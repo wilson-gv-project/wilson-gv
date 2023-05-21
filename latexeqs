@@ -1,0 +1,63 @@
+\subsection{Electrical anharmonicity}
+
+\begin{equation}
+    \begin{split}
+        \gamma^{[1,0]} = \frac{1}{24} \sum_{a,b} \frac{1}{\omega_{a} \omega_{b}} & \left[
+        \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial^{2} \mu_{\gamma} }{\partial Q_{a} \partial Q_{b} }\right)
+        \frac{1}{\omega_{a + b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        \right.
+        \\
+        & \left. {\color{red} +
+        \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial^{2} \alpha_{\alpha \delta} }{ \partial Q_{a} \partial Q_{b}}\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{b} }\right)
+        \frac{1}{\omega_{b, a}^{[-12]} \omega_{0, a}^{[-1]}} } \right]
+    \end{split}
+\end{equation}
+\subsection{Mechanical anharmonicity}
+
+\begin{equation}
+    \begin{split}
+        \gamma^{[0,1]} = \frac{-1}{48} \sum_{a,b,c} \frac{1}{\omega_{a} \omega_{b} \omega_{c}} & \left[
+        \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{c} }\right) F_{abc}
+        \frac{1}{\omega_{a + b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        \left[ \frac{1}{\omega_{a + b+ c, 0}^{} } + \frac{1}{\omega_{c, a+b}^{} } \right]
+        \right.
+        \\
+        &  {\color{red}  +
+        \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{c} }\right) F_{abc}
+        \frac{1}{\omega_{c, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        \left[ \frac{1}{\omega_{a + b, c}^{} } + \frac{1}{\omega_{b + c, a}^{} }  \right] }
+        \\ &  {\color{red}
+        + \frac{1}{2} \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{a} }\right) F_{bcc}
+        \frac{1}{\omega_{a + b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        {\color{blue} \left[ \frac{1}{\omega_{a, a + b}^{} } + \frac{1}{\omega_{b, 0}^{} } \right] } }
+        \\ &  {\color{red}
+        + \frac{1}{2} \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{b} }\right) F_{acc}
+        \frac{1}{\omega_{a + b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        {\color{blue}  \left[ \frac{1}{\omega_{b, a + b}^{} } + \frac{1}{\omega_{a, 0}^{} } \right] } }
+        \\ &  {\color{red}
+        - \frac{1}{2} \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{a} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{b} }\right) F_{bcc}
+        \frac{1}{\omega_{b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        {\color{blue} \left[ \frac{1}{\omega_{a, a + b}^{} } + \frac{1}{\omega_{b, 0}^{} } \right] } }
+        \\ & \left.  {\color{red}
+        - \frac{1}{2} \left( \frac{\partial \mu_{\beta} }{\partial Q_{a} }\right)
+        \left( \frac{\partial \alpha_{\alpha \delta} }{ \partial Q_{b} }\right)
+        \left( \frac{\partial \mu_{\gamma} }{\partial Q_{b} }\right) F_{acc}
+        \frac{1}{\omega_{b, a}^{[-12]} \omega_{0, a}^{[-1]}}
+        {\color{blue} \left[ \frac{1}{\omega_{b, a + b}^{} } + \frac{1}{\omega_{a, 0}^{} } \right] } }
+        \right]
+    \end{split}
+\end{equation}
