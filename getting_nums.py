@@ -25,7 +25,7 @@ hessianProp = props_list[-1]
 hessian_tensor = hessianProp.tensor
 
 import vib_analysis as va
-coordshere, chargeshere, masseshere = va.read_mol('./2dcalc_1805_1/MOLECULE.INP')
+coordshere, chargeshere, masseshere = va.read_mol('MOLECULE.INP')
 cut_w, cut_T, N_3, min_element, max_element = va.get_vib_harm_freqs_and_eigvecs(coordshere, chargeshere, masseshere, hessian_tensor,
                                                  outproj=True, print_level=1, harmonic_frequency_limits='Keep all')
 
@@ -50,6 +50,8 @@ mu_Q = np.einsum('ijk,iq->qjk', mu_Q1, cut_T)
 print(mu_Q.shape, tensor.shape)
 print(mu_Q)
 
+ff = orspReader.cart2normal(props_list[1], 'MOLECULE.INP', args.f)
+print(ff)
 
 import transform_nc_to_nm as trnsfM1
 old1 = trnsfM1.transform_cartesian_to_normal(tensor, (9, 9, 3), 2, 9, min_element, max_element, cut_T)

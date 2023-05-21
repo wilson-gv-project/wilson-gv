@@ -56,60 +56,39 @@ class rspProperty:
         # print('Tensor:')
         # print(self.tensor)
 
-    # find hessian tensor
-    def get_hessian(self, fname):
-        props, tensors = read_openrsp_tensor_file(fname)
-
-        for i, p in enumerate(props):
-            if p.operator == ['GEO', 'GEO']:
-                self.hasHessian = True
-                p.addTensor(tensors[i])
-                return p.tensor
-
-    # transform any tensor's GEO cartesian to normal
-    def cart2normal(self, fname_mol, fname_tens):
-
-        shape = self.tensor.shape
-
-        import vib_analysis as va
-        coordshere, chargeshere, masseshere = va.read_mol(fname_mol)
-        hessian_tensor = self.get_hessian(fname_tens)
-        cut_w, cut_T, N_3, min_el, max_el = va.get_vib_harm_freqs_and_eigvecs(coordshere, chargeshere, masseshere,
-                                                                              hessian_tensor,
-                                                                              outproj=True, print_level=0,
-                                                                              harmonic_frequency_limits='Keep all')
-        new_tensor = copy.deepcopy(self.tensor)
-
-        for indx, op in enumerate(self.operator):
-
-            if op == 'GEO':
-                einstr = str_einsum('ijkl', indx, len(shape))
-                new_tensor = np.einsum(einstr, new_tensor, cut_T)
-
-        return new_tensor
-
 
 # transform any tensor's GEO cartesian to normal
 def cart2normal(property, fname_mol, fname_tens):
+    shape = property.tensor.shape
 
-        shape = property.tensor.shape
+    import vib_analysis as va
+    coordshere, chargeshere, masseshere = va.read_mol(fname_mol)
+    hessian_tensor = get_hessian(fname_tens)
+    cut_w, cut_T, N_3, min_el, max_el = va.get_vib_harm_freqs_and_eigvecs(coordshere, chargeshere, masseshere,
+                                                                          hessian_tensor,
+                                                                          outproj=True, print_level=0,
+                                                                          harmonic_frequency_limits='Keep all')
+    new_tensor = copy.deepcopy(property.tensor)
 
-        import vib_analysis as va
-        coordshere, chargeshere, masseshere = va.read_mol(fname_mol)
-        hessian_tensor = property.get_hessian(fname_tens)
-        cut_w, cut_T, N_3, min_el, max_el = va.get_vib_harm_freqs_and_eigvecs(coordshere, chargeshere, masseshere,
-                                                                              hessian_tensor,
-                                                                              outproj=True, print_level=0,
-                                                                              harmonic_frequency_limits='Keep all')
-        new_tensor = copy.deepcopy(property.tensor)
+    for indx, op in enumerate(property.operator):
 
-        for indx, op in enumerate(property.operator):
+        if op == 'GEO':
+            einstr = str_einsum('ijkl', indx, len(shape))
+            new_tensor = np.einsum(einstr, new_tensor, cut_T)
 
-            if op == 'GEO':
-                einstr = str_einsum('ijkl', indx, len(shape))
-                new_tensor = np.einsum(einstr, new_tensor, cut_T)
+    return new_tensor
 
-        return new_tensor
+
+# find hessian tensor
+def get_hessian(fname):
+    props, tensors = read_openrsp_tensor_file(fname)
+
+    for i, p in enumerate(props):
+        # pops = [p.operator for p in props]
+        if p.operator == ['GEO', 'GEO']:
+            p.addTensor(tensors[i])
+            return p.tensor
+
 
 # Take the specification prop of a property and an index of the associated tensor
 # Generate all equivalent tensor indices based on perturbation equivalence symmetry
