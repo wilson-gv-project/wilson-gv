@@ -251,9 +251,6 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
             # f[1] - tuple ('a',)
             indx = tuple(abc[j] for j in f[1]) + abc_greek[i]
 
-            # print(f[0], data[f[0]][indx], indx)
-            # print(data, type(data[f[0]]))
-
             # f[0] - 'mu_Q'
             tot *= data[f[0]][indx]
         avrg += tot
