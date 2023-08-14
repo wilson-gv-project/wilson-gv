@@ -79,7 +79,7 @@ if test2:
     # set up frequencies for x and y axes: # todo 1 (starting point for rendering)
     w1, w2 = np.arange(0., 120, 1.), np.arange(0, 120, 1.)
 
-    # todo 3 + todo 2: should be coming from SpectroscPy
+    # todo 3 + todo 2: should be coming from SpectroscPy/VeloxChem
     funds = dict(zip(['0', '1', '2'], [20., 30., 50.]))
 
     # create class instance: initialize a 2dir spectrum instance
@@ -90,7 +90,7 @@ if test2:
     derivData = h.getDerivs(source='pyorsp')
     print(derivData) if printDerivs else None
 
-    # selection of terms by index in the complete list
+    # selection of terms by index in from complete lists (mechanical_terms, electric_terms)
     ee, mm = [0, 1], [0]
 
     # add mechanical and electrical anharmonicities terms and orientational averages (symbolic setup)
