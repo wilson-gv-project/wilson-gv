@@ -3,6 +3,13 @@ import numpy as np
 
 np.set_printoptions(linewidth=100000)
 
+# todo 1: numerical differentiation for missing orders
+# todo 2: harmonic frequencies - SpectroscPy or VeloxChem
+# todo 3: anharmonic corrections to frequencies (cubic, quartic) - SpectroscPy
+# todo 4: cartesian to normal mode basis transformation - SpectroscPy
+# todo 5: orientational averaging
+# todo 6: rendering
+
 """
 propsData - cart2norm transformed tensors
 avrgT - averaged tensor for alpha, beta, gamma, delta: float
@@ -55,13 +62,19 @@ class SpectrumEVV:
         self.combofuns = [dict(zip(self.electr_funs, self.electric_avrg)),
                           dict(zip(self.mech_funs, self.mechanical_avrg))]
 
-    # derivs from rsp_tensor file + MOLECULE.INP
-    def getDerivs(self, molfile=None, rspfile=None):
+        self.coords_ab = get_abc(2, len(self.fundamentals)) if electrical_terms is not None else []
+        self.coords_abc = get_abc(3, len(self.fundamentals)) if mechanical_terms is not None else []
 
-        if molfile is not None:
+    # derivs from rsp_tensor file + MOLECULE.INP # fixme: new way is to run PyOpenrsp
+    #  (mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc)
+    def getDerivs(self, source='files', molfile=None, rspfile=None):
 
-            import openrsp_tensor_reader as orspReader
+        import openrsp_tensor_reader as orspReader
+
+        if source == 'files' and molfile is not None:
+
             props_list, tens_list = orspReader.read_openrsp_tensor_file(rspfile)
+            print(props_list[0], props_list[0].hasTensor)
 
             for i in range(len(props_list)):
                 props_list[i].addTensor(tens_list[i])
@@ -69,13 +82,17 @@ class SpectrumEVV:
             # mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc
             transf_props_list = []
 
-            # cartesian basis to normal mode
+            # cartesian basis to normal mode  # todo 3 is here; after reading openrsp tensors
             for prop in props_list[:-1]:
-                transf = orspReader.cart2normal(prop, molfile, rspfile)
-                transf_props_list.append(transf)
+                trsfMatrix = orspReader.get_transfMat_Scpy(molfile, rspfile)
+                transformed = orspReader.cart2normal(prop, trsfMatrix)
+                transf_props_list.append(transformed)
 
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], transf_props_list))
-        else:
+
+        elif source == 'files' and molfile is None:
+            # FIXME : the simplest model data (verification of 2dir implementation)
+
             aa = len(self.fundamentals)
             data = [np.zeros(i) for i in [(aa,3), (aa,aa,3), (aa,3,3), (aa,aa,3,3), (aa,aa,aa)]]
 
@@ -90,6 +107,17 @@ class SpectrumEVV:
             data[-1].fill(1.)
 
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
+
+        elif source == 'pyorsp':
+            # run 2dir pyopenrsp calculation and get necessary tensors
+            import pyrsp_2dir
+            poprsp = []
+            # for i in pyrsp_2dir.props_list:
+            #     orspReader.rspProperty()
+            return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], pyrsp_2dir.props_list))
+
+        else:
+            print("Invalid combination of arguments for getDerivs method")
 
     # gamma all for normal modes (a, b, c)
     def gamma_mn(self, a, b, c=False, molfile=None, rspfile=None):
@@ -129,7 +157,8 @@ class SpectrumEVV:
             for mechfun, mechavrg in self.combofuns[1].items():
                 averg_mech1 = avrg_abc(mechavrg[:-1], data, [a, b, c], gammaCompsAll)
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
-                indx = tuple(abc[j] for j in mechavrg[-1])
+                # print('hiii', mechavrg)
+                indx = tuple([abc[j] for j in mechavrg[-1]])
                 # print(indx, mechavrg[-1], [a, b, c], 'F_abc', flush=True)
                 # print(data['F_abc'], flush=True)
                 F = data['F_abc'][indx]
@@ -153,9 +182,11 @@ class SpectrumEVV:
 
         return X, Y, Z
 
-    def plot2D(self, Qab, Qabc, figname, w1mw2=False, surface=False):
+    def plot2D(self, figname, w1mw2=False, surface=False):
         import matplotlib.pyplot as plt
         # from matplotlib import cm, ticker, colors
+
+        Qab, Qabc = self.coords_ab, self.coords_abc
 
         # PLOTTING
         if not surface:

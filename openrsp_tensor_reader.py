@@ -57,9 +57,7 @@ class rspProperty:
         # print(self.tensor)
 
 
-# transform any tensor's GEO cartesian to normal
-def cart2normal(property, fname_mol, fname_tens):
-    shape = property.tensor.shape
+def get_transfMat_Scpy(fname_mol, fname_tens):
 
     import vib_analysis as va
     coordshere, chargeshere, masseshere = va.read_mol(fname_mol)
@@ -68,13 +66,20 @@ def cart2normal(property, fname_mol, fname_tens):
                                                                           hessian_tensor,
                                                                           outproj=True, print_level=0,
                                                                           harmonic_frequency_limits='Keep all')
+    return cut_T
+
+
+# transform any tensor's GEO cartesian to normal
+def cart2normal(property, transfMatrix):
+    shape = property.tensor.shape # rspProperty (SpectroscPy class)
+
     new_tensor = copy.deepcopy(property.tensor)
 
     for indx, op in enumerate(property.operator):
 
         if op == 'GEO':
             einstr = str_einsum('ijkl', indx, len(shape))
-            new_tensor = np.einsum(einstr, new_tensor, cut_T)
+            new_tensor = np.einsum(einstr, new_tensor, transfMatrix)
 
     return new_tensor
 
