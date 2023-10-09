@@ -1,3 +1,9 @@
+######################################################################
+##                                                                  ##
+##    EXAMPLES OF USING openrsp_tensor_reader and vib_analysis      ##
+##                                                                  ##
+######################################################################
+
 import numpy as np
 
 import openrsp_tensor_reader as orspReader

@@ -9,6 +9,12 @@
 # The package is released under a LGPL licence.
 # For questions, please contact on karen.o.dundas@uit.no
 
+#######################################################################
+##                                                                   ##
+##    openrsp_tensor_reader for post-processing rsp_tensor file      ##
+##                                                                   ##
+#######################################################################
+
 import numpy as np
 import copy
 import itertools

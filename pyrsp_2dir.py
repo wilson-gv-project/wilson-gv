@@ -1,4 +1,9 @@
-# Testing framework for OpenRSP
+###########################################################
+##                                                       ##
+##    Properties for 2DIR calculated with PyOpenRSP      ##
+##                                                       ##
+###########################################################
+
 
 # PyOpenRSP imports
 import os
