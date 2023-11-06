@@ -441,26 +441,8 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
         return avrg / 15
 
 
-# t1el = lambda w, w1, w2, Gamma, a, b: \
-#     1 / (w[''.join(sorted(str(a) + str(b)))] - w[str(a)] + w1 - w2 - 1j * Gamma) / (
-#             0. - w[str(a)] + w1 - 1j * Gamma)
-#
-# t2el = lambda w, w1, w2, Gamma, a, b: \
-#     1 / (w[str(b)] - w[str(a)] + w1 - w2 - 1j * Gamma) / (0. - w[str(a)] + w1 - 1j * Gamma)
-#
-# t1mech = lambda w, w1, w2, Gamma, a, b, c: \
-#     1 / (w[''.join(sorted(str(a) + str(b)))] - w[str(a)] + w1 - w2 - 1j * Gamma) / (
-#             0. - w[str(a)] + w1 - 1j * Gamma) * \
-#     (1 / (w[''.join(sorted(str(a) + str(b) + str(c)))] - 0. + self.fermirm) \
-#      + 1 / (w[str(c)] - w[''.join(sorted(str(a) + str(b)))] + self.fermirm))
-#
-# t2mech = lambda w, w1, w2, Gamma, a, b, c: \
-#     1 / (w[str(c)] - w[str(a)] + w1 - w2 - 1j * Gamma) / (0. - w[str(a)] + w1 - 1j * Gamma) * \
-#     (1 / (w[''.join(sorted(str(a) + str(b)))] - w[str(c)] + self.fermirm) \
-#      + 1 / (w[''.join(sorted(str(a) + str(b)))] - w[str(a)] + self.fermirm))
-
 # function generator
-def w_mn_prod(subscripts, margin=10, fermi=None):
+def w_mn_prod(subscripts, fermi=None, margin=10):
     m1n1m2n2 = [i.split(',') for i in subscripts]
     print(m1n1m2n2)
     if fermi is not None:
