@@ -90,30 +90,11 @@ class SpectrumEVV:
     #  (mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc)
     def getDerivs(self, source='files', molfile=None, rspfile=None):
 
-        import openrsp_tensor_reader as orspReader
+
         if self.avrg_ones:
             return 'ones'
 
-        if source == 'files' and molfile is not None:
-
-            props_list, tens_list = orspReader.read_openrsp_tensor_file(rspfile)
-            # print(props_list[0], props_list[0].hasTensor)
-
-            for i in range(len(props_list)):
-                props_list[i].addTensor(tens_list[i])
-
-            # mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc
-            transf_props_list = []
-
-            # cartesian basis to normal mode  # todo 3 is here; after reading openrsp tensors
-            for prop in props_list[:-1]:
-                trsfMatrix = orspReader.get_transfMat_Scpy(molfile, rspfile)
-                transformed = orspReader.cart2normal(prop, trsfMatrix)
-                transf_props_list.append(transformed)
-
-            return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], transf_props_list))
-
-        elif source == 'files' and molfile is None:
+        if source == 'mock':
             # FIXME : the simplest model data (verification of 2dir implementation)
 
             aa = len(self.fundamentals)
@@ -135,22 +116,47 @@ class SpectrumEVV:
 
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
+        if source == 'openrsp' and molfile is not None and rspfile is not None:
+            import openrsp_tensor_reader as orspReader
+
+            props_list, tens_list = orspReader.read_openrsp_tensor_file(rspfile)
+            # print(props_list[0], props_list[0].hasTensor)
+
+            for i in range(len(props_list)):
+                props_list[i].addTensor(tens_list[i])
+
+            # mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc
+            transf_props_list = []
+
+            # cartesian basis to normal mode  # todo 3 is here; after reading openrsp tensors
+            for prop in props_list[:-1]:
+                trsfMatrix = orspReader.get_transfMat_Scpy(molfile, rspfile)
+                transformed = orspReader.cart2normal(prop, trsfMatrix)
+                transf_props_list.append(transformed)
+
+            return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], transf_props_list))
+
         elif source == 'pyorsp':
             # run 2dir pyopenrsp calculation and get necessary tensors
+
             import pyrsp_2dir
-            poprsp = []
-            # for i in pyrsp_2dir.props_list:
-            #     orspReader.rspProperty()
+
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], pyrsp_2dir.props_list))
 
+        elif source == 'cfour':
+            # TBA
+
+            return
+
         else:
-            print("Invalid combination of arguments for getDerivs method")
+            print("Invalid data source")
 
     # gamma all for normal modes (a, b, c)
     def gamma_mn(self, style, a, b, c=False, molfile=None, rspfile=None):
 
         # components lists for averaging: terms of the sum
         gammaCompsAll = getting_abcgreek4avrg(num_f=4)
+        print('gammaCompsAll', gammaCompsAll)
 
         # getting derivs
         data = self.getDerivs(molfile=molfile, rspfile=rspfile)
@@ -420,9 +426,12 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
         return 1.
     else:
         for gammaComps in gammaCompsAll:
+        # fixme: for loop can be optimized?
 
             alpha, beta, gamma, delta = gammaComps
             abc = dict(zip(['a', 'b', 'c'], normalModes))
+
+            # this is indexing for "formula" that has 3 elements, therefore 0, 1, 2
             abc_greek = {0: (beta,), 1: (alpha, delta,), 2: (gamma,)}
 
             tot = 1.
@@ -431,10 +440,12 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
             # f - tuple ('mu_Q', ('a',))
             for i, f in enumerate(formula):
                 # index for tensor component
-                # f[1] - tuple ('a',)
+
+                # f[1] - normal modes - tuple ('a',),
+                # abc dict is made from the input normalModes, e.g. [a, b] where a and b are indices of normal modes
                 indx = tuple(abc[j] for j in f[1]) + abc_greek[i]
 
-                # f[0] - 'mu_Q'
+                # f[0] - property name - 'mu_Q'
                 tot *= data[f[0]][indx]
             avrg += tot
 
