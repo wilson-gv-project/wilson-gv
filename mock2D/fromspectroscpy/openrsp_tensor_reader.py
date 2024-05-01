@@ -89,6 +89,10 @@ def cart2normal(property, transfMatrix):
 
     return new_tensor
 
+def str_einsum(origstr, same_ind, lenshape):
+    origstr = origstr[:lenshape]
+    neworigstr = origstr[:same_ind] + 'q' + origstr[same_ind + 1:]
+    return origstr + f',{origstr[same_ind]}q->' + neworigstr
 
 # find hessian tensor
 def get_hessian(fname):
@@ -339,7 +343,4 @@ def read_openrsp_tensor_file(fname):
     return rsp_redundant_properties, rsp_tensors
 
 
-def str_einsum(origstr, same_ind, lenshape):
-    origstr = origstr[:lenshape]
-    neworigstr = origstr[:same_ind] + 'q' + origstr[same_ind + 1:]
-    return origstr + f',{origstr[same_ind]}q->' + neworigstr
+

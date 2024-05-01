@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-# import sys
-# sys.path.append('../scriptsHPC/utils')
-# import parseCFOUR as pc4
 
-import clean2DIRmain as dd_ir
+import src.spectrum.c2DIRmain as dd_ir
 
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=10)
@@ -22,10 +19,10 @@ y =  omega2 if not w1mw2 else omega2-omega1
 # meshgrid for spectrum
 x_mesh, y_mesh =  np.meshgrid(omega1, y)
 
-cfourdatafiles = {'vibdata': '../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/vibdata.pkl',
-                  'cubic': '../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/cubic.pkl',
-                  'dipole': '../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/dipolexyz.pkl',
-                  'polar': '../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/polders.pkl'
+cfourdatafiles = {'vibdata': '../../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/vibdata.pkl',
+                  'cubic': '../../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/cubic.pkl',
+                  'dipole': '../../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/dipolexyz.pkl',
+                  'polar': '../../scriptsHPC/data/hf_anharm_nodropmo_fdprojon_pkl/polders.pkl'
                   }
 
 # cfourdatafiles = {'out': '../scriptsHPC/data/anharm_hf_out',
@@ -152,10 +149,13 @@ def printT(tensor):
     else:
         print(f"Dimension of the property in not 2, 3 or 4, it's {ndims}")
 
-# for d in ders:
-#     print(d, ders[d].shape)#, '\n', ders[d])
-#     printT(ders[d])
-#     print('==================================\n')
+def printed2DIRtensors():
+    for d in ders:
+        print(d, ders[d].shape)#, '\n', ders[d])
+        printT(ders[d])
+        print('==================================\n')
+
+quit()
 
 ee, mm = [0, 1], [0, 1, 2, 3, 4, 5]
 

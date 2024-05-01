@@ -130,7 +130,7 @@ class SpectrumEVV:
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
         if source['source'] == 'openrsp':
-            from fromspectroscpy import openrsp_tensor_reader as orspReader
+            from mock2D.fromspectroscpy import openrsp_tensor_reader as orspReader
             molfile = source['molfile']
             rspfile = source['rspfile']
 
@@ -271,7 +271,7 @@ class SpectrumEVV:
             #         cubicmat[p] = e[3]
             cubicpickle = '../scriptsHPC/cfourscripts/cubicarray.pkl'
             picklefilevib = '../scriptsHPC/cfourscripts/vibdata.pkl'
-            from src.testmain_realdata import cubicpost
+            from mock2D.testmain_realdata import cubicpost
             cubicmat = cubicpost(picklefilevib, cubicpickle)
             data.append(cubicmat)
 
@@ -1327,7 +1327,7 @@ def get_abc(nloops, abcrange):
 
 # num_f = 4 -four-wave mixing
 def getting_abcgreek4avrg(num_f):
-    from src.macroscopic import macroscopics
+    from mock2D.macroscopic import macroscopics
     pol_g = macroscopics.get_iso_f(num_f)
     new = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
 

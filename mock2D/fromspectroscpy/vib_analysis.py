@@ -30,7 +30,7 @@ import numpy as np
 import copy
 import re
 from math import acos, pi
-from parameters import one_twelfth_carbon, electron_mass, hbar
+from mock2D.fromspectroscpy.parameters import one_twelfth_carbon, electron_mass, hbar
 
 # Take coordinates and determine if molecule is linear; return 1 if linear or 0 if not
 # Coordinates given as nested list - first atoms and then Cartesian coordinates

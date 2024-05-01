@@ -8,10 +8,7 @@
 import numpy as np
 np.set_printoptions(linewidth=100000)
 
-import sys
-sys.path.append('../../../scriptsHPC/utils')
-
-import callbacks2DIR as cb
+from .callbacks2DIR import CFOURdata, VeloxChemdata, LSDaltondata
 
 # todo 1: numerical differentiation for missing orders
 # todo 2: harmonic frequencies - SpectroscPy or VeloxChem
@@ -79,7 +76,7 @@ class SpectrumEVV:
         self.shape2d = self.w1_mesh.shape
         self.data = data
 
-        cfuncs = {'cfour': cb.CFOURdata(data), 'vlx': cb.VeloxChemdata(data)}
+        cfuncs = {'cfour': CFOURdata(data), 'vlx': VeloxChemdata(data), 'openrsp': LSDaltondata(data)}
         self.callbacks = cfuncs[data['source']]
 
         # dictionary; keys from 0 to (3Natoms-6)
@@ -140,26 +137,25 @@ class SpectrumEVV:
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
         if self.data['source'] == 'openrsp':
-            from fromspectroscpy import openrsp_tensor_reader as orspReader
-            molfile = source['molfile']
-            rspfile = source['rspfile']
 
-            props_list, tens_list = orspReader.read_openrsp_tensor_file(rspfile)
+            self.callbacks.getTensors()
+            # here transformation from cart to nm basis is happening
+            self.callbacks.tensors2NMbasis()
+            prOperators = dict(zip([tuple(['GEO', 'EL']), tuple(['GEO', 'GEO', 'EL']),
+                                     tuple(['GEO', 'EL', 'EL']), tuple(['GEO', 'GEO', 'EL', 'EL']),
+                                     tuple(['GEO', 'GEO', 'GEO'])],
+                                   ['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc']))
+            # quit()
             # print(props_list[0], props_list[0].hasTensor)
 
-            for i in range(len(props_list)):
-                props_list[i].addTensor(tens_list[i])
+            finaldict = {}
+            for pt in self.callbacks.props:
+                ops = pt.operator
+                finaldict[prOperators[tuple(ops)]] = pt.tensor
 
             # mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc
-            transf_props_list = []
 
-            # cartesian basis to normal mode  # todo 3 is here; after reading openrsp tensors
-            for prop in props_list[:-1]:
-                trsfMatrix = orspReader.get_transfMat_Scpy(molfile, rspfile)
-                transformed = orspReader.cart2normal(prop, trsfMatrix)
-                transf_props_list.append(transformed)
-
-            return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], transf_props_list))
+            return finaldict
 
         elif self.data['source'] == 'pyorsp':
             # run 2dir pyopenrsp calculation and get necessary tensors
@@ -848,3 +844,124 @@ def makehtml(name, fig):
     # Save the HTML content to a file
     with open(name, 'w') as f:
         f.write(html_content)
+
+def printT(tensor):
+    import pandas as pd
+    pd.set_option('display.float_format', '{:.10f}'.format)
+
+    ndims = len(tensor.shape)
+
+    # mu_Q
+    if ndims == 2:
+        column_names = ['x', 'y', 'z']
+        row_names    = [f'{i}' for i in range(tensor.shape[0])]
+        df = pd.DataFrame(tensor, columns=column_names)#, index=row_names)
+        df.insert(0, "I", row_names, allow_duplicates=True)
+        df.insert(1, "", ['|']*len(row_names), allow_duplicates=True)
+
+        # print(df)
+        print(df.to_string(index=False))
+
+    elif ndims == 3:
+        # F_abc
+        if tensor.shape[0] == tensor.shape[1] == tensor.shape[2]:
+            row_names = [f'K {i}' for i in range(tensor.shape[0])]
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)#, index=row_names)
+            df.insert(0, "I", ['0']*len(row_names), allow_duplicates=True)
+            df.insert(1, "J", indx, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)#, index=row_names)
+                dfi.insert(0, "I", [f'{ii+1}']*len(row_names), allow_duplicates=True)
+                dfi.insert(1, "J", indx, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+        # mu_QQ
+        elif tensor.shape[0] == tensor.shape[1] != tensor.shape[2]:
+            row_names = ['x', 'y', 'z']
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
+            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
+            df.insert(1, "J", indx, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
+                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
+                dfi.insert(1, "J", indx, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+        # alpha_Q
+        elif tensor.shape[0] != tensor.shape[1] == tensor.shape[2]:
+            row_names = ['x', 'y', 'z']
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
+            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
+            df.insert(1, "", row_names, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
+                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
+                dfi.insert(1, "", row_names, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+    # alpha_QQ
+    elif ndims == 4:
+        listdf = []
+        for i in range(tensor.shape[0]):
+            for j in range(tensor.shape[0]):
+                row_names = ['x', 'y', 'z']
+                df = pd.DataFrame(tensor[i, j], columns=row_names)  # , index=row_names)
+                df.insert(0, "I", [f'{i}'] * 3, allow_duplicates=True)
+                df.insert(1, "J", [f'{j}'] * 3, allow_duplicates=True)
+                df.insert(2, "", row_names, allow_duplicates=True)
+                df.insert(3, "", ['|'] * 3, allow_duplicates=True)
+
+                listdf.append(df)
+
+        dfs = pd.concat(listdf, ignore_index=True)
+        n = tensor.shape[2]  # chunk row size
+        list_df = [dfs[i:i + n] for i in range(0, dfs.shape[0], n)]
+
+        for dframe in list_df:
+            print(dframe.to_string(index=False))
+
+    else:
+        print(f"Dimension of the property in not 2, 3 or 4, it's {ndims}")
+
+def printed2DIRtensors(setup: SpectrumEVV):
+    ders = setup.getDerivs()
+    print('Fundamental frequencies:', list(setup.fundamentals.values()), '\n')
+    # for k in setup.fundamentals:
+    #     print()
+    for d in ders:
+        print(d, ders[d].shape)#, '\n', ders[d])
+        printT(ders[d])
+        print('=========================================================\n')
