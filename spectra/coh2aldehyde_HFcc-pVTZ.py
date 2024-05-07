@@ -34,27 +34,31 @@ cfourdatafiles = {'vibdata': '../../scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/vibda
 #                   'dipolem': '../scriptsHPC/data/anharm_hf_dipole',
 #                   'polar': ''
 #                   }
+dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
 
 # spectrum is computing intensities on the grid of 2 frequencies
-# setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'cfour',
-#                                                 'type': 'pkl',
-#                                                 'files':cfourdatafiles})
-#
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'cfour',
+                                                'type': 'pkl',
+                                                'files':cfourdatafiles})
+
 # ders = setup.getDerivs()
-#
-# c2DIRmain.printed2DIRtensors(setup)
+
+print(setup.data, '\n')
+c2DIRmain.printed2DIRtensors(setup)
 
 
 lsdaltondatafiles = {'rsp_tensor': '/home/vlew/REF/HFcc-pVTZ/rsp_tensor',
                      'moleculeinp': '/home/vlew/REF/HFcc-pVTZ/MOLECULE.INP',
                      'rsp_tensor_hessian': '/home/vlew/REF/HFcc-pVTZ/rsp_tensor'
                      }
+dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
+# dimlessFile = None
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'openrsp',
-                                                    'type': 'lsd',
-                                                    'files': lsdaltondatafiles})
+setup2 = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'openrsp',
+                                                     'type': 'lsd',
+                                                     'files': lsdaltondatafiles, 'dimensionless': dimlessFile})
+# ders = setup.getDerivs()
 
-ders = setup.getDerivs()
-
-c2DIRmain.printed2DIRtensors(setup)
+# print(setup2.data, '\n')
+# c2DIRmain.printed2DIRtensors(setup2)

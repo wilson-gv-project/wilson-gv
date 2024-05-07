@@ -139,8 +139,15 @@ class SpectrumEVV:
         if self.data['source'] == 'openrsp':
 
             self.callbacks.getTensors()
+
             # here transformation from cart to nm basis is happening
-            self.callbacks.tensors2NMbasis()
+            dimlessFile = self.data['dimensionless']
+            if dimlessFile is None:
+                print('>>>>>   Using non-dimensionless normal coordinates')
+            else:
+                print('>>>>>   Using dimensionless normal coordinates')
+
+            self.callbacks.tensors2NMbasis(dimlessFile)
             prOperators = dict(zip([tuple(['GEO', 'EL']), tuple(['GEO', 'GEO', 'EL']),
                                      tuple(['GEO', 'EL', 'EL']), tuple(['GEO', 'GEO', 'EL', 'EL']),
                                      tuple(['GEO', 'GEO', 'GEO'])],
@@ -160,7 +167,7 @@ class SpectrumEVV:
         elif self.data['source'] == 'pyorsp':
             # run 2dir pyopenrsp calculation and get necessary tensors
 
-            from frompyopenrsp import pyrsp_2dir
+            from mock2D.frompyopenrsp import pyrsp_2dir
 
             return dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], pyrsp_2dir.props_list))
 
@@ -958,7 +965,7 @@ def printT(tensor):
 
 def printed2DIRtensors(setup: SpectrumEVV):
     ders = setup.getDerivs()
-    print('Fundamental frequencies:', list(setup.fundamentals.values()), '\n')
+    print('\nFundamental frequencies:', list(setup.fundamentals.values()), '\n')
     # for k in setup.fundamentals:
     #     print()
     for d in ders:

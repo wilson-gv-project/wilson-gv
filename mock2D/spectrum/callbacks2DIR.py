@@ -93,6 +93,24 @@ class CFOURdata:
 
         return cubicFC
 
+def getDimensionlessNM(datafile: str = None) -> dict:
+    """
+    Reduced (dimensionless) normal coordinates
+    Return: a transformation matrix with dimensionless normal coordinates
+    """
+
+    if datafile[-3:] == 'pkl':
+        import pickle
+        with open(datafile, 'rb') as file:
+            # first 3 columns are the normal mode indices, the last column holds the derivatives
+            undisplaced_matrix, dimless, freqs = pickle.load(file)
+        return dimless
+
+    else:
+        undisplaced_matrix, freqs, dimless  = parseCFOUR.pQUADRATURE(datafile)
+        # print(dimless)
+        return dimless
+
 class VeloxChemdata:
 
     def __init__(self, data: dict[str:[str, dict]]):
@@ -110,6 +128,7 @@ class LSDaltondata:
 
     def getTensors(self):
         """
+        Adding tensors to self.props
             hessianProp = props_list[-1]
             hessian_tensor = hessianProp.tensor
         :return:
@@ -117,16 +136,23 @@ class LSDaltondata:
         from mock2D.fromspectroscpy import openrsp_tensor_reader
 
         props_list, tens_list = openrsp_tensor_reader.read_openrsp_tensor_file(self.files['rsp_tensor'])
-        print(f'There are {len(props_list)} in this rsp_tensor file')
+        # print(f'There are {len(props_list)} in this rsp_tensor file')
 
         for i in range(len(props_list)):
-            props_list[i].addTensor(tens_list[i])
+            if props_list[i].operator == ['GEO', 'GEO', 'GEO']:
+                # print('LDALTON CFF')
+                # np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+                # print(repr(tens_list[i]))
+                # make in cm-1 for comparison with CFOUR
+                props_list[i].addTensor(tens_list[i])
+            else:
+                props_list[i].addTensor(tens_list[i])
             # props_list[i].tellProp()
 
         self.props = props_list[:-1]
         # print('\nType self.props is', type(self.props), '\n')
-        for kk in self.props:
-            print(repr(kk.tensor))
+        # for kk in self.props:
+        #     print(repr(kk.tensor))
 
         return props_list
 
@@ -164,8 +190,8 @@ class LSDaltondata:
         eigenvalues = eigenvalues[:-6]
         mass_weighted_eigenvectors = mass_weighted_eigenvectors[:, :-6]
         eigenvalues = jonas.hartree_amu_bohr_2_wavenumbers(eigenvalues)
-        print('#####################_________')
-        print(mass_weighted_eigenvectors)
+        # print('#####################_________')
+        # print(mass_weighted_eigenvectors)
 
         sqrtmmm = np.repeat(np.sqrt(np.array(masseshere)), 3)
         sqrtmmminv = np.divide(1.0, sqrtmmm)
@@ -173,34 +199,34 @@ class LSDaltondata:
         sqrtmmminv_reshaped = sqrtmmminv[:, np.newaxis]
         # Now you can multiply the 2D array by the reshaped 1D array
         mass_weighted_eigenvectors = mass_weighted_eigenvectors * sqrtmmminv_reshaped
-        print('#####################_________')
-        print(mass_weighted_eigenvectors)
-
-        # this is not necessary
         # print('#####################_________')
-        # reduced_mass_u = np.divide(1.0, np.linalg.norm(mass_weighted_eigenvectors, axis=0) ** 2)
-        # xL = np.sqrt(reduced_mass_u) * mass_weighted_eigenvectors
-        # print(xL)
-        # quit()
-        # print(np.flip(eigenvalues, 0))
-        # print(np.flip(mass_weighted_eigenvectors, 1))
+        # print(mass_weighted_eigenvectors)
 
         return np.flip(eigenvalues, 0), np.flip(mass_weighted_eigenvectors, 1)
         # return np.flip(eigenvalues, 0), np.flip(xL, 1)
 
-    def tensors2NMbasis(self) -> None:
-        """"""
-        eigenvalues, mass_weighted_eigenvectors = self.vibrational_analysis()
+    def tensors2NMbasis(self, dimlessFile: str = None) -> None:
+        """
 
-        # newprops = []
-        # import copy
+        :param dimlessFile:
+        :return:
+        """
+        if dimlessFile is None:
+            eigenvalues, mass_weighted_eigenvectors = self.vibrational_analysis()
+            # print(mass_weighted_eigenvectors, mass_weighted_eigenvectors.shape)
+        else:
+            # a dictionary is returned
+            rr = getDimensionlessNM(dimlessFile)
+            # print(rr)
+            mass_weighted_eigenvectors = np.concatenate([i.reshape(-1, 1) for i in rr.values()], axis=1)
+            # print(mass_weighted_eigenvectors, mass_weighted_eigenvectors.shape)
+
 
         for p in self.props:
             # if p.operator == ['EL', 'GEO'] or p.operator == ['GEO', 'EL']:
             # if p.operator == ['GEO', 'GEO', 'EL']:
             self.cart2normal(p, mass_weighted_eigenvectors)
 
-        # self.props = newprops
 
     # transform any tensor's GEO cartesian to normal
     def cart2normal(self, property, transfMatrix):
