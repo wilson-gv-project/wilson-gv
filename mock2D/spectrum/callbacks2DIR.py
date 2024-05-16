@@ -1,5 +1,8 @@
 from scriptsHPC.utils import parseCFOUR
+from scriptsHPC.utils import parseGaussian
+
 import numpy as np
+np.set_printoptions(linewidth=250, suppress=False, precision=12)
 
 class CFOURdata:
 
@@ -78,7 +81,9 @@ class CFOURdata:
         Return: np.ndarray - shape(NM, NM, NM)
         """
         if self.sourcetype == 'out':
-            cff = parseCFOUR.getCubicPost(self.files['out'], self.files['cubic'])
+            cubic = parseCFOUR.pCubicORQuartic(self.files['cubic'])
+            freq = self.getFundamentals()
+            cff = parseCFOUR.getCubicPost(freq, cubic)
             return cff
 
         elif self.sourcetype == 'pkl':
@@ -88,10 +93,15 @@ class CFOURdata:
                 # first 3 columns are the normal mode indices, the last column holds the derivatives
                 cff = pickle.load(file)
 
-        freq = self.getFundamentals()
-        cubicFC = parseCFOUR.getCubicPost(freq, cff)
+            freq = self.getFundamentals()
+            cubicFC = parseCFOUR.getCubicPost(freq, cff)
 
-        return cubicFC
+            return cubicFC
+
+def str_einsum(origstr, same_ind, lenshape):
+    origstr = origstr[:lenshape]
+    neworigstr = origstr[:same_ind] + 'q' + origstr[same_ind + 1:]
+    return origstr + f',{origstr[same_ind]}q->' + neworigstr
 
 def getDimensionlessNM(datafile: str = None) -> dict:
     """
@@ -110,6 +120,35 @@ def getDimensionlessNM(datafile: str = None) -> dict:
         undisplaced_matrix, freqs, dimless  = parseCFOUR.pQUADRATURE(datafile)
         # print(dimless)
         return dimless
+
+def cart2normalGen(tensor, transfMatrix, geoDims):
+
+    import copy
+    new_tensor = copy.deepcopy(tensor)
+    sh = new_tensor.shape
+
+    for d in geoDims:
+        einstr = str_einsum('ijkl', d, len(sh))
+        print(einstr)
+        new_tensor = np.einsum(einstr, new_tensor, transfMatrix)
+
+    return new_tensor
+def tensors2dimlessNMbasis(prop, geoDims, dimlessFile: str = None) -> np.ndarray:
+    """
+
+    :param dimlessFile:
+    :return:
+    """
+    # a dictionary is returned
+    rr = getDimensionlessNM(dimlessFile)
+    # print(rr)
+    mass_weighted_eigenvectors = np.concatenate([i.reshape(-1, 1) for i in rr.values()], axis=1)
+    # print(mass_weighted_eigenvectors, mass_weighted_eigenvectors.shape)
+
+    transformed = cart2normalGen(prop, mass_weighted_eigenvectors, geoDims)
+
+    return transformed
+
 
 class VeloxChemdata:
 
@@ -239,17 +278,12 @@ class LSDaltondata:
         for indx, op in enumerate(property.operator):
 
             if op == 'GEO':
-                einstr = self.str_einsum('ijkl', indx, len(shape))
+                einstr = str_einsum('ijkl', indx, len(shape))
                 # print(einstr)
                 new_tensor = np.einsum(einstr, new_tensor, transfMatrix)
 
         property.tensor = new_tensor
         return new_tensor
-
-    def str_einsum(self, origstr, same_ind, lenshape):
-        origstr = origstr[:lenshape]
-        neworigstr = origstr[:same_ind] + 'q' + origstr[same_ind + 1:]
-        return origstr + f',{origstr[same_ind]}q->' + neworigstr
 
     def getFundamentals(self) -> dict[int:float]:
         """
@@ -273,7 +307,30 @@ class LSDaltondata:
         return Delta
 
 
+class GaussianData:
 
+    def __init__(self, data: dict[str:[str, dict]]):
+        self.sourcetype = data['type']
+        self.files = data['files']
+
+    def getDipDersCart(self):
+
+        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        dipderCart = fchk_parser.dipolederiv()
+        return dipderCart
+
+
+    def getPolarDersCart(self):
+        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        polder = fchk_parser.polarderiv()
+        return polder
+
+    def get_hessian_tensor(self):
+        if self.sourcetype == 'fchk':
+            fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+            hessian = fchk_parser.hessian()
+
+            return hessian
 
 from abc import ABC, abstractmethod
 from typing import Callable, Iterator, Union, Optional, Any
