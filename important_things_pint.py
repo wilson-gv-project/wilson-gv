@@ -120,9 +120,14 @@ print('hbaroveromega:              ', hbaroveromega)
 
 print('\n---------------------------------------------------------------------')
 
-from scipy import constants
 hartree2J = constants.physical_constants['hartree-joule relationship'][0]
 
 t = 100 * constants.h * constants.c / hartree2J
 print('conversion factor rcm_rs from cm^-1 to s^-1:  ', t)
 print('1/rcm_rs', 1/t)
+
+print('\n---------------------------------------------------------------------')
+amc_au = constants.physical_constants['atomic mass constant'][0]/constants.physical_constants['atomic unit of mass'][0]
+print("amc_au = constants.physical_constants['atomic mass constant'][0]/constants.physical_constants['atomic unit of mass'][0]")
+print(amc_au)
+print(np.sqrt(amc_au))

@@ -48,9 +48,8 @@ print(ders.keys(), '\n')
 
 print(ders['alpha_Q'])
 from scipy import constants
-# print(constants.physical_constants['atomic unit of mass'][0])
-# print(constants.physical_constants['atomic mass constant'][0])
 amc_au = constants.physical_constants['atomic mass constant'][0]/constants.physical_constants['atomic unit of mass'][0]
+print("amc_au = constants.physical_constants['atomic mass constant'][0]/constants.physical_constants['atomic unit of mass'][0]")
 print(amc_au)
 print(np.sqrt(amc_au))
 # quit()

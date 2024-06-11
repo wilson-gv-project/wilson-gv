@@ -32,13 +32,8 @@ g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2
 
 from scriptsHPC.utils import parseGaussian
 qq = parseGaussian.parse_frequencies(g16files['3quanta'])
-# print(qq)
-# for i in qq:
-#     print(qq[i])
 
 print('\n-----------------------------------\n')
-
-# quit()
 
 dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
 
@@ -47,22 +42,14 @@ setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 
-print(setup.all_states)
-print(setup.all_states[('0', '0', '0')])
-# quit()
+# print(setup.all_states)
 
 # collect derivatives
 ders = setup.getDerivs()
-# print(setup.fundamentals)
-# print(setup.fundamentals_harmonic)
 
-# quit()
-
-# print(setup.all_states)
 # add mechanical and electrical anharmonicities terms and orientational averages (symbolic setup)
 setup.addTerms(None, None, None, None)
 
-# print(setup.electric_avrg, '\n')
 print(setup.data, '\n')
 
 # print derivatives
@@ -73,24 +60,16 @@ gcmrec = 10.
 gamma = c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec)
 print(c2DIRmain.rec_cm2hartree_amu_bohr_2(1660.), 1660)
 print(c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec), gcmrec)
-# quit()
 
 import time
 start_time = time.time()
-Z, savedict = setup.intensity(gamma, {})
+Z, savedict = setup.intensity(gamma, {}, el=False, mech=True, printdata=False)
 end_time = time.time()
 execution_time = end_time - start_time
 print(f"Execution time - setup.intensity: {execution_time} seconds")
 
-
-percent = 0.0
-# f1 = setup.plot2Dplotly(Z, w1mw2, gamma, percent, step)
-# c2DIRmain.makeHTML([f1], w1mw2, step, percent)
-
-# setup.plot2Dmatplotlib(Z, w1mw2)
-# setup.plt_matshow(Z, w1mw2)
-# setup.plt_matshow_Skewed(Z, w1mw2, skew_factor=6, Gamma=gamma)
+# percent = 0.0
 
 figfilename = f'./hcoh_HFcc_pVDZ_Gaussian_Gamma{gamma}_({start1}_{stop1-step1}_{step1})({start2}_{stop2-step2}_{step2}).svg'
 
-setup.plot2Dmatplotlib(Z, w1mw2, figfilename)
+setup.plot2Dmatplotlib(Z, w1mw2, figfilename, dpi=100, contour_levels=100)

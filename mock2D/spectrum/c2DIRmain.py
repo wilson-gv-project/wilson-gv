@@ -245,24 +245,23 @@ class SpectrumEVV:
             return allpropsdict
 
         elif self.data['source'] == 'gaussian':
+            from scipy import constants
+            # to go from amu to au mass unit (m_e)
+            amc_au = constants.physical_constants['atomic mass constant'][0] / \
+                     constants.physical_constants['atomic unit of mass'][0]
+
             # data is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
             firstder, secder = self.callbacks.getDipDers()
-            # print('firstder, secder', firstder.shape, secder.shape)
-            # print('\nfirstder', firstder)
-            # print('\nsecder', secder)
-            data = [firstder, secder]
+            data = [firstder * np.sqrt(amc_au), secder * amc_au]
 
             polder = self.callbacks.getPolarDers()
-            data.append(polder[0])
-            data.append(polder[1])
-            # print('polder1, polder2', polder[0].shape, polder[1].shape)
+            data.append(polder[0] * np.sqrt(amc_au))
+            data.append(polder[1] * amc_au)
 
             cubicmat = self.callbacks.getCFF()
-            data.append(cubicmat)
-            # print('cubicmat', cubicmat.shape)
+            data.append(cubicmat * amc_au**1.5)
 
             allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
-            # print('jk')
 
             return allpropsdict
 
@@ -272,7 +271,6 @@ class SpectrumEVV:
     def gamma_mn(self, Gamma, a, b, c=False):
         # components lists for averaging: terms of the sum
         gammaCompsAll = getting_abcgreek4avrg(num_f=4)
-
         shape = self.shape2d
 
         # if 'c' is not provided, compute electrical anharmonicity
@@ -286,7 +284,6 @@ class SpectrumEVV:
             for el_func, elavrg in self.combofuns[0].items():
                 # average for given (a, b) for a given term
                 averg_el1 = avrg_abc(elavrg, self.deriv_data, [a, b], gammaCompsAll)
-
                 total_sum_el += prefac_el * averg_el1 * el_func(self.all_states, self.w1_mesh, self.w2_mesh,
                                                                 Gamma, (a, b))
 
@@ -306,110 +303,101 @@ class SpectrumEVV:
                 indx = tuple([abc[j] for j in mechavrg[-1]])
 
                 F = self.deriv_data['F_abc'][indx]
-
                 total_sum_mech += prefac_mech * averg_mech1 * F * mech_func(self.all_states,
                                                                             self.w1_mesh, self.w2_mesh, Gamma,
                                                                             (a, b, c))
 
             return -total_sum_mech / 48.
 
-    def intensity(self, Gamma, savedict):
+    def intensity(self, Gamma, savedict, el=True, mech=True, printdata=False):
 
         Qab, Qabc = self.coords_ab, self.coords_abc
-        
+
         Z = 0
         Qab_contrib_dict = {}
         Qabc_contrib_dict = {}
 
-        start_time = time.time()
-        elall = np.zeros(self.shape2d, dtype='complex128')
-        for i in Qab:
-            contrib_ab = self.gamma_mn(Gamma, i[0], i[1])
-            Qab_contrib_dict[tuple(i)] = contrib_ab
-            elall += contrib_ab
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Execution time - electrical: {execution_time} seconds")
+        if el:
+            start_time = time.time()
+            elall = np.zeros(self.shape2d, dtype='complex128')
+            for i in Qab:
+                contrib_ab = self.gamma_mn(Gamma, i[0], i[1])
+                Qab_contrib_dict[tuple(i)] = contrib_ab
+                elall += contrib_ab
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"Execution time - electrical: {execution_time} seconds")
+            print('Electrical anharmonicities are calculated')
+            Z += elall
 
-        print('Electrical anharmonicities are calculated')
+        if mech:
+            start_time = time.time()
+            mechall = np.zeros(self.shape2d, dtype='complex128')
+            for i in Qabc:
+                contrib_abc = self.gamma_mn(Gamma, i[0], i[1], i[2])
+                Qabc_contrib_dict[tuple(i)] = contrib_abc
+                mechall += contrib_abc
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"Execution time - mechanical: {execution_time} seconds")
+            print('Mechanical anharmonicities are calculated')
+            Z += mechall
 
-        # start_time = time.time()
-        # mechall = np.zeros(self.shape2d, dtype='complex128')
-        # for i in Qabc:
-        #     contrib_abc = self.gamma_mn(Gamma, i[0], i[1], i[2])
-        #     Qabc_contrib_dict[tuple(i)] = contrib_abc
-        #     mechall += contrib_abc
-        # end_time = time.time()
-        # execution_time = end_time - start_time
-        # print(f"Execution time - mechanical: {execution_time} seconds")
-        #
-        # print('Mechanical anharmonicities are calculated')
+        if printdata:
+            np.set_printoptions(linewidth=250, suppress=True, precision=10)
+            np.set_printoptions(threshold=np.inf)
 
-        # Z += mechall+elall
-        Z += elall
-        np.set_printoptions(linewidth=250, suppress=True, precision=10)
-        np.set_printoptions(threshold=np.inf)
+            import sys
+            import io
+            output = io.StringIO()
+            sys.stdout = output
+            print("\nGrid:")
 
-        import sys
-        import io
-        # Use StringIO to capture the print output
-        output = io.StringIO()
-        sys.stdout = output
-        # Print the array (output goes to StringIO)
-        print("\nGrid:")
-        # print(self.w1_mesh)
-        # print(self.w2_mesh)
-        array_3d = np.array([self.w1_mesh,self.w2_mesh]).T
-        # print(array_3d)
-        print(array_3d.shape)
-        alist = [np.array2string(i).splitlines() for i in array_3d]
-        print('\n'.join(['\t'.join(k) for k in zip(*alist)]))
-        np.set_printoptions(linewidth=250, suppress=False, precision=10)
+            array_3d = np.array([self.w1_mesh,self.w2_mesh]).T
+            print(array_3d.shape)
+            alist = [np.array2string(i).splitlines() for i in array_3d]
+            print('\n'.join(['\t'.join(k) for k in zip(*alist)]))
+            np.set_printoptions(linewidth=250, suppress=False, precision=10)
 
-        # print("\nMechanical  :")
-        # print(mechall)
-        print("\nElectrical  :")
-        print(elall)
+            print("\nMechanical  :") if mech else None
+            print(mechall) if mech else None
+            print("\nElectrical  :") if el else None
+            print(elall) if el else None
 
-        # print("\nMechanical np.log10(mechall) :")
-        # print(np.log10(mechall))
-        print("\nElectrical np.log10(elall)   :")
-        print(np.log10(elall))
-        # print("\nnp.log10(elall*mechall)      :")
-        # print(np.log10(elall*mechall))
+            print("\nMechanical np.log10(mechall) :") if mech else None
+            print(np.log10(mechall)) if mech else None
+            print("\nElectrical np.log10(elall)   :") if el else None
+            print(np.log10(elall)) if el else None
+            print("\nnp.log10(elall*mechall)      :") if el and mech else None
+            print(np.log10(elall*mechall)) if el and mech else None
 
-        # print('\nnp.log10(elall)/np.log10(mechall):')
-        # print(np.log10(elall)/np.log10(mechall))
-        # print(np.mean((np.log10(elall)/np.log10(mechall)).flatten()))
+            # print('\nnp.log10(elall)/np.log10(mechall):')
+            # print(np.log10(elall)/np.log10(mechall))
+            # print(np.mean((np.log10(elall)/np.log10(mechall)).flatten()))
+            # print("\nTotal (abs(mechall)+abs(elall))** 2:")
+            # print((abs(mechall)+abs(elall))** 2)
 
-        # print("\nTotal (abs(mechall)+abs(elall))** 2:")
-        # print((abs(mechall)+abs(elall))** 2)
-        print("\nTotal abs(Z)** 2:")
-        print(abs(Z)** 2)
+            print("\nTotal abs(Z)** 2:")
+            print(abs(Z)** 2)
 
-        # print('\n >>>>>', np.log10(abs(Z)** 2)==np.log10((abs(mechall)+abs(elall))** 2))
+            print("\nTotal np.log10(abs(Z)** 2):")
+            print(np.log10(abs(Z)** 2))
 
-        print("\nTotal np.log10(abs(Z)** 2):")
-        print(np.log10(abs(Z)** 2))
+            sys.stdout = sys.__stdout__
+            array_str = output.getvalue()
 
-        # Restore sys.stdout to default
-        sys.stdout = sys.__stdout__
-        # Get the string from StringIO
-        array_str = output.getvalue()
-
-        with open(f'./anharmonicities_Gamma{Gamma}_({self.w1[0]}_{self.w1[-1]}_{self.w1[1]-self.w1[0]})({self.w2[0]}_{self.w2[-1]}_{self.w2[1]-self.w2[0]}).txt', 'w') as f:
-            import os
-            f.write(f"""Generated with:
-            getcwd:        {os.getcwd()}
-            __file__:      {__file__}
-            sys.argv:      {sys.argv[0]}\n\n""")
-            f.write(array_str)
+            with open(f'./anharmonicities_Gamma{Gamma}_({self.w1[0]}_{self.w1[-1]}_{self.w1[1]-self.w1[0]})({self.w2[0]}_{self.w2[-1]}_{self.w2[1]-self.w2[0]}).txt', 'w') as f:
+                import os
+                f.write(f"""Generated with:
+                getcwd:        {os.getcwd()}
+                __file__:      {__file__}
+                sys.argv:      {sys.argv[0]}\n\n""")
+                f.write(array_str)
 
         key = self.id+f'_gamma{Gamma}'
         if key not in savedict:
-            savedict[key] = {}  # Initialize with an empty dictionary or appropriate structure
+            savedict[key] = {}
 
-        # Now you can safely assign the value to the nested key
         savedict[key]['mechanical'] = mechall
         savedict[key]['mechanical'] = mechall
         savedict[key]['electrical'] = elall
@@ -681,9 +669,13 @@ class SpectrumEVV:
         except IOError as e:
             print(f"Error writing to file {meshgrid_filename}: {e}")
 
-    def plot2Dmatplotlib(self, Z, w1mw2, name):
+    def plot2Dmatplotlib(self, Z, w1mw2, name, dpi=500, contour_levels=100):
         import matplotlib.pyplot as plt
         import numpy as np
+        import matplotlib
+        matplotlib.use('Agg')
+        plt.rcParams['path.simplify'] = True
+        plt.rcParams['agg.path.chunksize'] = 10000
 
         X, Y = self.w1_mesh, self.w2_mesh
         if w1mw2:
@@ -700,10 +692,6 @@ class SpectrumEVV:
 
         # load the sample data
         df = {
-            # 'w1': X.flatten(),
-            #                ystr: y.flatten(),
-            #                'value': Z_positive.flatten(),
-            #                'valuelog10': np.log10(Z_positive).flatten(),
                            'w1_mesh': X,
                            ystr_mesh: y,
                            'valueslog10_mesh': np.log10(Z_positive)
@@ -713,7 +701,7 @@ class SpectrumEVV:
         plt.figure(figsize=(12, 11))
 
         start_time = time.time()
-        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['valueslog10_mesh'], levels=100, cmap='viridis')
+        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['valueslog10_mesh'], levels=contour_levels, cmap='viridis')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.contourf: {execution_time} seconds")
@@ -728,51 +716,10 @@ class SpectrumEVV:
         # plt.show()
         # plt.savefig(f'./simplecontour_fixed.svg', dpi=500)
         start_time = time.time()
-        plt.savefig(name, dpi=500)
+        plt.savefig(name, dpi=dpi, format='svg')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.savefig: {execution_time} seconds")
-
-
-    def plt_matshow(self, Z, w1mw2):
-        print('in plt_matshow')
-        import matplotlib.pyplot as plt
-
-        X, Y = self.w1_mesh, self.w2_mesh
-        if w1mw2:
-            y = -(X - Y)
-            ystr = 'w2-w1'
-            ystr_mesh = ystr+'_'
-
-        else:
-            y = Y
-            ystr = 'w2'
-            ystr_mesh = ystr+'_'
-        Z_positive = abs(Z) ** 2
-        fig, ax = plt.subplots()
-        im = ax.imshow(np.log2(Z_positive))
-
-        # Loop over data dimensions and create text annotations.
-        for i in range(len(list(Y[:, 0]))):
-            for j in range(len(list(X[0, :]))):
-                text = ax.text(j, i, round(np.log2(Z_positive)[i, j], 3),
-                               ha="center", va="center", color="w")
-
-        ax.set_xticks(np.arange(len(list(X[0, :]))), labels=list(X[0, :]))
-        ax.xaxis.tick_top()
-        ax.set_yticks(np.arange(len(list(Y[:, 0]))), labels=list(Y[:, 0]))
-        fig.set_size_inches(5, 11)
-        fig.colorbar(im)
-
-        import matplotlib.colors as colors
-        # Use LogNorm for the normalization of the colorbar
-        # pcm = ax.imshow(Z_positive, norm=colors.LogNorm(vmin=Z_positive.min(), vmax=Z_positive.max()))
-        # Create colorbar
-        # cbar = fig.colorbar(pcm, ax=ax, extend='max')
-
-        # fig.tight_layout()
-        plt.savefig(f'./plt_matshow.svg', dpi=500)
-        print('exiting plt_matshow')
 
     def plt_matshow_Skewed(self, Z, w1mw2, skew_factor, Gamma):
         print('in plt_matshow')
@@ -1016,7 +963,6 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
                 # print(f[0], indx)
                 # print(data[f[0]].shape, data[f[0]])
                 # print(data[f[0]].T.shape, data[f[0]].T)
-                # quit()
                 tot *= data[f[0]][indx]
             avrg += tot
 
@@ -1026,17 +972,13 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
 # function generator
 def w_mn_prod(subscripts, fermi=None, margin=10):
     m1n1m2n2 = [i.split(',') for i in subscripts]
-    # print(m1n1m2n2, 'm1n1m2n2') if fermi is not None else None
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
-        # print(fermi, 'fermi')
 
     def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
-        # print('type(w1)', type(w1))
 
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
-        # print('\ndictabc', dictabc)
         w_all[('zero',)] = 0.
         # print(m1n1m2n2)
         # print(w_all)
