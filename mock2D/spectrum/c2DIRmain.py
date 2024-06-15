@@ -59,13 +59,9 @@ def picks(pool, listofinds):
     return [pool[i] for i in listofinds]
 
 
-def rec_cm2hartree_amu_bohr_2(cm_m1):
+def rec_cm2rec_s(cm_m1):
     from scipy import constants
     hartree2J = constants.physical_constants['hartree-joule relationship'][0]
-    # amu2kg = constants.physical_constants['atomic mass constant'][0]
-    # bohr2cm = constants.physical_constants['Bohr radius'][0]*100.
-    # return np.sqrt(cm_m1**2 * (amu2kg* bohr2cm**2 / hartree2J) * 4 * np.pi**2 * constants.c**2)
-
     return cm_m1 * (100*constants.h*constants.c/hartree2J)
 
 class SpectrumEVV:
@@ -81,10 +77,10 @@ class SpectrumEVV:
     def __init__(self, w1, w2, data):
 
         # defines the grid of spectrum (pixels)
-        self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2)
+        self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         self.w1, self.w2 = np.array(w1), np.array(w2)
         self.shape2d = self.w1_mesh.shape
-        self.data = data
+        self.data = data # dictionary with data source and type - inputs
 
         cfuncs = {'cfour': CFOURdata(data), 'vlx': VeloxChemdata(data),
                   'openrsp': LSDaltondata(data), 'gaussian': GaussianData(data)}
@@ -110,6 +106,8 @@ class SpectrumEVV:
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
         self.deriv_data = self.getDerivs()
+
+        self.gammaCompsAll = getting_abcgreek4avrg(num_f=4)
 
 
     # setting up the expressions for mechanical and electrical anharmonicities
@@ -143,18 +141,11 @@ class SpectrumEVV:
             ee, mm = [0, 1], [0, 1, 2, 3, 4, 5]
             electrical_terms, mechanical_terms, el_avrg, mech_avrg = picks(electrical_terms_r, ee), picks(mechanical_terms_r, mm), picks(electric_avrg_r, ee), picks(mechanical_avrg_r, mm)
 
-        # print(electrical_terms, electric_avrg)
-
         # here the functions of 2 frequencies
         self.electr_funs = [w_mn_prod(i, margin=self.margin) for i in electrical_terms]
         self.mech_funs = [w_mn_prod(*i) for i in mechanical_terms]
-        # print("self.electr_funs:", self.electr_funs)
-        # print("self.mech_funs:", self.mech_funs)
         self.electric_avrg = el_avrg
         self.mechanical_avrg = mech_avrg
-
-        # print("self.electr_funs:", self.electr_funs)
-        # print("self.electric_avrg:", self.electric_avrg)
 
         # pairing the terms with averaging in those terms
         self.combofuns = [dict(zip(self.electr_funs, self.electric_avrg)),
@@ -163,6 +154,7 @@ class SpectrumEVV:
         # setting up the combinations of states for the terms
         self.coords_ab = get_abc(2, len(self.fundamentals)) if electrical_terms is not None else []
         self.coords_abc = get_abc(3, len(self.fundamentals)) if mechanical_terms is not None else []
+
 
     # derivs from rsp_tensor file + MOLECULE.INP # fixme: new way is to run PyOpenrsp
     #  (mu_Q, mu_QQ, alpha_Q, alpha_QQ, F_abc)
@@ -252,14 +244,14 @@ class SpectrumEVV:
 
             # data is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
             firstder, secder = self.callbacks.getDipDers()
-            data = [firstder * np.sqrt(amc_au), secder * amc_au]
+            data = [firstder / np.sqrt(amc_au), secder / amc_au]
 
             polder = self.callbacks.getPolarDers()
-            data.append(polder[0] * np.sqrt(amc_au))
-            data.append(polder[1] * amc_au)
+            data.append(polder[0] / np.sqrt(amc_au))
+            data.append(polder[1] / amc_au)
 
             cubicmat = self.callbacks.getCFF()
-            data.append(cubicmat * amc_au**1.5)
+            data.append(cubicmat / amc_au**1.5)
 
             allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
@@ -269,50 +261,390 @@ class SpectrumEVV:
             print("Invalid data source")
 
     def gamma_mn(self, Gamma, a, b, c=False):
-        # components lists for averaging: terms of the sum
-        gammaCompsAll = getting_abcgreek4avrg(num_f=4)
-        shape = self.shape2d
 
         # if 'c' is not provided, compute electrical anharmonicity
         if type(c) == bool:
 
-            total_sum_el = np.zeros(shape, dtype='complex128')
+            total_sum_el = 0 #np.zeros(self.shape2d, dtype='complex128')
 
             # prefac_el = 1 / self.fundamentals_harmonic[str(a)] / self.fundamentals_harmonic[str(b)]
-            prefac_el = 1 / rec_cm2hartree_amu_bohr_2(self.fundamentals_harmonic[str(a)]) / rec_cm2hartree_amu_bohr_2(self.fundamentals_harmonic[str(b)])
+            prefac_el = 1 / rec_cm2rec_s(self.fundamentals_harmonic[str(a)]) / rec_cm2rec_s(self.fundamentals_harmonic[str(b)])
+            collectionAvrg_el = {}
+            # for el_func, elavrg in self.combofuns[0].items():
+            for index, (el_func, elavrg) in enumerate(self.combofuns[0].items()):
 
-            for el_func, elavrg in self.combofuns[0].items():
                 # average for given (a, b) for a given term
-                averg_el1 = avrg_abc(elavrg, self.deriv_data, [a, b], gammaCompsAll)
-                total_sum_el += prefac_el * averg_el1 * el_func(self.all_states, self.w1_mesh, self.w2_mesh,
+                # averg_el1 = avrg_abc(elavrg, self.deriv_data, [a, b], self.gammaCompsAll)
+                if el_func in collectionAvrg_el:
+                    averg_el1 = collectionAvrg_el[el_func]
+                else:
+                    collectionAvrg_el[el_func] = avrg_abc_tensor(elavrg, self.deriv_data, self.gammaCompsAll)
+                    averg_el1 = collectionAvrg_el[el_func]
+
+                # now it's a big tensor (a, b, (c)) for a given term
+                # averg_el1 = avrg_abc(elavrg, self.deriv_data, self.gammaCompsAll)
+                total_sum_el += prefac_el * averg_el1[a, b] * el_func(self.all_states, self.w1_mesh, self.w2_mesh,
                                                                 Gamma, (a, b))
 
             return total_sum_el / 24.
 
         else:
 
-            total_sum_mech = np.zeros(shape, dtype='complex128')
+            total_sum_mech = 0 #np.zeros(self.shape2d, dtype='complex128')
 
             # mechanical
             # prefac_mech = 1 / self.fundamentals_harmonic[str(a)] / self.fundamentals_harmonic[str(b)] / self.fundamentals_harmonic[str(c)]
-            prefac_mech = 1 / rec_cm2hartree_amu_bohr_2(self.fundamentals_harmonic[str(a)]) / rec_cm2hartree_amu_bohr_2(self.fundamentals_harmonic[str(b)]) / rec_cm2hartree_amu_bohr_2(self.fundamentals_harmonic[str(c)])
+            prefac_mech = 1 / rec_cm2rec_s(self.fundamentals_harmonic[str(a)]) / rec_cm2rec_s(self.fundamentals_harmonic[str(b)]) / rec_cm2rec_s(self.fundamentals_harmonic[str(c)])
+            factors = {0: 1., 1: 1., 2: 0.5, 3: 0.5, 4: -0.5, 5: -0.5}
+            collectionAvrg_mech = {}
+            # for mech_func, mechavrg in self.combofuns[1].items():
+            # for id, (mech_func, mechavrg) in enumerate(self.combofuns[1].items()):
+            for index, (mech_func, mechavrg) in enumerate(self.combofuns[1].items()):
 
-            for mech_func, mechavrg in self.combofuns[1].items():
-                averg_mech1 = avrg_abc(mechavrg[:-1], self.deriv_data, [a, b, c], gammaCompsAll)
+                # averg_mech1 = avrg_abc(mechavrg[:-1], self.deriv_data, [a, b, c], self.gammaCompsAll)
+                if mech_func in collectionAvrg_mech:
+                    averg_mech1 = collectionAvrg_mech[mech_func]
+                else:
+                    collectionAvrg_mech[mech_func] = avrg_abc_tensor(mechavrg[:-1], self.deriv_data, self.gammaCompsAll)
+                    averg_mech1 = collectionAvrg_mech[mech_func]
+
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+                # print(mechavrg, c)
+                # quit()
                 indx = tuple([abc[j] for j in mechavrg[-1]])
-
                 F = self.deriv_data['F_abc'][indx]
-                total_sum_mech += prefac_mech * averg_mech1 * F * mech_func(self.all_states,
+
+                total_sum_mech += factors[index] * prefac_mech * averg_mech1[a, b, c] * F * mech_func(self.all_states,
                                                                             self.w1_mesh, self.w2_mesh, Gamma,
                                                                             (a, b, c))
 
             return -total_sum_mech / 48.
 
+    # def gamma_mn(self, Gamma, a, b, c=False):
+    #     import numexpr as ne
+    #     if type(c) == bool:
+    #         total_sum_el = 0
+    #         prefac_el = 1 / rec_cm2rec_s(self.fundamentals_harmonic[str(a)]) / rec_cm2rec_s(
+    #             self.fundamentals_harmonic[str(b)])
+    #         collectionAvrg_el = {}
+    #         for index, (el_func, elavrg) in enumerate(self.combofuns[0].items()):
+    #             if el_func in collectionAvrg_el:
+    #                 averg_el1 = collectionAvrg_el[el_func]
+    #             else:
+    #                 collectionAvrg_el[el_func] = avrg_abc_tensor(elavrg, self.deriv_data, self.gammaCompsAll)
+    #                 averg_el1 = collectionAvrg_el[el_func]
+    #
+    #             func_result = el_func(self.all_states, self.w1_mesh, self.w2_mesh, Gamma, (a, b))
+    #
+    #             # Debugging: print shapes
+    #             print("Shapes - averg_el1:", averg_el1.shape, "func_result:", func_result.shape)
+    #
+    #             # Retrieve the value from averg_el1 for indices a, b
+    #             value_ab = averg_el1[a, b]
+    #
+    #             # Using numexpr for the computation
+    #             # Ensure func_result can be combined with a scalar value_ab
+    #             total_sum_el = ne.evaluate("total_sum_el + prefac_el * value_ab * func_result")
+    #
+    #         return total_sum_el / 24.
+    #
+    #     else:
+    #         total_sum_mech = 0
+    #         prefac_mech = 1 / rec_cm2rec_s(self.fundamentals_harmonic[str(a)]) / rec_cm2rec_s(self.fundamentals_harmonic[str(b)]) / rec_cm2rec_s(self.fundamentals_harmonic[str(c)])
+    #         factors = {0: 1., 1: 1., 2: 0.5, 3: 0.5, 4: -0.5, 5: -0.5}
+    #         collectionAvrg_mech = {}
+    #
+    #         for index, (mech_func, mechavrg) in enumerate(self.combofuns[1].items()):
+    #             if mech_func in collectionAvrg_mech:
+    #                 averg_mech1 = collectionAvrg_mech[mech_func]
+    #             else:
+    #                 collectionAvrg_mech[mech_func] = avrg_abc_tensor(mechavrg[:-1], self.deriv_data, self.gammaCompsAll)
+    #                 averg_mech1 = collectionAvrg_mech[mech_func]
+    #
+    #             abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+    #             indx = tuple([abc[j] for j in mechavrg[-1]])
+    #             F = self.deriv_data['F_abc'][indx]
+    #
+    #             # Retrieve the specific value from averg_mech1 using indices a, b, c
+    #             value_abc = averg_mech1[a, b, c]
+    #
+    #             # Calculate the contribution from this mechanical function
+    #             contribution = factors[index] * prefac_mech * value_abc * F * mech_func(self.all_states, self.w1_mesh, self.w2_mesh, Gamma, (a, b, c))
+    #             total_sum_mech += contribution
+    #
+    #         return -total_sum_mech / 48.
+
+    def gamma_mn_tensors(self, Gamma, el=True, mech=True):
+        nmodes = len(self.fundamentals)
+        wstart = rec_cm2rec_s(np.array(list(self.fundamentals_harmonic.values()))) # shape (6,)
+
+        w_ab = np.zeros((nmodes, nmodes))
+        w_abc = np.zeros((nmodes, nmodes, nmodes))
+        for state in self.all_states:
+            if len(state) == 2:
+                w_ab[int(state[0]), int(state[1])] = self.all_states[state]
+                w_ab[int(state[1]), int(state[0])] = self.all_states[state]
+            elif len(state) == 3:
+                w_abc[int(state[0]), int(state[1]), int(state[2])] = self.all_states[state]
+                w_abc[int(state[0]), int(state[2]), int(state[1])] = self.all_states[state]
+                w_abc[int(state[1]), int(state[0]), int(state[2])] = self.all_states[state]
+                w_abc[int(state[1]), int(state[2]), int(state[0])] = self.all_states[state]
+                w_abc[int(state[2]), int(state[0]), int(state[1])] = self.all_states[state]
+                w_abc[int(state[2]), int(state[1]), int(state[0])] = self.all_states[state]
+        w_abc = rec_cm2rec_s(w_abc)
+        w_ab = rec_cm2rec_s(w_ab) # for omega_{a+b} frequencies
+        w_a = rec_cm2rec_s(np.array(list(self.fundamentals.values()))) # for omega_a frequencies
+
+        total_sum_el = 0.
+        total_sum_mech = 0.
+
+        if el:
+            start_time1 = time.time()
+            # Expand dimensions of w_a to shape (i, i, 1, 1) for broadcasting
+            w_a_expanded = w_a[:, np.newaxis, np.newaxis, np.newaxis]
+            w_b_expanded = w_a[np.newaxis, :, np.newaxis, np.newaxis]
+            w_ab_expanded = w_ab[:, :, np.newaxis, np.newaxis]
+
+            w1_expanded = self.w1_mesh[np.newaxis, np.newaxis, :, :]
+            w2_expanded = self.w2_mesh[np.newaxis, np.newaxis, :, :]
+
+            pref_Tab = 1. / np.einsum('i,j->ij', wstart, wstart) # shape (6, 6)
+            pref_Tab_extended = pref_Tab[:, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+
+            # for omega_{a+b} - omega_a + omega_1 - omega_2 - iGamma - shape (6, 6, Nx, Ny)
+            # w_a_extended = w_a[:, np.newaxis, np.newaxis, np.newaxis]  # shape (6, 1, 1, 1)
+            # w_ab_extended = w_ab[:, :, np.newaxis, np.newaxis]  # shape (6, 6, 1, 1)
+            # w_abc_extended = w_abc[:, :, :, np.newaxis, np.newaxis]  # shape (6, 6, 6, 1, 1)
+            # for omega_a in omega_{0,a}
+            # w_a_prime_extended = w_a_prime[:, :, np.newaxis, np.newaxis]  # shape (6, 6, 1, 1)
+
+            # for omega_{a+b} - omega_a + omega_1 - omega_2 - iGamma - shape (6, 6, Nx, Ny)
+            # w1_extended_ab = self.w1_mesh[np.newaxis, np.newaxis, :, :]  # shape (1, 1, Nx, Ny)
+            # w2_extended_ab = self.w2_mesh[np.newaxis, np.newaxis, :, :]  # shape (1, 1, Nx, Ny)
+            #
+            # w1_extended_abc = self.w1_mesh[np.newaxis, np.newaxis, np.newaxis, :, :]  # shape (1, 1, Nx, Ny)
+            # w2_extended_abc = self.w2_mesh[np.newaxis, np.newaxis, np.newaxis, :, :]  # shape (1, 1, Nx, Ny)
+
+            #
+            result_11 = 1. / (w_ab_expanded - w_a_expanded + w1_expanded - w2_expanded - 1j * Gamma) # shape (6, 6, Nx, Ny)
+            result_12 = 1. / ((-1) * w_a_expanded + w1_expanded - 1j * Gamma) # shape (6, 6, Nx, Ny)
+            avg1 = [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))]
+            averg_el1 = avrg_abc_tensor(avg1, self.deriv_data, self.gammaCompsAll)
+
+            result_21 = 1. / (w_b_expanded - w_a_expanded + w1_expanded - w2_expanded - 1j * Gamma)
+            # result_22 = copy.deepcopy(result_12)
+            result_22 = result_12
+            avg2 = [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
+            averg_el2 = avrg_abc_tensor(avg2, self.deriv_data, self.gammaCompsAll)
+            print(result_21.shape, result_11.shape)
+            sum_el1 = (result_11*result_12).sum(axis=(0, 1)) # resulting shape (Nx, Ny)
+            sum_el2 = (result_21*result_22).sum(axis=(0, 1)) # resulting shape (Nx, Ny)
+            # print(averg_el1)
+            # print(sum_el1)
+            print('=====================sum_el1')
+            # print(sum_el1)
+            print(np.nonzero(sum_el1))
+
+            print('=====================sum_el2')
+            # print(sum_el2)
+            print(np.nonzero(sum_el2))
+
+            total_sum_el += (averg_el1 * result_11 * result_12 + averg_el2 * result_21 * result_22) * pref_Tab_extended
+            total_sum_el = total_sum_el.sum(axis=(0, 1))
+            # print('total_sum_el += (averg_el1 * sum_el1 + averg_el2 * sum_el2) * pref_Tab_extended / 24.')
+            # print shapes of the terms of total eum el
+            # print(f'averg_el1 {averg_el1.shape}')
+            # print(f'sum_el1 {sum_el1.shape}')
+            # print(f'averg_el2 {averg_el2.shape}')
+            # print(f'sum_el2 {sum_el2.shape}')
+            # print(f'pref_Tab_extended {pref_Tab_extended.shape}')
+            # print(f'result_11 {result_11.shape}')
+            # print(f'result_12 {result_12.shape}')
+            # print(f'total_sum_el {total_sum_el.shape}')
+            # quit()
+
+
+            # print(f'\nresult11 {result_11.shape}')
+            # print(f'\nresult12 {result_12.shape}')
+            # print(f'pref_Tab {pref_Tab.shape}')
+            # # print(f'sum_result_el {sum_result_el.shape}')
+            # print(f'w1 mesh {self.w1_mesh.shape}')
+            # print(f'w2 mesh {self.w2_mesh.shape}')
+            # print(len(self.w1), len(self.w2))
+            # print(f'w_a_prime_extended {w_a_prime_extended.shape}')
+            # print(f'w_a_prime_extended \n{w_a_prime_extended}')
+
+            # r11 = result_11[0, 2, 0, 0]
+            # check11 = 1./(w_ab[0, 2] - w_a[0] + self.w1_mesh[0, 0] - self.w2_mesh[0, 0] - 1j * Gamma)
+            # print(f'r11 {r11}')
+            # print(f'check11 {check11}')
+            # print('-------')
+            #
+            # r12 = result_12[0, 2, 0, 0]
+            # check12 = 1./((-1) * w_a_prime[0, 2] + self.w1_mesh[0, 0] - 1j * Gamma)
+            # print(f'r12 {r12}')
+            # print(f'check12 {check12}')
+            #
+            # r11 = result_11[2, 4, 0, 0]
+            # check11 = 1./(w_ab[2, 4] - w_a[0] + self.w1_mesh[0, 0] - self.w2_mesh[0, 0] - 1j * Gamma)
+            # print(f'r11 {r11}')
+            # print(f'check11 {check11}')
+            # print('-------')
+            #
+            # r12 = result_12[2, 4, 0, 0]
+            # check12 = 1./((-1) * w_a_prime[2, 4] + self.w1_mesh[0, 0] - 1j * Gamma)
+            # print(f'r12 {r12}')
+            # print(f'check12 {check12}')
+
+            # for el_func, elavrg in self.combofuns[0].items():
+            #     averg_el1 = avrg_abc_tensor(elavrg, self.deriv_data, self.gammaCompsAll)
+            #     print(f'averg_el1 {averg_el1.shape}')
+            #     quit()
+            #     term_result_el = pref_Tab * averg_el1 * sum_result_el
+            #     print(f'term_result_el {term_result_el.shape}')
+            #     total_sum_el += term_result_el
+            # # return total_sum_el / 24.
+            end_time1 = time.time()
+            execution_time1 = end_time1 - start_time1
+            print(f"Execution time - total_sum_el: {execution_time1} seconds")
+        if mech:
+            start_time2 = time.time()
+            # Expand dimensions of w_a to shape (i, i, i, 1, 1) for broadcasting
+            w_a_expanded = w_a[:, np.newaxis, np.newaxis, np.newaxis, np.newaxis]
+            w_b_expanded = w_a[np.newaxis, :, np.newaxis, np.newaxis, np.newaxis]
+            w_c_expanded = w_a[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+
+            w_ab_expanded = w_ab[:, :, np.newaxis, np.newaxis, np.newaxis]
+            w_bc_expanded = w_ab[np.newaxis, :, :, np.newaxis, np.newaxis]
+            w_abc_expanded = w_abc[:, :, :, np.newaxis, np.newaxis]
+
+            w1_expanded = self.w1_mesh[np.newaxis, np.newaxis, np.newaxis, :, :]
+            w2_expanded = self.w2_mesh[np.newaxis, np.newaxis, np.newaxis, :, :]
+
+            pref_Tabc = 1. /np.einsum('i,j,k->ijk', wstart, wstart, wstart)
+            pref_Tabc_extended = pref_Tabc[:, :, :, np.newaxis, np.newaxis]  # shape (6, 6, 6, Nx, Ny)
+
+            # print('pref_Tabc', pref_Tabc.shape)
+
+            result_31 = 1. / (w_ab_expanded - w_a_expanded + w1_expanded - w2_expanded - 1j * Gamma) # shape (6, 6, Nx, Ny)
+            result_32 = 1. / ((-1) * w_a_expanded + w1_expanded - 1j * Gamma) # shape (6, 6, Nx, Ny)
+            result_33 = 1. / w_abc_expanded
+            result_34 = 1. / (w_c_expanded - w_ab_expanded)
+            avg3 = [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc']
+            averg_mech3 = avrg_abc_tensor(avg3[:-1], self.deriv_data, self.gammaCompsAll)
+            F_abc = self.deriv_data['F_abc']
+            F_abc_extended = F_abc[:, :, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+
+            result_41 = 1. / (w_c_expanded - w_a_expanded + w1_expanded - w2_expanded - 1j * Gamma)
+            # result_42 = copy.deepcopy(result_32)
+            result_42 = result_32
+            result_43 = 1. / (w_ab_expanded - w_c_expanded)
+            result_44 = 1. / (w_bc_expanded - w_a_expanded)
+            # averg_mech4 = copy.deepcopy(averg_mech3)
+            averg_mech4 = averg_mech3
+
+            # result_51 = copy.deepcopy(result_31)
+            result_51 = result_31
+
+            # result_52 = copy.deepcopy(result_32)
+            result_52 = result_32
+            result_53 = 1. / (w_a_expanded - w_ab_expanded)
+            result_54 = 1. / w_b_expanded
+            avg5 = [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc']
+            averg_mech5 = avrg_abc_tensor(avg5[:-1], self.deriv_data, self.gammaCompsAll)
+            F_ijj = np.zeros_like(F_abc)
+            i, j = np.arange(F_abc.shape[0]), np.arange(F_abc.shape[0])
+            I, J = np.meshgrid(i, j, indexing='ij')
+            F_ijj[:, J, J] = F_abc[:, J, J]
+            F_ijj_extended = F_ijj[:, :, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+
+            # result_61 = copy.deepcopy(result_31)
+            result_61 = result_31
+            # result_62 = copy.deepcopy(result_32)
+            result_62 = result_32
+            result_63 =  1. / (w_b_expanded - w_ab_expanded)
+            result_64 = 1. / w_a_expanded
+            avg6 = [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']
+            averg_mech6 = avrg_abc_tensor(avg6[:-1], self.deriv_data, self.gammaCompsAll)
+
+            result_71 = 1. / (w_b_expanded - w_a_expanded + w1_expanded - w2_expanded - 1j * Gamma)
+            # result_72 = copy.deepcopy(result_32)
+            result_72 = result_32
+            # result_73 = copy.deepcopy(result_53)
+            result_73 = result_53
+            # result_74 = copy.deepcopy(result_54)
+            result_74 = result_54
+            avg7 = [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc']
+            averg_mech7 = avrg_abc_tensor(avg7[:-1], self.deriv_data, self.gammaCompsAll)
+
+            # result_81 = copy.deepcopy(result_71)
+            result_81 = result_71
+            # result_82 = copy.deepcopy(result_32)
+            result_82 = result_32
+            # result_83 = copy.deepcopy(result_63)
+            result_83 = result_63
+            # result_84 = copy.deepcopy(result_64)
+            result_84 = result_64
+            # averg_mech8 = copy.deepcopy(averg_mech6)
+            averg_mech8 = averg_mech6
+
+            sum_el3 = result_31*result_32*(result_33+result_34)*F_abc_extended*averg_mech3 # resulting shape (Nx, Ny)
+            sum_el4 = result_41*result_42*(result_43+result_44)*F_abc_extended*averg_mech4 # resulting shape (Nx, Ny)
+            sum_el5 = result_51*result_52*(result_53+result_54)*F_ijj_extended*averg_mech5 # resulting shape (Nx, Ny)
+            sum_el6 = result_61*result_62*(result_63+result_64)*F_ijj_extended*averg_mech6 # resulting shape (Nx, Ny)
+            sum_el7 = result_71*result_72*(result_73+result_74)*F_ijj_extended*averg_mech7 # resulting shape (Nx, Ny)
+            sum_el8 = result_81*result_82*(result_83+result_84)*F_ijj_extended*averg_mech8 # resulting shape (Nx, Ny)
+            total_sum_mech += -(sum_el3 + sum_el4 + 0.5*sum_el5 + 0.5*sum_el6 - 0.5*sum_el7 - 0.5*sum_el8) * pref_Tabc_extended
+            total_sum_mech = 1./48. * total_sum_mech.sum(axis=(0, 1, 2))
+            print('\n=====================sum_el3', sum_el3.shape)
+            print(np.nonzero(sum_el3))
+            print('\n=====================sum_el4', sum_el4.shape)
+            print(np.nonzero(sum_el4))
+            # print(f'\nresult_41 {result_41.shape}\n', np.where(np.isinf(result_41)))
+            # print(f'result_41 {result_41.shape}\n', result_41[np.where(np.isinf(result_41))])
+            # print(result_41)
+            print('\n=====================sum_el5', sum_el5.shape)
+            print(np.nonzero(sum_el5))
+            print('\n=====================sum_el6', sum_el6.shape)
+            print(np.nonzero(sum_el6))
+            print('\n=====================sum_el7', sum_el7.shape)
+            # print(sum_el7)
+            print(np.nonzero(sum_el7))
+
+            # print(f'averg_mech7 {averg_mech7.shape}\n', np.nonzero(averg_mech7))
+            # print(f'F_ijj_extended {F_ijj_extended.shape}\n', np.nonzero(F_ijj_extended))
+            # print(F_ijj_extended[np.nonzero(F_ijj_extended)])
+            # print(f'\nresult_71 {result_71.shape}\n', np.where(np.isinf(result_71)))
+            # print(f'result_71 {result_71.shape}\n', result_71[np.where(np.isinf(result_71))])
+            # print(f'result_72 {result_72.shape}\n', np.where(np.isinf(result_72)))
+            # print(f'result_73 {result_73.shape}\n', np.where(np.isinf(result_73)))
+            # print(f'result_74 {result_74.shape}\n', np.where(np.isinf(result_74)))
+
+            print('\n=====================sum_el8', sum_el8.shape)
+            print(np.nonzero(sum_el8))
+
+            # print(sum_el8)
+            # print(f'averg_mech7 {averg_mech7.shape}\n', np.nonzero(averg_mech7))
+            # print(f'F_ijj_extended {F_ijj_extended.shape}\n', np.nonzero(F_ijj_extended))
+            # print(F_ijj_extended[np.nonzero(F_ijj_extended)])
+            print(f'\nresult_81 {result_81.shape}\n', np.where(np.isinf(result_71)))
+            print(f'result_82 {result_82.shape}\n', np.where(np.isinf(result_72)))
+            print(f'result_83 {result_83.shape}\n', np.where(np.isinf(result_73)))
+            print(f'result_84 {result_84.shape}\n', np.where(np.isinf(result_74)))
+
+            end_time2 = time.time()
+            execution_time2 = end_time2 - start_time2
+            print(f"Execution time - total_sum_mech: {execution_time2} seconds")
+            # quit()
+        return total_sum_el+total_sum_mech
+
+
     def intensity(self, Gamma, savedict, el=True, mech=True, printdata=False):
 
         Qab, Qabc = self.coords_ab, self.coords_abc
-
+        # print('Qab', Qab)
+        # print('Qabc', Qabc)
+        # quit()
         Z = 0
         Qab_contrib_dict = {}
         Qabc_contrib_dict = {}
@@ -321,6 +653,7 @@ class SpectrumEVV:
             start_time = time.time()
             elall = np.zeros(self.shape2d, dtype='complex128')
             for i in Qab:
+                print('hello', i)
                 contrib_ab = self.gamma_mn(Gamma, i[0], i[1])
                 Qab_contrib_dict[tuple(i)] = contrib_ab
                 elall += contrib_ab
@@ -339,7 +672,7 @@ class SpectrumEVV:
                 mechall += contrib_abc
             end_time = time.time()
             execution_time = end_time - start_time
-            print(f"Execution time - mechanical: {execution_time} seconds")
+            print(f"\nExecution time - mechanical: {execution_time} seconds")
             print('Mechanical anharmonicities are calculated')
             Z += mechall
 
@@ -398,9 +731,8 @@ class SpectrumEVV:
         if key not in savedict:
             savedict[key] = {}
 
-        savedict[key]['mechanical'] = mechall
-        savedict[key]['mechanical'] = mechall
-        savedict[key]['electrical'] = elall
+        if mech: savedict[key]['mechanical'] = mechall
+        if el: savedict[key]['electrical'] = elall
         savedict[key]['Qab_contrib_dict'] = Qab_contrib_dict
         savedict[key]['Qabc_contrib_dict'] = Qabc_contrib_dict
 
@@ -669,52 +1001,45 @@ class SpectrumEVV:
         except IOError as e:
             print(f"Error writing to file {meshgrid_filename}: {e}")
 
-    def plot2Dmatplotlib(self, Z, w1mw2, name, dpi=500, contour_levels=100):
+    def plot2Dmatplotlib(self, Z, w1mw2, name, dpi=500, contour_levels=100, log10=True):
         import matplotlib.pyplot as plt
         import numpy as np
         import matplotlib
         matplotlib.use('Agg')
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
-
         X, Y = self.w1_mesh, self.w2_mesh
         if w1mw2:
             y = -(X - Y)
             ystr = 'w2-w1'
             ystr_mesh = ystr+'_'
-
         else:
             y = Y
             ystr = 'w2'
             ystr_mesh = ystr+'_'
-
         Z_positive = abs(Z) ** 2
-
-        # load the sample data
-        df = {
-                           'w1_mesh': X,
-                           ystr_mesh: y,
-                           'valueslog10_mesh': np.log10(Z_positive)
-                           }
-        # Create the contour plot
-        # set figure size
+        if log10:
+            df = {'w1_mesh': X, ystr_mesh: y, 'values_mesh': np.log10(Z_positive)}
+        else:
+            df = {'w1_mesh': X, ystr_mesh: y, 'values_mesh': Z_positive}
         plt.figure(figsize=(12, 11))
 
         start_time = time.time()
-        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['valueslog10_mesh'], levels=contour_levels, cmap='viridis')
+        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['values_mesh'], levels=contour_levels, cmap='viridis')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.contourf: {execution_time} seconds")
 
         # This is the fix for the white lines between contour levels
-        # for c in cont.collections:
-        #     c.set_edgecolor("face")
+        for c in cont.collections:
+            c.set_edgecolor("face")
         plt.colorbar()  # Add a colorbar to show the Z scale
         plt.xlabel('X-axis')
         plt.ylabel('Y-axis')
-        plt.title(f'plot2Dmatplotlib(). {name}')
-        # plt.show()
-        # plt.savefig(f'./simplecontour_fixed.svg', dpi=500)
+        xs = df['w1_mesh'][0], df['w1_mesh'][-1]
+        ys = df[ystr_mesh][0], df[ystr_mesh][-1]
+        plt.title(f'plot2Dmatplotlib().\ndpi={dpi} contour_levels={contour_levels} x{xs[0][0]}..{xs[-1][-1]} y{ys[0][0]}..{ys[-1][-1]}\n{name}')
+
         start_time = time.time()
         plt.savefig(name, dpi=dpi, format='svg')
         end_time = time.time()
@@ -925,6 +1250,13 @@ def get_abc(nloops, abcrange):
 # num_f = 4 -four-wave mixing
 def getting_abcgreek4avrg(num_f):
     from mock2D.macroscopic import macroscopics
+    # polarizations = np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0]])
+    # pol_laser = macroscopics.get_pol_laser(polarizations)
+    # print('pol_laser\n', pol_laser)
+    # pol_mat = macroscopics.get_iso_mat(num_f)
+    # print('pol_mat\n', pol_mat)
+    # pol_g = get_iso_f(spec_cfg.num_fields)
+
     pol_g = macroscopics.get_iso_f(num_f)
     new = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
 
@@ -966,8 +1298,143 @@ def avrg_abc(formula, data, normalModes, gammaCompsAll):
                 tot *= data[f[0]][indx]
             avrg += tot
 
-        return avrg / 15
+        return avrg / 15.
 
+# and now vectorized avrg_abc
+def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray], gammaCompsAll: list[tuple[float]]):
+
+    import copy
+    nmodes = data['mu_Q'].shape[0]
+    if type(formula[-1]) == str:
+        formula = formula[:-1]
+    nmodes_selections = nm_pattern(nmodes, sum([len(i[1]) for i in formula]), formula)
+    if [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_QQ']:
+        # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))]
+        # mu_Q, alpha_Q, mu_QQ - (6, 6, 6, 6, 3, 3, 3, 3)
+        mu_Q = copy.deepcopy(data['mu_Q']).reshape(nmodes, 1, 1, 1, 1, 3, 1, 1)
+        alpha_Q = copy.deepcopy(data['alpha_Q']).reshape(1, nmodes, 1, 1, 3, 1, 1, 3)
+        mu_QQ = copy.deepcopy(data['mu_QQ']).reshape(1, 1, nmodes, nmodes, 1, 1, 3, 1)
+
+        bigT = mu_Q * alpha_Q * mu_QQ
+        totB = np.zeros((nmodes, nmodes))
+
+        for indices in nmodes_selections:
+            tot = 0.
+            # print('indices', indices)
+            for gamma_indices in gammaCompsAll:
+                # print([*indices, *gamma_indices])
+                tot += bigT[*indices, *gamma_indices]
+
+            totB[indices[0], indices[1]] = tot/15.
+        # totB = totB[:, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+
+        # print('totB\n', totB)
+        return totB
+
+    elif [i[0] for i in formula] == ['mu_Q', 'alpha_QQ', 'mu_Q']:
+        # [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
+        # mu_Q, alpha_QQ, mu_Q
+        mu_Q = copy.deepcopy(data['mu_Q']).reshape(nmodes, 1, 1, 1, 1, 3, 1, 1)
+        alpha_QQ = copy.deepcopy(data['alpha_QQ']).reshape(1, 1, nmodes, nmodes, 3, 1, 1, 3)
+        mu_Qc = copy.deepcopy(data['mu_Q']).reshape(1, nmodes, 1, 1, 1, 1, 3, 1)
+        # print('hey')
+        bigT = mu_Q * alpha_QQ * mu_Qc
+        totB = np.zeros((nmodes, nmodes))
+        for indices in nmodes_selections:
+            tot = 0.
+            # print('indices', indices)
+            for gamma_indices in gammaCompsAll:
+                # print([*indices, *gamma_indices])
+                tot += bigT[*indices, *gamma_indices]
+
+            totB[indices[0], indices[2]] = tot/15.
+        # totB = totB[:, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+        # print('totB\n', totB)
+        return totB
+
+    elif [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_Q']:
+        # mu_Q, alpha_Q, mu_Q - (6, 6, 6, 3, 3, 3, 3)
+        mu_Q = copy.deepcopy(data['mu_Q']).reshape(nmodes, 1, 1, 1, 3, 1, 1)
+        alpha_Q = copy.deepcopy(data['alpha_Q']).reshape(1, nmodes, 1, 3, 1, 1, 3)
+        mu_Qc = copy.deepcopy(data['mu_Q']).reshape(1, 1, nmodes, 1, 1, 3, 1)
+
+        bigT = mu_Q * alpha_Q * mu_Qc
+        totB = np.zeros((nmodes, nmodes, nmodes))
+        # print(nmodes_selections)
+        # quit()
+        for indices in nmodes_selections:
+            tot = 0.
+            # print('indices', indices)
+            for gamma_indices in gammaCompsAll:
+                # print([*indices, *gamma_indices])
+                tot += bigT[*indices, *gamma_indices]
+
+            if [i[1] for i in formula] == [('a',), ('b',), ('a',)] or [i[1] for i in formula] == [('a',), ('b',), ('b',)]:
+                totB[indices[0], indices[1], :] = tot / 15.
+
+            elif [i[1] for i in formula] == [('a',), ('a',), ('b',)]:
+                totB[indices[0], indices[2], :] = tot / 15.
+        # totB = totB[:, :, :, np.newaxis, np.newaxis]  # shape (6, 6, Nx, Ny)
+
+        # print('totB\n', totB)
+        return totB
+
+
+def nm_pattern(nmodes: int, numberofindices: int, formula: list[tuple[str, tuple[str]]]):
+    """
+    Generate a pattern of indices for a tensor of nmodes.
+    :param numberofindices:
+    :param formula:
+    :param nmodes:
+    :return:
+    """
+    # Define the shape of the tensor
+    shape = tuple([nmodes for _ in range(numberofindices)])
+    # print('>>>', shape)
+    # Create the tensor using broadcasting
+    tensor = np.indices(shape).transpose(*[i for i in range(1, numberofindices + 1)] + [0])
+
+    flattened_tensor = tensor.reshape(-1, numberofindices)
+
+    # Create an empty list to store the selected indices
+    selected_indices = []
+
+    # Iterate through the flattened tensor and select indices of the form (a, a, b, b)
+    # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))]
+    if [i[1] for i in formula] == [('a',), ('b',), ('a', 'b',)]:
+        for indices in flattened_tensor:
+            if indices[0] == indices[2] and indices[1] == indices[3]:
+                selected_indices.append(indices)
+
+    elif [i[1] for i in formula] == [('a',), ('a', 'b',), ('b',)]:
+        for indices in flattened_tensor:
+            if indices[0] == indices[1] and indices[1] == indices[2]:
+                selected_indices.append(indices)
+
+    elif [i[1] for i in formula] == [('a',), ('b',), ('c',)]:
+        selected_indices = flattened_tensor
+
+    elif [i[1] for i in formula] == [('a',), ('b',), ('a',)]:
+        # print(f'WARNING: this is not implemented yet - {formula}')
+        for indices in flattened_tensor:
+            if indices[0] == indices[2]:
+                selected_indices.append(indices)
+
+    elif [i[1] for i in formula] == [('a',), ('b',), ('b',)]:
+        # print(f'WARNING: this is not implemented yet - {formula}')
+        for indices in flattened_tensor:
+            if indices[1] == indices[2]:
+                selected_indices.append(indices)
+
+    elif [i[1] for i in formula] == [('a',), ('a',), ('b',)]:
+        # print(f'WARNING: this is not implemented yet - {formula}')
+        for indices in flattened_tensor:
+            if indices[0] == indices[1]:
+                selected_indices.append(indices)
+
+    selected_indices_array = np.array(selected_indices)
+    # print('selected_indices_array', selected_indices_array)
+    return selected_indices_array
 
 # function generator
 def w_mn_prod(subscripts, fermi=None, margin=10):
@@ -980,39 +1447,18 @@ def w_mn_prod(subscripts, fermi=None, margin=10):
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
         w_all[('zero',)] = 0.
-        # print(m1n1m2n2)
-        # print(w_all)
-        # .join(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
-        # wm1 = ''.join(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
-        # wn1 = ''.join(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')]))
-        # wm2 = ''.join(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
-        # wn2 = ''.join(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
 
         wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
         wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')]))
         wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
         wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
-        # print(wm1, wn1, wm2, wn2, 'wm1, wn1, wm2, wn2')
-        # if fermi is None:
-        #     # print('w_all[wm1] - w_all[wn1] + w1 - w2', w_all[wm1], w_all[wn1], w1, w2)
-        #     # print('w1, w2, margin', margin)
-        #     # removes lower diagonal with margin 4
-        #     return np.where(w2-margin > w1, 1 / (w_all[wm1] - w_all[wn1] + w1 - w2 - 1j * Gamma) / (w_all[wm2] - w_all[wn2] + w1 - 1j * Gamma), 0.)
-        #
-        # else:
-        #     w_fr1 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')]))
-        #     w_fr2 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')]))
-        #
-        #     return (1 / (w_all[wm1] - w_all[wn1] + w1 - w2 - 1j * Gamma) / (
-        #             w_all[wm2] - w_all[wn2] + w1 - 1j * Gamma)) * (
-        #             1 / (w_all[w_fr1] + 0.0001) + 1 / (w_all[w_fr2] + 0.0001))
 
         if fermi is None:
             # print('w_all[wm1] - w_all[wn1] + w1 - w2', w_all[wm1], w_all[wn1], w1, w2)
             # print('w1, w2, margin', margin)
             # removes lower diagonal with margin 4
-            # print(rec_cm2hartree_amu_bohr_2(w_all[wm1]) , rec_cm2hartree_amu_bohr_2(w_all[wn1]), rec_cm2hartree_amu_bohr_2(w1) , rec_cm2hartree_amu_bohr_2(w2) , 1j * Gamma)
-            return np.where(w2-margin > w1, 1 / (rec_cm2hartree_amu_bohr_2(w_all[wm1]) - rec_cm2hartree_amu_bohr_2(w_all[wn1]) + rec_cm2hartree_amu_bohr_2(w1) - rec_cm2hartree_amu_bohr_2(w2) - 1j * Gamma) / (rec_cm2hartree_amu_bohr_2(w_all[wm2]) - rec_cm2hartree_amu_bohr_2(w_all[wn2]) + rec_cm2hartree_amu_bohr_2(w1) - 1j * Gamma), 0.)
+            # print(rec_cm2rec_s(w_all[wm1]) , rec_cm2rec_s(w_all[wn1]), rec_cm2rec_s(w1) , rec_cm2rec_s(w2) , 1j * Gamma)
+            return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
 
         else:
             w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')]))
@@ -1021,14 +1467,12 @@ def w_mn_prod(subscripts, fermi=None, margin=10):
             w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')]))
             w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')]))
 
-            # print(fermi, 'fermi')
-            # print('w_fr11, w_fr21', w_fr11, w_fr21)
-            # print('w_fr12, w_fr22', w_fr12, w_fr22)
-            # tail = 0.0001
             tail = 0.0
-            return (1 / (rec_cm2hartree_amu_bohr_2(w_all[wm1]) - rec_cm2hartree_amu_bohr_2(w_all[wn1]) + rec_cm2hartree_amu_bohr_2(w1) - rec_cm2hartree_amu_bohr_2(w2) - 1j * Gamma) / (
-                    rec_cm2hartree_amu_bohr_2(w_all[wm2]) - rec_cm2hartree_amu_bohr_2(w_all[wn2]) + rec_cm2hartree_amu_bohr_2(w1) - 1j * Gamma)) * (
-                    1 / (rec_cm2hartree_amu_bohr_2(w_all[w_fr11]) - rec_cm2hartree_amu_bohr_2(w_all[w_fr21])) + 1 / (rec_cm2hartree_amu_bohr_2(w_all[w_fr12]) - rec_cm2hartree_amu_bohr_2(w_all[w_fr22])))
+            t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
+            t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
+            t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
+            t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
+            return (1 / t1 / t2) * (1 / t3 + 1 / t4)
 
     return function
 
@@ -1197,7 +1641,7 @@ def printed2DIRtensors(setup: SpectrumEVV):
     print('Fundamental frequencies (harmonic)  :', list(setup.fundamentals_harmonic.values()), '\n')
 
     print('All frequencies (anharmonic)  :', setup.all_states, '\n')
-    print('All frequencies (harmonic)    :', setup.all_states_harm, '\n')
+    # print('All frequencies (harmonic)    :', setup.all_states_harm, '\n')
 
     # for k in setup.fundamentals:
     #     print()

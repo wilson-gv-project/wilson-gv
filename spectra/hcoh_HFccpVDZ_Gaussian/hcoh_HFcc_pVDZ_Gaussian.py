@@ -15,13 +15,14 @@ w1mw2 = False
 # start1, stop1, step = 1250., 1550., 50.
 # start2, stop2, step = 2400., 3600., 50.
 
-start1, stop1, step1 = 1250., 2250., 0.5
-start2, stop2, step2 = 2470., 3250., 0.5
+start1, stop1, step1 = 1150., 1780., 0.5
+start2, stop2, step2 = 2870., 3160., 0.5
 
 # ranges for 2 frequencies
 omega1 = np.arange(start1, stop1, step1)
 omega2 = np.arange(start2, stop2, step2)
-
+print(len(omega1), len(omega2))
+# quit()
 y =  omega2 if not w1mw2 else omega2-omega1
 
 # meshgrid for spectrum
@@ -51,25 +52,34 @@ ders = setup.getDerivs()
 setup.addTerms(None, None, None, None)
 
 print(setup.data, '\n')
-
+# print(setup.gammaCompsAll, '\n', len(setup.gammaCompsAll), '\n')
+# quit()
 # print derivatives
 # c2DIRmain.printed2DIRtensors(setup)
+# quit()
 
 
 gcmrec = 10.
 gamma = c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec)
+
 print(c2DIRmain.rec_cm2hartree_amu_bohr_2(1660.), 1660)
-print(c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec), gcmrec)
+print(str(c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec)), gcmrec)
+
+# el, mech = True, False
+# el, mech = False, True
+el, mech = True, True
 
 import time
-start_time = time.time()
-Z, savedict = setup.intensity(gamma, {}, el=False, mech=True, printdata=False)
-end_time = time.time()
-execution_time = end_time - start_time
-print(f"Execution time - setup.intensity: {execution_time} seconds")
+start_time0 = time.time()
+Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech, printdata=False)
+end_time0 = time.time()
+execution_time0 = end_time0 - start_time0
+print(f"Execution time - setup.intensity: {execution_time0} seconds")
 
 # percent = 0.0
+if mech and not el: contr = 'mech'
+elif el and not mech: contr = 'el'
+else: contr = 'both'
+figfilename = f'./{contr}_Gamma{f'{gamma:.2e}'}__{start1}_{stop1-step1}_{step1}__{start2}_{stop2-step2}_{step2}.svg'
 
-figfilename = f'./hcoh_HFcc_pVDZ_Gaussian_Gamma{gamma}_({start1}_{stop1-step1}_{step1})({start2}_{stop2-step2}_{step2}).svg'
-
-setup.plot2Dmatplotlib(Z, w1mw2, figfilename, dpi=100, contour_levels=100)
+setup.plot2Dmatplotlib(Z, w1mw2, figfilename, dpi=200, contour_levels=10)
