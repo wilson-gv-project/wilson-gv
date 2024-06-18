@@ -1,0 +1,26 @@
+Generated with: 
+'getcwd:        /cluster/projects/nn14654k/vle014/mock2D/spectra/more_tests
+'__file__:      /cluster/projects/nn14654k/vle014/mock2D/spectra/more_tests/./fram_tests_STO3G.py
+
+
+Harmonic    {'0': 3393.228, '1': 2076.928, '2': 1746.743, '3': 1271.401, '4': 3580.668, '5': 1386.441}
+Anharmonic  {'0': 3498.763, '1': 2099.857, '2': 1767.303, '3': 1278.846, '4': 3645.702, '5': 1397.617}
+
+-----------------------------------
+
+./svgs/biger_3_True_3_elTrue_mechTrue_log10False.svg
+
+-----------------------------------
+
+Execution time - electrical: 25.91811513900757 seconds
+Electrical anharmonicities are calculated
+
+Execution time - mechanical: 430.7456564903259 seconds
+Mechanical anharmonicities are calculated
+Execution time - setup.intensity: 456.70873975753784 seconds
+Execution time - plt.contourf: 0.5932199954986572 seconds
+Execution time - plt.savefig: 0.2479996681213379 seconds
+Execution time - setup.plot2Dmatplotlib: 1.3866615295410156 seconds
+
+00:07:38.34
+Execution time - global: 458.3405981063843 seconds

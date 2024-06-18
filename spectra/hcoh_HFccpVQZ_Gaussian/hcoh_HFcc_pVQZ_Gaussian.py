@@ -15,8 +15,8 @@ w1mw2 = False
 # start1, stop1, step = 1250., 1550., 50.
 # start2, stop2, step = 2400., 3600., 50.
 
-start1, stop1, step1 = 1580., 1650., 10.
-start2, stop2, step2 = 2870., 3100., 10.
+start1, stop1, step1 = 1580., 1650., 1.
+start2, stop2, step2 = 2870., 3100., 1.
 
 # ranges for 2 frequencies
 omega1 = np.arange(start1, stop1, step1)

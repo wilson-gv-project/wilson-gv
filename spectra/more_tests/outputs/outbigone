@@ -1,0 +1,97 @@
+Generated with: 
+'getcwd:        /cluster/projects/nn14654k/vle014/mock2D/spectra/more_tests
+'__file__:      /cluster/projects/nn14654k/vle014/mock2D/spectra/more_tests/./fram_tests_STO3G.py
+
+
+Harmonic    {'0': 3393.228, '1': 2076.928, '2': 1746.743, '3': 1271.401, '4': 3580.668, '5': 1386.441}
+Anharmonic  {'0': 3498.763, '1': 2099.857, '2': 1767.303, '3': 1278.846, '4': 3645.702, '5': 1397.617}
+gamma_str:  0p00
+
+-----------------------------------
+
+./svgs/w1mw2T_elT_mechT_log10T_gamma0p00.svg
+
+-----------------------------------
+
+gamma_str:  0p00
+
+-----------------------------------
+
+./svgs/w1mw2T_elT_mechT_log10F_gamma0p00.svg
+
+-----------------------------------
+
+gamma_str:  0p00
+
+-----------------------------------
+
+./svgs/w1mw2T_elT_mechF_log10T_gamma0p00.svg
+
+-----------------------------------
+
+gamma_str:  0p00
+
+-----------------------------------
+
+./svgs/w1mw2T_elT_mechF_log10F_gamma0p00.svg
+
+-----------------------------------
+
+Execution time - electrical: 28.500348567962646 seconds
+Electrical anharmonicities are calculated
+Execution time - setup.intensity: 28.53039240837097 seconds
+Execution time - electrical: 28.562403440475464 seconds
+Electrical anharmonicities are calculated
+Execution time - setup.intensity: 28.59057879447937 seconds
+Execution time - electrical: 29.8189537525177 seconds
+Electrical anharmonicities are calculated
+Execution time - electrical: 30.63861060142517 seconds
+Electrical anharmonicities are calculated
+gamma_str:  0p00
+
+-----------------------------------
+
+./svgs/w1mw2T_elF_mechT_log10T_gamma0p00.svg
+
+-----------------------------------
+
+Execution time - plt.contourf: 1.485816240310669 seconds
+Execution time - plt.savefig: 0.5238430500030518 seconds
+Execution time - setup.plot2Dmatplotlib: 7.421226501464844 seconds
+
+00:00:36.26
+Execution time - global: 36.26254916191101 seconds
+------------------ BREAKBREAKBREAKBREAK
+
+Execution time - mechanical: 756.9295101165771 seconds
+Mechanical anharmonicities are calculated
+Execution time - setup.intensity: 757.2702894210815 seconds
+Execution time - plt.contourf: 1.0633795261383057 seconds
+Execution time - plt.savefig: 0.3317098617553711 seconds
+Execution time - setup.plot2Dmatplotlib: 2.183330774307251 seconds
+
+00:13:14.82
+Execution time - global: 794.8195621967316 seconds
+------------------ BREAKBREAKBREAKBREAK
+
+Execution time - mechanical: 795.5644207000732 seconds
+Mechanical anharmonicities are calculated
+Execution time - setup.intensity: 825.438357591629 seconds
+Execution time - plt.contourf: 0.6004047393798828 seconds
+Execution time - plt.savefig: 0.15042591094970703 seconds
+Execution time - setup.plot2Dmatplotlib: 0.8571693897247314 seconds
+
+00:13:46.55
+Execution time - global: 826.5453321933746 seconds
+------------------ BREAKBREAKBREAKBREAK
+
+Execution time - mechanical: 835.5469031333923 seconds
+Mechanical anharmonicities are calculated
+Execution time - setup.intensity: 866.2370665073395 seconds
+Execution time - plt.contourf: 0.6449956893920898 seconds
+Execution time - plt.savefig: 0.3371102809906006 seconds
+Execution time - setup.plot2Dmatplotlib: 1.150691032409668 seconds
+
+00:14:27.64
+Execution time - global: 867.6373045444489 seconds
+------------------ BREAKBREAKBREAKBREAK
