@@ -43,7 +43,7 @@ ders = setup.getDerivs()
 # quit()
 print(setup.fundamentals)
 print(setup.all_states)
-quit()
+#quit()
 
 # add mechanical and electrical anharmonicities terms and orientational averages (symbolic setup)
 setup.addTerms(None, None, None, None)
@@ -52,7 +52,9 @@ setup.addTerms(None, None, None, None)
 print(setup.data, '\n')
 
 # print derivatives
-# c2DIRmain.printed2DIRtensors(setup)
+c2DIRmain.printed2DIRtensors(setup)
+
+quit()
 
 gamma = 3.8
 Z, savedict = setup.intensity(gamma, {})
