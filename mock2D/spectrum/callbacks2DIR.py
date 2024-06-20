@@ -1,5 +1,5 @@
-from scriptsHPC.utils import parseCFOUR
-from scriptsHPC.utils import parseGaussian
+from mock2D.spectrum import parseCFOUR
+from mock2D.spectrum import parseGaussian
 from typing import Any
 
 import numpy as np

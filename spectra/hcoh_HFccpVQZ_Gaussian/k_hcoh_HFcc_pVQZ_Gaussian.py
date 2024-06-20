@@ -11,19 +11,25 @@ print ('argument list', sys.argv)
 dic = {"True": True, "False": False}
 el = dic[sys.argv[1]]
 mech = dic[sys.argv[2]]
+region = int(sys.argv[3]) if len(sys.argv) == 4 else None
 print (f"el = {el}, mech = {mech}")
 
 print(f"""Generated with: 
 'getcwd:        {os.getcwd()}
 '__file__:      {__file__}\n\n""")
 
-# first region
-start1, stop1, step1 = 1180., 2150., 10.
-start2, stop2, step2 = 2309., 5350., 10.
+if region==1:
+    # first region
+    start1, stop1, step1 = 1180., 2150., 10.
+    start2, stop2, step2 = 2309., 5350., 10.
+elif region==2:
+    # second focused region
+    start1, stop1, step1 = 2810., 3210., 10.
+    start2, stop2, step2 = 5510., 6050., 10.
+elif region is None:
+    start1, stop1, step1 = 1180., 2150., 10.
+    start2, stop2, step2 = 2309., 5350., 10.
 
-# second focused region
-start1, stop1, step1 = 2810., 3210., 10.
-start2, stop2, step2 = 5510., 6050., 10.
 
 omega1 = np.arange(start1, stop1, step1)
 omega2 = np.arange(start2, stop2, step2)
