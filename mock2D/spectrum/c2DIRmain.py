@@ -14,7 +14,6 @@ from .callbacks2DIR import CFOURdata, GaussianData
 def picks(pool, listofinds):
     return [pool[i] for i in listofinds]
 
-
 def rec_cm2rec_s(cm_m1):
     from scipy import constants
     hartree2J = constants.physical_constants['hartree-joule relationship'][0]
@@ -54,12 +53,15 @@ class SpectrumEVV:
 
         self.all_states = {tuple(str(i) for i in k): v for k, v in parsed_states[0].items()}
         self.all_states_harm = {tuple(str(i) for i in k): v for k, v in parsed_states[1].items()}
+        print('all states\n', self.all_states, '\n')
+        print('all all_states_harm\n', self.all_states_harm, '\n')
+
+        print(sorted(self.all_states_harm.values()))
 
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
         self.deriv_data  = self.getDerivs()
         self.gammaCompsAll = getting_abcgreek4avrg(num_f=4)
-        print('gammaCompsAll\n', len(self.gammaCompsAll), '\n',self.gammaCompsAll)
 
 
     # setting up the expressions for mechanical and electrical anharmonicities
@@ -91,7 +93,7 @@ class SpectrumEVV:
                                [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc'],
                                [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
 
-            ee, mm = [0, 1], [0, 1, 2, 3, 4, 5]
+            ee, mm = [0, 1], [0, 1]
             self.electrical_terms, self.mechanical_terms, self.electric_avrg, self.mechanical_avrg = picks(electrical_terms_r, ee), picks(mechanical_terms_r, mm), picks(electric_avrg_r, ee), picks(mechanical_avrg_r, mm)
 
         # here the functions of 2 frequencies
@@ -138,10 +140,14 @@ class SpectrumEVV:
         w_h = rec_cm2rec_s(np.array([v for k,v in self.fundamentals_harmonic.items()]))
 
         self.matrix_2d = np.outer(w_h, w_h)
+        print('\nw_h')
+        print(w_h)
+        print('\n1./self.matrix_2d = 1./np.outer(w_h, w_h)')
+        print(1./self.matrix_2d)
         self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis, np.newaxis, :]
 
         for i, te in enumerate(self.el_avrg_tensors):
-            print(f'el_avrg_tensors {self.electric_avrg[i]}\n', te)
+            print(f'\nel_avrg_tensors {self.electric_avrg[i]}\n', te)
 
         for k, tm in enumerate(self.mech_avrg_tensors):
             print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
@@ -149,17 +155,60 @@ class SpectrumEVV:
     def getDerivs(self):
 
         if self.data['source'] == 'cfour':
+            w_h = rec_cm2rec_s(np.array([v for k, v in self.fundamentals_harmonic.items()]))
+            self.matrix_2d = np.outer(w_h, w_h)
+            self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
+                                                                                               np.newaxis, :]
+
+            sqrtvec = 1./np.sqrt(w_h)
+            sqrtmat = 1./np.sqrt(self.matrix_2d.T)
+            sqrt3d = 1./np.sqrt(self.tensor_3d.T)
+
             # data is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
             firstder, secder = self.callbacks.getDipDers()
-            data = [firstder, secder]
+
+            firstder_mat = np.zeros_like(firstder)
+            for i in range(len(sqrtvec)):
+                for j in range(3):
+                    firstder_mat[i, j] = firstder[i, j] / sqrtvec[i]
+
+            secder_mat = np.zeros_like(secder)
+            for i in range(len(sqrtvec)):
+                for j in range(len(sqrtvec)):
+                    for k in range(3):
+                        secder_mat[i, j, k] = secder[i, j, k] / sqrtmat[i, j]
+
+            data = [firstder_mat, secder_mat]
 
             polder = self.callbacks.getPolarDers()
-            data.append(polder[0])
-            data.append(polder[1])
+            fdpol = np.zeros_like(polder[0])
+            for i in range(len(sqrtvec)):
+                for j in range(3):
+                    for k in range(3):
+                        fdpol[i, j, k] = polder[0][i, j, k] / sqrtvec[i]
+
+            sdpol = np.zeros_like(polder[1])
+            for i in range(len(sqrtvec)):
+                for j in range(len(sqrtvec)):
+                    with open('./secPolder', 'a') as file1:
+                        file1.write(f'\n=============================={i} {j}\n{sqrtmat[i, j]}\n')
+                        file1.writelines(str(polder[1][i, j, :, :]))
+
+                    for k in range(3):
+                        for l in range(3):
+                            sdpol[i, j, k, l] = polder[1][i, j, k, l] / sqrtmat[i, j]
+
+            data.append(fdpol)
+            data.append(sdpol)
+
+            from scipy import constants
+            # to go from amu to au mass unit (m_e)
+            amc_au = constants.physical_constants['atomic mass constant'][0] / \
+                     constants.physical_constants['atomic unit of mass'][0]
 
             cubicmat = self.callbacks.getCFF()
+            cubicmat /= amc_au**1.5
             data.append(cubicmat)
-
             allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
             return allpropsdict
@@ -193,8 +242,16 @@ class SpectrumEVV:
             total_sum_el = 0
             prefac_el = self.matrix_2d.T[a, b]
             for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
-                total_sum_el += prefac_el * elavrg[a, b] * el_func(self.all_states, self.w1_mesh, self.w2_mesh,
+                resonance = el_func(self.all_states_harm, self.w1_mesh, self.w2_mesh,
                                                                 Gamma, (a, b))
+                if a==1 and b==4:
+                    print(a, b)
+                    print(resonance)
+                    print(self.w1_mesh)
+                    print(self.w2_mesh)
+                    print(1./prefac_el, elavrg[a, b])
+                    print("result\n", elavrg[a, b] * resonance / prefac_el/24.)
+                total_sum_el += elavrg[a, b] * resonance / prefac_el
             return total_sum_el / 24.
 
         else:
@@ -207,8 +264,12 @@ class SpectrumEVV:
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
                 indx = tuple([abc[j] for j in mechavrgF[-1]])
                 F = self.deriv_data['F_abc'][indx]
-                total_sum_mech += factors[index] * prefac_mech * mechavrg[a, b, c] * F * mech_func(self.all_states, self.w1_mesh, self.w2_mesh,
+                resonance2 = mech_func(self.all_states_harm, self.w1_mesh, self.w2_mesh,
                                                                 Gamma, (a, b, c))
+                with open('./resonance2', 'a') as file1:
+                    file1.write(f'{mech_func}\n')
+                    file1.writelines(str(resonance2)+'\n')
+                total_sum_mech += factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
 
     def intensity(self, Gamma, savedict, el=True, mech=True, printdata=False):
@@ -299,7 +360,7 @@ class SpectrumEVV:
 
         return Z, savedict
 
-    def plot2Dmatplotlib(self, Z, w1mw2, name, Gamma, dpi=500, contour_levels=100, log10=True, shift_scale=None):
+    def plot2Dmatplotlib(self, Z, w1mw2, nametuple, Gamma, el, mech, dpi=200, log10=True):
         import matplotlib.pyplot as plt
         import numpy as np
         import matplotlib
@@ -307,6 +368,13 @@ class SpectrumEVV:
         matplotlib.use('Agg')
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
+        plt.rcParams['axes.titlepad'] = 30
+
+        font = {'family': 'normal',
+                # 'weight': 'bold',
+                'size': 18}
+        matplotlib.rc('font', **font)
+
         X, Y = self.w1_mesh, self.w2_mesh
         if w1mw2:
             y = -(X - Y)
@@ -318,33 +386,46 @@ class SpectrumEVV:
             ystr_mesh = ystr + '_'
         Z_positive = abs(Z) ** 2
         if log10:
-            Z_data = np.log10(Z_positive)
+            Z_data = Z_positive
+            # Z_data = np.log10(Z_positive)
         else:
             Z_data = Z_positive
+            # Z_data = np.log10(Z_positive)
 
         df = {'w1_mesh': X, ystr_mesh: y, 'values_mesh': Z_data}
+        print('\n>>>>>>   Z_data max', max(np.max(df['values_mesh'].flatten(), axis=0), np.max(df['values_mesh'].flatten(), axis=0)),
+              f'\nmax in axes: {np.max(df['values_mesh'].flatten(), axis=0)}, {np.max(df['values_mesh'].flatten(), axis=0)}')
 
-        plt.figure(figsize=(12, 11))
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(1, 1, 1)
 
-        if shift_scale is not None:
-            import matplotlib.colors as colors
-
-            class SkewNormalize(colors.Normalize):
-                def __init__(self, vmin=None, vmax=None, skew_factor=2, clip=False):
-                    self.skew_factor = skew_factor
-                    colors.Normalize.__init__(self, vmin, vmax, clip)
-
-                def __call__(self, value, clip=None):
-                    normalized_value = super().__call__(value, clip)
-                    return np.minimum(normalized_value ** self.skew_factor, 1)
-
-            norm = SkewNormalize(vmin=np.log10(Z_positive).min(), vmax=np.log10(Z_positive).max(), skew_factor=shift_scale)
-        else:
-            norm = None
-
+        import matplotlib.colors as colors
         start_time = time.time()
-        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['values_mesh'], levels=contour_levels, cmap='viridis',
-                            norm=norm)
+        normnow = colors.LogNorm(vmin=1e3, vmax=1e8)
+
+        dynrange = 1000 # stop plotting when lower than this (number times 10) dmax
+        n_cont = 30
+        dynrange_log = np.log10(dynrange)
+
+        intensities = df['values_mesh']
+        d_min = (1.0 / float(dynrange)) * intensities.max()
+
+        dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
+        d_max = dmax_dict[(el, mech)] # m, e, t 29519537.48  48778401.3  48218929.9
+
+        dmax_log10 = float(int(np.log10(d_max)))
+        print("dmax_log10", dmax_log10)
+        levels_ticks = [10**(dmax_log10-i) for i in range(6)]
+        print("levels_ticks", levels_ticks)
+
+        levels = []
+        for i in range(n_cont):
+            levels.append(
+                (d_max) * 10.0 ** (-1.0 * dynrange_log * ((float(n_cont - 1) - float(i)) / float(n_cont - 1))))
+
+        cont = plt.contourf(df['w1_mesh'], df[ystr_mesh], df['values_mesh'], levels=levels, cmap='hot_r',
+                            norm=normnow)
+
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.contourf: {execution_time} seconds")
@@ -352,16 +433,34 @@ class SpectrumEVV:
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
             c.set_edgecolor("face")
-        plt.colorbar()  # Add a colorbar to show the Z scale
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
+
+        import matplotlib.ticker as ticker
+        def fmt(x, pos):
+            a, b = '{:.0e}'.format(x).split('e')
+            b = int(b)
+            return r'${} \times 10^{{{}}}$'.format(a, b)
+
+        # colorbar = plt.colorbar(cont, ticks=levels_ticks, format='%s')
+        colorbar = plt.colorbar(cont, ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
+        # https://stackoverflow.com/questions/25983218/scientific-notation-colorbar
+        # plt.ticklabel_format(style='sci', axis='y', scilimits=(0, 0), useMathText=True)
+
+        # colorbar.set_ticks(levels_ticks, format='%.4f')
+
+        # plt.xlabel(r'$\omega_1$')
+        # plt.ylabel(r'$\omega_2$')
         xs = df['w1_mesh'][0], df['w1_mesh'][-1]
         ys = df[ystr_mesh][0], df[ystr_mesh][-1]
-        plt.title(
-            f'plot2Dmatplotlib().\ndpi={dpi} contour_levels={contour_levels} x{xs[0][0]}..{xs[-1][-1]} y{ys[0][0]}..{ys[-1][-1]}\n{name}\nGamma={Gamma}')
-
+        labeltypedict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
+                         (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
+                         (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
+        nicetitle = f'{nametuple[2]}'
+        # plt.title(
+        #     f'plot2Dmatplotlib().\ndpi={dpi}\nx{xs[0][0]}..{xs[-1][-1]} y{ys[0][0]}..{ys[-1][-1]}\n{nametuple[0]}\nGamma={Gamma}\n{nametuple[1]}\n{np.max(df['values_mesh'].flatten(), axis=0)} or {'{:.4e}'.format(np.max(df['values_mesh'].flatten(), axis=0))}')
+        plt.title(nicetitle) # +'\n\n'+labeltypedict[(el, mech)]
+        plt.tight_layout()
         start_time = time.time()
-        plt.savefig(name, dpi=dpi, format='svg')
+        plt.savefig(nametuple[0], dpi=dpi, format='svg')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.savefig: {execution_time} seconds")
@@ -451,8 +550,21 @@ def w_mn_prod(subscripts, fermi=None, margin=10):
         wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
         wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
 
+        if  abctuple == (1, 4):
+            print(wm1, wn1)
+            print('wm1-wn1', rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))
+            print(wm2, wn2)
+            print('wm2-wn2', rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]))
+            print('w1-w2', rec_cm2rec_s(w1) - rec_cm2rec_s(w2))
+            print('rescod1\n', (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
+            print('rescond2\n', (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
+            print('1/rescod1\n',1./ (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
+            print('1/rescond2\n', 1./ (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
         if fermi is None:
-            return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
+            return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
 
         else:
             w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')]))
@@ -466,9 +578,136 @@ def w_mn_prod(subscripts, fermi=None, margin=10):
             t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
             t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
             t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
-            return (1 / t1 / t2) * (1 / t3 + 1 / t4)
+
+            sumfrac = (1 / t3 + 1 / t4)
+            with open('./fermi', 'a') as file1:
+                file1.write('\n==============================\n')
+                file1.write(f'{abctuple}\n{w_fr11} {w_fr21} {w_fr12} {w_fr22}\n{fermi}\n')
+                file1.writelines(str(t3)+'\n')
+                file1.writelines(str(t4)+'\n')
+                file1.writelines(str(sumfrac) + '\n')
+
+            with open('./fermi_other', 'a') as file1:
+                file1.write('\n==============================\n')
+                file1.write(f'{abctuple}\n{m1n1m2n2}\n')
+                file1.writelines(str(rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))+'\n')
+                file1.writelines(str( rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) )+'\n')
+                file1.writelines(str((1 / t1 / t2)) + '\n')
+
+            return (1 / t1 / t2) * sumfrac
 
     return function
+
+def printT(tensor):
+    import pandas as pd
+    pd.set_option('display.float_format', '{:.10f}'.format)
+
+    ndims = len(tensor.shape)
+
+    # mu_Q
+    if ndims == 2:
+        column_names = ['x', 'y', 'z']
+        row_names    = [f'{i}' for i in range(tensor.shape[0])]
+        df = pd.DataFrame(tensor, columns=column_names)#, index=row_names)
+        df.insert(0, "I", row_names, allow_duplicates=True)
+        df.insert(1, "", ['|']*len(row_names), allow_duplicates=True)
+
+        # print(df)
+        print(df.to_string(index=False))
+
+    elif ndims == 3:
+        # F_abc
+        if tensor.shape[0] == tensor.shape[1] == tensor.shape[2]:
+            row_names = [f'K {i}' for i in range(tensor.shape[0])]
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)#, index=row_names)
+            df.insert(0, "I", ['0']*len(row_names), allow_duplicates=True)
+            df.insert(1, "J", indx, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)#, index=row_names)
+                dfi.insert(0, "I", [f'{ii+1}']*len(row_names), allow_duplicates=True)
+                dfi.insert(1, "J", indx, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+        # mu_QQ
+        elif tensor.shape[0] == tensor.shape[1] != tensor.shape[2]:
+            row_names = ['x', 'y', 'z']
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
+            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
+            df.insert(1, "J", indx, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
+                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
+                dfi.insert(1, "J", indx, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+        # alpha_Q
+        elif tensor.shape[0] != tensor.shape[1] == tensor.shape[2]:
+            row_names = ['x', 'y', 'z']
+            indx = [f'{i}' for i in range(tensor.shape[1])]
+            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
+            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
+            df.insert(1, "", row_names, allow_duplicates=True)
+            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+            for ii, k in enumerate(tensor[1:]):
+                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
+                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
+                dfi.insert(1, "", row_names, allow_duplicates=True)
+                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
+
+                df = pd.concat([df, dfi], ignore_index=True)
+
+            n = len(indx)  # chunk row size
+            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
+
+            for dframe in list_df:
+                print(dframe.to_string(index=False))
+
+    # alpha_QQ
+    elif ndims == 4:
+        listdf = []
+        for i in range(tensor.shape[0]):
+            for j in range(tensor.shape[0]):
+                row_names = ['x', 'y', 'z']
+                df = pd.DataFrame(tensor[i, j], columns=row_names)  # , index=row_names)
+                df.insert(0, "I", [f'{i}'] * 3, allow_duplicates=True)
+                df.insert(1, "J", [f'{j}'] * 3, allow_duplicates=True)
+                df.insert(2, "", row_names, allow_duplicates=True)
+                df.insert(3, "", ['|'] * 3, allow_duplicates=True)
+
+                listdf.append(df)
+
+        dfs = pd.concat(listdf, ignore_index=True)
+        n = tensor.shape[2]  # chunk row size
+        list_df = [dfs[i:i + n] for i in range(0, dfs.shape[0], n)]
+
+        for dframe in list_df:
+            print(dframe.to_string(index=False))
+
+    else:
+        print(f"Dimension of the property in not 2, 3 or 4, it's {ndims}")
 
 def printed2DIRtensors(setup: SpectrumEVV):
     ders = setup.getDerivs()

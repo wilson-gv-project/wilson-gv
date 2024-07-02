@@ -1,5 +1,5 @@
-./spectra/
-!./spectra/*.py
+spectra/
+!spectra/*.py
 
 .idea/
 *.svg

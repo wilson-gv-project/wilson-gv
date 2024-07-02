@@ -38,8 +38,8 @@ omega2 = np.arange(start2, stop2, step2)
 # g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
 #             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out',}
 
 # spectrum is computing intensities on the grid of 2 frequencies
 setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',

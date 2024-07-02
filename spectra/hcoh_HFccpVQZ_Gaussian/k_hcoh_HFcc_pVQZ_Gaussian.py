@@ -3,7 +3,7 @@ import time
 start_time_global = time.time()
 from mock2D.spectrum import c2DIRmain
 import numpy as np
-np.set_printoptions(linewidth=250, suppress=True, precision=17)
+np.set_printoptions(linewidth=250, suppress=False, precision=17)
 import os
 import sys
 
@@ -20,19 +20,23 @@ print(f"""Generated with:
 
 if region==1:
     # first region
-    start1, stop1, step1 = 1180., 2150., 10.
+    start1, stop1, step1 = 1180., 2050., 10.
     start2, stop2, step2 = 2309., 5350., 10.
 elif region==2:
     # second focused region
     start1, stop1, step1 = 2810., 3210., 10.
     start2, stop2, step2 = 5510., 6050., 10.
 elif region is None:
-    start1, stop1, step1 = 1180., 2150., 10.
-    start2, stop2, step2 = 2309., 5350., 10.
+    start1, stop1, step1 = 1961.318, 1981.318, 10.
+    start2, stop2, step2 = 4931.662, 4951.662, 10.
+
 
 
 omega1 = np.arange(start1, stop1, step1)
 omega2 = np.arange(start2, stop2, step2)
+
+# g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
+#             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
 
 g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
@@ -43,22 +47,31 @@ setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
                                                 'files':g16files})
 setup.addTerms(None, None, None, None)
 
+print(setup.fundamentals)
+print(setup.all_states)
+print('----------\n')
+print(setup.all_states_harm)
+
+# print('\n', setup.deriv_data)
 log10=True
 w1mw2=False
-gamma_rc=3.
+gamma_rc=10.
 
 gamma = c2DIRmain.rec_cm2rec_s(gamma_rc)
 gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
-name=f'./svgs/old_w1mw2{str(w1mw2)[0]}_el{str(el)[0]}_mech{str(mech)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_x{start1}t{stop1}_y{start2}t{stop2}pureD.svg'
+step_str = f"{step1:.1f}".replace('.', 'p')
+
+name=f'./svgs/old_w1mw2{str(w1mw2)[0]}_el{str(el)[0]}_mech{str(mech)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_x{str(int(start1))}t{str(int(stop1))}_y{str(int(start2))}t{str(int(stop2))}_step{step_str}pureD.svg'
 
 start_time0 = time.time()
 Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech, printdata=False)
+print('intensity\n', abs(Z)**2)
 end_time0 = time.time()
 execution_time0 = end_time0 - start_time0
 print(f"\nExecution time - setup.intensity: {execution_time0} seconds")
 
 start_time = time.time()
-setup.plot2Dmatplotlib(Z, w1mw2=w1mw2, name=name, Gamma=gamma, dpi=200, contour_levels=6, log10=log10, shift_scale=None)
+setup.plot2Dmatplotlib(Z, w1mw2=w1mw2, nametuple=(name, __file__), Gamma=gamma, dpi=200, contour_levels=6, log10=log10, shift_scale=None)
 end_time = time.time()
 execution_time = end_time - start_time
 print(f"Execution time - setup.plot2Dmatplotlib: {execution_time} seconds")

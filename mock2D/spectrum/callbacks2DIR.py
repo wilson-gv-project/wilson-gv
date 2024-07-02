@@ -72,16 +72,6 @@ class CFOURdata:
         Polarizability derivatives: first order and second order
         Return: tuple[np.ndarray - shape(NM, 3, 3), np.ndarray - shape(NM, NM, 3, 3)]
         """
-        # if self.sourcetype == 'out':
-        #     dalpha, d2alpha = parseCFOUR.getPolarDers(self.files['polardir'])
-        #
-        # elif self.sourcetype == 'pkl':
-        #     dipolepkl = self.files['polar']
-        #     import pickle
-        #     with open(dipolepkl, 'rb') as file:
-        #         dalpha, d2alpha = pickle.load(file)
-        #
-        # return dalpha, d2alpha
 
         dipolepkl = self.files['polar']
         import pickle

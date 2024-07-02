@@ -281,7 +281,8 @@ def parse_output_file(filepath: str):
     coords_section = file_content[coords_start_index:dipole_line_index]
     coords_section = coords_section.split('\n')
     # print(coords_section)
-    for line in coords_section[5:-5]:
+    # quit()
+    for line in coords_section[5:-3]:
 
         if '-------------' not in line and 'Dipole' not in line:
             nus = line.strip().split()
