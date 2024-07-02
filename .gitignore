@@ -1,3 +1,6 @@
+./spectra/
+!./spectra/*.py
+
 .idea/
 *.svg
 *.txt
