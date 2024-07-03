@@ -53,7 +53,7 @@ def one_spectrum_fig(el, mech, region=None, gamma_rc=gamma_rc):
     setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
                                                         'type': 'log',
                                                         'files': g16files})
-    setup.addTerms(None, None, None, None)
+    setup.addTerms([0, 1], [0, 1])
 
     gamma = c2DIRmain.rec_cm2rec_s(gamma_rc)
     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')

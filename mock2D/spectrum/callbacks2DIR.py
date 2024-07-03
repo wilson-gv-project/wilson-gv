@@ -103,14 +103,10 @@ class CFOURdata:
 
             return cubicFC
 
-def str_einsum(origstr, same_ind, lenshape):
-    origstr = origstr[:lenshape]
-    neworigstr = origstr[:same_ind] + 'q' + origstr[same_ind + 1:]
-    return origstr + f',{origstr[same_ind]}q->' + neworigstr
 
 def getDimensionlessNM(datafile: str = None) -> dict:
     """
-    Reduced (dimensionless) normal coordinates
+    Reduced (dimensionless) normal coordinates from QUADRATURE file
     Return: a transformation matrix with dimensionless normal coordinates
     """
     # print('helloooo')

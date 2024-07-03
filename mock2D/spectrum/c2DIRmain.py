@@ -23,11 +23,10 @@ class SpectrumEVV:
     """
     SpectrumEVV class
     Attributes:
-        w1, w2 - np.arrays of of frequencies
+        w1, w2 - np.arrays of frequencies
         w1_mesh, w2_mesh - grid of frequencies w1 and w2
         shape2d - shape of the grid
         fermirm
-
     """
     def __init__(self, w1, w2, data):
 
@@ -65,36 +64,35 @@ class SpectrumEVV:
 
 
     # setting up the expressions for mechanical and electrical anharmonicities
-    def addTerms(self, electrical_terms, mechanical_terms, el_avrg, mech_avrg):
-        if electrical_terms is None and mechanical_terms is None and el_avrg is None and mech_avrg is None:
-            # Terms in expressions
-            electrical_terms_r = [('a+b,a', 'zero,a'), ('b,a', 'zero,a')]
+    def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
+        # Terms in expressions
+        electrical_terms_r = [('a+b,a', 'zero,a'), ('b,a', 'zero,a')]
 
-            # derivatives:
-            # 1. mu_Q, mu QQ, alpha_Q - electric dipole (1st and 2nd derivatives), polarizability (1st der.)
-            # 2. mu_Q, alpha_QQ - electric dipole (1st der.), polarizability (2nd der.)
-            electric_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))],
-                              [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
-                               ]
+        # derivatives:
+        # 1. mu_Q, mu QQ, alpha_Q - electric dipole (1st and 2nd derivatives), polarizability (1st der.)
+        # 2. mu_Q, alpha_QQ - electric dipole (1st der.), polarizability (2nd der.)
+        electric_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))],
+                          [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
+                           ]
 
-            mechanical_terms_r = [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
-                                (('c,a', 'zero,a'), ('a+b,c', 'b+c,a')),
-                                (('a+b,a', 'zero,a'), ('a,a+b', 'b,zero')),
-                                (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
-                                (('b,a', 'zero,a'), ('a,a+b', 'b,zero')),
-                                (('b,a', 'zero,a'), ('b,a+b', 'a,zero'))]
+        mechanical_terms_r = [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
+                            (('c,a', 'zero,a'), ('a+b,c', 'b+c,a')),
+                            (('a+b,a', 'zero,a'), ('a,a+b', 'b,zero')),
+                            (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
+                            (('b,a', 'zero,a'), ('a,a+b', 'b,zero')),
+                            (('b,a', 'zero,a'), ('b,a+b', 'a,zero'))]
 
-            # derivatives:
-            # mu_Q, alpha_Q - for all 6 terms
-            mechanical_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
-                                [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
-                               [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc'],
-                               [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc'],
-                               [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc'],
-                               [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
+        # derivatives:
+        # mu_Q, alpha_Q - for all 6 terms
+        mechanical_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
+                            [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
+                           [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc'],
+                           [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc'],
+                           [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc'],
+                           [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
 
-            ee, mm = [0, 1], [0, 1]
-            self.electrical_terms, self.mechanical_terms, self.electric_avrg, self.mechanical_avrg = picks(electrical_terms_r, ee), picks(mechanical_terms_r, mm), picks(electric_avrg_r, ee), picks(mechanical_avrg_r, mm)
+        ee, mm = electrical_terms_selection, mechanical_terms_selection
+        self.electrical_terms, self.mechanical_terms, self.electric_avrg, self.mechanical_avrg = picks(electrical_terms_r, ee), picks(mechanical_terms_r, mm), picks(electric_avrg_r, ee), picks(mechanical_avrg_r, mm)
 
         # here the functions of 2 frequencies
         self.electr_funs = [w_mn_prod(i, margin=self.margin) for i in self.electrical_terms]
@@ -303,51 +301,6 @@ class SpectrumEVV:
             print(f"\nExecution time - mechanical: {execution_time} seconds")
             print('Mechanical anharmonicities are calculated')
             Z += mechall
-
-        if printdata:
-            np.set_printoptions(linewidth=250, suppress=True, precision=10)
-            np.set_printoptions(threshold=np.inf)
-
-            import sys
-            import io
-            output = io.StringIO()
-            sys.stdout = output
-            print("\nGrid:")
-
-            array_3d = np.array([self.w1_mesh,self.w2_mesh]).T
-            print(array_3d.shape)
-            alist = [np.array2string(i).splitlines() for i in array_3d]
-            print('\n'.join(['\t'.join(k) for k in zip(*alist)]))
-            np.set_printoptions(linewidth=250, suppress=False, precision=10)
-
-            print("\nMechanical  :") if mech else None
-            print(mechall) if mech else None
-            print("\nElectrical  :") if el else None
-            print(elall) if el else None
-
-            print("\nMechanical np.log10(mechall) :") if mech else None
-            print(np.log10(mechall)) if mech else None
-            print("\nElectrical np.log10(elall)   :") if el else None
-            print(np.log10(elall)) if el else None
-            print("\nnp.log10(elall*mechall)      :") if el and mech else None
-            print(np.log10(elall*mechall)) if el and mech else None
-
-            print("\nTotal abs(Z)** 2:")
-            print(abs(Z)** 2)
-
-            print("\nTotal np.log10(abs(Z)** 2):")
-            print(np.log10(abs(Z)** 2))
-
-            sys.stdout = sys.__stdout__
-            array_str = output.getvalue()
-
-            with open(f'./anharmonicities_Gamma{Gamma}_({self.w1[0]}_{self.w1[-1]}_{self.w1[1]-self.w1[0]})({self.w2[0]}_{self.w2[-1]}_{self.w2[1]-self.w2[0]}).txt', 'w') as f:
-                import os
-                f.write(f"""Generated with:
-                getcwd:        {os.getcwd()}
-                __file__:      {__file__}
-                sys.argv:      {sys.argv[0]}\n\n""")
-                f.write(array_str)
 
         key = self.id+f'_gamma{Gamma}'
         if key not in savedict:
@@ -709,13 +662,16 @@ def printT(tensor):
     else:
         print(f"Dimension of the property in not 2, 3 or 4, it's {ndims}")
 
+
 def printed2DIRtensors(setup: SpectrumEVV):
+
     ders = setup.getDerivs()
     print('\nFundamental frequencies (anharmonic):', list(setup.fundamentals.values()))
     print('Fundamental frequencies (harmonic)  :', list(setup.fundamentals_harmonic.values()), '\n')
 
     print('All frequencies (anharmonic)  :', setup.all_states, '\n')
+
     for d in ders:
         print(d, ders[d].shape)#, '\n', ders[d])
         printT(ders[d])
-        print('=========================================================\n')
+        print('==================================\n')
