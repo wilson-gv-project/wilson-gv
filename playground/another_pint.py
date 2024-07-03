@@ -70,7 +70,7 @@ ureg.default_system = 'Planck'
 
 # print('\n----------------------------------------')
 # print('g16_coh2b3lypoptanhramanDZ\n')
-from mock2D.spectrum.callbacks2DIR import CFOURdata, GaussianData
+from wilson.spectrum.callbacks2DIR import CFOURdata, GaussianData
 gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out'
 q3 = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out'
 data = {'source': 'gaussian', 'type': 'log', 'files': {'log': gaussian_path, '3quanta': q3}}
@@ -217,7 +217,7 @@ print(dipole_derivs_CFOUR1)
 # print(targedvals/interm)
 
 print('\n---------------------------------------------------------------------')
-from mock2D.spectrum.callbacks2DIR import getDimensionlessNM
+from wilson.spectrum.callbacks2DIR import getDimensionlessNM
 dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/QUADRATURE'
 # print(dqs, type(dqs))
 

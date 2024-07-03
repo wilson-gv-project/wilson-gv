@@ -226,7 +226,7 @@ print(targedvals)
 # print(targedvals/interm)
 
 print('\n---------------------------------------------------------------------')
-from mock2D.spectrum.callbacks2DIR import getDimensionlessNM
+from wilson.spectrum.callbacks2DIR import getDimensionlessNM
 dimlessFilepkl = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/dimensionless.pkl'
 dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/QUADRATURE'
 dqs = getDimensionlessNM(dimlessFilepkl)

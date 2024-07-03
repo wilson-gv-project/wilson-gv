@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from mock2D.spectrum import c2DIRmain
+from wilson.spectrum import c2DIRmain
 
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=True, precision=10)

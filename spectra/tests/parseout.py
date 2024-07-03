@@ -10,7 +10,7 @@ from scipy import constants
 
 mute_vib = True
 
-from mock2D.spectrum.callbacks2DIR import CFOURdata, GaussianData
+from wilson.spectrum.callbacks2DIR import CFOURdata, GaussianData
 # is it really QZ?????
 vibdata_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/vibdata.pkl'
 cubic_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/cubic.pkl'

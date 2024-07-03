@@ -9,7 +9,7 @@ ureg = UnitRegistry()
 SQRT_HBAR_OVER_2PIC = (np.sqrt(ureg.hbar / (2 * np.pi * ureg.speed_of_light * 1 * ureg.cm**-1))).to('unified_atomic_mass_unit**0.5 * bohr').magnitude
 
 import numpy as np
-from mock2D.spectrum.callbacks2DIR import CFOURdata, GaussianData
+from wilson.spectrum.callbacks2DIR import CFOURdata, GaussianData
 
 basis = 'T'
 
