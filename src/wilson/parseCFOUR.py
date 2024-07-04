@@ -12,13 +12,13 @@
 #     - NORMCO                       --- mass-weighted coordinates: equilibrium and normal coordinates, and frequencies
 #     - FCMFINAL                     --- non-mass-weighted Hessian matrix in columns (xyz)
 #     - DIPOL                        --- dipole moment (a.u.)
-#     - DIPDER                       ---
+#     - DIPDER                       --- dipole moment first order derivatives (cartesian)
 #     - POLAR                        --- static polarizability (a.u.)
 #     - out                          --- the final output file in anharmonic parallel procedure:
 #                            1) All levels with up to three quanta frequencies; 2) equilibrium geometry;
 #                            3) normal coordinates, non-mass-weighted (a.u.); 4) F(IJKK)/a.u ; 5) F(IJKK)/cm-1 ;
 #                            6) harmonic and fundamental frequencies and intensities
-#     - dipolex(yz)                  ---
+#     - dipolex(yz)                  --- dipole moment (1st-2nd-3rd) order derivatives (normal coordinates)
 #     - cubic                        --- cubic force constants in cm-1 in dimensionless normal modes
 #     - quartic                      --- quartic force constants in cm-1 in dimensionless normal modes
 
@@ -27,11 +27,11 @@ import os
 import pickle
 
 
-def pOutfile(filepath: str):
+def pOutfile(filepath: str) -> np.array:
     """
     Parsing outfile0.out
     :param filepath:
-    :return:
+    :return: OMAT transformation (rotation) matrix from outfile which is printed when PRINT_LEVEL=1
     """
     with open(filepath, 'r') as file:
         file_content = file.read()
