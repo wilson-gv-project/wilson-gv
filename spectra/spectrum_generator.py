@@ -4,6 +4,9 @@ start_time_global = time.time()
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=17)
 import os
+
+from wilson import spectrum
+
 # import sys
 #
 # print ('argument list', sys.argv)
@@ -18,8 +21,8 @@ print(f"""Generated with:
 '__file__:      {__file__}\n\n""")
 
 
-g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
 datain = {'source': 'gaussian',
           'type': 'log',
@@ -45,11 +48,11 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
-    setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info=datain)
+    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
     setup.addTerms(*terms_selection)
 
     step1 = regions[region][0][-1]
-    gamma = c2DIRmain.rec_cm2rec_s(gamma_rc)
+    gamma = spectrum.rec_cm2rec_s(gamma_rc)
     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
     step_str = f"{step1:.1f}".replace('.', 'p')
 
@@ -79,8 +82,10 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     print('\n===============================================================\n   Next spectrum below\n')
 
 list_figs = [(True, False), (False, True), (True, True)]
-# for s in list_figs:
-#     one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1)
+for s in list_figs:
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1)
+
+quit()
 
 import pandas as pd
 import json

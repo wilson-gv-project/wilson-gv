@@ -9,7 +9,7 @@ import time
 import numpy as np
 np.set_printoptions(linewidth=100000)
 
-from src.wilson.retrievedata import CFOURdata, GaussianData
+from wilson.retrievedata import CFOURdata, GaussianData
 
 def picks(pool, list_of_indices):
     return [pool[i] for i in list_of_indices]
@@ -426,8 +426,8 @@ def get_abc(nloops, abcrange):
     return np.stack(np.meshgrid(*stacklist), axis=-1).reshape(-1, nloops)
 
 def getting_abcgreek4avrg(num_f):
-    from .. import macroscopics
-    pol_g = macroscopics.get_iso_f(num_f)
+    from wilson import orientationalaveraging
+    pol_g = orientationalaveraging.get_iso_f(num_f)
     new = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
     return new
 

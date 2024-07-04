@@ -1,4 +1,4 @@
-from src.calculations import parseGaussian, parseCFOUR
+from calculations import parseGaussian, parseCFOUR
 from typing import Any
 
 import numpy as np
