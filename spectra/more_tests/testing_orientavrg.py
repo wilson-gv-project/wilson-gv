@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from wilson.spectrum import c2DIRmain
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=True, precision=17)
 

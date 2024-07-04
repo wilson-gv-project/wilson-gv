@@ -3,13 +3,12 @@ import sys
 import numpy as np
 np.set_printoptions(linewidth=350, threshold=sys.maxsize, suppress=True, precision=12)
 
-import copy
 from pint import UnitRegistry
 ureg = UnitRegistry()
 SQRT_HBAR_OVER_2PIC = (np.sqrt(ureg.hbar / (2 * np.pi * ureg.speed_of_light * 1 * ureg.cm**-1))).to('unified_atomic_mass_unit**0.5 * bohr').magnitude
 
 import numpy as np
-from wilson.spectrum.callbacks2DIR import CFOURdata, GaussianData
+from src.wilson.retrievedata import CFOURdata, GaussianData
 
 basis = 'T'
 

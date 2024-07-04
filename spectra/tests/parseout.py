@@ -5,12 +5,11 @@ pd.set_option('display.max_rows', sys.maxsize)
 
 import numpy as np
 np.set_printoptions(linewidth=350, threshold=sys.maxsize, suppress=True, precision=10)
-import re
 from scipy import constants
 
 mute_vib = True
 
-from wilson.spectrum.callbacks2DIR import CFOURdata, GaussianData
+from src.wilson.retrievedata import CFOURdata, GaussianData
 # is it really QZ?????
 vibdata_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/vibdata.pkl'
 cubic_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/cubic.pkl'

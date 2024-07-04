@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from wilson.spectrum import c2DIRmain
 import faulthandler
 faulthandler.enable()
 

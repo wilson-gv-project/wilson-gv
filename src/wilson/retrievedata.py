@@ -1,5 +1,4 @@
-from wilson.spectrum import parseCFOUR
-from wilson.spectrum import parseGaussian
+from src.wilson import parseCFOUR, parseGaussian
 from typing import Any
 
 import numpy as np
@@ -34,6 +33,7 @@ class CFOURdata:
         """
         Dictionary of all the states and their frequencies
         Return: dict[tuple[int]: float, tuple[int, int]: float, tuple[int, int, int]: float]
+        E.g.: {(0,): 1000., (0, 1): 2000., (0, 1, 2): 3000.}
         """
         if self.sourcetype == 'out':
             ls0, ls1, ls2, ls3, ls4 = parseCFOUR.parse_output_file(self.files['out'])

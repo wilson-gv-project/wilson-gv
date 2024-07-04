@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import time
 start_time_global = time.time()
-from wilson.spectrum import c2DIRmain
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=17)
 import os
