@@ -11,10 +11,10 @@ mute_vib = True
 
 from src.wilson.retrievedata import CFOURdata, GaussianData
 # is it really QZ?????
-vibdata_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/vibdata.pkl'
-cubic_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/cubic.pkl'
-dipole_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/dipolexyz.pkl'
-polar_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/polar.pkl'
+vibdata_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/vibdata.pkl'
+cubic_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/cubic.pkl'
+dipole_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/dipolexyz.pkl'
+polar_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/polar.pkl'
 
 files = {'vibdata': vibdata_path, 'cubic': cubic_path, 'dipole': dipole_path, 'polar': polar_path}
 data = {'source': 'cfour', 'type': 'pkl', 'files': files}
@@ -29,7 +29,7 @@ if not mute_vib:
 
     print('\n-------------------------------------\n')
 
-gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out'
+gaussian_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out'
 data = {'source': 'gaussian', 'type': 'log', 'files': {'log': gaussian_path}}
 gaussianparser = GaussianData(data)
 
@@ -65,9 +65,9 @@ np.set_printoptions(linewidth=350, threshold=sys.maxsize, suppress=True, precisi
 # print(dipole_derivs_Gaussian2)
 
 print('\n-------------------------------------')
-print('Other Gaussian data - TZ\n')
+print('Other Gaussian input_data_info - TZ\n')
 
-gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfanh_newopt_raman_new.out'
+gaussian_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfanh_newopt_raman_new.out'
 data = {'source': 'gaussian', 'type': 'log', 'files': {'log': gaussian_path}}
 gaussianparser = GaussianData(data)
 
@@ -122,8 +122,8 @@ print(factors_array)
 quit()
 
 from scriptsHPC.utils import parseGaussian
-# file_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanDZ.out'
-file_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/g16_coh2hfoptanhramanQZ.out'
+# file_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanDZ.out'
+file_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/g16_coh2hfoptanhramanQZ.out'
 
 results = parseGaussian.parse_frequencies(file_path)
 # get a dictionary from results['Fundamental Bands'] dataframe with keys as the first column and values as the third column

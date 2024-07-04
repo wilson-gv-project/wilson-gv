@@ -30,7 +30,7 @@
 #         xja2fja
 #         # Execute xcubic and append output to out file
 #         xcubic >> out
-# 5. Make pickles from output files and save them in the data directory
+# 5. Make pickles from output files and save them in the input_data_info directory
 # 6. Tadaaa
 #
 
@@ -115,6 +115,6 @@ os.chdir(basedir)
 #
 # # - 7_4 -
 # makeDisplacements(delta=0.01)
-# # - 6 - make pickles and save to data dir
+# # - 6 - make pickles and save to input_data_info dir
 
 

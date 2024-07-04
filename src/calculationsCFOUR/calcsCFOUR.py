@@ -29,7 +29,7 @@
 #         xja2fja
 #         # Execute xcubic and append output to out file
 #         xcubic >> out
-# 5. Make pickles from output files and save them in the data directory
+# 5. Make pickles from output files and save them in the input_data_info directory
 # 6. Tadaaa
 #
 
@@ -78,7 +78,7 @@ MEM_UNIT=GB)
     # print(template)
     # Writing to file
     with open("ZMAT", "w") as file1:
-        # Writing data to a file
+        # Writing input_data_info to a file
         file1.writelines(template)
 
 
@@ -154,7 +154,7 @@ MEM_UNIT=GB)
 
     # Writing to file
     with open(f'./{jobtype}/ZMAT', "w") as file1:
-        # Writing data to a file
+        # Writing input_data_info to a file
         file1.writelines(znew)
 
 
@@ -304,7 +304,7 @@ exit 0
 """
 
     with open(outname, "w") as file1:
-        # Writing data to a file
+        # Writing input_data_info to a file
         file1.writelines(text)
 
     # make executable
@@ -414,7 +414,7 @@ done
     content.insert(index + 1, elmnt + elemnt2)
 
     with open(submitfile, "w") as file2:
-        # Writing data to a file
+        # Writing input_data_info to a file
         file2.writelines(content)
 
 
@@ -605,7 +605,7 @@ done
 """
 
     with open("submit.sh", "w") as file1:
-        # Writing data to a file
+        # Writing input_data_info to a file
         file1.writelines(text)
 
     # make executable

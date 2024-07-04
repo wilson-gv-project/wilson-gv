@@ -5,10 +5,10 @@ Expected directory structure:
 ├── GENBAS -> /cluster/projects/nn14654k/vle014/cfour_serial/bin/../basis/GENBAS
 ├── ZMAT
 ├── ZMATnew     ----> optimized geometry
-├── anharm      ----> directory with data
-│    ├── save           ----> directory with data
+├── anharm      ----> directory with input_data_info
+│    ├── save           ----> directory with input_data_info
 ├── outfile0.out
-├── polar       ----> directory with data
+├── polar       ----> directory with input_data_info
 │    ├── 10_12pn    ...
 │    ├── 8p         ...
 ├── slurm-5778462.out

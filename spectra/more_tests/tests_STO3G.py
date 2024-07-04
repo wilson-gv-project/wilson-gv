@@ -27,24 +27,24 @@ omega2 = np.arange(start2, stop2, step2)
 
 ################################################################
 
-# cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/TESTS_240607/c4_HF_STO_3G_allopt/outfile0.out',
-#                   'cubic': '/home/vlew/scriptsHPC/data/TESTS_240607/c4_HF_STO_3G_allopt/cubic',
-#                   'dipolexyz': '/home/vlew/scriptsHPC/data/TESTS_240607/c4_HF_STO_3G_allopt/dipole',
-#                   'polar': '/home/vlew/scriptsHPC/data/TESTS_240607/c4_HF_STO_3G_allopt/upd_polar/polar.pkl'
+# cfourdatafiles = {'out': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/c4_HF_STO_3G_allopt/outfile0.out',
+#                   'cubic': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/c4_HF_STO_3G_allopt/cubic',
+#                   'dipolexyz': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/c4_HF_STO_3G_allopt/dipole',
+#                   'polar': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/c4_HF_STO_3G_allopt/upd_polar/polar.pkl'
 #                   }
 #
 # # spectrum is computing intensities on the grid of 2 frequencies
-# setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'cfour',
+# setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'cfour',
 #                                                 'type': 'out',
 #                                                 'files':cfourdatafiles})
 
 ################################################################
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/TESTS_240607/g16_hfoptanhraman_STO_3G.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/TESTS_240607/g16_hfoptanhraman_STO_3G.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/g16_hfoptanhraman_STO_3G.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/g16_hfoptanhraman_STO_3G.out',}
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 print(setup.all_states)
@@ -150,11 +150,11 @@ print(result)
 quit()
 ################################################################
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/TESTS_240607/g16_hfoptanhraman_STO_3G.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/TESTS_240607/g16_hfoptanhraman_STO_3G.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/g16_hfoptanhraman_STO_3G.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/TESTS_240607/g16_hfoptanhraman_STO_3G.out',}
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup2 = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+setup2 = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 

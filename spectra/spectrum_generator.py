@@ -18,8 +18,8 @@ print(f"""Generated with:
 '__file__:      {__file__}\n\n""")
 
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
 datain = {'source': 'gaussian',
           'type': 'log',
@@ -28,7 +28,7 @@ datain = {'source': 'gaussian',
 # print(setup.fundamentals)
 # print(setup.all_states)
 # print('----------\n')
-# print(setup.all_states_harm)
+# print(setup.all_states_harmonic)
 
 log10=True
 w1mw2=False
@@ -45,7 +45,7 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
-    setup = c2DIRmain.SpectrumEVV(omega1, omega2, data=datain)
+    setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info=datain)
     setup.addTerms(*terms_selection)
 
     step1 = regions[region][0][-1]
@@ -85,7 +85,7 @@ list_figs = [(True, False), (False, True), (True, True)]
 import pandas as pd
 import json
 
-# Assuming your data is stored in a JSON file
+# Assuming your input_data_info is stored in a JSON file
 with open('calcfiles.json', 'r') as file:
     data = json.load(file)
 print(data)
@@ -108,7 +108,7 @@ for molecule_name, molecule_data in data['molecules'].items():
                                 if isinstance(file_paths, dict):
                                     all_keys.update(file_paths.keys())
 
-# Second pass to create the flattened data structure
+# Second pass to create the flattened input_data_info structure
 for molecule_name, molecule_data in data['molecules'].items():
     for method, method_data in molecule_data.items():
         if method.startswith('_comment'):

@@ -67,7 +67,7 @@ def pMOLDEN(filepath: str) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
-    # Variables to store atoms, geometry, and vibration data
+    # Variables to store atoms, geometry, and vibration input_data_info
     atoms = []
     geometry_data = []
     vibrations_data = {}
@@ -90,14 +90,14 @@ def pMOLDEN(filepath: str) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]
             in_geometry_section = False
             continue
 
-        # Capture atoms and geometry data
+        # Capture atoms and geometry input_data_info
         if in_geometry_section:
             data = line.strip().split()
             atom_label = data[0]
             atoms.append(atom_label)
             geometry_data.append(data[1:])  # Exclude the atom label
 
-        # Capture vibration data
+        # Capture vibration input_data_info
         elif in_vibration_section:
             if line.strip().startswith('vibration'):
                 vibration_number = int(line.split()[-1])
@@ -125,7 +125,7 @@ def pNORMCO(filepath: str):
     with open(filepath, 'r') as file1:
         linesnormco = file1.readlines()
 
-    # Variables to store atoms, geometry, and vibration data
+    # Variables to store atoms, geometry, and vibration input_data_info
     massweightgeo = []
 
     # Flags to identify sections
@@ -143,7 +143,7 @@ def pNORMCO(filepath: str):
             in_geometry_section = False
             break
 
-        # Capture atoms and geometry data
+        # Capture atoms and geometry input_data_info
         if in_geometry_section:
             data1 = lin.strip().split()
             massweightgeo.append(data1)  # Exclude the atom label
@@ -260,7 +260,7 @@ def parse_output_file(filepath: str):
              anharmonic_intensities
              harmonic_transitions
     """
-    # Initialize lists to hold the column data
+    # Initialize lists to hold the column input_data_info
     modes = []
     anharmonic_frequencies = []
     anharmonic_intensities = []
@@ -335,7 +335,7 @@ def get_anharmonic_fundamentals(outfile: str, filetype: str = 'out') -> dict:
     """
     Extracts fundamental frequencies with anharmonic corrections from a given file.
 
-    This function reads data from the specified output file or a pre-loaded object,
+    This function reads input_data_info from the specified output file or a pre-loaded object,
     and extracts the fundamental frequencies with anharmonic corrections.
 
     Parameters:
@@ -382,7 +382,7 @@ def pDipole(filenamebase: str):
     """
     Parsing dipole(xyz) files dipole(xyz)
     :param filenamebase: basename for dipole(xyz) files, e.g, 'dipole'
-    :return: dictionary from dipole(xyz) data
+    :return: dictionary from dipole(xyz) input_data_info
     """
     dct = {}
     with open(filenamebase, 'r') as file:
@@ -739,7 +739,7 @@ def getCubicPost(freq: dict, cubic: np.ndarray, recipcm: bool = False):
 
 def describe_structure(obj, level=0):
     """
-    Recursively describe the structure of a Python object with complex data types.
+    Recursively describe the structure of a Python object with complex input_data_info types.
     """
     indent = '  ' * level
     obj_type = type(obj).__name__
@@ -781,7 +781,7 @@ def unpickle(file: str):
     hf_cubicarray = '../scriptsHPC/cfourscripts/hf_cubicarray.pkl'
     hf_polarders = '../scriptsHPC/cfourscripts/hf_polarders.pkl'
     hf_vibdata = '../scriptsHPC/cfourscripts/hf_vibdata.pkl'
-    # this data is from MOLDEN file
+    # this input_data_info is from MOLDEN file
     hf_normalmodes = '../scriptsHPC/cfourscripts/hf_normalmodes.pkl'
     hf_rawdata_polar = '../scriptsHPC/cfourscripts/hf_rawdata_polar.pkl'
 
@@ -856,11 +856,11 @@ def dictinfo(dct: dict, level: int = 0):
                 print('\n' + ' ' * levels[level] + 'Description' + ' ' * (width - 11), dct['metadata']['description'])
                 print('\n' + ' ' * levels[level] + 'Contents' + ' ' * (width - 11))
                 for descr in dct['metadata']['contents']:
-                    # print(dct['data'][descr])
-                    if type(dct['data'][descr]) == np.ndarray:
-                        extra = 'with shape ' + str(dct['data'][descr].shape)
-                    elif type(dct['data'][descr]) == list:
-                        extra = 'with length ' + str(len(dct['data'][descr]))
+                    # print(dct['input_data_info'][descr])
+                    if type(dct['input_data_info'][descr]) == np.ndarray:
+                        extra = 'with shape ' + str(dct['input_data_info'][descr].shape)
+                    elif type(dct['input_data_info'][descr]) == list:
+                        extra = 'with length ' + str(len(dct['input_data_info'][descr]))
                     else:
                         extra = ''
                     print(' ' * levels[level + 1] + f'{descr}:' + ' ' * (width - len(descr)),
@@ -877,7 +877,7 @@ def dictinfo(dct: dict, level: int = 0):
 # this is about getting raw hessian matrix and doing vib analysis with it
 def hessianfromout(outfilename: str):
     """
-    Getting hessian data from outfile0.out
+    Getting hessian input_data_info from outfile0.out
 
     :param outfilename:
     :return:
@@ -964,7 +964,7 @@ def getrotproj(filename: str):
     """
     Getting Rotationally projected vibrational frequencies from.out file
 
-    E.g, filename = '../data/rawouts/anharm_hf_outfile0.out'
+    E.g, filename = '../input_data_info/rawouts/anharm_hf_outfile0.out'
     :return:
     """
     # Read the contents of the file fchk
@@ -1048,7 +1048,7 @@ def computeRedMass4nm(filename: str):
     # sqrtmmm = np.repeat(np.sqrt(mass), 3)
     # sqrtmmminv = np.divide(1.0, sqrtmmm)
 
-    # filename = '../scriptsHPC/data/rawouts/anharm_hf_MOLDEN'
+    # filename = '../scriptsHPC/input_data_info/rawouts/anharm_hf_MOLDEN'
     with open(filename, 'rb') as f:
         moldendata = pMOLDEN(filename)
 

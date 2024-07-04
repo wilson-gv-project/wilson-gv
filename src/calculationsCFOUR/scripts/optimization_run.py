@@ -30,7 +30,7 @@
 #         xja2fja
 #         # Execute xcubic and append output to out file
 #         xcubic >> out
-# 5. Make pickles from output files and save them in the data directory
+# 5. Make pickles from output files and save them in the input_data_info directory
 # 6. Tadaaa
 #
 

@@ -18,14 +18,14 @@ print(f"""Generated with:
 '__file__:      {__file__}\n\n""")
 
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
 
 # print(setup.fundamentals)
 # print(setup.all_states)
 # print('----------\n')
-# print(setup.all_states_harm)
+# print(setup.all_states_harmonic)
 
 log10=True
 w1mw2=False
@@ -49,7 +49,7 @@ def one_spectrum_fig(el, mech, region=None, gamma_rc=gamma_rc):
     omega2 = np.arange(start2, stop2, step2)
 
     # spectrum is computing intensities on the grid of 2 frequencies
-    setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+    setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                         'type': 'log',
                                                         'files': g16files})
     setup.addTerms([0, 1], [0, 1])

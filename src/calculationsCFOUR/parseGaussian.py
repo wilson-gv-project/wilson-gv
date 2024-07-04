@@ -158,7 +158,7 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
         else:
             results[section] = pd.DataFrame(data[2:-1])
         # elif section == 'Combination Bands':
-        #     results[section] = pd.DataFrame(data[1:-1])
+        #     results[section] = pd.DataFrame(input_data_info[1:-1])
         # print(results[section])
         # Extracting the digits before and in the parentheses
         main_numbers = [i[0] for i in results[section][0]]
@@ -183,7 +183,7 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
             results[section].insert(6, 'n_c', sub_numbers)
             results[section].drop(results[section].columns[4], axis=1, inplace=True)
 
-    # save the header of dataframes of the dictionary results and remove it from dataframe data
+    # save the header of dataframes of the dictionary results and remove it from dataframe input_data_info
     # results = {section: df.iloc[1:] for section, df in results.items()}
     # i also want to change values which contain () such as 2(1) and  1(1) - to 2 and 1, i.e. remove parentheses
     # results = {section: df.replace(r'\(.*\)', '', regex=True) for section, df in results.items()}

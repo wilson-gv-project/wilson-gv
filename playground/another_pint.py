@@ -71,8 +71,8 @@ ureg.default_system = 'Planck'
 # print('\n----------------------------------------')
 # print('g16_coh2b3lypoptanhramanDZ\n')
 from src.wilson.retrievedata import CFOURdata, GaussianData
-gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out'
-q3 = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out'
+gaussian_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out'
+q3 = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out'
 data = {'source': 'gaussian', 'type': 'log', 'files': {'log': gaussian_path, '3quanta': q3}}
 gaussianparser = GaussianData(data)
 # quit()
@@ -199,10 +199,10 @@ print('\n--------------------------------------------')
 # quit()
 
 basis = 'D'
-vibdata_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/out'
-cubic_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/cubic'
-dipole_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/dipole'
-# polar_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/polar.pkl'
+vibdata_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/out'
+cubic_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/cubic'
+dipole_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/dipole'
+# polar_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVDZ/polar.pkl'
 
 files = {'out': vibdata_path, 'cubic': cubic_path, 'dipolexyz': dipole_path}
 data = {'source': 'cfour', 'type': 'out', 'files': files}
@@ -218,7 +218,7 @@ print(dipole_derivs_CFOUR1)
 
 print('\n---------------------------------------------------------------------')
 from src.wilson.retrievedata import getDimensionlessNM
-dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/QUADRATURE'
+dimlessFile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVDZ/QUADRATURE'
 # print(dqs, type(dqs))
 
 dqs = getDimensionlessNM(dimlessFile)
@@ -232,13 +232,13 @@ undispl = np.array([     [  -0.0000000000   ,     0.0000000000    ,    1.1177168
 
 
 from scriptsHPC.utils import parseCFOUR
-moldenfile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/MOLDEN'
+moldenfile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVDZ/MOLDEN'
 one, two, three = parseCFOUR.pMOLDEN(moldenfile)
 # print('\nnon-mass-weighted - MOLDEN')
 # print(three[8])
 # print(one)
 
-normcofile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/NORMCO'
+normcofile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVDZ/NORMCO'
 massweighted = parseCFOUR.pNORMCO(normcofile)
 # print('\nmass-weighted - NORMCO')
 # print(massweighted)

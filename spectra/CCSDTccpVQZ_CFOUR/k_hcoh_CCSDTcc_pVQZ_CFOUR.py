@@ -17,19 +17,19 @@ print(f"""Generated with:
 'getcwd:        {os.getcwd()}
 '__file__:      {__file__}\n\n""")
 
-cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
-                  'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
-                  'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
+cfourdatafiles = {'out': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/CCSDTcc_pVQZ/out',
+                  'cubic': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
+                  'dipolexyz': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
                   'polar': '/home/vlew/mock2D/spectra/CCSDTccpVQZ_CFOUR/polar.pkl'
                   }
 
-dimlessFile = '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/QUADRATURE'
+dimlessFile = '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/CCSDTcc_pVQZ/QUADRATURE'
 
 
 # print(setup.fundamentals)
 # print(setup.all_states)
 # print('----------\n')
-# print(setup.all_states_harm)
+# print(setup.all_states_harmonic)
 
 log10=True
 w1mw2=False
@@ -53,7 +53,7 @@ def one_spectrum_fig(el, mech, region=None, gamma_rc=gamma_rc):
     omega2 = np.arange(start2, stop2, step2)
 
     # spectrum is computing intensities on the grid of 2 frequencies
-    setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'cfour',
+    setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'cfour',
                                                         'type': 'out',
                                                         'files': cfourdatafiles})
     setup.addTerms(None, None, None, None)

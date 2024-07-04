@@ -227,8 +227,8 @@ print(targedvals)
 
 print('\n---------------------------------------------------------------------')
 from src.wilson.retrievedata import getDimensionlessNM
-dimlessFilepkl = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/dimensionless.pkl'
-dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/QUADRATURE'
+dimlessFilepkl = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/dimensionless.pkl'
+dimlessFile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/QUADRATURE'
 dqs = getDimensionlessNM(dimlessFilepkl)
 # print(dqs, type(dqs))
 
@@ -236,7 +236,7 @@ dqs = getDimensionlessNM(dimlessFile)
 print(dqs[8])
 
 from scriptsHPC.utils import parseCFOUR
-moldenfile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVQZ/MOLDEN'
+moldenfile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/MOLDEN'
 one, two, three = parseCFOUR.pMOLDEN(moldenfile)
 print(three[8])
 

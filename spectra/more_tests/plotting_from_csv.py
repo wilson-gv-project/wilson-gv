@@ -220,8 +220,8 @@ shp1 = x.shape
 #
 # print(X.shape, Y.shape, Z.shape)
 #
-# w1mw2=False # fixed in data
-# log10=True # fixed in data
+# w1mw2=False # fixed in input_data_info
+# log10=True # fixed in input_data_info
 # contour_levels = 6
 # dpi = 200
 # pref = 'upd2_'
@@ -251,8 +251,8 @@ plot2Dmatplotlib_rawZ(X, Y, Z, w1mw2=w1mw2, name=pref1+f'clev{contour_levels}_dp
 print('\n-----------------------------------')
 print('plotted first one\n')
 
-# w1mw2=False # fixed in data
-# log10=True # fixed in data
+# w1mw2=False # fixed in input_data_info
+# log10=True # fixed in input_data_info
 # contour_levels = 4
 # dpi = 200
 # plot2Dmatplotlib(X, Y, Z, w1mw2=w1mw2, name=pref+f'clev{contour_levels}_dpi{dpi}'+fname[:-4]+'.svg', Gamma=5.0,

@@ -63,7 +63,7 @@ def parse_slurm_output(slurm_output):
         elif "Memory statistics, in GiB:" in line:
             next(lines)  # Skip header line
             next(lines)
-            alloc_line = next(lines)  # First data line
+            alloc_line = next(lines)  # First input_data_info line
             parts = alloc_line.split()
             results["Mem Alloc"] = float(parts[1])
             if len(parts) > 2:
@@ -196,7 +196,7 @@ def print_dataframe_with_alignment(df):
         formatted_row = " | ".join(f"{str(row[col]).ljust(column_widths[col] + len(str(row[col])) - len(remove_ansi_codes(str(row[col]))))}" for col in df.columns)
         print(formatted_row)
 
-# Collect data and display the DataFrame
+# Collect input_data_info and display the DataFrame
 df = collect_data_from_files()
 
 df.style.hide()

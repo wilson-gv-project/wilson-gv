@@ -12,10 +12,10 @@ from src.wilson.retrievedata import CFOURdata, GaussianData
 
 basis = 'T'
 
-# gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfoptanhramanDZ.out'
-gaussian_path = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfanh_newopt_raman_newTZ.out'
-q3 = '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfTZanh_newopt_raman_new_3quanta.out'
-# gaussian_path = f'/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhraman{basis}Z.out'
+# gaussian_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_hfoptanhramanDZ.out'
+gaussian_path = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfanh_newopt_raman_newTZ.out'
+q3 = '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_hfTZanh_newopt_raman_new_3quanta.out'
+# gaussian_path = f'/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhraman{basis}Z.out'
 data = {'source': 'gaussian', 'type': 'log', 'files': {'log': gaussian_path, '3quanta': q3}}
 gaussianparser = GaussianData(data)
 
@@ -62,10 +62,10 @@ print('-----------------------------')
 # Print the resulting transformed dipole moments
 print(mu_T)
 
-vibdata_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/out'
-cubic_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/cubic'
-dipole_path = f'/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pV{basis}Z/dipole'
-# polar_path = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVDZ/polar.pkl'
+vibdata_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/out'
+cubic_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/cubic'
+dipole_path = f'/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pV{basis}Z/dipole'
+# polar_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVDZ/polar.pkl'
 
 files = {'out': vibdata_path, 'cubic': cubic_path, 'dipolexyz': dipole_path}
 data = {'source': 'cfour', 'type': 'out', 'files': files}

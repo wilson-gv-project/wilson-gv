@@ -27,18 +27,18 @@ y =  omega2 if not w1mw2 else omega2-omega1
 # meshgrid for spectrum
 x_mesh, y_mesh =  np.meshgrid(omega1, y)
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanDZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_hfoptanhramanDZ_3q.out',}
 
 from scriptsHPC.utils import parseGaussian
 qq = parseGaussian.parse_frequencies(g16files['3quanta'])
 
 print('\n-----------------------------------\n')
 
-dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
+dimlessFile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 
@@ -50,7 +50,7 @@ ders = setup.getDerivs()
 # add mechanical and electrical anharmonicities terms and orientational averages (symbolic setup)
 setup.addTerms(None, None, None, None)
 
-print(setup.data, '\n')
+print(setup.data_info, '\n')
 # print(setup.gammaCompsAll, '\n', len(setup.gammaCompsAll), '\n')
 # quit()
 # print derivatives

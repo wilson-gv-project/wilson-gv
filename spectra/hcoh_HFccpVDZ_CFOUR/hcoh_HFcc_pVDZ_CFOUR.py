@@ -25,16 +25,16 @@ y =  omega2 if not w1mw2 else omega2-omega1
 # meshgrid for spectrum
 x_mesh, y_mesh =  np.meshgrid(omega1, y)
 
-cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/out',
-                  'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/cubic',
-                  'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/dipole',
-                  'polar': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/polar.pkl'
+cfourdatafiles = {'out': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pVDZ/out',
+                  'cubic': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pVDZ/cubic',
+                  'dipolexyz': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pVDZ/dipole',
+                  'polar': '/home/vlew/scriptsHPC/input_data_info/cfourdata/hcoh/HFcc_pVDZ/polar.pkl'
                   }
 
-dimlessFile = '/home/vlew/scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
+dimlessFile = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVTZ/QUADRATURE'
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'cfour',
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'cfour',
                                                 'type': 'out',
                                                 'files':cfourdatafiles})
 # collect derivatives
@@ -48,7 +48,7 @@ print(setup.all_states)
 setup.addTerms(None, None, None, None)
 
 # print(setup.electric_avrg, '\n')
-print(setup.data, '\n')
+print(setup.data_info, '\n')
 
 # print derivatives
 c2DIRmain.printed2DIRtensors(setup)

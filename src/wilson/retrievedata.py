@@ -1,4 +1,4 @@
-from src.wilson import parseCFOUR, parseGaussian
+from src.calculationsCFOUR import parseGaussian, parseCFOUR
 from typing import Any
 
 import numpy as np
@@ -126,7 +126,7 @@ class GaussianData:
     """
     Also fundamental frequencies with anharmonic corrections are needed
     Overtones and combination bands too
-    data is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
+    input_data_info is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
     """
     def __init__(self, data: dict[str:[str, dict]]):
         self.sourcetype = data['type']

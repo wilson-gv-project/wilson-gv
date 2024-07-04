@@ -19,13 +19,13 @@ start2, stop2, step2 = 2870., 3560., 10.
 omega1 = np.arange(start1, stop1, step1)
 omega2 = np.arange(start2, stop2, step2)
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
 gamma_rc=10.
 gamma = c2DIRmain.rec_cm2rec_s(gamma_rc)
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 # print(setup.all_states)

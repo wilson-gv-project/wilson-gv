@@ -3,15 +3,15 @@ import numpy as np
 np.set_printoptions(linewidth=250, suppress=True, precision=10)
 
 import pickle
-outfile = '../../scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/polarData.pkl'
+outfile = '../../scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVTZ/polarData.pkl'
 with open(outfile, 'rb') as file:
     things = pickle.load(file)
 
-rawfile = '../../scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/polarData_raw.pkl'
+rawfile = '../../scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVTZ/polarData_raw.pkl'
 with open(rawfile, 'rb') as file:
     rare = pickle.load(file)
 
-dimless = '../../scriptsHPC/data/coh2aldehyde_HFcc-pVTZ/dimensionless.pkl'
+dimless = '../../scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVTZ/dimensionless.pkl'
 with open(dimless, 'rb') as file:
     dless = pickle.load(file)
 

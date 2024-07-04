@@ -34,14 +34,14 @@ elif region is None:
 omega1 = np.arange(start1, stop1, step1)
 omega2 = np.arange(start2, stop2, step2)
 
-# g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
-#             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
+# g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
+#             '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
 
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
+g16files = {'log': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ.out',
+            '3quanta': '/home/vlew/scriptsHPC/input_data_info/dftGaussian/formaldehyde/g16_coh2hfoptanhramanQZ_3q.out',}
 
 # spectrum is computing intensities on the grid of 2 frequencies
-setup = c2DIRmain.SpectrumEVV(omega1, omega2, data={'source': 'gaussian',
+setup = c2DIRmain.SpectrumEVV(omega1, omega2, input_data_info={'source': 'gaussian',
                                                 'type': 'log',
                                                 'files':g16files})
 setup.addTerms(None, None, None, None)
@@ -49,7 +49,7 @@ setup.addTerms(None, None, None, None)
 print(setup.fundamentals)
 print(setup.all_states)
 print('----------\n')
-print(setup.all_states_harm)
+print(setup.all_states_harmonic)
 
 # print('\n', setup.deriv_data)
 log10=True
