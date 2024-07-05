@@ -27,92 +27,87 @@ import os
 import pickle
 
 
-def pOutfile(filepath: str) -> np.array:
+def getRotationMatrix(filepath: str) -> np.array:
     """
-    Parsing outfile0.out
+    Parsing outfile0.out to get the rotation matrix for xyz axes
     :param filepath:
     :return: OMAT transformation (rotation) matrix from outfile which is printed when PRINT_LEVEL=1
     """
     with open(filepath, 'r') as file:
         file_content = file.read()
+    if 'Transformation matrix between QCOM and QCOMP (OMAT)' in file_content:
+        start_index = file_content.find("(QCOM = OMAT * QCOMP,")
+        end_index = file_content.find("test:  OMAT * QCOMP = ", start_index)
+        omat_section = file_content[start_index:end_index]
+        newlinebreak = omat_section.find("\n")
+        coords_section = omat_section[newlinebreak:][1:-1].split('\n')
 
-    # Find the index where "Molecular hessian" appears
-    coords_start_index = file_content.find("(QCOM = OMAT * QCOMP,")
+        omat_array = []
+        for l in coords_section[:-1]:
+            ll = np.array([float(i) for i in l.strip().split() if '.' in i])
+            omat_array.append(ll)
+        omat_array = np.array(omat_array)
 
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_index = file_content.find("test:  OMAT * QCOMP = ", coords_start_index)
+        return omat_array
+    else:
+        print('No rotation matrix found in this outfile')
 
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    coords_section = file_content[coords_start_index:dipole_line_index]
-
-    brinx = coords_section.find("\n")
-    coords_section = coords_section[brinx:][1:-1].split('\n')
-
-    omat_array = []
-    for l in coords_section[:-1]:
-        ll = np.array([float(i) for i in l.strip().split() if '.' in i])
-        omat_array.append(ll)
-    omat_array = np.array(omat_array)
-
-    return omat_array
-
-def pMOLDEN(filepath: str) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]:
+def pMOLDEN(filepath: str, linear: bool = False) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]:
     """
-    Parsing MOLDEN file (VIB job, harmonic or anharmonic)
-
+    Parsing MOLDEN file (VIB job output, harmonic or anharmonic)
     :param filepath:
     :return:  geometry_data, atoms, selected_dict
     """
-    # Read the file content
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
-    # Variables to store atoms, geometry, and vibration input_data_info
     atoms = []
     geometry_data = []
     vibrations_data = {}
 
-    # Flags to identify sections
     in_geometry_section = False
     in_vibration_section = False
 
-    # Loop through each line in the file
     for line in lines:
-        # Check for the start of geometry section
         if '[FR-COORD]' in line:
             in_geometry_section = True
             in_vibration_section = False
             continue
 
-        # Check for the start of vibration section
         elif '[FR-NORM-COORD]' in line:
             in_vibration_section = True
             in_geometry_section = False
             continue
 
-        # Capture atoms and geometry input_data_info
         if in_geometry_section:
             data = line.strip().split()
             atom_label = data[0]
             atoms.append(atom_label)
             geometry_data.append(data[1:])  # Exclude the atom label
 
-        # Capture vibration input_data_info
+        # Capture vibration data
         elif in_vibration_section:
-            if line.strip().startswith('vibration'):
-                vibration_number = int(line.split()[-1])
-                vibrations_data[vibration_number] = []
-            else:
-                vibrations_data[vibration_number].append(list(map(float, line.split())))
+            stripped_line = line.strip()
+            line_parts = stripped_line.split()
 
-    # Convert lists to numpy arrays
+            if stripped_line.startswith('vibration'):
+                current_vibration_index = int(line_parts[-1])
+                vibrations_data[current_vibration_index] = []
+            else:
+                # to check if it was initialized
+                if 'current_vibration_index' in locals():
+                    vibrations_data[current_vibration_index].append(list(map(float, line_parts)))
+                else:
+                    print('Error: Vibration number not initialized before data lines.')
+
     atoms = np.array(atoms)
     geometry_data = np.array(geometry_data, dtype=float)
     vibrations_data = {key: np.array(value) for key, value in vibrations_data.items()}
-    # only normal modes
-    selected_dict = {key: value for idx, (key, value) in enumerate(vibrations_data.items()) if idx >= 6}
+    # only normal modes, ignore first 6 or 5
+    ndiscard = 5 if linear else 6
+    normal_modes_dict = {key: value for idx, (key, value) in enumerate(vibrations_data.items()) if idx >= ndiscard}
 
-    return geometry_data, atoms, selected_dict
+    return geometry_data, atoms, normal_modes_dict
 
 def pNORMCO(filepath: str):
     """
@@ -124,9 +119,8 @@ def pNORMCO(filepath: str):
 
     with open(filepath, 'r') as file1:
         linesnormco = file1.readlines()
-
-    # Variables to store atoms, geometry, and vibration input_data_info
-    massweightgeo = []
+    #massweighted_normal_coordinates
+    massweighted_geometry = []
 
     # Flags to identify sections
     in_geometry_section = False
@@ -138,19 +132,19 @@ def pNORMCO(filepath: str):
             in_geometry_section = True
             continue
 
-        # Check for the start of vibration section
+        # Check for the start of vibration section - can be used to collect normal coordinates
         elif '% frequency' in lin:
             in_geometry_section = False
             break
 
-        # Capture atoms and geometry input_data_info
+        # Capture atoms and geometry data
         if in_geometry_section:
             data1 = lin.strip().split()
-            massweightgeo.append(data1)  # Exclude the atom label
+            massweighted_geometry.append(data1)  # Exclude the atom label
 
     # Convert lists to numpy arrays
-    massweightgeo = np.array(massweightgeo, dtype=float)
-    return massweightgeo
+    massweighted_geometry = np.array(massweighted_geometry, dtype=float)
+    return massweighted_geometry
 
 def pQUADRATURE(filepath) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]:
     """Dimensionless normal coordinates are here, in QUADRATURE file"""
@@ -200,11 +194,10 @@ def pQUADRATURE(filepath) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]:
     # The last matrix read is the undisplaced matrix
     if current_matrix:
         undisplaced_matrix = current_matrix
-#    dqMats = np.vstack(dqMat).T
+    # normal_coordinates = np.vstack(dqMat).T
 
-    dqMats = dict(zip(np.arange(7, len(freqs)+7), dqMat))
-    return np.array(undisplaced_matrix), freqs, dqMats
-
+    normal_coordinates = dict(zip(np.arange(7, len(freqs)+7), dqMat))
+    return np.array(undisplaced_matrix), freqs, normal_coordinates
 
 def pTensor(filepath: str):
     """
@@ -228,7 +221,6 @@ def pDIPDER(filepath: str):
     :param filepath:
     :return: atomsorder, dipolefull - (3*Natoms, 3)
     """
-
     with open(filepath, 'r') as f:
         lines = f.readlines()
         dipmoment_cartder = []
@@ -260,73 +252,60 @@ def parse_output_file(filepath: str):
              anharmonic_intensities
              harmonic_transitions
     """
-    # Initialize lists to hold the column input_data_info
     modes = []
     anharmonic_frequencies = []
     anharmonic_intensities = []
     harmonic_transitions = []
 
-    # Read the contents of the MOLDEN file
     with open(filepath, 'r') as file:
         file_content = file.read()
 
-    # Find the index where "Molecular hessian" appears
-    coords_start_index = file_content.find("All levels with up to three quanta")
+    if "All levels with up to three quanta" in file_content:
+        start_index = file_content.find("All levels with up to three quanta")
 
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_index = file_content.find("Electric dipole moment function in dimensionless normal coordinates",
-                                          coords_start_index)
+        end_index = file_content.find("Electric dipole moment function in dimensionless normal coordinates",
+                                              start_index)
 
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    coords_section = file_content[coords_start_index:dipole_line_index]
-    coords_section = coords_section.split('\n')
-    # print(coords_section)
-    # quit()
-    for line in coords_section[5:-3]:
+        section = file_content[start_index:end_index]
+        section = section.split('\n')
+        for line in section:
+            if ('-------------' not in line and 'Dipole' not in line
+                    and 'quanta' not in line and 'MODE' not in line
+                    and 'Intensity' not in line and line.strip()!=''):
+                nus = line.strip().split()
+                m = tuple([int(f) for f in nus[:-3]])
+                modes.append(m)
+                anharmonic_frequencies.append(float(nus[-3]))
+                anharmonic_intensities.append(float(nus[-2]))
+                harmonic_transitions.append(float(nus[-1]))
 
-        if '-------------' not in line and 'Dipole' not in line:
-            nus = line.strip().split()
-            # print(nus)
-            m = tuple([int(f) for f in nus[:-3]])
-            modes.append(m)
-            anharmonic_frequencies.append(float(nus[-3]))
-            anharmonic_intensities.append(float(nus[-2]))
-            harmonic_transitions.append(float(nus[-1]))
+        modes = np.array(modes)
+        anharmonic_frequencies = np.array(anharmonic_frequencies)
+        anharmonic_intensities = np.array(anharmonic_intensities)
+        harmonic_transitions = np.array(harmonic_transitions)
 
-    # Convert the lists to NumPy arrays
-    modes = np.array(modes)
-    anharmonic_frequencies = np.array(anharmonic_frequencies)
-    anharmonic_intensities = np.array(anharmonic_intensities)
-    harmonic_transitions = np.array(harmonic_transitions)
+        labels = np.array('   I    J    K    L    M   NI  NJ  NK  NL  NM '.strip().split())
+        modes = [modes_array2tuple(arr) for arr in modes]
+        return modes, labels, anharmonic_frequencies, anharmonic_intensities, harmonic_transitions
 
-    # Print the NumPy arrays
-    labels = np.array('   I    J    K    L    M   NI  NJ  NK  NL  NM '.strip().split())
-    #print(modes)
-    #print([modes_array2tuple(arr) for arr in modes])
-    modes = [modes_array2tuple(arr) for arr in modes]
-
-    return modes, labels, anharmonic_frequencies, anharmonic_intensities, harmonic_transitions
+    else:
+        print('\nNo anharmonic levels information in this file')
 
 def modes_array2tuple(arr: np.array):
+    """I J K L M NI NJ NK NL NM information array
+    turned into a tuple, where I mode will be mentioned NI times and so on"""
     # Extract the non-zero elements from the array (ignoring the zeros after the first non-zero element)
     non_zero_elements = [x for x in arr[:3] if x != 0]  # We only care about the first two non-zero elements
-
-    # Initialize an empty list to hold the elements of the tuple
     tuple_elements = []
-
-    # Add the first non-zero element 'arr[5]' times to the list
     tuple_elements.extend([non_zero_elements[0]] * arr[5])
 
-    # If there is a second non-zero element, add it 'arr[6]' times to the list
     if len(non_zero_elements) == 2:
         tuple_elements.extend([non_zero_elements[1]] * arr[6])
 
     if len(non_zero_elements) == 3:
         tuple_elements.extend([non_zero_elements[1]] * arr[6])
-        # If there is no second non-zero element, add the first element 'arr[6]' more times
         tuple_elements.extend([non_zero_elements[2]] * arr[7])
 
-    # Convert the list to a tuple
     result_tuple = tuple(sorted(tuple_elements))
 
     return result_tuple
@@ -335,21 +314,12 @@ def get_anharmonic_fundamentals(outfile: str, filetype: str = 'out') -> dict:
     """
     Extracts fundamental frequencies with anharmonic corrections from a given file.
 
-    This function reads input_data_info from the specified output file or a pre-loaded object,
-    and extracts the fundamental frequencies with anharmonic corrections.
+    :param outfile: The path to the output file or the preloaded object
+    :param filetype: The type of the file to process: 'out' for output files or 'pkl' for pickle files
 
-    Parameters:
-    - outfile (str): The path to the output file or the pre-loaded object.
-    - filetype (str): The type of the file to process. Can be 'out' for output files or 'pkl' for pickle files.
-
-    Returns:
-    - dict: A dictionary where keys are the mode indices (adjusted by subtracting 7)
-            and values are the corresponding anharmonically corrected frequencies.
-
-    Raises:
-    - ValueError: If the filetype is not 'out' or 'pkl'.
+    :return dict: A dictionary where keys are the mode indices (adjusted by subtracting 7)
+            and values are the corresponding anharmonically corrected frequencies
     """
-
     if filetype == 'out':
         things = parse_output_file(outfile)
     elif filetype == 'pkl':
@@ -359,10 +329,8 @@ def get_anharmonic_fundamentals(outfile: str, filetype: str = 'out') -> dict:
         raise ValueError('Wrong file type. Choose "out" or "pkl".')
 
     labels = sorted({t[0] for t in things[0]})
-    tlab = [tuple(element for element in t if element != 0) for t in things[0]]
-    dd = dict(zip(tlab, things[2]))
-    freqs = {b[0] - 7: dd[b] for b in (tuple([e]) for e in labels)}
-    # freqs_harm = {b[0] - 7: dd[b] for b in (tuple([e]) for e in labels)}
+    all_states_dict = dict(zip(things[0], things[2]))
+    freqs = {b[0] - 7: all_states_dict[b] for b in (tuple([e]) for e in labels)}
 
     return freqs
 
@@ -382,7 +350,7 @@ def pDipole(filenamebase: str):
     """
     Parsing dipole(xyz) files dipole(xyz)
     :param filenamebase: basename for dipole(xyz) files, e.g, 'dipole'
-    :return: dictionary from dipole(xyz) input_data_info
+    :return: dictionary from dipole(xyz) data
     """
     dct = {}
     with open(filenamebase, 'r') as file:
@@ -499,7 +467,7 @@ def getAllPolarData4Ders(polar_dir: str, raw: bool = False):
         polar_file_path = dir_path + '/POLAR'
         poldata = pTensor(polar_file_path)
 
-        R = pOutfile(dir_path + '/outfile0.out')
+        R = getRotationMatrix(dir_path + '/outfile0.out')
 
         allallpolardataRaw[directory] = (poldata, R)
 
@@ -526,7 +494,7 @@ def pklPoldata(polar_dir):
     rawdata = getAllPolarData4Ders(polar_dir, raw=True)
 
     poldataeq = pTensor(polar_dir+'/../anharm/POLAR')
-    R = pOutfile(polar_dir + '/../anharm/outfile0.out')
+    R = getRotationMatrix(polar_dir + '/../anharm/outfile0.out')
     temp = np.einsum('ij,jk->ik', R.T, poldataeq)
     alpha_prime = np.einsum('ij,jk->ik', temp, R)
     allallpolardata['equil'] = alpha_prime
@@ -739,7 +707,7 @@ def getCubicPost(freq: dict, cubic: np.ndarray, recipcm: bool = False):
 
 def describe_structure(obj, level=0):
     """
-    Recursively describe the structure of a Python object with complex input_data_info types.
+    Recursively describe the structure of a Python object with complex data types.
     """
     indent = '  ' * level
     obj_type = type(obj).__name__
@@ -781,7 +749,7 @@ def unpickle(file: str):
     hf_cubicarray = '../scriptsHPC/cfourscripts/hf_cubicarray.pkl'
     hf_polarders = '../scriptsHPC/cfourscripts/hf_polarders.pkl'
     hf_vibdata = '../scriptsHPC/cfourscripts/hf_vibdata.pkl'
-    # this input_data_info is from MOLDEN file
+    # this data is from MOLDEN file
     hf_normalmodes = '../scriptsHPC/cfourscripts/hf_normalmodes.pkl'
     hf_rawdata_polar = '../scriptsHPC/cfourscripts/hf_rawdata_polar.pkl'
 
@@ -867,7 +835,6 @@ def dictinfo(dct: dict, level: int = 0):
                           dct['metadata']['contents'][descr], extra)
 
                 print('\n')
-                # break
 
             else:
                 dictinfo(dct[k1], level)
@@ -877,7 +844,7 @@ def dictinfo(dct: dict, level: int = 0):
 # this is about getting raw hessian matrix and doing vib analysis with it
 def hessianfromout(outfilename: str):
     """
-    Getting hessian input_data_info from outfile0.out
+    Getting hessian data from outfile0.out
 
     :param outfilename:
     :return:
@@ -964,7 +931,7 @@ def getrotproj(filename: str):
     """
     Getting Rotationally projected vibrational frequencies from.out file
 
-    E.g, filename = '../input_data_info/rawouts/anharm_hf_outfile0.out'
+    E.g, filename = '../data/rawouts/anharm_hf_outfile0.out'
     :return:
     """
     # Read the contents of the file fchk
@@ -1048,7 +1015,7 @@ def computeRedMass4nm(filename: str):
     # sqrtmmm = np.repeat(np.sqrt(mass), 3)
     # sqrtmmminv = np.divide(1.0, sqrtmmm)
 
-    # filename = '../scriptsHPC/input_data_info/rawouts/anharm_hf_MOLDEN'
+    # filename = '../scriptsHPC/data/rawouts/anharm_hf_MOLDEN'
     with open(filename, 'rb') as f:
         moldendata = pMOLDEN(filename)
 

@@ -254,7 +254,6 @@ class SpectrumEVV:
             return total_sum_el / 24.
 
         else:
-
             total_sum_mech = 0
             prefac_mech = self.tensor_3d.T[a, b, c]
             factors = [1., 1., 0.5, 0.5, -0.5, -0.5]
@@ -271,7 +270,7 @@ class SpectrumEVV:
                 total_sum_mech += factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
 
-    def intensity(self, Gamma, savedict, el=True, mech=True, printdata=False):
+    def intensity(self, Gamma, savedict, el=True, mech=True):
         Qab, Qabc = self.coords_ab, self.coords_abc
         Z = 0
         Qab_contrib_dict = {}
