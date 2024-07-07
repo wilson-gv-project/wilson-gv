@@ -1,125 +1,22 @@
+"""
+#################################################################################################
+##                                                                                             ##
+##                             Parsing Gaussian output files                                   ##
+##                                                                                             ##
+#################################################################################################
+#
+# Files:
+#     - .log  --- the main full output file that contains all the relevant data
+#     - .fchk --- formcheck (generated from checkpoint file)
+"""
+
 import numpy as np
 # np.set_printoptions(linewidth=250, suppress=True, precision=3)
 import sys
 import pandas as pd
 pd.set_option('display.max_rows', sys.maxsize)
 
-def getForceConstants_fchk(fchkfile: str):
-
-    # Read the contents of the file fchk
-    with open(fchkfile, 'r') as file:
-        file_content = file.read()
-
-    # Find the index where "Molecular hessian" appears
-    hessian_start_index = file_content.find("Cartesian Force Constants")
-
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_index = file_content.find("Cartesian 3rd/4th derivatives", hessian_start_index)
-
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    hessian_section = file_content[hessian_start_index:dipole_line_index]
-    brinx = hessian_section.find("\n")
-    hessian_section = hessian_section[brinx:]
-
-    # supposedly projected out
-    hessvec = np.array([float(i) for i in hessian_section.strip().split()])
-
-    return hessvec
-
-def getForceConstants_fchk2(fchkfile: str):
-
-    # Read the contents of the file fchk
-    with open(fchkfile, 'r') as file:
-        file_content = file.read()
-
-    # Find the index where "Molecular hessian" appears
-    hessian_start_index = file_content.find("Cartesian Force Constants")
-
-    # Find the index where the line with "Total dipole moment" appears
-    # dipole_line_index = file_content.find("Cartesian 3rd/4th derivatives", hessian_start_index)
-    dipole_line_index = file_content.find("Nonadiabatic coupling", hessian_start_index)
-
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    hessian_section = file_content[hessian_start_index:dipole_line_index]
-    brinx = hessian_section.find("\n")
-    hessian_section = hessian_section[brinx:]
-    # print(hessian_section)
-    # supposedly projected out
-    hessvec = np.array([float(i) for i in hessian_section.strip().split()])
-
-    return hessvec
-
-def getForceConstants_out(outfile: str):
-
-    # Read the contents of the file
-    with open(outfile, 'r') as fileR:
-        file_contentR = fileR.read()
-
-    # Find the index where "Molecular hessian" appears
-    hessian_start_indexR = file_contentR.rfind(" Force constants in Cartesian coordinates:")
-
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_indexR = file_contentR.find("Leave Link  716 at", hessian_start_indexR)
-
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    hessian_sectionR = file_contentR[hessian_start_indexR:dipole_line_indexR]
-
-
-    brinxR = hessian_sectionR.find("\n")
-    hessian_sectionR = hessian_sectionR[brinxR:]
-    brinxR = hessian_sectionR.find("\n")
-    hessian_sectionR = hessian_sectionR[brinxR:]
-    # print(hessian_sectionR)
-    # print('\n', hessian_sectionR)
-    hessvecR = np.array([float(i.replace('D', 'e')) for i in hessian_sectionR.strip().split() if '.' in i])
-
-    return hessvecR
-
-def getMass_fchk(fchkfile: str):
-    # Read the contents of the file fchk
-    with open(fchkfile, 'r') as file:
-        file_content = file.read()
-
-    # Find the index where "Molecular hessian" appears
-    coords_start_index = file_content.find("Nuclear charges")
-
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_index = file_content.find("Current cartesian coordinates", coords_start_index)
-
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    coords_section = file_content[coords_start_index:dipole_line_index]
-    brinx = coords_section.find("\n")
-    coords_section = coords_section[brinx:]
-    # print(coords_section)
-    # supposedly projected out
-    massvec = np.array([float(i) for i in coords_section.strip().split()])
-
-    return massvec
-
-def getCoords_fchk(fchkfile: str):
-    # Read the contents of the file fchk
-    with open(fchkfile, 'r') as file:
-        file_content = file.read()
-
-    # Find the index where "Molecular hessian" appears
-    coords_start_index = file_content.find("Current cartesian coordinates")
-
-    # Find the index where the line with "Total dipole moment" appears
-    dipole_line_index = file_content.find("Number of symbols in", coords_start_index)
-
-    # Extract the content starting from "Molecular hessian" up to "Total dipole moment"
-    coords_section = file_content[coords_start_index:dipole_line_index]
-    brinx = coords_section.find("\n")
-    coords_section = coords_section[brinx:]
-    # print(coords_section)
-    # supposedly projected out
-    coordsvec = np.array([float(i) for i in coords_section.strip().split()])
-
-    # print('COORDINATES')
-    # print(coordsvec)
-
-    return coordsvec
-
+# used in retrievedata.py
 def parse_frequencies(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -144,23 +41,17 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
             elif current_section:
                 if '------------' not in line:
                     linelist = line.split()
-                    # print(linelist)
                     # Insert None at the desired index (3rd position, which is index 2)
                     if len(linelist)==5 and current_section=='Combination Bands': linelist.insert(2, None)
 
                     results[current_section].append(linelist)
 
-    # Convert results to pandas DataFrames
     for section, data in results.items():
         if section != 'Overtones':
             results[section] = pd.DataFrame(data[1:-1])
-        # elif section == 'Overtones':
         else:
             results[section] = pd.DataFrame(data[2:-1])
-        # elif section == 'Combination Bands':
-        #     results[section] = pd.DataFrame(input_data_info[1:-1])
-        # print(results[section])
-        # Extracting the digits before and in the parentheses
+
         main_numbers = [i[0] for i in results[section][0]]
         sub_numbers = [i[2] for i in results[section][0]]
 
@@ -183,17 +74,9 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
             results[section].insert(6, 'n_c', sub_numbers)
             results[section].drop(results[section].columns[4], axis=1, inplace=True)
 
-    # save the header of dataframes of the dictionary results and remove it from dataframe input_data_info
-    # results = {section: df.iloc[1:] for section, df in results.items()}
-    # i also want to change values which contain () such as 2(1) and  1(1) - to 2 and 1, i.e. remove parentheses
-    # results = {section: df.replace(r'\(.*\)', '', regex=True) for section, df in results.items()}
-    # remove first row of each section dataframe
-    # results = {section: df.iloc[1:] for section, df in results.items()}
-    # for section, df in results.items():
-    #     df.dropna(inplace=True)
-
     return results
 
+# used in retrievedata.py
 def parse_cubic_constants(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -215,13 +98,12 @@ def parse_cubic_constants(file_path: str) -> pd.DataFrame:
                 parts = line.split()
                 results.append(parts)
             elif line.strip().startswith(': FI =') or line.strip().startswith(': k  =') or line.strip().startswith(': K  ='):
-                # print(line)
                 units_lines.append(line.strip())
-    # Convert results to pandas DataFrame
     df = pd.DataFrame(results, columns=["I", "J", "K", "FI(I,J,K)", "k(I,J,K)", "K(I,J,K)"])
 
     return df, units_lines
 
+# used in retrievedata.py
 def get_cubic_post(freq: dict, cubic: np.ndarray, recipcm: bool = False):
     n = len(freq)
     K3 = np.zeros((n, n, n), dtype=np.float64)
@@ -241,6 +123,7 @@ def get_cubic_post(freq: dict, cubic: np.ndarray, recipcm: bool = False):
 
     return K3
 
+# used in retrievedata.py
 def parse_dipole_moment(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -282,11 +165,12 @@ def parse_dipole_moment(file_path: str) -> pd.DataFrame:
                 # Fill in missing columns with None
                 row = [row_dict.get(column_name, np.nan) for column_name in column_names]
                 results.append(row)
-    # Convert results to pandas DataFrame
+
     df = pd.DataFrame(results, columns=column_names)
 
     return df, units_line
 
+# used in retrievedata.py
 def parse_polarizability(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -325,7 +209,6 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                     xyz = [float(s.replace('D', 'e')) for s in parts[3].strip().split()]
                     xyz.extend([np.nan] * (3 - len(xyz)))
                     allparts.extend(xyz)
-                # print(allparts)
                 # Create a dictionary that maps column names to values
                 row_dict = {column_names[i]: value for i, value in enumerate(allparts)}
                 # Fill in missing columns with None
@@ -336,7 +219,6 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                 parts = line.split('|')
                 allparts = [np.nan]
                 allparts.extend([np.nan, np.nan, np.nan])
-                # allparts.extend([parts[1].strip()])
                 allparts.extend([parts[2].strip()])
                 xyz = [float(s.replace('D', 'e')) for s in parts[3].strip().split()]
                 xyz.extend([np.nan] * (3 - len(xyz)))
@@ -346,7 +228,6 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                 # Fill in missing columns with None
                 row = [row_dict.get(column_name, np.nan) for column_name in column_names]
                 results.append(row)
-    # Convert results to pandas DataFrame
     df = pd.DataFrame(results, columns=column_names)
     array = df.to_numpy()
 
@@ -386,11 +267,97 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
         if np.isnan(block[1, 7]):
             block[1, 7] = block[2, 6]
 
-    # Assuming 'array' is your numpy array
     # pd.set_option('display.float_format', '{:.7f}'.format)
     df = pd.DataFrame(array)
     return df#, units_line
 
+# not used now
+def getForceConstants_fchk(fchkfile: str):
+
+    with open(fchkfile, 'r') as file:
+        file_content = file.read()
+
+    start_index = file_content.find("Cartesian Force Constants")
+
+    end_index = file_content.find("Cartesian 3rd/4th derivatives", start_index)
+
+    hessian_section = file_content[start_index:end_index]
+    brinx = hessian_section.find("\n")
+    hessian_section = hessian_section[brinx:]
+
+    # supposedly projected out
+    hessvec = np.array([float(i) for i in hessian_section.strip().split()])
+
+    return hessvec
+
+# not used now
+def getForceConstants_fchk2(fchkfile: str):
+
+    with open(fchkfile, 'r') as file:
+        file_content = file.read()
+
+    start_index = file_content.find("Cartesian Force Constants")
+
+    end_index = file_content.find("Nonadiabatic coupling", start_index)
+    hessian_section = file_content[start_index:end_index]
+    brinx = hessian_section.find("\n")
+    hessian_section = hessian_section[brinx:]
+    # supposedly projected out
+    hessvec = np.array([float(i) for i in hessian_section.strip().split()])
+
+    return hessvec
+
+# not used now
+def getForceConstants_out(outfile: str):
+
+    with open(outfile, 'r') as fileR:
+        file_contentR = fileR.read()
+
+    start_indexR = file_contentR.rfind(" Force constants in Cartesian coordinates:")
+    end_indexR = file_contentR.find("Leave Link  716 at", start_indexR)
+    hessian_sectionR = file_contentR[start_indexR:end_indexR]
+
+    brinxR = hessian_sectionR.find("\n")
+    hessian_sectionR = hessian_sectionR[brinxR:]
+    brinxR = hessian_sectionR.find("\n")
+    hessian_sectionR = hessian_sectionR[brinxR:]
+    hessvecR = np.array([float(i.replace('D', 'e')) for i in hessian_sectionR.strip().split() if '.' in i])
+
+    return hessvecR
+
+# not used now
+def getMass_fchk(fchkfile: str):
+    with open(fchkfile, 'r') as file:
+        file_content = file.read()
+
+    start_index = file_content.find("Nuclear charges")
+    end_index = file_content.find("Current cartesian coordinates", start_index)
+
+    coords_section = file_content[start_index:end_index]
+    brinx = coords_section.find("\n")
+    coords_section = coords_section[brinx:]
+    # supposedly projected out
+    massvec = np.array([float(i) for i in coords_section.strip().split()])
+
+    return massvec
+
+# not used now
+def getCoords_fchk(fchkfile: str):
+    with open(fchkfile, 'r') as file:
+        file_content = file.read()
+
+    start_index = file_content.find("Current cartesian coordinates")
+    end_index = file_content.find("Number of symbols in", start_index)
+    coords_section = file_content[start_index:end_index]
+    brinx = coords_section.find("\n")
+    coords_section = coords_section[brinx:]
+
+    # supposedly projected out
+    coordsvec = np.array([float(i) for i in coords_section.strip().split()])
+
+    return coordsvec
+
+# used for fchk methods
 class FormchkInterface:
 
     def __init__(self, file_path):
@@ -485,103 +452,3 @@ class FormchkInterface:
         if file_path is None:
             file_path = self.file_path
         return self.key_to_value("Dipole Derivatives", file_path).reshape(-1, 3)
-
-class FchkForceDerivatives:
-    """Holder class for force constant derivatives coming out of an fchk file"""
-    def __init__(self, derivs):
-        self.derivs = derivs
-        self._n = None
-
-    def __len__(self):
-        return len(self.derivs)
-
-    def _get_n(self):
-        if self._n is None:
-            l = len(self)
-            # had to use Mathematica to get this from the cubic poly
-            #  2*(3n-6)*(3n)^2 == 2*l - 2*(3n-6)*(3n)
-            l_quad = 81*l**2 + 3120*l - 5292
-            l_body = (3*np.sqrt(l_quad) - 27*l - 520)
-            if l_body > 0:
-                l1 = l_body**(1/3)
-            else:
-                l1 = -(-l_body)**(1/3)
-            n = (1/18)*( 10 + (2**(1/3))*( l1 - 86/l1) )
-            self._n = int(np.ceil(n)) # precision issues screw this up in python, but not in Mathematica (I think)
-        return self._n
-
-    @property
-    def n(self):
-        return self._get_n()
-
-    def _get_third_derivs(self):
-        # fourth and third derivs are same len
-        d = self.derivs
-        return d[:int(len(d)/2)]
-
-    def _get_fourth_derivs(self):
-        # fourth and third derivs are same len
-        d = self.derivs
-        return d[int(len(d)/2):]
-
-    @property
-    def third_derivs(self):
-        return self._get_third_derivs()
-
-    @property
-    def fourth_derivs(self):
-        return self._get_fourth_derivs()
-    @staticmethod
-    def _fill_3d_tensor(n, derivs):
-        """Makes and fills a 3D tensor for our derivatives
-        :param n:
-        :type n:
-        :param derivs:
-        :type derivs:
-        :return:
-        :rtype: np.ndarray
-        """
-        dim_1 = (3*n)
-        mode_n = 3*n-6
-
-        full_array_1 = np.zeros((mode_n, dim_1, dim_1))
-        # set the lower triangle
-        inds_1, inds_2 = np.tril_indices(dim_1)
-        l_per = len(inds_1)
-        main_ind = np.broadcast_to(np.arange(mode_n)[:, np.newaxis], (mode_n, l_per)).flatten()
-        sub_ind_1 = np.broadcast_to(inds_1, (mode_n, l_per)).flatten()
-        sub_ind_2 = np.broadcast_to(inds_2, (mode_n, l_per)).flatten()
-        inds = ( main_ind, sub_ind_1, sub_ind_2 )
-        full_array_1[inds] = derivs
-        # set the upper triangle
-        inds2 = ( main_ind, sub_ind_2, sub_ind_1 ) # basically just taking a transpose
-        full_array_1[inds2] = derivs
-
-        return full_array_1
-    def _get_third_deriv_array(self):
-        """we make the appropriate 3D tensor from a bunch of 2D tensors
-        :return:
-        :rtype: np.ndarray
-        """
-        n = self.n
-        derivs = self.third_derivs
-        return self._fill_3d_tensor(n, derivs)
-    @property
-    def third_deriv_array(self):
-        return self._get_third_deriv_array()
-
-    # def _get_fourth_deriv_array(self):
-    #     """We'll make our array of fourth derivs exactly the same as the third
-    #     admittedly this should be a 4D tensor, but we only have the diagonal elements so it's just 3D
-    #     I should make it a 4D sparse matrix honestly... Apparently we won't need many terms in the 4D tensor so it might
-    #     make sense to handle that bloop doop bloop in the schmoop
-    #     :return:
-    #     :rtype: np.ndarray
-    #     """
-    #     n = self.n
-    #     derivs = self.fourth_derivs
-    #     from Sparse import SparseArray
-    #     return SparseArray.from_diag(self._fill_3d_tensor(n, derivs))
-    @property
-    def fourth_deriv_array(self):
-        return self._get_fourth_deriv_array()

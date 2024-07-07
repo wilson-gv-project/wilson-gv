@@ -132,3 +132,28 @@ def test_get_anharmonic_fundamentals(mock_output_file):
     freqs = get_anharmonic_fundamentals(str(mock_output_file))
     assert freqs == {0: 1307.4}
 
+def test_CFOURdataParser():
+    datadict = {'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/out',
+                'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/dipole',
+                'polar_pkl': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/polar.pkl',
+                'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/cubic'}
+    parserC4 = CFOURdataParser(datadict)
+    parserC4.getData()
+    # print('\ndipole_first_derivatives\n', parserC4.dipole_first_derivatives)
+    # print('\ndipole_second_derivatives\n', parserC4.dipole_second_derivatives)
+
+    # with np.printoptions(linewidth=250, suppress=True, precision=12):
+    #     print('\ncubic\n', parserC4.cubic_force_constants)
+    #     print('\npolarizability_first_derivatives\n', parserC4.polarizability_first_derivatives)
+    #     print('\npolarizability_second_derivatives\n', parserC4.polarizability_second_derivatives)
+
+    essential = [parserC4.harmonic_states,
+                 parserC4.anharmonic_states,
+                 parserC4.fundamentals_harmonic_str,
+                 parserC4.fundamentals_anharmonic_str,
+                 parserC4.dipole_first_derivatives,
+                 parserC4.dipole_second_derivatives,
+                 parserC4.polarizability_first_derivatives,
+                 parserC4.polarizability_second_derivatives,
+                 parserC4.cubic_force_constants]
+    assert all(v is not None for v in essential)

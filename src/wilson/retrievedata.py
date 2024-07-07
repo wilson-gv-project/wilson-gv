@@ -1,3 +1,6 @@
+"""
+Is this a documentation?
+"""
 from calculations import parseGaussian, parseCFOUR
 from typing import Any
 
@@ -132,34 +135,30 @@ class GaussianData:
         self.sourcetype = data['type']
         self.files = data['files']
 
-    def getDipDersCart(self):
+    def getDipDersCart_fchk(self):
         fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
         dipderCart = fchk_parser.dipolederiv()
         return dipderCart
 
-    def getPolarDersCart(self):
+    def getPolarDersCart_fchk(self):
         fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
         polder = fchk_parser.polarderiv()
         return polder
 
-    def get_hessian_tensor(self):
-        if self.sourcetype == 'fchk':
-            fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
-            hessian = fchk_parser.hessian()
-            return hessian
+    def get_hessian_tensor_fchk(self):
+        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        hessian = fchk_parser.hessian()
+        return hessian
 
     def getFundamentals(self) -> dict[int:float]:
         """
         Fundamental frequency with anharmonic corrections
         Returns: dict[int:float]
         """
-        if self.sourcetype == 'fchk':
-            pass
-        elif self.sourcetype == 'log':
-            results = parseGaussian.parse_frequencies(self.files['log'])
-            funddict = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
-            funddict_harm = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
-            return funddict, funddict_harm
+        results = parseGaussian.parse_frequencies(self.files['log'])
+        funddict = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
+        funddict_harm = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
+        return funddict, funddict_harm
 
     def getAllStates(self) -> dict[tuple[int]: float, tuple[int, int]: float,
                                     tuple[int, int, int]: float]:
@@ -217,7 +216,7 @@ class GaussianData:
         Return: tuple[np.ndarray - shape(NM, 3), np.ndarray - shape(NM, NM, 3)]
         """
         if self.sourcetype == 'fchk':
-            dipderCart = self.getDipDersCart()
+            dipderCart = self.getDipDersCart_fchk()
             pass
 
         elif self.sourcetype == 'log':
