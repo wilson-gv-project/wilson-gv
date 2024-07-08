@@ -24,28 +24,28 @@ The output should be 7 pickle files:
                 'dimensionless.pkl'
 """
 
-from scriptsHPC.utils import parseCFOUR
+from calculations import parseCFOUR_forWilson
 import os
 
 curdir = os.getcwd()
 print(curdir)
 
 #outfile = curdir+'/anharm/save/out'
-#fname = parseCFOUR.pklOutFile(outfile)
+#fname = parseCFOUR_forWilson.pklOutFile(outfile)
 
 #dipolexfile = curdir+'/anharm/save/dipole'
-# d1, d2 = parseCFOUR.getDipoleDers(dipolexfile, outfile)
-#dippkl = parseCFOUR.pklDipole(dipolexfile, outfile)
+# d1, d2 = parseCFOUR_forWilson.getDipoleDers(dipolexfile, outfile)
+#dippkl = parseCFOUR_forWilson.pklDipole(dipolexfile, outfile)
 
 pol_dir = curdir+'/polar'
 # first, second = parseCFOUR.getPolarDers(pol_dir)
-pfile = parseCFOUR.pklPolder(pol_dir)
-polraw = parseCFOUR.pklPoldata(pol_dir)
+pfile = parseCFOUR_forWilson.pklPolder(pol_dir)
+polraw = parseCFOUR_forWilson.pklPoldata(pol_dir)
 
 #cubicfile = curdir+'/anharm/save/cubic'
-# cff = parseCFOUR.pCubicORQuartic(cubicfile) -- ??
-#cfile = parseCFOUR.pklCubic(cubicfile)
+# cff = parseCFOUR_forWilson.pCubicORQuartic(cubicfile) -- ??
+#cfile = parseCFOUR_forWilson.pklCubic(cubicfile)
 
 quadratureFile = curdir+'/anharm/QUADRATURE'
-# equilibrium_geometry, freqs, normal_modes = parseCFOUR.pQUADRATURE(quadratureFile) - normal_modes would be a dict
-dimlessFile = parseCFOUR.pklDimless_normal_modes(quadratureFile)
+# equilibrium_geometry, freqs, normal_modes = parseCFOUR_forWilson.pQUADRATURE(quadratureFile) - normal_modes would be a dict
+dimlessFile = parseCFOUR_forWilson.pklDimless_normal_modes(quadratureFile)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from scriptsHPC.utils import calcsCFOUR
+from calculations import calcsCFOUR
 from input_parameters import settingsCalcPolar, configHPCpolar
 
 # - 7 - now deal with polarizability
@@ -21,5 +21,5 @@ os.chdir(settingsCalcPolar['jobtype'])
 # calcsCFOUR.fromZmatNew2Zmat('ZMAT', settingsCalcPolar)
 
 # - 7_4 -
-calcsCFOUR.makeDisplacements_Dimless(delta=0.01, config=configHPCpolar)
+calcsCFOUR.makeDisplacements(delta=0.01, config=configHPCpolar)
 #calcsCFOUR.makeDisplacements(delta=0.01, config=configHPCpolar)

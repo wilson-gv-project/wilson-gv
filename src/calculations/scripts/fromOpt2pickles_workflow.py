@@ -1,42 +1,43 @@
 #!/usr/bin/env python
-##############################################################################
-##                                                                          ##
-##                    Hagakure, The Way of the Samurai                      ##
-##                                                                          ##
-##############################################################################
-#
-# 1. Optimize structure --> ZMATnew
-# 2. With ZMATnew geometry, run ANH_ALGORITHM=PARALLEL, VIBRATION=ANALYTIC,
-#                               FD_PROJECT=ON --> zmat0* files
-#
-#          xcfour > "$output_filename"
-#   2a. Add lines to generated submit.sh
-#          mkdir save
-#          cp JOBARC ./save/
-#          cp JAINDX ./save/
-#          ../../../../../scriptsHPC/cfourscripts/vpt2_parallel/mkzmatdirs
-# 3. Run all the new zmat0* in their directories
-#
-#           xcfour > "$output_filename"
-#    3a. Add lines to generated submit.sh
-#           cp DCT dct0
-#           xja2fja >> out1
-#           cp FJOBARC ../save/fja.004
-# 4. Run post-processing script for fja.0* files
-#
-#         # Copy fja.x to FJOBARC
-#         cp "$file" FJOBARC
-#         # Execute xja2fja
-#         xja2fja
-#         # Execute xcubic and append output to out file
-#         xcubic >> out
-# 5. Make pickles from output files and save them in the input_data_info directory
-# 6. Tadaaa
-#
+"""
+#############################################################################
+#                                                                          ##
+#                    Hagakure, The Way of the Samurai                      ##
+#                                                                          ##
+#############################################################################
+
+1. Optimize structure --> ZMATnew
+2. With ZMATnew geometry, run ANH_ALGORITHM=PARALLEL, VIBRATION=ANALYTIC,
+                              FD_PROJECT=ON --> zmat0* files
+
+         xcfour > "$output_filename"
+  2a. Add lines to generated submit.sh
+         mkdir save
+         cp JOBARC ./save/
+         cp JAINDX ./save/
+         ../../../../../scriptsHPC/cfourscripts/vpt2_parallel/mkzmatdirs
+3. Run all the new zmat0* in their directories
+
+          xcfour > "$output_filename"
+   3a. Add lines to generated submit.sh
+          cp DCT dct0
+          xja2fja >> out1
+          cp FJOBARC ../save/fja.004
+4. Run post-processing script for fja.0* files
+
+        # Copy fja.x to FJOBARC
+        cp "$file" FJOBARC
+        # Execute xja2fja
+        xja2fja
+        # Execute xcubic and append output to out file
+        xcubic >> out
+5. Make pickles from output files and save them in the input_data_info directory
+6. Tadaaa
+"""
 
 import os
 
-from scriptsHPC.utils import calcsCFOUR
+from calculations import calcsCFOUR
 
 # get the working directory where the optimization will be run
 basedir = os.getcwd()

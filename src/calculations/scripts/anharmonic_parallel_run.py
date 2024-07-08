@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from scriptsHPC.utils import calcsCFOUR
+from calculations import calcsCFOUR
 from input_parameters import settingsCalc, configHPC, configHPCdispl, config_fja
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

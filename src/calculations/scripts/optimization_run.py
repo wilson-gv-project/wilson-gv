@@ -36,7 +36,7 @@
 
 import os
 
-from scriptsHPC.utils import calcsCFOUR
+from calculations import calcsCFOUR
 from input_parameters import settingsOpt, configHPCopt, molecules
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter

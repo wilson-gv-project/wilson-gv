@@ -1,37 +1,38 @@
-##############################################################################
-##                                                                          ##
-##                             Samurai Tools                                ##
-##                                                                          ##
-##############################################################################
-#
-# 1. Optimize structure --> ZMATnew
-# 2. With ZMATnew geometry, run ANH_ALGORITHM=PARALLEL, VIBRATION=ANALYTIC,
-#                               FD_PROJECT=ON --> zmat0* files
-#
-#          xcfour > "$output_filename"
-#   2a. Add lines to generated submit.sh
-#          mkdir save
-#          cp JOBARC ./save/
-#          cp JAINDX ./save/
-#          ../../../../../scriptsHPC/cfourscripts/vpt2_parallel/mkzmatdirs
-# 3. Run all the new zmat0* in their directories
-#
-#           xcfour > "$output_filename"
-#    3a. Add lines to generated submit.sh
-#           cp DCT dct0
-#           xja2fja >> out1
-#           cp FJOBARC ../save/fja.004
-# 4. Run post-processing script for fja.0* files
-#
-#         # Copy fja.x to FJOBARC
-#         cp "$file" FJOBARC
-#         # Execute xja2fja
-#         xja2fja
-#         # Execute xcubic and append output to out file
-#         xcubic >> out
-# 5. Make pickles from output files and save them in the input_data_info directory
-# 6. Tadaaa
-#
+"""
+#############################################################################
+#                                                                          ##
+#                             Samurai Tools                                ##
+#                                                                          ##
+#############################################################################
+
+1. Optimize structure --> ZMATnew
+2. With ZMATnew geometry, run ANH_ALGORITHM=PARALLEL, VIBRATION=ANALYTIC,
+                              FD_PROJECT=ON --> zmat0* files
+
+         xcfour > "$output_filename"
+  2a. Add lines to generated submit.sh
+         mkdir save
+         cp JOBARC ./save/
+         cp JAINDX ./save/
+         ../../../../../scriptsHPC/cfourscripts/vpt2_parallel/mkzmatdirs
+3. Run all the new zmat0* in their directories
+
+          xcfour > "$output_filename"
+   3a. Add lines to generated submit.sh
+          cp DCT dct0
+          xja2fja >> out1
+          cp FJOBARC ../save/fja.004
+4. Run post-processing script for fja.0* files
+
+        # Copy fja.x to FJOBARC
+        cp "$file" FJOBARC
+        # Execute xja2fja
+        xja2fja
+        # Execute xcubic and append output to out file
+        xcubic >> out
+5. Make pickles from output files and save them in the input_data_info directory
+6. Tadaaa
+"""
 
 
 def makeOptZmat(settings: dict, molecule: str):
@@ -45,16 +46,6 @@ def makeOptZmat(settings: dict, molecule: str):
     LINEQ_MAXCY = settings['lineqcycles']
 
     startGeo = molecule
-#     startGeo = """O
-# C 1 B1*
-# H 2 B2* 1 A1*
-# H 2 B2* 1 A1* 3 D1
-#
-# B1   =        1.215105045020483
-# B2   =        1.118923051621344
-# A1   =      122.394541535245793
-# D1   =      180.000000000000000
-# """
     titleZmat = 'geo optimization'
 
     template = f"""formaldehyde {titleZmat}
@@ -74,11 +65,7 @@ MEMORY_SIZE=5
 MEM_UNIT=GB)
 
 """
-
-    # print(template)
-    # Writing to file
     with open("ZMAT", "w") as file1:
-        # Writing input_data_info to a file
         file1.writelines(template)
 
 
@@ -93,7 +80,6 @@ def fromZmatNew2Zmat(zmatnew: str, settings: dict):
     shutil.copy(zmatnew, f'./{jobtype}/ZMAT')
 
     with open(f'./{jobtype}/ZMAT', "r+") as file1:
-        # Reading form a file
         content = file1.readlines()
 
     coords = []
@@ -150,11 +136,7 @@ MEM_UNIT=GB)
 """
 
     znew = '\n'.join(coords) + '\n' + '\n'.join(params) + calc
-    # print(znew)
-
-    # Writing to file
     with open(f'./{jobtype}/ZMAT', "w") as file1:
-        # Writing input_data_info to a file
         file1.writelines(znew)
 
 
@@ -172,12 +154,11 @@ def generateSubmit(bash_script_path: str, config: dict, outname: str = None):
     hours = config['hours']
 
     import subprocess
-    # Run a bash script (make sure the script has execute permissions)
     # bash_script_path = f'/cluster/projects/nn14654k/vle014/scriptsHPC/submit_utils/scrmaster_{machine}'
 
     cpus = 16 if machine == 'fram' else 20
 
-    # Run a bash script in a specific location (cdw), here - in curdir
+    # Run a bash script in a specific location (cdw)
     script_args = [f'-h{hours}', f'-m{minutes}', '-n1', f'-c{cpus}', '-t2']
     subprocess.run(['bash', bash_script_path] + script_args, check=True)  # cwd=new_directory
 
@@ -302,12 +283,9 @@ xcfour > "$output_filename"
 
 exit 0
 """
-
     with open(outname, "w") as file1:
-        # Writing input_data_info to a file
         file1.writelines(text)
 
-    # make executable
     import subprocess
     subprocess.check_call(['chmod', '+x', outname])
 
@@ -326,19 +304,18 @@ def extendSubmitEquilParAnh(submitfile: str, configHPC: dict):
             - extend new submit with : cp DCT dct0; xja2fja >> out1; cp FJOBARC ../save/fja.$(basename "$(pwd)")
             - sbatch submit.sh
 
+    :param configHPC:
     :param submitfile:
     :return: after running this function, a big submit script will be created and after all submitted jobs are finished,
             'save' dir is ready for the final step of the calculation
     """
 
-    # Reading from file
     with open(submitfile, "r+") as file1:
-        # Reading form a file
         content = file1.readlines()
 
     for ln in content:
         if '#SBATCH --time=' in ln:
-            '#SBATCH --time=00:10:00'
+            # '#SBATCH --time=00:10:00'
             time = ln.split('=')[1].split(':')
             hm = [time[0], time[1]]
             timeoriginal = tuple(hm)
@@ -414,7 +391,6 @@ done
     content.insert(index + 1, elmnt + elemnt2)
 
     with open(submitfile, "w") as file2:
-        # Writing input_data_info to a file
         file2.writelines(content)
 
 
@@ -426,15 +402,10 @@ def sumbitSbatch(sbubmitname: str):
     import subprocess
     import re
 
-    # Define the command to be run
     command = ["sbatch", sbubmitname]
 
-    # Run the command and capture the output
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-
-        # sbatch typically returns a string like "Submitted batch job 12345"
-        # We'll use a regular expression to extract the job ID
         job_id_search = re.search(r'Submitted batch job (\d+)', result.stdout)
 
         if job_id_search:
@@ -483,8 +454,6 @@ def checkJobStatusNAME(basedirname: str):
 
     # Extracting the 'NAME' column to a list for comparison
     running_jobs = [line.split()[2] for line in output_lines[1:] ]  # Assuming the 'NAME' column is at index 3
-#    print(running_jobs, basedirname)
-#    print([basedirname in i.split('/') for i in running_jobs])
 
     if any([basedirname in i for i in running_jobs]):
         return 'RUNNING'
@@ -521,7 +490,6 @@ def checkStatus(typecheck: str, inputname: str):
 
     elif typecheck == 'name':
         basedirDIR = inputname.split('/')[-1]
-        # print('basedirDIR', basedirDIR, 'basedir', basedir, basedir.split('/'))
         resultJobOther = checkJobStatusNAME(basedirDIR)
 
         while resultJobOther == 'RUNNING':
@@ -603,187 +571,37 @@ for file in $files; do
     fi
 done
 """
-
     with open("submit.sh", "w") as file1:
-        # Writing input_data_info to a file
         file1.writelines(text)
 
-    # make executable
     import subprocess
     subprocess.check_call(['chmod', '+x', "submit.sh"])
     sumbitSbatch("submit.sh")
 
-
-def makeDisplacements(delta: float, config: dict):
+def makeDisplacements(delta: float, config: dict, dimensionless: bool = True):
     import os
     dircur = os.getcwd() + '/'
     print('dircur:', dircur)
 
     import shutil
-    # molden file from anharmonic/hessian calculation, with normal modes
-    shutil.copy('../anharm/MOLDEN', f'./MOLDEN_f')
-
-    # import sys
-    # # sys.path.append('/cluster/projects/nn14654k/vle014/scriptsHPC/utils')
-    # sys.path.append('/home/vlew/scriptsHPC/utils')
-    # import scriptsHPC.utils.parseCFOUR as pc4
-    from scriptsHPC.utils import parseCFOUR
-
-    # get normal modes
-    equilibrium_geometry, atomsMolden, normal_modes = parseCFOUR.pMOLDEN('MOLDEN_f')
-    mode_numbers = list(normal_modes.keys())
-    print('mode_numbers', mode_numbers)
-    # quit()
-
-    # Reading from file - ZMAT equilibrium
-    with open('ZMAT', "r+") as file1:
-        # Reading form a file
-        zmat_template = file1.readlines()
-    indx = zmat_template.index("\n")
-    zmat_template.insert(-3, 'COORD=CARTESIAN,UNITS=BOHR\n')
-
-    zm = zmat_template[indx + 1:]
-    if zmat_template[indx + 1][0] != '*':
-        indx1 = zm.index("\n")
-        zmat_template = zm[indx1 + 1:]
-    else:
-        zmat_template = zmat_template[indx + 1:]
-
-    # Generate single displacements for each mode
-    for mode_number0 in mode_numbers:
-        if mode_number0 <= 6:
-            continue
-        # for displacement in [delta, -delta]:
-        for displacement in [-delta, delta]:
-            mode_coords_list = [normal_modes[mode_number0]]
-
-            # create_zmat_file((atoms, equilibrium_geometry), zmat_template, (mode_number,), (displacement,),
-            #                  mode_coords_list, config)
-            mode_numbers1 = (mode_number0,)
-            # Generate a string for the displacement description
-            displacement_descriptions = []
-            for mode_number, d in zip(mode_numbers1, (displacement,)):
-                direction = 'POSITIVE' if d > 0 else 'NEGATIVE'
-                displacement_descriptions.append(f"{direction} DISPLACEMENT of {d}*Q{mode_number}")
-            displacement_str = ' and '.join(displacement_descriptions)
-            d_str = ''.join(['p' if d > 0 else 'n' for d in (displacement,)])
-
-            import os
-            # Create a new directory
-            new_directory = dircur + "_".join(map(str, mode_numbers1)) + d_str
-            os.makedirs(new_directory, exist_ok=True)
-            print(new_directory)
-            # Generate the filename
-            zmat_filename = dircur + f'zmat{"_".join(map(str, mode_numbers1))}{d_str}'
-            print(zmat_filename)
-            with open(zmat_filename, 'w') as file:
-                file.write(f'GEOMETRY {"_".join(map(str, mode_numbers1))} {displacement_str}\n')
-                atoms, eq_coords = atomsMolden, equilibrium_geometry
-
-                for i in range(len(atoms)):
-                    line = [atoms[i]]
-                    # Calculate the total displacement for this atom
-                    displace = [sum(d * mode_coord[i][j] for d, mode_coord in zip((displacement,), mode_coords_list))
-                                for
-                                j in range(3)]
-                    line.extend(["{:.10f}".format(c + disp) for c, disp in zip(eq_coords[i], displace)])
-                    file.write(' '.join(line) + '\n')
-
-                file.write('\n')
-                file.write(''.join(zmat_template))
-
-            shutil.copy(zmat_filename, new_directory + '/ZMAT')
-            os.chdir(new_directory)
-            generateSubmitPy(config, 'submit.sh')
-            #sumbitSbatch("submit.sh")
-            os.chdir('../')
-
-    # Generate double displacements for pairs of modes
-    for i, mode_number2 in enumerate(mode_numbers):
-        #print('i, mode_number2 <= 6', i, mode_number2, mode_number2 <= 6)
-        #if mode_number2 <= 6:
-        #    continue
-        for j, mode_number3 in enumerate(mode_numbers):
-            #print(f"i: {i}, j: {j}, mode_number2: {mode_number2}, mode_number3: {mode_number3}, j <= i")
-            if mode_number3 <= mode_number2:
-                continue
-            # Create displacement combinations for two different modes
-            displacement_combinations = [
-                (delta, delta), (delta, -delta),
-                (-delta, delta), (-delta, -delta)
-            ]
-            for displacements in displacement_combinations:
-                mode_coords_list = [normal_modes[mode_number2], normal_modes[mode_number3]]
-
-                # create_zmat_file((atoms, equilibrium_geometry), zmat_template, (mode_number1, mode_number2),
-                #                  displacements, mode_coords_list, config)
-
-                mode_numbers2 = (mode_number2, mode_number3)
-                # Generate a string for the displacement description
-                displacement_descriptions = []
-                for mode_number, d in zip(mode_numbers2, displacements):
-                    direction = 'POSITIVE' if d > 0 else 'NEGATIVE'
-                    displacement_descriptions.append(f"{direction} DISPLACEMENT of {d}*Q{mode_number}")
-                displacement_str = ' and '.join(displacement_descriptions)
-                d_str = ''.join(['p' if d > 0 else 'n' for d in displacements])
-
-                import os
-                # Create a new directory
-                new_directory = dircur + "_".join(map(str, mode_numbers2)) + d_str
-                os.makedirs(new_directory, exist_ok=True)
-
-                # Generate the filename
-                zmat_filename = dircur + f'zmat{"_".join(map(str, mode_numbers2))}{d_str}'
-
-                with open(zmat_filename, 'w') as file:
-                    file.write(f'GEOMETRY {"_".join(map(str, mode_numbers2))} {displacement_str} - regular\n')
-                    atoms, eq_coords = atomsMolden, equilibrium_geometry
-
-                    for i in range(len(atoms)):
-                        line = [atoms[i]]
-                        # Calculate the total displacement for this atom
-                        displace = [
-                            sum(d * mode_coord[i][j] for d, mode_coord in zip(displacements, mode_coords_list)) for
-                            j in range(3)]
-                        line.extend(["{:.10f}".format(c + disp) for c, disp in zip(eq_coords[i], displace)])
-                        file.write(' '.join(line) + '\n')
-
-                    file.write('\n')
-                    file.write(''.join(zmat_template))
-
-                shutil.copy(zmat_filename, new_directory + '/ZMAT')
-                os.chdir(new_directory)
-                generateSubmitPy(config, 'submit.sh')
-                #sumbitSbatch("submit.sh")
-                os.chdir('../')
-
-def makeDisplacements_Dimless(delta: float, config: dict):
-    import os
-    dircur = os.getcwd() + '/'
-    print('dircur:', dircur)
-
-    import shutil
-    # molden file from anharmonic/hessian calculation, with normal modes
+    # molden and quadrature files from anharmonic/hessian calculation, with normal modes
     shutil.copy('../anharm/QUADRATURE', f'./QUADRATURE_f')
     shutil.copy('../anharm/MOLDEN', f'./MOLDEN_f')
 
-    # import sys
-    # # sys.path.append('/cluster/projects/nn14654k/vle014/scriptsHPC/utils')
-    # sys.path.append('/home/vlew/scriptsHPC/utils')
-    # import scriptsHPC.utils.parseCFOUR as pc4
     from scriptsHPC.utils import parseCFOUR
+    equilibrium_geometry_Molden, atomsMolden, normal_modes_Molden = parseCFOUR.pMOLDEN('./MOLDEN_f')
 
     # get normal modes
-    equilibrium_geometry00, atomsMolden, normal_modes00 = parseCFOUR.pMOLDEN('MOLDEN_f')
-    equilibrium_geometry, freqs, normal_modes = parseCFOUR.pQUADRATURE('./QUADRATURE_f')
+    if dimensionless:
+        equilibrium_geometry, freqs, normal_modes = parseCFOUR.pQUADRATURE('./QUADRATURE_f')
+    else:
+        equilibrium_geometry = equilibrium_geometry_Molden
+        normal_modes = normal_modes_Molden
 
     mode_numbers = list(normal_modes.keys())
-    #print('mode_numbers', mode_numbers)
-    # quit()
 
     # Reading from file - ZMAT equilibrium
     with open('ZMAT', "r+") as file1:
-        # Reading form a file
         zmat_template = file1.readlines()
     indx = zmat_template.index("\n")
     zmat_template.insert(-3, 'COORD=CARTESIAN,UNITS=BOHR\n')
@@ -799,12 +617,9 @@ def makeDisplacements_Dimless(delta: float, config: dict):
     for mode_number0 in mode_numbers:
         if mode_number0 <= 6:
             continue
-        # for displacement in [delta, -delta]:
         for displacement in [-delta, delta]:
             mode_coords_list = [normal_modes[mode_number0]]
 
-            # create_zmat_file((atoms, equilibrium_geometry), zmat_template, (mode_number,), (displacement,),
-            #                  mode_coords_list, config)
             mode_numbers1 = (mode_number0,)
             # Generate a string for the displacement description
             displacement_descriptions = []
@@ -815,11 +630,9 @@ def makeDisplacements_Dimless(delta: float, config: dict):
             d_str = ''.join(['p' if d > 0 else 'n' for d in (displacement,)])
 
             import os
-            # Create a new directory
             new_directory = dircur + "_".join(map(str, mode_numbers1)) + d_str
             os.makedirs(new_directory, exist_ok=True)
             print(new_directory)
-            # Generate the filename
             zmat_filename = dircur + f'zmat{"_".join(map(str, mode_numbers1))}{d_str}'
             print(zmat_filename)
             with open(zmat_filename, 'w') as file:
@@ -846,11 +659,8 @@ def makeDisplacements_Dimless(delta: float, config: dict):
 
     # Generate double displacements for pairs of modes
     for i, mode_number2 in enumerate(mode_numbers):
-        #print('i, mode_number2 <= 6', i, mode_number2, mode_number2 <= 6)
-        #if mode_number2 <= 6:
-        #    continue
+
         for j, mode_number3 in enumerate(mode_numbers):
-            #print(f"i: {i}, j: {j}, mode_number2: {mode_number2}, mode_number3: {mode_number3}, j <= i")
             if mode_number3 <= mode_number2:
                 continue
             # Create displacement combinations for two different modes
@@ -860,9 +670,6 @@ def makeDisplacements_Dimless(delta: float, config: dict):
             ]
             for displacements in displacement_combinations:
                 mode_coords_list = [normal_modes[mode_number2], normal_modes[mode_number3]]
-
-                # create_zmat_file((atoms, equilibrium_geometry), zmat_template, (mode_number1, mode_number2),
-                #                  displacements, mode_coords_list, config)
 
                 mode_numbers2 = (mode_number2, mode_number3)
                 # Generate a string for the displacement description
@@ -874,11 +681,9 @@ def makeDisplacements_Dimless(delta: float, config: dict):
                 d_str = ''.join(['p' if d > 0 else 'n' for d in displacements])
 
                 import os
-                # Create a new directory
                 new_directory = dircur + "_".join(map(str, mode_numbers2)) + d_str
                 os.makedirs(new_directory, exist_ok=True)
 
-                # Generate the filename
                 zmat_filename = dircur + f'zmat{"_".join(map(str, mode_numbers2))}{d_str}'
 
                 with open(zmat_filename, 'w') as file:
@@ -933,7 +738,6 @@ def process_fja_files():
     def list_modules():
         run_command(['module', 'list'])
 
-    # Load modules
     purge_modules()
     load_module('gompi/2023a')
     load_module('imkl/2023.1.0')
@@ -959,16 +763,10 @@ def process_fja_files():
     # Process each file
     for file in files:
         if os.path.isfile(file):
-            # Copy fja.x to FJOBARC
             subprocess.run(['cp', file, 'FJOBARC'])
-
-            # Execute xja2fja
             run_command(['xja2fja'])
-
-            # Execute xcubic and append output to out file
             with open('out', 'a') as outfile:
                 subprocess.run(['xcubic'], stdout=outfile)
 
-            # Log the processed file
             with open('loglog', 'a') as logfile:
                 logfile.write(f"Processed {file}\n")
