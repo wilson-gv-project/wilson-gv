@@ -16,6 +16,76 @@ import sys
 import pandas as pd
 pd.set_option('display.max_rows', sys.maxsize)
 
+class GaussianDataParser(object):
+
+    def __init__(self, all_files_dict):
+        self.all_files_dict = all_files_dict
+        # {'log', 'fchk', 'com'}
+
+        self.nModesStart = None
+
+        self.dipole_first_derivatives = None
+        self.dipole_second_derivatives = None
+        self.polarizability_first_derivatives = None
+        self.polarizability_second_derivatives = None
+
+        self.fundamentals_harmonic_str = None
+        self.fundamentals_anharmonic_str = None
+
+        self.fundamentals_harmonic_int = None
+        self.fundamentals_anharmonic_int = None
+
+        self.harmonic_states = None
+        self.anharmonic_states = None
+        self.cubic_force_constants = None
+        self.quartic_constants = None
+
+        self.equilibrium_geometry = None
+        self.Q_normal_coordinates = None
+        self.q_normal_coordinates_dimensionless = None
+
+        self.atoms = None
+        self.basis = None
+        self.lot = None
+
+    def getData(self, linear_molecule: bool = False):
+        """Collect the data into the attributes.
+        Uses methods:
+            parse_output_file,
+            pCubicORQuartic, getCubicPost,
+            getDipoleDers_anharm,
+            'polar_pkl' file <- getPolarDers(getDisplacementsPolarData,
+                                getRotationMatrix, pTensor),
+                                pklPolder
+        """
+        # {'log', 'fchk', 'com'}
+        self.nModesStart = 6 if linear_molecule else 7
+
+        results_log = parse_frequencies(self.all_files_dict['3quanta'])
+        self.fundamentals_anharmonic_int = {int(k)-1: float(v) for k, v in zip(results_log['Fundamental Bands']['mode_a'],
+                                                                               results_log['Fundamental Bands'][2])}
+        self.fundamentals_harmonic_int = {int(k)-1: float(v) for k, v in zip(results_log['Fundamental Bands']['mode_a'],
+                                                                             results_log['Fundamental Bands'][1])}
+
+        self.fundamentals_harmonic_str = {str(k):v for k,v in self.fundamentals_anharmonic_int.items()}
+        self.fundamentals_anharmonic_str = {str(k):v for k,v in self.fundamentals_harmonic_int.items()}
+
+        self.anharmonic_states = get_allStates_fromParsedResults(results_log, anharmonic=True)
+        self.harmonic_states = get_allStates_fromParsedResults(results_log, anharmonic=False)
+
+        mu = getDipDers_log(self.all_files_dict['log'])
+        self.dipole_first_derivatives = mu[0]
+        self.dipole_second_derivatives = mu[1]
+
+        alpha = getPolarDers_log(self.all_files_dict['log'])
+        self.polarizability_first_derivatives = alpha[0]
+        self.polarizability_second_derivatives = alpha[1]
+
+        cubic_df = parse_cubic_constants(self.all_files_dict['log'])[0]
+        selected_df = cubic_df[['I', 'J', 'K', 'K(I,J,K)']]
+        cubic = selected_df.to_numpy()
+        self.cubic_force_constants = get_cubic_post(len(self.fundamentals_harmonic_str), cubic)
+
 # used in retrievedata.py
 def parse_frequencies(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
@@ -76,6 +146,100 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
 
     return results
 
+def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = False) -> dict:
+    """results is a DataFrame from parse_frequencies()"""
+    if anharmonic:
+        results['Combination Bands']['mode_c'] = results['Combination Bands']['mode_c'].fillna(0)
+        results['Combination Bands']['n_c'] = results['Combination Bands']['n_c'].fillna(0)
+
+        funddict = {tuple([int(k) - 1]): float(v) for k, v in
+                    zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
+        states = {
+            tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v)
+            for t, v, n in
+            zip(results['Overtones']['mode_a'], results['Overtones'][2], results['Overtones']['n_a'])
+        }
+        combinationbands = {
+            tuple(
+                sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+                    (int(t3) - 1)] * int(n3))
+            ): float(v)
+            for t1, t2, t3, v, n1, n2, n3 in
+            zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
+                results['Combination Bands']['mode_c'],
+                results['Combination Bands'][4], results['Combination Bands']['n_a'],
+                results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
+        }
+        allstates_anharm = {**funddict, **states, **combinationbands}
+        allstates_anharm = {key: allstates_anharm[key] for key in sorted(allstates_anharm, key=allstates_anharm.get)}
+        return allstates_anharm
+
+    else:
+        funddict1 = {tuple([int(k) - 1]): float(v) for k, v in
+                     zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
+        states1 = {tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v) for t, v, n in
+                   zip(results['Overtones']['mode_a'], results['Overtones'][1], results['Overtones']['n_a'])}
+        combinationbands1 = {
+            tuple(
+                sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+                    (int(t3) - 1)] * int(n3))
+            ): float(v)
+            for t1, t2, t3, v, n1, n2, n3 in
+            zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
+                results['Combination Bands']['mode_c'],
+                results['Combination Bands'][3], results['Combination Bands']['n_a'],
+                results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
+        }
+        allstates_harm = {**funddict1, **states1, **combinationbands1}
+        return allstates_harm
+
+def getDipDers_log(logfile: str) -> tuple:
+    """
+    Dipole derivatives: first order and second order
+    Return: tuple[np.ndarray - shape(NM, 3), np.ndarray - shape(NM, NM, 3)]
+    """
+    dipl, units = parse_dipole_moment(logfile)
+    a2d = dipl.loc[dipl['P'] == 'P1', ['X', 'Y', 'Z']].to_numpy()
+    shpNM = a2d.shape[0]
+    a2d2 = dipl.loc[dipl['P'] == 'P2', ['X', 'Y', 'Z']].to_numpy()
+    a2d2_3d = np.zeros((shpNM, shpNM, 3))
+
+    for i, j, xyz in zip(dipl.loc[dipl['P'] == 'P2', 'i'], dipl.loc[dipl['P'] == 'P2', 'j'], a2d2):
+        a2d2_3d[int(i) - 1, int(j) - 1] = xyz
+        a2d2_3d[int(j) - 1, int(i) - 1] = xyz
+    return tuple([a2d, a2d2_3d])
+
+def getPolarDers_log(logfile) -> tuple:
+    """
+    Polarizability derivatives: first order and second order
+    Return: tuple[np.ndarray - shape(NM, 3, 3), np.ndarray - shape(NM, NM, 3, 3)]
+    """
+    pol = parse_polarizability(logfile)
+    shpNM = int(pol.loc[pol[0] == 'P1', 1].max())
+    p1_3d = np.zeros((shpNM, 3, 3))
+    for i in pol.loc[pol[0] == 'P1', 1].unique():
+        # Get the rows with the current 'i' value and 'P' is 'P1', and select columns 5, 6, and 7
+        xyz = pol.loc[(pol[0] == 'P1') & (pol[1] == i), [5, 6, 7]].values
+        # Assign the 2D array 'xyz' to the corresponding slice of the 3D array
+        p1_3d[int(i) - 1] = xyz
+
+    nm_i = int(pol.loc[pol[0] == 'P2', 1].max())
+    nm_j = int(pol.loc[pol[0] == 'P2', 2].max())
+
+    p2_4d = np.zeros((nm_i, nm_j, 3, 3))
+
+    for i in pol.loc[pol[0] == 'P2', 1].unique():
+        for j in pol.loc[pol[0] == 'P2', 2].unique():
+            # Get the rows with the current 'i' and 'j' values and 'P' is 'P2', and select columns 5, 6, and 7
+            xyz = pol.loc[(pol[0] == 'P2') & (pol[1] == i) & (pol[2] == j), [5, 6, 7]].values
+            # Check if 'xyz' is not empty
+            if xyz.shape[0] != 0:
+                # Assign the 2D array 'xyz' to the corresponding slice of the 4D array
+                p2_4d[int(i) - 1, int(j) - 1] = xyz
+                p2_4d[int(j) - 1, int(i) - 1] = xyz
+
+    return tuple([p1_3d, p2_4d])
+
 # used in retrievedata.py
 def parse_cubic_constants(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
@@ -104,9 +268,8 @@ def parse_cubic_constants(file_path: str) -> pd.DataFrame:
     return df, units_lines
 
 # used in retrievedata.py
-def get_cubic_post(freq: dict, cubic: np.ndarray, recipcm: bool = False):
-    n = len(freq)
-    K3 = np.zeros((n, n, n), dtype=np.float64)
+def get_cubic_post(len_freq: int, cubic: np.ndarray, recipcm: bool = False):
+    K3 = np.zeros((len_freq, len_freq, len_freq), dtype=np.float64)
 
     for fijk in cubic:
         i = int(fijk[0]) - 7
@@ -270,6 +433,8 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
     # pd.set_option('display.float_format', '{:.7f}'.format)
     df = pd.DataFrame(array)
     return df#, units_line
+
+# -----------------------------------------------------------------------------
 
 # not used now
 def getForceConstants_fchk(fchkfile: str):
