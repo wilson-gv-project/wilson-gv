@@ -1,18 +1,18 @@
-#####################################################################################
-##                                                                                 ##
-##          File contains main code for 2DIR spectrum generation (images)          ##
-##                                                                                 ##
-#####################################################################################
-
+"""
+Mock should only:
+    input:
+        - fundamental frequencies (comb and overt made from them) - harmonic mock OR
+                        take also comb and overt
+        - skip (avrg=1.) or take mock derivatives
+        - spectral window
+"""
 import time
-
 import numpy as np
 np.set_printoptions(linewidth=100000)
 
 from wilson.retrievedata import CFOURdata, GaussianData
-
-def picks(pool, list_of_indices):
-    return [pool[i] for i in list_of_indices]
+from calculations.parseCFOUR_forWilson import CFOURdataParser
+from calculations.parseGaussian_forWilson import GaussianDataParser
 
 def rec_cm2rec_s(reciprocal_cm):
     from scipy import constants
@@ -35,7 +35,10 @@ class SpectrumEVV:
         # axes as arrays
         self.w1, self.w2 = np.array(w1), np.array(w2)
         self.shape2d = self.w1_mesh.shape
-        self.data_info = input_data_info # dictionary with input_data_info source and type - inputs
+
+        # in load_data method
+        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
+
         # Get the appropriate functions to retrieve the data
         cfuncs = {'cfour': CFOURdata(input_data_info), 'gaussian': GaussianData(input_data_info)}
         self.callbacks = cfuncs[input_data_info['source']]
@@ -45,9 +48,6 @@ class SpectrumEVV:
         # dictionary; keys from 0 to (3Natoms-6)
         self.fundamentals = {str(k):v for k,v in got_funds[0].items()}
         self.fundamentals_harmonic = {str(k):v for k,v in got_funds[1].items()}
-
-        # margin for higher diagonal
-        self.diagonal_margin = 10.
 
         parsed_states = self.callbacks.getAllStates()
 
@@ -61,7 +61,22 @@ class SpectrumEVV:
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
         self.deriv_data  = self.getDerivs()
-        self.gammaCompsAll = getting_abcgreek4avrg(num_f=4)
+        self.gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+
+        # margin for higher diagonal
+        self.diagonal_margin = 10.
+
+    def load_data(self, input_data_info: dict):
+        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
+
+        if input_data_info['source'] == 'cfour':
+            self.dataBank = CFOURdataParser(input_data_info)
+        elif input_data_info['source'] == 'gaussian':
+            self.dataBank = GaussianDataParser(input_data_info)
+        else:
+            pass
+
+        self.dataBank.getData()
 
 
     def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
@@ -93,8 +108,9 @@ class SpectrumEVV:
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
 
         ee, mm = electrical_terms_selection, mechanical_terms_selection
-        self.electrical_terms, self.mechanical_terms = picks(electrical_terms_r, ee), picks(mechanical_terms_r, mm)
-        self.electric_avrg, self.mechanical_avrg = picks(electric_avrg_r, ee), picks(mechanical_avrg_r, mm)
+        # [pool[i] for i in list_of_indices]
+        self.electrical_terms, self.mechanical_terms = [electrical_terms_r[i] for i in ee], [mechanical_terms_r[i] for i in mm]
+        self.electric_avrg, self.mechanical_avrg = [electric_avrg_r[i] for i in ee], [mechanical_avrg_r[i] for i in mm]
         # here the functions of 2 frequencies
         self.electr_funs = [w_mn_prod(i, margin=self.diagonal_margin) for i in self.electrical_terms]
         self.mech_funs = [w_mn_prod(*i) for i in self.mechanical_terms]
@@ -104,16 +120,16 @@ class SpectrumEVV:
                           dict(zip(self.mech_funs, self.mechanical_avrg))]
 
         # setting up the combinations of states for the terms
-        self.coords_ab = get_abc(2, len(self.fundamentals)) if self.electrical_terms is not None else []
-        self.coords_abc = get_abc(3, len(self.fundamentals)) if self.mechanical_terms is not None else []
+        self.coords_ab = get_abc_indices(2, len(self.fundamentals)) if self.electrical_terms is not None else []
+        self.coords_abc = get_abc_indices(3, len(self.fundamentals)) if self.mechanical_terms is not None else []
 
         if self.electrical_terms is not None:
-            self.el_avrg_tensors = [avrg_abc_tensor_new(ea, self.deriv_data, self.gammaCompsAll) for ea in self.electric_avrg]
+            self.el_avrg_tensors = [avrg_abc_tensor(ea, self.deriv_data, self.gammaCompsAll) for ea in self.electric_avrg]
         else:
             self.el_avrg_tensors = []
 
         if self.mechanical_terms is not None:
-            self.mech_avrg_tensors = [avrg_abc_tensor_new(ma, self.deriv_data, self.gammaCompsAll) for ma in self.mechanical_avrg]
+            self.mech_avrg_tensors = [avrg_abc_tensor(ma, self.deriv_data, self.gammaCompsAll) for ma in self.mechanical_avrg]
         else:
             self.mech_avrg_tensors = []
 
@@ -153,7 +169,7 @@ class SpectrumEVV:
 
     def getDerivs(self):
 
-        if self.data_info['source'] == 'cfour':
+        if self.dataInfo['source'] == 'cfour':
             w_h = rec_cm2rec_s(np.array([v for k, v in self.fundamentals_harmonic.items()]))
             self.matrix_2d = np.outer(w_h, w_h)
             self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
@@ -212,7 +228,7 @@ class SpectrumEVV:
 
             return allpropsdict
 
-        elif self.data_info['source'] == 'gaussian':
+        elif self.dataInfo['source'] == 'gaussian':
             from scipy import constants
             # to go from amu to au mass unit (m_e)
             amc_au = constants.physical_constants['atomic mass constant'][0] / \
@@ -418,62 +434,78 @@ class SpectrumEVV:
         execution_time = end_time - start_time
         print(f"Execution time - plt.savefig: {execution_time} seconds")
 
-def get_abc(nloops, abcrange):
-    stacklist = []
-    for i in range(nloops):
-        stacklist.append(np.arange(abcrange))
-    return np.stack(np.meshgrid(*stacklist), axis=-1).reshape(-1, nloops)
+def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int):
+    """
+    modes a, b, (c) - combinations of them in pairs (electric anharmonicity) or triplets (mechanical anharmonicity)
+    :param number_ofIndices:
+    :param number_ofFundamentals:
+    :return:
+    """
+    return np.indices([number_ofFundamentals]*number_ofIndices).reshape(number_ofIndices, -1).T
 
-def getting_abcgreek4avrg(num_f):
+def get_AlphaBetaGammaDelta_indices(num_f: int):
+    """
+    pol_g = orientationalaveraging.get_iso_f(num_f)
+    pol_g is a list of lists of 2 lists where the second one is empty
+          but first one contains the lists of interest
+
+    :param num_f:
+    :return: array_of_4greekIndices - an array of arrays of 4 greek indices for second hyperpolarizability :
+             [alpha, beta, gamma, delta]
+    """
     from wilson import orientationalaveraging
     pol_g = orientationalaveraging.get_iso_f(num_f)
-    new = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
-    return new
+    array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
+    return array_of_4greekIndices
 
-def avrg_abc(formula, data, normalModes, gammaCompsAll):
-    avrg = 0.
+def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray],
+                    gammaCompsAll: list[tuple[int, int, int, int]]):
+    """
+    Calculate the averaging tensor for a given formula.
+    Indices of the tensor are normal coordinates (NC) indices,
+    and the shape of the tensor depends on the nature of the term that is being calculated.
+    Shape of the averaging tensor for electrical anharmonicity terms is (n_NC, n_NC)
+    Shape of the averaging tensor for mechanical anharmonicity terms is (n_NC, n_NC, n_NC)
 
-    for gammaComps in gammaCompsAll:
-        alpha, beta, gamma, delta = gammaComps
-        abc = dict(zip(['a', 'b', 'c'], normalModes))
-        # this is indexing for "formula" that has 3 elements, therefore 0, 1, 2
-        abc_greek = {0: (beta,), 1: (alpha, delta,), 2: (gamma,)}
-        tot = 1.
-        for i, f in enumerate(formula):
-            # abc dict is made from the input normalModes, e.g. [a, b] where a and b are indices of normal modes
-            indx = tuple(abc[j] for j in f[1]) + abc_greek[i]
-            tot *= data[f[0]][indx]
-        avrg += tot
-    return avrg / 15.
-
-def avrg_abc_tensor_new(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray], gammaCompsAll: list[tuple[float]]):
+    :param formula:
+    :param data:
+    :param gammaCompsAll:
+    :return:
+    """
     nmodes = data['mu_Q'].shape[0]
+
     if type(formula[-1]) == str:
+        # True for mechanical anharmonicity terms
         formula = formula[:-1]
+
+    # specific case of the gamma_1,0 first term
     if [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_QQ']:
-        totB = np.zeros((nmodes, nmodes))
+        avrg_tensor = np.zeros((nmodes, nmodes))
         for a in range(nmodes):
             for b in range(nmodes):
                 total = 0.
                 for comps in gammaCompsAll:
                     alpha, beta, gamma, delta = comps
                     total += data['mu_Q'][a, beta] * data['alpha_Q'][b, alpha, delta] * data['mu_QQ'][a, b, gamma]
-                totB[a, b] = total/15.
-        return totB
+                avrg_tensor[a, b] = total/15.
+        return avrg_tensor
 
+    # specific case of the gamma_1,0 second term
     elif [i[0] for i in formula] == ['mu_Q', 'alpha_QQ', 'mu_Q']:
-        totB = np.zeros((nmodes, nmodes))
+        avrg_tensor = np.zeros((nmodes, nmodes))
         for a in range(nmodes):
             for b in range(nmodes):
                 total = 0.
                 for comps in gammaCompsAll:
                     alpha, beta, gamma, delta = comps
                     total += data['mu_Q'][a, beta] * data['alpha_QQ'][a, b, alpha, delta] * data['mu_Q'][b, gamma]
-                totB[a, b] = total/15.
-        return totB
+                avrg_tensor[a, b] = total/15.
+        return avrg_tensor
 
+    # all terms of gamma_0,1 have this structure of averaging part
     elif [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_Q']:
-        totB = np.zeros((nmodes, nmodes, nmodes))
+        avrg_tensor = np.zeros((nmodes, nmodes, nmodes))
+        # this part is changing for different terms
         modes_letters = [i[1] for i in formula]
         for a in range(nmodes):
             for b in range(nmodes):
@@ -484,8 +516,8 @@ def avrg_abc_tensor_new(formula: list[tuple[str, tuple[str]]], data: dict[str:np
                     for comps in gammaCompsAll:
                         alpha, beta, gamma, delta = comps
                         total += data['mu_Q'][i1, beta] * data['alpha_Q'][i2, alpha, delta] * data['mu_Q'][i3, gamma]
-                    totB[a, b, c] = total/15.
-        return totB
+                    avrg_tensor[a, b, c] = total/15.
+        return avrg_tensor
 
 # function generator
 def w_mn_prod(subscripts, fermi=None, margin=10.):

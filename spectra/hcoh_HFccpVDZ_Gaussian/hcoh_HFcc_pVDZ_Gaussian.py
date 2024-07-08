@@ -50,7 +50,7 @@ ders = setup.getDerivs()
 # add mechanical and electrical anharmonicities terms and orientational averages (symbolic setup)
 setup.addTerms(None, None, None, None)
 
-print(setup.data_info, '\n')
+print(setup.dataInfo, '\n')
 # print(setup.gammaCompsAll, '\n', len(setup.gammaCompsAll), '\n')
 # quit()
 # print derivatives

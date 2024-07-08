@@ -36,7 +36,7 @@ derivatives_data = setup.deriv_data
 inds = [(0, 1), (1, 3), (3, 0), (2, 2), (4, 4), (1, 1), (0, 0), (3, 1)]
 
 # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))]
-tensor_el1 = c2DIRmain.avrg_abc_tensor_new(electric_avrg_r[0], derivatives_data, setup.gammaCompsAll)
+tensor_el1 = c2DIRmain.avrg_abc_tensor(electric_avrg_r[0], derivatives_data, setup.gammaCompsAll)
 print(electric_avrg_r[0])
 tests = []
 for i in inds:
@@ -53,7 +53,7 @@ print(f'tensor_el1 - {tests}')
 print('---\n')
 
 # [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
-tensor_el2 = c2DIRmain.avrg_abc_tensor_new(electric_avrg_r[1], derivatives_data, setup.gammaCompsAll)
+tensor_el2 = c2DIRmain.avrg_abc_tensor(electric_avrg_r[1], derivatives_data, setup.gammaCompsAll)
 print(electric_avrg_r[1])
 tests = []
 for i in inds:
@@ -71,7 +71,7 @@ print('---\n')
 
 inds = [(0, 1, 2), (1, 3, 4), (3, 0, 5), (2, 2, 2), (0, 1, 4), (5, 3, 1), (0, 2, 5), (3, 1, 1), (0, 0, 0)]
 # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc']
-tensor_mech1 = c2DIRmain.avrg_abc_tensor_new(mechanical_avrg_r[0], derivatives_data, setup.gammaCompsAll)
+tensor_mech1 = c2DIRmain.avrg_abc_tensor(mechanical_avrg_r[0], derivatives_data, setup.gammaCompsAll)
 print(mechanical_avrg_r[0])
 tests = []
 for i in inds:
@@ -88,7 +88,7 @@ print(f'tensor_mech1 - {tests}')
 print('---\n')
 
 # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc']
-tensor_mech3 = c2DIRmain.avrg_abc_tensor_new(mechanical_avrg_r[2], derivatives_data, setup.gammaCompsAll)
+tensor_mech3 = c2DIRmain.avrg_abc_tensor(mechanical_avrg_r[2], derivatives_data, setup.gammaCompsAll)
 print(mechanical_avrg_r[2])
 tests = []
 for i in inds:
@@ -105,7 +105,7 @@ print(f'tensor_mech3 - {tests}')
 print('---\n')
 
 # [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']
-tensor_mech4 = c2DIRmain.avrg_abc_tensor_new(mechanical_avrg_r[3], derivatives_data, setup.gammaCompsAll)
+tensor_mech4 = c2DIRmain.avrg_abc_tensor(mechanical_avrg_r[3], derivatives_data, setup.gammaCompsAll)
 print(mechanical_avrg_r[3])
 tests = []
 for i in inds:
@@ -122,7 +122,7 @@ print(f'tensor_mech4 - {tests}')
 print('---\n')
 
 # [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc']
-tensor_mech5 = c2DIRmain.avrg_abc_tensor_new(mechanical_avrg_r[4], derivatives_data, setup.gammaCompsAll)
+tensor_mech5 = c2DIRmain.avrg_abc_tensor(mechanical_avrg_r[4], derivatives_data, setup.gammaCompsAll)
 print(mechanical_avrg_r[4])
 tests = []
 for i in inds:

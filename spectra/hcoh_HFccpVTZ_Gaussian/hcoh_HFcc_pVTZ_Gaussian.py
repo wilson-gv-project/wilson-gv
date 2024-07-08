@@ -59,7 +59,7 @@ ders = setup.getDerivs()
 setup.addTerms(None, None, None, None)
 
 # print(setup.electric_avrg, '\n')
-print(setup.data_info, '\n')
+print(setup.dataInfo, '\n')
 
 # print derivatives
 # c2DIRmain.printed2DIRtensors(setup)
