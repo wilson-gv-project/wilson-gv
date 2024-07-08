@@ -1,7 +1,8 @@
 """
 Is this a documentation?
 """
-from calculations import parseGaussian, parseCFOUR
+from calculations import parseGaussian_forWilson, parseCFOUR_forWilson
+from calculations import parseGaussian_extra, parseCFOUR_extra
 from typing import Any
 
 import numpy as np
@@ -19,8 +20,8 @@ class CFOURdata:
         Returns: dict[int:float]
         """
         if self.sourcetype == 'out':
-            fundamentals = parseCFOUR.get_anharmonic_fundamentals(self.files['out'], filetype='out')
-            # fundamentals_harm = parseCFOUR.get_anharmonic_fundamentals(self.files['out'], filetype='out')
+            fundamentals = parseCFOUR_extra.get_anharmonic_fundamentals(self.files['out'], filetype='out')
+            # fundamentals_harm = parseCFOUR_forWilson.get_anharmonic_fundamentals(self.files['out'], filetype='out')
             allstates_CFOUR, allstates_CFOUR_harm = self.getAllStates()
             funds_c4 = {k: v for k, v in allstates_CFOUR_harm.items() if len(k) == 1}
             sorted_data_c4 = {k[0]: funds_c4[k] for k in sorted(funds_c4)}
@@ -28,7 +29,7 @@ class CFOURdata:
             return fundamentals, sorted_data_c4
 
         elif self.sourcetype == 'pkl':
-            fundamentals = parseCFOUR.get_anharmonic_fundamentals(self.files['vibdata'], filetype='pkl')
+            fundamentals = parseCFOUR_extra.get_anharmonic_fundamentals(self.files['vibdata'], filetype='pkl')
             return fundamentals
 
     def getAllStates(self) -> dict[tuple[int]: float, tuple[int, int]: float,
@@ -39,7 +40,7 @@ class CFOURdata:
         E.g.: {(0,): 1000., (0, 1): 2000., (0, 1, 2): 3000.}
         """
         if self.sourcetype == 'out':
-            ls0, ls1, ls2, ls3, ls4 = parseCFOUR.parse_output_file(self.files['out'])
+            ls0, ls1, ls2, ls3, ls4 = parseCFOUR_forWilson.parse_output_file(self.files['out'])
 
         elif self.sourcetype == 'pkl':
             vibdatapkl = self.files['vibdata']
@@ -60,7 +61,7 @@ class CFOURdata:
         Return: tuple[np.ndarray - shape(NM, 3), np.ndarray - shape(NM, NM, 3)]
         """
         if self.sourcetype == 'out':
-            mu = parseCFOUR.getDipoleDers(self.files['dipolexyz'], self.files['out'])
+            mu = parseCFOUR_forWilson.getDipoleDers(self.files['dipolexyz'], self.files['out'])
             return mu
 
         elif self.sourcetype == 'pkl':
@@ -89,9 +90,9 @@ class CFOURdata:
         Return: np.ndarray - shape(NM, NM, NM)
         """
         if self.sourcetype == 'out':
-            cubic = parseCFOUR.pCubicORQuartic(self.files['cubic'])
+            cubic = parseCFOUR_forWilson.pCubicORQuartic(self.files['cubic'])
             freq, freq_harm = self.getFundamentals()
-            cff = parseCFOUR.getCubicPost(freq_harm, cubic)
+            cff = parseCFOUR_forWilson.getCubicPost(freq_harm, cubic)
             return cff
 
         elif self.sourcetype == 'pkl':
@@ -102,7 +103,7 @@ class CFOURdata:
                 cff = pickle.load(file)
 
             freq, freq_harm = self.getFundamentals()
-            cubicFC = parseCFOUR.getCubicPost(freq_harm, cff)
+            cubicFC = parseCFOUR_forWilson.getCubicPost(freq_harm, cff)
 
             return cubicFC
 
@@ -121,7 +122,7 @@ def getDimensionlessNM(datafile: str = None) -> dict:
         return dimless
 
     else:
-        undisplaced_matrix, freqs, dimless  = parseCFOUR.pQUADRATURE(datafile)
+        undisplaced_matrix, freqs, dimless  = parseCFOUR_forWilson.pQUADRATURE(datafile)
         # print(dimless)
         return dimless
 
@@ -136,17 +137,17 @@ class GaussianData:
         self.files = data['files']
 
     def getDipDersCart_fchk(self):
-        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        fchk_parser = parseGaussian_extra.FormchkInterface(self.files['fchk'])
         dipderCart = fchk_parser.dipolederiv()
         return dipderCart
 
     def getPolarDersCart_fchk(self):
-        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        fchk_parser = parseGaussian_extra.FormchkInterface(self.files['fchk'])
         polder = fchk_parser.polarderiv()
         return polder
 
     def get_hessian_tensor_fchk(self):
-        fchk_parser = parseGaussian.FormchkInterface(self.files['fchk'])
+        fchk_parser = parseGaussian_extra.FormchkInterface(self.files['fchk'])
         hessian = fchk_parser.hessian()
         return hessian
 
@@ -155,7 +156,7 @@ class GaussianData:
         Fundamental frequency with anharmonic corrections
         Returns: dict[int:float]
         """
-        results = parseGaussian.parse_frequencies(self.files['log'])
+        results = parseGaussian_forWilson.parse_frequencies(self.files['log'])
         funddict = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
         funddict_harm = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
         return funddict, funddict_harm
@@ -169,7 +170,7 @@ class GaussianData:
           if self.sourcetype == 'fchk':
                 pass
           elif self.sourcetype == 'log':
-                results = parseGaussian.parse_frequencies(self.files['3quanta'])
+                results = parseGaussian_forWilson.parse_frequencies(self.files['3quanta'])
                 results['Combination Bands']['mode_c'] = results['Combination Bands']['mode_c'].fillna(0)
                 results['Combination Bands']['n_c'] = results['Combination Bands']['n_c'].fillna(0)
 
@@ -220,7 +221,7 @@ class GaussianData:
             pass
 
         elif self.sourcetype == 'log':
-            dipl, units = parseGaussian.parse_dipole_moment(self.files['log'])
+            dipl, units = parseGaussian_forWilson.parse_dipole_moment(self.files['log'])
             a2d = dipl.loc[dipl['P'] == 'P1', ['X', 'Y', 'Z']].to_numpy()
             a2d2 = dipl.loc[dipl['P'] == 'P2', ['X', 'Y', 'Z']].to_numpy()
             a2d2_3d = np.zeros((6, 6, 3))
@@ -236,7 +237,7 @@ class GaussianData:
         Return: tuple[np.ndarray - shape(NM, 3, 3), np.ndarray - shape(NM, NM, 3, 3)]
         """
         if self.sourcetype == 'log':
-            pol = parseGaussian.parse_polarizability(self.files['log'])
+            pol = parseGaussian_forWilson.parse_polarizability(self.files['log'])
             nm = int(pol.loc[pol[0] == 'P1', 1].max())
             p1_3d = np.zeros((nm, 3, 3))
             for i in pol.loc[pol[0] == 'P1', 1].unique():
@@ -268,9 +269,9 @@ class GaussianData:
         Return: np.ndarray - shape(NM, NM, NM)
         """
         if self.sourcetype == 'log':
-            cubic_df = parseGaussian.parse_cubic_constants(self.files['log'])[0]
+            cubic_df = parseGaussian_forWilson.parse_cubic_constants(self.files['log'])[0]
             selected_df = cubic_df[['I', 'J', 'K', 'K(I,J,K)']]
             cubic = selected_df.to_numpy()
             freq, freq_harm = self.getFundamentals()
-            cff = parseGaussian.get_cubic_post(freq_harm, cubic)
+            cff = parseGaussian_forWilson.get_cubic_post(freq_harm, cubic)
             return cff

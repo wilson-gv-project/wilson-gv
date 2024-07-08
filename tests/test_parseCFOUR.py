@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from calculations.parseCFOUR import *
+from calculations.parseCFOUR_forWilson import *
 
 def test_getRotationMatrix():
     rotation_matrix = getRotationMatrix('./test_files_cfour/anharm_hf_outfile0.out')
