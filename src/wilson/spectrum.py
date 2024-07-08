@@ -28,13 +28,14 @@ class SpectrumEVV:
         shape2d - shape of the grid
         fermirm
     """
-    def __init__(self, w1, w2, input_data_info):
+    def __init__(self, w1, w2, input_data_info, new=False):
 
         # Define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         # axes as arrays
         self.w1, self.w2 = np.array(w1), np.array(w2)
         self.shape2d = self.w1_mesh.shape
+
 
         # in load_data method
         self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
@@ -53,31 +54,53 @@ class SpectrumEVV:
 
         self.all_states = {tuple(str(i) for i in k): v for k, v in parsed_states[0].items()}
         self.all_states_harmonic = {tuple(str(i) for i in k): v for k, v in parsed_states[1].items()}
-        print('all states\n', self.all_states, '\n')
-        print('all all_states_harmonic\n', self.all_states_harmonic, '\n')
+        # print('all states\n', self.all_states, '\n')
+        # print('all all_states_harmonic\n', self.all_states_harmonic, '\n')
+        # print(sorted(self.all_states_harmonic.values()))
+        self.deriv_data = self.getDerivs()
 
-        print(sorted(self.all_states_harmonic.values()))
+        if new:
+            self.load_data(input_data_info)
 
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
-        self.deriv_data  = self.getDerivs()
         self.gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
 
         # margin for higher diagonal
         self.diagonal_margin = 10.
 
     def load_data(self, input_data_info: dict):
-        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
+        # self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
 
         if input_data_info['source'] == 'cfour':
-            self.dataBank = CFOURdataParser(input_data_info)
+            dataBank = CFOURdataParser(input_data_info)
         elif input_data_info['source'] == 'gaussian':
-            self.dataBank = GaussianDataParser(input_data_info)
+            dataBank = GaussianDataParser(input_data_info)
         else:
             pass
 
-        self.dataBank.getData()
+        dataBank.getData()
 
+        self.fundamentals = dataBank.fundamentals_anharmonic_str
+        self.fundamentals_harmonic = dataBank.fundamentals_harmonic_str
+
+        self.all_states = dataBank.anharmonic_states
+        self.all_states_harmonic = dataBank.harmonic_states
+
+        # print('all states\n', self.all_states, '\n')
+        # print('all all_states_harmonic\n', self.all_states_harmonic, '\n')
+        # print(sorted(self.all_states_harmonic.values()))
+        ddata = [dataBank.dipole_first_derivatives,
+                 dataBank.dipole_second_derivatives,
+                 dataBank.polarizability_first_derivatives,
+                 dataBank.polarizability_second_derivatives,
+                 dataBank.cubic_force_constants]
+        # self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+        self.deriv_data['mu_Q'] = ddata[0]
+        self.deriv_data['mu_QQ'] = ddata[1]
+        self.deriv_data['alpha_Q'] = ddata[2]
+        self.deriv_data['alpha_QQ'] = ddata[3]
+        self.deriv_data['F_abc'] = ddata[4]
 
     def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities"""
@@ -155,17 +178,17 @@ class SpectrumEVV:
         w_h = rec_cm2rec_s(np.array([v for k,v in self.fundamentals_harmonic.items()]))
 
         self.matrix_2d = np.outer(w_h, w_h)
-        print('\nw_h')
-        print(w_h)
-        print('\n1./self.matrix_2d = 1./np.outer(w_h, w_h)')
-        print(1./self.matrix_2d)
+        # print('\nw_h')
+        # print(w_h)
+        # print('\n1./self.matrix_2d = 1./np.outer(w_h, w_h)')
+        # print(1./self.matrix_2d)
         self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis, np.newaxis, :]
 
-        for i, te in enumerate(self.el_avrg_tensors):
-            print(f'\nel_avrg_tensors {self.electric_avrg[i]}\n', te)
-
-        for k, tm in enumerate(self.mech_avrg_tensors):
-            print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
+        # for i, te in enumerate(self.el_avrg_tensors):
+        #     print(f'\nel_avrg_tensors {self.electric_avrg[i]}\n', te)
+        #
+        # for k, tm in enumerate(self.mech_avrg_tensors):
+        #     print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
 
     def getDerivs(self):
 
@@ -174,7 +197,6 @@ class SpectrumEVV:
             self.matrix_2d = np.outer(w_h, w_h)
             self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
                                                                                                np.newaxis, :]
-
             sqrtvec = 1./np.sqrt(w_h)
             sqrtmat = 1./np.sqrt(self.matrix_2d.T)
             sqrt3d = 1./np.sqrt(self.tensor_3d.T)
@@ -242,8 +264,9 @@ class SpectrumEVV:
             data.append(polder[0] / np.sqrt(amc_au))
             data.append(polder[1] / amc_au)
 
+            # / amc_au**1.5 is done in get_cubic_post in parseGaussian_forWilson
             cubicmat = self.callbacks.getCFF()
-            data.append(cubicmat / amc_au**1.5)
+            data.append(cubicmat)
 
             allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
             return allpropsdict
@@ -259,13 +282,13 @@ class SpectrumEVV:
             for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
                 resonance = el_func(self.all_states_harmonic, self.w1_mesh, self.w2_mesh,
                                     Gamma, (a, b))
-                if a==1 and b==4:
-                    print(a, b)
-                    print(resonance)
-                    print(self.w1_mesh)
-                    print(self.w2_mesh)
-                    print(1./prefac_el, elavrg[a, b])
-                    print("result\n", elavrg[a, b] * resonance / prefac_el/24.)
+                # if a==1 and b==4:
+                #     print(a, b)
+                #     print(resonance)
+                #     print(self.w1_mesh)
+                #     print(self.w2_mesh)
+                #     print(1./prefac_el, elavrg[a, b])
+                #     print("result\n", elavrg[a, b] * resonance / prefac_el/24.)
                 total_sum_el += elavrg[a, b] * resonance / prefac_el
             return total_sum_el / 24.
 
@@ -339,7 +362,7 @@ class SpectrumEVV:
         plt.rcParams['agg.path.chunksize'] = 10000
         plt.rcParams['axes.titlepad'] = 30
 
-        font = {'family': 'normal',
+        font = {#'family': 'normal',
                 # 'weight': 'bold',
                 'size': 18}
         matplotlib.rc('font', **font)
@@ -362,8 +385,8 @@ class SpectrumEVV:
             # Z_data = np.log10(Z_positive)
 
         df = {'w1_mesh': X, ystr_mesh: y, 'values_mesh': Z_data}
-        print('\n>>>>>>   Z_data max', max(np.max(df['values_mesh'].flatten(), axis=0), np.max(df['values_mesh'].flatten(), axis=0)),
-              f'\nmax in axes: {np.max(df['values_mesh'].flatten(), axis=0)}, {np.max(df['values_mesh'].flatten(), axis=0)}')
+        # print('\n>>>>>>   Z_data max', max(np.max(df['values_mesh'].flatten(), axis=0), np.max(df['values_mesh'].flatten(), axis=0)),
+        #       f'\nmax in axes: {np.max(df['values_mesh'].flatten(), axis=0)}, {np.max(df['values_mesh'].flatten(), axis=0)}')
 
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(1, 1, 1)
@@ -383,9 +406,9 @@ class SpectrumEVV:
         d_max = dmax_dict[(el, mech)] # m, e, t 29519537.48  48778401.3  48218929.9
 
         dmax_log10 = float(int(np.log10(d_max)))
-        print("dmax_log10", dmax_log10)
+        # print("dmax_log10", dmax_log10)
         levels_ticks = [10**(dmax_log10-i) for i in range(6)]
-        print("levels_ticks", levels_ticks)
+        # print("levels_ticks", levels_ticks)
 
         levels = []
         for i in range(n_cont):
@@ -525,6 +548,12 @@ def w_mn_prod(subscripts, fermi=None, margin=10.):
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
 
+    def safe_int(s):
+        try:
+            return int(s)
+        except ValueError:
+            return s
+
     def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
@@ -535,18 +564,23 @@ def w_mn_prod(subscripts, fermi=None, margin=10.):
         wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
         wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
 
-        if  abctuple == (1, 4):
-            print(wm1, wn1)
-            print('wm1-wn1', rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))
-            print(wm2, wn2)
-            print('wm2-wn2', rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]))
-            print('w1-w2', rec_cm2rec_s(w1) - rec_cm2rec_s(w2))
-            print('rescod1\n', (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
-            print('rescond2\n', (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
-            print('1/rescod1\n',1./ (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
-            print('1/rescond2\n', 1./ (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
+        # wm1 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
+        # wn1 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[0][1].split('+')]))
+        # wm2 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
+        # wn2 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
+
+        # if  abctuple == (1, 4):
+        #     print(wm1, wn1)
+        #     print('wm1-wn1', rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))
+        #     print(wm2, wn2)
+        #     print('wm2-wn2', rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]))
+        #     print('w1-w2', rec_cm2rec_s(w1) - rec_cm2rec_s(w2))
+        #     print('rescod1\n', (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+        #                                          + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
+        #     print('rescond2\n', (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
+        #     print('1/rescod1\n',1./ (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+        #                                          + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
+        #     print('1/rescond2\n', 1./ (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
         if fermi is None:
             return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
                                                  + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
@@ -557,6 +591,12 @@ def w_mn_prod(subscripts, fermi=None, margin=10.):
 
             w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')]))
             w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')]))
+
+            # w_fr11 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[0][0].split('+')]))
+            # w_fr21 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[0][1].split('+')]))
+            #
+            # w_fr12 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[1][0].split('+')]))
+            # w_fr22 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[1][1].split('+')]))
 
             tail = 0.0
             t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma

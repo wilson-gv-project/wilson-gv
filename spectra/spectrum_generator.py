@@ -43,24 +43,40 @@ regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
            2: ((2810., 3210., 10.), (5510., 6050., 10.)),
            3: ((1961.318, 1981.318, 10.), (4931.662, 4951.662, 10.))}
 
-def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = gamma_rc):
+def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = gamma_rc, new=False):
 
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
-    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
+    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, new=new)
     setup.addTerms(*terms_selection)
+
 
     step1 = regions[region][0][-1]
     gamma = spectrum.rec_cm2rec_s(gamma_rc)
     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
     step_str = f"{step1:.1f}".replace('.', 'p')
 
-    name=f'./specgen_B3LYP_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
+    if new:
+        tOld = 'tNew'
+    else:
+        tOld = 'tOld'
+    name=f'./{tOld}_B3LYP_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
+    with open("output.txt", "a") as f:
+        print(name, file=f)
+        print('\n-----------------------------------------', file=f)
+        # print(setup.deriv_data['mu_QQ'], file=f)
+        # print(setup.deriv_data['alpha_QQ'], file=f)
+        print(setup.deriv_data['F_abc'], file=f)
+        # print('\nsetup.all_states', setup.all_states, file=f)
+        # print('\nsetup.all_states_harmonic', setup.all_states_harmonic, file=f)
+        # print('\nsetup.fundamentals', setup.fundamentals, file=f)
+        # print('\nsetup.fundamentals_harmonic', setup.fundamentals_harmonic, file=f)
+        print('\n-----------------------------------------\n', file=f)
 
     start_time0 = time.time()
-    Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech, printdata=False)
-    print('intensity\n', abs(Z)**2)
+    Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech)
+    # print('intensity\n', abs(Z)**2)
     end_time0 = time.time()
     execution_time0 = end_time0 - start_time0
     print(f"\nExecution time - setup.intensity: {execution_time0} seconds")
@@ -81,9 +97,14 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     print(f"Execution time - global: {execution_time_global} seconds")
     print('\n===============================================================\n   Next spectrum below\n')
 
-list_figs = [(True, False), (False, True), (True, True)]
+# list_figs = [(True, False), (False, True), (True, True)]
+list_figs = [(True, True)]
 for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1)
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc)
+
+# list_figs = [(True, False), (False, True), (True, True)]
+for s in list_figs:
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc, new=True)
 
 quit()
 

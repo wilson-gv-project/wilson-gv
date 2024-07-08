@@ -156,7 +156,7 @@ class GaussianData:
         Fundamental frequency with anharmonic corrections
         Returns: dict[int:float]
         """
-        results = parseGaussian_forWilson.parse_frequencies(self.files['log'])
+        results = parseGaussian_forWilson.parse_frequencies(self.files['3quanta'])
         funddict = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
         funddict_harm = {int(k)-1: float(v) for k, v in zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
         return funddict, funddict_harm
@@ -208,7 +208,7 @@ class GaussianData:
                 }
                 allstates_harm = {**funddict1, **states1, **combinationbands1}
 
-                allstates_anharm = {key:allstates_anharm[key] for key in sorted(allstates_anharm,key=allstates_anharm.get)}
+                # allstates_anharm = {key:allstates_anharm[key] for key in sorted(allstates_anharm,key=allstates_anharm.get)}
                 return allstates_anharm, allstates_harm
 
     def getDipDers(self) -> tuple[Any, ...]:
@@ -273,5 +273,5 @@ class GaussianData:
             selected_df = cubic_df[['I', 'J', 'K', 'K(I,J,K)']]
             cubic = selected_df.to_numpy()
             freq, freq_harm = self.getFundamentals()
-            cff = parseGaussian_forWilson.get_cubic_post(freq_harm, cubic)
+            cff = parseGaussian_forWilson.get_cubic_post(len(freq_harm), cubic)
             return cff

@@ -333,6 +333,37 @@ def getDipoleDers_anharm(filenamebase: str, labels: list, nModesStart: int):
 
     return dmudq_array, dmudqdq_array
 
+def getPolarDers_au(logfile: str, fundamentals_harmonic: dict) -> tuple:
+    p1_3d, p2_4d = getPolarDers_log(logfile)
+
+    from wilson.spectrum import rec_cm2rec_s
+    w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
+
+    matrix_2d = np.outer(w_h, w_h)
+    # tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
+    #                                                                                    np.newaxis, :]
+    sqrtvec = 1. / np.sqrt(w_h)
+    sqrtmat = 1. / np.sqrt(matrix_2d.T)
+
+    fdpol = np.zeros_like(p1_3d)
+    for i in range(len(sqrtvec)):
+        for j in range(3):
+            for k in range(3):
+                fdpol[i, j, k] = p1_3d[i, j, k] / sqrtvec[i]
+
+    sdpol = np.zeros_like(p2_4d)
+    for i in range(len(sqrtvec)):
+        for j in range(len(sqrtvec)):
+            # with open('./secPolder', 'a') as file1:
+            #     file1.write(f'\n=============================={i} {j}\n{sqrtmat[i, j]}\n')
+            #     file1.writelines(str(p2_4d[i, j, :, :]))
+
+            for k in range(3):
+                for l in range(3):
+                    sdpol[i, j, k, l] = p2_4d[i, j, k, l] / sqrtmat[i, j]
+
+    return tuple([fdpol, sdpol])
+
 # used
 def getDisplacementsPolarData(polar_dir: str, raw: bool = False):
     """

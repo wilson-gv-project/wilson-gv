@@ -6,7 +6,7 @@ def test_GaussianDataParser():
 
     datadict = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
                 '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out'}
-    parserGaussian = GaussianDataParser(datadict)
+    parserGaussian = GaussianDataParser({'files': datadict})
     parserGaussian.getData()
 
     essential = [parserGaussian.harmonic_states,

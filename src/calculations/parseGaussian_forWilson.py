@@ -61,27 +61,29 @@ class GaussianDataParser(object):
         # {'log', 'fchk', 'com'}
         self.nModesStart = 6 if linear_molecule else 7
 
-        results_log = parse_frequencies(self.all_files_dict['3quanta'])
+        results_log = parse_frequencies(self.all_files_dict['files']['3quanta'])
         self.fundamentals_anharmonic_int = {int(k)-1: float(v) for k, v in zip(results_log['Fundamental Bands']['mode_a'],
                                                                                results_log['Fundamental Bands'][2])}
         self.fundamentals_harmonic_int = {int(k)-1: float(v) for k, v in zip(results_log['Fundamental Bands']['mode_a'],
                                                                              results_log['Fundamental Bands'][1])}
 
-        self.fundamentals_harmonic_str = {str(k):v for k,v in self.fundamentals_anharmonic_int.items()}
-        self.fundamentals_anharmonic_str = {str(k):v for k,v in self.fundamentals_harmonic_int.items()}
+        self.fundamentals_harmonic_str = {str(k):v for k,v in self.fundamentals_harmonic_int.items()}
+        self.fundamentals_anharmonic_str = {str(k):v for k,v in self.fundamentals_anharmonic_int.items()}
 
-        self.anharmonic_states = get_allStates_fromParsedResults(results_log, anharmonic=True)
-        self.harmonic_states = get_allStates_fromParsedResults(results_log, anharmonic=False)
+        ah_sts = get_allStates_fromParsedResults(results_log, anharmonic=True)
+        h_sts = get_allStates_fromParsedResults(results_log, anharmonic=False)
+        self.anharmonic_states = {tuple(str(i) for i in key): value for key, value in ah_sts.items()}
+        self.harmonic_states = {tuple(str(i) for i in key): value for key, value in h_sts.items()}
 
-        mu = getDipDers_log(self.all_files_dict['log'])
+        mu = getDipDers_au(self.all_files_dict['files']['log'])
         self.dipole_first_derivatives = mu[0]
         self.dipole_second_derivatives = mu[1]
 
-        alpha = getPolarDers_log(self.all_files_dict['log'])
+        alpha = getPolarDers_au(self.all_files_dict['files']['log'], self.fundamentals_harmonic_str)
         self.polarizability_first_derivatives = alpha[0]
         self.polarizability_second_derivatives = alpha[1]
 
-        cubic_df = parse_cubic_constants(self.all_files_dict['log'])[0]
+        cubic_df = parse_cubic_constants(self.all_files_dict['files']['log'])[0]
         selected_df = cubic_df[['I', 'J', 'K', 'K(I,J,K)']]
         cubic = selected_df.to_numpy()
         self.cubic_force_constants = get_cubic_post(len(self.fundamentals_harmonic_str), cubic)
@@ -171,7 +173,7 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
                 results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
         }
         allstates_anharm = {**funddict, **states, **combinationbands}
-        allstates_anharm = {key: allstates_anharm[key] for key in sorted(allstates_anharm, key=allstates_anharm.get)}
+        # allstates_anharm = {key: allstates_anharm[key] for key in sorted(allstates_anharm, key=allstates_anharm.get)}
         return allstates_anharm
 
     else:
@@ -207,9 +209,22 @@ def getDipDers_log(logfile: str) -> tuple:
     for i, j, xyz in zip(dipl.loc[dipl['P'] == 'P2', 'i'], dipl.loc[dipl['P'] == 'P2', 'j'], a2d2):
         a2d2_3d[int(i) - 1, int(j) - 1] = xyz
         a2d2_3d[int(j) - 1, int(i) - 1] = xyz
+
     return tuple([a2d, a2d2_3d])
 
-def getPolarDers_log(logfile) -> tuple:
+def getDipDers_au(logfile: str) -> tuple:
+    a2d, a2d2_3d = getDipDers_log(logfile)
+    from scipy import constants
+    # to go from amu to au mass unit (m_e)
+    amc_au = constants.physical_constants['atomic mass constant'][0] / \
+             constants.physical_constants['atomic unit of mass'][0]
+
+    # transformation from Gaussian to Wilson units
+    firstder = a2d / np.sqrt(amc_au)
+    secder = a2d2_3d / amc_au
+    return tuple([firstder, secder])
+
+def getPolarDers_log(logfile: str) -> tuple:
     """
     Polarizability derivatives: first order and second order
     Return: tuple[np.ndarray - shape(NM, 3, 3), np.ndarray - shape(NM, NM, 3, 3)]
@@ -239,6 +254,18 @@ def getPolarDers_log(logfile) -> tuple:
                 p2_4d[int(j) - 1, int(i) - 1] = xyz
 
     return tuple([p1_3d, p2_4d])
+
+def getPolarDers_au(logfile: str, fundamentals_harmonic: dict) -> tuple:
+    from scipy import constants
+    # to go from amu to au mass unit (m_e)
+    amc_au = constants.physical_constants['atomic mass constant'][0] / \
+             constants.physical_constants['atomic unit of mass'][0]
+
+    p1_3d, p2_4d = getPolarDers_log(logfile)
+    fdpol = p1_3d / np.sqrt(amc_au)
+    sdpol = p2_4d / amc_au
+
+    return tuple([fdpol, sdpol])
 
 # used in retrievedata.py
 def parse_cubic_constants(file_path: str) -> pd.DataFrame:
@@ -283,6 +310,13 @@ def get_cubic_post(len_freq: int, cubic: np.ndarray, recipcm: bool = False):
         K3[k, i, j] = d
         K3[j, i, k] = d
         K3[j, k, i] = d
+
+    from scipy import constants
+    # to go from amu to au mass unit (m_e)
+    amc_au = constants.physical_constants['atomic mass constant'][0] / \
+             constants.physical_constants['atomic unit of mass'][0]
+
+    K3 = K3 / amc_au**1.5
 
     return K3
 
