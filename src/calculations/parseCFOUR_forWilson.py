@@ -72,7 +72,7 @@ class CFOURdataParser(object):
         #  ''}
         self.nModesStart = 6 if linear_molecule else 7
 
-        parsed_data = parse_output_file(self.all_files_dict['out_anharm_final'])
+        parsed_data = parse_output_file(self.all_files_dict['files']['out_anharm_final'])
         vib_energy_levels_list, labelsTable, anharmonic_freqs, anharmonic_ints, harmonic_freqs = parsed_data
 
         anharm_states_dict = dict(zip(vib_energy_levels_list, anharmonic_freqs))
@@ -83,21 +83,21 @@ class CFOURdataParser(object):
         self.fundamentals_harmonic_str = {str(k[0]):v for k,v in harm_tuple_dict.items() if len(k)==1}
         self.fundamentals_anharmonic_str = {str(k[0]):v for k,v in anharm_tuple_dict.items() if len(k)==1}
 
-        self.anharmonic_states = {tuple(str(i) for i in k): v for k, v in harm_states_dict.items()}
-        self.harmonic_states = {tuple(str(i) for i in k): v for k, v in anharm_states_dict.items()}
+        self.anharmonic_states = {tuple(str(i -7) for i in k): v for k, v in anharm_states_dict.items()}
+        self.harmonic_states = {tuple(str(i-7) for i in k): v for k, v in harm_states_dict.items()}
 
-        cubic = pCubicORQuartic(self.all_files_dict['cubic'])
+        cubic = pCubicORQuartic(self.all_files_dict['files']['cubic'])
         self.funds_harm_ints = {int(k): v for k, v in self.fundamentals_harmonic_str.items()}
-
+        # transformed to Wilson units in getCubicPost
         self.cubic_force_constants = getCubicPost(self.funds_harm_ints, cubic)
-        labelsModes_original = [i+self.nModesStart for i in list(self.funds_harm_ints)]
 
-        mu = getDipoleDers_anharm(self.all_files_dict['dipolexyz'], labelsModes_original, self.nModesStart)
+        labelsModes_original = [i+self.nModesStart for i in list(self.funds_harm_ints)]
+        mu = getDipoleDers_anharm_au(self.all_files_dict['files']['dipolexyz'], labelsModes_original, self.nModesStart,
+                                     self.fundamentals_harmonic_str)
         self.dipole_first_derivatives = mu[0]
         self.dipole_second_derivatives = mu[1]
 
-        with open(self.all_files_dict['polar_pkl'], 'rb') as file:
-            alpha = pickle.load(file)
+        alpha = getPolarDers_pkl_au(self.all_files_dict['files']['polar_pkl'], self.fundamentals_harmonic_str)
         self.polarizability_first_derivatives = alpha[0]
         self.polarizability_second_derivatives = alpha[1]
 
@@ -264,6 +264,12 @@ def getCubicPost(freq: dict, cubic: np.ndarray, recipcm: bool = False):
             K3[j, i, k] = d
             K3[j, k, i] = d
 
+        from scipy import constants
+        # to go from amu to au mass unit (m_e)
+        amc_au = constants.physical_constants['atomic mass constant'][0] / \
+                 constants.physical_constants['atomic unit of mass'][0]
+        # to Wilson units
+        K3 /= amc_au ** 1.5
         return K3
 
 # used in getDipoleDers_anharm
@@ -333,36 +339,62 @@ def getDipoleDers_anharm(filenamebase: str, labels: list, nModesStart: int):
 
     return dmudq_array, dmudqdq_array
 
-def getPolarDers_au(logfile: str, fundamentals_harmonic: dict) -> tuple:
-    p1_3d, p2_4d = getPolarDers_log(logfile)
-
+def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, fundamentals_harmonic: dict) -> tuple:
+    firstder, secder = getDipoleDers_anharm(filenamebase, labels, nModesStart)
     from wilson.spectrum import rec_cm2rec_s
     w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
-
     matrix_2d = np.outer(w_h, w_h)
     # tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
     #                                                                                    np.newaxis, :]
     sqrtvec = 1. / np.sqrt(w_h)
     sqrtmat = 1. / np.sqrt(matrix_2d.T)
+    # sqrt3d = 1. / np.sqrt(tensor_3d.T)
 
-    fdpol = np.zeros_like(p1_3d)
+    firstder_mat = np.zeros_like(firstder)
+    for i in range(len(sqrtvec)):
+        for j in range(3):
+            firstder_mat[i, j] = firstder[i, j] / sqrtvec[i]
+
+    secder_mat = np.zeros_like(secder)
+    for i in range(len(sqrtvec)):
+        for j in range(len(sqrtvec)):
+            for k in range(3):
+                secder_mat[i, j, k] = secder[i, j, k] / sqrtmat[i, j]
+
+    return tuple([firstder_mat, secder_mat])
+
+
+def getPolarDers_pkl_au(polar_pkl_file: str, fundamentals_harmonic: dict):
+    from wilson.spectrum import rec_cm2rec_s
+    w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
+    matrix_2d = np.outer(w_h, w_h)
+    sqrtvec = 1. / np.sqrt(w_h)
+    sqrtmat = 1. / np.sqrt(matrix_2d.T)
+
+    with open(polar_pkl_file, 'rb') as file:
+        alpha = pickle.load(file)
+    polarizability_first_derivatives = alpha[0]
+    polarizability_second_derivatives = alpha[1]
+
+    fdpol = np.zeros_like(polarizability_first_derivatives)
     for i in range(len(sqrtvec)):
         for j in range(3):
             for k in range(3):
-                fdpol[i, j, k] = p1_3d[i, j, k] / sqrtvec[i]
+                fdpol[i, j, k] = polarizability_first_derivatives[i, j, k] / sqrtvec[i]
 
-    sdpol = np.zeros_like(p2_4d)
+    sdpol = np.zeros_like(polarizability_second_derivatives)
     for i in range(len(sqrtvec)):
         for j in range(len(sqrtvec)):
             # with open('./secPolder', 'a') as file1:
             #     file1.write(f'\n=============================={i} {j}\n{sqrtmat[i, j]}\n')
-            #     file1.writelines(str(p2_4d[i, j, :, :]))
+            #     file1.writelines(str(polarizability_second_derivatives[i, j, :, :]))
 
             for k in range(3):
                 for l in range(3):
-                    sdpol[i, j, k, l] = p2_4d[i, j, k, l] / sqrtmat[i, j]
+                    sdpol[i, j, k, l] = polarizability_second_derivatives[i, j, k, l] / sqrtmat[i, j]
 
     return tuple([fdpol, sdpol])
+
 
 # used
 def getDisplacementsPolarData(polar_dir: str, raw: bool = False):

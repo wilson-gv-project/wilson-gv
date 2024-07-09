@@ -24,9 +24,22 @@ print(f"""Generated with:
 g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
+
+cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
+                  'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
+                  'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
+                  'polar': '/home/vlew/Wilson/spectra/CCSDTccpVQZ_CFOUR/polar.pkl',
+                  'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
+                  'polar_pkl': '/home/vlew/Wilson/spectra/CCSDTccpVQZ_CFOUR/polar.pkl'
+                  }
+
 datain = {'source': 'gaussian',
           'type': 'log',
           'files': g16files}
+
+datain2 = {'source': 'cfour',
+            'type': 'out',
+            'files':cfourdatafiles}
 
 # print(setup.fundamentals)
 # print(setup.all_states)
@@ -51,7 +64,6 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, new=new)
     setup.addTerms(*terms_selection)
 
-
     step1 = regions[region][0][-1]
     gamma = spectrum.rec_cm2rec_s(gamma_rc)
     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
@@ -61,13 +73,19 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
         tOld = 'tNew'
     else:
         tOld = 'tOld'
-    name=f'./{tOld}_B3LYP_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
+
+    method_name = 'B3LYP' if datain['source'] == 'gaussian' else 'CCSDT'
+
+    name=f'./{tOld}_{method_name}_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
     with open("output.txt", "a") as f:
         print(name, file=f)
         print('\n-----------------------------------------', file=f)
-        # print(setup.deriv_data['mu_QQ'], file=f)
-        # print(setup.deriv_data['alpha_QQ'], file=f)
-        print(setup.deriv_data['F_abc'], file=f)
+        # print(setup.deriv_data['mu_Q'], file=f)
+        # with np.printoptions(precision=12, suppress=True):
+            # print(setup.deriv_data['mu_QQ'], file=f)  # check precision for CFOUR for both ders
+            # print(setup.deriv_data['alpha_Q'], file=f) # good match
+            # print(setup.deriv_data['alpha_QQ'], file=f)
+            # print(setup.deriv_data['F_abc'], file=f)
         # print('\nsetup.all_states', setup.all_states, file=f)
         # print('\nsetup.all_states_harmonic', setup.all_states_harmonic, file=f)
         # print('\nsetup.fundamentals', setup.fundamentals, file=f)
@@ -100,11 +118,11 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
 # list_figs = [(True, False), (False, True), (True, True)]
 list_figs = [(True, True)]
 for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc)
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc)
 
 # list_figs = [(True, False), (False, True), (True, True)]
 for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc, new=True)
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc, new=True)
 
 quit()
 

@@ -70,37 +70,33 @@ class SpectrumEVV:
         self.diagonal_margin = 10.
 
     def load_data(self, input_data_info: dict):
-        # self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
+        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
 
         if input_data_info['source'] == 'cfour':
             dataBank = CFOURdataParser(input_data_info)
         elif input_data_info['source'] == 'gaussian':
             dataBank = GaussianDataParser(input_data_info)
         else:
-            pass
+            dataBank = MockDataParser()
 
         dataBank.getData()
 
         self.fundamentals = dataBank.fundamentals_anharmonic_str
         self.fundamentals_harmonic = dataBank.fundamentals_harmonic_str
-
         self.all_states = dataBank.anharmonic_states
         self.all_states_harmonic = dataBank.harmonic_states
 
-        # print('all states\n', self.all_states, '\n')
-        # print('all all_states_harmonic\n', self.all_states_harmonic, '\n')
-        # print(sorted(self.all_states_harmonic.values()))
         ddata = [dataBank.dipole_first_derivatives,
                  dataBank.dipole_second_derivatives,
                  dataBank.polarizability_first_derivatives,
                  dataBank.polarizability_second_derivatives,
                  dataBank.cubic_force_constants]
-        # self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
-        self.deriv_data['mu_Q'] = ddata[0]
-        self.deriv_data['mu_QQ'] = ddata[1]
-        self.deriv_data['alpha_Q'] = ddata[2]
-        self.deriv_data['alpha_QQ'] = ddata[3]
-        self.deriv_data['F_abc'] = ddata[4]
+        self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+        # self.deriv_data['mu_Q'] = ddata[0]
+        # self.deriv_data['mu_QQ'] = ddata[1]
+        # self.deriv_data['alpha_Q'] = ddata[2]
+        # self.deriv_data['alpha_QQ'] = ddata[3]
+        # self.deriv_data['F_abc'] = ddata[4]
 
     def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities"""
@@ -238,14 +234,9 @@ class SpectrumEVV:
             data.append(fdpol)
             data.append(sdpol)
 
-            from scipy import constants
-            # to go from amu to au mass unit (m_e)
-            amc_au = constants.physical_constants['atomic mass constant'][0] / \
-                     constants.physical_constants['atomic unit of mass'][0]
-
             cubicmat = self.callbacks.getCFF()
-            cubicmat /= amc_au**1.5
             data.append(cubicmat)
+
             allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
 
             return allpropsdict
@@ -747,3 +738,9 @@ def printed2DIRtensors(setup: SpectrumEVV):
         print(d, ders[d].shape)#, '\n', ders[d])
         printT(ders[d])
         print('==================================\n')
+
+
+class MockDataParser:
+
+    def __init__(self):
+        pass
