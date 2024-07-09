@@ -24,7 +24,6 @@ print(f"""Generated with:
 g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
-
 cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
                   'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
                   'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
@@ -41,11 +40,6 @@ datain2 = {'source': 'cfour',
             'type': 'out',
             'files':cfourdatafiles}
 
-# print(setup.fundamentals)
-# print(setup.all_states)
-# print('----------\n')
-# print(setup.all_states_harmonic)
-
 log10=True
 w1mw2=False
 gamma_rc=10.
@@ -56,12 +50,12 @@ regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
            2: ((2810., 3210., 10.), (5510., 6050., 10.)),
            3: ((1961.318, 1981.318, 10.), (4931.662, 4951.662, 10.))}
 
-def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = gamma_rc, new=False):
+def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = gamma_rc):
 
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
-    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, new=new)
+    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
     setup.addTerms(*terms_selection)
 
     step1 = regions[region][0][-1]
@@ -69,10 +63,7 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
     step_str = f"{step1:.1f}".replace('.', 'p')
 
-    if new:
-        tOld = 'tNew'
-    else:
-        tOld = 'tOld'
+    tOld = 'tNew'
 
     method_name = 'B3LYP' if datain['source'] == 'gaussian' else 'CCSDT'
 
@@ -121,8 +112,8 @@ for s in list_figs:
     one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc)
 
 # list_figs = [(True, False), (False, True), (True, True)]
-for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc, new=True)
+# for s in list_figs:
+#     one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc, new=True)
 
 quit()
 

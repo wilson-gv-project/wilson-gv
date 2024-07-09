@@ -10,7 +10,6 @@ import time
 import numpy as np
 np.set_printoptions(linewidth=100000)
 
-from wilson.retrievedata import CFOURdata, GaussianData
 from calculations.parseCFOUR_forWilson import CFOURdataParser
 from calculations.parseGaussian_forWilson import GaussianDataParser
 
@@ -28,7 +27,7 @@ class SpectrumEVV:
         shape2d - shape of the grid
         fermirm
     """
-    def __init__(self, w1, w2, input_data_info, new=False):
+    def __init__(self, w1, w2, input_data_info):
 
         # Define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
@@ -36,32 +35,7 @@ class SpectrumEVV:
         self.w1, self.w2 = np.array(w1), np.array(w2)
         self.shape2d = self.w1_mesh.shape
 
-
-        # in load_data method
-        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
-
-        # Get the appropriate functions to retrieve the data
-        cfuncs = {'cfour': CFOURdata(input_data_info), 'gaussian': GaussianData(input_data_info)}
-        self.callbacks = cfuncs[input_data_info['source']]
-
-        got_funds = self.callbacks.getFundamentals()
-
-        # dictionary; keys from 0 to (3Natoms-6)
-        self.fundamentals = {str(k):v for k,v in got_funds[0].items()}
-        self.fundamentals_harmonic = {str(k):v for k,v in got_funds[1].items()}
-
-        parsed_states = self.callbacks.getAllStates()
-
-        self.all_states = {tuple(str(i) for i in k): v for k, v in parsed_states[0].items()}
-        self.all_states_harmonic = {tuple(str(i) for i in k): v for k, v in parsed_states[1].items()}
-        # print('all states\n', self.all_states, '\n')
-        # print('all all_states_harmonic\n', self.all_states_harmonic, '\n')
-        # print(sorted(self.all_states_harmonic.values()))
-        self.deriv_data = self.getDerivs()
-
-        if new:
-            self.load_data(input_data_info)
-
+        self.load_data(input_data_info)
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
         self.gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
@@ -92,25 +66,20 @@ class SpectrumEVV:
                  dataBank.polarizability_second_derivatives,
                  dataBank.cubic_force_constants]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
-        # self.deriv_data['mu_Q'] = ddata[0]
-        # self.deriv_data['mu_QQ'] = ddata[1]
-        # self.deriv_data['alpha_Q'] = ddata[2]
-        # self.deriv_data['alpha_QQ'] = ddata[3]
-        # self.deriv_data['F_abc'] = ddata[4]
 
     def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities"""
         # Terms in expressions
-        electrical_terms_r = [('a+b,a', 'zero,a'), ('b,a', 'zero,a')]
+        electrical_terms_str = [('a+b,a', 'zero,a'), ('b,a', 'zero,a')]
 
         # derivatives:
         # 1. mu_Q, mu QQ, alpha_Q - electric dipole (1st and 2nd derivatives), polarizability (1st der.)
         # 2. mu_Q, alpha_QQ - electric dipole (1st der.), polarizability (2nd der.)
-        electric_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))],
+        electric_avrg_str = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))],
                            [('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))]
                            ]
 
-        mechanical_terms_r = [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
+        mechanical_terms_str = [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
                               (('c,a', 'zero,a'), ('a+b,c', 'b+c,a')),
                               (('a+b,a', 'zero,a'), ('a,a+b', 'b,zero')),
                               (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
@@ -119,7 +88,7 @@ class SpectrumEVV:
 
         # derivatives:
         # mu_Q, alpha_Q - for all 6 terms
-        mechanical_avrg_r = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
+        mechanical_avrg_str = [[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc'],
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc'],
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc'],
@@ -128,11 +97,11 @@ class SpectrumEVV:
 
         ee, mm = electrical_terms_selection, mechanical_terms_selection
         # [pool[i] for i in list_of_indices]
-        self.electrical_terms, self.mechanical_terms = [electrical_terms_r[i] for i in ee], [mechanical_terms_r[i] for i in mm]
-        self.electric_avrg, self.mechanical_avrg = [electric_avrg_r[i] for i in ee], [mechanical_avrg_r[i] for i in mm]
+        self.electrical_terms, self.mechanical_terms = [electrical_terms_str[i] for i in ee], [mechanical_terms_str[i] for i in mm]
+        self.electric_avrg, self.mechanical_avrg = [electric_avrg_str[i] for i in ee], [mechanical_avrg_str[i] for i in mm]
         # here the functions of 2 frequencies
-        self.electr_funs = [w_mn_prod(i, margin=self.diagonal_margin) for i in self.electrical_terms]
-        self.mech_funs = [w_mn_prod(*i) for i in self.mechanical_terms]
+        self.electr_funs = [generate_resonances_functions(i, margin=self.diagonal_margin) for i in self.electrical_terms]
+        self.mech_funs = [generate_resonances_functions(*i) for i in self.mechanical_terms]
 
         nmodes = len(self.fundamentals)
         self.combofuns = [dict(zip(self.electr_funs, self.electric_avrg)),
@@ -168,102 +137,22 @@ class SpectrumEVV:
                 w_abc[int(state[1]), int(state[2]), int(state[0])] = self.all_states[state]
                 w_abc[int(state[2]), int(state[0]), int(state[1])] = self.all_states[state]
                 w_abc[int(state[2]), int(state[1]), int(state[0])] = self.all_states[state]
+
         self.w_abc = rec_cm2rec_s(w_abc)
         self.w_ab = rec_cm2rec_s(w_ab) # for omega_{a+b} frequencies
         w = rec_cm2rec_s(np.array([v for k,v in self.fundamentals.items()]))
-        w_h = rec_cm2rec_s(np.array([v for k,v in self.fundamentals_harmonic.items()]))
+        vib_ene_levels_harmonic = rec_cm2rec_s(np.array([v for k,v in self.fundamentals_harmonic.items()]))
 
-        self.matrix_2d = np.outer(w_h, w_h)
-        # print('\nw_h')
-        # print(w_h)
-        # print('\n1./self.matrix_2d = 1./np.outer(w_h, w_h)')
-        # print(1./self.matrix_2d)
-        self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis, np.newaxis, :]
+        self.matrix_2d = np.outer(vib_ene_levels_harmonic, vib_ene_levels_harmonic)
+        self.tensor_3d = (vib_ene_levels_harmonic[:, np.newaxis, np.newaxis] *
+                          vib_ene_levels_harmonic[np.newaxis, :, np.newaxis] *
+                          vib_ene_levels_harmonic[np.newaxis, np.newaxis, :])
 
         # for i, te in enumerate(self.el_avrg_tensors):
         #     print(f'\nel_avrg_tensors {self.electric_avrg[i]}\n', te)
         #
         # for k, tm in enumerate(self.mech_avrg_tensors):
         #     print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
-
-    def getDerivs(self):
-
-        if self.dataInfo['source'] == 'cfour':
-            w_h = rec_cm2rec_s(np.array([v for k, v in self.fundamentals_harmonic.items()]))
-            self.matrix_2d = np.outer(w_h, w_h)
-            self.tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
-                                                                                               np.newaxis, :]
-            sqrtvec = 1./np.sqrt(w_h)
-            sqrtmat = 1./np.sqrt(self.matrix_2d.T)
-            sqrt3d = 1./np.sqrt(self.tensor_3d.T)
-
-            # input_data_info is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
-            firstder, secder = self.callbacks.getDipDers()
-
-            firstder_mat = np.zeros_like(firstder)
-            for i in range(len(sqrtvec)):
-                for j in range(3):
-                    firstder_mat[i, j] = firstder[i, j] / sqrtvec[i]
-
-            secder_mat = np.zeros_like(secder)
-            for i in range(len(sqrtvec)):
-                for j in range(len(sqrtvec)):
-                    for k in range(3):
-                        secder_mat[i, j, k] = secder[i, j, k] / sqrtmat[i, j]
-
-            data = [firstder_mat, secder_mat]
-
-            polder = self.callbacks.getPolarDers()
-            fdpol = np.zeros_like(polder[0])
-            for i in range(len(sqrtvec)):
-                for j in range(3):
-                    for k in range(3):
-                        fdpol[i, j, k] = polder[0][i, j, k] / sqrtvec[i]
-
-            sdpol = np.zeros_like(polder[1])
-            for i in range(len(sqrtvec)):
-                for j in range(len(sqrtvec)):
-                    with open('./secPolder', 'a') as file1:
-                        file1.write(f'\n=============================={i} {j}\n{sqrtmat[i, j]}\n')
-                        file1.writelines(str(polder[1][i, j, :, :]))
-
-                    for k in range(3):
-                        for l in range(3):
-                            sdpol[i, j, k, l] = polder[1][i, j, k, l] / sqrtmat[i, j]
-
-            data.append(fdpol)
-            data.append(sdpol)
-
-            cubicmat = self.callbacks.getCFF()
-            data.append(cubicmat)
-
-            allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
-
-            return allpropsdict
-
-        elif self.dataInfo['source'] == 'gaussian':
-            from scipy import constants
-            # to go from amu to au mass unit (m_e)
-            amc_au = constants.physical_constants['atomic mass constant'][0] / \
-                     constants.physical_constants['atomic unit of mass'][0]
-
-            # input_data_info is a list of np.arrays 'mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'
-            firstder, secder = self.callbacks.getDipDers()
-            data = [firstder / np.sqrt(amc_au), secder / amc_au]
-
-            polder = self.callbacks.getPolarDers()
-            data.append(polder[0] / np.sqrt(amc_au))
-            data.append(polder[1] / amc_au)
-
-            # / amc_au**1.5 is done in get_cubic_post in parseGaussian_forWilson
-            cubicmat = self.callbacks.getCFF()
-            data.append(cubicmat)
-
-            allpropsdict = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], data))
-            return allpropsdict
-
-        else:
-            print("Invalid input_data_info source")
 
     def gamma_mn(self, Gamma, a, b, c=False):
         # if 'c' is not provided, compute electrical anharmonicity
@@ -273,13 +162,6 @@ class SpectrumEVV:
             for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
                 resonance = el_func(self.all_states_harmonic, self.w1_mesh, self.w2_mesh,
                                     Gamma, (a, b))
-                # if a==1 and b==4:
-                #     print(a, b)
-                #     print(resonance)
-                #     print(self.w1_mesh)
-                #     print(self.w2_mesh)
-                #     print(1./prefac_el, elavrg[a, b])
-                #     print("result\n", elavrg[a, b] * resonance / prefac_el/24.)
                 total_sum_el += elavrg[a, b] * resonance / prefac_el
             return total_sum_el / 24.
 
@@ -472,8 +354,7 @@ def get_AlphaBetaGammaDelta_indices(num_f: int):
     array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
     return array_of_4greekIndices
 
-def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray],
-                    gammaCompsAll: list[tuple[int, int, int, int]]):
+def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray], gammaCompsAll: np.array):
     """
     Calculate the averaging tensor for a given formula.
     Indices of the tensor are normal coordinates (NC) indices,
@@ -534,16 +415,10 @@ def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.nda
         return avrg_tensor
 
 # function generator
-def w_mn_prod(subscripts, fermi=None, margin=10.):
+def generate_resonances_functions(subscripts, fermi=None, margin=10.):
     m1n1m2n2 = [i.split(',') for i in subscripts]
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
-
-    def safe_int(s):
-        try:
-            return int(s)
-        except ValueError:
-            return s
 
     def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
@@ -555,26 +430,11 @@ def w_mn_prod(subscripts, fermi=None, margin=10.):
         wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
         wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
 
-        # wm1 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
-        # wn1 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[0][1].split('+')]))
-        # wm2 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
-        # wn2 = tuple(sorted([safe_int(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
-
-        # if  abctuple == (1, 4):
-        #     print(wm1, wn1)
-        #     print('wm1-wn1', rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))
-        #     print(wm2, wn2)
-        #     print('wm2-wn2', rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]))
-        #     print('w1-w2', rec_cm2rec_s(w1) - rec_cm2rec_s(w2))
-        #     print('rescod1\n', (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-        #                                          + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
-        #     print('rescond2\n', (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
-        #     print('1/rescod1\n',1./ (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-        #                                          + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) )
-        #     print('1/rescond2\n', 1./ (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma))
         if fermi is None:
             return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
+                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2)
+                                                 - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2])
+                                                                  + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
 
         else:
             w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')]))
@@ -583,13 +443,6 @@ def w_mn_prod(subscripts, fermi=None, margin=10.):
             w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')]))
             w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')]))
 
-            # w_fr11 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[0][0].split('+')]))
-            # w_fr21 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[0][1].split('+')]))
-            #
-            # w_fr12 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[1][0].split('+')]))
-            # w_fr22 = tuple(sorted([safe_int(dictabc[i]) for i in fermi[1][1].split('+')]))
-
-            tail = 0.0
             t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
             t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
             t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
@@ -728,7 +581,7 @@ def printT(tensor):
 
 def printed2DIRtensors(setup: SpectrumEVV):
 
-    ders = setup.getDerivs()
+    ders = setup.deriv_data
     print('\nFundamental frequencies (anharmonic):', list(setup.fundamentals.values()))
     print('Fundamental frequencies (harmonic)  :', list(setup.fundamentals_harmonic.values()), '\n')
 
