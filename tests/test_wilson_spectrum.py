@@ -22,3 +22,16 @@ def test_wilson_SpectrumEVV_gaussian():
     print(spec.__dict__)
     print(dir(spec))
 
+def test_read_csv_DB():
+    import pandas as pd
+    pd.set_option('display.width', 5000)
+    pd.set_option('display.max_colwidth', 2000)
+    pd.set_option('display.max_columns', None)
+
+    DB = spectrum.read_csv_DB('/mnt/c/Users/vle014/Downloads/files_fram/files_database.csv')
+
+    # filtered_df = DB[(DB['g16_3quanta_full'].notna()) & (DB['g16_3quanta_full'] != '')]
+    filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
+
+    selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
+    print(selected_columns_df)

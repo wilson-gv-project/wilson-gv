@@ -24,6 +24,9 @@ print(f"""Generated with:
 g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
             '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
 
+g16files = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/METH/B3LYPaug-cc-pVTZ/g16_inputFull_3q.out',
+            '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/METH/B3LYPaug-cc-pVTZ/g16_inputFull_3q.out'}
+
 cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
                   'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
                   'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
@@ -44,6 +47,7 @@ log10=True
 w1mw2=False
 gamma_rc=10.
 
+# select terms of electrical and mechanical anharmonicities
 terms_selection = [0, 1], [0, 1]
 
 regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
@@ -68,20 +72,20 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     method_name = 'B3LYP' if datain['source'] == 'gaussian' else 'CCSDT'
 
     name=f'./{tOld}_{method_name}_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
-    with open("output.txt", "a") as f:
-        print(name, file=f)
-        print('\n-----------------------------------------', file=f)
-        # print(setup.deriv_data['mu_Q'], file=f)
-        # with np.printoptions(precision=12, suppress=True):
-            # print(setup.deriv_data['mu_QQ'], file=f)  # check precision for CFOUR for both ders
-            # print(setup.deriv_data['alpha_Q'], file=f) # good match
-            # print(setup.deriv_data['alpha_QQ'], file=f)
-            # print(setup.deriv_data['F_abc'], file=f)
-        # print('\nsetup.all_states', setup.all_states, file=f)
-        # print('\nsetup.all_states_harmonic', setup.all_states_harmonic, file=f)
-        # print('\nsetup.fundamentals', setup.fundamentals, file=f)
-        # print('\nsetup.fundamentals_harmonic', setup.fundamentals_harmonic, file=f)
-        print('\n-----------------------------------------\n', file=f)
+    # with open("output.txt", "a") as f:
+    #     print(name, file=f)
+    #     print('\n-----------------------------------------', file=f)
+    #     # print(setup.deriv_data['mu_Q'], file=f)
+    #     # with np.printoptions(precision=12, suppress=True):
+    #         # print(setup.deriv_data['mu_QQ'], file=f)  # check precision for CFOUR for both ders
+    #         # print(setup.deriv_data['alpha_Q'], file=f) # good match
+    #         # print(setup.deriv_data['alpha_QQ'], file=f)
+    #         # print(setup.deriv_data['F_abc'], file=f)
+    #     # print('\nsetup.all_states', setup.all_states, file=f)
+    #     # print('\nsetup.all_states_harmonic', setup.all_states_harmonic, file=f)
+    #     # print('\nsetup.fundamentals', setup.fundamentals, file=f)
+    #     # print('\nsetup.fundamentals_harmonic', setup.fundamentals_harmonic, file=f)
+    #     print('\n-----------------------------------------\n', file=f)
 
     start_time0 = time.time()
     Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech)
@@ -109,65 +113,60 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
 # list_figs = [(True, False), (False, True), (True, True)]
 list_figs = [(True, True)]
 for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc)
+    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc)
 
-# list_figs = [(True, False), (False, True), (True, True)]
-# for s in list_figs:
-#     one_spectrum_fig(el=s[0], mech=s[1], datain=datain2, region=1, gamma_rc=gamma_rc, new=True)
-
-quit()
-
-import pandas as pd
-import json
-
-# Assuming your input_data_info is stored in a JSON file
-with open('calcfiles.json', 'r') as file:
-    data = json.load(file)
-print(data)
-
-flattened_data = []
-
-# First pass to determine all possible keys in the file_path dictionaries
-all_keys = set()
-
-for molecule_name, molecule_data in data['molecules'].items():
-    for method, method_data in molecule_data.items():
-        if method.startswith('_comment'):
-            continue  # Skip comments
-        if isinstance(method_data, dict):
-            for basis_set, basis_set_data in method_data.items():
-                if isinstance(basis_set_data, dict):
-                    for file_category, files in basis_set_data.items():
-                        if isinstance(files, dict):
-                            for file_type, file_paths in files.items():
-                                if isinstance(file_paths, dict):
-                                    all_keys.update(file_paths.keys())
-
-# Second pass to create the flattened input_data_info structure
-for molecule_name, molecule_data in data['molecules'].items():
-    for method, method_data in molecule_data.items():
-        if method.startswith('_comment'):
-            continue  # Skip comments
-        if isinstance(method_data, dict):
-            for basis_set, basis_set_data in method_data.items():
-                if isinstance(basis_set_data, dict):
-                    for file_category, files in basis_set_data.items():
-                        if isinstance(files, dict):
-                            for file_type, file_paths in files.items():
-                                if isinstance(file_paths, dict):
-                                    record = {
-                                        'molecule_name': molecule_name,
-                                        'method': method,
-                                        'basis_set': basis_set,
-                                        'file_category': file_category,
-                                        'file_type': file_type
-                                    }
-                                    # Add each possible key to the record, with default empty string if not present
-                                    for key in all_keys:
-                                        record[key] = file_paths.get(key, '')
-                                    flattened_data.append(record)
-
-# Create a DataFrame from the list of dictionaries
-df = pd.DataFrame(flattened_data)
-
-print(df)
+#
+# import pandas as pd
+# import json
+#
+# # Assuming your input_data_info is stored in a JSON file
+# with open('calcfiles.json', 'r') as file:
+#     data = json.load(file)
+# print(data)
+#
+# flattened_data = []
+#
+# # First pass to determine all possible keys in the file_path dictionaries
+# all_keys = set()
+#
+# for molecule_name, molecule_data in data['molecules'].items():
+#     for method, method_data in molecule_data.items():
+#         if method.startswith('_comment'):
+#             continue  # Skip comments
+#         if isinstance(method_data, dict):
+#             for basis_set, basis_set_data in method_data.items():
+#                 if isinstance(basis_set_data, dict):
+#                     for file_category, files in basis_set_data.items():
+#                         if isinstance(files, dict):
+#                             for file_type, file_paths in files.items():
+#                                 if isinstance(file_paths, dict):
+#                                     all_keys.update(file_paths.keys())
+#
+# # Second pass to create the flattened input_data_info structure
+# for molecule_name, molecule_data in data['molecules'].items():
+#     for method, method_data in molecule_data.items():
+#         if method.startswith('_comment'):
+#             continue  # Skip comments
+#         if isinstance(method_data, dict):
+#             for basis_set, basis_set_data in method_data.items():
+#                 if isinstance(basis_set_data, dict):
+#                     for file_category, files in basis_set_data.items():
+#                         if isinstance(files, dict):
+#                             for file_type, file_paths in files.items():
+#                                 if isinstance(file_paths, dict):
+#                                     record = {
+#                                         'molecule_name': molecule_name,
+#                                         'method': method,
+#                                         'basis_set': basis_set,
+#                                         'file_category': file_category,
+#                                         'file_type': file_type
+#                                     }
+#                                     # Add each possible key to the record, with default empty string if not present
+#                                     for key in all_keys:
+#                                         record[key] = file_paths.get(key, '')
+#                                     flattened_data.append(record)
+#
+# # Create a DataFrame from the list of dictionaries
+# df = pd.DataFrame(flattened_data)
+#
+# print(df)

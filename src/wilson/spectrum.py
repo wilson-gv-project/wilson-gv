@@ -235,9 +235,7 @@ class SpectrumEVV:
         plt.rcParams['agg.path.chunksize'] = 10000
         plt.rcParams['axes.titlepad'] = 30
 
-        font = {#'family': 'normal',
-                # 'weight': 'bold',
-                'size': 18}
+        font = {'size': 18}
         matplotlib.rc('font', **font)
 
         X, Y = self.w1_mesh, self.w2_mesh
@@ -320,8 +318,6 @@ class SpectrumEVV:
                          (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
                          (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
         nicetitle = f'{nametuple[2]}'
-        # plt.title(
-        #     f'plot2Dmatplotlib().\ndpi={dpi}\nx{xs[0][0]}..{xs[-1][-1]} y{ys[0][0]}..{ys[-1][-1]}\n{nametuple[0]}\nGamma={Gamma}\n{nametuple[1]}\n{np.max(df['values_mesh'].flatten(), axis=0)} or {'{:.4e}'.format(np.max(df['values_mesh'].flatten(), axis=0))}')
         plt.title(nicetitle) # +'\n\n'+labeltypedict[(el, mech)]
         plt.tight_layout()
         start_time = time.time()
@@ -329,6 +325,128 @@ class SpectrumEVV:
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time - plt.savefig: {execution_time} seconds")
+
+class SpectrumFigure:
+
+    def __init__(self, gamma_data, w1_mesh, w2_mesh, settings):
+
+        # figure XYZ data
+        self.gamma_data = gamma_data
+        self.intensities = abs(gamma_data) ** 2
+        self.X = w1_mesh
+        self.Y = w2_mesh
+
+        self.settings = {'omega1_minus_omega2': False, 'log10': True}
+        self.settings.update(settings)
+
+        if settings['omega1_minus_omega2']:
+            self.Y = -(self.X - self.Y)
+
+        # figure settings
+        self.dpi = self.settings['dpi']
+        self.font_dict = self.settings['font_dict'] # font = {'size': 18}
+
+        el, mech = self.settings['electrical'], self.settings['mechanical']
+
+        # dynamic range max - for setting up the norm and colorbar ticks
+        if 'dmax_dict' in self.settings:
+            self.d_max = self.settings['dmax_dict'][(el, mech)]
+        else:
+            print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
+                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), self.intensities.max())
+            self.d_max = self.intensities.max()
+        self.settings['d_max'] = self.d_max
+        # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
+        # d_max = dmax_dict[(el, mech)] # m, e, t 29519537.48  48778401.3  48218929.9
+
+
+
+    def update_settings(self, settings: dict):
+
+        self.settings.update(settings)
+        self.settings['norm_min'] = 1e3
+        self.settings['norm_max'] = 1e8
+
+
+    def plot2Dmatplotlib(self, nametuple):
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import matplotlib
+
+        matplotlib.use('Agg')
+        plt.rcParams['path.simplify'] = True
+        plt.rcParams['agg.path.chunksize'] = 10000
+        plt.rcParams['axes.titlepad'] = 30
+        matplotlib.rc('font', **self.font_dict)
+
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(1, 1, 1)
+
+        import matplotlib.colors as colors
+        colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
+
+        dynamic_range = 1000 # stop plotting when lower than this (number times 10) dmax
+        num_count = 30
+        dynrange_log = np.log10(dynamic_range)
+        d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
+        dmax_log10 = float(int(np.log10(self.d_max)))
+
+        num_level_ticks = 6
+        levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
+        levels = []
+        for i in range(num_count):
+            levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_count - 1 - i) / (num_count - 1))))
+
+        cont = plt.contourf(self.X, self.Y, self.intensities,
+                            levels=levels, cmap='hot_r',
+                            norm=colorbar_norm)
+
+        # This is the fix for the white lines between contour levels
+        for c in cont.collections:
+            c.set_edgecolor("face")
+
+        # formatting of colorbar tick labels
+        import matplotlib.ticker as ticker
+        def fmt(x, pos):
+            a, b = '{:.0e}'.format(x).split('e')
+            b = int(b)
+            return r'${} \times 10^{{{}}}$'.format(a, b)
+
+        # https://stackoverflow.com/questions/25983218/scientific-notation-colorbar
+        colorbar = plt.colorbar(cont, ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
+
+        # plt.xlabel(r'$\omega_1$')
+        # plt.ylabel(r'$\omega_2$')
+        xs = self.X[0], self.X[-1]
+        ys = self.Y[0], self.Y[-1]
+
+        title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
+                         (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
+                         (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
+
+        nicetitle = f'{nametuple[2]}'
+        plt.title(nicetitle) # +'\n\n'+title_type_dict[(el, mech)]
+        plt.tight_layout()
+        plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
+
+
+def read_csv_DB(filepath):
+    """
+
+    :param filepath:
+    :return:
+    """
+    # Column names are:
+    # code, method, basis_set, c4_ZMAT, c4_outfile_orig_hess,
+    # c4_QUADRATURE, pkl_dimensionless, pkl_dipole,
+    # c4_dipolexyz, pkl_polar, pkl_polar_raw, pkl_polar_data, c4_cubic,
+    # c4_out, pkl_vibdata, g16_3quanta_full
+    import pandas as pd
+    database = pd.read_csv(filepath)
+    columnsDB = list(database.columns)
+    print('\n', columnsDB)
+
+    return database
 
 def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int):
     """
