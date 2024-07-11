@@ -34,4 +34,12 @@ def test_read_csv_DB():
     filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
 
     selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
+    print('\n----------------------------------')
     print(selected_columns_df)
+
+
+def test_make_DatainputDict():
+    mol_tuple = ('FORM', 'B3LYP', 'aug_cc_pVTZ')
+    inpdict = spectrum.make_DatainputDict('gaussian', mol_tuple)
+
+    print('\n', inpdict)

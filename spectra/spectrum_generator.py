@@ -7,60 +7,13 @@ import os
 
 from wilson import spectrum
 
-# import sys
-#
-# print ('argument list', sys.argv)
-# dic = {"True": True, "False": False}
-# el = dic[sys.argv[1]]
-# mech = dic[sys.argv[2]]
-# region = int(sys.argv[3]) if len(sys.argv) == 4 else None
-# print (f"el = {el}, mech = {mech}")
-
-print(f"""Generated with: 
-'getcwd  :      {os.getcwd()}
-'__file__:      {__file__}\n\n""")
-
-
-g16files = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
-            '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out',}
-
-g16files = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/METH/B3LYPaug-cc-pVTZ/g16_inputFull_3q.out',
-            '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/METH/B3LYPaug-cc-pVTZ/g16_inputFull_3q.out'}
-
-cfourdatafiles = {'out': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
-                  'cubic': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/cubic',
-                  'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/dipole',
-                  'polar': '/home/vlew/Wilson/spectra/CCSDTccpVQZ_CFOUR/polar.pkl',
-                  'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/CCSDTcc_pVQZ/out',
-                  'polar_pkl': '/home/vlew/Wilson/spectra/CCSDTccpVQZ_CFOUR/polar.pkl'
-                  }
-
-datain = {'source': 'gaussian',
-          'type': 'log',
-          'files': g16files}
-
-datain2 = {'source': 'cfour',
-            'type': 'out',
-            'files':cfourdatafiles}
-
-log10=True
-w1mw2=False
-gamma_rc=10.
-
-# select terms of electrical and mechanical anharmonicities
-terms_selection = [0, 1], [0, 1]
-
-regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
-           2: ((2810., 3210., 10.), (5510., 6050., 10.)),
-           3: ((1961.318, 1981.318, 10.), (4931.662, 4951.662, 10.))}
-
-def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = gamma_rc):
+def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = 10.):
 
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
-    setup = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
-    setup.addTerms(*terms_selection)
+    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
+    computedSpectrum.addTerms(*terms_selection)
 
     step1 = regions[region][0][-1]
     gamma = spectrum.rec_cm2rec_s(gamma_rc)
@@ -75,45 +28,133 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
     # with open("output.txt", "a") as f:
     #     print(name, file=f)
     #     print('\n-----------------------------------------', file=f)
-    #     # print(setup.deriv_data['mu_Q'], file=f)
+    #     # print(computedSpectrum.deriv_data['mu_Q'], file=f)
     #     # with np.printoptions(precision=12, suppress=True):
-    #         # print(setup.deriv_data['mu_QQ'], file=f)  # check precision for CFOUR for both ders
-    #         # print(setup.deriv_data['alpha_Q'], file=f) # good match
-    #         # print(setup.deriv_data['alpha_QQ'], file=f)
-    #         # print(setup.deriv_data['F_abc'], file=f)
-    #     # print('\nsetup.all_states', setup.all_states, file=f)
-    #     # print('\nsetup.all_states_harmonic', setup.all_states_harmonic, file=f)
-    #     # print('\nsetup.fundamentals', setup.fundamentals, file=f)
-    #     # print('\nsetup.fundamentals_harmonic', setup.fundamentals_harmonic, file=f)
+    #         # print(computedSpectrum.deriv_data['mu_QQ'], file=f)  # check precision for CFOUR for both ders
+    #         # print(computedSpectrum.deriv_data['alpha_Q'], file=f) # good match
+    #         # print(computedSpectrum.deriv_data['alpha_QQ'], file=f)
+    #         # print(computedSpectrum.deriv_data['F_abc'], file=f)
+    #     # print('\ncomputedSpectrum.all_states', computedSpectrum.all_states, file=f)
+    #     # print('\ncomputedSpectrum.all_states_harmonic', computedSpectrum.all_states_harmonic, file=f)
+    #     # print('\ncomputedSpectrum.fundamentals', computedSpectrum.fundamentals, file=f)
+    #     # print('\ncomputedSpectrum.fundamentals_harmonic', computedSpectrum.fundamentals_harmonic, file=f)
     #     print('\n-----------------------------------------\n', file=f)
 
-    start_time0 = time.time()
-    Z, savedict = setup.intensity(gamma, {}, el=el, mech=mech)
-    # print('intensity\n', abs(Z)**2)
-    end_time0 = time.time()
-    execution_time0 = end_time0 - start_time0
-    print(f"\nExecution time - setup.intensity: {execution_time0} seconds")
+    Z, savedict = computedSpectrum.intensity(gamma, {}, el=el, mech=mech)
 
-    start_time = time.time()
-    setup.plot2Dmatplotlib(Z, w1mw2=w1mw2, nametuple=(name, __file__, "B3LYP/cc-pVQZ"), Gamma=gamma, el=el, mech=mech, dpi=200, log10=log10)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(f"Execution time - setup.plot2Dmatplotlib: {execution_time} seconds")
+    computedSpectrum.plot2Dmatplotlib(Z, w1mw2=w1mw2, nametuple=(name, __file__, "B3LYP/cc-pVQZ"), Gamma=gamma, el=el, mech=mech, dpi=200, log10=log10)
 
-    end_time_global = time.time()
-    execution_time_global = end_time_global - start_time_global
+def one_fig_Object(settings: dict, datainput: dict):
+    """Making a figure for one input data set"""
 
-    hours, rem = divmod(execution_time_global, 3600)
-    minutes, seconds = divmod(rem, 60)
+    region = settings['region']
+    Gamma_rc = settings['Gamma_rc']
+    el_bool = settings['electrical']
+    mech_bool = settings['mechanical']
 
-    print("\n{:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds))
-    print(f"Execution time - global: {execution_time_global} seconds")
-    print('\n===============================================================\n   Next spectrum below\n')
+    omega1 = np.arange(*regions[region][0])
+    omega2 = np.arange(*regions[region][1])
 
-# list_figs = [(True, False), (False, True), (True, True)]
-list_figs = [(True, True)]
+    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput)
+    computedSpectrum.addTerms(*terms_selection)
+
+    Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+    sec_hypol_data, savedict = computedSpectrum.intensity(Gamma, {}, el=el_bool, mech=mech_bool)
+
+    artist = spectrum.SpectrumFigure(sec_hypol_data, computedSpectrum.w1_mesh, computedSpectrum.w2_mesh, settings)
+    name, title_on_top, text_under_the_figure = make_texts4fig(datainput, computedSpectrum, artist, settings)
+    artist.plot2Dmatplotlib(nametuple=(name, __file__, title_on_top),
+                            text_under_the_figure=text_under_the_figure)
+
+def make_texts4fig(input_data_info, computedSpectrum, artist, settings):
+
+    prefix = 'figObj'
+    method_name = input_data_info['files']['method']
+    basis_name = input_data_info['files']['basis']
+    mol_code = input_data_info['files']['mol_code']
+
+    el_bool = settings['electrical']
+    mech_bool = settings['mechanical']
+
+    region = settings['region']
+    Gamma_rc = settings['Gamma_rc']
+
+    step1 = regions[region][0][-1]
+    Gamma_str = f"{Gamma_rc:.2f}".replace('.', 'p')
+    step_str = f"{step1:.1f}".replace('.', 'p')
+
+    name = f'./{prefix}_{mol_code}_{method_name}_{basis_name}_el{str(el_bool)[0]}_mech{str(mech_bool)[0]}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}_reg{region}_step{step_str}.svg'
+    title_on_top = f"{method_name}/{f"{basis_name}".replace('_', '-')}"
+
+    # here we prepare the text for the textbox
+    part1 = f'{name}\n\nMolecule: {mol_code}\nd_max = {'{:.4e}'.format(artist.d_max)}\n'
+    part5 = f'Terms in the expressions: \n      electrical -    {terms_selection[0]}\n      mechanical - {terms_selection[1]}\n\n'
+
+    values = list(computedSpectrum.fundamentals_harmonic.values())
+    if len(values) < 10:
+        part6 = f'Fundamentals (harmonic): \n   {sorted(values)}\n\n'
+    else:
+        sorted_values = sorted(values)
+        chunks = [sorted_values[i:i + 9] for i in range(0, len(sorted_values), 9)]
+        part6 = 'Fundamentals (harmonic):\n'
+        for chunk in chunks:
+            part6 += f"   {chunk}\n"
+        part6 += '\n'
+    values2 = list(computedSpectrum.fundamentals.values())
+    if len(values2) < 10:
+        part7 = f'Fundamentals (anharmonic): \n   {sorted(values2)}\n\n'
+    else:
+        sorted_values2 = sorted(values2)
+        chunks2 = [sorted_values2[i:i + 9] for i in range(0, len(sorted_values2), 9)]
+        part7 = 'Fundamentals (anharmonic):\n'
+        for chunk in chunks2:
+            part7 += f"   {chunk}\n"
+        part7 += '\n'
+    part2 = f'intensities.max() = {artist.intensities.max()} = {'{:.4e}'.format(artist.intensities.max())}\n'
+    part3 = f'Gamma in cm-1 = {Gamma_rc}\n'
+    settings_str = ['\nSettings dict:']
+    for key, value in settings.items():
+        settings_str.append(f"  {key}: {value}")
+    part4 = "\n".join(settings_str)
+    text_under_the_figure = part1+part5+part6+part7+part2+part3+part4
+
+    return name, title_on_top, text_under_the_figure
+
+def normalize_colorbars(list_of):
+    pass
+
+
+print(f"""Generated with: 
+'getcwd  :      {os.getcwd()}
+'__file__:      {__file__}\n\n""")
+
+log10=True
+w1mw2=False
+broad_factor_rc=10.
+
+# select terms of electrical and mechanical anharmonicities
+terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
+
+regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
+           2: ((2810., 3210., 10.), (5510., 6050., 10.)),
+           3: ((1961.318, 1981.318, 10.), (4931.662, 4951.662, 10.)),
+           4: ((680., 1750., 10.), (1509., 4350., 10.))}
+
+settings_here = {'electrical': None, 'mechanical': None,
+                 'Gamma_rc': broad_factor_rc, 'region': 4,
+                 'font_dict': {'size': 18}, 'figsize': (12, 15)}
+
+# datain = spectrum.make_DatainputDict('gaussian', ('FORM', 'B3LYP', 'aug_cc_pVTZ'))
+# datain = spectrum.make_DatainputDict('gaussian', ('METH', 'B3LYP', 'cc_pVQZ'))
+datain = spectrum.make_DatainputDict('gaussian', ('METH', 'B3LYP', 'cc_pVQZ'))
+
+list_figs = [(True, False), (False, True), (True, True)]
+# list_figs = [(True, True)]
 for s in list_figs:
-    one_spectrum_fig(el=s[0], mech=s[1], datain=datain, region=1, gamma_rc=gamma_rc)
+    settings_here['electrical'] = s[0]
+    settings_here['mechanical'] = s[1]
+    # one_spectrum_fig(el=el, mech=mech, datain=datain, region=1, gamma_rc=broad_factor_rc)
+    one_fig_Object(settings=settings_here, datainput=datain)
 
 #
 # import pandas as pd

@@ -72,6 +72,9 @@ class GaussianDataParser(object):
 
         ah_sts = get_allStates_fromParsedResults(results_log, anharmonic=True)
         h_sts = get_allStates_fromParsedResults(results_log, anharmonic=False)
+
+        # print("ah_sts\n", ah_sts)
+        # print("h_sts\n", h_sts)
         self.anharmonic_states = {tuple(str(i) for i in key): value for key, value in ah_sts.items()}
         self.harmonic_states = {tuple(str(i) for i in key): value for key, value in h_sts.items()}
 
@@ -113,6 +116,7 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
             elif current_section:
                 if '------------' not in line:
                     linelist = line.split()
+                    # print(f'{current_section} linelist:  ', linelist)
                     # Insert None at the desired index (3rd position, which is index 2)
                     if len(linelist)==5 and current_section=='Combination Bands': linelist.insert(2, None)
 
@@ -124,8 +128,8 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
         else:
             results[section] = pd.DataFrame(data[2:-1])
 
-        main_numbers = [i[0] for i in results[section][0]]
-        sub_numbers = [i[2] for i in results[section][0]]
+        main_numbers = [int(i.split('(')[0]) for i in results[section][0]]
+        sub_numbers = [int(i[:-1].split('(')[1]) for i in results[section][0]]
 
         # Insert these columns at specific positions
         results[section].insert(1, 'mode_a', main_numbers)
@@ -133,19 +137,24 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
         results[section].drop(results[section].columns[0], axis=1, inplace=True)
 
         if section=='Combination Bands':
-            main_numbers = [i[0] for i in results[section][1]]
-            sub_numbers = [i[2] for i in results[section][1]]
+            main_numbers = [int(i.split('(')[0]) for i in results[section][1]]
+            sub_numbers = [int(i[:-1].split('(')[1]) for i in results[section][1]]
+            # print('main_numbers, sub_numbers', main_numbers, sub_numbers)
             results[section].insert(3, 'mode_b', main_numbers)
             results[section].insert(4, 'n_b', sub_numbers)
             results[section].drop(results[section].columns[2], axis=1, inplace=True)
 
-            main_numbers = [i[0] if i is not None else i for i in results[section][2]]
-            sub_numbers = [i[2] if i is not None else i for i in results[section][2]]
+            main_numbers = [int(i.split('(')[0]) if i is not None else i for i in results[section][2]]
+            sub_numbers = [int(i[:-1].split('(')[1]) if i is not None else i for i in results[section][2]]
 
             results[section].insert(5, 'mode_c', main_numbers)
             results[section].insert(6, 'n_c', sub_numbers)
             results[section].drop(results[section].columns[4], axis=1, inplace=True)
-
+    # a = dict(zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2]))
+    # print("dict(zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2]))\n", a)
+    # print("results['Fundamental Bands']\n", results['Fundamental Bands'])
+    # print("results['Combination Bands']\n", results['Combination Bands'])
+    # print("results['Overtones']\n", results['Overtones'])
     return results
 
 def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = False) -> dict:
@@ -153,17 +162,35 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
     if anharmonic:
         results['Combination Bands']['mode_c'] = results['Combination Bands']['mode_c'].fillna(0)
         results['Combination Bands']['n_c'] = results['Combination Bands']['n_c'].fillna(0)
-
         funddict = {tuple([int(k) - 1]): float(v) for k, v in
                     zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
+        # print('funddict\n', funddict)
+        # print("results['Overtones']['n_a']\n", results['Overtones']['n_a'])
+        # print("results['Overtones']\n", results['Overtones'])
+        # states = {
+        #     tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v)
+        #     for t, v, n in
+        #     zip(results['Overtones']['mode_a'], results['Overtones'][2], results['Overtones']['n_a'])
+        # }
         states = {
-            tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v)
+            tuple(sorted([t-1] * int(n))): float(v)
             for t, v, n in
             zip(results['Overtones']['mode_a'], results['Overtones'][2], results['Overtones']['n_a'])
         }
+        # combinationbands = {
+        #     tuple(
+        #         sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+        #             (int(t3) - 1)] * int(n3))
+        #     ): float(v)
+        #     for t1, t2, t3, v, n1, n2, n3 in
+        #     zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
+        #         results['Combination Bands']['mode_c'],
+        #         results['Combination Bands'][4], results['Combination Bands']['n_a'],
+        #         results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
+        # }
         combinationbands = {
             tuple(
-                sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+                sorted([t1-1] * int(n1) + [t2-1] * int(n2) + [
                     (int(t3) - 1)] * int(n3))
             ): float(v)
             for t1, t2, t3, v, n1, n2, n3 in
@@ -179,11 +206,24 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
     else:
         funddict1 = {tuple([int(k) - 1]): float(v) for k, v in
                      zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
-        states1 = {tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v) for t, v, n in
+        # states1 = {tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v) for t, v, n in
+        #            zip(results['Overtones']['mode_a'], results['Overtones'][1], results['Overtones']['n_a'])}
+        # combinationbands1 = {
+        #     tuple(
+        #         sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+        #             (int(t3) - 1)] * int(n3))
+        #     ): float(v)
+        #     for t1, t2, t3, v, n1, n2, n3 in
+        #     zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
+        #         results['Combination Bands']['mode_c'],
+        #         results['Combination Bands'][3], results['Combination Bands']['n_a'],
+        #         results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
+        # }
+        states1 = {tuple(sorted([t-1] * int(n))): float(v) for t, v, n in
                    zip(results['Overtones']['mode_a'], results['Overtones'][1], results['Overtones']['n_a'])}
         combinationbands1 = {
             tuple(
-                sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
+                sorted([t1-1] * int(n1) + [t2-1] * int(n2) + [
                     (int(t3) - 1)] * int(n3))
             ): float(v)
             for t1, t2, t3, v, n1, n2, n3 in

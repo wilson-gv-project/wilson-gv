@@ -176,9 +176,10 @@ class SpectrumEVV:
                 F = self.deriv_data['F_abc'][indx]
                 resonance2 = mech_func(self.all_states_harmonic, self.w1_mesh, self.w2_mesh,
                                        Gamma, (a, b, c))
-                with open('./resonance2', 'a') as file1:
-                    file1.write(f'{mech_func}\n')
-                    file1.writelines(str(resonance2)+'\n')
+                # with open('./resonance2', 'a') as file1:
+                #     file1.write(f'{mech_func}\n')
+                #     file1.writelines(str(resonance2)+'\n')
+
                 total_sum_mech += factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
 
@@ -318,7 +319,7 @@ class SpectrumEVV:
                          (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
                          (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
         nicetitle = f'{nametuple[2]}'
-        plt.title(nicetitle) # +'\n\n'+labeltypedict[(el, mech)]
+        plt.title(nicetitle) # +'\n\n'+labeltypedict[(el_bool, mech_bool)]
         plt.tight_layout()
         start_time = time.time()
         plt.savefig(nametuple[0], dpi=dpi, format='svg')
@@ -328,23 +329,28 @@ class SpectrumEVV:
 
 class SpectrumFigure:
 
-    def __init__(self, gamma_data, w1_mesh, w2_mesh, settings):
+    def __init__(self, sec_hypol_data, w1_mesh, w2_mesh, settings):
 
         # figure XYZ data
-        self.gamma_data = gamma_data
-        self.intensities = abs(gamma_data) ** 2
+        self.gamma_data = sec_hypol_data
+        self.intensities = abs(sec_hypol_data) ** 2
         self.X = w1_mesh
         self.Y = w2_mesh
 
-        self.settings = {'omega1_minus_omega2': False, 'log10': True}
+        self.settings = {'omega1_minus_omega2': False, 'log10': True,
+                         'font_dict': {'size': 18}, 'dpi': 200,
+                         'figsize': (12, 12)}
         self.settings.update(settings)
 
-        if settings['omega1_minus_omega2']:
+        if self.settings['omega1_minus_omega2']:
             self.Y = -(self.X - self.Y)
 
         # figure settings
+        self.figsize = self.settings['figsize']
         self.dpi = self.settings['dpi']
         self.font_dict = self.settings['font_dict'] # font = {'size': 18}
+        self.settings['norm_min'] = 1e3
+        self.settings['norm_max'] = 1e8
 
         el, mech = self.settings['electrical'], self.settings['mechanical']
 
@@ -357,18 +363,16 @@ class SpectrumFigure:
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
         # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
-        # d_max = dmax_dict[(el, mech)] # m, e, t 29519537.48  48778401.3  48218929.9
+        # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
 
 
 
     def update_settings(self, settings: dict):
 
         self.settings.update(settings)
-        self.settings['norm_min'] = 1e3
-        self.settings['norm_max'] = 1e8
 
 
-    def plot2Dmatplotlib(self, nametuple):
+    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = ''):
         import matplotlib.pyplot as plt
         import numpy as np
         import matplotlib
@@ -379,13 +383,14 @@ class SpectrumFigure:
         plt.rcParams['axes.titlepad'] = 30
         matplotlib.rc('font', **self.font_dict)
 
-        fig = plt.figure(figsize=(12, 12))
+        fig = plt.figure(figsize=self.figsize)
         ax = fig.add_subplot(1, 1, 1)
 
         import matplotlib.colors as colors
         colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
 
-        dynamic_range = 1000 # stop plotting when lower than this (number times 10) dmax
+        dynamic_range = 300 # stop plotting when lower than this (number times 10) dmax
+        # dynamic_range = self.settings['dynamic_range']
         num_count = 30
         dynrange_log = np.log10(dynamic_range)
         d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
@@ -421,11 +426,24 @@ class SpectrumFigure:
         ys = self.Y[0], self.Y[-1]
 
         title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
-                         (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
-                         (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
+                           (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
+                           (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
 
         nicetitle = f'{nametuple[2]}'
-        plt.title(nicetitle) # +'\n\n'+title_type_dict[(el, mech)]
+        plt.title(nicetitle) # +'\n\n'+title_type_dict[(el_bool, mech_bool)]
+
+        # plt.figtext(0.5, 0.01, text_under_the_figure, ha="center", fontsize=18,
+        #             bbox={"facecolor": "orange", "alpha": 0.3, "pad": 5})
+        # bbox_args = dict(boxstyle="round", facecolor='red', alpha=0.3)
+        # arrow_args = dict(arrowstyle="->")
+        # ax.annotate(text_under_the_figure, xy=(0.1, 0.0), xycoords='figure fraction',
+        #              xytext=(20, 20), textcoords='offset points',
+        #              ha="left", va="bottom",
+        #              bbox=bbox_args)
+        bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
+        # plt.subplots_adjust(bottom=0.15)  # Increase the bottom margin to make space for the annotation
+        ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
+                    ha="left", va="top", bbox=bbox_args, fontsize=12)
         plt.tight_layout()
         plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
 
@@ -443,10 +461,63 @@ def read_csv_DB(filepath):
     # c4_out, pkl_vibdata, g16_3quanta_full
     import pandas as pd
     database = pd.read_csv(filepath)
-    columnsDB = list(database.columns)
-    print('\n', columnsDB)
+    # columnsDB = list(database.columns)
+    # print('\ncolumnsDB\n', columnsDB)
 
     return database
+
+def getting_files_DB(sourceProgram: str):
+    """
+
+    :param sourceProgram:
+    :return:
+    """
+    DB = read_csv_DB('/mnt/c/Users/vle014/Downloads/files_fram/files_database.csv')
+
+    if sourceProgram == 'gaussian':
+        filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
+        selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
+        return selected_columns_df
+
+    # else:
+    #     filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
+    #     selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
+    #     return selected_columns_df
+
+def make_DatainputDict(sourceProgram: str, mol_tuple: tuple):
+    """
+
+    :param mol_tuple:
+    :param sourceProgram:
+    :return:
+    """
+    dataframe = getting_files_DB(sourceProgram)
+    mol_code, method, basis = mol_tuple
+    files_dict = {'mol_code': mol_code, 'method': method, 'basis': basis}
+
+    narrow_df = dataframe.loc[(dataframe['code'] == mol_code)
+                              & (dataframe['method'] == method)
+                              & (dataframe['basis_set'] == basis)]
+    if len(narrow_df) > 1:
+        print('Something is wrong, more than one file found. First one is taken here.')
+
+    if sourceProgram == 'gaussian':
+        result = {'source': 'gaussian', 'type': 'log'}
+
+        files_dict.update({'3quanta': narrow_df.iloc[0]['g16_3quanta_full'],
+                           'log': narrow_df.iloc[0]['g16_3quanta_full']})
+        result['files'] = files_dict
+        return result
+
+    elif sourceProgram == 'cfour':
+        result = {'source': 'cfour', 'type': 'out'}
+
+        files_dict.update({'out': narrow_df.iloc[0]['c4_out'], 'cubic': narrow_df.iloc[0]['c4_cubic'],
+                           'dipolexyz': narrow_df.iloc[0]['c4_dipolexyz'], 'polar': narrow_df.iloc[0]['pkl_polar'],
+                           'out_anharm_final': narrow_df.iloc[0]['c4_out'], 'polar_pkl': narrow_df.iloc[0]['pkl_polar']})
+        result['files'] = files_dict
+        return result
+
 
 def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int):
     """
@@ -543,10 +614,13 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
         w_all[('zero',)] = 0.
 
-        wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')]))
-        wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')]))
-        wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')]))
-        wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')]))
+        wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
+        wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))# if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
+        # print([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')])
+        # print(m1n1m2n2[1][0])
+
+        wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int)) if 'zero' not in m1n1m2n2[1][0].split('+') else tuple([m1n1m2n2[1][0]])
+        wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
 
         if fermi is None:
             return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
@@ -555,11 +629,11 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
                                                                   + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
 
         else:
-            w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')]))
-            w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')]))
+            w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')], key=int))
+            w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')], key=int)) if 'zero' not in fermi[0][1].split('+') else tuple([fermi[0][1]])
 
-            w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')]))
-            w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')]))
+            w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')], key=int))
+            w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int)) if 'zero' not in fermi[1][1].split('+') else tuple([fermi[1][1]])
 
             t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
             t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
@@ -567,19 +641,19 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
             t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
 
             sumfrac = (1 / t3 + 1 / t4)
-            with open('./fermi', 'a') as file1:
-                file1.write('\n==============================\n')
-                file1.write(f'{abctuple}\n{w_fr11} {w_fr21} {w_fr12} {w_fr22}\n{fermi}\n')
-                file1.writelines(str(t3)+'\n')
-                file1.writelines(str(t4)+'\n')
-                file1.writelines(str(sumfrac) + '\n')
+            # with open('./fermi', 'a') as file1:
+            #     file1.write('\n==============================\n')
+            #     file1.write(f'{abctuple}\n{w_fr11} {w_fr21} {w_fr12} {w_fr22}\n{fermi}\n')
+            #     file1.writelines(str(t3)+'\n')
+            #     file1.writelines(str(t4)+'\n')
+            #     file1.writelines(str(sumfrac) + '\n')
 
-            with open('./fermi_other', 'a') as file1:
-                file1.write('\n==============================\n')
-                file1.write(f'{abctuple}\n{m1n1m2n2}\n')
-                file1.writelines(str(rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))+'\n')
-                file1.writelines(str( rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) )+'\n')
-                file1.writelines(str((1 / t1 / t2)) + '\n')
+            # with open('./fermi_other', 'a') as file1:
+            #     file1.write('\n==============================\n')
+            #     file1.write(f'{abctuple}\n{m1n1m2n2}\n')
+            #     file1.writelines(str(rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))+'\n')
+            #     file1.writelines(str( rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) )+'\n')
+            #     file1.writelines(str((1 / t1 / t2)) + '\n')
 
             return (1 / t1 / t2) * sumfrac
 

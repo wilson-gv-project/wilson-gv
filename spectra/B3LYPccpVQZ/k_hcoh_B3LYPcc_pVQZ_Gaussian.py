@@ -8,10 +8,10 @@ import os
 #
 # print ('argument list', sys.argv)
 # dic = {"True": True, "False": False}
-# el = dic[sys.argv[1]]
-# mech = dic[sys.argv[2]]
+# el_bool = dic[sys.argv[1]]
+# mech_bool = dic[sys.argv[2]]
 # region = int(sys.argv[3]) if len(sys.argv) == 4 else None
-# print (f"el = {el}, mech = {mech}")
+# print (f"el_bool = {el_bool}, mech_bool = {mech_bool}")
 
 print(f"""Generated with: 
 'getcwd:        {os.getcwd()}

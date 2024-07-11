@@ -64,8 +64,8 @@ gamma = c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec)
 print(c2DIRmain.rec_cm2hartree_amu_bohr_2(1660.), 1660)
 print(str(c2DIRmain.rec_cm2hartree_amu_bohr_2(gcmrec)), gcmrec)
 
-# el, mech = True, False
-# el, mech = False, True
+# el_bool, mech_bool = True, False
+# el_bool, mech_bool = False, True
 el, mech = True, True
 
 import time
@@ -76,8 +76,8 @@ execution_time0 = end_time0 - start_time0
 print(f"Execution time - setup.intensity: {execution_time0} seconds")
 
 # percent = 0.0
-if mech and not el: contr = 'mech'
-elif el and not mech: contr = 'el'
+if mech and not el: contr = 'mech_bool'
+elif el and not mech: contr = 'el_bool'
 else: contr = 'both'
 figfilename = f'./{contr}_Gamma{f'{gamma:.2e}'}__{start1}_{stop1-step1}_{step1}__{start2}_{stop2-step2}_{step2}.svg'
 
