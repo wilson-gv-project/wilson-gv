@@ -70,18 +70,17 @@
 import os
 
 # Directory containing SVG files
-directory_path = './svgs'
+directory_path = '/home/vlew/Wilson/spectra'
 # Output HTML file path
-output_path = 'index.html'
+output_path = '/home/vlew/Wilson/spectra/index.html'
 
 # Retrieve list of files with their creation times
 files_with_ctime = [
     (filename, os.path.getctime(os.path.join(directory_path, filename)))
     for filename in os.listdir(directory_path)
-    if filename.endswith(".svg") and 'w1mw2' in filename
+    if filename.endswith(".svg")
 ]
-files_with_ctime = sorted([i for i in files_with_ctime if 'w1mw2' in i[0]])
-# print(files_with_ctime)
+print(files_with_ctime)
 # Sort files by creation time (from older to newer)
 sorted_files = sorted(files_with_ctime, key=lambda x: x[1])
 
@@ -89,7 +88,8 @@ sorted_files = sorted(files_with_ctime, key=lambda x: x[1])
 def group_files(files):
     groups = {}
     for filename, ctime in files:
-        group_name = filename.split('_')[1]+'_'+filename.split('_')[2]
+        allnameparts = filename.split('_')
+        group_name = ' '.join(allnameparts[1:5])
         if group_name not in groups:
             groups[group_name] = []
         groups[group_name].append((filename, ctime))
@@ -97,7 +97,7 @@ def group_files(files):
 
 # Group the sorted files
 grouped_files = group_files(sorted_files)
-
+print('\ngrouped_files\n', grouped_files)
 # Start of HTML content
 html_content = """
 <!DOCTYPE html>

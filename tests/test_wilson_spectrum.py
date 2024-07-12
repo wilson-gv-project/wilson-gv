@@ -43,3 +43,17 @@ def test_make_DatainputDict():
     inpdict = spectrum.make_DatainputDict('gaussian', mol_tuple)
 
     print('\n', inpdict)
+
+def test_getting_files_DB():
+    import pandas as pd
+    pd.set_option('display.width', 5000)
+    pd.set_option('display.max_colwidth', 2000)
+    pd.set_option('display.max_columns', None)
+
+    selected_columns_df = spectrum.getting_files_DB('gaussian')
+    print('\n----------------------------------')
+    print(selected_columns_df)
+
+    selected_columns_df = spectrum.getting_files_DB('cfour')
+    print('\n----------------------------------')
+    print(selected_columns_df)

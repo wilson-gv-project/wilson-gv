@@ -27,7 +27,7 @@ class SpectrumEVV:
         shape2d - shape of the grid
         fermirm
     """
-    def __init__(self, w1, w2, input_data_info):
+    def __init__(self, w1: np.array, w2: np.array, input_data_info: dict, vib_levels_harmonic: bool = True):
 
         # Define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
@@ -42,6 +42,8 @@ class SpectrumEVV:
 
         # margin for higher diagonal
         self.diagonal_margin = 10.
+
+        self.vib_levels_harmonic = vib_levels_harmonic
 
     def load_data(self, input_data_info: dict):
         self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
@@ -155,12 +157,18 @@ class SpectrumEVV:
         #     print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
 
     def gamma_mn(self, Gamma, a, b, c=False):
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic
+        else:
+            vib_ene_levels = self.all_states
+        print(f'\nUsed vibrational energy levels:\n {vib_ene_levels}')
+
         # if 'c' is not provided, compute electrical anharmonicity
         if type(c) == bool:
             total_sum_el = 0
             prefac_el = self.matrix_2d.T[a, b]
             for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
-                resonance = el_func(self.all_states_harmonic, self.w1_mesh, self.w2_mesh,
+                resonance = el_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
                                     Gamma, (a, b))
                 total_sum_el += elavrg[a, b] * resonance / prefac_el
             return total_sum_el / 24.
@@ -174,7 +182,7 @@ class SpectrumEVV:
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
                 indx = tuple([abc[j] for j in mechavrgF[-1]])
                 F = self.deriv_data['F_abc'][indx]
-                resonance2 = mech_func(self.all_states_harmonic, self.w1_mesh, self.w2_mesh,
+                resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
                                        Gamma, (a, b, c))
                 # with open('./resonance2', 'a') as file1:
                 #     file1.write(f'{mech_func}\n')
@@ -390,7 +398,6 @@ class SpectrumFigure:
         colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
 
         dynamic_range = 300 # stop plotting when lower than this (number times 10) dmax
-        # dynamic_range = self.settings['dynamic_range']
         num_count = 30
         dynrange_log = np.log10(dynamic_range)
         d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
@@ -430,22 +437,15 @@ class SpectrumFigure:
                            (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
 
         nicetitle = f'{nametuple[2]}'
-        plt.title(nicetitle) # +'\n\n'+title_type_dict[(el_bool, mech_bool)]
-
-        # plt.figtext(0.5, 0.01, text_under_the_figure, ha="center", fontsize=18,
-        #             bbox={"facecolor": "orange", "alpha": 0.3, "pad": 5})
-        # bbox_args = dict(boxstyle="round", facecolor='red', alpha=0.3)
-        # arrow_args = dict(arrowstyle="->")
-        # ax.annotate(text_under_the_figure, xy=(0.1, 0.0), xycoords='figure fraction',
-        #              xytext=(20, 20), textcoords='offset points',
-        #              ha="left", va="bottom",
-        #              bbox=bbox_args)
+        plt.title(nicetitle)
         bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
-        # plt.subplots_adjust(bottom=0.15)  # Increase the bottom margin to make space for the annotation
         ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
                     ha="left", va="top", bbox=bbox_args, fontsize=12)
         plt.tight_layout()
         plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
+
+        import shutil
+        shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
 
 
 def read_csv_DB(filepath):
@@ -479,10 +479,18 @@ def getting_files_DB(sourceProgram: str):
         selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
         return selected_columns_df
 
-    # else:
-    #     filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
-    #     selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
-    #     return selected_columns_df
+    else:
+        # c4_ZMAT, c4_outfile_orig_hess,
+        # c4_QUADRATURE, pkl_dimensionless, pkl_dipole,
+        # c4_dipolexyz, pkl_polar, pkl_polar_raw, pkl_polar_data, c4_cubic,
+        # c4_out, pkl_vibdata
+        columns_to_check = ['c4_dipolexyz', 'pkl_polar', 'c4_cubic', 'c4_out']
+        conditions = " and ".join([f"{col}.notna() and {col} != ''" for col in columns_to_check])
+        filtered_df = DB.query(conditions)
+
+        # filtered_df = DB.query('c4_dipolexyz.notna() and c4_dipolexyz != "" and pkl_polar.notna() and pkl_polar != "" ')
+        selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out']]
+        return selected_columns_df
 
 def make_DatainputDict(sourceProgram: str, mol_tuple: tuple):
     """

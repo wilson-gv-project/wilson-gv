@@ -88,8 +88,8 @@ def make_texts4fig(input_data_info, computedSpectrum, artist, settings):
 
     # here we prepare the text for the textbox
     part1 = f'{name}\n\nMolecule: {mol_code}\nd_max = {'{:.4e}'.format(artist.d_max)}\n'
-    part5 = f'Terms in the expressions: \n      electrical -    {terms_selection[0]}\n      mechanical - {terms_selection[1]}\n\n'
-
+    part5 = f'Terms in the expressions: \n      electrical -    {terms_selection[0]}\n      mechanical - {terms_selection[1]}\n'
+    part8 = f'Used vibrational energy levels: vib_levels_harmonic={computedSpectrum.vib_levels_harmonic}\n\n'
     values = list(computedSpectrum.fundamentals_harmonic.values())
     if len(values) < 10:
         part6 = f'Fundamentals (harmonic): \n   {sorted(values)}\n\n'
@@ -116,7 +116,10 @@ def make_texts4fig(input_data_info, computedSpectrum, artist, settings):
     for key, value in settings.items():
         settings_str.append(f"  {key}: {value}")
     part4 = "\n".join(settings_str)
-    text_under_the_figure = part1+part5+part6+part7+part2+part3+part4
+
+    part9 = f"\nsettings['norm_min'] {artist.settings['norm_min']}\nsettings['norm_max'] {artist.settings['norm_max']}\n"
+
+    text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
 
     return name, title_on_top, text_under_the_figure
 
@@ -146,7 +149,7 @@ settings_here = {'electrical': None, 'mechanical': None,
 
 # datain = spectrum.make_DatainputDict('gaussian', ('FORM', 'B3LYP', 'aug_cc_pVTZ'))
 # datain = spectrum.make_DatainputDict('gaussian', ('METH', 'B3LYP', 'cc_pVQZ'))
-datain = spectrum.make_DatainputDict('gaussian', ('METH', 'B3LYP', 'cc_pVQZ'))
+datain = spectrum.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
 
 list_figs = [(True, False), (False, True), (True, True)]
 # list_figs = [(True, True)]
@@ -154,6 +157,7 @@ for s in list_figs:
     settings_here['electrical'] = s[0]
     settings_here['mechanical'] = s[1]
     # one_spectrum_fig(el=el, mech=mech, datain=datain, region=1, gamma_rc=broad_factor_rc)
+    print('\n         NEXT FIGURE\n')
     one_fig_Object(settings=settings_here, datainput=datain)
 
 #
