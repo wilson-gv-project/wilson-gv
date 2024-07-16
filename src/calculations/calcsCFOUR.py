@@ -613,7 +613,7 @@ def makeDisplacements(delta: float, config: dict, dimensionless: bool = True):
     else:
         zmat_template = zmat_template[indx + 1:]
 
-    # Generate single displacements for each mode
+    # Generate single mode displacements for each mode
     for mode_number0 in mode_numbers:
         if mode_number0 <= 6:
             continue
@@ -689,6 +689,137 @@ def makeDisplacements(delta: float, config: dict, dimensionless: bool = True):
                 with open(zmat_filename, 'w') as file:
                     file.write(f'GEOMETRY {"_".join(map(str, mode_numbers2))} {displacement_str} - dimensionless\n')
                     atoms, eq_coords = atomsMolden, equilibrium_geometry
+
+                    for i in range(len(atoms)):
+                        line = [atoms[i]]
+                        # Calculate the total displacement for this atom
+                        displace = [
+                            sum(d * mode_coord[i][j] for d, mode_coord in zip(displacements, mode_coords_list)) for
+                            j in range(3)]
+                        line.extend(["{:.10f}".format(c + disp) for c, disp in zip(eq_coords[i], displace)])
+                        file.write(' '.join(line) + '\n')
+
+                    file.write('\n')
+                    file.write(''.join(zmat_template))
+
+                shutil.copy(zmat_filename, new_directory + '/ZMAT')
+                os.chdir(new_directory)
+                generateSubmitPy(config, 'submit.sh')
+                sumbitSbatch("submit.sh")
+                os.chdir('../')
+
+def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True):
+    import os
+    polar_directory = os.getcwd() + '/'
+    print('polar_directory:', polar_directory)
+
+    import shutil
+    # molden and quadrature files from anharmonic/hessian calculation, with normal modes
+    shutil.copy('../anharm/QUADRATURE', f'./QUADRATURE_f')
+    shutil.copy('../anharm/MOLDEN', f'./MOLDEN_f')
+
+    from calculations import parseCFOUR_forWilson
+    equilibrium_geometry_Molden, atomsStrs_Molden, normal_modes_Molden = parseCFOUR_forWilson.pMOLDEN('./MOLDEN_f')
+
+    # get normal modes
+    if dimensionless:
+        equilibrium_geometry, freqs, normal_modes = parseCFOUR_forWilson.pQUADRATURE('./QUADRATURE_f')
+    else:
+        equilibrium_geometry = equilibrium_geometry_Molden
+        normal_modes = normal_modes_Molden
+
+    mode_indices = list(normal_modes.keys())
+
+    # Reading from file - ZMAT equilibrium
+    with open('ZMAT', "r+") as file1:
+        zmat_template = file1.readlines()
+
+    indx = zmat_template.index("\n")
+    zmat_template.insert(-3, 'COORD=CARTESIAN,UNITS=BOHR\n')
+
+    zm = zmat_template[indx + 1:]
+    if zmat_template[indx + 1][0] != '*':
+        indx1 = zm.index("\n")
+        zmat_template = zm[indx1 + 1:]
+    else:
+        zmat_template = zmat_template[indx + 1:]
+
+    # Generate single mode displacements for each mode
+    for mode_number0 in mode_indices:
+        if mode_number0 <= 6:
+            continue
+        for displacement in [-delta, delta]:
+            mode_coords_list = [normal_modes[mode_number0]]
+
+            mode_numbers1 = (mode_number0,)
+            # Generate a string for the displacement description
+            displacement_descriptions = []
+            for mode_number, d in zip(mode_numbers1, (displacement,)):
+                direction = 'POSITIVE' if d > 0 else 'NEGATIVE'
+                displacement_descriptions.append(f"{direction} DISPLACEMENT of {d}*Q{mode_number}")
+            displacement_str = ' and '.join(displacement_descriptions)
+            d_str = ''.join(['p' if d > 0 else 'n' for d in (displacement,)])
+
+            import os
+            new_directory = polar_directory + "_".join(map(str, mode_numbers1)) + d_str
+            os.makedirs(new_directory, exist_ok=True)
+            print(new_directory)
+            zmat_filename = polar_directory + f'zmat{"_".join(map(str, mode_numbers1))}{d_str}'
+            print(zmat_filename)
+            with open(zmat_filename, 'w') as file:
+                file.write(f'GEOMETRY {"_".join(map(str, mode_numbers1))} {displacement_str} - dimensionless\n')
+                atoms, eq_coords = atomsStrs_Molden, equilibrium_geometry
+
+                for i in range(len(atoms)):
+                    line = [atoms[i]]
+                    # Calculate the total displacement for this atom
+                    displace = [sum(d * mode_coord[i][j] for d, mode_coord in zip((displacement,), mode_coords_list))
+                                for
+                                j in range(3)]
+                    line.extend(["{:.10f}".format(c + disp) for c, disp in zip(eq_coords[i], displace)])
+                    file.write(' '.join(line) + '\n')
+
+                file.write('\n')
+                file.write(''.join(zmat_template))
+
+            shutil.copy(zmat_filename, new_directory + '/ZMAT')
+            os.chdir(new_directory)
+            generateSubmitPy(config, 'submit.sh')
+            sumbitSbatch("submit.sh")
+            os.chdir('../')
+
+    # Generate double displacements for pairs of modes
+    for i, mode_number2 in enumerate(mode_indices):
+
+        for j, mode_number3 in enumerate(mode_indices):
+            if mode_number3 <= mode_number2:
+                continue
+            # Create displacement combinations for two different modes
+            displacement_combinations = [
+                (delta, delta), (delta, -delta),
+                (-delta, delta), (-delta, -delta)
+            ]
+            for displacements in displacement_combinations:
+                mode_coords_list = [normal_modes[mode_number2], normal_modes[mode_number3]]
+
+                mode_numbers2 = (mode_number2, mode_number3)
+                # Generate a string for the displacement description
+                displacement_descriptions = []
+                for mode_number, d in zip(mode_numbers2, displacements):
+                    direction = 'POSITIVE' if d > 0 else 'NEGATIVE'
+                    displacement_descriptions.append(f"{direction} DISPLACEMENT of {d}*Q{mode_number}")
+                displacement_str = ' and '.join(displacement_descriptions)
+                d_str = ''.join(['p' if d > 0 else 'n' for d in displacements])
+
+                import os
+                new_directory = polar_directory + "_".join(map(str, mode_numbers2)) + d_str
+                os.makedirs(new_directory, exist_ok=True)
+
+                zmat_filename = polar_directory + f'zmat{"_".join(map(str, mode_numbers2))}{d_str}'
+
+                with open(zmat_filename, 'w') as file:
+                    file.write(f'GEOMETRY {"_".join(map(str, mode_numbers2))} {displacement_str} - dimensionless\n')
+                    atoms, eq_coords = atomsStrs_Molden, equilibrium_geometry
 
                     for i in range(len(atoms)):
                         line = [atoms[i]]

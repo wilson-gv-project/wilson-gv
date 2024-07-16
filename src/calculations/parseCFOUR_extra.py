@@ -1,65 +1,6 @@
 import numpy as np
 import pickle
 
-# used only in computeRedMass4nm which is not used now
-def pMOLDEN(filepath: str, linear: bool = False) -> tuple[np.ndarray, np.array, dict[int: np.ndarray]]:
-    """
-    Parsing MOLDEN file (VIB job output, harmonic or anharmonic)
-    :param linear:
-    :param filepath:
-    :return:  geometry_data, atoms, selected_dict
-    """
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
-
-    atoms = []
-    geometry_data = []
-    vibrations_data = {}
-
-    in_geometry_section = False
-    in_vibration_section = False
-
-    for line in lines:
-        if '[FR-COORD]' in line:
-            in_geometry_section = True
-            in_vibration_section = False
-            continue
-
-        elif '[FR-NORM-COORD]' in line:
-            in_vibration_section = True
-            in_geometry_section = False
-            continue
-
-        if in_geometry_section:
-            data = line.strip().split()
-            atom_label = data[0]
-            atoms.append(atom_label)
-            geometry_data.append(data[1:])  # Exclude the atom label
-
-        # Capture vibration data
-        elif in_vibration_section:
-            stripped_line = line.strip()
-            line_parts = stripped_line.split()
-
-            if stripped_line.startswith('vibration'):
-                current_vibration_index = int(line_parts[-1])
-                vibrations_data[current_vibration_index] = []
-            else:
-                # to check if it was initialized
-                if 'current_vibration_index' in locals():
-                    vibrations_data[current_vibration_index].append(list(map(float, line_parts)))
-                else:
-                    print('Error: Vibration number not initialized before data lines.')
-
-    atoms = np.array(atoms)
-    geometry_data = np.array(geometry_data, dtype=float)
-    vibrations_data = {key: np.array(value) for key, value in vibrations_data.items()}
-    # only normal modes, ignore first 6 or 5
-    ndiscard = 5 if linear else 6
-    normal_modes_dict = {key: value for idx, (key, value) in enumerate(vibrations_data.items()) if idx >= ndiscard}
-
-    return geometry_data, atoms, normal_modes_dict
-
 # not used now
 def pNORMCO(filepath: str):
     """
