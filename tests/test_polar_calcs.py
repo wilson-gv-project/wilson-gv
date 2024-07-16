@@ -121,10 +121,6 @@ def get_molecules_Quadrature(cfourQuadratureFile: str, cfourMoldenFile: str) -> 
 
     return displ_molecules
 
-import sys
-orig_stdout = sys.stdout
-f = open('out.txt', 'w')
-sys.stdout = f
 
 def test_polar_displacement_geometries_FOAC():
     polar_directory = '/cluster/projects/nn14654k/vle014/refinedc4/formicac/CCSDTcc-pVQZ/polar/'
@@ -135,11 +131,18 @@ def test_polar_displacement_geometries_FOAC():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
+    import sys
+    orig_stdout = sys.stdout
+    f = open('out.txt', 'w')
+    sys.stdout = f
+
     print('\nFOAC')
     for directory in fromPolDir:
         results[directory] = fromPolDir[directory] == fromQuadrature[directory]
         print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
         print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
+    sys.stdout = orig_stdout
+    f.close()
     assert all(results.values())
 
 def test_polar_displacement_geometries_FORM():
@@ -174,5 +177,3 @@ def test_polar_displacement_geometries_METH():
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
 
-sys.stdout = orig_stdout
-f.close()
