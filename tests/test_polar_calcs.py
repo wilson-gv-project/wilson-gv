@@ -34,6 +34,7 @@ def get_zmat_from_ZMAT(cfourZMATfile: str):
     return result
 
 def get_zmatLikeList(cfourZMATfile: str):
+
     with open(cfourZMATfile, "r") as f:
         cfourZMAT = f.read()
     blocks = cfourZMAT.split('\n\n')
@@ -47,6 +48,7 @@ def get_zmatLikeList(cfourZMATfile: str):
             line_list = line.strip().split()
             line_upd = [float(i) if line_list.index(i) != 0 else i for i in line_list]
             xyz_lst.append(line_upd)
+
         return xyz_lst
     else:
         structure = blocks[0].strip().split('\n')
@@ -170,7 +172,7 @@ def test_polar_displacement_geometries_FOAC():
 
     for directory in fromPolDir:
         if directory in fromQuadrature:
-            results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+            results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
             print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
             print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
@@ -186,7 +188,7 @@ def test_polar_displacement_geometries_FORM():
     results = {}
     # print('\nFORM', file='./testout')
     for directory in fromPolDir:
-        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+        results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
         # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
@@ -202,7 +204,7 @@ def test_polar_displacement_geometries_METH():
     results = {}
     # print('\nMETH', file='./testout')
     for directory in fromPolDir:
-        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+        results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
         # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
