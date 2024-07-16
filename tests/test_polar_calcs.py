@@ -131,11 +131,12 @@ def test_polar_displacement_geometries_FOAC():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    print('\nFOAC', file='./testout')
+    f = open('./testout', 'a')
+    print('\nFOAC', file=f)
     for directory in fromPolDir:
         results[directory] = fromPolDir[directory] == fromQuadrature[directory]
-        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
-        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
+        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file=f)
+        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file=f)
     assert all(results.values())
 
 def test_polar_displacement_geometries_FORM():
@@ -147,11 +148,11 @@ def test_polar_displacement_geometries_FORM():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    print('\nFORM', file='./testout')
+    # print('\nFORM', file='./testout')
     for directory in fromPolDir:
         results[directory] = fromPolDir[directory] == fromQuadrature[directory]
-        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
-        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
 
 def test_polar_displacement_geometries_METH():
@@ -163,9 +164,9 @@ def test_polar_displacement_geometries_METH():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    print('\nMETH', file='./testout')
+    # print('\nMETH', file='./testout')
     for directory in fromPolDir:
         results[directory] = fromPolDir[directory] == fromQuadrature[directory]
-        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
-        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
