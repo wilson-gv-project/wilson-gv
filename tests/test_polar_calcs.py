@@ -1,4 +1,4 @@
-
+import numpy as np
 import hyobj as hyo
 
 def get_zmat_from_ZMAT(cfourZMATfile: str):
@@ -172,9 +172,9 @@ def test_polar_displacement_geometries_FOAC():
 
     for directory in fromPolDir:
         if directory in fromQuadrature:
-            results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
-            print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
-            print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
+            results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
+            #print(f'\n{directory} fromPolDir {type(fromPolDir[directory].coordinates)}\n', fromPolDir[directory].coordinates)
+            #print(f'\n{directory} fromQuadrature {type(fromQuadrature[directory].coordinates)}\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
 
 def test_polar_displacement_geometries_FORM():
@@ -188,7 +188,7 @@ def test_polar_displacement_geometries_FORM():
     results = {}
     # print('\nFORM', file='./testout')
     for directory in fromPolDir:
-        results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
+        results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
         # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
@@ -204,7 +204,7 @@ def test_polar_displacement_geometries_METH():
     results = {}
     # print('\nMETH', file='./testout')
     for directory in fromPolDir:
-        results[directory] = fromPolDir[directory].coordinates == fromQuadrature[directory].coordinates
+        results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
         # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
