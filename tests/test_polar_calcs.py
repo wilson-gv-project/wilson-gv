@@ -131,9 +131,11 @@ def test_polar_displacement_geometries_FOAC():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    for dir in fromPolDir:
-        results[dir] = fromPolDir[dir] == fromQuadrature[dir]
-
+    print('\nFOAC')
+    for directory in fromPolDir:
+        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
+        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
 
 def test_polar_displacement_geometries_FORM():
@@ -145,9 +147,11 @@ def test_polar_displacement_geometries_FORM():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    for dir in fromPolDir:
-        results[dir] = fromPolDir[dir] == fromQuadrature[dir]
-
+    print('\nFORM')
+    for directory in fromPolDir:
+        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
+        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
 
 def test_polar_displacement_geometries_METH():
@@ -159,7 +163,9 @@ def test_polar_displacement_geometries_METH():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    for dir in fromPolDir:
-        results[dir] = fromPolDir[dir] == fromQuadrature[dir]
-
+    print('\nMETH')
+    for directory in fromPolDir:
+        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
+        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
