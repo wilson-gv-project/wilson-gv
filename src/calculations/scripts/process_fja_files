@@ -1,0 +1,68 @@
+#!/bin/bash
+# ==================================================================================
+# SLURM job scheduler for the OpenMP-parallel CFOUR program and FRAM supercomputer
+# ==================================================================================
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=16
+#SBATCH --mail-typefile=ALL
+#SBATCH --job-name=process_fja_files
+#SBATCH --account=nn14654k
+#SBATCH --partition normal
+#SBATCH --time=0:10:00
+#
+# SETME
+# -----
+#
+# README
+# ------
+
+#load modules
+module purge
+module load gompi/2023a
+module load imkl/2023.1.0
+module load OpenMPI/4.1.5-GCC-12.3.0
+module list
+
+#set some local OMP-specific defaults
+ulimit -s unlimited
+export OMP_NUM_THREADS=16
+export OMP_STACKSIZE=4500m
+
+#setup ReSpect installation directory
+export CFOUR=/cluster/projects/nn14654k/vle014/cfour_serial/bin
+
+# add to path if not there
+PATH=${PATH}:/cluster/projects/nn14654k/vle014/cfour_serial/bin
+
+#setup ReSpect installation directory
+#export CFOUR=/cluster/projects/nn14654k/vle014/cfour-public-master/bin
+
+# add to path if not there
+#PATH=${PATH}:/cluster/projects/nn14654k/vle014/cfour-public-master/bin
+
+#cd ./save/
+
+#files=$(find . -maxdepth 1 -typefile f -name 'fja.*')
+files=$(ls fja.* | grep -E 'fja\.[0-9]{3}$')
+echo $files
+
+#cp jaindx.save JAINDX
+#cp jobarc.save JOBARC
+
+# Assuming fja.x files are in the current directory
+for file in $files; do
+    if [ -f "$file" ]; then
+        # Copy fja.x to FJOBARC
+        cp "$file" FJOBARC
+
+        # Execute xja2fja
+        xja2fja
+
+        # Execute xcubic and append output to out file
+        xcubic >> out
+
+        echo "Processed $file" >> loglog
+    fi
+done
+
