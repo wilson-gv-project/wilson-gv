@@ -38,8 +38,7 @@ def get_zmatLikeList(cfourZMATfile: str):
         cfourZMAT = f.read()
     blocks = cfourZMAT.split('\n\n')
     cartesianFormat = ('COORD=CARTESIAN' in cfourZMAT
-                       and 'COORD=INTERNAL' not in cfourZMAT and len(blocks) == 2)
-
+                       and 'COORD=INTERNAL' not in cfourZMAT)
     if cartesianFormat:
         xyz_lines = blocks[0].strip().split('\n')[1:]
         # print(xyz_lines)
@@ -79,8 +78,7 @@ def get_zmatLikeList(cfourZMATfile: str):
 
 def get_molecules_PolarDir(polar_directory: str):
     import os
-    subdirs = [d for d in os.listdir(polar_directory) if os.path.isdir(d)]
-
+    subdirs = [d for d in os.listdir(polar_directory) if os.path.isdir(polar_directory+d)]
     collected_polar_displGeos = {}
     for subdir in subdirs:
         zmatName = '/'.join([polar_directory, subdir, 'ZMAT'])
@@ -118,6 +116,44 @@ def get_molecules_Quadrature(cfourQuadratureFile: str, cfourMoldenFile: str) -> 
     displ_molecules = {}
     for i in single_mode_displaced_xyzstr:
         displ_molecules[i] = hyo.Molecule(single_mode_displaced_xyzstr[i])
+    
+    two_modes_displaced_xyzstr = {}
+    import itertools
+    unique_pairs = itertools.combinations(normal_modes, 2)
+    print(unique_pairs)
+    for pair in unique_pairs:
+        i, j = pair
+        displArr_nn = equilibrium_geometry - 0.01 * normal_modes[i] - 0.01 * normal_modes[j]
+        displArr_pn = equilibrium_geometry + 0.01 * normal_modes[i] - 0.01 * normal_modes[j]
+        displArr_np = equilibrium_geometry - 0.01 * normal_modes[i] + 0.01 * normal_modes[j]
+        displArr_pp = equilibrium_geometry + 0.01 * normal_modes[i] + 0.01 * normal_modes[j]
+
+        two_modes_displaced_xyzstr[f'{i}_{j}nn'] = []
+        for na1, atom1 in enumerate(displArr_nn):
+            oneline1 = [atomsStrs_Molden[na1][0]]
+            oneline1.extend(atom1)
+            two_modes_displaced_xyzstr[f'{i}_{j}nn'].append(oneline1)
+
+        two_modes_displaced_xyzstr[f'{i}_{j}pn'] = []
+        for na2, atom2 in enumerate(displArr_pn):
+            oneline2 = [atomsStrs_Molden[na2][0]]
+            oneline2.extend(atom2)
+            two_modes_displaced_xyzstr[f'{i}_{j}pn'].append(oneline2)
+
+        two_modes_displaced_xyzstr[f'{i}_{j}np'] = []
+        for na3, atom3 in enumerate(displArr_np):
+            oneline3 = [atomsStrs_Molden[na3][0]]
+            oneline3.extend(atom3)
+            two_modes_displaced_xyzstr[f'{i}_{j}np'].append(oneline3)
+
+        two_modes_displaced_xyzstr[f'{i}_{j}pp'] = []
+        for na4, atom4 in enumerate(displArr_pp):
+            oneline4 = [atomsStrs_Molden[na4][0]]
+            oneline4.extend(atom4)
+            two_modes_displaced_xyzstr[f'{i}_{j}pp'].append(oneline4)
+
+    for i in two_modes_displaced_xyzstr:
+        displ_molecules[i] = hyo.Molecule(two_modes_displaced_xyzstr[i])
 
     return displ_molecules
 
@@ -131,18 +167,12 @@ def test_polar_displacement_geometries_FOAC():
     fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
 
     results = {}
-    import sys
-    orig_stdout = sys.stdout
-    f = open('out.txt', 'w')
-    sys.stdout = f
 
-    print('\nFOAC')
     for directory in fromPolDir:
-        results[directory] = fromPolDir[directory] == fromQuadrature[directory]
-        print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
-        print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
-    sys.stdout = orig_stdout
-    f.close()
+        if directory in fromQuadrature:
+            results[directory] = fromPolDir[directory] == fromQuadrature[directory]
+            print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates)
+            print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
 
 def test_polar_displacement_geometries_FORM():
