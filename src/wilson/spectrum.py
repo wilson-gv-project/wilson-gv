@@ -466,9 +466,10 @@ def read_csv_DB(filepath):
 
     return database
 
-def getting_files_DB(sourceProgram: str):
+def getting_files_DB(sourceProgram: str, printing: bool = False):
     """
 
+    :param printing:
     :param sourceProgram:
     :return:
     """
@@ -489,7 +490,12 @@ def getting_files_DB(sourceProgram: str):
         filtered_df = DB.query(conditions)
 
         # filtered_df = DB.query('c4_dipolexyz.notna() and c4_dipolexyz != "" and pkl_polar.notna() and pkl_polar != "" ')
-        selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out']]
+        if printing:
+            selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out']]
+        else:
+            selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out', 'c4_cubic',
+                                               'c4_dipolexyz', 'pkl_polar']]
+
         return selected_columns_df
 
 def make_DatainputDict(sourceProgram: str, mol_tuple: tuple):
@@ -519,9 +525,8 @@ def make_DatainputDict(sourceProgram: str, mol_tuple: tuple):
 
     elif sourceProgram == 'cfour':
         result = {'source': 'cfour', 'type': 'out'}
-
         files_dict.update({'out': narrow_df.iloc[0]['c4_out'], 'cubic': narrow_df.iloc[0]['c4_cubic'],
-                           'dipolexyz': narrow_df.iloc[0]['c4_dipolexyz'], 'polar': narrow_df.iloc[0]['pkl_polar'],
+                           'dipolexyz': narrow_df.iloc[0]['c4_dipolexyz'][:-1], 'polar': narrow_df.iloc[0]['pkl_polar'],
                            'out_anharm_final': narrow_df.iloc[0]['c4_out'], 'polar_pkl': narrow_df.iloc[0]['pkl_polar']})
         result['files'] = files_dict
         return result

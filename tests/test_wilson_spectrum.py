@@ -50,10 +50,10 @@ def test_getting_files_DB():
     pd.set_option('display.max_colwidth', 2000)
     pd.set_option('display.max_columns', None)
 
-    selected_columns_df = spectrum.getting_files_DB('gaussian')
+    selected_columns_df = spectrum.getting_files_DB('gaussian', printing=True)
     print('\n----------------------------------\nFrom Gaussian\n')
     print(selected_columns_df)
 
-    selected_columns_df = spectrum.getting_files_DB('cfour')
+    selected_columns_df = spectrum.getting_files_DB('cfour', printing=True)
     print('\n----------------------------------\nFrom CFOUR\n')
     print(selected_columns_df)
