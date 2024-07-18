@@ -15,8 +15,8 @@ os.chdir(settingsCalcPolar['jobtype'])
 # # - 7_3 - sbatch submit.sh for polar equilibrium
 # calcsCFOUR.sumbitSbatch("submitpy.sh")
 
-#os.makedirs('polar', exist_ok=True)
-#os.chdir('./polar')
+os.makedirs('polar', exist_ok=True)
+os.chdir('./polar')
 
 # calcsCFOUR.fromZmatNew2Zmat('ZMAT', settingsCalcPolar)
 

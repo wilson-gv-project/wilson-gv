@@ -209,3 +209,35 @@ def test_polar_displacement_geometries_METH():
         # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
     assert all(results.values())
 
+
+def test_polar_displacement_geometries_FORM_sto3g():
+    polar_directory = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HF_STO_3G/polar/'
+    cfourQuadratureFile = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HF_STO_3G/polar/QUADRATURE_f'
+    cfourMoldenFile = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HF_STO_3G/polar/MOLDEN_f'
+
+    fromPolDir = get_molecules_PolarDir(polar_directory)
+    fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
+
+    results = {}
+    # print('\nFORM', file='./testout')
+    for directory in fromPolDir:
+        results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
+        # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
+    assert all(results.values())
+
+def test_polar_displacement_geometries_FORM_HF():
+    polar_directory = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HFcc-pVTZ/polar/'
+    cfourQuadratureFile = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HFcc-pVTZ/polar/QUADRATURE_f'
+    cfourMoldenFile = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/HFcc-pVTZ/polar/MOLDEN_f'
+
+    fromPolDir = get_molecules_PolarDir(polar_directory)
+    fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
+
+    results = {}
+    # print('\nFORM', file='./testout')
+    for directory in fromPolDir:
+        results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
+        # print(f'\n{directory} fromPolDir\n', fromPolDir[directory].coordinates, file='./testout')
+        # print(f'\n{directory} fromQuadrature\n', fromQuadrature[directory].coordinates, file='./testout')
+    assert all(results.values())
