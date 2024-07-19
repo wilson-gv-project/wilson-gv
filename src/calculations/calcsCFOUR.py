@@ -785,7 +785,7 @@ def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True)
             shutil.copy(zmat_filename, new_directory + '/ZMAT')
             os.chdir(new_directory)
             generateSubmitPy(config, 'submit.sh')
-            sumbitSbatch("submit.sh")
+            #sumbitSbatch("submit.sh")
             os.chdir('../')
 
     # Generate double displacements for pairs of modes
@@ -836,7 +836,7 @@ def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True)
                 shutil.copy(zmat_filename, new_directory + '/ZMAT')
                 os.chdir(new_directory)
                 generateSubmitPy(config, 'submit.sh')
-                sumbitSbatch("submit.sh")
+                #sumbitSbatch("submit.sh")
                 os.chdir('../')
 
 def process_fja_files():

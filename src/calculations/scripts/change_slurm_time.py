@@ -5,13 +5,11 @@ import glob
 import subprocess
 import re
 
-def main(directory, hours):
-    # Validate inputs
+def main(directory, hours, submit_job=False):
     if not os.path.isdir(directory):
         print(f"Error: The directory {directory} does not exist.")
         return
 
-    # Change to the specified directory
     os.chdir(directory)
 
     # List of files to keep
@@ -26,7 +24,6 @@ def main(directory, hours):
                 os.remove(item)
             print(f"Removed: {item}")
 
-    # Modify the submit.sh or submitpy.sh file
     submit_file = 'submit.sh' if os.path.exists('submit.sh') else 'submitpy.sh' if os.path.exists('submitpy.sh') else None
     if submit_file:
         with open(submit_file, 'r') as file:
@@ -35,21 +32,20 @@ def main(directory, hours):
         with open(submit_file, 'w') as file:
             for line in lines:
                 if '#SBATCH --time=' in line:
-                    # Regex to find the pattern and replace the hours
                     new_line = re.sub(r'(?<=#SBATCH --time=)\d+', str(hours), line)
                     file.write(new_line)
                 else:
                     file.write(line)
 
         print(f"Updated {submit_file} with new time.")
-
-    # Execute sbatch command if a submit file exists
-    if submit_file:
-        result = subprocess.run(['sbatch', submit_file], capture_output=True, text=True)
-        print(f"Executed sbatch for {submit_file}:")
-        print(result.stdout)
-    else:
-        print("No submit file found to execute.")
+    
+    if submit_job:
+        if submit_file:
+            result = subprocess.run(['sbatch', submit_file], capture_output=True, text=True)
+            print(f"Executed sbatch for {submit_file}:")
+            print(result.stdout)
+        else:
+            print("No submit file found to execute.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -57,4 +53,4 @@ if __name__ == "__main__":
     else:
         directory_path = sys.argv[1]
         hours = int(sys.argv[2])
-        main(directory_path, hours)
+        main(directory_path, hours, True)

@@ -177,6 +177,23 @@ def test_polar_displacement_geometries_FOAC():
             #print(f'\n{directory} fromQuadrature {type(fromQuadrature[directory].coordinates)}\n', fromQuadrature[directory].coordinates)
     assert all(results.values())
 
+def test_polar_displacement_geometries_FOMA():
+    polar_directory = '/cluster/projects/nn14654k/vle014/refinedc4/formamide/formamide_ccsdt_QZ_s_12c_2t_opt/polar/'
+    cfourQuadratureFile = '/cluster/projects/nn14654k/vle014/refinedc4/formamide/formamide_ccsdt_QZ_s_12c_2t_opt/polar/QUADRATURE_f'
+    cfourMoldenFile = '/cluster/projects/nn14654k/vle014/refinedc4/formamide/formamide_ccsdt_QZ_s_12c_2t_opt/polar/MOLDEN_f'
+
+    fromPolDir = get_molecules_PolarDir(polar_directory)
+    fromQuadrature = get_molecules_Quadrature(cfourQuadratureFile, cfourMoldenFile)
+
+    results = {}
+
+    for directory in fromPolDir:
+        if directory in fromQuadrature:
+            results[directory] = np.allclose(fromPolDir[directory].coordinates, fromQuadrature[directory].coordinates)
+            #print(f'\n{directory} fromPolDir {type(fromPolDir[directory].coordinates)}\n', fromPolDir[directory].coordinates)
+            #print(f'\n{directory} fromQuadrature {type(fromQuadrature[directory].coordinates)}\n', fromQuadrature[directory].coordinates)
+    assert all(results.values())
+
 def test_polar_displacement_geometries_FORM():
     polar_directory = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/CCSDTcc_pVQZ/polar/'
     cfourQuadratureFile = '/cluster/projects/nn14654k/vle014/refinedc4/coh2aldehyde/CCSDTcc_pVQZ/polar/QUADRATURE_f'

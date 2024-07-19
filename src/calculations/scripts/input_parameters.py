@@ -115,17 +115,17 @@ settingsCalc = {'level of theory': tuple(['HF', 'cc-pVQZ']),
 configHPC = {'machine':'fram', 'minutes':'40', 'hours':'08', 'nodes':1, 'dir3':True,
              'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
 # generated displaced zmat0*
-configHPCdispl = {'machine':'fram', 'minutes':'30', 'hours':'08', 'nodes':1, 'dir3':True,
+configHPCdispl = {'machine':'fram', 'minutes':'30', 'hours':'18', 'nodes':1, 'dir3':True,
                   'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
 
 # for fja files processing
 config_fja = {'machine':'fram', 'minutes':'05', 'hours':'00', 'nodes':1, 'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
 
 ## polarizability
-settingsCalcPolar = {'level of theory': tuple(['HF', 'STO-3G']),
+settingsCalcPolar = {'level of theory': tuple(['CCSD(T)', 'cc-pVQZ']),
                      'geoconv':11, 'ccconv':11, 'scfconv':11, 'lineqconv':11, 'geocycles': 50,
                      'scfcycles': 400, 'cccycles': 350, 'lineqcycles': 300,
                      'job':'PROPS=SECOND_ORDER\nPRINT=1',
                      'jobtype':'polar'}
 
-configHPCpolar = {'machine':'fram', 'minutes':20, 'hours':'00', 'nodes':1, 'dir3':True, 'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
+configHPCpolar = {'machine':'fram', 'minutes':20, 'hours':'18', 'nodes':1, 'dir3':True, 'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
