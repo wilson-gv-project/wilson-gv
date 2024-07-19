@@ -192,6 +192,20 @@ def getRotationMatrix(filepath: str) -> np.array:
     else:
         print('No rotation matrix found in this outfile')
 
+def get_detected_resonances_c4(filepath: str):
+
+    with open(filepath, 'r') as file:
+        file_content = file.read()
+
+    if "Thresholds for removing resonance denominators:" in file_content:
+        with open(filepath, 'r') as file:
+            file_lines = file.readlines()
+        found_resonances_str = []
+        for line in file_lines:
+            if 'Resonance between' in line and 'combination' in line:
+                found_resonances_str.append(line)
+        return found_resonances_str
+
 # used
 def pCubicORQuartic(filepath: str):
     """

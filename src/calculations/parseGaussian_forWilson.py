@@ -235,6 +235,32 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
         allstates_harm = {**funddict1, **states1, **combinationbands1}
         return allstates_harm
 
+def get_detected_resonances_g16(filepath: str):
+
+    with open(filepath, 'r') as file:
+        file_content = file.read()
+
+    if "Resonance Analysis" in file_content:
+        with open(filepath, 'r') as file:
+            file_lines = file.readlines()
+        found_resonances_str = []
+        inFR = False
+        for line in file_lines:
+            if 'I      J  +   K' in line:
+                inFR = True
+                col_names = line.strip().split()
+                found_resonances_str.append(line)
+            if 'Active Fermi resonances' in line:
+                number_of_FR = int(line.strip().split()[0])
+                found_resonances_str.append(f'There are {number_of_FR} Fermi resonances')
+                inFR = False
+
+            if inFR:
+                line_numbers = line.strip().split()
+                if len(line_numbers)>0 and line not in found_resonances_str:
+                    found_resonances_str.append(line)
+        return found_resonances_str
+
 def getDipDers_log(logfile: str) -> tuple:
     """
     Dipole derivatives: first order and second order
