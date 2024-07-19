@@ -1,29 +1,10 @@
+import numpy as np
+
 from calculations.parseGaussian_forWilson import *
 from calculations.parseCFOUR_forWilson import *
 from wilson.spectrum import make_DatainputDict
 
 def test_anharmonicHF_DZ_freqs():
-
-    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVDZ/g16_inputFull_3q.out',
-    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVDZ/g16_inputFull_3q.out'}
-    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVDZ'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    # print(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian\nharmonic_states', g16_harmFreqs)
-    print('anharmonic_states', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    # print(resonances_strs)
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
 
     # datadict_cfour = {'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/out',
     #                   'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVDZ/dipole',
@@ -47,47 +28,53 @@ def test_anharmonicHF_DZ_freqs():
 
     print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
 
+    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVDZ/g16_inputFull_3q.out',
+    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVDZ/g16_inputFull_3q.out'}
+    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVDZ'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    # print(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian cc_pVDZ\nharmonic_states', g16_harmFreqs)
+    print('anharmonic_states', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    # print(resonances_strs)
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVDZ_VPT2'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    # print(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian cc_pVDZ_VPT2\nharmonic_states', g16_harmFreqs)
+    print('anharmonic_states', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    # print(resonances_strs)
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
     assert g16_anharmFreqs != c4_anharmFreqs
     assert np.allclose(g16_harmFreqs, c4_harmFreqs, atol=10**(-4))
 
 def test_anharmonicHF_QZ_freqs():
-
-    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out',
-    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out'}
-    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian\nharmonic_states', g16_harmFreqs)
-    print('anharmonic_states', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ_VPT2'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian cc_pVQZ_VPT2\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
     # datadict_cfour = {'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVQZ/out',
     #                   'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVQZ/dipole',
     #                   'polar_pkl': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVQZ/polar.pkl',
@@ -112,112 +99,51 @@ def test_anharmonicHF_QZ_freqs():
     resonances_strs = get_detected_resonances_c4(datadict_cfourFull['files']['out_anharm_final'])
     print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
 
+    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out',
+    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out'}
+    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian cc_pVQZ\nharmonic_states', g16_harmFreqs)
+    print('anharmonic_states', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ_VPT2'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian cc_pVQZ_VPT2\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+
     assert g16_anharmFreqs != c4_anharmFreqs
     assert np.allclose(g16_harmFreqs, c4_harmFreqs, atol=10**(-4))
 
 def test_anharmonicHF_sto3g_freqs_dvpt2():
-
-    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out',
-    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out'}
-    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_GVPT2'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G GVPT2\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_DVPT2'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G_DVPT2\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_VPT2'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G_VPT2\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_GVPT2_Resonances'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G_GVPT2_Resonances\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
-
-    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_DVPT2_Resonances'))
-    parserGaussian = GaussianDataParser(datadict_gaussianFull)
-    parserGaussian.getData()
-
-    essential_gaussian = [parserGaussian.harmonic_states,
-                          parserGaussian.anharmonic_states,
-                          parserGaussian.fundamentals_harmonic_str,
-                          parserGaussian.fundamentals_anharmonic_str,
-                          ]
-    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
-    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
-    print('\nGaussian STO_3G_DVPT2_Resonances\nharmonic freqs', g16_harmFreqs)
-    print('anharmonic freqs', g16_anharmFreqs)
-    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
-    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
 
     # datadict_cfour = {'out_anharm_final': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVQZ/out',
     #                   'dipolexyz': '/home/vlew/scriptsHPC/data/cfourdata/hcoh/HFcc_pVQZ/dipole',
@@ -240,6 +166,120 @@ def test_anharmonicHF_sto3g_freqs_dvpt2():
     print('\nCFOUR\nharmonic freqs', c4_harmFreqs)
     print('anharmonic freqs', c4_anharmFreqs)
     resonances_strs = get_detected_resonances_c4(datadict_cfourFull['files']['out_anharm_final'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    # datadict_gaussian = {'log': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out',
+    #             '3quanta': '/mnt/c/Users/vle014/Downloads/files_fram/dftGaussian/FORM/HFcc_pVQZ/g16_inputFull_3q.out'}
+    # parserGaussian = GaussianDataParser({'files': datadict_gaussian})
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_GVPT2'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G GVPT2\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_DVPT2'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G_DVPT2\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_VPT2'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G_VPT2\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_GVPT2_Resonances'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G_GVPT2_Resonances\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
+    print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
+
+    datadict_gaussianFull = make_DatainputDict('gaussian', ('FORM', 'HF', 'STO_3G_DVPT2_Resonances'))
+    parserGaussian = GaussianDataParser(datadict_gaussianFull)
+    parserGaussian.getData()
+
+    essential_gaussian = [parserGaussian.harmonic_states,
+                          parserGaussian.anharmonic_states,
+                          parserGaussian.fundamentals_harmonic_str,
+                          parserGaussian.fundamentals_anharmonic_str,
+                          ]
+    g16_harmFreqs = sorted(list(essential_gaussian[2].values()))
+    g16_anharmFreqs = sorted(list(essential_gaussian[3].values()))
+    print('\nGaussian STO_3G_DVPT2_Resonances\nharmonic freqs', g16_harmFreqs)
+    print('anharmonic freqs', g16_anharmFreqs)
+    with np.printoptions(suppress=True):
+        print('CFOUR-Gaussian', np.array(c4_anharmFreqs) - np.array(g16_anharmFreqs))
+    resonances_strs = get_detected_resonances_g16(datadict_gaussianFull['files']['3quanta'])
     print(''.join(resonances_strs)) if len(resonances_strs)>0 else None
 
     assert g16_anharmFreqs != c4_anharmFreqs

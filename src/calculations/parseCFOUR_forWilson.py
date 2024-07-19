@@ -204,6 +204,8 @@ def get_detected_resonances_c4(filepath: str):
         for line in file_lines:
             if 'Resonance between' in line and 'combination' in line:
                 found_resonances_str.append(line)
+        if found_resonances_str:
+            found_resonances_str.append(f'There are {len(found_resonances_str)} Fermi resonances\n')
         return found_resonances_str
 
 # used
