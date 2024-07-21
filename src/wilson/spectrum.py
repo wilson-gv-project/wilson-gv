@@ -44,6 +44,7 @@ class SpectrumEVV:
         self.diagonal_margin = 10.
 
         self.vib_levels_harmonic = vib_levels_harmonic
+        print(f'\nUsed vibrational energy levels:\n harmonic? - {self.vib_levels_harmonic}')
 
     def load_data(self, input_data_info: dict):
         self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
@@ -98,6 +99,8 @@ class SpectrumEVV:
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
 
         ee, mm = electrical_terms_selection, mechanical_terms_selection
+        factors = [1., 1., 0.5, 0.5, -0.5, -0.5]
+        self.mech_factors = [factors[i] for i in mechanical_terms_selection]
         # [pool[i] for i in list_of_indices]
         self.electrical_terms, self.mechanical_terms = [electrical_terms_str[i] for i in ee], [mechanical_terms_str[i] for i in mm]
         self.electric_avrg, self.mechanical_avrg = [electric_avrg_str[i] for i in ee], [mechanical_avrg_str[i] for i in mm]
@@ -161,7 +164,6 @@ class SpectrumEVV:
             vib_ene_levels = self.all_states_harmonic
         else:
             vib_ene_levels = self.all_states
-        print(f'\nUsed vibrational energy levels:\n {vib_ene_levels}')
 
         # if 'c' is not provided, compute electrical anharmonicity
         if type(c) == bool:
@@ -176,20 +178,53 @@ class SpectrumEVV:
         else:
             total_sum_mech = 0
             prefac_mech = self.tensor_3d.T[a, b, c]
-            factors = [1., 1., 0.5, 0.5, -0.5, -0.5]
             for index, (mech_func, mechavrg) in enumerate(self.combofuns_tensors[1].items()):
                 mechavrgF = list(self.combofuns[1].items())[index][1]
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
-                indx = tuple([abc[j] for j in mechavrgF[-1]])
-                F = self.deriv_data['F_abc'][indx]
+                ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
+                F = self.deriv_data['F_abc'][ijk_indx]
                 resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
                                        Gamma, (a, b, c))
-                # with open('./resonance2', 'a') as file1:
-                #     file1.write(f'{mech_func}\n')
-                #     file1.writelines(str(resonance2)+'\n')
 
-                total_sum_mech += factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
+                total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
+
+    def get_total_gamma_sum_el(self, Gamma, a, b):
+        """
+        """
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic
+        else:
+            vib_ene_levels = self.all_states
+
+        total_sum_el = 0
+        prefac_el = self.matrix_2d.T[a, b]
+        for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
+            resonance = el_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
+                                Gamma, (a, b))
+            total_sum_el += elavrg[a, b] * resonance / prefac_el
+        return total_sum_el / 24.
+
+    def get_total_gamma_sum_mech(self, Gamma, a, b, c):
+        """
+        """
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic
+        else:
+            vib_ene_levels = self.all_states
+
+        total_sum_mech = 0
+        prefac_mech = self.tensor_3d.T[a, b, c]
+        for index, (mech_func, mechavrg) in enumerate(self.combofuns_tensors[1].items()):
+            mechavrgF = list(self.combofuns[1].items())[index][1]
+            abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+            ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
+            F = self.deriv_data['F_abc'][ijk_indx]
+            resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
+                                   Gamma, (a, b, c))
+
+            total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
+        return -total_sum_mech / 48.
 
     def intensity(self, Gamma, savedict, el=True, mech=True):
         Qab, Qabc = self.coords_ab, self.coords_abc
@@ -233,6 +268,42 @@ class SpectrumEVV:
         savedict[key]['Qabc_contrib_dict'] = Qabc_contrib_dict
 
         return Z, savedict
+
+    def intensity_electrical(self, Gamma):
+        start_time = time.time()
+
+        Qab_contrib_dict = {}
+
+        elall = np.zeros(self.shape2d, dtype='complex128')
+        for i in self.coords_ab:
+            contrib_ab = self.get_total_gamma_sum_el(Gamma, i[0], i[1])
+            Qab_contrib_dict[tuple(i)] = contrib_ab
+            elall += contrib_ab
+
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time -| electrical: {execution_time} seconds")
+        print('Electrical anharmonicities are calculated')
+
+        return elall
+
+    def intensity_mechanical(self, Gamma):
+        start_time = time.time()
+
+        Qabc_contrib_dict = {}
+
+        mechall = np.zeros(self.shape2d, dtype='complex128')
+        for i in self.coords_abc:
+            contrib_abc = self.get_total_gamma_sum_mech(Gamma, i[0], i[1], i[2])
+            Qabc_contrib_dict[tuple(i)] = contrib_abc
+            mechall += contrib_abc
+
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"\nExecution time - mechanical: {execution_time} seconds")
+        print('Mechanical anharmonicities are calculated')
+
+        return mechall
 
     def plot2Dmatplotlib(self, Z, w1mw2, nametuple, Gamma, el, mech, dpi=200, log10=True):
         import matplotlib.pyplot as plt
@@ -373,12 +444,9 @@ class SpectrumFigure:
         # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
         # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
 
-
-
     def update_settings(self, settings: dict):
 
         self.settings.update(settings)
-
 
     def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = ''):
         import matplotlib.pyplot as plt
@@ -444,8 +512,8 @@ class SpectrumFigure:
         plt.tight_layout()
         plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
 
-        import shutil
-        shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
+        # import shutil
+        # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
 
 
 def read_csv_DB(filepath):
@@ -667,6 +735,67 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
             #     file1.writelines(str(rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))+'\n')
             #     file1.writelines(str( rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) )+'\n')
             #     file1.writelines(str((1 / t1 / t2)) + '\n')
+
+            return (1 / t1 / t2) * sumfrac
+
+    return function
+
+def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, margin=10.):
+    """
+    subscripts /and fermi
+    :param subscripts:
+    :param fermi:
+    :param margin:
+    :return:
+    """
+    nfunds = len([i for i in w_all if len(i)==1])
+
+    for elTerm in electrical_terms_dict:
+        subscripts = electrical_terms_dict[elTerm]
+        m1n1m2n2 = [i.split(',') for i in subscripts]
+
+
+    for mechTerm in mechanical_terms_dict:
+        subscripts, fermi = mechanical_terms_dict[mechTerm]
+        fermi = [i.split(',') for i in fermi]
+
+    def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
+
+        resonances_tensor = np.zeros((len(abctuple), len(abctuple)))
+
+        letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
+        dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
+        w_all[('zero',)] = 0.
+
+        wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
+        wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))
+        # if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
+
+        wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int)) \
+            if 'zero' not in m1n1m2n2[1][0].split('+') else tuple([m1n1m2n2[1][0]])
+        wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
+
+        if fermi is None:
+            return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
+                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2)
+                                                 - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2])
+                                                                  + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
+
+        else:
+            w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')], key=int))
+            w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')], key=int)) \
+                if 'zero' not in fermi[0][1].split('+') else tuple([fermi[0][1]])
+
+            w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')], key=int))
+            w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int)) \
+                if 'zero' not in fermi[1][1].split('+') else tuple([fermi[1][1]])
+
+            t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
+            t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
+            t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
+            t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
+
+            sumfrac = (1 / t3 + 1 / t4)
 
             return (1 / t1 / t2) * sumfrac
 

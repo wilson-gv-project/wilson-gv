@@ -2,44 +2,49 @@
 import os
 
 # Directory containing SVG files
-directory_path = '/home/vlew/Wilson/spectra/'
-directory_pathW = 'C:/Users/vle014/OneDrive%20-%20UiT%20Office%20365/Documents/svgs/'
-# Output HTML file path
-output_path = '/home/vlew/Wilson/spectra/index.html'
+# directory_path = '/home/vlew/Wilson/spectra/'
+directory_path = '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/new_specs_FOAC_anharm/'
+# directory_pathW = 'C:/Users/vle014/OneDrive%20-%20UiT%20Office%20365/Documents/svgs/'
+directory_pathW = 'C:/Users/vle014/OneDrive%20-%20UiT%20Office%20365/Documents/svgs/new_specs_FOAC_anharm/'
+output_path = '/home/vlew/Wilson/spectra/FORM.html'
 
-# Retrieve list of files with their creation times
 files_with_ctime = [
     (filename, os.path.getctime(os.path.join(directory_path, filename)))
     for filename in os.listdir(directory_path)
     if filename.endswith(".svg")
 ]
-print(files_with_ctime)
+# for k in [i[0].split('/')[0].split('_el')[0] for i in files_with_ctime]:
+#     print(k)
+
 # Sort files by creation time (from older to newer)
 sorted_files = sorted(files_with_ctime, key=lambda x: x[1])
-
-# Define the function to group files (example: based on filename prefix)
+# print(sorted_files)
 def group_files(files):
     groups = {}
+    gTitles = [i[0].split('/')[0].split('_el')[0] for i in files]
     for filename, ctime in files:
         allnameparts = filename.split('_')
-        group_name = ' '.join(allnameparts[1:5])
+        group_name = filename.split('/')[0].split('_el')[0].split('EL_')[1]
+        # if 'aug' in filename:
+        #     group_name = ' '.join(allnameparts[2:8])
+        # else:
+        #     group_name = ' '.join(allnameparts[2:7])
         if group_name not in groups:
             groups[group_name] = []
         groups[group_name].append((filename, ctime))
     return groups
 
-# Group the sorted files
 grouped_files = group_files(sorted_files)
-print('\ngrouped_files\n', grouped_files)
+print('\ngrouped_files\n', grouped_files.keys())
 
-# Start of HTML content
-html_content = """
+html_content = (f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SVG Gallery</title>
+    <title>{directory_path.split('/')[-1]}</title>"""
+                +"""
     <style>
         .grid {
             display: grid;
@@ -61,9 +66,8 @@ html_content = """
     </style>
 </head>
 <body>
-"""
+""")
 
-# Loop through each group and generate the HTML content
 for group_name, files in grouped_files.items():
     html_content += f"""
     <h2 class="group-title">{group_name}</h2>
@@ -71,7 +75,7 @@ for group_name, files in grouped_files.items():
     """
     for filename, _ in files:
         file_path = os.path.join(directory_pathW, filename)
-        print(file_path)
+        # print(file_path)
 
         file_title = 'yes'
         # <p>{file_title}</p>
@@ -84,13 +88,11 @@ for group_name, files in grouped_files.items():
     </div>
     """
 
-# End of HTML content
 html_content += """
 </body>
 </html>
 """
 
-# Write the HTML content to the output file
 with open(output_path, 'w') as file:
     file.write(html_content)
 

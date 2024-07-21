@@ -126,7 +126,7 @@ from scriptsHPC.utils import parseGaussian
 file_path = '/home/vlew/scriptsHPC/input_data_info/coh2aldehyde_HFcc-pVQZ/g16_coh2hfoptanhramanQZ.out'
 
 results = parseGaussian.parse_frequencies(file_path)
-# get a dictionary from results['Fundamental Bands'] dataframe with keys as the first column and values as the third column
+# get a dictionary from results['Fundamental Bands'] dataframe_gaussian with keys as the first column and values as the third column
 f = {tuple([int(k)]): float(v) for k, v in zip(results['Fundamental Bands'][0], results['Fundamental Bands'][2])}
 states = {tuple([int(k) for k in t.split()]+[int(k) for k in t.split()]): float(v) for t, v in
           zip(results['Overtones'][0], results['Overtones'][2])}
@@ -276,7 +276,7 @@ df, units_line = parseGaussian.parse_dipole_moment(file_path)
 # print(units_line)
 # print('\n>>>>> Dipole moment\n---------------------------------------\n')
 
-# from df dataframe get P column - P1 values from X, Y, Z columns - into a2d numpy array
+# from df dataframe_gaussian get P column - P1 values from X, Y, Z columns - into a2d numpy array
 # but only where P is P1, also without the P column
 a2d = df.loc[df['P'] == 'P1', ['X', 'Y', 'Z']].to_numpy()
 a2d2 = df.loc[df['P'] == 'P2', ['X', 'Y', 'Z']].to_numpy() # this is a 2d array, but i need 3d based on i and j indices

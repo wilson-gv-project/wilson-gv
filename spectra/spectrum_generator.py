@@ -8,7 +8,9 @@ import os
 from wilson import spectrum
 
 def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_rc: float = 10.):
-
+    """
+        # one_spectrum_fig(el=el, mech=mech, datain=datain, region=1, gamma_rc=broad_factor_rc)
+    """
     omega1 = np.arange(*regions[region][0])
     omega2 = np.arange(*regions[region][1])
 
@@ -44,50 +46,45 @@ def one_spectrum_fig(el: bool, mech: bool, datain: dict, region: int = 3, gamma_
 
     computedSpectrum.plot2Dmatplotlib(Z, w1mw2=w1mw2, nametuple=(name, __file__, "B3LYP/cc-pVQZ"), Gamma=gamma, el=el, mech=mech, dpi=200, log10=log10)
 
-def one_fig_Object(settings: dict, datainput: dict):
+def one_fig_Object(settings: dict, datainput: dict, directory: str = '.', vibEL: bool = True):
     """Making a figure for one input data set"""
+    name = make_name(datainput, vibEL, settings, directory)
+    print(name)
+    if not os.path.isfile(name):
+        region = settings['region']
+        Gamma_rc = settings['Gamma_rc']
+        el_bool = settings['electrical']
+        mech_bool = settings['mechanical']
 
-    region = settings['region']
-    Gamma_rc = settings['Gamma_rc']
-    el_bool = settings['electrical']
-    mech_bool = settings['mechanical']
+        omega1 = np.arange(*regions[region][0])
+        omega2 = np.arange(*regions[region][1])
 
-    omega1 = np.arange(*regions[region][0])
-    omega2 = np.arange(*regions[region][1])
+        computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput, vib_levels_harmonic=vibEL)
+        computedSpectrum.addTerms(*terms_selection)
 
-    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput)
-    computedSpectrum.addTerms(*terms_selection)
+        Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+        sec_hypol_data, savedict = computedSpectrum.intensity(Gamma, {}, el=el_bool, mech=mech_bool)
 
-    Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
-    sec_hypol_data, savedict = computedSpectrum.intensity(Gamma, {}, el=el_bool, mech=mech_bool)
+        artist = spectrum.SpectrumFigure(sec_hypol_data, computedSpectrum.w1_mesh, computedSpectrum.w2_mesh, settings)
+        title_on_top, text_under_the_figure = make_texts4fig(datainput, computedSpectrum, artist, settings, directory)
+        print(name)
+        artist.plot2Dmatplotlib(nametuple=(name, __file__, title_on_top),
+                                text_under_the_figure=text_under_the_figure)
+    else:
+        print('Spectrum file exists')
 
-    artist = spectrum.SpectrumFigure(sec_hypol_data, computedSpectrum.w1_mesh, computedSpectrum.w2_mesh, settings)
-    name, title_on_top, text_under_the_figure = make_texts4fig(datainput, computedSpectrum, artist, settings)
-    artist.plot2Dmatplotlib(nametuple=(name, __file__, title_on_top),
-                            text_under_the_figure=text_under_the_figure)
+def make_texts4fig(input_data_info: dict, computedSpectrum, artist, settings: dict, directory: str = '.'):
 
-def make_texts4fig(input_data_info, computedSpectrum, artist, settings):
-
-    prefix = 'figObj'
     method_name = input_data_info['files']['method']
     basis_name = input_data_info['files']['basis']
     mol_code = input_data_info['files']['mol_code']
 
-    el_bool = settings['electrical']
-    mech_bool = settings['mechanical']
-
-    region = settings['region']
     Gamma_rc = settings['Gamma_rc']
 
-    step1 = regions[region][0][-1]
-    Gamma_str = f"{Gamma_rc:.2f}".replace('.', 'p')
-    step_str = f"{step1:.1f}".replace('.', 'p')
-
-    name = f'./{prefix}_{mol_code}_{method_name}_{basis_name}_el{str(el_bool)[0]}_mech{str(mech_bool)[0]}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}_reg{region}_step{step_str}.svg'
     title_on_top = f"{method_name}/{f"{basis_name}".replace('_', '-')}"
 
     # here we prepare the text for the textbox
-    part1 = f'{name}\n\nMolecule: {mol_code}\nd_max = {'{:.4e}'.format(artist.d_max)}\n'
+    part1 = f'{directory}\n\nMolecule: {mol_code}\nd_max = {'{:.4e}'.format(artist.d_max)}\n'
     part5 = f'Terms in the expressions: \n      electrical -    {terms_selection[0]}\n      mechanical - {terms_selection[1]}\n'
     part8 = f'Used vibrational energy levels: vib_levels_harmonic={computedSpectrum.vib_levels_harmonic}\n\n'
     values = list(computedSpectrum.fundamentals_harmonic.values())
@@ -121,10 +118,36 @@ def make_texts4fig(input_data_info, computedSpectrum, artist, settings):
 
     text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
 
-    return name, title_on_top, text_under_the_figure
+    # return name, title_on_top, text_under_the_figure
+    return title_on_top, text_under_the_figure
+
+def make_name(input_data_info: dict, vib_levels_harmonic, settings: dict, directory: str = '.'):
+
+    software = input_data_info['source']
+    vibEneLevels = 'harmonicEL' if vib_levels_harmonic else 'anharmonicEL'
+    prefix = f'figObj_{vibEneLevels}_{software}'
+    method_name = input_data_info['files']['method']
+    basis_name = input_data_info['files']['basis']
+    mol_code = input_data_info['files']['mol_code']
+
+    el_bool = settings['electrical']
+    mech_bool = settings['mechanical']
+
+    region = settings['region']
+    Gamma_rc = settings['Gamma_rc']
+
+    step1 = regions[region][0][-1]
+    Gamma_str = f"{Gamma_rc:.2f}".replace('.', 'p')
+    step_str = f"{step1:.1f}".replace('.', 'p')
+
+    name = f'{directory}/{prefix}_{mol_code}_{method_name}_{basis_name}_el{str(el_bool)[0]}_mech{str(mech_bool)[0]}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}_reg{region}_step{step_str}.svg'
+
+    return name
 
 def normalize_colorbars(list_of):
     pass
+
+
 
 
 print(f"""Generated with: 
@@ -147,71 +170,37 @@ settings_here = {'electrical': None, 'mechanical': None,
                  'Gamma_rc': broad_factor_rc, 'region': 4,
                  'font_dict': {'size': 18}, 'figsize': (12, 15)}
 
-# datain = spectrum.make_DatainputDict('gaussian', ('FORM', 'B3LYP', 'aug_cc_pVTZ'))
-# datain = spectrum.make_DatainputDict('gaussian', ('METH', 'B3LYP', 'cc_pVQZ'))
-datain = spectrum.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
+spectra_dict = {"software": [], "code": [], "method": [], "basis_set": [],
+                "el+mech max": [], "el max": [], "mech max": []}
 
-list_figs = [(True, False), (False, True), (True, True)]
-# list_figs = [(True, True)]
-for s in list_figs:
-    settings_here['electrical'] = s[0]
-    settings_here['mechanical'] = s[1]
-    # one_spectrum_fig(el=el, mech=mech, datain=datain, region=1, gamma_rc=broad_factor_rc)
-    print('\n         NEXT FIGURE\n')
-    one_fig_Object(settings=settings_here, datainput=datain)
+from wilson.spectrum import getting_files_DB
 
-#
-# import pandas as pd
-# import json
-#
-# # Assuming your input_data_info is stored in a JSON file
-# with open('calcfiles.json', 'r') as file:
-#     data = json.load(file)
-# print(data)
-#
-# flattened_data = []
-#
-# # First pass to determine all possible keys in the file_path dictionaries
-# all_keys = set()
-#
-# for molecule_name, molecule_data in data['molecules'].items():
-#     for method, method_data in molecule_data.items():
-#         if method.startswith('_comment'):
-#             continue  # Skip comments
-#         if isinstance(method_data, dict):
-#             for basis_set, basis_set_data in method_data.items():
-#                 if isinstance(basis_set_data, dict):
-#                     for file_category, files in basis_set_data.items():
-#                         if isinstance(files, dict):
-#                             for file_type, file_paths in files.items():
-#                                 if isinstance(file_paths, dict):
-#                                     all_keys.update(file_paths.keys())
-#
-# # Second pass to create the flattened input_data_info structure
-# for molecule_name, molecule_data in data['molecules'].items():
-#     for method, method_data in molecule_data.items():
-#         if method.startswith('_comment'):
-#             continue  # Skip comments
-#         if isinstance(method_data, dict):
-#             for basis_set, basis_set_data in method_data.items():
-#                 if isinstance(basis_set_data, dict):
-#                     for file_category, files in basis_set_data.items():
-#                         if isinstance(files, dict):
-#                             for file_type, file_paths in files.items():
-#                                 if isinstance(file_paths, dict):
-#                                     record = {
-#                                         'molecule_name': molecule_name,
-#                                         'method': method,
-#                                         'basis_set': basis_set,
-#                                         'file_category': file_category,
-#                                         'file_type': file_type
-#                                     }
-#                                     # Add each possible key to the record, with default empty string if not present
-#                                     for key in all_keys:
-#                                         record[key] = file_paths.get(key, '')
-#                                     flattened_data.append(record)
-#
-# # Create a DataFrame from the list of dictionaries
-# df = pd.DataFrame(flattened_data)
-#
-# print(df)
+dataframe_gaussian = getting_files_DB("gaussian")
+method_basis = dataframe_gaussian[(dataframe_gaussian['code'] == 'FOAC') & (dataframe_gaussian['method'] != 'PBE0')][["code", "method", "basis_set"]]
+tuples_method_basis = [(row['code'], row['method'], row['basis_set']) for index, row in method_basis.iterrows()]
+print(tuples_method_basis)
+
+
+for method in tuples_method_basis:
+    print('\n>>>>>>>>>   ', method)
+    datain = spectrum.make_DatainputDict('gaussian', method)
+    list_figs = [(True, False), (False, True), (True, True)]
+    for s in list_figs:
+        settings_here['electrical'] = s[0]
+        settings_here['mechanical'] = s[1]
+        # print('\n         NEXT FIGURE\n')
+        one_fig_Object(settings=settings_here, datainput=datain, directory='./new_specs_FOAC_anharm', vibEL=False)
+
+dataframe_gaussian = getting_files_DB("cfour")
+method_basis = dataframe_gaussian[dataframe_gaussian['code'] == 'FOAC'][["code", "method", "basis_set"]]
+tuples_method_basis = [(row['code'], row['method'], row['basis_set']) for index, row in method_basis.iterrows()]
+
+for method in tuples_method_basis:
+    print('\n>>>>>>>>>   ', method)
+    datain = spectrum.make_DatainputDict('cfour', method)
+    list_figs = [(True, False), (False, True), (True, True)]
+    for s in list_figs:
+        settings_here['electrical'] = s[0]
+        settings_here['mechanical'] = s[1]
+        # print('\n         NEXT FIGURE\n')
+        one_fig_Object(settings=settings_here, datainput=datain, directory='./new_specs_FOAC_anharm', vibEL=False)
