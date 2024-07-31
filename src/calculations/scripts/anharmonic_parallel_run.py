@@ -29,7 +29,7 @@ if stage == '1':
     calcsCFOUR.extendSubmitEquilParAnh('./submitpy.sh', configHPCdispl)
 
     # - 7 - sbatch submit.sh for anharm
-    jobid = calcsCFOUR.sumbitSbatch("submitpy.sh")
+#    jobid = calcsCFOUR.sumbitSbatch("submitpy.sh")
     # os.chdir(basedir)
 
     print('\nSubmitted the main anharmonic parallel job')

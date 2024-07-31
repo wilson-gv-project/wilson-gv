@@ -188,7 +188,8 @@ def generateSubmitPy(config: dict, outname: str):
     print('Job Name will be', dir_name)
 
     cpus = 16 if machine == 'fram' else 20
-
+    bigmemthing = """#SBATCH --partition bigmem
+#SBATCH --mem-per-cpu=4GB""" if int(hours)>168 else """#SBATCH --partition normal"""
     text = rf"""#!/bin/bash
 # ==================================================================================
 # SLURM job scheduler for the OpenMP-parallel CFOUR program and {machine} supercomputer
@@ -199,6 +200,7 @@ def generateSubmitPy(config: dict, outname: str):
 #SBATCH --mail-type=ALL
 #SBATCH --job-name={dir_name}
 #SBATCH --account=nn14654k
+{bigmemthing}
 #SBATCH --partition normal
 #SBATCH --time={hours}:{minutes}:00
 

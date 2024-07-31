@@ -112,10 +112,10 @@ settingsCalc = {'level of theory': tuple(['HF', 'cc-pVQZ']),
                 'jobtype':'anharm'}
 
 # main job
-configHPC = {'machine':'fram', 'minutes':'40', 'hours':'08', 'nodes':1, 'dir3':True,
+configHPC = {'machine':'fram', 'minutes':'00', 'hours':'300', 'nodes':1, 'dir3':True,
              'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
 # generated displaced zmat0*
-configHPCdispl = {'machine':'fram', 'minutes':'30', 'hours':'18', 'nodes':1, 'dir3':True,
+configHPCdispl = {'machine':'fram', 'minutes':'00', 'hours':'300', 'nodes':1, 'dir3':True,
                   'c4path': '/cluster/projects/nn14654k/vle014/cfour_serial/bin'}
 
 # for fja files processing
