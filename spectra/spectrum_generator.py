@@ -148,8 +148,6 @@ def normalize_colorbars(list_of):
     pass
 
 
-
-
 print(f"""Generated with: 
 'getcwd  :      {os.getcwd()}
 '__file__:      {__file__}\n\n""")
@@ -159,7 +157,8 @@ w1mw2=False
 broad_factor_rc=10.
 
 # select terms of electrical and mechanical anharmonicities
-terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
+# terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
+terms_selection = [0, 1], [0, 1]
 
 regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
            2: ((2810., 3210., 10.), (5510., 6050., 10.)),
@@ -180,6 +179,16 @@ method_basis = dataframe_gaussian[(dataframe_gaussian['code'] == 'FOAC') & (data
 tuples_method_basis = [(row['code'], row['method'], row['basis_set']) for index, row in method_basis.iterrows()]
 print(tuples_method_basis)
 
+print('\n>>>>>>>>>   ', ('FOAC', 'B3LYP', 'cc_pVQZ'))
+datain = spectrum.make_DatainputDict('gaussian', ('FOAC', 'B3LYP', 'cc_pVQZ'))
+list_figs = [(True, False), (False, True), (True, True)]
+for s in list_figs:
+    settings_here['electrical'] = s[0]
+    settings_here['mechanical'] = s[1]
+    # print('\n         NEXT FIGURE\n')
+    one_fig_Object(settings=settings_here, datainput=datain, directory='./smth', vibEL=False)
+
+quit()
 
 for method in tuples_method_basis:
     print('\n>>>>>>>>>   ', method)

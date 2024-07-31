@@ -1,5 +1,5 @@
 import numpy as np
-from wilson.spectrum import rec_cm2rec_s
+from wilson import spectrum
 import sys
 import pandas as pd
 pd.set_option('display.max_rows', sys.maxsize)
@@ -7,7 +7,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', 2000)
 pd.set_option('display.width', 5000)
 
-def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, rec_cm=True):
+def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, computedSpectrum, rec_cm=True):
     """
     """
     # nfunds = len([i for i in w_all if len(i) == 1])
@@ -50,11 +50,11 @@ def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, 
                 dict_df_term['ω_1'].append(secondres)
                 dict_df_term['ω_2'].append(firstres+secondres)
             else:
-                dict_df_term['ω_a'].append(rec_cm2rec_s(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(rec_cm2rec_s(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_2-ω_1'].append(rec_cm2rec_s(firstres))
-                dict_df_term['ω_1'].append(rec_cm2rec_s(secondres))
-                dict_df_term['ω_2'].append(rec_cm2rec_s(firstres+secondres))
+                dict_df_term['ω_a'].append(spectrum.rec_cm2rec_s(w_all[tuple([str(c[0])])]))
+                dict_df_term['ω_b'].append(spectrum.rec_cm2rec_s(w_all[tuple([str(c[1])])]))
+                dict_df_term['ω_2-ω_1'].append(spectrum.rec_cm2rec_s(firstres))
+                dict_df_term['ω_1'].append(spectrum.rec_cm2rec_s(secondres))
+                dict_df_term['ω_2'].append(spectrum.rec_cm2rec_s(firstres+secondres))
 
         dfs4terms_el.append(dict_df_term)
 
@@ -70,7 +70,7 @@ def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, 
         # print(mechanical_terms_dict[mechTerm])
         dict_df_term = {'res1': '__'.join(mechanical_terms_dict[mechTerm][0]), 'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
-                        'ω_a': [], r'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'FR1': [], 'FR2': []}
+                        'ω_a': [], r'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'FR1': [], 'FR2': [], 'F_abc': []}
         for c in combos[1]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
 
@@ -114,19 +114,22 @@ def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, 
                 dict_df_term['ω_2'].append(firstres+secondres)
                 dict_df_term['FR1'].append(thirdres)
                 dict_df_term['FR2'].append(fourthres)
+                dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
+
             else:
-                dict_df_term['ω_a'].append(rec_cm2rec_s(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(rec_cm2rec_s(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_2-ω_1'].append(rec_cm2rec_s(firstres))
-                dict_df_term['ω_1'].append(rec_cm2rec_s(secondres))
-                dict_df_term['ω_2'].append(rec_cm2rec_s(firstres+secondres))
-                dict_df_term['FR1'].append(rec_cm2rec_s(thirdres))
-                dict_df_term['FR2'].append(rec_cm2rec_s(fourthres))
+                dict_df_term['ω_a'].append(spectrum.rec_cm2rec_s(w_all[tuple([str(c[0])])]))
+                dict_df_term['ω_b'].append(spectrum.rec_cm2rec_s(w_all[tuple([str(c[1])])]))
+                dict_df_term['ω_2-ω_1'].append(spectrum.rec_cm2rec_s(firstres))
+                dict_df_term['ω_1'].append(spectrum.rec_cm2rec_s(secondres))
+                dict_df_term['ω_2'].append(spectrum.rec_cm2rec_s(firstres+secondres))
+                dict_df_term['FR1'].append(spectrum.rec_cm2rec_s(thirdres))
+                dict_df_term['FR2'].append(spectrum.rec_cm2rec_s(fourthres))
+                dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
         dfs4terms_mech.append(dict_df_term)
 
     for r in dfs4terms_mech:
         dd = pd.DataFrame(data=r)
-        print(dd)
+        print(dd[(dd['F_abc']!=0.) & (abs(dd['FR2'])<1000.) & (abs(dd['ω_2'])>1600.)  & (abs(dd['ω_2'])<4500.) & (abs(dd['ω_1'])>750.) & (abs(dd['ω_1'])<1650.)])
         dd['abs(FR1)'] = abs(dd['FR1'])
         dd['abs(FR2)'] = abs(dd['FR2'])
         print('\n', dd.nsmallest(3, 'abs(FR1)'))
@@ -135,10 +138,37 @@ def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, combos, 
 
     return
 
-def get_MechEl_contributions():
+def get_MechEl_contributions(datainput, settings, vibEL):
     """
-
-    :return:
     """
+    terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
 
-    
+    regions = {1: ((1180., 2050., 10.), (2309., 5350., 10.)),
+               2: ((2810., 3210., 10.), (5510., 6050., 10.)),
+               3: ((1961.318, 1981.318, 10.), (4931.662, 4951.662, 10.)),
+               4: ((680., 1750., 10.), (1509., 4350., 10.)),
+               5: ((1800, 1900, 20.), (2300, 2400, 20.))}
+
+    region = settings['region']
+    Gamma_rc = settings['Gamma_rc']
+    Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+
+    omega1 = np.arange(*regions[region][0])
+    omega2 = np.arange(*regions[region][1])
+
+    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput, vib_levels_harmonic=vibEL)
+    computedSpectrum.addTerms(*terms_selection)
+
+    el_gamma = computedSpectrum.intensity_electrical(Gamma)
+    mech_gamma = computedSpectrum.intensity_mechanical(Gamma)
+
+    total = abs(el_gamma+mech_gamma)**2
+    print('\ntotal\n', total)
+    print('\n|el_gamma|**2\n', abs(el_gamma)**2)
+    print('\n|mech_gamma|**2\n', abs(mech_gamma)**2)
+    percent_el = abs(el_gamma)**2/total*100
+    percent_mech = abs(mech_gamma)**2/total*100
+
+    print('\n|el_gamma|**2/|mech_gamma|**2\n', abs(el_gamma)**2/abs(mech_gamma)**2)
+
+    return percent_el, percent_mech
