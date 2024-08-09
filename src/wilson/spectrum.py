@@ -98,12 +98,12 @@ class SpectrumEVV:
                              [('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc'],
                              [('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc']]
 
-        ee, mm = electrical_terms_selection, mechanical_terms_selection
+        self.ee, self.mm = electrical_terms_selection, mechanical_terms_selection
         factors = [1., 1., 0.5, 0.5, -0.5, -0.5]
         self.mech_factors = [factors[i] for i in mechanical_terms_selection]
         # [pool[i] for i in list_of_indices]
-        self.electrical_terms, self.mechanical_terms = [electrical_terms_str[i] for i in ee], [mechanical_terms_str[i] for i in mm]
-        self.electric_avrg, self.mechanical_avrg = [electric_avrg_str[i] for i in ee], [mechanical_avrg_str[i] for i in mm]
+        self.electrical_terms, self.mechanical_terms = [electrical_terms_str[i] for i in self.ee], [mechanical_terms_str[i] for i in self.mm]
+        self.electric_avrg, self.mechanical_avrg = [electric_avrg_str[i] for i in self.ee], [mechanical_avrg_str[i] for i in self.mm]
         # here the functions of 2 frequencies
         self.electr_funs = [generate_resonances_functions(i, margin=self.diagonal_margin) for i in self.electrical_terms]
         self.mech_funs = [generate_resonances_functions(*i) for i in self.mechanical_terms]
