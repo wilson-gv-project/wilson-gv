@@ -201,7 +201,6 @@ def generateSubmitPy(config: dict, outname: str):
 #SBATCH --job-name={dir_name}
 #SBATCH --account=nn14654k
 {bigmemthing}
-#SBATCH --partition normal
 #SBATCH --time={hours}:{minutes}:00
 
 #load modules
