@@ -7,8 +7,11 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', 2000)
 pd.set_option('display.width', 5000)
 
-def get_resonances(computedSpectrum, rec_cm=True, vib_levels_harmonic=False):
+def get_resonances_DF(computedSpectrum, rec_cm=True, vib_levels_harmonic=False):
     """
+    Returns dataframes with columns: res (expression), a, b, [c], ω_a, ω_b, [ω_c],
+                                     ω_2-ω_1, ω_1, ω_2, [FR1, FR2, F_abc], avrg_g
+
     """
     electrical_terms_dict = dict(zip(computedSpectrum.ee, computedSpectrum.electrical_terms))
     mechanical_terms_dict = dict(zip(computedSpectrum.mm, computedSpectrum.mechanical_terms))
@@ -28,7 +31,7 @@ def get_resonances(computedSpectrum, rec_cm=True, vib_levels_harmonic=False):
         letters = ['a', 'b', 'zero']
         dict_df_term = {'res': '__'.join(electrical_terms_dict[elTerm]),
                         'a': [], 'b': [],
-                        'ω_a': [], r'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'avrg_g': []}
+                        'ω_a': [], 'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'avrg_g': []}
         for c in combos[0]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
 
@@ -67,12 +70,13 @@ def get_resonances(computedSpectrum, rec_cm=True, vib_levels_harmonic=False):
     for ii in range(len(dfs4terms_el)):
         dd = pd.DataFrame(data=dfs4terms_el[ii])
         dfs4terms_el[ii] = dd
-    for mechTerm in mechanical_terms_dict:
+
+    for index, mechTerm in enumerate(mechanical_terms_dict):
         subscripts, fermi = mechanical_terms_dict[mechTerm]
         m1n1m2n2 = [i.split(',') for i in subscripts]
         fermi = [i.split(',') for i in fermi]
         letters = ['a', 'b', 'c', 'zero']
-        dict_df_term = {'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
+        dict_df_term = {'ii': index, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
                         'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
                         'ω_a': [], 'ω_b': [], 'ω_c': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [],
@@ -134,6 +138,7 @@ def get_resonances(computedSpectrum, rec_cm=True, vib_levels_harmonic=False):
                 dict_df_term['FR2'].append(spectrum.rec_cm2rec_s(fourthres))
                 dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
             dict_df_term['avrg_g'].append(mechanical_terms_avrg_dict[mechTerm][*c])
+            # dict_df_term['finalI'].append(dict_df_term['avrg_g']*dict_df_term['F_abc']*(dict_df_term['FR1']+dict_df_term['FR2'])/dict_df_term['FR1']/dict_df_term['FR2'])
 
         dfs4terms_mech.append(dict_df_term)
 
@@ -176,5 +181,4 @@ def get_El2Mech_ratio(datainput, settings, vibEL):
 
     print('\n|el_gamma|**2/|mech_gamma|**2\n', abs(el_gamma)**2/abs(mech_gamma)**2)
 
-    # return percent_el, percent_mech
     return abs(el_gamma)**2/abs(mech_gamma)**2

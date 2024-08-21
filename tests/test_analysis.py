@@ -15,8 +15,8 @@ def test_get_resonances_electrical():
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
-    dfs4terms_el, dfs4terms_mech = get_resonances(computedSpectrum, rec_cm=True,
-                                                  vib_levels_harmonic=vib_levels_harmonic)
+    dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=True,
+                                                     vib_levels_harmonic=vib_levels_harmonic)
     import matplotlib.pyplot as plt
     for dfEL in dfs4terms_el:
         # print(dfEL)
@@ -34,8 +34,8 @@ def test_get_resonances_mechanical():
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
-    dfs4terms_el, dfs4terms_mech = get_resonances(computedSpectrum, rec_cm=True,
-                                                  vib_levels_harmonic=vib_levels_harmonic)
+    dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=True,
+                                                     vib_levels_harmonic=vib_levels_harmonic)
 
     import matplotlib.pyplot as plt
 
@@ -90,7 +90,6 @@ def test_get_avrg_tensors():
         print(mt)
     print('\ncubic force constants')
     print(computedSpectrum.deriv_data['F_abc'])
-
 
 def test_get_El2Mech_ratio():
     method = ('FOAC', 'HF', 'cc_pVQZ')

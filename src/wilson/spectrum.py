@@ -46,6 +46,9 @@ class SpectrumEVV:
         self.vib_levels_harmonic = vib_levels_harmonic
         print(f'\nUsed vibrational energy levels:\n harmonic? - {self.vib_levels_harmonic}')
 
+        self.saved_mech = {}
+        self.saved_el = {}
+
     def load_data(self, input_data_info: dict):
         self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
 
@@ -183,8 +186,7 @@ class SpectrumEVV:
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
                 ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
                 F = self.deriv_data['F_abc'][ijk_indx]
-                resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
-                                       Gamma, (a, b, c))
+                resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh, Gamma, (a, b, c))
 
                 total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
@@ -215,15 +217,22 @@ class SpectrumEVV:
 
         total_sum_mech = 0
         prefac_mech = self.tensor_3d.T[a, b, c]
+        # prefac_mech = self.tensor_3d[a, b, c]
         for index, (mech_func, mechavrg) in enumerate(self.combofuns_tensors[1].items()):
+            if index not in self.saved_mech:
+                self.saved_mech[index] = {}
             mechavrgF = list(self.combofuns[1].items())[index][1]
             abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
             ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
             F = self.deriv_data['F_abc'][ijk_indx]
-            resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
-                                   Gamma, (a, b, c))
+            resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh, Gamma, (a, b, c))
 
-            total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
+            addition = self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
+            is_equal = np.allclose(np.abs(addition),
+                                   np.abs(np.full(addition.shape, -0. + 0.j, dtype=complex)))
+            if not is_equal:
+                self.saved_mech[index][tuple([a, b, c])] = (addition*(-1./48.), mechavrg[a, b, c], F, resonance2)
+                total_sum_mech += addition
         return -total_sum_mech / 48.
 
     def intensity(self, Gamma, savedict, el=True, mech=True):
@@ -303,7 +312,7 @@ class SpectrumEVV:
         print(f"\nExecution time - mechanical: {execution_time} seconds")
         print('Mechanical anharmonicities are calculated')
 
-        return mechall
+        return mechall, Qabc_contrib_dict
 
 
 class SpectrumFigure:
@@ -329,7 +338,7 @@ class SpectrumFigure:
         self.dpi = self.settings['dpi']
         self.font_dict = self.settings['font_dict'] # font = {'size': 18}
         self.settings['norm_min'] = 1e3
-        self.settings['norm_max'] = 1e8
+        # self.settings['norm_max'] = 1e8
 
         el, mech = self.settings['electrical'], self.settings['mechanical']
 
@@ -338,7 +347,7 @@ class SpectrumFigure:
             self.d_max = self.settings['dmax_dict'][(el, mech)]
         else:
             print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
-                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), self.intensities.max())
+                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
         # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
@@ -348,12 +357,12 @@ class SpectrumFigure:
 
         self.settings.update(settings)
 
-    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = ''):
+    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', to_save=True):
         import matplotlib.pyplot as plt
         import numpy as np
         import matplotlib
-
-        matplotlib.use('Agg')
+        if to_save:
+            matplotlib.use('Agg')
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
         plt.rcParams['axes.titlepad'] = 30
@@ -410,11 +419,12 @@ class SpectrumFigure:
         ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
                     ha="left", va="top", bbox=bbox_args, fontsize=12)
         plt.tight_layout()
-        plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
+        if to_save:
+            plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
 
         # import shutil
         # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
-
+        return fig
 
 def read_csv_DB(filepath):
     """
@@ -590,7 +600,7 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
 
-    def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
+    def function(w_all: dict, w1, w2, Gamma: float, abctuple: tuple[int, int, int], m1n1m2n2=m1n1m2n2, fermi=fermi):
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
         w_all[('zero',)] = 0.
@@ -616,10 +626,10 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
             w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')], key=int))
             w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int)) if 'zero' not in fermi[1][1].split('+') else tuple([fermi[1][1]])
 
-            t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
-            t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
-            t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
-            t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
+            t1 = rec_cm2rec_s(w_all[wm1]-w_all[wn1]+w1-w2) - 1j * Gamma
+            t2 = rec_cm2rec_s(w_all[wm2]-w_all[wn2]+w1) - 1j * Gamma
+            t3 = rec_cm2rec_s(w_all[w_fr11]-w_all[w_fr21])
+            t4 = rec_cm2rec_s(w_all[w_fr12]-w_all[w_fr22])
 
             sumfrac = (1 / t3 + 1 / t4)
             # with open('./fermi', 'a') as file1:
