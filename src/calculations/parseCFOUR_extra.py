@@ -124,6 +124,77 @@ def describe_structure(obj, level=0):
     # Fallback for any other types
     return obj_type
 
+def getQuarticPost(freq: dict, quartic: np.ndarray, recipcm: bool = False):
+    """ Derives cubic and quartic anharmonic constants.
+        It takes reduced values [cm-1] from gaussian output
+        and transforms it to :
+          * cubic   force constants : [Hartree*amu(-3/2)*Bohr(-3)]
+          * quartic force constants : [Hartree*amu(-2  )*Bohr(-4)]
+    """
+    if recipcm:
+
+        n = len(freq)
+        K4 = np.zeros((n, n, n, n), dtype=np.float64)
+
+        for fijkl in quartic:
+            i = int(fijkl[0]) - 7
+            j = int(fijkl[1]) - 7
+            k = int(fijkl[2]) - 7
+            l = int(fijkl[3]) - 7
+            d = np.float64(fijkl[4])
+
+            indices = [(i, j, k, l), (i, j, l, k), (i, k, j, l), (i, k, l, j),
+                       (i, l, j, k), (i, l, k, j), (j, i, k, l), (j, i, l, k),
+                       (j, k, i, l), (j, k, l, i), (j, l, i, k), (j, l, k, i),
+                       (k, i, j, l), (k, i, l, j), (k, j, i, l), (k, j, l, i),
+                       (k, l, i, j), (k, l, j, i), (l, i, j, k), (l, i, k, j),
+                       (l, j, i, k), (l, j, k, i), (l, k, i, j), (l, k, j, i)]
+
+            for idx in indices:
+                K4[idx] = d
+
+        return K4
+
+    else:
+        n = len(freq)
+        K4 = np.zeros((n, n, n, n), dtype=np.float64)
+
+        for fijkl in quartic:
+
+            i = int(fijkl[0]) - 7
+            j = int(fijkl[1]) - 7
+            k = int(fijkl[2]) - 7
+            l = int(fijkl[3]) - 7
+            d = np.float64(fijkl[4])
+            d *= np.sqrt(freq[i] * freq[j] * freq[k] * freq[l])
+
+            from scipy import constants
+            a = np.sqrt(constants.h / constants.c / constants.physical_constants['unified atomic mass unit'][0] / 100)
+            b = 10 ** 10 / 2 / np.pi / constants.physical_constants['Bohr radius'][0] / 10 ** 10
+            Fact3R = (constants.physical_constants['hartree-joule relationship'][
+                          0] / constants.h / constants.c / 100) * (a * b) ** 4
+
+            d /= Fact3R
+
+            indices = [(i, j, k, l), (i, j, l, k), (i, k, j, l), (i, k, l, j),
+                       (i, l, j, k), (i, l, k, j), (j, i, k, l), (j, i, l, k),
+                       (j, k, i, l), (j, k, l, i), (j, l, i, k), (j, l, k, i),
+                       (k, i, j, l), (k, i, l, j), (k, j, i, l), (k, j, l, i),
+                       (k, l, i, j), (k, l, j, i), (l, i, j, k), (l, i, k, j),
+                       (l, j, i, k), (l, j, k, i), (l, k, i, j), (l, k, j, i)]
+
+            for idx in indices:
+                K4[idx] = d
+
+
+        from scipy import constants
+        # to go from amu to au mass unit (m_e)
+        amc_au = constants.physical_constants['atomic mass constant'][0] / \
+                 constants.physical_constants['atomic unit of mass'][0]
+        # to Wilson units
+        K4 /= amc_au ** 2
+        return K4
+
 # For pickled things
 def unpickle(file: str):
     """

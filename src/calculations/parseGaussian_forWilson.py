@@ -334,7 +334,7 @@ def getPolarDers_au(logfile: str, fundamentals_harmonic: dict) -> tuple:
     return tuple([fdpol, sdpol])
 
 # used in retrievedata.py
-def parse_cubic_constants(file_path: str) -> pd.DataFrame:
+def parse_cubic_constants(file_path: str) -> [pd.DataFrame, list]:
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -357,6 +357,32 @@ def parse_cubic_constants(file_path: str) -> pd.DataFrame:
             elif line.strip().startswith(': FI =') or line.strip().startswith(': k  =') or line.strip().startswith(': K  ='):
                 units_lines.append(line.strip())
     df = pd.DataFrame(results, columns=["I", "J", "K", "FI(I,J,K)", "k(I,J,K)", "K(I,J,K)"])
+
+    return df, units_lines
+
+def parse_quartic_constants(file_path: str) -> [pd.DataFrame, list]:
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    results = []
+    start = False
+    start2 = False
+    units_lines = []
+
+    for line in lines:
+        if "QUARTIC FORCE CONSTANTS IN NORMAL MODES" in line:
+            start = True
+        elif line.strip().startswith("Num. of 4th derivatives"):
+            break
+        elif start:
+            if line.strip().startswith("I"):
+                start2 = True
+            elif start2 and line.strip() and not line.isspace():
+                parts = line.split()
+                results.append(parts)
+            elif line.strip().startswith(': FI =') or line.strip().startswith(': k  =') or line.strip().startswith(': K  ='):
+                units_lines.append(line.strip())
+    df = pd.DataFrame(results, columns=["I", "J", "K", "L", "FI(I,J,K,L)", "k(I,J,K,L)", "K(I,J,K,L)"])
 
     return df, units_lines
 
@@ -385,6 +411,35 @@ def get_cubic_post(len_freq: int, cubic: np.ndarray, recipcm: bool = False):
     K3 = K3 / amc_au**1.5
 
     return K3
+
+def get_quartic_post(len_freq: int, quartic: np.ndarray, recipcm: bool = False):
+    K4 = np.zeros((len_freq, len_freq, len_freq, len_freq), dtype=np.float64)
+
+    for fijkl in quartic:
+        i = int(fijkl[0]) - 7
+        j = int(fijkl[1]) - 7
+        k = int(fijkl[2]) - 7
+        l = int(fijkl[3]) - 7
+        d = np.float64(fijkl[4])
+
+        indices = [(i, j, k, l), (i, j, l, k), (i, k, j, l), (i, k, l, j),
+                   (i, l, j, k), (i, l, k, j), (j, i, k, l), (j, i, l, k),
+                   (j, k, i, l), (j, k, l, i), (j, l, i, k), (j, l, k, i),
+                   (k, i, j, l), (k, i, l, j), (k, j, i, l), (k, j, l, i),
+                   (k, l, i, j), (k, l, j, i), (l, i, j, k), (l, i, k, j),
+                   (l, j, i, k), (l, j, k, i), (l, k, i, j), (l, k, j, i)]
+
+        for idx in indices:
+            K4[idx] = d
+
+    from scipy import constants
+    # to go from amu to au mass unit (m_e)
+    amc_au = constants.physical_constants['atomic mass constant'][0] / \
+             constants.physical_constants['atomic unit of mass'][0]
+
+    K4 = K4 / amc_au**2
+
+    return K4
 
 # used in retrievedata.py
 def parse_dipole_moment(file_path: str) -> pd.DataFrame:

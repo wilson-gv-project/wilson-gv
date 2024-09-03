@@ -107,6 +107,37 @@ class CFOURdata:
 
             return cubicFC
 
+    def getQFF(self, file: str = None) -> np.ndarray:
+        """
+        QFF: quartic force constant tensor
+        Return: np.ndarray - shape(NM, NM, NM, NM)
+        """
+
+        if file is not None:
+            quartic = parseCFOUR_forWilson.pCubicORQuartic(file)
+            freq, freq_harm = self.getFundamentals()
+            qff = parseCFOUR_extra.getQuarticPost(freq_harm, quartic)
+            return qff
+
+        else:
+            if self.sourcetype == 'out':
+                quartic = parseCFOUR_forWilson.pCubicORQuartic(self.files['quartic'])
+                freq, freq_harm = self.getFundamentals()
+                qff = parseCFOUR_extra.getQuarticPost(freq_harm, quartic)
+                return qff
+
+            elif self.sourcetype == 'pkl':
+                cubicpkl = self.files['cubic']
+                import pickle
+                with open(cubicpkl, 'rb') as file:
+                    # first 3 columns are the normal mode indices, the last column holds the derivatives
+                    qff = pickle.load(file)
+
+                freq, freq_harm = self.getFundamentals()
+                quarticFC = parseCFOUR_extra.getQuarticPost(freq_harm, qff)
+
+                return quarticFC
+
 
 def getDimensionlessNM(datafile: str = None) -> dict:
     """
@@ -269,9 +300,30 @@ class GaussianData:
         Return: np.ndarray - shape(NM, NM, NM)
         """
         if self.sourcetype == 'log':
-            cubic_df = parseGaussian_forWilson.parse_cubic_constants(self.files['log'])[0]
+            cubic_df = parseGaussian_forWilson.parse_cubic_constants(self.files['3quanta'])[0]
             selected_df = cubic_df[['I', 'J', 'K', 'K(I,J,K)']]
             cubic = selected_df.to_numpy()
             freq, freq_harm = self.getFundamentals()
             cff = parseGaussian_forWilson.get_cubic_post(len(freq_harm), cubic)
             return cff
+
+    def getQFF(self, file: str = None) -> np.ndarray:
+        """
+        CFF: cubic force constant tensor
+        Return: np.ndarray - shape(NM, NM, NM)
+        """
+        if file is not None:
+            file_here = file
+        else:
+            if self.sourcetype == 'log':
+                file_here = self.files['3quanta']
+            else:
+                file_here = ''
+                print('No file provided')
+
+        quartic_df = parseGaussian_forWilson.parse_quartic_constants(file_here)[0]
+        selected_df = quartic_df[['I', 'J', 'K', 'L', 'K(I,J,K,L)']]
+        quartic = selected_df.to_numpy()
+        freq, freq_harm = self.getFundamentals()
+        qff = parseGaussian_forWilson.get_quartic_post(len(freq_harm), quartic)
+        return qff
