@@ -389,6 +389,7 @@ class SpectrumFigure:
         cont = plt.contourf(self.X, self.Y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)
+        plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
 
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
