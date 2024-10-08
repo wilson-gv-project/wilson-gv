@@ -284,11 +284,12 @@ class SpectrumEVV:
         Qab_contrib_dict = {}
 
         elall = np.zeros(self.shape2d, dtype='complex128')
-        for i in self.coords_ab:
+        for ind, i in enumerate(self.coords_ab):
             contrib_ab = self.get_total_gamma_sum_el(Gamma, i[0], i[1])
             Qab_contrib_dict[tuple(i)] = contrib_ab
             elall += contrib_ab
-
+            if ind % 100 == 0:
+                print(f'{ind}/{len(self.coords_abc)} -- {ind*100/len(self.coords_abc)}')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time -| electrical: {execution_time} seconds")
@@ -302,10 +303,12 @@ class SpectrumEVV:
         Qabc_contrib_dict = {}
 
         mechall = np.zeros(self.shape2d, dtype='complex128')
-        for i in self.coords_abc:
+        for ind, i in enumerate(self.coords_abc):
             contrib_abc = self.get_total_gamma_sum_mech(Gamma, i[0], i[1], i[2])
             Qabc_contrib_dict[tuple(i)] = contrib_abc
             mechall += contrib_abc
+            if ind % 1000 == 0:
+                print(f'{ind}/{len(self.coords_abc)} -- {ind*100/len(self.coords_abc)}')
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -337,7 +340,7 @@ class SpectrumFigure:
         self.figsize = self.settings['figsize']
         self.dpi = self.settings['dpi']
         self.font_dict = self.settings['font_dict'] # font = {'size': 18}
-        self.settings['norm_min'] = 1e3
+        # self.settings['norm_min'] = 1e3
         # self.settings['norm_max'] = 1e8
 
         el, mech = self.settings['electrical'], self.settings['mechanical']
@@ -357,7 +360,7 @@ class SpectrumFigure:
 
         self.settings.update(settings)
 
-    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', to_save=True):
+    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', diagonal=False, to_save=True):
         import matplotlib.pyplot as plt
         import numpy as np
         import matplotlib
@@ -374,8 +377,9 @@ class SpectrumFigure:
         import matplotlib.colors as colors
         colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
 
-        dynamic_range = 300 # stop plotting when lower than this (number times 10) dmax
-        num_count = 30
+        num_count = self.settings['dynamic_range_n']
+        dynamic_range = num_count*10 # stop plotting when lower than this (number times 10) dmax
+
         dynrange_log = np.log10(dynamic_range)
         d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
         dmax_log10 = float(int(np.log10(self.d_max)))
@@ -389,7 +393,8 @@ class SpectrumFigure:
         cont = plt.contourf(self.X, self.Y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)
-        plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
+        if diagonal:
+            plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
 
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
@@ -452,7 +457,7 @@ def getting_files_DB(sourceProgram: str, printing: bool = False):
     :param sourceProgram:
     :return:
     """
-    DB = read_csv_DB('/mnt/c/Users/vle014/Downloads/files_fram/files_database.csv')
+    DB = read_csv_DB('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
 
     if sourceProgram == 'gaussian':
         filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
