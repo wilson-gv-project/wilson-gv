@@ -1,6 +1,4 @@
-import numpy as np
-import pytest
-from calculations.parseGaussian_forWilson import *
+from parsing.parseGaussian_forWilson import *
 
 def test_GaussianDataParser():
 

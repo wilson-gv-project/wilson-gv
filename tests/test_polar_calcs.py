@@ -89,7 +89,7 @@ def get_molecules_PolarDir(polar_directory: str):
     return collected_polar_displGeos
 
 def get_molecules_Quadrature(cfourQuadratureFile: str, cfourMoldenFile: str) -> dict[str:hyo.Molecule]:
-    from calculations import parseCFOUR_forWilson
+    from parsing import parseCFOUR_forWilson
     equilibrium_geometry_Molden, atomsStrs_Molden, normal_modes_Molden = parseCFOUR_forWilson.pMOLDEN(cfourMoldenFile)
     equilibrium_geometry, freqs, normal_modes = parseCFOUR_forWilson.pQUADRATURE(cfourQuadratureFile)
 

@@ -1,7 +1,5 @@
-import numpy as np
-
-from calculations.parseGaussian_forWilson import *
-from calculations.parseCFOUR_forWilson import *
+from parsing.parseGaussian_forWilson import *
+from parsing.parseCFOUR_forWilson import *
 from wilson.spectrum import make_DatainputDict
 
 def test_anharmonicHF_DZ_freqs():

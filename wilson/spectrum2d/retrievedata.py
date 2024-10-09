@@ -1,8 +1,7 @@
 """
 Is this a documentation?
 """
-from calculations import parseGaussian_forWilson, parseCFOUR_forWilson
-from calculations import parseGaussian_extra, parseCFOUR_extra
+from parsing import parseGaussian_forWilson, parseCFOUR_forWilson, parseCFOUR_extra, parseGaussian_extra
 from typing import Any
 
 import numpy as np

@@ -24,7 +24,7 @@ The output should be 7 pickle files:
                 'dimensionless.pkl'
 """
 
-from calculations import parseCFOUR_forWilson
+from parsing import parseCFOUR_forWilson
 import os
 
 curdir = os.getcwd()

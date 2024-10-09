@@ -16,7 +16,7 @@ def main(directory, hours, submit_job=False):
     keep_files = {"ZMAT", "GENBAS", "submit.sh", "submitpy.sh"}
 
     # Remove other files
-    for item in os.listdir('.'):
+    for item in os.listdir(''):
         if item not in keep_files:
             if os.path.isdir(item):
                 subprocess.run(['rm', '-rv', item], check=True)

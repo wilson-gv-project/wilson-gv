@@ -10,8 +10,8 @@ import time
 import numpy as np
 np.set_printoptions(linewidth=100000)
 
-from calculations.parseCFOUR_forWilson import CFOURdataParser
-from calculations.parseGaussian_forWilson import GaussianDataParser
+from parsing.parseCFOUR_forWilson import CFOURdataParser
+from parsing.parseGaussian_forWilson import GaussianDataParser
 
 def rec_cm2rec_s(reciprocal_cm):
     from scipy import constants

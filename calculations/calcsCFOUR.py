@@ -656,7 +656,7 @@ def makeDisplacements(delta: float, config: dict, dimensionless: bool = True):
             os.chdir(new_directory)
             generateSubmitPy(config, 'submit.sh')
             sumbitSbatch("submit.sh")
-            os.chdir('../')
+            os.chdir('../wilson/')
 
     # Generate double displacements for pairs of modes
     for i, mode_number2 in enumerate(mode_numbers):
@@ -707,7 +707,7 @@ def makeDisplacements(delta: float, config: dict, dimensionless: bool = True):
                 os.chdir(new_directory)
                 generateSubmitPy(config, 'submit.sh')
                 sumbitSbatch("submit.sh")
-                os.chdir('../')
+                os.chdir('../wilson/')
 
 def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True):
     import os
@@ -719,7 +719,7 @@ def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True)
     shutil.copy('../anharm/QUADRATURE', f'./QUADRATURE_f')
     shutil.copy('../anharm/MOLDEN', f'./MOLDEN_f')
 
-    from calculations import parseCFOUR_forWilson
+    from parsing import parseCFOUR_forWilson
     equilibrium_geometry_Molden, atomsStrs_Molden, normal_modes_Molden = parseCFOUR_forWilson.pMOLDEN('./MOLDEN_f')
 
     # get normal modes
@@ -787,7 +787,7 @@ def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True)
             os.chdir(new_directory)
             generateSubmitPy(config, 'submit.sh')
             #sumbitSbatch("submit.sh")
-            os.chdir('../')
+            os.chdir('../wilson/')
 
     # Generate double displacements for pairs of modes
     for i, mode_number2 in enumerate(mode_indices):
@@ -838,7 +838,7 @@ def makeDisplacementsNew(delta: float, config: dict, dimensionless: bool = True)
                 os.chdir(new_directory)
                 generateSubmitPy(config, 'submit.sh')
                 #sumbitSbatch("submit.sh")
-                os.chdir('../')
+                os.chdir('../wilson/')
 
 def process_fja_files():
     import subprocess
