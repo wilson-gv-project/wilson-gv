@@ -10,12 +10,14 @@
 
 ## Big picture
 
-| Section           | Description                                      | Extra (for paper II) | Module |
-|-------------------|--------------------------------------------------|----------------------|--------|
-| Parsing           | CFOUR and Gaussian outputs parsing               | Class template       |        |
-| Intensities       | Spectrum class, Expressions class?? calculations |                      |        |
-| Orient. averaging | Derivatives data, averaged tensor                |                      |        |
-| Rendering         | 2D spectrum plot                                 |                      |        |
+| Section              | Description                                      | Extra (for paper II) | Module |
+|----------------------|--------------------------------------------------|----------------------|--------|
+| 1. Parsing           | CFOUR and Gaussian outputs parsing               | Class template       |        |
+| 1. Data relay        | data to supply intensities engine                |                      |        |
+| 2. Intensities       | Spectrum class, Expressions class?? calculations |                      |        |
+| 2. Orient. averaging | Derivatives data, averaged tensor                |                      |        |
+| 3. Rendering         | 2D spectrum plot                                 |                      |        |
+| 4. Analysis          | Analysis tools                                   |                      |        |
 
 ---
 ### Data analysis tools

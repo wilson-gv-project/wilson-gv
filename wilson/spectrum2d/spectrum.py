@@ -1,19 +1,18 @@
-"""
-Mock should only:
-    input:
-        - fundamental frequencies (comb and overt made from them) - harmonic mock OR
-                        take also comb and overt
-        - skip (avrg=1.) or take mock derivatives
-        - spectral window
-"""
 import time
+from collections.abc import Iterable
+from typing import Callable
+
 import numpy as np
+
+from spectrum2d import get_iso_f
+
 np.set_printoptions(linewidth=100000)
 
 from parsing.parseCFOUR_forWilson import CFOURdataParser
 from parsing.parseGaussian_forWilson import GaussianDataParser
+from parsing.parser_template import MockParser
 
-def rec_cm2rec_s(reciprocal_cm):
+def rec_cm2rec_s(reciprocal_cm: float | np.ndarray) -> float | np.ndarray:
     from scipy import constants
     hartree2J = constants.physical_constants['hartree-joule relationship'][0]
     return reciprocal_cm * (100 * constants.h * constants.c / hartree2J)
@@ -25,17 +24,18 @@ class SpectrumEVV:
         w1, w2 - np.arrays of frequencies
         w1_mesh, w2_mesh - grid of frequencies w1 and w2
         shape2d - shape of the grid
-        fermirm
     """
-    def __init__(self, w1: np.array, w2: np.array, input_data_info: dict, vib_levels_harmonic: bool = True):
+    def __init__(self, w1: np.array, w2: np.array,
+                 input_data_info: dict, vib_levels_harmonic: bool = True):
 
         # Define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         # axes as arrays
         self.w1, self.w2 = np.array(w1), np.array(w2)
         self.shape2d = self.w1_mesh.shape
+        self.input_data_info = input_data_info
 
-        self.load_data(input_data_info)
+        self.load_data() # fetching data with self.input_data_info
         self.id = f'w1{min(self.w1)}_{max(self.w1)}w2{min(self.w2)}_{max(self.w2)}'
 
         self.gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
@@ -49,15 +49,17 @@ class SpectrumEVV:
         self.saved_mech = {}
         self.saved_el = {}
 
-    def load_data(self, input_data_info: dict):
-        self.dataInfo = input_data_info # dictionary with input_data_info source and type - inputs
+    def load_data(self):
+        """
 
-        if input_data_info['source'] == 'cfour':
-            dataBank = CFOURdataParser(input_data_info)
-        elif input_data_info['source'] == 'gaussian':
-            dataBank = GaussianDataParser(input_data_info)
+        """
+        if self.input_data_info['source'] == 'cfour':
+            dataBank = CFOURdataParser(self.input_data_info)
+        elif self.input_data_info['source'] == 'gaussian':
+            dataBank = GaussianDataParser(self.input_data_info)
         else:
-            dataBank = MockDataParser()
+            print('datasource not implemented')
+            dataBank = MockParser({})
 
         dataBank.getData()
 
@@ -73,7 +75,7 @@ class SpectrumEVV:
                  dataBank.cubic_force_constants]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
 
-    def addTerms(self, electrical_terms_selection, mechanical_terms_selection):
+    def addTerms(self, electrical_terms_selection: list, mechanical_terms_selection: list):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities"""
         # Terms in expressions
         electrical_terms_str = [('a+b,a', 'zero,a'), ('b,a', 'zero,a')]
@@ -156,13 +158,7 @@ class SpectrumEVV:
                           vib_ene_levels_harmonic[np.newaxis, :, np.newaxis] *
                           vib_ene_levels_harmonic[np.newaxis, np.newaxis, :])
 
-        # for i, te in enumerate(self.el_avrg_tensors):
-        #     print(f'\nel_avrg_tensors {self.electric_avrg[i]}\n', te)
-        #
-        # for k, tm in enumerate(self.mech_avrg_tensors):
-        #     print(f'mech_avrg_tensors {self.mechanical_avrg[k]}\n', tm)
-
-    def gamma_mn(self, Gamma, a, b, c=False):
+    def gamma_mn(self, Gamma: float, a: int, b: int, c: int = False) -> np.ndarray:
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic
         else:
@@ -191,7 +187,7 @@ class SpectrumEVV:
                 total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             return -total_sum_mech / 48.
 
-    def get_total_gamma_sum_el(self, Gamma, a, b):
+    def get_total_gamma_sum_el(self, Gamma: float, a: int, b: int) -> np.ndarray:
         """
         """
         if self.vib_levels_harmonic:
@@ -207,7 +203,7 @@ class SpectrumEVV:
             total_sum_el += elavrg[a, b] * resonance / prefac_el
         return total_sum_el / 24.
 
-    def get_total_gamma_sum_mech(self, Gamma, a, b, c):
+    def get_total_gamma_sum_mech(self, Gamma: float, a: int, b: int, c: int) -> np.ndarray:
         """
         """
         if self.vib_levels_harmonic:
@@ -217,7 +213,6 @@ class SpectrumEVV:
 
         total_sum_mech = 0
         prefac_mech = self.tensor_3d.T[a, b, c]
-        # prefac_mech = self.tensor_3d[a, b, c]
         for index, (mech_func, mechavrg) in enumerate(self.combofuns_tensors[1].items()):
             if index not in self.saved_mech:
                 self.saved_mech[index] = {}
@@ -235,11 +230,15 @@ class SpectrumEVV:
                 total_sum_mech += addition
         return -total_sum_mech / 48.
 
-    def intensity(self, Gamma, savedict, el=True, mech=True):
+    def intensity(self, Gamma: float, savedict: dict, el: bool = True, mech: bool = True) -> (np.ndarray, dict):
         Qab, Qabc = self.coords_ab, self.coords_abc
         Z = 0
         Qab_contrib_dict = {}
         Qabc_contrib_dict = {}
+
+        key = self.id+f'_gamma{Gamma}'
+        if key not in savedict:
+            savedict[key] = {}
 
         if el:
             start_time = time.time()
@@ -254,6 +253,8 @@ class SpectrumEVV:
             print('Electrical anharmonicities are calculated')
             Z += elall
 
+            savedict[key]['electrical'] = elall
+
         if mech:
             start_time = time.time()
             mechall = np.zeros(self.shape2d, dtype='complex128')
@@ -267,18 +268,14 @@ class SpectrumEVV:
             print('Mechanical anharmonicities are calculated')
             Z += mechall
 
-        key = self.id+f'_gamma{Gamma}'
-        if key not in savedict:
-            savedict[key] = {}
+            savedict[key]['mechanical'] = mechall
 
-        if mech: savedict[key]['mechanical'] = mechall
-        if el: savedict[key]['electrical'] = elall
         savedict[key]['Qab_contrib_dict'] = Qab_contrib_dict
         savedict[key]['Qabc_contrib_dict'] = Qabc_contrib_dict
 
         return Z, savedict
 
-    def intensity_electrical(self, Gamma):
+    def intensity_electrical(self, Gamma: float) -> (np.ndarray, dict):
         start_time = time.time()
 
         Qab_contrib_dict = {}
@@ -289,15 +286,15 @@ class SpectrumEVV:
             Qab_contrib_dict[tuple(i)] = contrib_ab
             elall += contrib_ab
             if ind % 100 == 0:
-                print(f'{ind}/{len(self.coords_abc)} -- {ind*100/len(self.coords_abc)}')
+                print(f'{ind}/{len(self.coords_ab)} modes combinations -- {ind*100/len(self.coords_ab)}%')
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time -| electrical: {execution_time} seconds")
         print('Electrical anharmonicities are calculated')
 
-        return elall
+        return elall, Qab_contrib_dict
 
-    def intensity_mechanical(self, Gamma):
+    def intensity_mechanical(self, Gamma: float) -> (np.ndarray, dict):
         start_time = time.time()
 
         Qabc_contrib_dict = {}
@@ -308,7 +305,7 @@ class SpectrumEVV:
             Qabc_contrib_dict[tuple(i)] = contrib_abc
             mechall += contrib_abc
             if ind % 1000 == 0:
-                print(f'{ind}/{len(self.coords_abc)} -- {ind*100/len(self.coords_abc)}')
+                print(f'{ind}/{len(self.coords_abc)} modes combinations -- {ind*100/len(self.coords_abc)}%')
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -318,205 +315,7 @@ class SpectrumEVV:
         return mechall, Qabc_contrib_dict
 
 
-class SpectrumFigure:
-
-    def __init__(self, sec_hypol_data, w1_mesh, w2_mesh, settings):
-
-        # figure XYZ data
-        self.gamma_data = sec_hypol_data
-        self.intensities = abs(sec_hypol_data) ** 2
-        self.X = w1_mesh
-        self.Y = w2_mesh
-
-        self.settings = {'omega1_minus_omega2': False, 'log10': True,
-                         'font_dict': {'size': 18}, 'dpi': 200,
-                         'figsize': (12, 12)}
-        self.settings.update(settings)
-
-        if self.settings['omega1_minus_omega2']:
-            self.Y = -(self.X - self.Y)
-
-        # figure settings
-        self.figsize = self.settings['figsize']
-        self.dpi = self.settings['dpi']
-        self.font_dict = self.settings['font_dict'] # font = {'size': 18}
-        # self.settings['norm_min'] = 1e3
-        # self.settings['norm_max'] = 1e8
-
-        el, mech = self.settings['electrical'], self.settings['mechanical']
-
-        # dynamic range max - for setting up the norm and colorbar ticks
-        if 'dmax_dict' in self.settings:
-            self.d_max = self.settings['dmax_dict'][(el, mech)]
-        else:
-            print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
-                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
-            self.d_max = self.intensities.max()
-        self.settings['d_max'] = self.d_max
-        # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
-        # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
-
-    def update_settings(self, settings: dict):
-
-        self.settings.update(settings)
-
-    def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', diagonal=False, to_save=True):
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import matplotlib
-        if to_save:
-            matplotlib.use('Agg')
-        plt.rcParams['path.simplify'] = True
-        plt.rcParams['agg.path.chunksize'] = 10000
-        plt.rcParams['axes.titlepad'] = 30
-        matplotlib.rc('font', **self.font_dict)
-
-        fig = plt.figure(figsize=self.figsize)
-        ax = fig.add_subplot(1, 1, 1)
-
-        import matplotlib.colors as colors
-        colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
-
-        num_count = self.settings['dynamic_range_n']
-        dynamic_range = num_count*10 # stop plotting when lower than this (number times 10) dmax
-
-        dynrange_log = np.log10(dynamic_range)
-        d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
-        dmax_log10 = float(int(np.log10(self.d_max)))
-
-        num_level_ticks = 6
-        levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
-        levels = []
-        for i in range(num_count):
-            levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_count - 1 - i) / (num_count - 1))))
-
-        cont = plt.contourf(self.X, self.Y, self.intensities,
-                            levels=levels, cmap='hot_r',
-                            norm=colorbar_norm)
-        if diagonal:
-            plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
-
-        # This is the fix for the white lines between contour levels
-        for c in cont.collections:
-            c.set_edgecolor("face")
-
-        # formatting of colorbar tick labels
-        import matplotlib.ticker as ticker
-        def fmt(x, pos):
-            a, b = '{:.0e}'.format(x).split('e')
-            b = int(b)
-            return r'${} \times 10^{{{}}}$'.format(a, b)
-
-        # https://stackoverflow.com/questions/25983218/scientific-notation-colorbar
-        colorbar = plt.colorbar(cont, ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
-
-        # plt.xlabel(r'$\omega_1$')
-        # plt.ylabel(r'$\omega_2$')
-        xs = self.X[0], self.X[-1]
-        ys = self.Y[0], self.Y[-1]
-
-        title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
-                           (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
-                           (True, True): r'both $|\gamma^{[1,0]}+\gamma^{[0,1]}|^2$'}
-
-        nicetitle = f'{nametuple[2]}'
-        plt.title(nicetitle)
-        bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
-        ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
-                    ha="left", va="top", bbox=bbox_args, fontsize=12)
-        plt.tight_layout()
-        if to_save:
-            plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
-
-        # import shutil
-        # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
-        return fig
-
-def read_csv_DB(filepath):
-    """
-
-    :param filepath:
-    :return:
-    """
-    # Column names are:
-    # code, method, basis_set, c4_ZMAT, c4_outfile_orig_hess,
-    # c4_QUADRATURE, pkl_dimensionless, pkl_dipole,
-    # c4_dipolexyz, pkl_polar, pkl_polar_raw, pkl_polar_data, c4_cubic,
-    # c4_out, pkl_vibdata, g16_3quanta_full
-    import pandas as pd
-    database = pd.read_csv(filepath)
-    # columnsDB = list(database.columns)
-    # print('\ncolumnsDB\n', columnsDB)
-
-    return database
-
-def getting_files_DB(sourceProgram: str, printing: bool = False):
-    """
-
-    :param printing:
-    :param sourceProgram:
-    :return:
-    """
-    DB = read_csv_DB('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
-
-    if sourceProgram == 'gaussian':
-        filtered_df = DB.query('g16_3quanta_full.notna() and g16_3quanta_full != ""')
-        selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'g16_3quanta_full']]
-        return selected_columns_df
-
-    else:
-        # c4_ZMAT, c4_outfile_orig_hess,
-        # c4_QUADRATURE, pkl_dimensionless, pkl_dipole,
-        # c4_dipolexyz, pkl_polar, pkl_polar_raw, pkl_polar_data, c4_cubic,
-        # c4_out, pkl_vibdata
-        columns_to_check = ['c4_dipolexyz', 'pkl_polar', 'c4_cubic', 'c4_out']
-        conditions = " and ".join([f"{col}.notna() and {col} != ''" for col in columns_to_check])
-        filtered_df = DB.query(conditions)
-
-        # filtered_df = DB.query('c4_dipolexyz.notna() and c4_dipolexyz != "" and pkl_polar.notna() and pkl_polar != "" ')
-        if printing:
-            selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out']]
-        else:
-            selected_columns_df = filtered_df[['code', 'method', 'basis_set', 'c4_out', 'c4_cubic',
-                                               'c4_dipolexyz', 'pkl_polar']]
-
-        return selected_columns_df
-
-def make_DatainputDict(sourceProgram: str, mol_tuple: tuple):
-    """
-
-    :param mol_tuple:
-    :param sourceProgram:
-    :return:
-    """
-    dataframe = getting_files_DB(sourceProgram)
-    mol_code, method, basis = mol_tuple
-    files_dict = {'mol_code': mol_code, 'method': method, 'basis': basis}
-
-    narrow_df = dataframe.loc[(dataframe['code'] == mol_code)
-                              & (dataframe['method'] == method)
-                              & (dataframe['basis_set'] == basis)]
-    if len(narrow_df) > 1:
-        print('Something is wrong, more than one file found. First one is taken here.')
-
-    if sourceProgram == 'gaussian':
-        result = {'source': 'gaussian', 'type': 'log'}
-
-        files_dict.update({'3quanta': narrow_df.iloc[0]['g16_3quanta_full'],
-                           'log': narrow_df.iloc[0]['g16_3quanta_full']})
-        result['files'] = files_dict
-        return result
-
-    elif sourceProgram == 'cfour':
-        result = {'source': 'cfour', 'type': 'out'}
-        files_dict.update({'out': narrow_df.iloc[0]['c4_out'], 'cubic': narrow_df.iloc[0]['c4_cubic'],
-                           'dipolexyz': narrow_df.iloc[0]['c4_dipolexyz'][:-1], 'polar': narrow_df.iloc[0]['pkl_polar'],
-                           'out_anharm_final': narrow_df.iloc[0]['c4_out'], 'polar_pkl': narrow_df.iloc[0]['pkl_polar']})
-        result['files'] = files_dict
-        return result
-
-
-def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int):
+def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int) -> Iterable:
     """
     modes a, b, (c) - combinations of them in pairs (electric anharmonicity) or triplets (mechanical anharmonicity)
     :param number_ofIndices:
@@ -525,7 +324,7 @@ def get_abc_indices(number_ofIndices: int, number_ofFundamentals: int):
     """
     return np.indices([number_ofFundamentals]*number_ofIndices).reshape(number_ofIndices, -1).T
 
-def get_AlphaBetaGammaDelta_indices(num_f: int):
+def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
     """
     pol_g = orientationalaveraging.get_iso_f(num_f)
     pol_g is a list of lists of 2 lists where the second one is empty
@@ -535,12 +334,12 @@ def get_AlphaBetaGammaDelta_indices(num_f: int):
     :return: array_of_4greekIndices - an array of arrays of 4 greek indices for second hyperpolarizability :
              [alpha, beta, gamma, delta]
     """
-    from wilson import orientationalaveraging
-    pol_g = orientationalaveraging.get_iso_f(num_f)
+    pol_g = get_iso_f(num_f)
     array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
     return array_of_4greekIndices
 
-def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.ndarray], gammaCompsAll: np.array):
+def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]],
+                    data: dict[str:np.ndarray], gammaCompsAll: np.array) -> np.ndarray:
     """
     Calculate the averaging tensor for a given formula.
     Indices of the tensor are normal coordinates (NC) indices,
@@ -601,22 +400,26 @@ def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]], data: dict[str:np.nda
         return avrg_tensor
 
 # function generator
-def generate_resonances_functions(subscripts, fermi=None, margin=10.):
+def generate_resonances_functions(subscripts, fermi=None, margin=10.) -> Callable:
     m1n1m2n2 = [i.split(',') for i in subscripts]
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
 
-    def function(w_all: dict, w1, w2, Gamma: float, abctuple: tuple[int, int, int], m1n1m2n2=m1n1m2n2, fermi=fermi):
+    def function(w_all: dict, w1: np.ndarray, w2: np.ndarray, Gamma: float,
+                 abctuple: tuple[int, int] | tuple[int, int, int],
+                 m1n1m2n2: list = m1n1m2n2, fermi: list = fermi) -> np.ndarray:
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
         w_all[('zero',)] = 0.
 
         wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
         wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))# if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
-        # print([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')])
-        # print(m1n1m2n2[1][0])
 
-        wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int)) if 'zero' not in m1n1m2n2[1][0].split('+') else tuple([m1n1m2n2[1][0]])
+        if 'zero' not in m1n1m2n2[1][0].split('+'):
+            wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int))
+        else:
+            wm2 = tuple([m1n1m2n2[1][0]])
+
         wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
 
         if fermi is None:
@@ -627,10 +430,16 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
 
         else:
             w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')], key=int))
-            w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')], key=int)) if 'zero' not in fermi[0][1].split('+') else tuple([fermi[0][1]])
+            if 'zero' not in fermi[0][1].split('+'):
+                w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')], key=int))
+            else:
+                w_fr21 = tuple([fermi[0][1]])
 
             w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')], key=int))
-            w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int)) if 'zero' not in fermi[1][1].split('+') else tuple([fermi[1][1]])
+            if 'zero' not in fermi[1][1].split('+'):
+                w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int))
+            else:
+                w_fr22 = tuple([fermi[1][1]])
 
             t1 = rec_cm2rec_s(w_all[wm1]-w_all[wn1]+w1-w2) - 1j * Gamma
             t2 = rec_cm2rec_s(w_all[wm2]-w_all[wn2]+w1) - 1j * Gamma
@@ -638,212 +447,7 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.):
             t4 = rec_cm2rec_s(w_all[w_fr12]-w_all[w_fr22])
 
             sumfrac = (1 / t3 + 1 / t4)
-            # with open('./fermi', 'a') as file1:
-            #     file1.write('\n==============================\n')
-            #     file1.write(f'{abctuple}\n{w_fr11} {w_fr21} {w_fr12} {w_fr22}\n{fermi}\n')
-            #     file1.writelines(str(t3)+'\n')
-            #     file1.writelines(str(t4)+'\n')
-            #     file1.writelines(str(sumfrac) + '\n')
-
-            # with open('./fermi_other', 'a') as file1:
-            #     file1.write('\n==============================\n')
-            #     file1.write(f'{abctuple}\n{m1n1m2n2}\n')
-            #     file1.writelines(str(rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]))+'\n')
-            #     file1.writelines(str( rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) )+'\n')
-            #     file1.writelines(str((1 / t1 / t2)) + '\n')
 
             return (1 / t1 / t2) * sumfrac
 
     return function
-
-def get_resonances(electrical_terms_dict, mechanical_terms_dict, w_all, margin=10.):
-    """
-    subscripts /and fermi
-    :param subscripts:
-    :param fermi:
-    :param margin:
-    :return:
-    """
-    nfunds = len([i for i in w_all if len(i)==1])
-
-    for elTerm in electrical_terms_dict:
-        subscripts = electrical_terms_dict[elTerm]
-        m1n1m2n2 = [i.split(',') for i in subscripts]
-
-
-    for mechTerm in mechanical_terms_dict:
-        subscripts, fermi = mechanical_terms_dict[mechTerm]
-        fermi = [i.split(',') for i in fermi]
-
-    def function(w_all, w1, w2, Gamma, abctuple, m1n1m2n2=m1n1m2n2, fermi=fermi):
-
-        resonances_tensor = np.zeros((len(abctuple), len(abctuple)))
-
-        letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
-        dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
-        w_all[('zero',)] = 0.
-
-        wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
-        wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))
-        # if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
-
-        wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int)) \
-            if 'zero' not in m1n1m2n2[1][0].split('+') else tuple([m1n1m2n2[1][0]])
-        wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
-
-        if fermi is None:
-            return np.where(w2-margin > w1, 1 / (rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1])
-                                                 + rec_cm2rec_s(w1) - rec_cm2rec_s(w2)
-                                                 - 1j * Gamma) / (rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2])
-                                                                  + rec_cm2rec_s(w1) - 1j * Gamma), 0.)
-
-        else:
-            w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')], key=int))
-            w_fr21 = tuple(sorted([str(dictabc[i]) for i in fermi[0][1].split('+')], key=int)) \
-                if 'zero' not in fermi[0][1].split('+') else tuple([fermi[0][1]])
-
-            w_fr12 = tuple(sorted([str(dictabc[i]) for i in fermi[1][0].split('+')], key=int))
-            w_fr22 = tuple(sorted([str(dictabc[i]) for i in fermi[1][1].split('+')], key=int)) \
-                if 'zero' not in fermi[1][1].split('+') else tuple([fermi[1][1]])
-
-            t1 = rec_cm2rec_s(w_all[wm1]) - rec_cm2rec_s(w_all[wn1]) + rec_cm2rec_s(w1) - rec_cm2rec_s(w2) - 1j * Gamma
-            t2 = rec_cm2rec_s(w_all[wm2]) - rec_cm2rec_s(w_all[wn2]) + rec_cm2rec_s(w1) - 1j * Gamma
-            t3 = rec_cm2rec_s(w_all[w_fr11]) - rec_cm2rec_s(w_all[w_fr21])
-            t4 = rec_cm2rec_s(w_all[w_fr12]) - rec_cm2rec_s(w_all[w_fr22])
-
-            sumfrac = (1 / t3 + 1 / t4)
-
-            return (1 / t1 / t2) * sumfrac
-
-    return function
-
-def printT(tensor):
-    import pandas as pd
-    pd.set_option('display.float_format', '{:.10f}'.format)
-
-    ndims = len(tensor.shape)
-
-    # mu_Q
-    if ndims == 2:
-        column_names = ['x', 'y', 'z']
-        row_names    = [f'{i}' for i in range(tensor.shape[0])]
-        df = pd.DataFrame(tensor, columns=column_names)#, index=row_names)
-        df.insert(0, "I", row_names, allow_duplicates=True)
-        df.insert(1, "", ['|']*len(row_names), allow_duplicates=True)
-
-        # print(df)
-        print(df.to_string(index=False))
-
-    elif ndims == 3:
-        # F_abc
-        if tensor.shape[0] == tensor.shape[1] == tensor.shape[2]:
-            row_names = [f'K {i}' for i in range(tensor.shape[0])]
-            indx = [f'{i}' for i in range(tensor.shape[1])]
-            df = pd.DataFrame(tensor[0], columns=row_names)#, index=row_names)
-            df.insert(0, "I", ['0']*len(row_names), allow_duplicates=True)
-            df.insert(1, "J", indx, allow_duplicates=True)
-            df.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
-
-            for ii, k in enumerate(tensor[1:]):
-                dfi = pd.DataFrame(k, columns=row_names)#, index=row_names)
-                dfi.insert(0, "I", [f'{ii+1}']*len(row_names), allow_duplicates=True)
-                dfi.insert(1, "J", indx, allow_duplicates=True)
-                dfi.insert(2, "", ['|'] * len(row_names), allow_duplicates=True)
-
-                df = pd.concat([df, dfi], ignore_index=True)
-
-            n = len(indx)  # chunk row size
-            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
-
-            for dframe in list_df:
-                print(dframe.to_string(index=False))
-
-        # mu_QQ
-        elif tensor.shape[0] == tensor.shape[1] != tensor.shape[2]:
-            row_names = ['x', 'y', 'z']
-            indx = [f'{i}' for i in range(tensor.shape[1])]
-            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
-            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
-            df.insert(1, "J", indx, allow_duplicates=True)
-            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
-
-            for ii, k in enumerate(tensor[1:]):
-                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
-                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
-                dfi.insert(1, "J", indx, allow_duplicates=True)
-                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
-
-                df = pd.concat([df, dfi], ignore_index=True)
-
-            n = len(indx)  # chunk row size
-            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
-
-            for dframe in list_df:
-                print(dframe.to_string(index=False))
-
-        # alpha_Q
-        elif tensor.shape[0] != tensor.shape[1] == tensor.shape[2]:
-            row_names = ['x', 'y', 'z']
-            indx = [f'{i}' for i in range(tensor.shape[1])]
-            df = pd.DataFrame(tensor[0], columns=row_names)  # , index=row_names)
-            df.insert(0, "I", ['0'] * len(indx), allow_duplicates=True)
-            df.insert(1, "", row_names, allow_duplicates=True)
-            df.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
-
-            for ii, k in enumerate(tensor[1:]):
-                dfi = pd.DataFrame(k, columns=row_names)  # , index=row_names)
-                dfi.insert(0, "I", [f'{ii + 1}'] * len(indx), allow_duplicates=True)
-                dfi.insert(1, "", row_names, allow_duplicates=True)
-                dfi.insert(2, "", ['|'] * len(indx), allow_duplicates=True)
-
-                df = pd.concat([df, dfi], ignore_index=True)
-
-            n = len(indx)  # chunk row size
-            list_df = [df[i:i + n] for i in range(0, df.shape[0], n)]
-
-            for dframe in list_df:
-                print(dframe.to_string(index=False))
-
-    # alpha_QQ
-    elif ndims == 4:
-        listdf = []
-        for i in range(tensor.shape[0]):
-            for j in range(tensor.shape[0]):
-                row_names = ['x', 'y', 'z']
-                df = pd.DataFrame(tensor[i, j], columns=row_names)  # , index=row_names)
-                df.insert(0, "I", [f'{i}'] * 3, allow_duplicates=True)
-                df.insert(1, "J", [f'{j}'] * 3, allow_duplicates=True)
-                df.insert(2, "", row_names, allow_duplicates=True)
-                df.insert(3, "", ['|'] * 3, allow_duplicates=True)
-
-                listdf.append(df)
-
-        dfs = pd.concat(listdf, ignore_index=True)
-        n = tensor.shape[2]  # chunk row size
-        list_df = [dfs[i:i + n] for i in range(0, dfs.shape[0], n)]
-
-        for dframe in list_df:
-            print(dframe.to_string(index=False))
-
-    else:
-        print(f"Dimension of the property in not 2, 3 or 4, it's {ndims}")
-
-
-def printed2DIRtensors(setup: SpectrumEVV):
-
-    ders = setup.deriv_data
-    print('\nFundamental frequencies (anharmonic):', list(setup.fundamentals.values()))
-    print('Fundamental frequencies (harmonic)  :', list(setup.fundamentals_harmonic.values()), '\n')
-
-    print('All frequencies (anharmonic)  :', setup.all_states, '\n')
-
-    for d in ders:
-        print(d, ders[d].shape)#, '\n', ders[d])
-        printT(ders[d])
-        print('==================================\n')
-
-
-class MockDataParser:
-
-    def __init__(self):
-        pass

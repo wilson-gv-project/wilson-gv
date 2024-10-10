@@ -1,3 +1,7 @@
+"""
+Uses hylleraas software program package hyobj
+"""
+
 import numpy as np
 import hyobj as hyo
 

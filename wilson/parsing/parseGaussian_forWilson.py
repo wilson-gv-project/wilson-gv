@@ -18,7 +18,7 @@ pd.set_option('display.max_rows', sys.maxsize)
 
 class GaussianDataParser(object):
 
-    def __init__(self, all_files_dict):
+    def __init__(self, all_files_dict: dict):
         self.all_files_dict = all_files_dict
         # {'log', 'fchk', 'com'}
 
@@ -73,8 +73,6 @@ class GaussianDataParser(object):
         ah_sts = get_allStates_fromParsedResults(results_log, anharmonic=True)
         h_sts = get_allStates_fromParsedResults(results_log, anharmonic=False)
 
-        # print("ah_sts\n", ah_sts)
-        # print("h_sts\n", h_sts)
         self.anharmonic_states = {tuple(str(i) for i in key): value for key, value in ah_sts.items()}
         self.harmonic_states = {tuple(str(i) for i in key): value for key, value in h_sts.items()}
 
@@ -82,7 +80,7 @@ class GaussianDataParser(object):
         self.dipole_first_derivatives = mu[0]
         self.dipole_second_derivatives = mu[1]
 
-        alpha = getPolarDers_au(self.all_files_dict['files']['log'], self.fundamentals_harmonic_str)
+        alpha = getPolarDers_au(self.all_files_dict['files']['log'])
         self.polarizability_first_derivatives = alpha[0]
         self.polarizability_second_derivatives = alpha[1]
 
@@ -92,7 +90,7 @@ class GaussianDataParser(object):
         self.cubic_force_constants = get_cubic_post(len(self.fundamentals_harmonic_str), cubic)
 
 # used in retrievedata.py
-def parse_frequencies(file_path: str) -> pd.DataFrame:
+def parse_frequencies(file_path: str) -> dict[str: pd.DataFrame]:
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -116,46 +114,41 @@ def parse_frequencies(file_path: str) -> pd.DataFrame:
             elif current_section:
                 if '------------' not in line:
                     linelist = line.split()
-                    # print(f'{current_section} linelist:  ', linelist)
-                    # Insert None at the desired index (3rd position, which is index 2)
+                    # inserting None at the desired index 2
                     if len(linelist)==5 and current_section=='Combination Bands': linelist.insert(2, None)
 
                     results[current_section].append(linelist)
 
+    results_dataframes = {}
     for section, data in results.items():
         if section != 'Overtones':
-            results[section] = pd.DataFrame(data[1:-1])
+            results_dataframes[section] = pd.DataFrame(data[1:-1])
         else:
-            results[section] = pd.DataFrame(data[2:-1])
+            results_dataframes[section] = pd.DataFrame(data[2:-1])
 
-        main_numbers = [int(i.split('(')[0]) for i in results[section][0]]
-        sub_numbers = [int(i[:-1].split('(')[1]) for i in results[section][0]]
-
-        # Insert these columns at specific positions
-        results[section].insert(1, 'mode_a', main_numbers)
-        results[section].insert(2, 'n_a', sub_numbers)
-        results[section].drop(results[section].columns[0], axis=1, inplace=True)
+        main_numbers = [i.split('(')[0] for i in results_dataframes[section][0]]
+        sub_numbers = [int(i[:-1].split('(')[1]) for i in results_dataframes[section][0]]
+        # nserting columns at specific positions
+        results_dataframes[section].insert(1, 'mode_a', main_numbers)
+        results_dataframes[section].insert(2, 'n_a', sub_numbers)
+        results_dataframes[section].drop(results_dataframes[section].columns[0], axis=1, inplace=True)
 
         if section=='Combination Bands':
-            main_numbers = [int(i.split('(')[0]) for i in results[section][1]]
-            sub_numbers = [int(i[:-1].split('(')[1]) for i in results[section][1]]
-            # print('main_numbers, sub_numbers', main_numbers, sub_numbers)
-            results[section].insert(3, 'mode_b', main_numbers)
-            results[section].insert(4, 'n_b', sub_numbers)
-            results[section].drop(results[section].columns[2], axis=1, inplace=True)
+            main_numbers = [int(i.split('(')[0]) for i in results_dataframes[section][1]]
+            sub_numbers = [int(i[:-1].split('(')[1]) for i in results_dataframes[section][1]]
 
-            main_numbers = [int(i.split('(')[0]) if i is not None else i for i in results[section][2]]
-            sub_numbers = [int(i[:-1].split('(')[1]) if i is not None else i for i in results[section][2]]
+            results_dataframes[section].insert(3, 'mode_b', main_numbers)
+            results_dataframes[section].insert(4, 'n_b', sub_numbers)
+            results_dataframes[section].drop(results_dataframes[section].columns[2], axis=1, inplace=True)
 
-            results[section].insert(5, 'mode_c', main_numbers)
-            results[section].insert(6, 'n_c', sub_numbers)
-            results[section].drop(results[section].columns[4], axis=1, inplace=True)
-    # a = dict(zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2]))
-    # print("dict(zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2]))\n", a)
-    # print("results['Fundamental Bands']\n", results['Fundamental Bands'])
-    # print("results['Combination Bands']\n", results['Combination Bands'])
-    # print("results['Overtones']\n", results['Overtones'])
-    return results
+            main_numbers = [int(i.split('(')[0]) if i is not None else i for i in results_dataframes[section][2]]
+            sub_numbers = [int(i[:-1].split('(')[1]) if i is not None else i for i in results_dataframes[section][2]]
+
+            results_dataframes[section].insert(5, 'mode_c', main_numbers)
+            results_dataframes[section].insert(6, 'n_c', sub_numbers)
+            results_dataframes[section].drop(results_dataframes[section].columns[4], axis=1, inplace=True)
+
+    return results_dataframes
 
 def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = False) -> dict:
     """results is a DataFrame from parse_frequencies()"""
@@ -164,33 +157,15 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
         results['Combination Bands']['n_c'] = results['Combination Bands']['n_c'].fillna(0)
         funddict = {tuple([int(k) - 1]): float(v) for k, v in
                     zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][2])}
-        # print('funddict\n', funddict)
-        # print("results['Overtones']['n_a']\n", results['Overtones']['n_a'])
-        # print("results['Overtones']\n", results['Overtones'])
-        # states = {
-        #     tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v)
-        #     for t, v, n in
-        #     zip(results['Overtones']['mode_a'], results['Overtones'][2], results['Overtones']['n_a'])
-        # }
+
         states = {
-            tuple(sorted([t-1] * int(n))): float(v)
+            tuple(sorted([int(t)-1] * int(n))): float(v)
             for t, v, n in
             zip(results['Overtones']['mode_a'], results['Overtones'][2], results['Overtones']['n_a'])
         }
-        # combinationbands = {
-        #     tuple(
-        #         sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
-        #             (int(t3) - 1)] * int(n3))
-        #     ): float(v)
-        #     for t1, t2, t3, v, n1, n2, n3 in
-        #     zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
-        #         results['Combination Bands']['mode_c'],
-        #         results['Combination Bands'][4], results['Combination Bands']['n_a'],
-        #         results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
-        # }
         combinationbands = {
             tuple(
-                sorted([t1-1] * int(n1) + [t2-1] * int(n2) + [
+                sorted([int(t1)-1] * int(n1) + [t2-1] * int(n2) + [
                     (int(t3) - 1)] * int(n3))
             ): float(v)
             for t1, t2, t3, v, n1, n2, n3 in
@@ -206,24 +181,11 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
     else:
         funddict1 = {tuple([int(k) - 1]): float(v) for k, v in
                      zip(results['Fundamental Bands']['mode_a'], results['Fundamental Bands'][1])}
-        # states1 = {tuple(sorted([int(k) - 1 for k in t.split()] * int(n))): float(v) for t, v, n in
-        #            zip(results['Overtones']['mode_a'], results['Overtones'][1], results['Overtones']['n_a'])}
-        # combinationbands1 = {
-        #     tuple(
-        #         sorted([int(k) - 1 for k in t1.split()] * int(n1) + [int(l) - 1 for l in t2.split()] * int(n2) + [
-        #             (int(t3) - 1)] * int(n3))
-        #     ): float(v)
-        #     for t1, t2, t3, v, n1, n2, n3 in
-        #     zip(results['Combination Bands']['mode_a'], results['Combination Bands']['mode_b'],
-        #         results['Combination Bands']['mode_c'],
-        #         results['Combination Bands'][3], results['Combination Bands']['n_a'],
-        #         results['Combination Bands']['n_b'], results['Combination Bands']['n_c'])
-        # }
-        states1 = {tuple(sorted([t-1] * int(n))): float(v) for t, v, n in
+        states1 = {tuple(sorted([int(t)-1] * int(n))): float(v) for t, v, n in
                    zip(results['Overtones']['mode_a'], results['Overtones'][1], results['Overtones']['n_a'])}
         combinationbands1 = {
             tuple(
-                sorted([t1-1] * int(n1) + [t2-1] * int(n2) + [
+                sorted([int(t1)-1] * int(n1) + [t2-1] * int(n2) + [
                     (int(t3) - 1)] * int(n3))
             ): float(v)
             for t1, t2, t3, v, n1, n2, n3 in
@@ -235,7 +197,7 @@ def get_allStates_fromParsedResults(results: pd.DataFrame, anharmonic: bool = Fa
         allstates_harm = {**funddict1, **states1, **combinationbands1}
         return allstates_harm
 
-def get_detected_resonances_g16(filepath: str):
+def get_detected_resonances_g16(filepath: str) -> list[str]:
 
     with open(filepath, 'r') as file:
         file_content = file.read()
@@ -299,9 +261,8 @@ def getPolarDers_log(logfile: str) -> tuple:
     shpNM = int(pol.loc[pol[0] == 'P1', 1].max())
     p1_3d = np.zeros((shpNM, 3, 3))
     for i in pol.loc[pol[0] == 'P1', 1].unique():
-        # Get the rows with the current 'i' value and 'P' is 'P1', and select columns 5, 6, and 7
+        # in the rows with the current 'i' value and 'P' is 'P1', select columns 5, 6, and 7
         xyz = pol.loc[(pol[0] == 'P1') & (pol[1] == i), [5, 6, 7]].values
-        # Assign the 2D array 'xyz' to the corresponding slice of the 3D array
         p1_3d[int(i) - 1] = xyz
 
     nm_i = int(pol.loc[pol[0] == 'P2', 1].max())
@@ -311,17 +272,17 @@ def getPolarDers_log(logfile: str) -> tuple:
 
     for i in pol.loc[pol[0] == 'P2', 1].unique():
         for j in pol.loc[pol[0] == 'P2', 2].unique():
-            # Get the rows with the current 'i' and 'j' values and 'P' is 'P2', and select columns 5, 6, and 7
+            # in the rows with the current 'i' and 'j' values and 'P' is 'P2', select columns 5, 6, and 7
             xyz = pol.loc[(pol[0] == 'P2') & (pol[1] == i) & (pol[2] == j), [5, 6, 7]].values
-            # Check if 'xyz' is not empty
+            # if 'xyz' is not empty
             if xyz.shape[0] != 0:
-                # Assign the 2D array 'xyz' to the corresponding slice of the 4D array
+                # xyz is a 2D array
                 p2_4d[int(i) - 1, int(j) - 1] = xyz
                 p2_4d[int(j) - 1, int(i) - 1] = xyz
 
     return tuple([p1_3d, p2_4d])
 
-def getPolarDers_au(logfile: str, fundamentals_harmonic: dict) -> tuple:
+def getPolarDers_au(logfile: str) -> tuple:
     from scipy import constants
     # to go from amu to au mass unit (m_e)
     amc_au = constants.physical_constants['atomic mass constant'][0] / \
@@ -354,7 +315,8 @@ def parse_cubic_constants(file_path: str) -> [pd.DataFrame, list]:
             elif start2 and line.strip() and not line.isspace():
                 parts = line.split()
                 results.append(parts)
-            elif line.strip().startswith(': FI =') or line.strip().startswith(': k  =') or line.strip().startswith(': K  ='):
+            elif (line.strip().startswith(': FI =') or line.strip().startswith(': k  =')
+                  or line.strip().startswith(': K  =')):
                 units_lines.append(line.strip())
     df = pd.DataFrame(results, columns=["I", "J", "K", "FI(I,J,K)", "k(I,J,K)", "K(I,J,K)"])
 
@@ -380,14 +342,15 @@ def parse_quartic_constants(file_path: str) -> [pd.DataFrame, list]:
             elif start2 and line.strip() and not line.isspace():
                 parts = line.split()
                 results.append(parts)
-            elif line.strip().startswith(': FI =') or line.strip().startswith(': k  =') or line.strip().startswith(': K  ='):
+            elif (line.strip().startswith(': FI =') or line.strip().startswith(': k  =')
+                  or line.strip().startswith(': K  =')):
                 units_lines.append(line.strip())
     df = pd.DataFrame(results, columns=["I", "J", "K", "L", "FI(I,J,K,L)", "k(I,J,K,L)", "K(I,J,K,L)"])
 
     return df, units_lines
 
 # used in retrievedata.py
-def get_cubic_post(len_freq: int, cubic: np.ndarray, recipcm: bool = False):
+def get_cubic_post(len_freq: int, cubic: np.ndarray):
     K3 = np.zeros((len_freq, len_freq, len_freq), dtype=np.float64)
 
     for fijk in cubic:
@@ -412,7 +375,7 @@ def get_cubic_post(len_freq: int, cubic: np.ndarray, recipcm: bool = False):
 
     return K3
 
-def get_quartic_post(len_freq: int, quartic: np.ndarray, recipcm: bool = False):
+def get_quartic_post(len_freq: int, quartic: np.ndarray):
     K4 = np.zeros((len_freq, len_freq, len_freq, len_freq), dtype=np.float64)
 
     for fijkl in quartic:
@@ -442,7 +405,7 @@ def get_quartic_post(len_freq: int, quartic: np.ndarray, recipcm: bool = False):
     return K4
 
 # used in retrievedata.py
-def parse_dipole_moment(file_path: str) -> pd.DataFrame:
+def parse_dipole_moment(file_path: str) -> (pd.DataFrame, str):
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -450,7 +413,7 @@ def parse_dipole_moment(file_path: str) -> pd.DataFrame:
     start = False
     units_line = None
     column_names = ["P", "i", "j", "k", "X", "Y", "Z"]
-    last_ijk = [np.nan, np.nan, np.nan]  # Initialize last seen "i", "j", "k" values
+    last_ijk = [np.nan, np.nan, np.nan]  # last seen "i", "j", "k" values
 
     from scipy import constants
     bohr_radius = constants.physical_constants['Bohr radius'][0]
@@ -470,7 +433,7 @@ def parse_dipole_moment(file_path: str) -> pd.DataFrame:
                 # parts = re.split("[| ]+", line.strip())
                 parts = line.split('|')
                 allparts = [parts[0].strip()]
-                # If "i", "j", "k" values are missing, use last seen values
+                # if "i", "j", "k" values are missing, use last seen values
                 if parts[1].strip() == '':
                     allparts.extend(last_ijk)
                 else:
@@ -478,9 +441,8 @@ def parse_dipole_moment(file_path: str) -> pd.DataFrame:
                     ijk.extend([np.nan] * (3 - len(ijk)))
                     allparts.extend(ijk)
                 allparts.extend([float(s.replace('D', 'e'))*debye_to_au for s in parts[2].split()])
-                # Create a dictionary that maps column names to values
                 row_dict = {column_names[i]: value for i, value in enumerate(allparts)}
-                # Fill in missing columns with None
+                # missing columns to None
                 row = [row_dict.get(column_name, np.nan) for column_name in column_names]
                 results.append(row)
 
@@ -497,7 +459,7 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
     start = False
     units_line = None
     column_names = ["P", "i", "j", "k", "comp", "X", "Y", "Z"]
-    last_ijk = [np.nan, np.nan, np.nan]  # Initialize last seen "i", "j", "k" values
+    last_ijk = [np.nan, np.nan, np.nan]  # last seen "i", "j", "k" values
 
     for line in lines:
         if line.strip().startswith('Polarizability Tensor'):
@@ -511,7 +473,7 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                 # parts = re.split("[| ]+", line.strip())
                 parts = line.split('|')
                 allparts = [parts[0].strip()]
-                # If "i", "j", "k" values are missing, use last seen values
+                # use last seen values if missing
                 if parts[1].strip() == '':
                     allparts.extend(last_ijk)
                 else:
@@ -527,9 +489,7 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                     xyz = [float(s.replace('D', 'e')) for s in parts[3].strip().split()]
                     xyz.extend([np.nan] * (3 - len(xyz)))
                     allparts.extend(xyz)
-                # Create a dictionary that maps column names to values
                 row_dict = {column_names[i]: value for i, value in enumerate(allparts)}
-                # Fill in missing columns with None
                 row = [row_dict.get(column_name, np.nan) for column_name in column_names]
                 results.append(row)
 
@@ -541,24 +501,21 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                 xyz = [float(s.replace('D', 'e')) for s in parts[3].strip().split()]
                 xyz.extend([np.nan] * (3 - len(xyz)))
                 allparts.extend(xyz)
-                # Create a dictionary that maps column names to values
                 row_dict = {column_names[i]: value for i, value in enumerate(allparts)}
-                # Fill in missing columns with None
+                # missing columns to None
                 row = [row_dict.get(column_name, np.nan) for column_name in column_names]
                 results.append(row)
     df = pd.DataFrame(results, columns=column_names)
     array = df.to_numpy()
 
-    # Iterate over the array in steps of 3
     for i in range(0, len(array), 3):
-        # Get the current 3-row block
+        # current 3-row block
         block = array[i:i + 3]
-        # Find the 'P' value in the second row of the block
         p_value = block[1, 0]
         ival = block[1, 1]
         kval = block[1, 2]
         jval = block[1, 3]
-        # Replace 'nan' values in the first column of the block with the 'P' value
+        # replacing nan values in the first column of the block with the P value
         for j in range(3):
             try:
                 if np.isnan(block[j, 0]):
@@ -577,7 +534,6 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
                     block[j, 3] = block[j, 3] if np.isnan(block[j, 3]) else int(block[j, 3])
             except TypeError:
                 continue
-        # Replace 'nan' values in the specified positions with the corresponding values
         if np.isnan(block[0, 6]):
             block[0, 6] = block[1, 5]
         if np.isnan(block[0, 7]):
@@ -585,8 +541,5 @@ def parse_polarizability(file_path: str) -> pd.DataFrame:
         if np.isnan(block[1, 7]):
             block[1, 7] = block[2, 6]
 
-    # pd.set_option('display.float_format', '{:.7f}'.format)
     df = pd.DataFrame(array)
     return df#, units_line
-
-# -----------------------------------------------------------------------------

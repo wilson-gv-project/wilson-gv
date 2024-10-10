@@ -1,5 +1,8 @@
 import numpy as np
-from wilson.dataanalysis import *
+
+# from playground.units_with_pint import omega
+from wilson.relay import DataVault
+from wilson import analysis
 from wilson import spectrum
 
 
@@ -8,36 +11,38 @@ def test_get_resonances_electrical():
 
     omega1 = np.arange(2810., 3210., 10.)
     omega2 = np.arange(5510., 6050., 10.)
-    datain = spectrum.make_DatainputDict('gaussian', ('FOAC', 'HF', 'cc_pVQZ'))
+
+    data_vault = DataVault('./test_database/mini_files_database.csv')
+    datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
     vib_levels_harmonic = True
     computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain,
                                             vib_levels_harmonic=vib_levels_harmonic)
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
-    dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=True,
+    dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=True,
                                                      vib_levels_harmonic=vib_levels_harmonic)
-    import matplotlib.pyplot as plt
-    for dfEL in dfs4terms_el:
-        # print(dfEL)
-        pass
+    # for dfEL in dfs4terms_el:
+    #     print(dfEL)
+        # pass
 
 def test_get_resonances_mechanical():
     terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
 
     omega1 = np.arange(2810., 3210., 10.)
     omega2 = np.arange(5510., 6050., 10.)
-    datain = spectrum.make_DatainputDict('gaussian', ('FOAC', 'HF', 'cc_pVQZ'))
+
+    data_vault = DataVault()
+    datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
     vib_levels_harmonic = True
     computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain,
                                             vib_levels_harmonic=vib_levels_harmonic)
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
-    dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=True,
+    dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=True,
                                                      vib_levels_harmonic=vib_levels_harmonic)
 
-    import matplotlib.pyplot as plt
 
     for dfMech in dfs4terms_mech:
         print('Original length', len(dfMech))
@@ -75,7 +80,9 @@ def test_get_avrg_tensors():
     terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
     omega1 = np.arange(2810., 3210., 10.)
     omega2 = np.arange(5510., 6050., 10.)
-    datain = spectrum.make_DatainputDict('gaussian', ('FOAC', 'HF', 'cc_pVQZ'))
+
+    data_vault = DataVault()
+    datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
 
     computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, vib_levels_harmonic=False)
     computedSpectrum.addTerms(*terms_selection)
@@ -92,15 +99,18 @@ def test_get_avrg_tensors():
     print(computedSpectrum.deriv_data['F_abc'])
 
 def test_get_El2Mech_ratio():
-    method = ('FOAC', 'HF', 'cc_pVQZ')
-    datain = spectrum.make_DatainputDict('gaussian', method)
-    settings_here = {'electrical': None, 'mechanical': None,
-                     'Gamma_rc': 10., 'region': 5,
-                     'font_dict': {'size': 18}, 'figsize': (12, 15)}
+    method = ('FORM', 'HF', 'cc_pVQZ')
+    data_vault = DataVault()
+    datain = data_vault.make_DatainputDict('gaussian', method)
 
-    el_percnt, mech_percnt = get_El2Mech_ratio(datain, settings_here, vibEL=True)
-    print('\n-------------')
-    print(el_percnt)
+    Gamma_rc = 10
+    Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+    omega1, omega2 = (1800, 1900, 20.), (2300, 2400, 20.)
+    terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
 
+    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, vib_levels_harmonic=True)
+    computedSpectrum.addTerms(*terms_selection)
+
+    ratio = analysis.get_El2Mech_ratio(computedSpectrum, Gamma)
     print('\n-------------')
-    print(mech_percnt)
+    print(ratio)

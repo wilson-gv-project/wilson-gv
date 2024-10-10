@@ -2,8 +2,8 @@ from parsing.parseGaussian_forWilson import *
 
 def test_GaussianDataParser():
 
-    datadict = {'log': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_coh2b3lypoptanhramanQZ.out',
-                '3quanta': '/home/vlew/scriptsHPC/data/dftGaussian/formaldehyde/g16_b3lypanhQZ_3q.out'}
+    datadict = {'log': './test_files_gaussian/g16_inputFull_3q.out',
+                '3quanta': './test_files_gaussian/g16_inputFull_3q.out'}
     parserGaussian = GaussianDataParser({'files': datadict})
     parserGaussian.getData()
 

@@ -28,7 +28,8 @@ import numpy as np
 import os
 import pickle
 
-class CFOURdataParser(object):
+
+class CFOURdataParser:
     """A class that contains parsed CFOUR output data"""
     def __init__(self, all_files_dict):
         self.all_files_dict = all_files_dict
@@ -357,7 +358,7 @@ def getDipoleDers_anharm(filenamebase: str, labels: list, nModesStart: int):
 
 def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, fundamentals_harmonic: dict) -> tuple:
     firstder, secder = getDipoleDers_anharm(filenamebase, labels, nModesStart)
-    from wilson.spectrum import rec_cm2rec_s
+    from wilson.spectrum2d.spectrum import rec_cm2rec_s
     w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
     matrix_2d = np.outer(w_h, w_h)
     # tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
@@ -381,7 +382,7 @@ def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, f
 
 
 def getPolarDers_pkl_au(polar_pkl_file: str, fundamentals_harmonic: dict):
-    from wilson.spectrum import rec_cm2rec_s
+    from wilson.spectrum2d.spectrum import rec_cm2rec_s
     w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
     matrix_2d = np.outer(w_h, w_h)
     sqrtvec = 1. / np.sqrt(w_h)

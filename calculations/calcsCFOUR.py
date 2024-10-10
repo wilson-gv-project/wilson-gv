@@ -1,7 +1,7 @@
 """
 #############################################################################
 #                                                                          ##
-#                             Samurai Tools                                ##
+#                             CFOUR tools                                  ##
 #                                                                          ##
 #############################################################################
 
@@ -140,7 +140,7 @@ MEM_UNIT=GB)
         file1.writelines(znew)
 
 
-def generateSubmit(bash_script_path: str, config: dict, outname: str = None):
+def generateSubmit(bash_script_path: str, config: dict):
     """
     Running bash script that generates submit.sh
 
@@ -158,7 +158,7 @@ def generateSubmit(bash_script_path: str, config: dict, outname: str = None):
 
     cpus = 16 if machine == 'fram' else 20
 
-    # Run a bash script in a specific location (cdw)
+    # run a bash script in a specific location (cdw)
     script_args = [f'-h{hours}', f'-m{minutes}', '-n1', f'-c{cpus}', '-t2']
     subprocess.run(['bash', bash_script_path] + script_args, check=True)  # cwd=new_directory
 
