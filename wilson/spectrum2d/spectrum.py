@@ -6,7 +6,6 @@ import numpy as np
 
 from spectrum2d import get_iso_f
 
-np.set_printoptions(linewidth=100000)
 
 from parsing.parseCFOUR_forWilson import CFOURdataParser
 from parsing.parseGaussian_forWilson import GaussianDataParser
