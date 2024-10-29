@@ -361,11 +361,11 @@ def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, f
     from wilson.spectrum2d.spectrum import rec_cm2rec_s
     w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
     matrix_2d = np.outer(w_h, w_h)
-    # tensor_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
+    # prefac_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
     #                                                                                    np.newaxis, :]
     sqrtvec = 1. / np.sqrt(w_h)
     sqrtmat = 1. / np.sqrt(matrix_2d.T)
-    # sqrt3d = 1. / np.sqrt(tensor_3d.T)
+    # sqrt3d = 1. / np.sqrt(prefac_3d.T)
 
     firstder_mat = np.zeros_like(firstder)
     for i in range(len(sqrtvec)):
