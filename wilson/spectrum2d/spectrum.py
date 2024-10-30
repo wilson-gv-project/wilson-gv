@@ -53,25 +53,25 @@ class SpectrumEVV:
         """
         # fixme - make it more flexible, give an option to
         if self.input_data_info['source'] == 'cfour':
-            dataBank = CFOURdataParser(self.input_data_info)
+            parserObj = CFOURdataParser(self.input_data_info)
         elif self.input_data_info['source'] == 'gaussian':
-            dataBank = GaussianDataParser(self.input_data_info)
+            parserObj = GaussianDataParser(self.input_data_info)
         else:
             print('datasource not implemented')
-            dataBank = MockParser({})
+            parserObj = MockParser({})
 
-        dataBank.getData()
+        parserObj.getData()
 
-        self.fundamentals = dataBank.fundamentals_anharmonic_str
-        self.fundamentals_harmonic = dataBank.fundamentals_harmonic_str
-        self.all_states = dataBank.anharmonic_states
-        self.all_states_harmonic = dataBank.harmonic_states
+        self.fundamentals = parserObj.fundamentals_anharmonic_str
+        self.fundamentals_harmonic = parserObj.fundamentals_harmonic_str
+        self.all_states = parserObj.anharmonic_states
+        self.all_states_harmonic = parserObj.harmonic_states
 
-        ddata = [dataBank.dipole_first_derivatives,
-                 dataBank.dipole_second_derivatives,
-                 dataBank.polarizability_first_derivatives,
-                 dataBank.polarizability_second_derivatives,
-                 dataBank.cubic_force_constants]
+        ddata = [parserObj.dipole_first_derivatives,
+                 parserObj.dipole_second_derivatives,
+                 parserObj.polarizability_first_derivatives,
+                 parserObj.polarizability_second_derivatives,
+                 parserObj.cubic_force_constants]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
 
     def addTerms(self, electrical_terms_selection: list, mechanical_terms_selection: list):
@@ -112,26 +112,26 @@ class SpectrumEVV:
         self.ee, self.mm = electrical_terms_selection, mechanical_terms_selection
         self.mech_factors = [factors[i] for i in mechanical_terms_selection]
         # [pool[i] for i in list_of_indices]
-        electrical_terms, mechanical_terms = [electrical_terms_str[i] for i in self.ee], [mechanical_terms_str[i] for i in self.mm]
+        self.electrical_terms, self.mechanical_terms = [electrical_terms_str[i] for i in self.ee], [mechanical_terms_str[i] for i in self.mm]
         self.electric_avrg, self.mechanical_avrg = [electric_avrg_str[i] for i in self.ee], [mechanical_avrg_str[i] for i in self.mm]
         # here the functions of 2 frequencies
-        self.electr_funs = [generate_resonances_functions(i, margin=self.diagonal_margin) for i in electrical_terms]
-        self.mech_funs = [generate_resonances_functions(*i) for i in mechanical_terms]
+        self.electr_funs = [generate_resonances_functions(i, margin=self.diagonal_margin) for i in self.electrical_terms]
+        self.mech_funs = [generate_resonances_functions(*i) for i in self.mechanical_terms]
 
         nmodes = len(self.fundamentals)
         self.combofuns = [dict(zip(self.electr_funs, self.electric_avrg)),
                           dict(zip(self.mech_funs, self.mechanical_avrg))]
 
         # setting up the combinations of states for the terms
-        self.coords_ab = get_abc_indices(2, len(self.fundamentals)) if electrical_terms is not None else []
-        self.coords_abc = get_abc_indices(3, len(self.fundamentals)) if mechanical_terms is not None else []
+        self.coords_ab = get_abc_indices(2, len(self.fundamentals)) if self.electrical_terms is not None else []
+        self.coords_abc = get_abc_indices(3, len(self.fundamentals)) if self.mechanical_terms is not None else []
 
-        if electrical_terms is not None:
+        if self.electrical_terms is not None:
             self.el_avrg_tensors = [avrg_abc_tensor(ea, self.deriv_data, self.gammaCompsAll) for ea in self.electric_avrg]
         else:
             self.el_avrg_tensors = []
 
-        if mechanical_terms is not None:
+        if self.mechanical_terms is not None:
             self.mech_avrg_tensors = [avrg_abc_tensor(ma, self.deriv_data, self.gammaCompsAll) for ma in self.mechanical_avrg]
         else:
             self.mech_avrg_tensors = []
