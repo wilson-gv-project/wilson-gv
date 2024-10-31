@@ -16,8 +16,8 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
     pd.set_option('display.max_colwidth', 2000)
     pd.set_option('display.width', 5000)
     """
-    electrical_terms_dict = dict(zip(computedSpectrum.ee, computedSpectrum.electrical_terms))
-    mechanical_terms_dict = dict(zip(computedSpectrum.mm, computedSpectrum.mechanical_terms))
+    electrical_terms_dict = dict(zip(computedSpectrum.e_selection, computedSpectrum.electrical_terms))
+    mechanical_terms_dict = dict(zip(computedSpectrum.m_selection, computedSpectrum.mechanical_terms))
     w_all = computedSpectrum.all_states_harmonic if vib_levels_harmonic else computedSpectrum.all_states
     combos = (computedSpectrum.coords_ab, computedSpectrum.coords_abc)
     w_all[('zero',)] = 0.
@@ -28,10 +28,13 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
     mechanical_terms_avrg_dict = dict(zip(list(mechanical_terms_dict.keys()), computedSpectrum.mech_avrg_tensors))
 
     for elTerm in electrical_terms_dict:
-        subscripts = electrical_terms_dict[elTerm]
+        # print(elTerm)
+        subscripts = electrical_terms_dict[elTerm][0]
+        # print(subscripts)
+
         m1n1m2n2 = [i.split(',') for i in subscripts]
         letters = ['a', 'b', 'zero']
-        dict_df_term = {'res': '__'.join(electrical_terms_dict[elTerm]),
+        dict_df_term = {'res': '__'.join(subscripts),
                         'a': [], 'b': [],
                         'ω_a': [], 'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'avrg_g': []}
         for c in combos[0]:
