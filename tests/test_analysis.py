@@ -104,7 +104,7 @@ def test_get_El2Mech_ratio():
     datain = data_vault.make_DatainputDict('gaussian', method)
 
     Gamma_rc = 10
-    Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+    Gamma = spectrum.convWnum2Freq(Gamma_rc)
     omega1, omega2 = (1800, 1900, 20.), (2300, 2400, 20.)
     terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
 

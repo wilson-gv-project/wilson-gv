@@ -358,8 +358,8 @@ def getDipoleDers_anharm(filenamebase: str, labels: list, nModesStart: int):
 
 def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, fundamentals_harmonic: dict) -> tuple:
     firstder, secder = getDipoleDers_anharm(filenamebase, labels, nModesStart)
-    from wilson.spectrum2d.spectrum import rec_cm2rec_s
-    w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
+    from wilson.spectrum2d.spectrum import convWnum2Freq
+    w_h = convWnum2Freq(np.array([v for k, v in fundamentals_harmonic.items()]))
     matrix_2d = np.outer(w_h, w_h)
     # prefac_3d = w_h[:, np.newaxis, np.newaxis] * w_h[np.newaxis, :, np.newaxis] * w_h[np.newaxis,
     #                                                                                    np.newaxis, :]
@@ -382,8 +382,8 @@ def getDipoleDers_anharm_au(filenamebase: str, labels: list, nModesStart: int, f
 
 
 def getPolarDers_pkl_au(polar_pkl_file: str, fundamentals_harmonic: dict):
-    from wilson.spectrum2d.spectrum import rec_cm2rec_s
-    w_h = rec_cm2rec_s(np.array([v for k, v in fundamentals_harmonic.items()]))
+    from wilson.spectrum2d.spectrum import convWnum2Freq
+    w_h = convWnum2Freq(np.array([v for k, v in fundamentals_harmonic.items()]))
     matrix_2d = np.outer(w_h, w_h)
     sqrtvec = 1. / np.sqrt(w_h)
     sqrtmat = 1. / np.sqrt(matrix_2d.T)

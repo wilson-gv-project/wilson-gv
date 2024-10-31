@@ -20,7 +20,7 @@ np.set_printoptions(linewidth=250, suppress=False, precision=17)
 #     computedSpectrum.addTerms(*terms_selection)
 #
 #     step1 = regions[region][0][-1]
-#     gamma = spectrum.rec_cm2rec_s(gamma_rc)
+#     gamma = spectrum.convWnum2Freq(gamma_rc)
 #     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
 #     step_str = f"{step1:.1f}".replace('.', 'p')
 #
@@ -53,7 +53,7 @@ np.set_printoptions(linewidth=250, suppress=False, precision=17)
 #         computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput, vib_levels_harmonic=vibEL)
 #         computedSpectrum.addTerms(*terms_selection)
 #
-#         Gamma = spectrum.rec_cm2rec_s(Gamma_rc)
+#         Gamma = spectrum.convWnum2Freq(Gamma_rc)
 #         sec_hypol_data, savedict = computedSpectrum.intensity(Gamma, {}, el=el_bool, mech=mech_bool)
 #
 #         artist = spectrum.SpectrumFigure(sec_hypol_data, computedSpectrum.w1_mesh, computedSpectrum.w2_mesh, settings)
@@ -66,7 +66,10 @@ np.set_printoptions(linewidth=250, suppress=False, precision=17)
 
 def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
                    settings: dict, other: dict, directory: str = '.') -> tuple[str, str]:
+    """
+    other = {'regions': regions, 'terms_selection': terms_selection, 'w1mw2': False, 'log10': True}
 
+    """
     terms_selection = other['terms_selection']
 
     method_name = input_data_info['files']['method']
@@ -117,6 +120,10 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
 
 def make_name(input_data_info: dict, vib_levels_harmonic: bool,
               settings: dict, other: dict, directory: str = '.') -> str:
+    """
+    other = {'regions': regions, 'terms_selection': terms_selection, 'w1mw2': False, 'log10': True}
+
+    """
     w1mw2 = other['w1mw2']
     regions = other['regions']
 
