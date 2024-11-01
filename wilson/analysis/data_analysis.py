@@ -34,7 +34,7 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
 
         m1n1m2n2 = [i.split(',') for i in subscripts]
         letters = ['a', 'b', 'zero']
-        dict_df_term = {'res': '__'.join(subscripts),
+        dict_df_term = {'ii': elTerm, 'res': '__'.join(subscripts),
                         'a': [], 'b': [],
                         'ω_a': [], 'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'avrg_g': []}
         for c in combos[0]:
@@ -77,12 +77,12 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
         dd = pd.DataFrame(data=dfs4terms_el[ii])
         dfs4terms_el[ii] = dd
 
-    for index, mechTerm in enumerate(mechanical_terms_dict):
+    for mechTerm in mechanical_terms_dict:
         subscripts, fermi = mechanical_terms_dict[mechTerm]
         m1n1m2n2 = [i.split(',') for i in subscripts]
         fermi = [i.split(',') for i in fermi]
         letters = ['a', 'b', 'c', 'zero']
-        dict_df_term = {'ii': index, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
+        dict_df_term = {'ii': mechTerm, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
                         'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
                         'ω_a': [], 'ω_b': [], 'ω_c': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [],

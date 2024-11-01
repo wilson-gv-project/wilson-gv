@@ -35,6 +35,7 @@ class SpectrumEVV:
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         self.shape2d = self.w1_mesh.shape
         self.input_data_info = input_data_info
+        self.Gamma = None
 
         # fixme not needed
         self.id = f'w1{min(w1)}_{max(w1)}w2{min(w2)}_{max(w2)}'
@@ -76,8 +77,21 @@ class SpectrumEVV:
                  parserObj.cubic_force_constants]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
 
+
+    def conversion2InternalUnits(self):
+        """
+        rs - reciprocal second
+        """
+        self.all_states_harmonic_rs = {k: convWnum2Freq(v) for k, v in self.all_states_harmonic.items()}
+        self.all_states_rs = {k: convWnum2Freq(v) for k, v in self.all_states.items()}
+        self.w1_rs_mesh, self.w2_rs_mesh = convWnum2Freq(self.w1_mesh), convWnum2Freq(self.w2_mesh)
+        self.diagonal_margin_rs = convWnum2Freq(self.diagonal_margin)
+
+
     def addTerms(self, electrical_terms_selection: list, mechanical_terms_selection: list):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities"""
+
+        self.conversion2InternalUnits() # need now at least for diag margin_rs
 
         # fixme - common precalculated terms
 
@@ -122,8 +136,8 @@ class SpectrumEVV:
         self.electric_avrg = [electric_avrg_str[i] for i in self.e_selection]
         self.mechanical_avrg = [mechanical_avrg_str[i] for i in self.m_selection]
         # here the functions of 2 frequencies
-        self.e_funcs = [generate_resonances_functions(i[0], i[1], margin=self.diagonal_margin) for i in self.electrical_terms]
-        self.m_funcs = [generate_resonances_functions(i[0], i[1], margin=self.diagonal_margin) for i in self.mechanical_terms]
+        self.e_funcs = [generate_resonances_functions(i[0], i[1], margin_rs=self.diagonal_margin_rs) for i in self.electrical_terms]
+        self.m_funcs = [generate_resonances_functions(i[0], i[1], margin_rs=self.diagonal_margin_rs) for i in self.mechanical_terms]
 
         # self.e_funcs = [generate_resonances_functions(i, margin=self.diagonal_margin) for i in self.electrical_terms]
         # self.m_funcs = [generate_resonances_functions(*i) for i in self.mechanical_terms]
@@ -202,23 +216,28 @@ class SpectrumEVV:
     #             total_sum_mech += self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
     #         return -total_sum_mech / 48.
 
-    def get_total_gamma_sum_el(self, Gamma: float, a: int, b: int) -> np.ndarray:
+    def setSpectrumSettings(self, Gamma_rc):
+        """Settings to be set before computing the intensities"""
+        self.Gamma = convWnum2Freq(Gamma_rc)
+
+    def get_total_gamma_sum_el(self, a: int, b: int) -> np.ndarray:
         """
         """
         if self.vib_levels_harmonic:
-            vib_ene_levels = self.all_states_harmonic
+            vib_ene_levels = self.all_states_harmonic_rs
         else:
-            vib_ene_levels = self.all_states
-
+            vib_ene_levels = self.all_states_rs
+        print('a, b', a, b)
         total_sum_el = 0
         prefac_el = self.prefac_2d.T[a, b]
         for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
-            resonance = el_func(vib_ene_levels, self.w1_mesh, self.w2_mesh,
-                                Gamma, (a, b))
+            resonance = el_func(vib_ene_levels, self.w1_rs_mesh, self.w2_rs_mesh,
+                                self.Gamma, (a, b))
+            print('elavrg[a, b]', elavrg[a, b], a, b)
             total_sum_el += elavrg[a, b] * resonance / prefac_el
         return total_sum_el / 24.
 
-    def get_total_gamma_sum_mech(self, Gamma: float, a: int, b: int, c: int) -> np.ndarray:
+    def get_total_gamma_sum_mech(self, a: int, b: int, c: int) -> np.ndarray:
         """
         """
         if self.vib_levels_harmonic:
@@ -235,7 +254,7 @@ class SpectrumEVV:
             abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
             ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
             F = self.deriv_data['F_abc'][ijk_indx]
-            resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh, Gamma, (a, b, c))
+            resonance2 = mech_func(vib_ene_levels, self.w1_mesh, self.w2_mesh, self.Gamma, (a, b, c))
 
             addition = self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             is_equal = np.allclose(np.abs(addition),
@@ -246,14 +265,14 @@ class SpectrumEVV:
         return -total_sum_mech / 48.
 
 
-    def intensity_electrical(self, Gamma: float) -> (np.ndarray, dict):
+    def intensity_electrical(self) -> (np.ndarray, dict):
         start_time = time.time()
 
         Qab_contrib_dict = {}
 
         elall = np.zeros(self.shape2d, dtype='complex128')
         for ind, i in enumerate(self.coords_ab):
-            contrib_ab = self.get_total_gamma_sum_el(Gamma, i[0], i[1])
+            contrib_ab = self.get_total_gamma_sum_el(i[0], i[1])
             Qab_contrib_dict[tuple(i)] = contrib_ab
             elall += contrib_ab
             if ind % 100 == 0:
@@ -265,17 +284,16 @@ class SpectrumEVV:
 
         return elall, Qab_contrib_dict
 
-    def intensity_mechanical(self, Gamma_rc: float) -> (np.ndarray, dict):
+    def intensity_mechanical(self) -> (np.ndarray, dict):
         """Gama_rc - broadening factor in reciprocal centimeters (cm-1)"""
 
         start_time = time.time()
-        Gamma = convWnum2Freq(Gamma_rc)
 
         Qabc_contrib_dict = {}
 
         mechall = np.zeros(self.shape2d, dtype='complex128')
         for ind, i in enumerate(self.coords_abc):
-            contrib_abc = self.get_total_gamma_sum_mech(Gamma, i[0], i[1], i[2])
+            contrib_abc = self.get_total_gamma_sum_mech(i[0], i[1], i[2])
             Qabc_contrib_dict[tuple(i)] = contrib_abc
             mechall += contrib_abc
             if ind % 1000 == 0:
@@ -374,23 +392,22 @@ def avrg_abc_tensor(formula: list[tuple[str, tuple[str]]],
         return avrg_tensor
 
 # function generator
-def generate_resonances_functions(subscripts, fermi=None, margin=10.) -> Callable:
+def generate_resonances_functions(subscripts, fermi=None, margin_rs=convWnum2Freq(10.)) -> Callable:
     """
-
+    rs - reciprocal second
     """
     m1n1m2n2 = [i.split(',') for i in subscripts]
     if fermi is not None:
         fermi = [i.split(',') for i in fermi]
 
-    def function(w_all: dict, w1: np.ndarray, w2: np.ndarray, Gamma: float,
+    def function(w_all_rs: dict, w1_rs: np.ndarray, w2_rs: np.ndarray, Gamma_rs: float,
                  abctuple: tuple[int, int] | tuple[int, int, int],
                  m1n1m2n2: list = m1n1m2n2, fermi: list = fermi) -> np.ndarray:
-
         # fixme - lorenzian shape cutoff
 
         letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
         dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
-        w_all[('zero',)] = 0.
+        w_all_rs[('zero',)] = 0.
 
         wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
         wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))# if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
@@ -404,16 +421,15 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.) -> Callabl
 
         if fermi is None:
 
-            f1 = 1/(convWnum2Freq(w_all[wm2]) - convWnum2Freq(w_all[wn2])
-                    + convWnum2Freq(w1) - 1j * Gamma)
-            w1_rec = convWnum2Freq(w1) # pre-calculation fixme
-            w2_rec = convWnum2Freq(w2)
+            f1 = w_all_rs[wm2] - w_all_rs[wn2] + w1_rs - 1j * Gamma_rs
             # test np.where
 
-            return np.where(w2-margin > w1, 1 / (convWnum2Freq(w_all[wm1]) - convWnum2Freq(w_all[wn1])
-                                                 + w1_rec - w2_rec
-                                                 - 1j * Gamma) / f1, 0.)
-
+            return np.where(w2_rs-margin_rs > w1_rs, 1 / (w_all_rs[wm1] - w_all_rs[wn1]
+                                                 + w1_rs - w2_rs
+                                                 - 1j * Gamma_rs) / f1, 0.)
+            # return np.where(w2-margin > w1, 1 / (w_all[wm1] - w_all[wn1] + convWnum2Freq(w1) - convWnum2Freq(w2)
+            #                                      - 1j * Gamma) / (w_all[wm2] - w_all[wn2]
+            #                                                       + convWnum2Freq(w1) - 1j * Gamma), 0.)
         else:
             w_fr11 = tuple(sorted([str(dictabc[i]) for i in fermi[0][0].split('+')], key=int))
             if 'zero' not in fermi[0][1].split('+'):
@@ -427,10 +443,10 @@ def generate_resonances_functions(subscripts, fermi=None, margin=10.) -> Callabl
             else:
                 w_fr22 = tuple([fermi[1][1]])
             # fixme : get resonance conditions once for both, then sumfrac only for mech
-            t1 = convWnum2Freq(w_all[wm1] - w_all[wn1] + w1 - w2) - 1j * Gamma
-            t2 = convWnum2Freq(w_all[wm2] - w_all[wn2] + w1) - 1j * Gamma
-            t3 = convWnum2Freq(w_all[w_fr11] - w_all[w_fr21])
-            t4 = convWnum2Freq(w_all[w_fr12] - w_all[w_fr22])
+            t1 = w_all_rs[wm1] - w_all_rs[wn1] + w1_rs - w2_rs - 1j * Gamma_rs
+            t2 = w_all_rs[wm2] - w_all_rs[wn2] + w1_rs - 1j * Gamma_rs
+            t3 = convWnum2Freq(w_all_rs[w_fr11] - w_all_rs[w_fr21])
+            t4 = convWnum2Freq(w_all_rs[w_fr12] - w_all_rs[w_fr22])
 
             sumfrac = (1 / t3 + 1 / t4)
 
