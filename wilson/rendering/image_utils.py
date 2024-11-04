@@ -48,8 +48,16 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
     for key, value in settings.items():
         settings_str.append(f"  {key}: {value}")
     part4 = "\n".join(settings_str)
+    if artist.settings['norm_min'] is None:
+        n_min_str = 'None'
+    else:
+        n_min_str = '{:.2e}'.format(artist.settings['norm_min'])
+    if artist.settings['norm_max'] is None:
+        n_max_str = 'None'
+    else:
+        n_max_str = '{:.2e}'.format(artist.settings['norm_max'])
 
-    part9 = f"\nsettings['norm_min'] {'{:.2e}'.format(artist.settings['norm_min'])}\nsettings['norm_max'] {'{:.2e}'.format(artist.settings['norm_max'])}\n"
+    part9 = f"\nsettings['norm_min'] {n_min_str}\nsettings['norm_max'] {n_max_str}\n"
 
     text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
 

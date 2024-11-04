@@ -7,6 +7,10 @@ class SpectrumFigure:
         # figure XYZ data
         self.gamma_data = sec_hypol_data
         self.intensities = abs(sec_hypol_data) ** 2
+
+        min_positive = 1e-6
+        self.intensities[self.intensities <= 0] = min_positive
+
         self.X = w1_mesh
         self.Y = w2_mesh
 
@@ -35,6 +39,10 @@ class SpectrumFigure:
                   self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
+        if 'norm_max' not in self.settings:
+            self.settings['norm_max'] = self.intensities.max()
+        if 'norm_min' not in self.settings:
+            self.settings['norm_min'] = self.intensities.min()
         # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
         # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
 
