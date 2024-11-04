@@ -12,7 +12,7 @@ def convNu2Ene(reciprocal_cm: float | np.ndarray) -> float | np.ndarray:
     from scipy import constants
     hartree2J = constants.physical_constants['hartree-joule relationship'][0]
     # print(hartree2J, constants.h)
-    print('\n', (100 * constants.h * constants.c / hartree2J))
+    # print('\n', (100 * constants.h * constants.c / hartree2J))
     return reciprocal_cm * (100 * constants.h * constants.c / hartree2J)
 
 class Spectrum2D:
