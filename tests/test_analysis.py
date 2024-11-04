@@ -1,7 +1,7 @@
 import numpy as np
 
 # from playground.units_with_pint import omega
-from wilson.relay import DataVault
+from CQCParse.relay import DataVault
 from wilson import analysis
 from wilson import spectrum
 
@@ -15,16 +15,14 @@ def test_get_resonances_electrical():
     data_vault = DataVault('./test_database/mini_files_database.csv')
     datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
     vib_levels_harmonic = True
-    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain,
-                                            vib_levels_harmonic=vib_levels_harmonic)
+    computedSpectrum = spectrum.Spectrum2D(omega1, omega2, input_data_info=datain,
+                                           vib_levels_harmonic=vib_levels_harmonic)
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=True,
                                                      vib_levels_harmonic=vib_levels_harmonic)
-    # for dfEL in dfs4terms_el:
-    #     print(dfEL)
-        # pass
+
 
 def test_get_resonances_mechanical():
     terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
@@ -35,8 +33,8 @@ def test_get_resonances_mechanical():
     data_vault = DataVault()
     datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
     vib_levels_harmonic = True
-    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain,
-                                            vib_levels_harmonic=vib_levels_harmonic)
+    computedSpectrum = spectrum.Spectrum2D(omega1, omega2, input_data_info=datain,
+                                           vib_levels_harmonic=vib_levels_harmonic)
     computedSpectrum.addTerms(*terms_selection)
 
     print('------------------------\n')
@@ -84,7 +82,7 @@ def test_get_avrg_tensors():
     data_vault = DataVault()
     datain = data_vault.make_DatainputDict('gaussian', ('FORM', 'HF', 'cc_pVQZ'))
 
-    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, vib_levels_harmonic=False)
+    computedSpectrum = spectrum.Spectrum2D(omega1, omega2, input_data_info=datain, vib_levels_harmonic=False)
     computedSpectrum.addTerms(*terms_selection)
 
     print('\n-------------------')
@@ -108,7 +106,7 @@ def test_get_El2Mech_ratio():
     omega1, omega2 = (1800, 1900, 20.), (2300, 2400, 20.)
     terms_selection = [0, 1], [0, 1, 2, 3, 4, 5]
 
-    computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain, vib_levels_harmonic=True)
+    computedSpectrum = spectrum.Spectrum2D(omega1, omega2, input_data_info=datain, vib_levels_harmonic=True)
     computedSpectrum.addTerms(*terms_selection)
 
     ratio = analysis.get_El2Mech_ratio(computedSpectrum, Gamma)

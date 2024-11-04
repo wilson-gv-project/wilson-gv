@@ -1,68 +1,6 @@
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=17)
-# from wilson import spectrum
-# from wilson import rendering
-# import os
-#
-# def one_spectrum_fig(el: bool, mech: bool, datain: dict, other: dict, region: int = 3, gamma_rc: float = 10.):
-#     """
-#         # one_spectrum_fig(el=el, mech=mech, datain=datain, region=1, gamma_rc=broad_factor_rc)
-#     """
-#     regions = other['regions']
-#     terms_selection = other['terms_selection']
-#     w1mw2 = other['w1mw2']
-#     log10 = other['log10']
-#
-#     omega1 = np.arange(*regions[region][0])
-#     omega2 = np.arange(*regions[region][1])
-#
-#     computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
-#     computedSpectrum.addTerms(*terms_selection)
-#
-#     step1 = regions[region][0][-1]
-#     gamma = spectrum.convWnum2Freq(gamma_rc)
-#     gamma_str = f"{gamma_rc:.2f}".replace('.', 'p')
-#     step_str = f"{step1:.1f}".replace('.', 'p')
-#
-#     tOld = 'tNew'
-#
-#     method_name = 'B3LYP' if datain['source'] == 'gaussian' else 'CCSDT'
-#
-#     name=f'./{tOld}_{method_name}_el{str(el)[0]}_mech{str(mech)[0]}_w1mw2{str(w1mw2)[0]}_log10{str(log10)[0]}_gamma{gamma_str}_reg{region}_step{step_str}.svg'
-#
-#     Z, savedict = computedSpectrum.intensity(gamma, {}, el=el, mech=mech)
-#
-#     computedSpectrum.plot2Dmatplotlib(Z, w1mw2=w1mw2, nametuple=(name, __file__, "B3LYP/cc-pVQZ"), Gamma=gamma, el=el, mech=mech, dpi=200, log10=log10)
-#
-# def one_fig_Object(settings: dict, datainput: dict, other: dict, directory: str = '.', vibEL: bool = True):
-#     """Making a figure for one input data set"""
-#     name = make_name(datainput, vibEL, settings, directory)
-#     print(name)
-#     if not os.path.isfile(name):
-#         region = settings['region']
-#         Gamma_rc = settings['Gamma_rc']
-#         el_bool = settings['electrical']
-#         mech_bool = settings['mechanical']
-#
-#         regions = other['regions']
-#         terms_selection = other['terms_selection']
-#
-#         omega1 = np.arange(*regions[region][0])
-#         omega2 = np.arange(*regions[region][1])
-#
-#         computedSpectrum = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datainput, vib_levels_harmonic=vibEL)
-#         computedSpectrum.addTerms(*terms_selection)
-#
-#         Gamma = spectrum.convWnum2Freq(Gamma_rc)
-#         sec_hypol_data, savedict = computedSpectrum.intensity(Gamma, {}, el=el_bool, mech=mech_bool)
-#
-#         artist = spectrum.SpectrumFigure(sec_hypol_data, computedSpectrum.w1_mesh, computedSpectrum.w2_mesh, settings)
-#         title_on_top, text_under_the_figure = make_texts4fig(datainput, computedSpectrum, artist, settings, directory)
-#         print(name)
-#         artist.plot2Dmatplotlib(nametuple=(name, __file__, title_on_top),
-#                                 text_under_the_figure=text_under_the_figure)
-#     else:
-#         print('Spectrum file exists')
+
 
 def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
                    settings: dict, other: dict, directory: str = '.') -> tuple[str, str]:

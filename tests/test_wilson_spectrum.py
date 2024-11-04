@@ -1,5 +1,5 @@
 from wilson import spectrum
-from wilson.relay import DataVault
+from CQCParse.relay import DataVault
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ def test_wilson_SpectrumEVV_gaussian():
               'type': 'log',
               'files': g16files}
 
-    spec = spectrum.SpectrumEVV(omega1, omega2, input_data_info=datain)
+    spec = spectrum.Spectrum2D(omega1, omega2, input_data_info=datain)
     # setup.addTerms(*terms_selection)
     print('\n----------------------------------')
     print(spec.__dict__)

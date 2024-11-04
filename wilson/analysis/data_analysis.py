@@ -1,8 +1,11 @@
-import numpy as np
-from wilson.spectrum2d import spectrum
+"""
+For now these will stay in current form
+"""
+
+from wilson.spectrum import spectrum2D
 import pandas as pd
 
-def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
+def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
                       rec_cm: bool = True,
                       vib_levels_harmonic: bool = False) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
     """
@@ -16,8 +19,8 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
     pd.set_option('display.max_colwidth', 2000)
     pd.set_option('display.width', 5000)
     """
-    electrical_terms_dict = dict(zip(computedSpectrum.e_selection, computedSpectrum.electrical_terms))
-    mechanical_terms_dict = dict(zip(computedSpectrum.m_selection, computedSpectrum.mechanical_terms))
+    electrical_terms_dict = dict(zip(computedSpectrum.e_selected, computedSpectrum.electrical_terms))
+    mechanical_terms_dict = dict(zip(computedSpectrum.m_selected, computedSpectrum.mechanical_terms))
     w_all = computedSpectrum.all_states_harmonic if vib_levels_harmonic else computedSpectrum.all_states
     combos = (computedSpectrum.coords_ab, computedSpectrum.coords_abc)
     w_all[('zero',)] = 0.
@@ -64,11 +67,11 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
                 dict_df_term['ω_1'].append(secondres)
                 dict_df_term['ω_2'].append(firstres+secondres)
             else:
-                dict_df_term['ω_a'].append(spectrum.convWnum2Freq(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(spectrum.convWnum2Freq(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_2-ω_1'].append(spectrum.convWnum2Freq(firstres))
-                dict_df_term['ω_1'].append(spectrum.convWnum2Freq(secondres))
-                dict_df_term['ω_2'].append(spectrum.convWnum2Freq(firstres + secondres))
+                dict_df_term['ω_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
+                dict_df_term['ω_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
+                dict_df_term['ω_2-ω_1'].append(spectrum2D.convNu2Ene(firstres))
+                dict_df_term['ω_1'].append(spectrum2D.convNu2Ene(secondres))
+                dict_df_term['ω_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
             # dict_df_term['avrg_g'].append(electrical_terms_avrg_dict[elTerm][*c])
             dict_df_term['avrg_g'].append(electrical_terms_avrg_dict[elTerm][(c[0], c[1])])
         dfs4terms_el.append(dict_df_term)
@@ -134,14 +137,14 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
                 dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
 
             else:
-                dict_df_term['ω_a'].append(spectrum.convWnum2Freq(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(spectrum.convWnum2Freq(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_c'].append(spectrum.convWnum2Freq(w_all[tuple([str(c[2])])]))
-                dict_df_term['ω_2-ω_1'].append(spectrum.convWnum2Freq(firstres))
-                dict_df_term['ω_1'].append(spectrum.convWnum2Freq(secondres))
-                dict_df_term['ω_2'].append(spectrum.convWnum2Freq(firstres + secondres))
-                dict_df_term['FR1'].append(spectrum.convWnum2Freq(thirdres))
-                dict_df_term['FR2'].append(spectrum.convWnum2Freq(fourthres))
+                dict_df_term['ω_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
+                dict_df_term['ω_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
+                dict_df_term['ω_c'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[2])])]))
+                dict_df_term['ω_2-ω_1'].append(spectrum2D.convNu2Ene(firstres))
+                dict_df_term['ω_1'].append(spectrum2D.convNu2Ene(secondres))
+                dict_df_term['ω_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
+                dict_df_term['FR1'].append(spectrum2D.convNu2Ene(thirdres))
+                dict_df_term['FR2'].append(spectrum2D.convNu2Ene(fourthres))
                 dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
             # dict_df_term['avrg_g'].append(mechanical_terms_avrg_dict[mechTerm][*c])
             dict_df_term['avrg_g'].append(mechanical_terms_avrg_dict[mechTerm][(c[0], c[1], c[2])])
@@ -155,7 +158,7 @@ def get_resonances_DF(computedSpectrum: spectrum.SpectrumEVV,
 
     return dfs4terms_el, dfs4terms_mech
 
-def get_El2Mech_ratio(computedSpectrum: spectrum.SpectrumEVV, Gamma: float) -> float:
+def get_El2Mech_ratio(computedSpectrum: spectrum2D.Spectrum2D, Gamma: float) -> float:
     """
     """
 
