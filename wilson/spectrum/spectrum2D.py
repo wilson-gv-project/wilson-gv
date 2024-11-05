@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 from scipy import constants
 
-from spectrum import get_iso_f
+from .averaging import get_iso_f
 
 
 class Spectrum2D:

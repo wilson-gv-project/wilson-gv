@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+
 
 class SpectrumFigure:
 
@@ -50,9 +53,7 @@ class SpectrumFigure:
         self.settings.update(settings)
 
     def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', diagonal=False, to_save=True):
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import matplotlib
+
         if to_save:
             matplotlib.use('Agg')
         plt.rcParams['path.simplify'] = True
