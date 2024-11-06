@@ -61,7 +61,6 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
 
     text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
 
-    # return name, title_on_top, text_under_the_figure
     return title_on_top, text_under_the_figure
 
 def make_name(input_data_info: dict, vib_levels_harmonic: bool,
