@@ -46,6 +46,9 @@ class Spectrum2D:
         self.saved_mech = {}
         self.saved_el = {}
 
+        self.deriv_data = None
+        self.corrected_levels = None
+
 
     def getDerivedTermsEVV(self):
         """
@@ -101,6 +104,36 @@ class Spectrum2D:
                  parserObj.polarizability_second_derivatives,
                  parserObj.cubic_force_constants]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+
+        cff_cm_1 = parserObj.cubic_cm_1
+        qff_cm_1 = parserObj.quartic_cm_1
+        rot_c, cor_c = parserObj.rotational_constant, parserObj.coriolis_constant
+        from .vpt2 import anharm_corr_energiesVPT2
+        # corrected_levels = funds, over2q, combo2q, over3q, combo3q
+        self.corrected_levels = anharm_corr_energiesVPT2(list(self.fundamentals_harmonic.values()),
+                                                         cff_cm_1, qff_cm_1, rot_c, cor_c,
+                                                         'Anharmonic: VPT2')
+
+        self.all_states_corr = {}
+        for i in range(len(self.fundamentals)):
+            self.all_states_corr[tuple(str(i))] = self.corrected_levels[0][i]
+
+            for j in range(i+1):
+                if i==j:
+                    self.all_states_corr[tuple([str(i), str(i)])] = self.corrected_levels[1][i]
+                else:
+                    self.all_states_corr[tuple(sorted([str(i), str(j)]))] = self.corrected_levels[2][i, j]
+
+                for k in range(len(self.fundamentals)):
+                    if i==j==k:
+                        self.all_states_corr[tuple([str(i), str(i), str(i)])] = self.corrected_levels[3][i]
+                    else:
+                        key = tuple(sorted([str(i), str(j), str(k)]))
+                        if key not in self.all_states_corr:
+                            if self.corrected_levels[4][i, j, k]!=0.:
+                                self.all_states_corr[tuple(sorted([str(i), str(j), str(k)]))] = self.corrected_levels[4][i, j, k]
+
+        # self.all_states_corr = {tuple(str(i -7) for i in k): v for k, v in anharm_states_dict.items()}
 
     def setSpectrumSettings(self, Gamma_rc: float, diag_margin_rc: float = 10., vib_levels_harmonic: bool =True):
         """Settings to be set before computing the intensities.
@@ -169,6 +202,8 @@ class Spectrum2D:
                                                                             for i in range(len(self.electric_avrg))]
         self.mech_avrg_tensors = [avrg_abc_tensor(self.mechanical_avrg[i], self.deriv_data, self.gammaCompsAll)
                                                                             for i in range(len(self.mechanical_avrg))]
+        print(self.el_avrg_tensors)
+        print(self.mech_avrg_tensors)
         # this mapping is used in the evaluation methods
         self.combofuns_tensors = [dict(zip(e_funcs, self.el_avrg_tensors)),
                                   dict(zip(m_funcs, zip(self.mech_avrg_tensors, self.mechanical_avrg)))]
