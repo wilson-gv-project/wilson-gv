@@ -202,8 +202,8 @@ class Spectrum2D:
                                                                             for i in range(len(self.electric_avrg))]
         self.mech_avrg_tensors = [avrg_abc_tensor(self.mechanical_avrg[i], self.deriv_data, self.gammaCompsAll)
                                                                             for i in range(len(self.mechanical_avrg))]
-        print(self.el_avrg_tensors)
-        print(self.mech_avrg_tensors)
+        # print(self.el_avrg_tensors)
+        # print(self.mech_avrg_tensors)
         # this mapping is used in the evaluation methods
         self.combofuns_tensors = [dict(zip(e_funcs, self.el_avrg_tensors)),
                                   dict(zip(m_funcs, zip(self.mech_avrg_tensors, self.mechanical_avrg)))]

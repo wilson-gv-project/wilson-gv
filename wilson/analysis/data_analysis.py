@@ -85,7 +85,7 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
         m1n1m2n2 = [i.split(',') for i in subscripts]
         fermi = [i.split(',') for i in fermi]
         letters = ['a', 'b', 'c', 'zero']
-        dict_df_term = {'ii': mechTerm, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
+        dict_df_term = {'ii': mechTerm+2, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
                         'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
                         'ω_a': [], 'ω_b': [], 'ω_c': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [],
