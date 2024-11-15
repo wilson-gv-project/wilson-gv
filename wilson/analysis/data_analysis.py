@@ -9,8 +9,8 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
                       rec_cm: bool = True,
                       vib_levels_harmonic: bool = False) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
     """
-    Returns dataframes with columns: res (expression), a, b, [c], ω_a, ω_b, [ω_c],
-                                     ω_2-ω_1, ω_1, ω_2, [FR1, FR2, F_abc], avrg_g
+    Returns dataframes with columns: res (expression), a, b, [c], w_a, w_b, [w_c],
+                                     w_2-w_1, w_1, w_2, [FR1, FR2, F_abc], avrg_g
 
     # Printing pandas options:
     import sys
@@ -31,15 +31,13 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
     mechanical_terms_avrg_dict = dict(zip(list(mechanical_terms_dict.keys()), computedSpectrum.mech_avrg_tensors))
 
     for elTerm in electrical_terms_dict:
-        # print(elTerm)
         subscripts = electrical_terms_dict[elTerm][0]
-        # print(subscripts)
 
         m1n1m2n2 = [i.split(',') for i in subscripts]
         letters = ['a', 'b', 'zero']
         dict_df_term = {'ii': elTerm, 'res': '__'.join(subscripts),
                         'a': [], 'b': [],
-                        'ω_a': [], 'ω_b': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [], 'avrg_g': []}
+                        'w_a': [], 'w_b': [], 'w_2-w_1': [], 'w_1': [], 'w_2': [], 'avrg_g': []}
         for c in combos[0]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
 
@@ -61,18 +59,17 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
             dict_df_term['b'].append(c[1])
 
             if rec_cm:
-                dict_df_term['ω_a'].append(w_all[tuple([str(c[0])])])
-                dict_df_term['ω_b'].append(w_all[tuple([str(c[1])])])
-                dict_df_term['ω_2-ω_1'].append(firstres)
-                dict_df_term['ω_1'].append(secondres)
-                dict_df_term['ω_2'].append(firstres+secondres)
+                dict_df_term['w_a'].append(w_all[tuple([str(c[0])])])
+                dict_df_term['w_b'].append(w_all[tuple([str(c[1])])])
+                dict_df_term['w_2-w_1'].append(firstres)
+                dict_df_term['w_1'].append(secondres)
+                dict_df_term['w_2'].append(firstres+secondres)
             else:
-                dict_df_term['ω_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_2-ω_1'].append(spectrum2D.convNu2Ene(firstres))
-                dict_df_term['ω_1'].append(spectrum2D.convNu2Ene(secondres))
-                dict_df_term['ω_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
-            # dict_df_term['avrg_g'].append(electrical_terms_avrg_dict[elTerm][*c])
+                dict_df_term['w_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
+                dict_df_term['w_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
+                dict_df_term['w_2-w_1'].append(spectrum2D.convNu2Ene(firstres))
+                dict_df_term['w_1'].append(spectrum2D.convNu2Ene(secondres))
+                dict_df_term['w_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
             dict_df_term['avrg_g'].append(electrical_terms_avrg_dict[elTerm][(c[0], c[1])])
         dfs4terms_el.append(dict_df_term)
 
@@ -88,7 +85,7 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
         dict_df_term = {'ii': mechTerm+2, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
                         'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
-                        'ω_a': [], 'ω_b': [], 'ω_c': [], 'ω_2-ω_1': [], 'ω_1': [], 'ω_2': [],
+                        'w_a': [], 'w_b': [], 'w_c': [], 'w_2-w_1': [], 'w_1': [], 'w_2': [],
                         'FR1': [], 'FR2': [], 'F_abc': [], 'avrg_g': []}
         for c in combos[1]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
@@ -126,27 +123,26 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
             dict_df_term['c'].append(c[2])
 
             if rec_cm:
-                dict_df_term['ω_a'].append(w_all[tuple([str(c[0])])])
-                dict_df_term['ω_b'].append(w_all[tuple([str(c[1])])])
-                dict_df_term['ω_c'].append(w_all[tuple([str(c[2])])])
-                dict_df_term['ω_2-ω_1'].append(firstres)
-                dict_df_term['ω_1'].append(secondres)
-                dict_df_term['ω_2'].append(firstres+secondres)
+                dict_df_term['w_a'].append(w_all[tuple([str(c[0])])])
+                dict_df_term['w_b'].append(w_all[tuple([str(c[1])])])
+                dict_df_term['w_c'].append(w_all[tuple([str(c[2])])])
+                dict_df_term['w_2-w_1'].append(firstres)
+                dict_df_term['w_1'].append(secondres)
+                dict_df_term['w_2'].append(firstres+secondres)
                 dict_df_term['FR1'].append(thirdres)
                 dict_df_term['FR2'].append(fourthres)
                 dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
 
             else:
-                dict_df_term['ω_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
-                dict_df_term['ω_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
-                dict_df_term['ω_c'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[2])])]))
-                dict_df_term['ω_2-ω_1'].append(spectrum2D.convNu2Ene(firstres))
-                dict_df_term['ω_1'].append(spectrum2D.convNu2Ene(secondres))
-                dict_df_term['ω_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
+                dict_df_term['w_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
+                dict_df_term['w_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
+                dict_df_term['w_c'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[2])])]))
+                dict_df_term['w_2-w_1'].append(spectrum2D.convNu2Ene(firstres))
+                dict_df_term['w_1'].append(spectrum2D.convNu2Ene(secondres))
+                dict_df_term['w_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
                 dict_df_term['FR1'].append(spectrum2D.convNu2Ene(thirdres))
                 dict_df_term['FR2'].append(spectrum2D.convNu2Ene(fourthres))
                 dict_df_term['F_abc'].append(computedSpectrum.deriv_data['F_abc'][c[0], c[1], c[2]])
-            # dict_df_term['avrg_g'].append(mechanical_terms_avrg_dict[mechTerm][*c])
             dict_df_term['avrg_g'].append(mechanical_terms_avrg_dict[mechTerm][(c[0], c[1], c[2])])
             # dict_df_term['finalI'].append(dict_df_term['avrg_g']*dict_df_term['F_abc']*(dict_df_term['FR1']+dict_df_term['FR2'])/dict_df_term['FR1']/dict_df_term['FR2'])
 
@@ -158,22 +154,23 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
 
     return dfs4terms_el, dfs4terms_mech
 
-def get_El2Mech_ratio(computedSpectrum: spectrum2D.Spectrum2D, Gamma: float) -> float:
+
+def get_El2Mech_ratio(computedSpectrum: spectrum2D.Spectrum2D) -> float:
     """
     """
 
-    el_gamma, Qab_contrib_dict = computedSpectrum.intensity_electrical(Gamma)
-    mech_gamma, Qabc_contrib_dict = computedSpectrum.intensity_mechanical(Gamma)
-    print(el_gamma)
-    print(mech_gamma)
+    el_gamma, Qab_contrib_dict = computedSpectrum.intensity_electrical()
+    mech_gamma, Qabc_contrib_dict = computedSpectrum.intensity_mechanical()
+    # print(el_gamma)
+    # print(mech_gamma)
 
-    total = abs(el_gamma+mech_gamma)**2
-    print('\ntotal\n', total)
-    print('\n|el_gamma|**2\n', abs(el_gamma)**2)
-    print('\n|mech_gamma|**2\n', abs(mech_gamma)**2)
+    # total = abs(el_gamma+mech_gamma)**2
+    # print('\ntotal\n', total)
+    # print('\n|el_gamma|**2\n', abs(el_gamma)**2)
+    # print('\n|mech_gamma|**2\n', abs(mech_gamma)**2)
     # percent_el = abs(el_gamma)**2/total*100
     # percent_mech = abs(mech_gamma)**2/total*100
 
-    print('\n|el_gamma|**2/|mech_gamma|**2\n', abs(el_gamma)**2/abs(mech_gamma)**2)
+    # print('\n|el_gamma|**2/|mech_gamma|**2\n', abs(el_gamma)**2/abs(mech_gamma)**2)
 
     return abs(el_gamma)**2/abs(mech_gamma)**2
