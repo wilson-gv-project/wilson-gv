@@ -235,6 +235,20 @@ class Spectrum2D:
                                                                          self.__axes[abs(ix)], 0) for ix in typelist])
 
 
+    def exclude_modes(self, list2exclude):
+        """
+        To be used before intensities calculation
+            (sets up combinations of modes here)
+        """
+        if list2exclude:
+            contains_any = lambda combination, list: any(map(lambda x: x in combination, list))
+
+            filtered_ab = [i for i in self.coords_ab if not contains_any(i, list2exclude)]
+            filtered_abc = [i for i in self.coords_abc if not contains_any(i, list2exclude)]
+            self.coords_ab = np.array(filtered_ab)
+            self.coords_abc = np.array(filtered_abc)
+
+
     def get_total_gamma_sum_el(self, a: int, b: int) -> np.ndarray:
         """
         Computes \gamma^{[1,0]} for given combination of modes

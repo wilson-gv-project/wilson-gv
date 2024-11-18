@@ -37,7 +37,9 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
         letters = ['a', 'b', 'zero']
         dict_df_term = {'ii': elTerm, 'res': '__'.join(subscripts),
                         'a': [], 'b': [],
-                        'w_a': [], 'w_b': [], 'w_2-w_1': [], 'w_1': [], 'w_2': [], 'avrg_g': []}
+                        'w_a': [], 'w_b': [],
+                        'w_2-w_1': [], 'w_1': [], 'w_2': [],
+                        'avrg_g': []}
         for c in combos[0]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
 
@@ -85,7 +87,8 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
         dict_df_term = {'ii': mechTerm+2, 'res1': '__'.join(mechanical_terms_dict[mechTerm][0]),
                         'res2': '__'.join(mechanical_terms_dict[mechTerm][1]),
                         'a': [], 'b': [], 'c': [],
-                        'w_a': [], 'w_b': [], 'w_c': [], 'w_2-w_1': [], 'w_1': [], 'w_2': [],
+                        'w_a': [], 'w_b': [], 'w_c': [],
+                        'w_2-w_1': [], 'w_1': [], 'w_2': [],
                         'FR1': [], 'FR2': [], 'F_abc': [], 'avrg_g': []}
         for c in combos[1]:
             dictabc = dict(zip(letters, tuple(c) + tuple(['zero'])))
