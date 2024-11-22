@@ -5,7 +5,7 @@ import matplotlib
 
 class SpectrumFigure:
 
-    def __init__(self, sec_hypol_data, w1_mesh, w2_mesh, settings):
+    def __init__(self, sec_hypol_data, computedSpectrum, w1_mesh, w2_mesh, settings):
 
         # figure XYZ data
         self.gamma_data = sec_hypol_data
@@ -17,9 +17,13 @@ class SpectrumFigure:
         self.X = w1_mesh
         self.Y = w2_mesh
 
+        # defaults
         self.settings = {'omega1_minus_omega2': False, 'log10': True,
-                         'font_dict': {'size': 18}, 'dpi': 200,
-                         'figsize': (12, 12)}
+                         'font_dict': {'size': 18}, 'dpi': 200, 'figsize': (12, 12),
+                         'norm_max': None, 'norm_min': None,
+                         'levels': None, 'level_ticks': None,
+                         'Gamma_rc': computedSpectrum.Gamma_rc,
+                         'electrical': computedSpectrum.e_selected, 'mechanical': computedSpectrum.m_selected}
         self.settings.update(settings)
 
         if self.settings['omega1_minus_omega2']:
@@ -28,9 +32,7 @@ class SpectrumFigure:
         # figure settings
         self.figsize = self.settings['figsize']
         self.dpi = self.settings['dpi']
-        self.font_dict = self.settings['font_dict'] # font = {'size': 18}
-        # self.settings['norm_min'] = 1e3
-        # self.settings['norm_max'] = 1e8
+        self.font_dict = self.settings['font_dict']
 
         el, mech = self.settings['electrical'], self.settings['mechanical']
 
@@ -46,11 +48,11 @@ class SpectrumFigure:
             self.settings['norm_max'] = self.intensities.max()
         if 'norm_min' not in self.settings:
             self.settings['norm_min'] = self.intensities.min()
-        # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
-        # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
+
 
     def update_settings(self, settings: dict):
         self.settings.update(settings)
+
 
     def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', diagonal=False, to_save=True):
 
@@ -65,21 +67,31 @@ class SpectrumFigure:
         ax = fig.add_subplot(1, 1, 1)
 
         import matplotlib.colors as colors
-        colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
 
-        num_count = self.settings['dynamic_range_n']
-        dynamic_range = num_count*10 # stop plotting when lower than this (number times 10) dmax
-
+        dynamic_range = self.settings['dynamic_range_n']
+        num_color_levels = self.settings['num_color_levels']
         dynrange_log = np.log10(dynamic_range)
-        d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
+        # d_max - max intensity
         dmax_log10 = float(int(np.log10(self.d_max)))
 
-        num_level_ticks = 6
-        levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
-        levels = []
-        for i in range(num_count):
-            levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_count - 1 - i) / (num_count - 1))))
+        num_level_ticks = self.settings['num_level_ticks']
 
+        if self.settings['levels_ticks'] is None:
+            # contour regions
+            levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
+        else:
+            levels_ticks = self.settings['levels_ticks']
+
+        if self.settings['levels_ticks'] is None:
+            levels = []
+            for i in range(num_color_levels):
+                levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_color_levels - 1 - i) / (num_color_levels - 1))))
+        else:
+            levels = self.settings['levels']
+        print('levels\n', levels)
+
+        # range for color on the color bar
+        colorbar_norm = colors.LogNorm(vmax=self.settings['norm_max'], vmin=self.settings['norm_min'])
         cont = plt.contourf(self.X, self.Y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)

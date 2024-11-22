@@ -39,6 +39,7 @@ class Spectrum2D:
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         self.shape2d = self.w1_mesh.shape
         self.Gamma = None
+        self.Gamma_rc = None
         self.diagonal_margin_rc = None
 
         self.gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
@@ -142,6 +143,7 @@ class Spectrum2D:
         vib_levels_harmonic - weather to use harmonic levels for resonance terms
                 (useful for the investigations of Fermi resonances? or other)
         """
+        self.Gamma_rc = Gamma_rc
         self.Gamma = convNu2Ene(Gamma_rc)
         # margin for higher diagonal, to not show/compute data to close to the diagonal
         self.diagonal_margin_rc = diag_margin_rc
@@ -265,7 +267,7 @@ class Spectrum2D:
 
         for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
             # resonance computed on the grid; could be precalculated with keys in self.__collectionFreqRes (later)
-            resonance = el_func(vib_ene_levels, self.resonances, (a, b))                # a 2D np.array
+            resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b))                # a 2D np.array
             total_sum_el += elavrg[a, b] * resonance / prefac_el                        # elavrg[a, b] is a number
 
         return total_sum_el / 24.
@@ -291,7 +293,7 @@ class Spectrum2D:
             ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
             F = self.deriv_data['F_abc'][ijk_indx]                                  # a number, from F tensor
             # resonance2 is a product of resonances and freq. difference term
-            resonance2 = mech_func(vib_ene_levels, self.resonances, (a, b, c))      # a 2D np.array (Nomega1, Nomega2)
+            resonance2 = mech_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b, c))      # a 2D np.array (Nomega1, Nomega2)
             mechavrg = mechavrg_pair[0]                                             # a 2D np.array (nmodes, nmodes)
 
             addition = self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
@@ -365,7 +367,7 @@ class Spectrum2D:
         def function(allLevels_Eh: dict, w_res_dict: dict[str:np.ndarray],
                      abctuple: tuple[int, int] | tuple[int, int, int],
                      m1n1m2n2: list = m1n1m2n2, freqDiff: list = freqDiff,
-                     Gamma_rs: float = self.Gamma, filter=self.w1w2Condition) -> np.ndarray:
+                     Gamma_hartree: float = self.Gamma, w1w2Condition=self.w1w2Condition) -> np.ndarray:
             """
             allLevels_Eh collects all vibrational energy levels in Hartree; e.g., [('1', '2')] - combination mode
             w_res_dict contains [-1, 2] and [-1] 2d arrays (in s-1)
@@ -389,8 +391,9 @@ class Spectrum2D:
 
             wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
 
-            t1 = allLevels_Eh[wm1] - allLevels_Eh[wn1] + w_res_dict[(-1, 2)] - 1j * Gamma_rs
-            t2 = allLevels_Eh[wm2] - allLevels_Eh[wn2] + w_res_dict[(-1,)] - 1j * Gamma_rs
+            # w_res_dict[(-1, 2)] is w1-w2; w_res_dict[(-1,)] is w1
+            t1 = allLevels_Eh[wm1] - allLevels_Eh[wn1] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree
+            t2 = allLevels_Eh[wm2] - allLevels_Eh[wn2] + w_res_dict[(-1,)] - 1j * Gamma_hartree
 
             if freqDiff is None:
                 sumfrac = 1.
@@ -414,7 +417,7 @@ class Spectrum2D:
                 sumfrac = (1 / t3 + 1 / t4)
 
             product = t1 * t2
-            return  np.where(filter, sumfrac / product, 0)
+            return  np.where(w1w2Condition, sumfrac / product, 0)
 
         return function
 
