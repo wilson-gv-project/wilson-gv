@@ -5,6 +5,28 @@ import numpy as np
 from scipy import constants
 
 from .averaging import get_iso_f
+# from ..analysis.data_analysis import find_nearest_index, fill_subgrid
+import pandas as pd
+
+# from memory_profiler import profile
+
+def min_abs_preserve_sign(array):
+    abs_array = np.abs(array)
+    # Find the index of the minimum absolute value
+    min_index = np.unravel_index(np.argmin(abs_array), abs_array.shape)
+    # Return the element from the original array using this index
+    return array[min_index]
+
+def find_nearest_index(array, value):
+    idx = np.abs(array - value).argmin()
+    return idx
+
+def fill_subgrid(grid, seed, radius, grid_size):
+    top = max(0, seed[0] - radius)
+    bottom = min(grid_size[0], seed[0] + radius + 1)
+    left = max(0, seed[1] - radius)
+    right = min(grid_size[1], seed[1] + radius + 1)
+    grid[top:bottom, left:right] += 1
 
 
 class Spectrum2D:
@@ -28,13 +50,18 @@ class Spectrum2D:
         a helper can be used - DataVault.make_DatainputDict with specific choice of molecule calculation
     """
 
-    def __init__(self, w1: np.array, w2: np.array):
+    def __init__(self, w1=None, w2=None):
         """
         TODO: remove w1 and w2 from init here; clean up init
         """
+        if w2 is None:
+            w2 = []
+        if w1 is None:
+            w1 = []
         if type(w1)==list or type(w2)==list:
-            w1, w2 = np.array(w1), np.array(w2)
-
+            self.w1, self.w2 = np.array(w1), np.array(w2)
+        else:
+            self.w1, self.w2 = w1, w2
         # Define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         self.shape2d = self.w1_mesh.shape
@@ -123,16 +150,16 @@ class Spectrum2D:
                 if i==j:
                     self.all_states_corr[tuple([str(i), str(i)])] = self.corrected_levels[1][i]
                 else:
-                    self.all_states_corr[tuple(sorted([str(i), str(j)]))] = self.corrected_levels[2][i, j]
+                    self.all_states_corr[tuple([str(el) for el in sorted([i, j])])] = self.corrected_levels[2][i, j]
 
                 for k in range(len(self.fundamentals)):
                     if i==j==k:
                         self.all_states_corr[tuple([str(i), str(i), str(i)])] = self.corrected_levels[3][i]
                     else:
-                        key = tuple(sorted([str(i), str(j), str(k)]))
+                        key = tuple([str(el) for el in sorted([i, j, k])])
                         if key not in self.all_states_corr:
                             if self.corrected_levels[4][i, j, k]!=0.:
-                                self.all_states_corr[tuple(sorted([str(i), str(j), str(k)]))] = self.corrected_levels[4][i, j, k]
+                                self.all_states_corr[tuple([str(el) for el in sorted([i, j, k])])] = self.corrected_levels[4][i, j, k]
 
         # self.all_states_corr = {tuple(str(i -7) for i in k): v for k, v in anharm_states_dict.items()}
 
@@ -183,7 +210,7 @@ class Spectrum2D:
         self.mechanical_avrg = [self.__mechanical_avrg_str[i] for i in mechanical_terms_selection]
 
 
-        # TODO: identification of unique contributions; future precalculation
+        # TODO: identification of unique contributions; future pre-calculation
         # lines from 159 to 167 will be used for this purpose later
         electric_avrg_tuples = [tuple(self.__electric_avrg_str[i]) for i in electrical_terms_selection]
         mechanical_avrg_tuples = [tuple(self.__mechanical_avrg_str[i][:-1]) for i in mechanical_terms_selection]
@@ -216,13 +243,18 @@ class Spectrum2D:
         self.coords_abc = np.indices([nmodes] * 3).reshape(3, -1).T if self.mechanical_terms else []
 
 
-    def precalculateParts(self):
+    def precalculateParts(self, res_radius=40):
         """
         Precalculate some parts:
             factors (1/wa/wb/wc);
             resonance terms (wmn[-1,2], wmn[-1]);
             diff terms (wmn)
         """
+        self.res_radius = res_radius
+
+        # if selectionCond is None:
+        #     selectionCond = np.zeros(self.w1w2Condition.shape, dtype=bool)
+
         vib_ene_levels_harmonic = convNu2Ene(np.array([v for k,v in self.fundamentals_harmonic.items()]))
 
         self.prefac_2d = np.outer(vib_ene_levels_harmonic, vib_ene_levels_harmonic)
@@ -234,8 +266,35 @@ class Spectrum2D:
         self.resonances = {}
         for typelist in self.__resonancesTypes:
             self.resonances[typelist] = (-1) * sum([np.sign(ix)*np.where(self.w1w2Condition,
-                                                                         self.__axes[abs(ix)], 0) for ix in typelist])
+                                                                         self.__axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
 
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic_Eh
+        else:
+            vib_ene_levels = self.all_states_Eh
+
+        nmodes = len(self.fundamentals)
+
+        w_apbbma = np.zeros((nmodes, nmodes))
+        w_bma = np.zeros((nmodes, nmodes))
+        for a in range(nmodes):
+            for b in range(nmodes):
+                w_apbbma[a, b] = vib_ene_levels[tuple([str(el) for el in sorted([a, b])])] - vib_ene_levels[tuple([str(a)])]
+                # w_apbbma[b, a] = np.copy(w_apbbma[a, b])
+
+                w_bma[a, b] = vib_ene_levels[tuple([str(b)])] - vib_ene_levels[tuple([str(a)])]
+                # w_bma[b, a] = -1 * np.copy(w_apbbma[a, b])
+        self.w_mn_dict = {'a+b,a': w_apbbma, 'b,a': w_bma, 'c,a': w_bma,
+                          'zero,a': np.array([-vib_ene_levels[tuple([str(k)])] for k in range(nmodes)])}
+        # self.w_mn_dict = {'a+b,a': w_apbbma, 'b,a': w_bma, 'c,a': w_bma,
+        #                   'zero,a': np.array([-vib_ene_levels[tuple([str(k)])] for k in range(nmodes)])}
+
+        from .. import analysis
+        dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(self, rec_cm=True,
+                                                                  vib_levels_harmonic=False)
+
+        self.resonancesDFel = pd.concat(dfs4terms_el, ignore_index=True)
+        self.resonancesDFmech = pd.concat(dfs4terms_mech, ignore_index=True)
 
     def exclude_modes(self, list2exclude):
         """
@@ -251,13 +310,16 @@ class Spectrum2D:
             self.coords_abc = np.array(filtered_abc)
 
 
-    def get_total_gamma_sum_el(self, a: int, b: int) -> np.ndarray:
+    def get_total_gamma_sum_el(self, a: int, b: int, selectionCond: np.ndarray) -> np.ndarray:
         """
         Computes \gamma^{[1,0]} for given combination of modes
 
         Future: get_total_gamma_sum_el unified with get_total_gamma_sum_mech
         so there would be only one get_gamma function without if ... else conditions
         """
+        # import time
+        # st = time.time()
+
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
         else:
@@ -267,18 +329,26 @@ class Spectrum2D:
 
         for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
             # resonance computed on the grid; could be precalculated with keys in self.__collectionFreqRes (later)
-            resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b))                # a 2D np.array
+            resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b),
+                                   w1w2Condition=(self.w1w2Condition & selectionCond))                # a 2D np.array
             total_sum_el += elavrg[a, b] * resonance / prefac_el                        # elavrg[a, b] is a number
 
-        return total_sum_el / 24.
+        result = total_sum_el / 24.
 
-    def get_total_gamma_sum_mech(self, a: int, b: int, c: int) -> np.ndarray:
+        # elapsed_time = time.time() - st
+        # print('Compute time for one ab(c) in get_total_gamma_sum_el:', time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+        return result
+
+    def get_total_gamma_sum_mech(self, a: int, b: int, c: int, selectionCond: np.ndarray) -> np.ndarray:
         """
         Computes \gamma^{[0,1]} for given combination of modes
 
         Future: get_total_gamma_sum_el unified with get_total_gamma_sum_mech
         so there would be only one get_gamma function without if ... else conditions
         """
+        # import time
+        # st = time.time()
+
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
         else:
@@ -293,60 +363,133 @@ class Spectrum2D:
             ijk_indx = tuple([abc[j] for j in mechavrgF[-1]])
             F = self.deriv_data['F_abc'][ijk_indx]                                  # a number, from F tensor
             # resonance2 is a product of resonances and freq. difference term
-            resonance2 = mech_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b, c))      # a 2D np.array (Nomega1, Nomega2)
+            resonance2 = mech_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b, c),
+                                   w1w2Condition=(self.w1w2Condition & selectionCond))      # a 2D np.array (Nomega1, Nomega2)
             mechavrg = mechavrg_pair[0]                                             # a 2D np.array (nmodes, nmodes)
 
             addition = self.mech_factors[index] / prefac_mech * mechavrg[a, b, c] * F * resonance2
             total_sum_mech += addition
 
-        return total_sum_mech / (-48.)
+        result = total_sum_mech / (-48.)
 
-    def intensity_electrical(self) -> (np.ndarray, dict):
+        # elapsed_time = time.time() - st
+        # print('Compute time for one ab(c) in get_total_gamma_sum_mech:', time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+        return result
+
+    def intensity_electrical(self, selectionCond: np.ndarray = None) -> (np.ndarray, dict):
         """
         Looping over a,b combinations - full sum of \gamma^{[1,0]}
         """
-        start_time = time.time()
+        import time
+        st = time.time()
+
+        if selectionCond is None:
+            selectionCond = ~np.zeros(self.w1w2Condition.shape, dtype=bool)
 
         Qab_contrib_dict = {}
-
         elall = np.zeros(self.shape2d, dtype='complex128')
+
+        count = 0
+
         for ind, i in enumerate(self.coords_ab):
-            contrib_ab = self.get_total_gamma_sum_el(i[0], i[1])
+            import time
+            st_ab = time.time()
+
+            resonance_w1 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
+                                        & (self.resonancesDFel['b'] == i[1])][['w_1', 'res']]
+            resonance_w2 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
+                                        & (self.resonancesDFel['b'] == i[1])][['w_2', 'res']]
+
+            res_list = []
+            for index, row in resonance_w1.iterrows():
+                if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
+                    ww1 = None
+                else:
+                    ww1 = row['w_1']
+
+            for index, row in resonance_w2.iterrows():
+                if row['w_2'] < np.min(self.w2) or row['w_2'] > np.max(self.w2):
+                    ww2 = None
+                else:
+                    ww2 = row['w_2']
+
+            if ww1 is None or ww2 is None:
+                continue
+            else:
+                count += 1
+                res_list.append(tuple([ww1, ww2]))
+
+            contrib_ab = self.get_total_gamma_sum_el(i[0], i[1], selectionCond)
             # saving contribution of each pair of normal modes - may be organized in other way or just taken out
             Qab_contrib_dict[tuple(i)] = contrib_ab
 
             elall += contrib_ab
-            if ind % 100 == 0:
-                print(f'{ind}/{len(self.coords_ab)} modes combinations -- {ind*100/len(self.coords_ab)}%')
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Execution time -| electrical: {execution_time} seconds")
-        print('Electrical anharmonicities are calculated')
+            if ind % 10 == 0:
+                print(f'{ind}/{len(self.coords_ab)} modes combinations -- {ind*100/len(self.coords_ab)}%; time passed: {time.strftime("%H:%M:%S", time.gmtime(time.time() - st_ab))}')
+
+        elapsed_time = time.time() - st
+        print('Compute time of looping over ab combinations in intensity_electrical:',
+              time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+        print('Electrical anharmonicities are calculated. Count:', count)
 
         return elall, Qab_contrib_dict
 
-    def intensity_mechanical(self) -> (np.ndarray, dict):
+    def intensity_mechanical(self, selectionCond: np.ndarray = None) -> (np.ndarray, dict):
         """
         Looping over a,b,c combinations - full sum of \gamma^{[0,1]}
         """
+        import time
+        st = time.time()
 
-        start_time = time.time()
+        if selectionCond is None:
+            selectionCond = ~np.zeros(self.w1w2Condition.shape, dtype=bool)
 
         Qabc_contrib_dict = {}
 
         mechall = np.zeros(self.shape2d, dtype='complex128')
+        count = 0
+
         for ind, i in enumerate(self.coords_abc):
-            contrib_abc = self.get_total_gamma_sum_mech(i[0], i[1], i[2])
+            import time
+            st_abc = time.time()
+
+            resonance_w1 = self.resonancesDFmech[(self.resonancesDFmech['a'] == i[0])
+                                        & (self.resonancesDFmech['b'] == i[1])
+                                        & (self.resonancesDFmech['c'] == i[2])][['w_1']]
+
+            resonance_w2 = self.resonancesDFmech[(self.resonancesDFmech['a'] == i[0])
+                                        & (self.resonancesDFmech['b'] == i[1])
+                                        & (self.resonancesDFmech['c'] == i[2])][['w_2']]
+
+            res_list = []
+            for index, row in resonance_w1.iterrows():
+                if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
+                    ww1 = None
+                else:
+                    ww1 = row['w_1']
+
+            for index, row in resonance_w2.iterrows():
+                if row['w_2'] < np.min(self.w2) or row['w_2'] > np.max(self.w2):
+                    ww2 = None
+                else:
+                    ww2 = row['w_2']
+
+            if ww1 is None or ww2 is None:
+                continue
+            else:
+                count+=1
+                res_list.append(tuple([ww1, ww2]))
+
+            contrib_abc = self.get_total_gamma_sum_mech(i[0], i[1], i[2], selectionCond)
             # saving contribution of each triple of normal modes - may be organized in other way or just taken out
             Qabc_contrib_dict[tuple(i)] = contrib_abc
             mechall += contrib_abc
-            if ind % 1000 == 0:
-                print(f'{ind}/{len(self.coords_abc)} modes combinations -- {ind*100/len(self.coords_abc)}%')
-
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"\nExecution time - mechanical: {execution_time} seconds")
-        print('Mechanical anharmonicities are calculated')
+            if ind % 10 == 0:
+                print(f'{ind}/{len(self.coords_abc)} modes combinations -- {ind*100/len(self.coords_abc)}%; time passed: {time.strftime("%H:%M:%S", time.gmtime(time.time() - st_abc))}')
+        elapsed_time = time.time() - st
+        print('Compute time of looping over abc combinations in intensity_mechanical:',
+              time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+        print('Mechanical anharmonicities are calculated. Count:', count)
 
         return mechall, Qabc_contrib_dict
 
@@ -364,37 +507,143 @@ class Spectrum2D:
         if freqDiff is not None:
             freqDiff = [i.split(',') for i in freqDiff]
 
+        # @profile
         def function(allLevels_Eh: dict, w_res_dict: dict[str:np.ndarray],
                      abctuple: tuple[int, int] | tuple[int, int, int],
+                     w1w2Condition: np.ndarray[bool],
                      m1n1m2n2: list = m1n1m2n2, freqDiff: list = freqDiff,
-                     Gamma_hartree: float = self.Gamma, w1w2Condition=self.w1w2Condition) -> np.ndarray:
+                     Gamma_hartree: float = self.Gamma) -> np.ndarray:
             """
             allLevels_Eh collects all vibrational energy levels in Hartree; e.g., [('1', '2')] - combination mode
             w_res_dict contains [-1, 2] and [-1] 2d arrays (in s-1)
             abctuple is a tuple of normal mode indices for which current iteration is evaluating resonance term
             """
             # todo: lorentzian shape cutoff
+            # import time
+            # st = time.time()
 
             letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
             dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
             allLevels_Eh[('zero',)] = 0.
 
-            wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
-            wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))
+            res_grid = np.zeros_like(w_res_dict[(-1, 2)])
+
+            if 'c' not in subscripts[0]:
+                index_wmn = (abctuple[0], abctuple[1])
+                # resonancesDF = pd.concat(self.dfs4terms_el, ignore_index=True)
+                # resonance_w1 = resonancesDF[(resonancesDF['a'] == abctuple[0])
+                                            # & (resonancesDF['b'] == abctuple[1])]['w_1']
+                # resonance_w2 = resonancesDF[(resonancesDF['a'] == abctuple[0])
+                                            # & (resonancesDF['b'] == abctuple[1])]['w_2']
+            else:
+                index_wmn = (abctuple[0], abctuple[2])
+
+
+            # if resonance_w1[0]
+            # if resonance_w1[0]<np.max(self.w1) and resonance_w1[0]>np.min(self.w1):
+
+            # maxGLor = abs(1. / ((- 1j * Gamma_hartree) * (- 1j * Gamma_hartree)))
+            # min_thresh = maxGLor / self.dynrange # step is going to be 1 cm-1
+
+            # resonance_gridp = self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[1]] if 'c' not in subscripts[0] else
+
+            # small_grid = np.zeros((2*self.res_radius+1, 2*self.res_radius+1), dtype=complex)
+            # print('self.w_mn_dict[subscripts[0]][index_wmn]', self.w_mn_dict[subscripts[0]][index_wmn])
+            # print((resonance_w1, resonance_w2))
+            # print('abctuple', abctuple)
+            # print('resonance_w1', resonance_w1[0], resonance_w2[0])
+            # seeds_indices = tuple([find_nearest_index(self.w1, resonance_w1[0]),
+            #                        find_nearest_index(self.w2, resonance_w2[0])])
+            # print('        seeds_indices', seeds_indices)
+            # print('w_res_dict[(-1, 2)]', w_res_dict[(-1, 2)].shape)
+            # print('small_grid', small_grid.shape)
+
+            # where to add
+            # r,c = seeds_indices[0]-self.res_radius, seeds_indices[1]-self.res_radius
+            # print('        rc', r, c, small_grid.shape[0], small_grid.shape[1], r+small_grid.shape[0], c+small_grid.shape[1])
+            # print(res_grid[r:r+3*self.res_radius+1, c:c+3*self.res_radius+1].shape, [r , r +3*self.res_radius+1, c, c +3*self.res_radius+1])
+            # res_grid[r:r + small_grid.shape[0], c:c + small_grid.shape[1]] += small_grid
+            # print(res_grid)
+            # exit()
+            # wm1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][0].split('+')], key=int))
+            # wn1 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[0][1].split('+')], key=int))
             # fixme ?
             # if len(m1n1m2n2[0][1].split('+')) > 1 else tuple([m1n1m2n2[0][1]])
 
-            if 'zero' not in m1n1m2n2[1][0].split('+'):
-                wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int))
-            else:
-                wm2 = tuple([m1n1m2n2[1][0]])
-
-            wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
+            # if 'zero' not in m1n1m2n2[1][0].split('+'):
+            #     wm2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][0].split('+')], key=int))
+            # else:
+            #     wm2 = tuple([m1n1m2n2[1][0]])
+            #
+            # wn2 = tuple(sorted([str(dictabc[i]) for i in m1n1m2n2[1][1].split('+')], key=int))
 
             # w_res_dict[(-1, 2)] is w1-w2; w_res_dict[(-1,)] is w1
-            t1 = allLevels_Eh[wm1] - allLevels_Eh[wn1] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree
-            t2 = allLevels_Eh[wm2] - allLevels_Eh[wn2] + w_res_dict[(-1,)] - 1j * Gamma_hartree
+            # t1 = allLevels_Eh[wm1] - allLevels_Eh[wn1] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree
+            # t2 = allLevels_Eh[wm2] - allLevels_Eh[wn2] + w_res_dict[(-1,)] - 1j * Gamma_hartree
+            # print(allLevels_Eh[wm1] - allLevels_Eh[wn1], allLevels_Eh[wm2] - allLevels_Eh[wn2])
+            # print(subscripts[0])
 
+            # very specific now
+            t1 = self.w_mn_dict[subscripts[0]][index_wmn] + w_res_dict[(-1, 2)]  # - 1j * Gamma_hartree
+
+            # if 'c' not in subscripts[0]:
+                # t1 = np.where(w1w2Condition, self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[1]] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree, 0)
+                # t1 = self.w_mn_dict[subscripts[0]][index_wmn] + w_res_dict[(-1, 2)] #- 1j * Gamma_hartree
+            #     # bb = self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[1]]
+            #     # jj = 1./(self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[1]] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree)
+            #     # filtered_arr = jj[np.isfinite(jj)]
+            #     # max_index = np.argmax(abs(filtered_arr))
+            #     # max_value = filtered_arr[max_index]
+            #     # print(np.max(abs(filtered_arr)), np.min(abs(jj)), filtered_arr.shape)
+            #     # print(np.max(filtered_arr), np.min(jj))
+            #     # print(filtered_arr[max_index], abs(max_value), np.min(jj))
+            #     # print(np.abs(1./(- 1j * Gamma_hartree)))
+            #
+            # else:
+            #     # t1 = np.where(w1w2Condition, self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[2]] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree, 0)
+            #     t1 = self.w_mn_dict[subscripts[0]][index_wmn] + w_res_dict[(-1, 2)] #- 1j * Gamma_hartree
+            #     # bb = self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[2]]
+            #     # jj = 1./(self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[2]] + w_res_dict[(-1, 2)] - 1j * Gamma_hartree)
+            #     # filtered_arr = jj[np.isfinite(jj)]
+            #     # max_index = np.argmax(abs(filtered_arr))
+            #     # max_value = filtered_arr[max_index]
+            #     # print(np.max(abs(filtered_arr)), np.min(abs(jj)))
+            #     # print(np.max(filtered_arr), np.min(jj))
+            #     # print(filtered_arr[max_index], abs(max_value), np.min(jj))
+            #     # print(np.abs(1. / (- 1j * Gamma_hartree)))
+
+            # print(self.w_mn_dict[subscripts[0]][abctuple[0], abctuple[1]] + w_res_dict[(-1, 2)])
+            # t2 = np.where(w1w2Condition, self.w_mn_dict[subscripts[1]][abctuple[0]] + w_res_dict[(-1,)] - 1j * Gamma_hartree, 0)
+            t2 = self.w_mn_dict[subscripts[1]][abctuple[0]] + w_res_dict[(-1,)] #- 1j * Gamma_hartree
+            # jj2 = 1. / (self.w_mn_dict[subscripts[1]][abctuple[0]] + w_res_dict[(-1,)] - 1j * Gamma_hartree)
+            # filtered_arr2 = jj2[np.isfinite(jj2)]
+            # max_index = np.argmax(abs(filtered_arr))
+            # max_value = filtered_arr[max_index]
+            # print(np.max(abs(filtered_arr2)), np.min(abs(jj2)))
+            # print(np.max(filtered_arr), np.min(jj))
+            # print(filtered_arr2[max_index], abs(filtered_arr2[max_index]), np.min(jj2))
+            # print(np.abs(1. / (- 1j * Gamma_hartree)))
+
+            # print(abs(1./t1 / t2).shape, abs(1./t1 / t2).shape, np.argmax(abs(1./t1 / t2)), np.argmin(abs(1./t1 / t2)))
+            # print((1./t1 / t2)[np.unravel_index(np.argmax(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape)], (1./t1 / t2)[np.unravel_index(np.argmin(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape)], np.unravel_index(np.argmax(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape), np.unravel_index(np.argmin(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape))
+            # max1, min1 = abs((1./t1 / t2)[np.unravel_index(np.argmax(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape)]), abs((1./t1 / t2)[np.unravel_index(np.argmin(abs(1./t1 / t2), axis=None), (1./t1 / t2).shape)])
+            # print(max1, min1, '{:.2e}'.format(max1/min1))
+            # print(wm1, wn1, wm2, wn2)
+            # print(abctuple[0], abctuple[1])
+            # print(bb, self.w_mn_dict[subscripts[1]][abctuple[0]], '\n----')
+            # umax, umin = min_abs_preserve_sign(self.w_mn_dict[subscripts[0]]), min_abs_preserve_sign(self.w_mn_dict[subscripts[0]])
+            # omax, omin = min_abs_preserve_sign(self.w_mn_dict[subscripts[1]]), min_abs_preserve_sign(self.w_mn_dict[subscripts[1]])
+            # fmax, fmin = np.max(w_res_dict[(-1,2)]), np.min(w_res_dict[(-1,2)])
+            # rmax, rmin = np.max(w_res_dict[(-1,)]), np.min(w_res_dict[(-1,)])
+            # if np.sign(umax)!=np.sign(umin):
+            #     umin
+            # g1 = np.argmin(np.array([umin + fmin, umin + fmax, umax + fmin, umax + fmax]))
+            # h1 = min_abs_preserve_sign(np.array([umin + fmin, umin + fmax, umax + fmin, umax + fmax]))
+            # g2 = np.argmin(np.array([omin + rmin, omin + rmax, omax + rmin, omax + rmax]))
+            # h2 = min_abs_preserve_sign(np.array([omin + rmin, omin + rmax, omax + rmin, omax + rmax]))
+            # print('      self.w_mn_dict[subscripts[0]]', abs(1./(h1- 1j * Gamma_hartree)))
+            # print('      self.w_mn_dict[subscripts[1]]', abs(1./(h2- 1j * Gamma_hartree)))
+            # print(w_res_dict[(-1,2)])
             if freqDiff is None:
                 sumfrac = 1.
 
@@ -417,9 +666,29 @@ class Spectrum2D:
                 sumfrac = (1 / t3 + 1 / t4)
 
             product = t1 * t2
-            return  np.where(w1w2Condition, sumfrac / product, 0)
+
+            result = np.where(w1w2Condition, sumfrac / product, 0.)
+
+            # elapsed_time = time.time() - st
+            # print('Execution compute time for one ab(c):', time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+            return  result
 
         return function
+
+    def get_where_matrix1seed(self, radius, seed):
+
+        # this is for the big grid
+        seeds_indices = tuple([(find_nearest_index(self.w1, seed[0]),
+                                find_nearest_index(self.w2, seed[1]))])
+
+        grid_size = (2*radius+1, 2*radius+1)
+        grid = np.zeros(grid_size, dtype=int)
+        for seed in seeds_indices:
+            fill_subgrid(grid, seed, radius, grid_size)
+
+        return grid
+
+
 
 
 def convNu2Ene(reciprocal_cm: float | np.ndarray) -> float | np.ndarray:
@@ -589,3 +858,4 @@ class EvalTerm:
                                 i3, gamma]
                         avrg_tensor[a, b, c] = total / 15.
             return avrg_tensor
+

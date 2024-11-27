@@ -1,5 +1,6 @@
 import numpy as np
-from spectroscpy.anharmonic import get_X, anharmonicProperty, adjust_for_fermi_resonance
+from spectroscpy.anharmonic import anharmonicProperty, adjust_for_fermi_resonance
+from spectroscpy.resonance_checks import is_fermi_resonance, add_fermi_resonance, is_11_resonance
 
 
 def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
@@ -52,8 +53,8 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
     over3q = np.zeros((len(harmonic_energies)))
     combo3q = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
 
-    X, fermi_resonance = get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
-                               rotational_constant, coriolis_constant, do_resonance_checks)
+    X, fermi_resonance, X_cubic, X_quartic = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+                                                       rotational_constant, coriolis_constant, do_resonance_checks)
 
     if fermi_resonance: # if not an empty list
         print('Fermi resonances')
@@ -126,3 +127,90 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
 
     # return anharmonic_energies
     return fundamental, overtones, combotones, over3q, combo3q
+
+
+def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+          rotational_constant, coriolis_constant, do_resonance_checks):
+
+    fermi_resonance = []
+    X = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+    X_cubic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+    X_quartic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+    X_coriolis = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+
+    for i in range(len(harmonic_energies)):
+        vi = harmonic_energies[i]
+        X[i][i] = quartic_forcefield[i][i][i][i]/16.0
+        X_quartic[i][i] = quartic_forcefield[i][i][i][i]/16.0
+
+        rhs = 0
+
+        for k in range(len(harmonic_energies)):
+            vk = harmonic_energies[k]
+            kiik = cubic_forcefield[i][i][k]
+
+            tmp1 = 4.0/vk
+            tmp2 = 1/(2.0*vi + vk)
+            if (not is_fermi_resonance(2*vi - vk, kiik, True) or not do_resonance_checks):
+                tmp3 = 1/(2.0*vi - vk)
+            else:
+                fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
+                tmp3 = 0.0
+
+            rhs = rhs + (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
+
+        X[i][i] = X[i][i] - rhs
+
+        for j in range(i):
+            vj = harmonic_energies[j]
+            X[i][j] = quartic_forcefield[i][i][j][j]/4.0
+            X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
+
+            A = 0
+            for k in range(len(harmonic_energies)):
+                A = A + cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
+
+            B = 0
+            for k in range(len(harmonic_energies)):
+                vk = harmonic_energies[k]
+                kijk = cubic_forcefield[i][j][k]
+
+                tmp1 = 1/(vi + vj + vk)
+                if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j) or not do_resonance_checks):
+                    tmp2 = 1/(-vi + vj + vk)
+                else:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
+                    tmp2 = 0.0
+
+                if (not is_fermi_resonance(vi - vj + vk, kijk, k == i) or not do_resonance_checks):
+                    tmp3 = 1/(vi -vj + vk)
+                else:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
+                    tmp3 = 0.0
+
+                if (not is_fermi_resonance(vi + vj - vk, kijk, False) or not do_resonance_checks):
+                    tmp4 = 1/(vi + vj - vk)
+                else:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, False])
+                    tmp4 = 0.0
+
+                B = B + kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
+
+            C = 0
+            if (not type(coriolis_constant) == str):
+                for k in range(len(rotational_constant)):
+                    C = C + rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                        (harmonic_energies[i]/harmonic_energies[j] +
+                         harmonic_energies[j]/harmonic_energies[i])
+
+            X[i][j] = X[i][j] - A - B + C
+            X[j][i] = np.copy(X[i][j])
+
+            X_coriolis[i][j] = C
+            X_coriolis[j][i] = np.copy(X_coriolis[i][j])
+            X_cubic[i][j] = B
+            X_cubic[j][i] = np.copy(X_cubic[i][j])
+
+    fermi_resonance = sorted(fermi_resonance)
+
+    return X, fermi_resonance, X_cubic, X_quartic
