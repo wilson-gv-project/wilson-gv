@@ -3,8 +3,13 @@ For now these will stay in current form
 """
 
 from wilson.spectrum import spectrum2D
+from CQCParse.parsing import GaussianDataParser, CFOURdataParser
+from CQCParse.relay import DataVault
+
 import pandas as pd
 import numpy as np
+import plotly
+import plotly.express as px
 
 def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
                       rec_cm: bool = True,
@@ -414,6 +419,447 @@ def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
     result_dfF['final_both'] = abs(result_dfF['gamma_mn']) ** 2
 
     return result_dfF, computedSpectrum
+
+
+def allAddedres(molecule, method, basis, data_vault,
+                terms_selection, Gamma_rc, plotHigherThan=1e5) -> [plotly.graph_objs.Figure,
+                                                                   pd.DataFrame, spectrum2D.Spectrum2D]:
+    # settings
+    vib_levels_harmonic = False
+    rec_cm = True
+    datain = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+
+    # spectrum object
+    computedSpectrum = spectrum2D.Spectrum2D([], [])
+    computedSpectrum.load_data(GaussianDataParser(datain))
+    computedSpectrum.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=10., vib_levels_harmonic=False)
+    computedSpectrum.addTerms(*terms_selection)
+    if molecule=="ACDM":
+        computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
+    computedSpectrum.precalculateParts()
+
+    # dataframes with resonances for used terms in spectrum object
+    dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
+                                                              vib_levels_harmonic=vib_levels_harmonic)
+    formatted_df2 = analyse_electrical_resonances(dfs4terms_el, computedSpectrum)
+
+    result_later = (
+        formatted_df2
+        .groupby(['w_1', 'w_2'])
+        .agg({
+            'gamma_mn': 'sum',
+            'a': lambda x: list(x),
+            'b': lambda x: list(x),
+            'ii': lambda x: list(set(x))
+        })
+        .reset_index()
+    )
+    result_later['gamma_mn'] = np.real(np.copy(result_later['gamma_mn']))
+    result_later['term'] = result_later['ii'].apply(lambda x: ', '.join(map(str, x)))
+    result_later['final'] = abs(result_later['gamma_mn']) ** 2
+    result_later['w_1'] = result_later['w_1'].map('{:.3f}'.format)
+    result_later['w_2'] = result_later['w_2'].map('{:.3f}'.format)
+    result_later['ab_tuples'] = result_later.apply(lambda row: str(list(zip(row['a'], row['b']))), axis=1)
+    result_later = result_later.drop(columns=['a', 'b'])
+    # max_int = max(result_later['final'])
+    # power = float(np.log10(max_int)).__floor__()
+
+    formatted_df1 = result_later.copy()
+
+    formatted_df1['Terms'] = formatted_df1['term'].map({
+        '0': 'Term1',
+        '1': 'Term2',
+        '2': 'Term3',
+        '3': 'Term4',
+        '4': 'Term5',
+        '5': 'Term6'
+    })
+
+    formatted_df4 = analyse_mechanical_resonances(dfs4terms_mech, computedSpectrum)
+    # print(formatted_df4, '\n-------------')
+
+    # smaller dataframe
+    result_later1 = (
+        formatted_df4
+        .groupby(['w_1', 'w_2'])
+        .agg({
+            'gamma_mn': 'sum',
+            'a': lambda x: list(x),
+            'b': lambda x: list(x),
+            'c': lambda x: list(x),
+            'ii': lambda x: list(set(x))
+        })
+        .reset_index()
+    )
+    result_later['gamma_mn'] = np.real(np.copy(result_later['gamma_mn']))
+    result_later1['term'] = result_later1['ii'].apply(lambda x: ', '.join(map(str, x)))
+    result_later1['final'] = abs(result_later1['gamma_mn']) ** 2
+    result_later1['w_1'] = result_later1['w_1'].map('{:.3f}'.format)
+    result_later1['w_2'] = result_later1['w_2'].map('{:.3f}'.format)
+
+    result_later1['ab_tuples'] = result_later1.apply(lambda row: str(list(zip(row['a'], row['b'], row['c']))), axis=1)
+    result_later1 = result_later1.drop(columns=['a', 'b', 'c'])
+    # max_int = max(result_later1['final'])
+    # power = float(np.log10(max_int)).__floor__()
+
+    formatted_df3 = result_later1.copy()
+    # power = float(np.log10(formatted_df3['final'].max())).__floor__()
+
+    formatted_df3['Terms'] = formatted_df3['term'].map({
+        '0': 'Term1',
+        '1': 'Term2',
+        '2': 'Term3',
+        '3': 'Term4',
+        '4': 'Term5',
+        '5': 'Term6'
+    })
+
+    combined_df = pd.concat([formatted_df1, formatted_df3])
+    combined_df['gamma_mn_list'] = combined_df['gamma_mn']
+    combined_df['gamma_mn'] = np.real(np.copy(combined_df['gamma_mn']))
+
+    # print(combined_df)
+    result_dfF = (
+        combined_df.groupby(['w_1', 'w_2'])
+        .agg({
+            'Terms': lambda x: list(x),
+            # 'term': lambda x: list(x),
+            # 'final': lambda x: list(x),
+            'ab_tuples': lambda x: list(x),
+            # 'ii': lambda x: list(x),
+            'gamma_mn': 'sum',
+            'gamma_mn_list': lambda x: list(x)
+        })
+        .reset_index()
+    )
+    result_later['gamma_mn'] = np.real(np.copy(result_later['gamma_mn']))
+    result_dfF['ab_tuples'] = result_dfF['ab_tuples'].apply(tuple)
+    result_dfF['Terms'] = result_dfF['Terms'].apply(tuple)
+    # result_dfF['term'] = result_dfF['term'].apply(tuple)
+    def format_tuple_to_scientific(tpl):
+        # print([x for x in tpl if np.imag(x)!=0.])
+        return tuple(f"{np.real(x):.3e}" for x in tpl)
+
+    result_dfF['gamma_mn_list'] = result_dfF['gamma_mn_list'].apply(format_tuple_to_scientific)
+
+    # result_dfF['final'] = result_dfF['final'].apply(tuple)
+    result_dfF['final_both'] = abs(result_dfF['gamma_mn']) ** 2
+    # print(result_dfF[result_dfF['final_both']>1e4])
+    # ('Term2',) ('Term2', 'Term4') ('Term1', 'Term3') ('Term1',)
+    symbol_dict = {
+        ('Term1',): 'diamond',
+        ('Term2',): 'circle',
+        ('Term1', 'Term3'): 'star',
+        ('Term2', 'Term4'): 'triangle-up'
+    }
+
+    color_discrete_map = {
+        ('Term1',): 'fuchsia',
+        ('Term1', 'Term3'): 'blue',
+        ('Term2',): 'green',
+        ('Term2', 'Term4'): 'darkorange',
+    }
+
+    plt_bgcolor = 'white'
+    plt_gridcolor = 'lightgrey'
+
+    import plotly.io as pio
+    pio.templates.default = "ggplot2"
+
+    fig1 = px.scatter(result_dfF[(result_dfF['final_both'] > plotHigherThan)
+                     ],
+                     x='w_1',
+                     y='w_2',
+                     color_continuous_scale='viridis',
+                     title=f'{molecule}/{method}/{basis}: electrical {terms_selection[0]} anharmonicity contribution\nmechanical {terms_selection[1]}',
+                     width=1300, height=800,
+                     hover_data={'gamma_mn_list': True, 'ab_tuples': True, 'final_both': ':.3e'
+                                 },
+                    color_discrete_map=color_discrete_map,
+                    symbol_map=symbol_dict,
+                    color='Terms',
+                    symbol='Terms',
+                     range_color=(5e4, 0.4e7)
+                     )
+
+    fig1.update_layout(
+        xaxis_title='w_1',
+        yaxis_title='w_2',
+        coloraxis_colorbar=dict(title='final'),
+        plot_bgcolor=plt_bgcolor
+    )
+
+    fig1.update_layout(
+        legend=dict(
+            x=0.5,
+            y=-0.1,
+            xanchor='center',
+            yanchor='top',
+            orientation='h',
+            bgcolor="LightBlue"
+        ),
+    )
+
+    fig1.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+    fig1.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+    fig1.update_xaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+    fig1.update_yaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+    fig1.update_coloraxes(colorbar_tickformat='.2e'.format())
+
+    fig1.update_layout(autotypenumbers='convert types')
+    fig1.update_traces(marker_size=8)
+
+    # print(result_dfF)
+    return fig1, result_dfF, computedSpectrum
+
+
+# def ELplotly_resonances(molecule, method, basis, terms_selection, plotHigherThan=1e5) -> [plotly.graph_objs.Figure, pd.DataFrame]:
+#     # settings
+#     datain = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+#     vib_levels_harmonic = False
+#     rec_cm = True
+#
+#     # spectrum object
+#     computedSpectrum = Spectrum2D([], [])
+#     computedSpectrum.load_data(GaussianDataParser(datain))
+#     computedSpectrum.setSpectrumSettings(Gamma_rc=10., diag_margin_rc=10., vib_levels_harmonic=False)
+#     computedSpectrum.addTerms(*terms_selection)
+#     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
+#     computedSpectrum.precalculateParts()
+#
+#     # dataframes with resonances for used terms in spectrum object
+#     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
+#                                                               vib_levels_harmonic=vib_levels_harmonic)
+#     initialDF = analyse_electrical_resonances(dfs4terms_el, computedSpectrum)
+#
+#     # smaller dataframe
+#     condensed1 = (
+#         initialDF
+#         .groupby(['w_1', 'w_2'])
+#         .agg({
+#             'gamma_mn': 'sum',
+#             'a': lambda x: list(x),
+#             'b': lambda x: list(x),
+#             'ii': lambda x: list(set(x))
+#         })
+#         .reset_index()
+#     )
+#     condensed1['term'] = condensed1['ii'].apply(lambda x: ', '.join(map(str, x)))
+#     condensed1['final'] = abs(condensed1['gamma_mn']) ** 2
+#     condensed1['w_1'] = condensed1['w_1'].map('{:.3f}'.format)
+#     condensed1['w_2'] = condensed1['w_2'].map('{:.3f}'.format)
+#     condensed1['ab_tuples'] = condensed1.apply(lambda row: str(list(zip(row['a'], row['b']))), axis=1)
+#     condensed1 = condensed1.drop(columns=['a', 'b'])
+#
+#     condensedDF2 = condensed1.copy()
+#     # power = float(np.log10(formatted_df1['final'].max())).__floor__()
+#
+#     # second contraction and labeling for the plot
+#     condensedDF2['Terms'] = condensedDF2['term'].map({
+#         '0': 'Term1',
+#         '1': 'Term2',
+#         '2': 'Term3',
+#         '3': 'Term4',
+#         '4': 'Term5',
+#         '5': 'Term6'
+#     })
+#
+#     symbol_dict = {
+#         'Term1': 'triangle-left',
+#         'Term2': 'diamond',
+#         'Term3': 'triangle-right',
+#         'Term4': 'circle',
+#         'Term5': 'star',
+#         'Term6': 'triangle-up'
+#     }
+#
+#     color_discrete_map = {
+#         'Term1': 'fuchsia',
+#         'Term2': 'blue',
+#         'Term3': 'green',
+#         'Term4': 'darkorange',
+#         'Term5': 'purple',
+#         'Term6': 'pink'
+#     }
+#     import plotly.io as pio
+#     pio.templates.default = "ggplot2"
+#
+#     fig1 = px.scatter(condensedDF2[(condensedDF2['final'] > plotHigherThan)
+#                       ],
+#                       x='w_1',
+#                       y='w_2',
+#                       color_continuous_scale='viridis',
+#                       title=f'{molecule}/{method}/{basis}: electrical {terms_selection[0]} anharmonicity contribution\nmechanical {terms_selection[1]}',
+#                       width=1300, height=800,
+#                       hover_data={'final': ':.2e', 'ab_tuples': True,
+#                                   },
+#                       color_discrete_map=color_discrete_map,
+#                       symbol_map=symbol_dict,
+#                       color='Terms',
+#                       symbol='Terms',
+#                       range_color=(5e4, 0.4e7)
+#                       )
+#
+#     # plot settings/layout
+#     fig1.update_layout(
+#         xaxis_title='w_1',
+#         yaxis_title='w_2',
+#         coloraxis_colorbar=dict(title='final'),
+#         plot_bgcolor=plt_bgcolor
+#     )
+#
+#     fig1.update_layout(
+#         legend=dict(
+#             x=0.5,
+#             y=-0.1,
+#             xanchor='center',
+#             yanchor='top',
+#             orientation='h',
+#             bgcolor="LightBlue"
+#         ),
+#     )
+#
+#     fig1.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+#     fig1.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+#
+#     fig1.update_xaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+#     fig1.update_yaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+#
+#     fig1.update_coloraxes(colorbar_tickformat='.2e'.format())
+#
+#     fig1.update_layout(autotypenumbers='convert types')
+#     fig1.update_traces(marker_size=8)
+#
+#     return fig1, condensedDF2
+#
+#
+# def MECHplotly_resonances(molecule, method, basis, terms_selection, plotHigherThan=1e5) -> [plotly.graph_objs.Figure, pd.DataFrame]:
+#     # settings
+#     datain = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+#     vib_levels_harmonic = False
+#     rec_cm = True
+#
+#     # spectrum object
+#     computedSpectrum = Spectrum2D([], [])
+#     computedSpectrum.load_data(GaussianDataParser(datain))
+#     computedSpectrum.setSpectrumSettings(Gamma_rc=10., diag_margin_rc=10., vib_levels_harmonic=False)
+#     computedSpectrum.addTerms(*terms_selection)
+#     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
+#     computedSpectrum.precalculateParts()
+#
+#     # dataframes with resonances for used terms in spectrum object
+#     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
+#                                                               vib_levels_harmonic=vib_levels_harmonic)
+#     formatted_df2 = analyse_mechanical_resonances(dfs4terms_mech, computedSpectrum)
+#
+#     # smaller dataframe
+#     result_later = (
+#         formatted_df2
+#         .groupby(['w_1', 'w_2'])
+#         .agg({
+#             'gamma_mn': 'sum',
+#             'a': lambda x: list(x),
+#             'b': lambda x: list(x),
+#             'c': lambda x: list(x),
+#             'ii': lambda x: list(set(x))
+#         })
+#         .reset_index()
+#     )
+#     result_later['term'] = result_later['ii'].apply(lambda x: ', '.join(map(str, x)))
+#     result_later['final'] = abs(result_later['gamma_mn']) ** 2
+#     result_later['w_1'] = result_later['w_1'].map('{:.3f}'.format)
+#     result_later['w_2'] = result_later['w_2'].map('{:.3f}'.format)
+#     result_later['abc_tuples'] = result_later.apply(lambda row: str(list(zip(row['a'], row['b'], row['c']))), axis=1)
+#     result_later = result_later.drop(columns=['a', 'b', 'c'])
+#     # max_int = max(result_later['final'])
+#     # power = float(np.log10(max_int)).__floor__()
+#
+#     formatted_df1 = result_later.copy()  # needed??
+#     # power = float(np.log10(formatted_df1['final'].max())).__floor__()
+#
+#     # second contraction and labeling for the plot
+#     formatted_df1['Terms'] = formatted_df1['term'].map({
+#         '0': 'Term1',
+#         '1': 'Term2',
+#         '2': 'Term3',
+#         '3': 'Term4',
+#         '4': 'Term5',
+#         '5': 'Term6'
+#     })
+#
+#     symbol_dict = {
+#         'Term1': 'triangle-left',
+#         'Term2': 'diamond',
+#         'Term3': 'triangle-right',
+#         'Term4': 'circle',
+#         'Term5': 'star',
+#         'Term6': 'triangle-up'
+#     }
+#
+#     color_discrete_map = {
+#         'Term1': 'fuchsia',
+#         'Term2': 'blue',
+#         'Term3': 'green',
+#         'Term4': 'darkorange',
+#         'Term5': 'purple',
+#         'Term6': 'pink'
+#     }
+#
+#     fig2 = px.scatter(formatted_df1[(formatted_df1['final'] > plotHigherThan)
+#                       ],
+#                       x='w_1',
+#                       y='w_2',
+#                       color_continuous_scale='viridis',
+#                       title=f'{molecule}/{method}/{basis}: electrical {terms_selection[0]} anharmonicity contribution\nmechanical {terms_selection[1]}',
+#                       width=1300, height=800,
+#                       hover_data={'final': ':.2e', 'abc_tuples': True,  # 'a': True, 'b': True, 'c': True
+#                                   },
+#                       color_discrete_map=color_discrete_map,
+#                       symbol_map=symbol_dict,
+#                       color='Terms',
+#                       symbol='Terms',
+#                       range_color=(5e4, 1.5e11))
+#
+#     # plot settings/layout
+#     fig2.update_layout(
+#         xaxis_title='w_1',
+#         yaxis_title='w_2',
+#         coloraxis_colorbar=dict(title='final'),
+#         plot_bgcolor=plt_bgcolor
+#     )
+#
+#     fig2.update_layout(
+#         legend=dict(
+#             x=0.5,
+#             y=-0.1,
+#             xanchor='center',
+#             yanchor='top',
+#             orientation='h',
+#             bgcolor="LightBlue"
+#         ),
+#     )
+#
+#     fig2.update_xaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+#     fig2.update_yaxes(showline=True, linewidth=1, linecolor='black', mirror=True)
+#     fig2.update_xaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+#     fig2.update_yaxes(showgrid=True, gridwidth=0.4, gridcolor=plt_gridcolor)
+#     fig2.update_coloraxes(colorbar_tickformat='.2e'.format())
+#     fig2.update_layout(autotypenumbers='convert types')
+#     fig2.update_traces(marker_size=13)
+#
+#     return fig2, formatted_df1
+
+
+def check_unhashable_columns(df):
+    unhashable_columns = []
+    for column in df.columns:
+        try:
+            # Attempt to convert the column to a set
+            _ = set(df[column])
+        except TypeError:
+            # If there is a TypeError, the column contains unhashable types
+            unhashable_columns.append(column)
+    return unhashable_columns
 
 
 def find_nearest_index(array, value):

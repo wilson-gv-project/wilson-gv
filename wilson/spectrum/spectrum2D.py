@@ -136,6 +136,7 @@ class Spectrum2D:
         cff_cm_1 = parserObj.cubic_cm_1
         qff_cm_1 = parserObj.quartic_cm_1
         rot_c, cor_c = parserObj.rotational_constant, parserObj.coriolis_constant
+
         from .vpt2 import anharm_corr_energiesVPT2
         # corrected_levels = funds, over2q, combo2q, over3q, combo3q
         self.corrected_levels = anharm_corr_energiesVPT2(list(self.fundamentals_harmonic.values()),
@@ -395,12 +396,14 @@ class Spectrum2D:
             import time
             st_ab = time.time()
 
+            # getting resonances dataframes
             resonance_w1 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
                                         & (self.resonancesDFel['b'] == i[1])][['w_1', 'res']]
             resonance_w2 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
                                         & (self.resonancesDFel['b'] == i[1])][['w_2', 'res']]
 
             res_list = []
+            ww1, ww2 = None, None
             for index, row in resonance_w1.iterrows():
                 if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
                     ww1 = None
@@ -417,7 +420,10 @@ class Spectrum2D:
                 continue
             else:
                 count += 1
+                # collecting tuples of resonance coordinates
                 res_list.append(tuple([ww1, ww2]))
+
+            print('int electr debug print after continue', ind, i)
 
             contrib_ab = self.get_total_gamma_sum_el(i[0], i[1], selectionCond)
             # saving contribution of each pair of normal modes - may be organized in other way or just taken out
@@ -462,6 +468,7 @@ class Spectrum2D:
                                         & (self.resonancesDFmech['c'] == i[2])][['w_2']]
 
             res_list = []
+            ww1, ww2 = None, None
             for index, row in resonance_w1.iterrows():
                 if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
                     ww1 = None
@@ -502,7 +509,7 @@ class Spectrum2D:
         freqDiff - a tuple of strings from the formula; subscripts of omega energy levels in the freq. difference part;
                         e.g., ('a+b+c,0', 'c,a+b'); not None for mech. anharm.
         """
-
+        # superscripts isn't formally passed down but it is used there??
         m1n1m2n2 = [i.split(',') for i in subscripts]
         if freqDiff is not None:
             freqDiff = [i.split(',') for i in freqDiff]

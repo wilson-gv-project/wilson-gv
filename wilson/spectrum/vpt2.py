@@ -1,6 +1,4 @@
 import numpy as np
-from spectroscpy.anharmonic import anharmonicProperty, adjust_for_fermi_resonance
-from spectroscpy.resonance_checks import is_fermi_resonance, add_fermi_resonance, is_11_resonance
 
 
 def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
@@ -57,7 +55,7 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                                                        rotational_constant, coriolis_constant, do_resonance_checks)
 
     if fermi_resonance: # if not an empty list
-        print('Fermi resonances')
+        print('Fermi resonances' , fermi_resonance)
         for a in range(len(fermi_resonance)):
             i = fermi_resonance[a][0]
             j = fermi_resonance[a][1]
@@ -109,24 +107,17 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                     combo3q[i][j][k] += fundamental[i] + fundamental[j] + fundamental[k] + X[i][j] + X[i][k] + X[j][k]
                     combo3q_corrections[i][j][k] += X[i][j] + X[i][k] + X[j][k]
 
-    # if do_variational_correction:
-    #     adjusted_fundamental, adjusted_overtones, adjusted_combotones = \
-    #         adjust_for_fermi_resonance(fundamental, overtones, combotones, cubic_forcefield,
-    #                                    fermi_resonance)
-    #     anharmonic_energies = anharmonicProperty(harmonic_energies, adjusted_fundamental,
-    #                                              adjusted_overtones, adjusted_combotones)
-    # else:
-    #     anharmonic_energies = anharmonicProperty(harmonic_energies, fundamental, overtones, combotones)
+    if do_variational_correction:
+        selectedFR = [0, 1]
+        adjusted_fundamental, adjusted_overtones, adjusted_combotones = \
+            adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo3q, cubic_forcefield,
+                                       [fermi_resonance[i] for i in selectedFR])
+        # anharmonic_energies = anharmonicProperty(harmonic_energies, adjusted_fundamental,
+        #                                          adjusted_overtones, adjusted_combotones)
+        return adjusted_fundamental, adjusted_overtones, adjusted_combotones, over3q, combo3q
 
-    # print('funds_corrections\n', funds_corrections)
-    # print('overtones_corrections\n', overtones_corrections)
-    # print('combotones_corrections\n', combotones_corrections)
-    # print('over3q_corrections\n', over3q_corrections)
-    # print('combo3q_corrections\n', combo3q_corrections)
-    # print('\ncombo3q\n', combo3q)
-
-    # return anharmonic_energies
-    return fundamental, overtones, combotones, over3q, combo3q
+    else:
+        return fundamental, overtones, combotones, over3q, combo3q
 
 
 def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
@@ -177,20 +168,26 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
 
                 tmp1 = 1/(vi + vj + vk)
                 if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j) or not do_resonance_checks):
+                    # perturb if no fermi resonance or dont do resonance checks
                     tmp2 = 1/(-vi + vj + vk)
                 else:
+                    # deperturbing otherwise - when resonance and do checks
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
                     tmp2 = 0.0
 
                 if (not is_fermi_resonance(vi - vj + vk, kijk, k == i) or not do_resonance_checks):
+                    # perturb if no fermi resonance or dont do resonance checks
                     tmp3 = 1/(vi -vj + vk)
                 else:
+                    # deperturbing otherwise - when resonance and do checks
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
                     tmp3 = 0.0
 
                 if (not is_fermi_resonance(vi + vj - vk, kijk, False) or not do_resonance_checks):
+                    # perturb if no fermi resonance or dont do resonance checks
                     tmp4 = 1/(vi + vj - vk)
                 else:
+                    # deperturbing otherwise - when resonance and do checks
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, False])
                     tmp4 = 0.0
 
@@ -214,3 +211,128 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
     fermi_resonance = sorted(fermi_resonance)
 
     return X, fermi_resonance, X_cubic, X_quartic
+
+fermi_threshold  = 200.0
+martin_threshold = 1.0
+
+def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
+    fermi = False
+
+    if (abs(delta) <= fermi_threshold): # in FR should be less than 200 cm-1
+        if (i_is_j):
+            martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
+            if (abs(martin_parameter) >= martin_threshold): # in FR should be greater than 1 cm-1
+                fermi = True
+                print(abs(delta), fermi_threshold)
+                print(abs(martin_parameter), martin_threshold)
+            else:
+                fermi = False
+        else:
+            martin_parameter = cubic_force_ijk**4/(64.0*delta**3)
+            if (abs(martin_parameter) >= martin_threshold):
+                fermi = True
+                print(abs(delta), fermi_threshold)
+                print(abs(martin_parameter), martin_threshold)
+            else:
+                fermi = False
+
+    return fermi
+
+
+def add_fermi_resonance(total_list, new_element):
+
+    i = new_element[0]
+    j = new_element[1]
+    k = new_element[2]
+    l = new_element[3]
+
+    j, k = sorted([j, k])
+    new_element[0] = i
+    new_element[1] = j
+    new_element[2] = k
+    new_element[3] = l
+
+    if not new_element in total_list:
+        total_list.append(new_element)
+
+    return total_list
+
+
+def adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo3q, cubic_forcefield, fermi_resonance):
+
+    num_modes = len(fundamental)
+    red_num_combotones = (num_modes**2 - num_modes)//2
+
+    num_frequencies = num_modes*2 + red_num_combotones
+
+    adjusted_frequencies = np.zeros((num_frequencies))
+    V = np.zeros((num_frequencies, num_frequencies))
+
+    k = 2*num_modes
+    for i in range(num_modes):
+
+        V[i][i] = fundamental[i]
+        V[i + num_modes][i + num_modes] = overtones[i]
+
+        for j in range(i):
+            V[k][k] = combotones[i][j]
+
+            k = k + 1
+
+    for a in range(len(fermi_resonance)):
+        i = fermi_resonance[a][0]
+        j = fermi_resonance[a][1]
+        k = fermi_resonance[a][2]
+        fermi_type = fermi_resonance[a][3]
+
+        if fermi_type:
+            V[i][num_modes + j] = cubic_forcefield[j][k][i]/4.0
+            V[num_modes + j][i] = V[i][num_modes + j]
+        else:
+            V[i][x_matrix_position(j, k, num_modes)] = cubic_forcefield[j][k][i]/np.sqrt(8.0)
+            V[x_matrix_position(j, k, num_modes)][i] = V[i][x_matrix_position(j, k, num_modes)]
+
+    eigenvalue, eigenvector = np.linalg.eig(V)
+
+    k = 0
+    for i in range(num_frequencies):
+        orig_character = 0.0
+
+        for j in range(num_frequencies):
+            if (abs(eigenvector[i][j]) > orig_character):
+                orig_character = abs(eigenvector[i][j])
+                adjusted_frequencies[k] = eigenvalue[j]
+
+                i_index = i
+                j_index = j
+
+        # A little uncertain of this one...
+        for j in range(num_frequencies):
+            eigenvector[j][j_index] = 0.0
+
+        k = k + 1
+
+    adjusted_fundamental = np.zeros((num_modes))
+    adjusted_overtones = np.zeros((num_modes))
+    adjusted_combotones = np.zeros((num_modes, num_modes))
+
+    k = 2*num_modes
+    for i in range(num_modes):
+        adjusted_fundamental[i] = adjusted_frequencies[i]
+        adjusted_overtones[i] = adjusted_frequencies[i + num_modes]
+
+        for j in range(i):
+            adjusted_combotones[i][j] = adjusted_frequencies[k]
+            adjusted_combotones[j][i] = adjusted_combotones[i][j]
+
+            k = k + 1
+
+    return adjusted_fundamental, adjusted_overtones, adjusted_combotones
+
+
+def x_matrix_position(a, b, n):
+    pos = a
+    for i in range(b):
+        pos += i
+
+    return pos + 2*n
