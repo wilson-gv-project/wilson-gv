@@ -223,16 +223,16 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
             martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
             if (abs(martin_parameter) >= martin_threshold): # in FR should be greater than 1 cm-1
                 fermi = True
-                print(abs(delta), fermi_threshold)
-                print(abs(martin_parameter), martin_threshold)
+                # print(abs(delta), fermi_threshold)
+                # print(abs(martin_parameter), martin_threshold)
             else:
                 fermi = False
         else:
             martin_parameter = cubic_force_ijk**4/(64.0*delta**3)
             if (abs(martin_parameter) >= martin_threshold):
                 fermi = True
-                print(abs(delta), fermi_threshold)
-                print(abs(martin_parameter), martin_threshold)
+                # print(abs(delta), fermi_threshold)
+                # print(abs(martin_parameter), martin_threshold)
             else:
                 fermi = False
 
