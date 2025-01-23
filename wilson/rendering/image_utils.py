@@ -62,7 +62,7 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: s
 
     return title_on_top, text_under_the_figure
 
-def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = '.') -> str:
+def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = '.', prefix: str = None) -> str:
     """
     other = {'regions': regions, 'terms_selection': terms_selection, 'w1mw2': False, 'log10': True}
 
@@ -72,13 +72,22 @@ def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = 
 
     software = input_data_info['source']
     vibEneLevels = 'harmonicEL' if vib_levels_harmonic else 'anharmonicEL'
-    prefix = f'figObj_{vibEneLevels}_{software}'
+
+    if prefix is None:
+        prefix = f'figObj_{vibEneLevels}_{software}'
+    else:
+        prefix += f'_{vibEneLevels}_{software}'
+
+    # prefix = f'figObj_{vibEneLevels}_{software}'
     method_name = input_data_info['files']['method']
     basis_name = input_data_info['files']['basis']
     mol_code = input_data_info['files']['mol_code']
 
-    el_bool = artist.settings['electrical']
-    mech_bool = artist.settings['mechanical']
+    # el_bool = artist.settings['electrical']
+    # mech_bool = artist.settings['mechanical']
+
+    els_str = ''.join([str(i) for i in artist.settings['electrical']])
+    mechs_str = ''.join([str(i) for i in artist.settings['mechanical']])
 
     Gamma_rc = artist.settings['Gamma_rc']
     Gamma_str = f"{Gamma_rc:.2f}".replace('.', 'p')
@@ -86,7 +95,7 @@ def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = 
     # step1 = regions[region][0][-1]
     # step_str = f"{step1:.1f}".replace('.', 'p')
 
-    name = f'{directory}/{prefix}_{mol_code}_{method_name}_{basis_name}_el{str(el_bool)[0]}_mech{str(mech_bool)[0]}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}.svg'
+    name = f'{directory}/{prefix}_{mol_code}_{method_name}_{basis_name}_el{els_str}_mech{mechs_str}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}.svg'
 
     return name
 

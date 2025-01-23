@@ -133,3 +133,8 @@ class SpectrumFigure:
         # import shutil
         # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
         return fig
+
+    def plot_resonances(self):
+
+        plt.scatter(x, y, s=area1, marker='^', c=c)
+        pass
