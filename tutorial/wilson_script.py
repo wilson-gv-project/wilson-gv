@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-
+"""
+./wilson_script.py --new y --sparse 0. --preview n --vpt2 n --w1mw2 n
+"""
 import argparse
 import warnings
 from matplotlib import MatplotlibDeprecationWarning
@@ -36,7 +38,8 @@ parser.add_argument('-s', "--sparse", type=float, default=0.,
                     help='Radius of small grids; default is 0. which means full window will be calculated')
 parser.add_argument('-p', "--preview", type=str2bool, default=False)
 parser.add_argument('-a', "--vpt2", type=str2bool, default=False)
-parser.add_argument('-w', "--w1mw2", type=str2bool, default=False)
+parser.add_argument('-w', "--w1mw2", type=str2bool, default=False,
+                    help='(w1,w2) or (w1,w2-w1) spectrum format')
 
 args = parser.parse_args()
 
