@@ -2,7 +2,7 @@ import numpy as np
 np.set_printoptions(legacy='1.25')
 
 from wilson.spectrum.spectrum2D import (convNu2Ene, avrg_abc_tensor,
-                                        Spectrum2D, EvalTerm, get_AlphaBetaGammaDelta_indices)
+                                        Spectrum2D, get_AlphaBetaGammaDelta_indices)
 from CQCParse.parsing import GaussianDataParser
 from CQCParse.relay import DataVault
 

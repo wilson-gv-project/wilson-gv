@@ -12,14 +12,8 @@ from .tools import convNu2Ene, avrg_abc_tensor
 
 import itertools
 def combinations_with_permutations(iterable, k):
-    # return (perm for comb in itertools.combinations(iterable, k) for perm in itertools.permutations(comb))
-    # return (comb for comb in itertools.combinations_with_replacement(iterable, k))
-    # print(itertools.product(iterable, repeat=k))
-    # print(type(itertools.product(iterable, repeat=k)))
     return (comb for comb in itertools.product(iterable, repeat=k))
 
-import math
-# numcombperm = lambda n, k: math.factorial(n) // math.factorial(n - k)
 numcombperm = lambda n, k: n**k
 
 
@@ -56,9 +50,13 @@ class Spectrum2D:
             self.w1, self.w2 = np.array(w1), np.array(w2)
         else:
             self.w1, self.w2 = w1, w2
-        # Define the grid of spectrum (pixels)
+        # define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
         self.shape2d = self.w1_mesh.shape
+
+        # initialized final spectrum pixels
+        self.intensities_grid = np.zeros(self.shape2d, dtype='complex64')
+
         self.Gamma = None
         self.Gamma_rc = None
         self.diagonal_margin_rc = None
@@ -77,16 +75,16 @@ class Spectrum2D:
         """
         Currently available for selection EVV terms
         """
-        self.__resonancesTypes = [(-1, 2), (-1,)]
-        self.__axes = {1: self.w1_mesh_Eh, 2: self.w2_mesh_Eh}
-        self.w1w2Condition = self.__axes[2] - self.diagonal_margin_Eh > self.__axes[1]
+        self.resonancesTypes = [(-1, 2), (-1,)]
+        self.axes = {1: self.w1_mesh_Eh, 2: self.w2_mesh_Eh}
+        self.w1w2Condition = self.axes[2] - self.diagonal_margin_Eh > self.axes[1]
         # self.w1w2Condition = np.ones(self.w1_mesh_Eh.shape, dtype=bool)
 
         # Terms in the expressions
-        self.__electrical_terms_str = [(('a+b,a', 'zero,a'), None),
+        self.electrical_terms_str = [(('a+b,a', 'zero,a'), None),
                                        (('b,a', 'zero,a'), None)]
 
-        self.__mechanical_terms_str = [ (('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
+        self.mechanical_terms_str = [ (('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
                                         (('b,a', 'zero,a'), ('a+c,b', 'b+c,a')),
                                         (('a+b,a', 'zero,a'), ('a,a+b', 'b,zero')),
                                         (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
@@ -96,18 +94,16 @@ class Spectrum2D:
         # derivatives:
         # 1. mu_Q, mu QQ, alpha_Q - electric dipole (1st and 2nd derivatives), polarizability (1st der.)
         # 2. mu_Q, alpha_QQ - electric dipole (1st der.), polarizability (2nd der.)
-        self.__electric_avrg_str = [(('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))),
+        self.electric_avrg_str = [(('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))),
                                     (('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))) ]
 
         # mu_Q, alpha_Q - for all 6 terms
-        self.__mechanical_avrg_str = [ (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.),
+        self.mechanical_avrg_str = [   (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.),
                                        (('mu_Q', ('a',)), ('alpha_Q', ('c',)), ('mu_Q', ('b',)), 'acb', 1.),
                                        (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc', 0.5),
                                        (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', 0.5),
                                        (('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc', -0.5),
                                        (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', -0.5)]
-
-        self.__factors = [1., 1., 0.5, 0.5, -0.5, -0.5]
 
 
     def load_data(self, parserObj, vpt2=False, vpt2settings=None):
@@ -224,26 +220,25 @@ class Spectrum2D:
         # now used in the analysis
         self.e_selected, self.m_selected = electrical_terms_selection, mechanical_terms_selection
         # fraction factors for mechanical anh. terms
-        self.mech_factors = [self.__factors[i] for i in mechanical_terms_selection]
+        self.mech_factors = [self.mechanical_avrg_str[i][-1] for i in mechanical_terms_selection]
 
-        self.electrical_terms = [self.__electrical_terms_str[i] for i in electrical_terms_selection]
-        self.mechanical_terms = [self.__mechanical_terms_str[i] for i in mechanical_terms_selection]
+        self.electrical_terms = [self.electrical_terms_str[i] for i in electrical_terms_selection]
+        self.mechanical_terms = [self.mechanical_terms_str[i] for i in mechanical_terms_selection]
 
-        self.electric_avrg = [self.__electric_avrg_str[i] for i in electrical_terms_selection]
-        self.mechanical_avrg = [self.__mechanical_avrg_str[i] for i in mechanical_terms_selection]
+        self.electric_avrg = [self.electric_avrg_str[i] for i in electrical_terms_selection]
+        self.mechanical_avrg = [self.mechanical_avrg_str[i] for i in mechanical_terms_selection]
 
 
         # TODO: identification of unique contributions; future pre-calculation
-        # lines from 159 to 167 will be used for this purpose later
-        electric_avrg_tuples = [tuple(self.__electric_avrg_str[i]) for i in electrical_terms_selection]
-        mechanical_avrg_tuples = [tuple(self.__mechanical_avrg_str[i][:-1]) for i in mechanical_terms_selection]
+        electric_avrg_tuples = [tuple(self.electric_avrg_str[i]) for i in electrical_terms_selection]
+        mechanical_avrg_tuples = [tuple(self.mechanical_avrg_str[i][:-1]) for i in mechanical_terms_selection]
         # a combined list
-        combFreqDiff = ([(self.__electrical_terms_str[i])[1] for i in electrical_terms_selection]
-                      + [(self.__mechanical_terms_str[i])[1] for i in mechanical_terms_selection])
-        self.__collectionFreqDiff = set([j for i in [x for x in combFreqDiff if x is not None] for j in i])
-        self.__collectionFreqRes = set([(self.__electrical_terms_str[i])[0] for i in electrical_terms_selection]
-                                     + [(self.__mechanical_terms_str[i])[0] for i in mechanical_terms_selection])
-        self.__collectionAveraging = set(electric_avrg_tuples + mechanical_avrg_tuples)
+        combFreqDiff = ([(self.electrical_terms_str[i])[1] for i in electrical_terms_selection]
+                      + [(self.mechanical_terms_str[i])[1] for i in mechanical_terms_selection])
+        self.collectionFreqDiff = set([j for i in [x for x in combFreqDiff if x is not None] for j in i])
+        self.collectionFreqRes = set([(self.electrical_terms_str[i])[0] for i in electrical_terms_selection]
+                                     + [(self.mechanical_terms_str[i])[0] for i in mechanical_terms_selection])
+        self.collectionAveraging = set(electric_avrg_tuples + mechanical_avrg_tuples)
 
         # here the functions of 2 frequencies
         self.e_funcs = [self.generate_resonances_functions(i[0], i[1]) for i in self.electrical_terms]
@@ -260,15 +255,9 @@ class Spectrum2D:
                                   for i in self.electric_avrg}
         self.mech_avrg_tensorsD = {tuple(i): avrg_abc_tensor(i, self.deriv_data, self.gammaCompsAll)
                                     for i in self.mechanical_avrg}
-        self.el_terms = [(self.__electrical_terms_str[i], self.__electric_avrg_str[i]) for i in electrical_terms_selection]
-        self.mech_terms = [(self.__mechanical_terms_str[i], self.__mechanical_avrg_str[i]) for i in mechanical_terms_selection]
-        # self.electrical_terms = [self.__electrical_terms_str[i] for i in electrical_terms_selection]
-        # self.mechanical_terms = [self.__mechanical_terms_str[i] for i in mechanical_terms_selection]
-        # self.electric_avrg = [self.__electric_avrg_str[i] for i in electrical_terms_selection]
-        # self.mechanical_avrg = [self.__mechanical_avrg_str[i] for i in mechanical_terms_selection]
+        self.el_terms = [(self.electrical_terms_str[i], self.electric_avrg_str[i]) for i in electrical_terms_selection]
+        self.mech_terms = [(self.mechanical_terms_str[i], self.mechanical_avrg_str[i]) for i in mechanical_terms_selection]
 
-        # print(self.el_avrg_tensors)
-        # print(self.mech_avrg_tensors)
         # this mapping is used in the evaluation methods
         self.combofuns_tensors = [dict(zip(self.e_funcs, self.el_avrg_tensors)),
                                   dict(zip(self.m_funcs, zip(self.mech_avrg_tensors, self.mechanical_avrg)))]
@@ -278,7 +267,7 @@ class Spectrum2D:
         self.coords_ab = np.indices([self.nmodes] * 2).reshape(2, -1).T if self.electrical_terms else []
         self.coords_abc = np.indices([self.nmodes] * 3).reshape(3, -1).T if self.mechanical_terms else []
 
-    def precalculateParts(self, *, res_radius=40,
+    def precalculateParts(self, *,
                           list2exclude=None,
                           preview=False,
                           screenmodeswindow=True):
@@ -291,7 +280,6 @@ class Spectrum2D:
         if list2exclude is None:
             list2exclude = []
 
-        self.res_radius = res_radius
         self.screenmodeswindow = screenmodeswindow
 
         vib_ene_levels_harmonic = convNu2Ene(np.array([v for k,v in self.fundamentals_harmonic.items()]))
@@ -303,9 +291,9 @@ class Spectrum2D:
         # [-1, 2] and [-1] types of terms: w1-w2 or w1, without w_{m,n}
         # these 2d arrays will be added to combinations of wm and wn when looped over combinations of a, b, (c)
         self.resonances = {}
-        for typelist in self.__resonancesTypes:
+        for typelist in self.resonancesTypes:
             self.resonances[typelist] = (-1) * sum([np.sign(ix)*np.where(self.w1w2Condition,
-                                                                         self.__axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
+                                                                         self.axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
 
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
@@ -316,6 +304,7 @@ class Spectrum2D:
 
         self.nmodes = len(self.fundamentals)
         self.nmodes_original = len(self.fundamentals)
+
         self.list2exclude = list2exclude
         if list2exclude:
             self.mode_indices = [i for i in np.arange(self.nmodes) if i not in list2exclude]
@@ -366,19 +355,13 @@ class Spectrum2D:
                                                            w_apbbma_rc[a, b] - za_rc[a, b]), (a, b)))
                 self.res_dict[('b,a', 'zero,a')].append(((-za_rc[a, b],
                                                          w_bma_rc[a, b] - za_rc[a, b]), (a, b)))
-                # self.inwindow[(a,b)] = {('a+b,a', 'zero,a'): [(-za_rc[a, b],
-                #                                            w_apbbma_rc[a, b] - za_rc[a, b]) if not (mw1 <= -za_rc[a, b] <= Mw1)
-                #                                                                                and not (mw1 <= w_apbbma_rc[a, b] - za_rc[a, b] <= Mw1) else None],
-                #                         ('b,a', 'zero,a'): [(-za_rc[a, b],
-                #                                            w_bma_rc[a, b] - za_rc[a, b]) if not (mw1 <= -za_rc[a, b] <= Mw1)
-                #                                                                                and not (mw2 <= w_apbbma_rc[a, b] - za_rc[a, b] <= Mw2) else None]}
                 if self.screenmodeswindow:
                     margin = 50.
                     if not (mw1+margin <= -za_rc[a, b] <= Mw1-margin) and not (mw2+margin <= w_apbbma_rc[a, b] - za_rc[a, b] <= Mw2-margin):
                         self.inwindow[('a+b,a', 'zero,a')][(a,b)] = (-za_rc[a, b], w_apbbma_rc[a, b] - za_rc[a, b])
                     if not (mw1+margin <= -za_rc[a, b] <= Mw1-margin) and not (mw2+margin <= w_bma_rc[a, b] - za_rc[a, b] <= Mw2-margin):
                         self.inwindow[('a+b,a', 'zero,a')][(a,b)] = (-za_rc[a, b], w_bma_rc[a, b] - za_rc[a, b])
-        print(self.inwindow) if self.screenmodeswindow else None
+        # print(self.inwindow) if self.screenmodeswindow else None
         # print(mw1, Mw1, mw2, Mw2)
         # exit()
 
@@ -396,24 +379,19 @@ class Spectrum2D:
 
         self.comb_fac_dict = {}
         for old_key in self.m_selected:
-            newkey = tuple([self.__mechanical_terms_str[old_key],
-                                self.__mechanical_avrg_str[old_key]])
+            newkey = tuple([self.mechanical_terms_str[old_key],
+                                self.mechanical_avrg_str[old_key]])
             self.comb_fac_dict[newkey] = np.zeros((self.nmodes_original, self.nmodes_original))
-        # print(self.mode_indices)
-        # for ab in combinations_with_permutations(self.mode_indices, 2):
-        #     print(ab)
 
         # for ab in self.coords_ab:
         for ab in combinations_with_permutations(self.mode_indices, 2):
 
             a, b = ab
             for key in self.m_selected:
-                newkey = tuple([self.__mechanical_terms_str[key],
-                                self.__mechanical_avrg_str[key]])
-                # print(self.get_gamma_mech(a, b, factor=True))
+                newkey = tuple([self.mechanical_terms_str[key],
+                                self.mechanical_avrg_str[key]])
                 self.comb_fac_dict[newkey][a,b] = self.get_gamma_mech(a, b, factor=True)[key]
 
-        # print(self.comb_fac_dict)
 
         if preview:
 
@@ -437,18 +415,13 @@ class Spectrum2D:
         from .. import analysis
         dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(self, rec_cm=True,
                                                                   vib_levels_harmonic=self.vib_levels_harmonic)
-        # print(type(dfs4terms_mech), dfs4terms_mech)
-        # print(type(dfs4terms_el), len(dfs4terms_el))
         if dfs4terms_el:
             self.resonancesDFel = pd.concat(dfs4terms_el, ignore_index=True).query('w_2>w_1 & avrg_g>1e-30')
-            # print(type(self.resonancesDFel))
-            # print('\nself.resonancesDFel\n', self.resonancesDFel)
         else:
             self.resonancesDFel = pd.DataFrame()
 
         if dfs4terms_mech:
             self.resonancesDFmech = pd.concat(dfs4terms_mech, ignore_index=True).query('(avrg_g>1e-30 & F_abc != 0.) & w_2>w_1')
-            # print('\nself.resonancesDFmech\n', self.resonancesDFmech)
         else:
             self.resonancesDFmech = pd.DataFrame()
 
@@ -504,11 +477,11 @@ class Spectrum2D:
             cutout_w1_Ha = w1grid_Ha[x1:x2+1, y1:y2+1]
             cutout_w2_Ha = w2grid_Ha[x1:x2+1, y1:y2+1]
 
-            __axes = {1: cutout_w1_Ha, 2: cutout_w2_Ha}
-            __resonancesTypes = [(-1, 2), (-1,)]
+            axes = {1: cutout_w1_Ha, 2: cutout_w2_Ha}
             resonances = {}
-            for typelist in __resonancesTypes:
-                resonances[typelist] = ((-1) * sum([np.sign(ix) * __axes[abs(ix)] for ix in typelist])
+            resonancesTypes = [(-1, 2), (-1,)]
+            for typelist in resonancesTypes:
+                resonances[typelist] = ((-1) * sum([np.sign(ix) * axes[abs(ix)] for ix in typelist])
                                                 - 1j * self.Gamma)
 
             resGridsDict[tuple([seed, (x1, x2+1, y1, y2+1)])] = (cutout_w1, cutout_w2,
@@ -533,14 +506,17 @@ class Spectrum2D:
             vib_ene_levels = self.all_states_harmonic_Eh
         else:
             vib_ene_levels = self.all_states_Eh
+
         prefac_el = self.prefac_2d.T[a, b]         # a number
 
+        # going through el. terms
         for index, (el_func, elavrg) in enumerate(self.combofuns_tensors[0].items()):
             if self.screenmodeswindow:
+                # checking if resonance point is inside the full window; getting with the resonance key
                 if (a,b) in self.inwindow[self.electrical_terms[index][0]]:
                     continue
 
-            # resonance computed on the grid; could be precalculated with keys in self.__collectionFreqRes (later)
+            # resonance computed on the grid; could be precalculated with keys in self.collectionFreqRes (later???)
             resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b),
                                    w1w2Condition=(self.w1w2Condition & selectionCond))       # a 2D np.array
             self.intensities_grid += elavrg[a, b] * resonance / prefac_el / 24.              # elavrg[a, b] is a number
@@ -586,10 +562,7 @@ class Spectrum2D:
 
     def get_gamma_mech(self, a: int, b: int, selectionCond: np.ndarray = None, factor=False) -> dict:
         """
-        Computes \\gamma^{[0,1]} for given combination of modes
 
-        Future: get_total_gamma_sum_el unified with get_total_gamma_sum_mech
-        so there would be only one get_gamma function without if ... else conditions
         """
 
         if self.vib_levels_harmonic:
@@ -605,8 +578,6 @@ class Spectrum2D:
 
             if factor:
                 fac = 0.
-                # ref_combfac = np.zeros((self.nmodes,))
-
                 termavrg = self.mechanical_avrg[idx]
 
                 for c in self.mode_indices:
@@ -650,8 +621,10 @@ class Spectrum2D:
                         continue
 
                 self.mechab = True
-                resonances[idx] = self.m_funcs[idx](allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b),
-                                                    w1w2Condition=(self.w1w2Condition & selectionCond))      # a 2D np.array (Nomega1, Nomega2)
+                # a 2D np.array (Nomega1, Nomega2)
+                resonances[idx] = self.m_funcs[idx](allLevels_Eh=vib_ene_levels,
+                                                    w_res_dict=self.resonances, abctuple=(a, b),
+                                                    w1w2Condition=(self.w1w2Condition & selectionCond))
 
         if factor:
             return factors
@@ -669,10 +642,6 @@ class Spectrum2D:
         if selectionCond is None:
             selectionCond = ~np.zeros(self.w1w2Condition.shape, dtype=bool)
 
-        # Qab_contrib_dict = {}
-        # elall = np.zeros(self.shape2d, dtype='complex128')
-        self.intensities_grid = np.zeros(self.shape2d, dtype='complex64')
-
         count = 0
 
         for ind, i in enumerate(self.coords_ab):
@@ -681,40 +650,8 @@ class Spectrum2D:
             import time
             st_ab = time.time()
 
-            # getting resonances dataframes
-            # resonance_w1 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
-            #                             & (self.resonancesDFel['b'] == i[1])][['w_1', 'res']]
-            # resonance_w2 = self.resonancesDFel[(self.resonancesDFel['a'] == i[0])
-            #                             & (self.resonancesDFel['b'] == i[1])][['w_2', 'res']]
-            #
-            # res_list = []
-            # ww1, ww2 = None, None
-            # for index, row in resonance_w1.iterrows():
-            #     if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
-            #         ww1 = None
-            #     else:
-            #         ww1 = row['w_1']
-            #
-            # for index, row in resonance_w2.iterrows():
-            #     if row['w_2'] < np.min(self.w2) or row['w_2'] > np.max(self.w2):
-            #         ww2 = None
-            #     else:
-            #         ww2 = row['w_2']
-            #
-            # if ww1 is None or ww2 is None:
-            #     continue
-            # else:
-            #     count += 1
-            #     # collecting tuples of resonance coordinates
-            #     res_list.append(tuple([ww1, ww2]))
-
-            # print('int electr debug print after continue', ind, i)
-
             self.intensities_grid = self.get_total_gamma_sum_el(i[0], i[1], selectionCond)
-            # saving contribution of each pair of normal modes - may be organized in other way or just taken out
-            # Qab_contrib_dict[tuple(i)] = contrib_ab
 
-            # elall += contrib_ab
             if ind % 10 == 0:
                 print(f'{ind}/{len(self.coords_ab)} modes combinations -- {ind*100/len(self.coords_ab)}%; time passed: {time.strftime("%H:%M:%S", time.gmtime(time.time() - st_ab))}')
 
@@ -745,40 +682,11 @@ class Spectrum2D:
             import time
             st_abc = time.time()
 
-            # resonance_w1 = self.resonancesDFmech[(self.resonancesDFmech['a'] == i[0])
-            #                             & (self.resonancesDFmech['b'] == i[1])
-            #                             & (self.resonancesDFmech['c'] == i[2])][['w_1']]
-            #
-            # resonance_w2 = self.resonancesDFmech[(self.resonancesDFmech['a'] == i[0])
-            #                             & (self.resonancesDFmech['b'] == i[1])
-            #                             & (self.resonancesDFmech['c'] == i[2])][['w_2']]
-            #
-            # res_list = []
-            # ww1, ww2 = None, None
-            # for index, row in resonance_w1.iterrows():
-            #     if row['w_1'] < np.min(self.w1) or row['w_1'] > np.max(self.w1):
-            #         ww1 = None
-            #     else:
-            #         ww1 = row['w_1']
-            #
-            # for index, row in resonance_w2.iterrows():
-            #     if row['w_2'] < np.min(self.w2) or row['w_2'] > np.max(self.w2):
-            #         ww2 = None
-            #     else:
-            #         ww2 = row['w_2']
-            #
-            # if ww1 is None or ww2 is None:
-            #     continue
-            # else:
-            #     count+=1
-            #     res_list.append(tuple([ww1, ww2]))
-
             self.intensities_grid = self.get_total_gamma_sum_mech(i[0], i[1], i[2], selectionCond)
-            # saving contribution of each triple of normal modes - may be organized in other way or just taken out
-            # Qabc_contrib_dict[tuple(i)] = contrib_abc
-            # mechall += contrib_abc
+
             if ind % 10 == 0:
                 print(f'{ind}/{len(self.coords_abc)} modes combinations -- {ind*100/len(self.coords_abc)}%; time passed: {time.strftime("%H:%M:%S", time.gmtime(time.time() - st_abc))}')
+
         elapsed_time = time.time() - st
         print('Compute time of looping over abc combinations in intensity_mechanical:',
               time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
@@ -796,8 +704,6 @@ class Spectrum2D:
         if selectionCond is None:
             selectionCond = ~np.zeros(self.w1w2Condition.shape, dtype=bool)
 
-        self.intensities_grid = np.zeros(self.shape2d, dtype='complex64')
-
         count = 0
         skipped = 0
         numberofcombs = numcombperm(len(self.mode_indices), 2)
@@ -808,20 +714,19 @@ class Spectrum2D:
             import time
             st_ab = time.time()
             a,b = ab
-            # filter out the modes that are to be excluded - fixme?
+            # filter out the modes that are to be excluded - fixme? - to be more careful with derivatives
             if a in self.list2exclude or b in self.list2exclude:
                 skipped+=1
                 continue
 
-            # if self.screenwindow:
-            #     if
-
             count+=1
 
+            # electrical terms added; self.intensities_grid += for a,b inside (for each term)
             self.intensities_grid = self.get_total_gamma_sum_el(a, b, selectionCond)
-            # self.comb_facs = self.get_gamma_mech(a, b, selectionCond, factor=True)
-            resonances = self.get_gamma_mech(a, b, selectionCond, factor=False)
 
+            # mechanical terms here
+            # identifying the resonances for selected terms
+            resonances = self.get_gamma_mech(a, b, selectionCond, factor=False)
             for term in resonances:
                 # self.intensities_grid += self.comb_facs[term]*resonances[term]
                 self.intensities_grid += self.comb_fac_dict[(self.mechanical_terms[term],

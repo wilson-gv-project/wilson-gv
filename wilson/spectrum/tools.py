@@ -71,9 +71,7 @@ def avrg_abc_tensor(formula: tuple,
 
 def min_abs_preserve_sign(array):
     abs_array = np.abs(array)
-    # Find the index of the minimum absolute value
     min_index = np.unravel_index(np.argmin(abs_array), abs_array.shape)
-    # Return the element from the original array using this index
     return array[min_index]
 
 

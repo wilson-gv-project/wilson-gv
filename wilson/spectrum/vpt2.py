@@ -143,13 +143,13 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
 
             tmp1 = 4.0/vk
             tmp2 = 1/(2.0*vi + vk)
-            if (not is_fermi_resonance(2*vi - vk, kiik, True) or not do_resonance_checks):
+            if not is_fermi_resonance(2 * vi - vk, kiik, True) or not do_resonance_checks:
                 tmp3 = 1/(2.0*vi - vk)
             else:
                 fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
                 tmp3 = 0.0
 
-            rhs = rhs + (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
+            rhs += (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
 
         X[i][i] = X[i][i] - rhs
 
@@ -160,7 +160,7 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
 
             A = 0
             for k in range(len(harmonic_energies)):
-                A = A + cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
+                A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
 
             B = 0
             for k in range(len(harmonic_energies)):
@@ -168,7 +168,7 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                 kijk = cubic_forcefield[i][j][k]
 
                 tmp1 = 1/(vi + vj + vk)
-                if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j) or not do_resonance_checks):
+                if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j)) or (not do_resonance_checks):
                     # perturb if no fermi resonance or dont do resonance checks
                     tmp2 = 1/(-vi + vj + vk)
                 else:
@@ -176,7 +176,7 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
                     tmp2 = 0.0
 
-                if (not is_fermi_resonance(vi - vj + vk, kijk, k == i) or not do_resonance_checks):
+                if (not is_fermi_resonance(vi - vj + vk, kijk, k == i)) or (not do_resonance_checks):
                     # perturb if no fermi resonance or dont do resonance checks
                     tmp3 = 1/(vi -vj + vk)
                 else:
@@ -184,7 +184,7 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
                     tmp3 = 0.0
 
-                if (not is_fermi_resonance(vi + vj - vk, kijk, False) or not do_resonance_checks):
+                if not (is_fermi_resonance(vi + vj - vk, kijk, False)) or (not do_resonance_checks):
                     # perturb if no fermi resonance or dont do resonance checks
                     tmp4 = 1/(vi + vj - vk)
                 else:
@@ -192,12 +192,12 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                     fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, False])
                     tmp4 = 0.0
 
-                B = B + kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
+                B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
 
             C = 0
-            if (not type(coriolis_constant) == str):
+            if not type(coriolis_constant) == str:
                 for k in range(len(rotational_constant)):
-                    C = C + rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
                         (harmonic_energies[i]/harmonic_energies[j] +
                          harmonic_energies[j]/harmonic_energies[i])
 
@@ -219,10 +219,10 @@ martin_threshold = 1.0
 def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
     fermi = False
 
-    if (abs(delta) <= fermi_threshold): # in FR should be less than 200 cm-1
-        if (i_is_j):
+    if abs(delta) <= fermi_threshold: # in FR should be less than 200 cm-1
+        if i_is_j:
             martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
-            if (abs(martin_parameter) >= martin_threshold): # in FR should be greater than 1 cm-1
+            if abs(martin_parameter) >= martin_threshold: # in FR should be greater than 1 cm-1
                 fermi = True
                 # print(abs(delta), fermi_threshold)
                 # print(abs(martin_parameter), martin_threshold)
@@ -230,7 +230,7 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
                 fermi = False
         else:
             martin_parameter = cubic_force_ijk**4/(64.0*delta**3)
-            if (abs(martin_parameter) >= martin_threshold):
+            if abs(martin_parameter) >= martin_threshold:
                 fermi = True
                 # print(abs(delta), fermi_threshold)
                 # print(abs(martin_parameter), martin_threshold)
@@ -300,7 +300,7 @@ def adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo
         orig_character = 0.0
 
         for j in range(num_frequencies):
-            if (abs(eigenvector[i][j]) > orig_character):
+            if abs(eigenvector[i][j]) > orig_character:
                 orig_character = abs(eigenvector[i][j])
                 adjusted_frequencies[k] = eigenvalue[j]
 
