@@ -143,7 +143,7 @@ class Spectrum2D:
         # (6, 3)  (6, 6, 3)  (6, 3, 3) (6, 6, 3, 3) (6, 6, 6)
         if vpt2:
             if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
-                print("Warning: found Darling-Dennison resonances in data:")
+                print("Warning: found Darling-Dennison resonances_args in data:")
                 print(f"DD 1-1: {parserObj.DD11}")
                 print(f"DD 2-2: {parserObj.DD22}")
                 print(f"DD 1-3: {parserObj.DD13}")
@@ -187,7 +187,7 @@ class Spectrum2D:
         rc - reciprocal centimeter.
 
         vib_levels_harmonic - weather to use harmonic levels for resonance terms
-                (useful for the investigations of Fermi resonances? or other)
+                (useful for the investigations of Fermi resonances_args? or other)
         """
         self.Gamma_rc = Gamma_rc
         self.Gamma = convNu2Ene(Gamma_rc)
@@ -290,11 +290,12 @@ class Spectrum2D:
                           vib_ene_levels_harmonic[np.newaxis, np.newaxis, :])
         # [-1, 2] and [-1] types of terms: w1-w2 or w1, without w_{m,n}
         # these 2d arrays will be added to combinations of wm and wn when looped over combinations of a, b, (c)
-        self.resonances = {}
+        self.resonances_args = {}
+        # fixme: computes all (2) now
         for typelist in self.resonancesTypes:
-            self.resonances[typelist] = (-1) * sum([np.sign(ix)*np.where(self.w1w2Condition,
-                                                                         self.axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
-
+            self.resonances_args[typelist] = (-1) * sum([np.sign(ix) * np.where(self.w1w2Condition,
+                                                                                self.axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
+        # selection of vibrational energy levels
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
             vib_ene_levels_rc = copy.deepcopy(self.all_states_harmonic)
@@ -517,8 +518,8 @@ class Spectrum2D:
                     continue
 
             # resonance computed on the grid; could be precalculated with keys in self.collectionFreqRes (later???)
-            resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b),
-                                   w1w2Condition=(self.w1w2Condition & selectionCond))       # a 2D np.array
+            resonance = el_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances_args, abctuple=(a, b),
+                                w1w2Condition=(self.w1w2Condition & selectionCond))       # a 2D np.array
             self.intensities_grid += elavrg[a, b] * resonance / prefac_el / 24.              # elavrg[a, b] is a number
 
         return self.intensities_grid
@@ -546,8 +547,8 @@ class Spectrum2D:
             abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
             ijk_indx = tuple([abc[j] for j in mechavrgF[-2]])
             F = self.deriv_data['F_abc'][ijk_indx]                                  # a number, from F tensor
-            # resonance2 is a product of resonances and freq. difference term
-            resonance2 = mech_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances, abctuple=(a, b, c),
+            # resonance2 is a product of resonances_args and freq. difference term
+            resonance2 = mech_func(allLevels_Eh=vib_ene_levels, w_res_dict=self.resonances_args, abctuple=(a, b, c),
                                    w1w2Condition=(self.w1w2Condition & selectionCond))      # a 2D np.array (Nomega1, Nomega2)
             mechavrg = mechavrg_pair[0]                                             # a 2D np.array (nmodes, nmodes)
 
@@ -623,7 +624,7 @@ class Spectrum2D:
                 self.mechab = True
                 # a 2D np.array (Nomega1, Nomega2)
                 resonances[idx] = self.m_funcs[idx](allLevels_Eh=vib_ene_levels,
-                                                    w_res_dict=self.resonances, abctuple=(a, b),
+                                                    w_res_dict=self.resonances_args, abctuple=(a, b),
                                                     w1w2Condition=(self.w1w2Condition & selectionCond))
 
         if factor:
@@ -725,13 +726,13 @@ class Spectrum2D:
             self.intensities_grid = self.get_total_gamma_sum_el(a, b, selectionCond)
 
             # mechanical terms here
-            # identifying the resonances for selected terms
+            # identifying the resonances_args for selected terms
             resonances = self.get_gamma_mech(a, b, selectionCond, factor=False)
             for term in resonances:
-                # self.intensities_grid += self.comb_facs[term]*resonances[term]
+                # self.intensities_grid += self.comb_facs[term]*resonances_args[term]
                 self.intensities_grid += self.comb_fac_dict[(self.mechanical_terms[term],
                                                              self.mechanical_avrg[term])][a,b]*resonances[term]
-                # self.intensities_grid += self.comb_fac_dict[term][a,b]*resonances[term]
+                # self.intensities_grid += self.comb_fac_dict[term][a,b]*resonances_args[term]
                 # print('checking', a, b, self.comb_fac_dict[(self.mechanical_terms[term],
                 #                                       self.mechanical_avrg[term])][a,b],
                 #       self.comb_facs[term],

@@ -190,8 +190,8 @@ def analyse_mechanical_resonances(dataframe_mech_resonances, computedSpectrum, r
     frames = []
 
     for dfMech in dataframe_mech_resonances:
-        # how many resonances there could be - depends on the number of combinations of a,b,c - combinations_number = Nmodes**3
-        # print the expressions for resonances of this term
+        # how many resonances_args there could be - depends on the number of combinations of a,b,c - combinations_number = Nmodes**3
+        # print the expressions for resonances_args of this term
         # print('Resonances:', dfMech['res1'].iloc[0], '\nFormula:', dfMech['res2'].iloc[0], '\n')
 
         if rec_cm:
@@ -220,7 +220,7 @@ def analyse_mechanical_resonances(dataframe_mech_resonances, computedSpectrum, r
             dfMech['abs Fermi'] = abs(1. / dfMech['FR1'] / dfMech['FR2'])
             # product of resonance terms
             dfMech['DoR'] = dfMech['SoF'] * (1. / (- 1j * Gamma) / (- 1j * Gamma))
-        # dfMech['resonances'] is confirmed now, so the rest should be okay too; now confirmed!
+        # dfMech['resonances_args'] is confirmed now, so the rest should be okay too; now confirmed!
         dfMech['gamma_mn'] = dfMech['avrg_g'] * dfMech['F_abc'] * dfMech['DoR'] / computedSpectrum.prefac_3d[
             dfMech['a'], dfMech['b'], dfMech['c']] * (-1.) / 48.
         dd = []
@@ -256,8 +256,8 @@ def analyse_electrical_resonances(dataframe_electric_resonances, computedSpectru
     frames = []
 
     for dfElectric in dataframe_electric_resonances:
-        # how many resonances there could be - depends on the number of combinations of a,b - combinations_number = Nmodes**2
-        # print the expressions for resonances of this term
+        # how many resonances_args there could be - depends on the number of combinations of a,b - combinations_number = Nmodes**2
+        # print the expressions for resonances_args of this term
         # print('Resonance:', dfElectric['res'].iloc[0], '\n')
 
         if rec_cm:
@@ -281,7 +281,7 @@ def analyse_electrical_resonances(dataframe_electric_resonances, computedSpectru
         #     dfElectric['abs Fermi'] = abs( 1./dfElectric['FR1']/dfElectric['FR2'])
         #     dfElectric['DoR'] = dfElectric['SoF']*(1./(- 1j * Gamma)/(- 1j * Gamma))
 
-        # dfElectric['resonances'] is not yet confirmed
+        # dfElectric['resonances_args'] is not yet confirmed
         dfElectric['gamma_mn'] = dfElectric['avrg_g'] * dfElectric['DoR'] / computedSpectrum.prefac_2d[
             dfElectric['a'], dfElectric['b']] / 24.
         dd = []
@@ -320,7 +320,7 @@ def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
     #     computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
     # computedSpectrum.precalculateParts()
 
-    # dataframes with resonances for used terms in spectrum object
+    # dataframes with resonances_args for used terms in spectrum object
     dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
                                                               vib_levels_harmonic=vib_levels_harmonic)
     formatted_df2 = analyse_electrical_resonances(dfs4terms_el, computedSpectrum)
@@ -439,7 +439,7 @@ def allAddedres(molecule, method, basis, data_vault,
         computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
     computedSpectrum.precalculateParts()
 
-    # dataframes with resonances for used terms in spectrum object
+    # dataframes with resonances_args for used terms in spectrum object
     dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
                                                               vib_levels_harmonic=vib_levels_harmonic)
     formatted_df2 = analyse_electrical_resonances(dfs4terms_el, computedSpectrum)
@@ -628,7 +628,7 @@ def allAddedres(molecule, method, basis, data_vault,
 #     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
 #     computedSpectrum.precalculateParts()
 #
-#     # dataframes with resonances for used terms in spectrum object
+#     # dataframes with resonances_args for used terms in spectrum object
 #     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
 #                                                               vib_levels_harmonic=vib_levels_harmonic)
 #     initialDF = analyse_electrical_resonances(dfs4terms_el, computedSpectrum)
@@ -748,7 +748,7 @@ def allAddedres(molecule, method, basis, data_vault,
 #     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
 #     computedSpectrum.precalculateParts()
 #
-#     # dataframes with resonances for used terms in spectrum object
+#     # dataframes with resonances_args for used terms in spectrum object
 #     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
 #                                                               vib_levels_harmonic=vib_levels_harmonic)
 #     formatted_df2 = analyse_mechanical_resonances(dfs4terms_mech, computedSpectrum)

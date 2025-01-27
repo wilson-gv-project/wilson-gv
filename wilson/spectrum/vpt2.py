@@ -55,7 +55,7 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                                                        rotational_constant, coriolis_constant, do_resonance_checks)
 
     if fermi_resonance: # if not an empty list
-        print('Fermi resonances' , fermi_resonance)
+        print('Fermi resonances_args' , fermi_resonance)
         for a in range(len(fermi_resonance)):
             i = fermi_resonance[a][0]
             j = fermi_resonance[a][1]
