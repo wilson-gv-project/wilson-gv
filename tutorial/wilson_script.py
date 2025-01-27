@@ -132,6 +132,7 @@ spectrumObj.precalculateParts(list2exclude=list2exclude,
                               preview=preview,
                               screenmodeswindow=screenmodeswindow)
 print(sorted(list(spectrumObj.all_states.values())))
+print(spectrumObj.all_states)
 # exit()
 
 mask = None

@@ -141,6 +141,7 @@ class Spectrum2D:
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
         # 'mu_Q',  'mu_QQ',  'alpha_Q', 'alpha_QQ', 'F_abc'
         # (6, 3)  (6, 6, 3)  (6, 3, 3) (6, 6, 3, 3) (6, 6, 6)
+
         if vpt2:
             if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
                 print("Warning: found Darling-Dennison resonances_args in data:")
@@ -413,18 +414,18 @@ class Spectrum2D:
             plt.savefig(self.parserObj.molecule+'_resloc.svg', format='svg')
             exit()
 
-        from .. import analysis
-        dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(self, rec_cm=True,
-                                                                  vib_levels_harmonic=self.vib_levels_harmonic)
-        if dfs4terms_el:
-            self.resonancesDFel = pd.concat(dfs4terms_el, ignore_index=True).query('w_2>w_1 & avrg_g>1e-30')
-        else:
-            self.resonancesDFel = pd.DataFrame()
-
-        if dfs4terms_mech:
-            self.resonancesDFmech = pd.concat(dfs4terms_mech, ignore_index=True).query('(avrg_g>1e-30 & F_abc != 0.) & w_2>w_1')
-        else:
-            self.resonancesDFmech = pd.DataFrame()
+        # from .. import analysis
+        # dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(self, rec_cm=True,
+        #                                                           vib_levels_harmonic=self.vib_levels_harmonic)
+        # if dfs4terms_el:
+        #     self.resonancesDFel = pd.concat(dfs4terms_el, ignore_index=True).query('w_2>w_1 & avrg_g>1e-30')
+        # else:
+        #     self.resonancesDFel = pd.DataFrame()
+        #
+        # if dfs4terms_mech:
+        #     self.resonancesDFmech = pd.concat(dfs4terms_mech, ignore_index=True).query('(avrg_g>1e-30 & F_abc != 0.) & w_2>w_1')
+        # else:
+        #     self.resonancesDFmech = pd.DataFrame()
 
     def locateOnBigGrid(self, seed, radius):
 
