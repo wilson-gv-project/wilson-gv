@@ -1,6 +1,7 @@
 """
 For now these will stay in current form
 """
+import copy
 
 from wilson.spectrum import spectrum2D
 from CQCParse.parsing import GaussianDataParser, CFOURdataParser
@@ -27,7 +28,7 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
     """
     electrical_terms_dict = dict(zip(computedSpectrum.e_selected, computedSpectrum.electrical_terms))
     mechanical_terms_dict = dict(zip(computedSpectrum.m_selected, computedSpectrum.mechanical_terms))
-    w_all = computedSpectrum.all_states_harmonic if vib_levels_harmonic else computedSpectrum.all_states
+    w_all = copy.deepcopy(computedSpectrum.all_states_harmonic) if vib_levels_harmonic else copy.deepcopy(computedSpectrum.all_states)
     combos = (computedSpectrum.coords_ab, computedSpectrum.coords_abc)
     w_all[('zero',)] = 0.
 
@@ -420,7 +421,7 @@ def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
 
     return result_dfF, computedSpectrum
 
-
+# todo: needs to be updated or removed
 def allAddedres(molecule, method, basis, data_vault,
                 terms_selection, Gamma_rc, plotHigherThan=1e5) -> [plotly.graph_objs.Figure,
                                                                    pd.DataFrame, spectrum2D.Spectrum2D]:

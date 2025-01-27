@@ -63,8 +63,10 @@ class SpectrumFigure:
         plt.rcParams['axes.titlepad'] = 30
         matplotlib.rc('font', **self.font_dict)
 
-        fig = plt.figure(figsize=self.figsize)
-        ax = fig.add_subplot(1, 1, 1)
+        # fig = plt.figure(figsize=self.figsize)
+        # fig = plt.figure(figsize=(14,14))
+        # ax = fig.add_subplot(1, 1, 1)
+        fig, ax = plt.subplots(figsize=self.figsize)
 
         import matplotlib.colors as colors
 
@@ -90,13 +92,27 @@ class SpectrumFigure:
             levels = self.settings['levels']
         print('levels\n', levels)
 
+        if self.settings['w1mw2']:
+            y = -(self.X - self.Y)
+            ax.set_ylabel('w2-w1', fontsize=18)
+        else:
+            y = self.Y
         # range for color on the color bar
         colorbar_norm = colors.LogNorm(vmax=self.settings['norm_max'], vmin=self.settings['norm_min'])
-        cont = plt.contourf(self.X, self.Y, self.intensities,
+        # cont = plt.contourf(self.X, y, self.intensities,
+        #                     levels=levels, cmap='hot_r',
+        #                     norm=colorbar_norm)
+        cont = ax.contourf(self.X, y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)
+
         if diagonal:
             plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
+
+        if self.settings['w1mw2']:
+            # y_limits = ax.get_ylim()
+            # x_limits = ax.get_xlim()
+            ax.set_ylim(0, 3400)
 
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
@@ -110,12 +126,13 @@ class SpectrumFigure:
             return r'${} \times 10^{{{}}}$'.format(a, b)
 
         # https://stackoverflow.com/questions/25983218/scientific-notation-colorbar
-        colorbar = plt.colorbar(cont, ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
+        colorbar = plt.colorbar(cont, aspect=65, shrink=0.9,
+                                ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
 
         # plt.xlabel(r'$\omega_1$')
         # plt.ylabel(r'$\omega_2$')
-        xs = self.X[0], self.X[-1]
-        ys = self.Y[0], self.Y[-1]
+        # xs = self.X[0], self.X[-1]
+        # ys = self.Y[0], self.Y[-1]
 
         title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
                            (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
@@ -127,11 +144,16 @@ class SpectrumFigure:
         ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
                     ha="left", va="top", bbox=bbox_args, fontsize=12)
         plt.tight_layout()
-        if to_save:
-            plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(True, linestyle='--', alpha=0.7)
 
         # import shutil
         # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
+        if to_save:
+            plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
         return fig
 
     def plot_resonances(self):

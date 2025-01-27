@@ -1,7 +1,7 @@
 import numpy as np
 
 from wilson.spectrum.spectrum2D import (convNu2Ene, avrg_abc_tensor,
-                                        Spectrum2D, EvalTerm, get_AlphaBetaGammaDelta_indices)
+                                        Spectrum2D, get_AlphaBetaGammaDelta_indices)
 from CQCParse.parsing import GaussianDataParser
 from CQCParse.relay import DataVault
 
@@ -29,10 +29,8 @@ spectrumObj.load_data(dictInputs['parserObject'], vpt2=False)
 spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
 # currently requires diag_margin_rc attribute to be set
 spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-spectrumObj.precalculateParts(opt=True, list2exclude=list2exclude)
+spectrumObj.precalculateParts(list2exclude=list2exclude)
 
-# spectrumObj.intensity_electrical()
-# spectrumObj.intensity_mechanical()
 
 
 def test_convNu2Ene():
@@ -55,37 +53,6 @@ def test_Spectrum2DObj():
     assert np.all(specObj.w1_mesh == W1)
     assert np.all(specObj.w2_mesh == W2)
 
-
-def test_avrg_abc_tensor():
-    """
-
-    """
-    specObj = Spectrum2D([1.], [2.])
-    # result = avrg_abc_tensor(self.electric_avrg[i], self.deriv_data, self.gammaCompsAll)
-    pass
-
-
-def test_get_derived_terms_evv():
-    specObj = Spectrum2D([1.], [2.])
-    specObj.getDerivedTermsEVV()
-    specObj
-    assert False
-
-
-def test_load_data():
-    assert False
-
-
-def test_set_spectrum_settings():
-    assert False
-
-
-def test_conversion2internal_units():
-    assert False
-
-
-def test_add_terms():
-    assert False
 
 
 def test_precalculate_parts():
@@ -111,24 +78,6 @@ def test_precalculate_parts():
     assert spectrumObj.w_mn_dict['b,a'][a,b] == enelev[(str(b),)] - enelev[(str(a),)]
     assert spectrumObj.w_mn_dict['zero,a'][a,b] == enelev[('zero',)] - enelev[(str(a),)]
 
-
-def test_get_total_gamma_sum_el():
-    assert False
-
-
-def test_get_total_gamma_sum_mech():
-    assert False
-
-
-def test_intensity_opt():
-    a, b = 0, 2
-    w1, w2 = 1343., -2574.
-
-    w_res_dict = {(-1, 2): np.array([w1-w2]) - 1j * spectrumObj.Gamma,
-                  (-1,): np.array([w1]) - 1j * spectrumObj.Gamma}
-
-    w1w2pq =  w_res_dict[(-1, 2)]*w_res_dict[(-1,)]
-    assert False
 
 
 def test_generate_resonances_functions():
@@ -164,6 +113,8 @@ def test_generate_resonances_functions():
 
     combfactor = spectrumObj.comb_fac_dict[(mechterm, mechavrg)][a,b]
     ref_combfac = np.zeros((spectrumObj.nmodes,))
+    # careful here with spectrumObj.mode_indices
+    total_cs = 0.
     for c in spectrumObj.mode_indices:
         abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
         ijk_indx = tuple([abc[j] for j in mechavrg[-2]])
@@ -172,7 +123,6 @@ def test_generate_resonances_functions():
         assert F1==F2
 
         freqDiff = [i.split(',') for i in mechterm[1]]
-        # print(freqDiff)
         letters = ['a', 'b', 'c', 'zero']
         dictabc = dict(zip(letters, (a, b, c) + tuple(['zero'])))
         allLevels_Eh[('zero',)] = 0.
@@ -198,14 +148,13 @@ def test_generate_resonances_functions():
         assert wr_fr21==w_fr21
         assert wr_fr22==w_fr22
 
-        t3 = allLevels_Eh[w_fr11] - allLevels_Eh[w_fr21]
-        t4 = allLevels_Eh[w_fr12] - allLevels_Eh[w_fr22]
+        t3 = allLevels_Eh[wr_fr11] - allLevels_Eh[wr_fr21]
+        t4 = allLevels_Eh[wr_fr12] - allLevels_Eh[wr_fr22]
         sumfrac = (1 / t3 + 1 / t4)
         ref_combfac[c] = avrgT2[a,b,c] * F1 * sumfrac / spectrumObj.prefac_3d[a,b,c] / (-48.)
-
-    # print(ref_combfac, np.sum(ref_combfac), combfactor)
+        total_cs += avrgT2[a,b,c] * F1 * sumfrac / spectrumObj.prefac_3d[a,b,c] / (-48.)
+    # print(ref_combfac, np.sum(ref_combfac), total_cs, combfactor)
     assert combfactor==np.sum(ref_combfac)
-    # print(spectrumObj.comb_fac_dict.keys())
 
 
 def test_calc_averaging():

@@ -108,7 +108,8 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                     combo3q_corrections[i][j][k] += X[i][j] + X[i][k] + X[j][k]
 
     if do_variational_correction:
-        selectedFR = [0, 1]
+        # selectedFR = range((len(fermi_resonance)))
+        selectedFR = [2]
         adjusted_fundamental, adjusted_overtones, adjusted_combotones = \
             adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo3q, cubic_forcefield,
                                        [fermi_resonance[i] for i in selectedFR])
