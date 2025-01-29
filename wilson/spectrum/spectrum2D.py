@@ -4,11 +4,9 @@ from datetime import timedelta
 from typing import Callable
 
 import numpy as np
-import pandas as pd
 
 from .averaging import get_AlphaBetaGammaDelta_indices
 from .tools import convNu2Ene, avrg_abc_tensor
-
 
 import itertools
 def combinations_with_permutations(iterable, k):
@@ -490,7 +488,6 @@ class Spectrum2D:
             self.intensities_grid += np.where(selectionCond,
                                               factors[idx] * self.resonances_bank[elterm[0]], 0.)
 
-
     def get_gamma_mech(self, a: int, b: int, selectionCond: np.ndarray = None, factor=False):
         """
 
@@ -502,7 +499,6 @@ class Spectrum2D:
             vib_ene_levels = self.all_states_Eh
 
         factors = {}
-
         for idx, mechterm in enumerate(self.mechanical_terms):
 
             if factor:
@@ -560,6 +556,7 @@ class Spectrum2D:
         if factor:
             return factors
 
+
     def intensity_both(self, selectionCond: np.ndarray = None) -> np.ndarray:
         """
         Collects all the contributions to intensity.
@@ -581,8 +578,10 @@ class Spectrum2D:
             a,b = ab
             count+=1
 
-            self.get_gamma_el(a, b, condition)
-            self.get_gamma_mech(a, b, condition)
+            if self.electrical_terms:
+                self.get_gamma_el(a, b, condition)
+            if self.mechanical_terms:
+                self.get_gamma_mech(a, b, condition)
 
             if count % 10 == 0:
                 print(f'{count}/{numberofcombs} modes combinations -- {count*100/numberofcombs}%; '
