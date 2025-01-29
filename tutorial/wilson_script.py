@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-./wilson_script.py --new y --sparse 0. --preview n --vpt2 n --w1mw2 n
+./wilson_script.py --new y --sparse 0. --preview n --vpt2 n --w1mw2 n --molecule FOAC
 """
 import argparse
 import warnings
@@ -40,6 +40,7 @@ parser.add_argument('-p', "--preview", type=str2bool, default=False)
 parser.add_argument('-a', "--vpt2", type=str2bool, default=False)
 parser.add_argument('-w', "--w1mw2", type=str2bool, default=False,
                     help='(w1,w2) or (w1,w2-w1) spectrum format')
+parser.add_argument('-m', "--molecule", type=str, default='FORM')
 
 args = parser.parse_args()
 
@@ -58,11 +59,6 @@ w1mw2 = args.w1mw2
 if vpt2:
     prefix = 'vpt2'
 
-# data_vault = DataVault(wilson_root+'/tests/test_database/mini_files_database.csv')
-data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
-
-dataframe_gaussian = data_vault.getting_files_DB("gaussian")
-# print(dataframe_gaussian[dataframe_gaussian['code']!='FORM'])
 
 # set up big spectrum window
 omega1 = np.arange(1130., 2050., 2.91)
@@ -70,13 +66,14 @@ omega2 = np.arange(1300., 5150., 2.91)
 
 # METH - methanol, ACAC - acetic acid, ACDM - acetic acid dimer, FORM - formaldehyde, FOAC - formic acid,
 # OXAC1 - oxalic acid 1, OXAC2 - oxalic acid 2
-molecule = 'FORM'
+# molecule = 'FORM'
+molecule = args.molecule
 method = 'B3LYP' # HF, B3LYP
 basis = 'cc_pVQZ'
 Gamma_rc = 4.7
 list2exclude = []
 diag_margin_rc=180.
-terms_selection = [0,1], [0,1]  # FIXME!!
+terms_selection = [0,1], [0,1]
 screenmodeswindow = True
 
 if molecule=='FORM':
@@ -108,16 +105,24 @@ print('    E:', terms_selection[0])
 print('    M:', terms_selection[1], '\n')
 
 
-# fixme: try defaultdict ?
-datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+# datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+# datadict = {'source': 'gaussian', 'type': 'log',
+#             'files': {'mol_code': 'FOAC', 'method': 'B3LYP', 'basis': 'cc_pVQZ',
+#                       'log': '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/dftGaussian/FOAC/B3LYPcc-pVQZ/g16_inputFull_3q.out'}}
+datadict = {'source': 'gaussian', 'type': 'log',
+            'files': {'mol_code': molecule, 'method': method, 'basis': basis,
+                      'log': f'/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/dftGaussian/{molecule}/{method}{basis}/g16_inputFull_3q.out'}}
 gParser = GaussianDataParser(datadict)
+
 
 dictInputs = {'parserObject': gParser,
               'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
 
 # ------- setting up a Spectrum2D object
 spectrumObj = Spectrum2D(omega1, omega2)
-spectrumObj.load_data(dictInputs['parserObject'], vpt2=vpt2)
+# 'Anharmonic: Freq GVPT2, Int DVPT2', 'Anharmonic: VPT2', 'Anharmonic: DVPT2'
+spectrumObj.load_data(dictInputs['parserObject'], vpt2=vpt2, vpt2settings={'anharmonic_type':
+                                                                               'Anharmonic: Freq GVPT2, Int DVPT2'})
 
 
 spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
@@ -131,9 +136,16 @@ print('    coords_ab', len(spectrumObj.coords_ab))
 spectrumObj.precalculateParts(list2exclude=list2exclude,
                               preview=preview,
                               screenmodeswindow=screenmodeswindow)
-print(sorted(list(spectrumObj.all_states.values())))
-print(spectrumObj.all_states)
-# exit()
+
+print('Harmonic')
+print(spectrumObj.fundamentals_harmonic)
+
+# print(, '\n')
+# print(sorted(list(spectrumObj.fundamentals.values())), '\n')
+print('\n', [spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==1])
+print('\n', {i:spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==1})
+print('\n', {i:spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==2})
+exit()
 
 mask = None
 

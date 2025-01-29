@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                    rotational_constant, coriolis_constant, anharmonic_type):
     """
@@ -9,36 +8,21 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
         (nmodes,);   (nmodes, nmodes, nmodes);   (nmodes, nmodes, nmodes, nmodes);   [x,y,z];   (nmodes, nmodes)
 
     anharmonic_type options:
-            'Anharmonic: VPT2'                                                              - don't do_res, don't do_var
-            'Anharmonic: DVPT2' = 'Anharmonic: Freq DVPT2, Int VPT2'
-                    = 'Anharmonic: DVPT2, w/ 1-1 checks'                                    - do_res, don't do_var
-            'Anharmonic: Freq GVPT2, Int DVPT2' = 'Anharmonic: Freq GVPT2, Int DVPT2, w/ 1-1 checks'
-                    = 'Anharmonic: Freq GVPT2, Int DVPT2, w/ 1-1 checks and forced removal' - do_res, do_var
-
+            'VPT2'                        - don't do_res, don't do_var
+            'DVPT2'                       - do_res, don't do_var
+            'GVPT2'                       - do_res, do_var
     returns:
         fundamental, overtones, combotones, over3q, combo3q
     """
-    if anharmonic_type == 'Anharmonic: Freq GVPT2, Int DVPT2':
+    if anharmonic_type == 'GVPT2':
         do_variational_correction = True
         do_resonance_checks = True
-    elif anharmonic_type == 'Anharmonic: VPT2':
+    elif anharmonic_type == 'VPT2':
         do_resonance_checks = False
         do_variational_correction = False
-    elif anharmonic_type == 'Anharmonic: DVPT2':
+    elif anharmonic_type == 'DVPT2':
         do_resonance_checks = True
         do_variational_correction = False
-    elif anharmonic_type == 'Anharmonic: Freq DVPT2, Int VPT2':
-        do_resonance_checks = True
-        do_variational_correction = False
-    elif anharmonic_type == 'Anharmonic: DVPT2, w/ 1-1 checks':
-        do_resonance_checks = True
-        do_variational_correction = False
-    elif anharmonic_type == 'Anharmonic: Freq GVPT2, Int DVPT2, w/ 1-1 checks':
-        do_resonance_checks = True
-        do_variational_correction = True
-    elif anharmonic_type == 'Anharmonic: Freq GVPT2, Int DVPT2, w/ 1-1 checks and forced removal':
-        do_resonance_checks = True
-        do_variational_correction = True
     else:
         print('\n')
         print('Something strange has happened in anharm_corrected_vibrational_energies')
@@ -51,15 +35,24 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
     over3q = np.zeros((len(harmonic_energies)))
     combo3q = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
 
-    X, fermi_resonance, X_cubic, X_quartic = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-                                                       rotational_constant, coriolis_constant, do_resonance_checks)
+    fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
+
+    X, X_cubic, X_quartic, X_coriolis = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+                                                  rotational_constant, coriolis_constant, do_resonance_checks,
+                                                  fermi_resonance)
+
+    # np.set_printoptions(suppress=True, precision=5)
+    # print('X\n', X, '\n')
+    # print('X_cubic\n', X_cubic, '\n')
+    # print('X_quartic\n', X_quartic, '\n')
+    # print('X_coriolis\n', X_coriolis, '\n')
 
     if fermi_resonance: # if not an empty list
-        print('Fermi resonances_args' , fermi_resonance)
-        for a in range(len(fermi_resonance)):
-            i = fermi_resonance[a][0]
-            j = fermi_resonance[a][1]
-            k = fermi_resonance[a][2]
+        print(f'Fermi identified - {len(fermi_resonance)}:' , fermi_resonance)
+        # for a in range(len(fermi_resonance)):
+        #     i = fermi_resonance[a][0]
+        #     j = fermi_resonance[a][1]
+        #     k = fermi_resonance[a][2]
 
             # print(i, j, k, harmonic_energies[i], harmonic_energies[j], harmonic_energies[k],
             #       'type: ', fermi_resonance[a][3],
@@ -93,7 +86,6 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
             if i == j:
                 for k in range(len(harmonic_energies)):
                     if k != i:
-                        # continue
                         combo3q[i][i][k] += 2 * fundamental[i] + 2 * X[i][i] + fundamental[k] + 2 * X[i][k]
                         combo3q_corrections[i][i][k] += 2 * X[i][i] + 2 * X[i][k]
 
@@ -108,23 +100,166 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                     combo3q_corrections[i][j][k] += X[i][j] + X[i][k] + X[j][k]
 
     if do_variational_correction:
-        # selectedFR = range((len(fermi_resonance)))
-        selectedFR = [2]
+        selectedFR = range((len(fermi_resonance)))
         adjusted_fundamental, adjusted_overtones, adjusted_combotones = \
             adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo3q, cubic_forcefield,
                                        [fermi_resonance[i] for i in selectedFR])
-        # anharmonic_energies = anharmonicProperty(harmonic_energies, adjusted_fundamental,
-        #                                          adjusted_overtones, adjusted_combotones)
         return adjusted_fundamental, adjusted_overtones, adjusted_combotones, over3q, combo3q
 
     else:
         return fundamental, overtones, combotones, over3q, combo3q
 
 
-def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-          rotational_constant, coriolis_constant, do_resonance_checks):
+def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
     fermi_resonance = []
+    for i in range(len(harmonic_energies)):
+        vi = harmonic_energies[i]
+
+        for k in range(len(harmonic_energies)):
+            vk = harmonic_energies[k]
+            kiik = cubic_forcefield[i][i][k]
+
+            isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
+            if isfermi and do_resonance_checks:
+                fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
+
+        for j in range(i):
+            vj = harmonic_energies[j]
+
+            for k in range(len(harmonic_energies)):
+                vk = harmonic_energies[k]
+                kijk = cubic_forcefield[i][j][k]
+
+                if is_fermi_resonance(-vi + vj + vk, kijk, k == j) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [i, *sorted([j, k]), k == j])
+                if is_fermi_resonance(vi - vj + vk, kijk, k == i) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [j, *sorted([k, i]), k == i])
+                if is_fermi_resonance(vi + vj - vk, kijk, i == j) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [k, *sorted([i, j]), i == j])
+
+    return fermi_resonance
+
+# def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+#           rotational_constant, coriolis_constant, do_resonance_checks):
+#
+#     fermi_resonance = []
+#     X = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+#     X_cubic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+#     X_quartic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+#     X_coriolis = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+#
+#     for i in range(len(harmonic_energies)):
+#         vi = harmonic_energies[i]
+#         X[i][i] = quartic_forcefield[i][i][i][i]/16.0
+#         X_quartic[i][i] = quartic_forcefield[i][i][i][i]/16.0
+#
+#         rhs = 0
+#
+#         for k in range(len(harmonic_energies)):
+#             vk = harmonic_energies[k]
+#             kiik = cubic_forcefield[i][i][k]
+#
+#             tmp1 = 4.0/vk
+#             tmp2 = 1/(2.0*vi + vk)
+#             isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
+#             print(i, i, k, isfermi)
+#             if not isfermi or not do_resonance_checks:
+#                 tmp3 = 1/(2.0*vi - vk)
+#             else:
+#                 fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
+#                 tmp3 = 0.0
+#                 if i == 8 and k == 5:
+#                     tmp3 = 1 / (2.0 * vi - vk)
+#
+#             print('kiik, tmp1, tmp2, tmp3, +=', (i, k), kiik, tmp1, tmp2, tmp3, (kiik**2/32.0)*(tmp1 + tmp2 - tmp3))
+#
+#             rhs += (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
+#             # if i == 8:
+#             #     print('>>>>>>>>> cubic+= for', i, k)
+#             #     print('kiik, tmp1, tmp2, tmp3, +=', (i, k), kiik, tmp1, tmp2, tmp3, (kiik**2/32.0)*(tmp1 + tmp2 - tmp3))
+#
+#         # X[i][i] = X[i][i] - rhs
+#         X[i][i] += - rhs
+#         X_cubic[i][i] = - rhs
+#
+#         for j in range(i):
+#             vj = harmonic_energies[j]
+#             X[i][j] = quartic_forcefield[i][i][j][j]/4.0
+#             X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
+#
+#             A = 0
+#             for k in range(len(harmonic_energies)):
+#                 A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
+#                 if i == 8 and j == 5:
+#                     print('\n>>>>>>>>> A+= for', i, j, k)
+#                     print('Fiik, Fjjk, 4*vk, vk', cubic_forcefield[i][i][k],cubic_forcefield[j][j][k],(4.0*harmonic_energies[k]), harmonic_energies[k])
+#                     print('A+=', cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k]))
+#
+#             B = 0
+#             for k in range(len(harmonic_energies)):
+#                 vk = harmonic_energies[k]
+#                 kijk = cubic_forcefield[i][j][k]
+#
+#                 tmp1 = 1/(vi + vj + vk)
+#                 if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j)) or (not do_resonance_checks):
+#                     # perturb if no fermi resonance or dont do resonance checks
+#                     tmp2 = 1/(-vi + vj + vk)
+#                 else:
+#                     # deperturbing otherwise - when resonance and do checks
+#                     fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
+#                     tmp2 = 0.0
+#
+#                 if (not is_fermi_resonance(vi - vj + vk, kijk, k == i)) or (not do_resonance_checks):
+#                     # perturb if no fermi resonance or dont do resonance checks
+#                     tmp3 = 1/(vi -vj + vk)
+#
+#                 else:
+#                     if i == 8 and j == 5 and k ==8:
+#                         tmp3 = 1 / (vi - vj + vk)
+#                     else:
+#                         # deperturbing otherwise - when resonance and do checks
+#                         fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
+#                         tmp3 = 0.0
+#
+#                 if (not is_fermi_resonance(vi + vj - vk, kijk, i == j)) or (not do_resonance_checks):
+#                     # perturb if no fermi resonance or dont do resonance checks
+#                     tmp4 = 1/(vi + vj - vk)
+#                 else:
+#                     # deperturbing otherwise - when resonance and do checks
+#                     fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, i == j])
+#                     tmp4 = 0.0
+#                 if i == 8 and j == 5:
+#                     print('kijk, tmp1, tmp2, tmp3, -tmp4, B +=', (i,j,k), kijk, tmp1, tmp2, tmp3, -tmp4, kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4))
+#                 B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
+#
+#             if i==8 and j==5:
+#                 print('>>>>>>>>> if i==8 and j==5', i, j)
+#                 print('-A, -B', -A, -B, '\n')
+#
+#             C = 0
+#
+#             for k in range(len(rotational_constant)):
+#
+#                 C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+#                     (harmonic_energies[i]/harmonic_energies[j] +
+#                      harmonic_energies[j]/harmonic_energies[i])
+#
+#             X[i][j] = X[i][j] - A - B + C
+#             X[j][i] = np.copy(X[i][j])
+#
+#             X_coriolis[i][j] = C
+#             X_coriolis[j][i] = np.copy(X_coriolis[i][j])
+#             X_cubic[i][j] = - A - B
+#             X_cubic[j][i] = np.copy(X_cubic[i][j])
+#
+#     fermi_resonance = sorted(fermi_resonance)
+#
+#     return X, fermi_resonance, X_cubic, X_quartic, X_coriolis
+
+def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+          rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance):
+
     X = np.zeros((len(harmonic_energies), len(harmonic_energies)))
     X_cubic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
     X_quartic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
@@ -143,15 +278,16 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
 
             tmp1 = 4.0/vk
             tmp2 = 1/(2.0*vi + vk)
-            if not is_fermi_resonance(2 * vi - vk, kiik, True) or not do_resonance_checks:
-                tmp3 = 1/(2.0*vi - vk)
-            else:
-                fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
+
+            if [k, i, i, True] in fermi_resonance and do_resonance_checks:
                 tmp3 = 0.0
+            else:
+                tmp3 = 1 / (2.0 * vi - vk)
 
             rhs += (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
 
-        X[i][i] = X[i][i] - rhs
+        X[i][i] += - rhs
+        X_cubic[i][i] = - rhs
 
         for j in range(i):
             vj = harmonic_energies[j]
@@ -168,50 +304,45 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                 kijk = cubic_forcefield[i][j][k]
 
                 tmp1 = 1/(vi + vj + vk)
-                if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j)) or (not do_resonance_checks):
-                    # perturb if no fermi resonance or dont do resonance checks
-                    tmp2 = 1/(-vi + vj + vk)
-                else:
-                    # deperturbing otherwise - when resonance and do checks
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
+
+                if [i, *sorted([j, k]), k == j] in fermi_resonance and do_resonance_checks:
                     tmp2 = 0.0
-
-                if (not is_fermi_resonance(vi - vj + vk, kijk, k == i)) or (not do_resonance_checks):
-                    # perturb if no fermi resonance or dont do resonance checks
-                    tmp3 = 1/(vi -vj + vk)
                 else:
-                    # deperturbing otherwise - when resonance and do checks
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
+                    tmp2 = 1/(-vi + vj + vk)
+
+                if [j, *sorted([k, i]), k == i] in fermi_resonance and do_resonance_checks:
                     tmp3 = 0.0
-
-                if not (is_fermi_resonance(vi + vj - vk, kijk, False)) or (not do_resonance_checks):
-                    # perturb if no fermi resonance or dont do resonance checks
-                    tmp4 = 1/(vi + vj - vk)
                 else:
-                    # deperturbing otherwise - when resonance and do checks
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, False])
+                    tmp3 = 1 / (vi - vj + vk)
+
+                if [k, *sorted([i, j]), i == j] in fermi_resonance and do_resonance_checks:
                     tmp4 = 0.0
+                else:
+                    tmp4 = 1/(vi + vj - vk)
 
                 B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
 
+            # if i==8 and j==5:
+            #     print('>>>>>>>>> if i==8 and j==5', i, j)
+            #     print('-A, -B', -A, -B, '\n')
+
             C = 0
-            if not type(coriolis_constant) == str:
-                for k in range(len(rotational_constant)):
-                    C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
-                        (harmonic_energies[i]/harmonic_energies[j] +
-                         harmonic_energies[j]/harmonic_energies[i])
+
+            for k in range(len(rotational_constant)):
+
+                C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    (harmonic_energies[i]/harmonic_energies[j] +
+                     harmonic_energies[j]/harmonic_energies[i])
 
             X[i][j] = X[i][j] - A - B + C
             X[j][i] = np.copy(X[i][j])
 
             X_coriolis[i][j] = C
             X_coriolis[j][i] = np.copy(X_coriolis[i][j])
-            X_cubic[i][j] = B
+            X_cubic[i][j] = - A - B
             X_cubic[j][i] = np.copy(X_cubic[i][j])
 
-    fermi_resonance = sorted(fermi_resonance)
-
-    return X, fermi_resonance, X_cubic, X_quartic
+    return X, X_cubic, X_quartic, X_coriolis
 
 fermi_threshold  = 200.0
 martin_threshold = 1.0
@@ -222,6 +353,7 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
     if abs(delta) <= fermi_threshold: # in FR should be less than 200 cm-1
         if i_is_j:
             martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
+            print('martin_parameter', abs(martin_parameter), abs(martin_parameter) >= martin_threshold, martin_threshold)
             if abs(martin_parameter) >= martin_threshold: # in FR should be greater than 1 cm-1
                 fermi = True
                 # print(abs(delta), fermi_threshold)
@@ -241,18 +373,16 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
 
 
 def add_fermi_resonance(total_list, new_element):
-
-    i = new_element[0]
-    j = new_element[1]
-    k = new_element[2]
-    l = new_element[3]
-
-    j, k = sorted([j, k])
-    new_element[0] = i
-    new_element[1] = j
-    new_element[2] = k
-    new_element[3] = l
-
+    # i = new_element[0]
+    # j = new_element[1]
+    # k = new_element[2]
+    # l = new_element[3]
+    #
+    # j, k = sorted([j, k])
+    # new_element[0] = i
+    # new_element[1] = j
+    # new_element[2] = k
+    # new_element[3] = l
     if not new_element in total_list:
         total_list.append(new_element)
 
@@ -289,6 +419,7 @@ def adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo
         if fermi_type:
             V[i][num_modes + j] = cubic_forcefield[j][k][i]/4.0
             V[num_modes + j][i] = V[i][num_modes + j]
+
         else:
             V[i][x_matrix_position(j, k, num_modes)] = cubic_forcefield[j][k][i]/np.sqrt(8.0)
             V[x_matrix_position(j, k, num_modes)][i] = V[i][x_matrix_position(j, k, num_modes)]
