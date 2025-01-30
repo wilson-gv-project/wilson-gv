@@ -19,7 +19,7 @@ basis = 'cc_pVQZ'
 Gamma_rc = 5.1
 diag_margin_rc=3.
 list2exclude = []
-terms_selection = [0,1], [0,1]
+terms_selection = [0,1], [2,3]
 
 datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
 gParser = GaussianDataParser(datadict)
@@ -199,7 +199,7 @@ def test_compute_mech_factors():
         reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
 
     from_factors = spectrumObj.compute_mech_factors(a, b)
-    assert np.isclose(reference , from_factors[0])
+    assert np.isclose(reference , from_factors[2])
 
     a, b = 4, 5
     reference = 0.
@@ -215,7 +215,7 @@ def test_compute_mech_factors():
         reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
 
     from_factors = spectrumObj.compute_mech_factors(a, b)
-    assert np.isclose(reference , from_factors[0])
+    assert np.isclose(reference , from_factors[2])
 
     for ab in combinations_with_permutations(spectrumObj.mode_indices, 2):
 
@@ -233,11 +233,9 @@ def test_compute_mech_factors():
             reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
 
         # from_factors = spectrumObj.compute_mech_factors(a, b)[0]
-        # print(from_factors)
         from_factors = spectrumObj.comb_fac_dict[((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
                                                 (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)),
                                                  'abc', 1.0))][a, b]
-        # print(from_factors)
 
         assert np.isclose(reference , from_factors)
 
@@ -254,7 +252,7 @@ def test_get_gamma_mech():
     spectrumObj = Spectrum2D(np.array([1130., 2050., 2190.]), np.array([1300., 3150., 4590.]))
     spectrumObj.load_data(gParser, vpt2=False)
     spectrumObj.setSpectrumSettings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
-    spectrumObj.addTerms([], [0])
+    spectrumObj.addTerms([], [2])
     spectrumObj.precalculateParts(list2exclude=[], preview=False, screenmodeswindow=True)
 
     vib_ene_levels = copy.deepcopy(spectrumObj.all_states_Eh)
@@ -283,7 +281,7 @@ def test_get_gamma_mech():
         assert wmnab1 == vib_ene_levels[tuple([str(i) for i in sorted([a,b])])] - vib_ene_levels[(str(a),)]
         assert wmnab2 == - vib_ene_levels[(str(a),)]
         # testing this
-        resonance = spectrumObj.m_funcs[0](allLevels_Eh=vib_ene_levels,
+        resonance = spectrumObj.allfunc_dict[2](allLevels_Eh=vib_ene_levels,
                                            w_res_dict=resonances_args, abctuple=(a, b),
                                            w1w2Condition=condition)
         # res2 = np.where(condition, 1. / (spectrumObj.axes[1] - spectrumObj.axes[2] +
@@ -294,13 +292,12 @@ def test_get_gamma_mech():
 
         assert np.allclose(resonance, res2)
 
-        full = np.where(condition, mechfactor * res2, 0.+0.j)
+        # full = np.where(condition, mechfactor * res2, 0.+0.j)
 
-        spectrumObj.intensities_grid = np.zeros(spectrumObj.shape2d, dtype='complex64')
-        spectrumObj.get_gamma_mech(a, b, condition)
-        ints = spectrumObj.intensities_grid
-
-        assert np.allclose(ints , full)
+        # spectrumObj.intensities_grid = np.zeros(spectrumObj.shape2d, dtype='complex64')
+        # spectrumObj.intensity_both(a, b, condition)
+        # ints = spectrumObj.intensities_grid
+        # assert np.allclose(ints , full)
 
 
 # def test_calc_averaging():

@@ -36,7 +36,7 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
     combo3q = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
 
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
-    fermi_resonance = [fermi_resonance[0]]
+    # fermi_resonance = [fermi_resonance[0]]
     X, X_cubic, X_quartic, X_coriolis = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                                   rotational_constant, coriolis_constant, do_resonance_checks,
                                                   fermi_resonance)
