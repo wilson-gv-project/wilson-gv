@@ -71,7 +71,7 @@ basis = 'cc_pVQZ'
 Gamma_rc = 4.7
 list2exclude = []
 diag_margin_rc=180.
-terms_selection = [0,1], [0,1]
+el_terms_selected, mech_terms_selected = [0,1], [2,3]
 screenmodeswindow = True
 
 if molecule=='FORM':
@@ -99,32 +99,23 @@ if molecule=='METH':
 
 
 print('\n     Calculation:', (molecule, method, basis))
-print('    E:', terms_selection[0])
-print('    M:', terms_selection[1], '\n')
+print('    E:', el_terms_selected)
+print('    M:', mech_terms_selected, '\n')
 
 
 # datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
-# datadict = {'source': 'gaussian', 'type': 'log',
-#             'files': {'mol_code': 'FOAC', 'method': 'B3LYP', 'basis': 'cc_pVQZ',
-#                       'log': '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/dftGaussian/FOAC/B3LYPcc-pVQZ/g16_inputFull_3q.out'}}
 datadict = {'source': 'gaussian', 'type': 'log',
             'files': {'mol_code': molecule, 'method': method, 'basis': basis,
                       'log': f'/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/dftGaussian/{molecule}/{method}{basis}/g16_inputFull_3q.out'}}
 gParser = GaussianDataParser(datadict)
 
-
-dictInputs = {'parserObject': gParser,
-              'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
-
+#########################################################################################################
 # ------- setting up a Spectrum2D object
 spectrumObj = Spectrum2D(omega1, omega2)
-# 'Anharmonic: Freq GVPT2, Int DVPT2', 'Anharmonic: VPT2', 'Anharmonic: DVPT2'
-spectrumObj.load_data(dictInputs['parserObject'], vpt2=vpt2, vpt2settings={'anharmonic_type':
-                                                                               'Anharmonic: Freq GVPT2, Int DVPT2'})
-
-
+# 'GVPT2', 'VPT2', 'DVPT2'
+spectrumObj.load_data(gParser, vpt2=vpt2, vpt2settings={'anharmonic_type': 'GVPT2'})
 spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
-spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select']) # currently requires diag_margin_rc attribute to be set
+spectrumObj.addTerms(el_terms_selected, mech_terms_selected)
 
 if molecule=='ACDM':
     print('     Number of normal modes:', spectrumObj.nmodes)
@@ -134,15 +125,6 @@ spectrumObj.precalculateParts(list2exclude=list2exclude,
                               preview=preview,
                               screenmodeswindow=screenmodeswindow)
 
-print('Harmonic')
-print(spectrumObj.fundamentals_harmonic)
-
-# print(, '\n')
-# print(sorted(list(spectrumObj.fundamentals.values())), '\n')
-print('\n', [spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==1])
-print('\n', {i:spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==1})
-print('\n', {i:spectrumObj.all_states[i] for i in spectrumObj.all_states if len(i)==2})
-exit()
 
 mask = None
 
@@ -171,6 +153,8 @@ np.set_printoptions(precision=6)
 finalIntGrid = np.zeros(spectrumObj.shape2d, dtype='complex64')
 print('     Number of normal modes again:', spectrumObj.nmodes)
 
+
+#########################################################################################################
 # ------- computing anharmonicities
 
 st = time.time()
@@ -182,7 +166,6 @@ elapsed_timedelta = timedelta(seconds=elapsed_time)
 formatted_time = str(elapsed_timedelta)
 print('Calculated intensities with opt in:',
       formatted_time)
-
 
 
 #########################################################################################################
