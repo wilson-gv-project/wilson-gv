@@ -1,11 +1,11 @@
 # Wilson
 
 ## Next steps - features
-- [ ] Coriolis for GVPT2
-- [ ] 3 quanta levels
-- [ ] GVPT2 for freqs
-- [ ] dynamic range parameters and colorbar scale - figure out rendering
-- [ ] optimize intensity calculation - minimize redundant calculations
+- [x] Coriolis for GVPT2
+- [x] 3 quanta levels
+- [x] GVPT2 for freqs
+- [x] dynamic range parameters and colorbar scale - figure out rendering
+- [x] optimize intensity calculation - minimize redundant calculations
 
 
 ## Big picture
