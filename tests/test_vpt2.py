@@ -69,6 +69,7 @@ def test_corrected_levels_default0():
 
     freqs = []
     for i in spectrumObj.all_states:
+        # spectrumObj.all_states (from gaussian) vs spectrumObj.all_states_corr (from vpt2 code)
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
 
     assert all(freqs)
@@ -207,8 +208,6 @@ def test_corrected_levels_default3p():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
                                                                                    'GVPT2'
-                                                                                   # 'Anharmonic: VPT2'
-                                                                                   # 'Anharmonic: DVPT2'
                                                                                })
 
     spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
@@ -224,7 +223,6 @@ def test_corrected_levels_default3p():
     print(np.sum(np.array(freqs)))
     print(freqs)
     assert all(freqs)
-        # assert np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3)
 
 def test_corrected_levels_default4():
     """

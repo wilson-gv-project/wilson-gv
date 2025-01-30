@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-./wilson_script.py --sparse 0. --preview n --vpt2 n --w1mw2 n --molecule FOAC
+./wilson_script.py --sparse 0. --preview n --vpt2 n --w1mw2 n
 """
 import argparse
 import warnings
@@ -17,10 +17,10 @@ from wilson.spectrum.spectrum2D import Spectrum2D
 from CQCParse.parsing import GaussianDataParser, CFOURdataParser
 from CQCParse.relay import DataVault
 from wilson.utils import get_package_root
+wilson_root = get_package_root()
 
 st0 = time.time()
 
-wilson_root = get_package_root()
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -35,11 +35,11 @@ def str2bool(v):
 parser = argparse.ArgumentParser()
 parser.add_argument('-s', "--sparse", type=float, default=0.,
                     help='Radius of small grids; default is 0. which means full window will be calculated')
-parser.add_argument('-p', "--preview", type=str2bool, default=False)
+parser.add_argument('-p', "--preview", type=str2bool, default=False,
+                    help='If true, will make a "stick spectrum" without intensities at resonance points')
 parser.add_argument('-a', "--vpt2", type=str2bool, default=False)
 parser.add_argument('-w', "--w1mw2", type=str2bool, default=False,
                     help='(w1,w2) or (w1,w2-w1) spectrum format')
-parser.add_argument('-m', "--molecule", type=str, default='FORM')
 
 args = parser.parse_args()
 
@@ -52,61 +52,31 @@ if sparse == 'n':
 preview = args.preview
 vpt2 = args.vpt2
 w1mw2 = args.w1mw2
-# print(new, sparse, preview, vpt2, w1mw2)
 
 if vpt2:
     prefix = 'vpt2'
 
 
-# set up big spectrum window
-omega1 = np.arange(1130., 2050., 2.91)
-omega2 = np.arange(1300., 5150., 2.91)
+# set up big spectrum window - for formaldehyde here
+omega1 = np.arange(1000., 2950., 3.8)
+omega2 = np.arange(1400., 5650., 3.8)
 
-# METH - methanol, ACAC - acetic acid, ACDM - acetic acid dimer, FORM - formaldehyde, FOAC - formic acid,
-# OXAC1 - oxalic acid 1, OXAC2 - oxalic acid 2
-# molecule = 'FORM'
-molecule = args.molecule
-method = 'B3LYP' # HF, B3LYP
-basis = 'cc_pVQZ'
 Gamma_rc = 4.7
 list2exclude = []
 diag_margin_rc=180.
 el_terms_selected, mech_terms_selected = [0,1], [2,3]
+# do not count the modes with resonances outside the spectrum window
 screenmodeswindow = True
 
-if molecule=='FORM':
-    omega1 = np.arange(1000., 2950., 3.8)
-    omega2 = np.arange(1400., 5650., 3.8)
 
-    # omega1 = np.arange(1150., 2050., 3.8)
-    # omega2 = np.arange(2400., 5150., 3.8)
-
-if molecule=='FOAC':
-    omega1 = np.arange(300., 3850., 3.8)
-    omega2 = np.arange(450., 7250., 3.8)
-
-if molecule=='ACDM':
-    omega1 = np.arange(350., 3450., 3.8)
-    omega2 = np.arange(450., 6250., 3.8)
-
-if molecule=='ACAC':
-    omega1 = np.arange(0., 3750., 3.8)
-    omega2 = np.arange(250., 7150., 3.8)
-
-if molecule=='METH':
-    omega1 = np.arange(100., 3850., 3.8)
-    omega2 = np.arange(250, 7350., 3.8)
-
-
-print('\n     Calculation:', (molecule, method, basis))
+print('\n     Calculation:', ('FORM', 'B3LYP', 'cc_pVDZ'))
 print('    E:', el_terms_selected)
 print('    M:', mech_terms_selected, '\n')
 
 
-# datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
 datadict = {'source': 'gaussian', 'type': 'log',
-            'files': {'mol_code': molecule, 'method': method, 'basis': basis,
-                      'log': f'/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/dftGaussian/{molecule}/{method}{basis}/g16_inputFull_3q.out'}}
+            'files': {'mol_code': 'FORM', 'method': 'B3LYP', 'basis': 'cc_pVDZ',
+                      'log': wilson_root+'/tests/test_database/dftGaussian/FORM/B3LYPcc_pVDZ/g16_inputFull_3q.out'}}
 gParser = GaussianDataParser(datadict)
 
 #########################################################################################################
@@ -117,15 +87,9 @@ spectrumObj.load_data(gParser, vpt2=vpt2, vpt2settings={'anharmonic_type': 'GVPT
 spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
 spectrumObj.addTerms(el_terms_selected, mech_terms_selected)
 
-if molecule=='ACDM':
-    print('     Number of normal modes:', spectrumObj.nmodes)
-    list2exclude = [34, 35, 36, 37, 38, 39, 40, 41]
-
 spectrumObj.precalculateParts(list2exclude=list2exclude,
                               preview=preview,
                               screenmodeswindow=screenmodeswindow)
-
-
 mask = None
 
 if sparse!=0.:
@@ -151,7 +115,6 @@ if sparse!=0.:
 np.set_printoptions(precision=6)
 
 finalIntGrid = np.zeros(spectrumObj.shape2d, dtype='complex64')
-print('     Number of normal modes again:', spectrumObj.nmodes)
 
 
 #########################################################################################################
