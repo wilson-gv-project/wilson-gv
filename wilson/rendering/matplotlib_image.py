@@ -155,7 +155,3 @@ class SpectrumFigure:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
         return fig
 
-    def plot_resonances(self):
-
-        plt.scatter(x, y, s=area1, marker='^', c=c)
-        pass
