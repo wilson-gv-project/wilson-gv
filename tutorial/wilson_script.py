@@ -64,7 +64,7 @@ omega2 = np.arange(1400., 5650., 3.8)
 Gamma_rc = 4.7
 list2exclude = []
 diag_margin_rc=180.
-el_terms_selected, mech_terms_selected = [0,1], [2,3]
+el_terms_selected, mech_terms_selected = [0, 1], [2, 3]
 # do not count the modes with resonances outside the spectrum window
 screenmodeswindow = True
 
@@ -84,17 +84,17 @@ gParser = GaussianDataParser(datadict)
 spectrumObj = Spectrum2D(omega1, omega2)
 # 'GVPT2', 'VPT2', 'DVPT2'
 spectrumObj.load_data(gParser, vpt2=vpt2, vpt2settings={'anharmonic_type': 'GVPT2'})
-spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
-spectrumObj.addTerms(el_terms_selected, mech_terms_selected)
+spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
+spectrumObj.add_terms(el_terms_selected, mech_terms_selected)
 
-spectrumObj.precalculateParts(list2exclude=list2exclude,
-                              preview=preview,
-                              screenmodeswindow=screenmodeswindow)
+spectrumObj.precalculate_parts(list2exclude=list2exclude,
+                               preview=preview,
+                               screenmodeswindow=screenmodeswindow)
 mask = None
 
 if sparse!=0.:
 
-    d1 = spectrumObj.findAllGrids(sparse)
+    d1 = spectrumObj.find_all_grids(sparse)
     prefix = 'windows'
 
     print('         Number of grids:', len(d1))

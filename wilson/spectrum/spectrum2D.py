@@ -70,7 +70,7 @@ class Spectrum2D:
         self.mechab = False
 
 
-    def getDerivedTermsEVV(self):
+    def get_derived_terms_evv(self):
         """
         Currently available for selection EVV terms
         """
@@ -172,7 +172,7 @@ class Spectrum2D:
             print(dict(sorted(one.items())))
             print(dict(sorted(two.items())), '\n')
 
-    def setSpectrumSettings(self, Gamma_rc: float, diag_margin_rc: float = 10., vib_levels_harmonic: bool =True):
+    def set_spectrum_settings(self, Gamma_rc: float, diag_margin_rc: float = 10., vib_levels_harmonic: bool =True):
         """Settings to be set before computing the intensities.
         rc - reciprocal centimeter.
 
@@ -183,30 +183,33 @@ class Spectrum2D:
         self.Gamma = convNu2Ene(Gamma_rc)
         # margin for higher diagonal, to not show/compute data to close to the diagonal
         self.diagonal_margin_rc = diag_margin_rc
-        self.conversion2InternalUnits()
+        self.convert_units()
         self.vib_levels_harmonic = vib_levels_harmonic
         print(f'\nUsed vibrational energy levels are harmonic? - {self.vib_levels_harmonic}')
 
-    def conversion2InternalUnits(self):
+    def convert_units(self):
         """
         Eh - Hartree unit
         convNu2Ene converts from wavenumber to Hartree
         """
         self.all_states_harmonic_Eh = {k: convNu2Ene(v) for k, v in self.all_states_harmonic.items()}
+        self.all_states_harmonic_Eh[('zero',)] = 0.
         self.all_states_Eh = {k: convNu2Ene(v) for k, v in self.all_states.items()}
+        self.all_states_Eh[('zero',)] = 0.
+
         self.w1_mesh_Eh, self.w2_mesh_Eh = convNu2Ene(self.w1_mesh), convNu2Ene(self.w2_mesh)
         self.diagonal_margin_Eh = convNu2Ene(self.diagonal_margin_rc)
 
 
-    def addTerms(self, electrical_terms_selection: list, mechanical_terms_selection: list):
+    def add_terms(self, electrical_terms_selection: list, mechanical_terms_selection: list):
         """Creating functions for computing the expressions for mechanical and electrical anharmonicities.
             Different functions because of the difference in terms.
 
-        The terms available for selection are set with self.getDerivedTermsEVV() and are currently for EVV experiment
+        The terms available for selection are set with self.get_derived_terms_evv() and are currently for EVV experiment
         """
 
         # setting up terms available for selection (all EVV terms now)
-        self.getDerivedTermsEVV()
+        self.get_derived_terms_evv()
 
         # now used in the analysis
         self.e_selected, self.m_selected = electrical_terms_selection, mechanical_terms_selection
@@ -219,10 +222,10 @@ class Spectrum2D:
         self.nmodes = len(self.fundamentals)
 
 
-    def precalculateParts(self, *,
-                          list2exclude=None,
-                          preview=False,
-                          screenmodeswindow=True):
+    def precalculate_parts(self, *,
+                           list2exclude=None,
+                           preview=False,
+                           screenmodeswindow=True):
         """
         Precalculate some parts:
             factors (1/wa/wb/wc);
@@ -260,10 +263,10 @@ class Spectrum2D:
         # selection of vibrational energy levels
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
-            vib_ene_levels_rc = copy.deepcopy(self.all_states_harmonic)
+            vib_ene_levels_rc = self.all_states_harmonic
         else:
             vib_ene_levels = self.all_states_Eh
-            vib_ene_levels_rc = copy.deepcopy(self.all_states)
+            vib_ene_levels_rc = self.all_states
 
         self.nmodes = len(self.fundamentals)
         self.nmodes_original = len(self.fundamentals)
@@ -375,7 +378,7 @@ class Spectrum2D:
               time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
 
-    def locateOnBigGrid(self, seed, radius):
+    def locate_on_big_grid(self, seed, radius):
         """
         Find corner points of the small square
         """
@@ -410,7 +413,7 @@ class Spectrum2D:
 
         return strIndX, endIndX + 1, strIndY, endIndY + 1
 
-    def findAllGrids(self, radius_rc):
+    def find_all_grids(self, radius_rc):
         """
         Find all small squares around each resonance point
         """
@@ -425,7 +428,7 @@ class Spectrum2D:
         w2grid = self.w2_mesh
 
         for seed in allRes:
-            x1, x2, y1, y2 = self.locateOnBigGrid(seed, radius_rc)
+            x1, x2, y1, y2 = self.locate_on_big_grid(seed, radius_rc)
             cutout_w1 = w1grid[x1:x2+1, y1:y2+1]
             cutout_w2 = w2grid[x1:x2+1, y1:y2+1]
 
@@ -445,7 +448,7 @@ class Spectrum2D:
         elapsed_time = time.time() - st
         elapsed_timedelta = timedelta(seconds=elapsed_time)
         formatted_time = str(elapsed_timedelta)
-        print('findAllGrids in:', formatted_time)
+        print('find_all_grids in:', formatted_time)
         return resGridsDict
 
 
@@ -473,9 +476,6 @@ class Spectrum2D:
                 freqDiff = [i.split(',') for i in mechterm[1]]
                 letters = ['a', 'b', 'c', 'zero']
                 dictabc = dict(zip(letters, (a, b, c) + tuple(['zero'])))
-
-                if ('zero',) not in vib_ene_levels:
-                    vib_ene_levels[('zero',)] = 0.
 
                 w_fr11 = tuple(sorted([str(dictabc[i]) for i in freqDiff[0][0].split('+')], key=int))
                 if 'zero' not in freqDiff[0][1]:
@@ -567,13 +567,10 @@ class Spectrum2D:
         freqDiff - a tuple of strings from the formula; subscripts of omega energy levels in the freq. difference part;
                         e.g., ('a+b+c,0', 'c,a+b'); not None for mech. anharm.
         """
-        # superscripts isn't formally passed down but it is used there??
-        m1n1m2n2 = [i.split(',') for i in subscripts]
         if freqDiff is not None:
             freqDiff = [i.split(',') for i in freqDiff]
 
-        # @profile
-        def function(allLevels_Eh: dict, w_res_dict: dict[str:np.ndarray],
+        def compute_res_condition(allLevels_Eh: dict, w_res_dict: dict[str:np.ndarray],
                      abctuple: tuple[int, int] | tuple[int, int, int],
                      w1w2Condition: np.ndarray[bool],
                      freqDiff: list = freqDiff) -> np.ndarray:
@@ -586,9 +583,7 @@ class Spectrum2D:
 
             letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
             dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
-            allLevels_Eh_c = copy.deepcopy(allLevels_Eh)
-            if ('zero',) not in allLevels_Eh_c:
-                allLevels_Eh_c[('zero',)] = 0.
+            # allLevels_Eh_c = copy.deepcopy(allLevels_Eh)
 
             if 'c' not in subscripts[0]:
                 index_wmn = (abctuple[0], abctuple[1])
@@ -616,8 +611,8 @@ class Spectrum2D:
                     else:
                         w_fr22 = tuple([freqDiff[1][1]])
 
-                    t3 = allLevels_Eh_c[w_fr11] - allLevels_Eh_c[w_fr21]
-                    t4 = allLevels_Eh_c[w_fr12] - allLevels_Eh_c[w_fr22]
+                    t3 = allLevels_Eh[w_fr11] - allLevels_Eh[w_fr21]
+                    t4 = allLevels_Eh[w_fr12] - allLevels_Eh[w_fr22]
 
                     sumfrac = (1 / t3 + 1 / t4)
                     # self.mechab = False
@@ -625,11 +620,7 @@ class Spectrum2D:
                 else:
                     sumfrac = 1.
 
-            # product = t1 * t2
+            return  np.where(w1w2Condition, sumfrac / (t1 * t2), 0.)
 
-            result = np.where(w1w2Condition, sumfrac / (t1 * t2), 0.)
-
-            return  result
-
-        return function
+        return compute_res_condition
 

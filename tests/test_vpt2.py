@@ -5,16 +5,18 @@ from wilson.spectrum.spectrum2D import Spectrum2D
 from CQCParse.parsing import GaussianDataParser
 from CQCParse.relay import DataVault
 
-data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+path_to_files = '' # set up your path to the directory shared on OneDrive
+# https://universitetetitromso-my.sharepoint.com/:f:/g/personal/vle014_uit_no/EgH4Rjk0_YtNvH1BXVMdh3gBnB5H5j68lDC7EROXiBM3Ag?email=magnus.ringholm%40uit.no&e=ScmRmw
+data_vault = DataVault('/files_fram/files_database.csv')
 
 omega1 = np.arange(1130., 2050., 2.91)
 omega2 = np.arange(1300., 5150., 2.91)
 
 
-def test_corrected_levels():
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
+def test_VPT2():
+    molecule = 'FORM'
     method = 'HF'
-    basis = 'STO_3G_VPT2'  # 'STO_3G_VPT2'
+    basis = 'STO_3G_VPT2'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -28,10 +30,10 @@ def test_corrected_levels():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':'VPT2'})
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -41,46 +43,12 @@ def test_corrected_levels():
     assert all(freqs)
 
 
-def test_corrected_levels_default0():
+def test_GVPT2():
     """
     """
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'HF' # 'B3LYP' 'HF'
-    basis = 'STO_3G_VPT2'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
-    Gamma_rc = 5.1
-    list2exclude = []
-    terms_selection = [0, 1], [2, 3]
-
-    datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
-    gParser = GaussianDataParser(datadict)
-
-    dictInputs = {'parserObject': gParser,
-                  'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
-
-    spectrumObj = Spectrum2D(omega1, omega2)
-    spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
-                                                                                   'VPT2'
-                                                                               })
-
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
-    # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
-
-    freqs = []
-    for i in spectrumObj.all_states:
-        # spectrumObj.all_states (from gaussian) vs spectrumObj.all_states_corr (from vpt2 code)
-        freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-
-    assert all(freqs)
-
-
-def test_corrected_levels_default1():
-    """
-    """
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'HF' # 'B3LYP' 'HF'
-    basis = 'STO_3G'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FORM'
+    method = 'HF'
+    basis = 'STO_3G'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -96,10 +64,10 @@ def test_corrected_levels_default1():
                                                                                    'GVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -108,12 +76,12 @@ def test_corrected_levels_default1():
     assert all(freqs)
 
 
-def test_corrected_levels_default2():
+def test_GVPT2_b3lyp_cc_pvqz():
     """
     """
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVQZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G' 'cc_pVDZ' 'cc_pVDZ_VPT2' 'cc_pVTZ' 'cc_pVQZ'
+    molecule = 'FORM'
+    method = 'B3LYP'
+    basis = 'cc_pVQZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -130,12 +98,12 @@ def test_corrected_levels_default2():
                                                                                    'GVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
 
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
 
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -144,57 +112,12 @@ def test_corrected_levels_default2():
     assert all(freqs)
 
 
-def test_corrected_levels_default3():
+def test_GVPT2_b3lyp_cc_pvtz():
     """
     """
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVTZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
-    Gamma_rc = 5.1
-    list2exclude = []
-    terms_selection = [0, 1], [2, 3]
-
-    datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
-    gParser = GaussianDataParser(datadict)
-
-    dictInputs = {'parserObject': gParser,
-                  'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
-
-    spectrumObj = Spectrum2D(omega1, omega2)
-    spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
-                                                                                   'GVPT2'
-                                                                                   # 'Anharmonic: VPT2'
-                                                                                   # 'Anharmonic: DVPT2'
-                                                                               })
-
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
-    # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
-
-    # print(spectrumObj.nmodes)
-    # print([i for i in spectrumObj.all_states.keys() if len(i)==1])
-    # print(spectrumObj.all_states)
-    # print(spectrumObj.all_states.keys())
-    # print('-----------------------')
-    # print([i for i in spectrumObj.all_states_corr.keys() if len(i)==1])
-    freqs = []
-    for i in spectrumObj.all_states:
-        freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
-
-    print(np.sum(np.array(freqs)))
-    print(freqs)
-    assert all(freqs)
-        # assert np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3)
-
-
-def test_corrected_levels_default3p():
-    """
-    """
-    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVDZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FORM'
+    method = 'B3LYP'
+    basis = 'cc_pVTZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -210,26 +133,25 @@ def test_corrected_levels_default3p():
                                                                                    'GVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+
 
     freqs = []
     for i in spectrumObj.all_states:
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
 
-    print(np.sum(np.array(freqs)))
-    print(freqs)
     assert all(freqs)
 
-def test_corrected_levels_default4():
+
+def test_GVPT2_b3lyp_cc_pvdz():
     """
     """
-    molecule = 'FOAC'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'HF' # 'B3LYP' 'HF'
-    basis = 'cc_pVQZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FORM'
+    method = 'B3LYP'
+    basis = 'cc_pVDZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -243,31 +165,25 @@ def test_corrected_levels_default4():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
                                                                                    'GVPT2'
-                                                                                   # 'VPT2'
-                                                                                   # 'DVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
 
-    # print(np.sum(np.array(freqs)))
-    # print(freqs)
     assert all(freqs)
 
-
-def test_corrected_levels_default5():
+def test_GVPT2_FOAC_hf_cc_pvqz():
     """
     """
-    molecule = 'FOAC'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVQZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FOAC'
+    method = 'HF'
+    basis = 'cc_pVQZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -281,31 +197,26 @@ def test_corrected_levels_default5():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
                                                                                    'GVPT2'
-                                                                                   # 'VPT2'
-                                                                                   # 'DVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
 
-    # print(np.sum(np.array(freqs)))
-    # print(freqs)
     assert all(freqs)
 
 
-def test_corrected_levels_default6():
+def test_GVPT2_FOAC_b3lyp_cc_pvqz():
     """
     """
-    molecule = 'FOAC'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVDZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FOAC'
+    method = 'B3LYP'
+    basis = 'cc_pVQZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -319,31 +230,26 @@ def test_corrected_levels_default6():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
                                                                                    'GVPT2'
-                                                                                   # 'VPT2'
-                                                                                   # 'DVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
 
-    # print(np.sum(np.array(freqs)))
-    # print(freqs)
     assert all(freqs)
 
 
-def test_corrected_levels_default7():
+def test_GVPT2_FOAC_b3lyp_cc_pvdz():
     """
     """
-    molecule = 'OXAC2'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
-    method = 'B3LYP' # 'B3LYP' 'HF'
-    basis = 'cc_pVQZ'  # 'STO_3G_VPT2' 'cc_pVQZ' 'STO_3G'
+    molecule = 'FOAC'
+    method = 'B3LYP'
+    basis = 'cc_pVDZ'
     Gamma_rc = 5.1
     list2exclude = []
     terms_selection = [0, 1], [2, 3]
@@ -357,20 +263,48 @@ def test_corrected_levels_default7():
     spectrumObj = Spectrum2D(omega1, omega2)
     spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
                                                                                    'GVPT2'
-                                                                                   # 'VPT2'
-                                                                                   # 'DVPT2'
                                                                                })
 
-    spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
-    spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculateParts(list2exclude=list2exclude)
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
         freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
-        # print(spectrumObj.all_states[i], spectrumObj.all_states_corr[i])
 
-    # print(np.sum(np.array(freqs)))
-    # print(freqs)
+    assert all(freqs)
+
+
+def test_GVPT2_OXAC2_b3lyp_cc_pvqz():
+    """
+    """
+    molecule = 'OXAC2'
+    method = 'B3LYP'
+    basis = 'cc_pVQZ'
+    Gamma_rc = 5.1
+    list2exclude = []
+    terms_selection = [0, 1], [2, 3]
+
+    datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+    gParser = GaussianDataParser(datadict)
+
+    dictInputs = {'parserObject': gParser,
+                  'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
+
+    spectrumObj = Spectrum2D(omega1, omega2)
+    spectrumObj.load_data(dictInputs['parserObject'], vpt2=True, vpt2settings={'anharmonic_type':
+                                                                                   'GVPT2'
+                                                                               })
+
+    spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
+    # currently requires diag_margin_rc attribute to be set
+    spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+
+    freqs = []
+    for i in spectrumObj.all_states:
+        freqs.append(np.isclose(spectrumObj.all_states[i], spectrumObj.all_states_corr[i], atol=1e-3))
+
     assert all(freqs)

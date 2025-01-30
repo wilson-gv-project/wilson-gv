@@ -31,10 +31,10 @@ dictInputs = {'parserObject': gParser,
 spectrumObj = Spectrum2D(omega1, omega2)
 spectrumObj.load_data(dictInputs['parserObject'], vpt2=False)
 
-spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=True)
+spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=True)
 # currently requires diag_margin_rc attribute to be set
-spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-spectrumObj.precalculateParts(list2exclude=list2exclude)
+spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
+spectrumObj.precalculate_parts(list2exclude=list2exclude)
 
 
 
@@ -175,9 +175,9 @@ def test_compute_mech_factors():
 
     spectrumObj = Spectrum2D(np.arange(1130., 2050., 90.), np.arange(1300., 5150., 90.))
     spectrumObj.load_data(gParser, vpt2=False)
-    spectrumObj.setSpectrumSettings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
-    spectrumObj.addTerms([], [2])
-    spectrumObj.precalculateParts(list2exclude=[])
+    spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.add_terms([], [2])
+    spectrumObj.precalculate_parts(list2exclude=[])
 
 
     vib_ene_levels = spectrumObj.all_states_Eh
@@ -220,9 +220,9 @@ def test_get_gamma_mech():
 
     spectrumObj = Spectrum2D(np.array([1130., 2050., 2190.]), np.array([1300., 3150., 4590.]))
     spectrumObj.load_data(gParser, vpt2=False)
-    spectrumObj.setSpectrumSettings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
-    spectrumObj.addTerms([], [2])
-    spectrumObj.precalculateParts(list2exclude=[], preview=False, screenmodeswindow=True)
+    spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.add_terms([], [2])
+    spectrumObj.precalculate_parts(list2exclude=[], preview=False, screenmodeswindow=True)
 
     vib_ene_levels = copy.deepcopy(spectrumObj.all_states_Eh)
 
