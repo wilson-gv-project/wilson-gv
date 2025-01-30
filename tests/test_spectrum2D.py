@@ -1,7 +1,10 @@
+import copy
+
 import numpy as np
+np.set_printoptions(legacy='1.25')
 
 from wilson.spectrum.spectrum2D import (convNu2Ene, avrg_abc_tensor,
-                                        Spectrum2D, get_AlphaBetaGammaDelta_indices)
+                                        Spectrum2D, combinations_with_permutations)
 from CQCParse.parsing import GaussianDataParser
 from CQCParse.relay import DataVault
 
@@ -14,6 +17,7 @@ molecule = 'FORM' # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
 method = 'B3LYP'
 basis = 'cc_pVQZ'
 Gamma_rc = 5.1
+diag_margin_rc=3.
 list2exclude = []
 terms_selection = [0,1], [0,1]
 
@@ -26,7 +30,7 @@ dictInputs = {'parserObject': gParser,
 spectrumObj = Spectrum2D(omega1, omega2)
 spectrumObj.load_data(dictInputs['parserObject'], vpt2=False)
 
-spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
+spectrumObj.setSpectrumSettings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=True)
 # currently requires diag_margin_rc attribute to be set
 spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
 spectrumObj.precalculateParts(list2exclude=list2exclude)
@@ -157,70 +161,183 @@ def test_generate_resonances_functions():
     assert combfactor==np.sum(ref_combfac)
 
 
-def test_calc_averaging():
+def test_compute_mech_factors():
 
-    # gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
-    # [alpha, beta, gamma, delta]
-    gammaCompsAll = [[2, 2, 0, 0],
-                     [1, 0, 0, 1],
-                     [1, 2, 1, 2]]
+    data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
+    method = 'B3LYP'
+    basis = 'cc_pVQZ'
+    # [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b'))]
+    # [(('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.0)]
 
-    from DATA import mu_Q, mu_QQ, alpha_Q, alpha_QQ
-    data = {'mu_Q': mu_Q, 'mu_QQ': mu_QQ, 'alpha_Q': alpha_Q, 'alpha_QQ': alpha_QQ}
+    datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+    gParser = GaussianDataParser(datadict)
+    spectrumObj = Spectrum2D(np.arange(1130., 2050., 90.), np.arange(1300., 5150., 90.))
+    spectrumObj.load_data(gParser, vpt2=False)
+    spectrumObj.setSpectrumSettings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.addTerms([], [2])
+    spectrumObj.precalculateParts(list2exclude=[])
 
-    term_m = EvalTerm(avrg=[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',))], prefac='abc')
-    avrgF_m = term_m.calcAveraging(data=data, gammaCompsAll=gammaCompsAll)
-    # nmodes = 4
-    a,b,c = (1, 3, 0)
-    # ((beta,), (alpha,delta), (gamma))
-    ref_avrgF_m1 = (data['mu_Q'][a, 2] * data['alpha_Q'][b, 2, 0] * data['mu_Q'][c, 0]+
-                    data['mu_Q'][a, 0] * data['alpha_Q'][b, 1, 1] * data['mu_Q'][c, 0]+
-                    data['mu_Q'][a, 2] * data['alpha_Q'][b, 1, 2] * data['mu_Q'][c, 1])
-    assert ref_avrgF_m1==avrgF_m[a,b,c]
 
-    term_e = EvalTerm(avrg=[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))], prefac='ab')
-    avrgF_e = term_e.calcAveraging(data=data, gammaCompsAll=gammaCompsAll)
+    vib_ene_levels = spectrumObj.all_states_Eh
+    vib_ene_levels_h = spectrumObj.all_states_harmonic_Eh
+    averaging_tens = spectrumObj.avrg_tensors_dict[2]
 
-    # final tensor will have dimensions (nmodes, nmodes) or (nmodes, nmodes, nmodes)
-    #           [a, b] for el. and [a, b, c] for mech. (c=a or c=b sometimes)
-    # element of the final tensor is a sum of products according to
-    #                     the gammaCompsAll array of xyz-indices for each greek index: [alpha, beta, gamma, delta]
-    # one product per one array from the gammaCompsAll array:
-    #   derT1[nmodes..., beta_val]*derT2[nmodes..., alpha_val, delta_val]*derT3[nmodes..., gamma_val] where
-    #         nmodes..., marks the derivative dimensions, and greek indices refer to cartesian dimensions
+    F = spectrumObj.deriv_data['F_abc']
 
-    print('\n')
-    np.set_printoptions(precision=4)
+    a, b = 2, 1
+    reference = 0.
+    prefac_ab = 1./(vib_ene_levels_h[(str(a),)]*vib_ene_levels_h[(str(b),)])
+    assert 1./spectrumObj.prefac_2d[a, b] == prefac_ab
 
-    # print('\n', avrgF_m)
-    # print('\n', avrgF_e)
+    for c in spectrumObj.mode_indices:
+        # ('a+b+c,zero', 'c,a+b')
+        assert np.isclose(1./spectrumObj.prefac_3d[a, b, c] , prefac_ab / vib_ene_levels_h[(str(c),)])
 
-np.array([[0, 0, 0, 0],
-       [0, 0, 1, 1],
-       [0, 0, 2, 2],
-       [1, 1, 0, 0],
-       [1, 1, 1, 1],
-       [1, 1, 2, 2],
-       [2, 2, 0, 0],
-       [2, 2, 1, 1],
-       [2, 2, 2, 2],
+        freqDiff = (1./vib_ene_levels[tuple([str(i) for i in sorted([a,b,c])])]
+                    + 1./(vib_ene_levels[(str(c),)] - vib_ene_levels[tuple([str(i) for i in sorted([a,b])])]))
+        reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
 
-       [0, 0, 0, 0],
-       [0, 1, 0, 1],
-       [0, 2, 0, 2],
-       [1, 0, 1, 0],
-       [1, 1, 1, 1],
-       [1, 2, 1, 2],
-       [2, 0, 2, 0],
-       [2, 1, 2, 1],
-       [2, 2, 2, 2],
+    from_factors = spectrumObj.compute_mech_factors(a, b)
+    assert np.isclose(reference , from_factors[0])
 
-       [0, 0, 0, 0],
-       [0, 1, 1, 0],
-       [0, 2, 2, 0],
-       [1, 0, 0, 1],
-       [1, 1, 1, 1],
-       [1, 2, 2, 1],
-       [2, 0, 0, 2],
-       [2, 1, 1, 2],
-       [2, 2, 2, 2]], dtype=object)
+    a, b = 4, 5
+    reference = 0.
+    prefac_ab = 1./(vib_ene_levels_h[(str(a),)]*vib_ene_levels_h[(str(b),)])
+    assert 1./spectrumObj.prefac_2d[a, b] == prefac_ab
+
+    for c in spectrumObj.mode_indices:
+        # ('a+b+c,zero', 'c,a+b')
+        assert np.isclose(1./spectrumObj.prefac_3d[a, b, c] , prefac_ab / vib_ene_levels_h[(str(c),)])
+
+        freqDiff = (1./vib_ene_levels[tuple([str(i) for i in sorted([a,b,c])])]
+                    + 1./(vib_ene_levels[(str(c),)] - vib_ene_levels[tuple([str(i) for i in sorted([a,b])])]))
+        reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
+
+    from_factors = spectrumObj.compute_mech_factors(a, b)
+    assert np.isclose(reference , from_factors[0])
+
+    for ab in combinations_with_permutations(spectrumObj.mode_indices, 2):
+
+        a, b = ab
+        reference = 0.
+        prefac_ab = 1./(vib_ene_levels_h[(str(a),)]*vib_ene_levels_h[(str(b),)])
+        assert 1./spectrumObj.prefac_2d[a, b] == prefac_ab
+
+        for c in spectrumObj.mode_indices:
+            # ('a+b+c,zero', 'c,a+b')
+            assert np.isclose(1./spectrumObj.prefac_3d[a, b, c] , prefac_ab / vib_ene_levels_h[(str(c),)])
+
+            freqDiff = (1./vib_ene_levels[tuple([str(i) for i in sorted([a,b,c])])]
+                        + 1./(vib_ene_levels[(str(c),)] - vib_ene_levels[tuple([str(i) for i in sorted([a,b])])]))
+            reference += averaging_tens[a,b,c] * F[a,b,c] * freqDiff * prefac_ab / vib_ene_levels_h[(str(c),)] / (-48)
+
+        # from_factors = spectrumObj.compute_mech_factors(a, b)[0]
+        # print(from_factors)
+        from_factors = spectrumObj.comb_fac_dict[((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
+                                                (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)),
+                                                 'abc', 1.0))][a, b]
+        # print(from_factors)
+
+        assert np.isclose(reference , from_factors)
+
+def test_get_gamma_mech():
+    data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+    molecule = 'FORM'  # METH, ACDM, ACAC, ACDM, FORM, FOAC, OXAC1, OXAC2
+    method = 'B3LYP'
+    basis = 'cc_pVQZ'
+    # [(('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b'))]
+    # [(('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.0)]
+
+    datadict = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
+    gParser = GaussianDataParser(datadict)
+    spectrumObj = Spectrum2D(np.array([1130., 2050., 2190.]), np.array([1300., 3150., 4590.]))
+    spectrumObj.load_data(gParser, vpt2=False)
+    spectrumObj.setSpectrumSettings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
+    spectrumObj.addTerms([], [0])
+    spectrumObj.precalculateParts(list2exclude=[], preview=False, screenmodeswindow=True)
+
+    vib_ene_levels = copy.deepcopy(spectrumObj.all_states_Eh)
+    # vib_ene_levels_h = spectrumObj.all_states_harmonic_Eh
+
+    selectionCond = np.ones(spectrumObj.w1w2Condition.shape, dtype=bool)
+    condition = (spectrumObj.w1w2Condition & selectionCond)
+
+    resonances_args = {}
+    for typelist in [(-1, 2), (-1,)]:
+        resonances_args[typelist] = (-1) * sum([np.sign(ix) * np.where(spectrumObj.w1w2Condition,
+                                                                       spectrumObj.axes[abs(ix)], 0) for ix in
+                                                typelist]) - 1j * spectrumObj.Gamma
+
+    # for ab in [(0, 3,), (2, 2), (3, 1)]:
+    for ab in combinations_with_permutations(spectrumObj.mode_indices, 2):
+        a, b = ab
+        # testing this
+        # mechfactor = spectrumObj.compute_mech_factors(a, b)[0]
+        mechfactor = spectrumObj.comb_fac_dict[((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
+                                                (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)),
+                                                 'abc', 1.0))][a, b]
+        # print(spectrumObj.w_mn_dict)
+        wmnab1 = spectrumObj.w_mn_dict['a+b,a'][a,b]
+        wmnab2 = spectrumObj.w_mn_dict['zero,a'][a,b]
+        assert wmnab1 == vib_ene_levels[tuple([str(i) for i in sorted([a,b])])] - vib_ene_levels[(str(a),)]
+        assert wmnab2 == - vib_ene_levels[(str(a),)]
+        # testing this
+        resonance = spectrumObj.m_funcs[0](allLevels_Eh=vib_ene_levels,
+                                           w_res_dict=resonances_args, abctuple=(a, b),
+                                           w1w2Condition=condition)
+        # res2 = np.where(condition, 1. / (spectrumObj.axes[1] - spectrumObj.axes[2] +
+        #         vib_ene_levels[tuple([str(i) for i in sorted([a,b])])] - vib_ene_levels[(str(a),)] - 1j * spectrumObj.Gamma)
+        #                 / (spectrumObj.axes[1] - vib_ene_levels[(str(a),)] - 1j * spectrumObj.Gamma), 0.+0.j)
+        res2 = np.where(condition, 1. / (spectrumObj.axes[1] - spectrumObj.axes[2] + wmnab1 - 1j * spectrumObj.Gamma)
+                    / (spectrumObj.axes[1] + wmnab2 - 1j * spectrumObj.Gamma), 0. + 0.j)
+
+        assert np.allclose(resonance, res2)
+
+        full = np.where(condition, mechfactor * res2, 0.+0.j)
+
+        spectrumObj.intensities_grid = np.zeros(spectrumObj.shape2d, dtype='complex64')
+        spectrumObj.get_gamma_mech(a, b, condition)
+        ints = spectrumObj.intensities_grid
+
+        assert np.allclose(ints , full)
+
+
+# def test_calc_averaging():
+#
+#     # gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+#     # [alpha, beta, gamma, delta]
+#     gammaCompsAll = [[2, 2, 0, 0],
+#                      [1, 0, 0, 1],
+#                      [1, 2, 1, 2]]
+#
+#     from DATA import mu_Q, mu_QQ, alpha_Q, alpha_QQ
+#     data = {'mu_Q': mu_Q, 'mu_QQ': mu_QQ, 'alpha_Q': alpha_Q, 'alpha_QQ': alpha_QQ}
+#
+#     term_m = EvalTerm(avrg=[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',))], prefac='abc')
+#     avrgF_m = term_m.calcAveraging(data=data, gammaCompsAll=gammaCompsAll)
+#     # nmodes = 4
+#     a,b,c = (1, 3, 0)
+#     # ((beta,), (alpha,delta), (gamma))
+#     ref_avrgF_m1 = (data['mu_Q'][a, 2] * data['alpha_Q'][b, 2, 0] * data['mu_Q'][c, 0]+
+#                     data['mu_Q'][a, 0] * data['alpha_Q'][b, 1, 1] * data['mu_Q'][c, 0]+
+#                     data['mu_Q'][a, 2] * data['alpha_Q'][b, 1, 2] * data['mu_Q'][c, 1])
+#     assert ref_avrgF_m1==avrgF_m[a,b,c]
+#
+#     term_e = EvalTerm(avrg=[('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))], prefac='ab')
+#     avrgF_e = term_e.calcAveraging(data=data, gammaCompsAll=gammaCompsAll)
+#
+#     # final tensor will have dimensions (nmodes, nmodes) or (nmodes, nmodes, nmodes)
+#     #           [a, b] for el. and [a, b, c] for mech. (c=a or c=b sometimes)
+#     # element of the final tensor is a sum of products according to
+#     #                     the gammaCompsAll array of xyz-indices for each greek index: [alpha, beta, gamma, delta]
+#     # one product per one array from the gammaCompsAll array:
+#     #   derT1[nmodes..., beta_val]*derT2[nmodes..., alpha_val, delta_val]*derT3[nmodes..., gamma_val] where
+#     #         nmodes..., marks the derivative dimensions, and greek indices refer to cartesian dimensions
+#
+#     print('\n')
+#     np.set_printoptions(precision=4)
+#
+#     # print('\n', avrgF_m)
+#     # print('\n', avrgF_e)
+

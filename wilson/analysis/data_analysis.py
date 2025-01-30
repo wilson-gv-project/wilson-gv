@@ -1,5 +1,5 @@
 """
-For now these will stay in current form
+TODO: to be cleaned up
 """
 import copy
 
@@ -12,6 +12,7 @@ import numpy as np
 import plotly
 import plotly.express as px
 
+# todo: needs to be updated or removed
 def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
                       rec_cm: bool = True,
                       vib_levels_harmonic: bool = False) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
@@ -164,26 +165,6 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
 
     return dfs4terms_el, dfs4terms_mech
 
-
-def get_El2Mech_ratio(computedSpectrum: spectrum2D.Spectrum2D) -> float:
-    """
-    """
-
-    el_gamma, Qab_contrib_dict = computedSpectrum.intensity_electrical()
-    mech_gamma, Qabc_contrib_dict = computedSpectrum.intensity_mechanical()
-    # print(el_gamma)
-    # print(mech_gamma)
-
-    # total = abs(el_gamma+mech_gamma)**2
-    # print('\ntotal\n', total)
-    # print('\n|el_gamma|**2\n', abs(el_gamma)**2)
-    # print('\n|mech_gamma|**2\n', abs(mech_gamma)**2)
-    # percent_el = abs(el_gamma)**2/total*100
-    # percent_mech = abs(mech_gamma)**2/total*100
-
-    # print('\n|el_gamma|**2/|mech_gamma|**2\n', abs(el_gamma)**2/abs(mech_gamma)**2)
-
-    return abs(el_gamma)**2/abs(mech_gamma)**2
 
 
 def analyse_mechanical_resonances(dataframe_mech_resonances, computedSpectrum, rec_cm=True) -> pd.DataFrame:

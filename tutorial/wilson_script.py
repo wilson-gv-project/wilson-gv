@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-./wilson_script.py --new y --sparse 0. --preview n --vpt2 n --w1mw2 n --molecule FOAC
+./wilson_script.py --sparse 0. --preview n --vpt2 n --w1mw2 n --molecule FOAC
 """
 import argparse
 import warnings
@@ -33,7 +33,6 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-n', "--new", type=str2bool, default=True)
 parser.add_argument('-s', "--sparse", type=float, default=0.,
                     help='Radius of small grids; default is 0. which means full window will be calculated')
 parser.add_argument('-p', "--preview", type=str2bool, default=False)
@@ -46,7 +45,6 @@ args = parser.parse_args()
 
 prefix = None
 
-new = args.new
 sparse = args.sparse
 if sparse == 'n':
     sparse = 0.
@@ -131,7 +129,6 @@ spectrumObj.addTerms(dictInputs['el_terms_select'], dictInputs['mech_terms_selec
 if molecule=='ACDM':
     print('     Number of normal modes:', spectrumObj.nmodes)
     list2exclude = [34, 35, 36, 37, 38, 39, 40, 41]
-print('    coords_ab', len(spectrumObj.coords_ab))
 
 spectrumObj.precalculateParts(list2exclude=list2exclude,
                               preview=preview,
@@ -175,39 +172,16 @@ finalIntGrid = np.zeros(spectrumObj.shape2d, dtype='complex64')
 print('     Number of normal modes again:', spectrumObj.nmodes)
 
 # ------- computing anharmonicities
-if new:
 
-    st = time.time()
+st = time.time()
 
-    sec_hypol_dataALL = spectrumObj.intensity_both(selectionCond=mask)
+sec_hypol_dataALL = spectrumObj.intensity_both(selectionCond=mask)
 
-    elapsed_time = time.time() - st
-    elapsed_timedelta = timedelta(seconds=elapsed_time)
-    formatted_time = str(elapsed_timedelta)
-    print('Calculated intensities with opt in:',
-          formatted_time)
-
-else:
-
-    st = time.time()
-
-    sec_hypol_dataALL = 0
-
-    sec_hypol_data1 = 0
-    if dictInputs['el_terms_select']:
-        spectrumObj.intensity_electrical()
-
-    sec_hypol_data2 = 0
-    if dictInputs['mech_terms_select']:
-        spectrumObj.intensity_mechanical()
-
-    sec_hypol_dataALL = spectrumObj.intensities_grid
-
-    elapsed_time = time.time() - st
-    elapsed_timedelta = timedelta(seconds=elapsed_time)
-    formatted_time = str(elapsed_timedelta)
-    print('Calculated intensities in:',
-          formatted_time)
+elapsed_time = time.time() - st
+elapsed_timedelta = timedelta(seconds=elapsed_time)
+formatted_time = str(elapsed_timedelta)
+print('Calculated intensities with opt in:',
+      formatted_time)
 
 
 

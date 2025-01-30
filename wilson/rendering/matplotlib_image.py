@@ -40,8 +40,8 @@ class SpectrumFigure:
         if 'dmax_dict' in self.settings:
             self.d_max = self.settings['dmax_dict'][(el, mech)]
         else:
-            print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
-                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
+            # print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
+            #       self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
         if 'norm_max' not in self.settings:
@@ -90,7 +90,6 @@ class SpectrumFigure:
                 levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_color_levels - 1 - i) / (num_color_levels - 1))))
         else:
             levels = self.settings['levels']
-        print('levels\n', levels)
 
         if self.settings['w1mw2']:
             y = -(self.X - self.Y)

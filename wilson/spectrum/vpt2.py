@@ -36,27 +36,14 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
     combo3q = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
 
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
-
+    fermi_resonance = [fermi_resonance[0]]
     X, X_cubic, X_quartic, X_coriolis = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                                   rotational_constant, coriolis_constant, do_resonance_checks,
                                                   fermi_resonance)
 
-    # np.set_printoptions(suppress=True, precision=5)
-    # print('X\n', X, '\n')
-    # print('X_cubic\n', X_cubic, '\n')
-    # print('X_quartic\n', X_quartic, '\n')
-    # print('X_coriolis\n', X_coriolis, '\n')
 
     if fermi_resonance: # if not an empty list
         print(f'Fermi identified - {len(fermi_resonance)}:' , fermi_resonance)
-        # for a in range(len(fermi_resonance)):
-        #     i = fermi_resonance[a][0]
-        #     j = fermi_resonance[a][1]
-        #     k = fermi_resonance[a][2]
-
-            # print(i, j, k, harmonic_energies[i], harmonic_energies[j], harmonic_energies[k],
-            #       'type: ', fermi_resonance[a][3],
-            #       np.multiply(cubic_forcefield[i][j][k], 0.01 / (plancs_constant * speed_of_light)))
 
     funds_corrections = np.zeros((len(harmonic_energies)))
     for i in range(len(harmonic_energies)):
@@ -140,122 +127,6 @@ def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
     return fermi_resonance
 
-# def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-#           rotational_constant, coriolis_constant, do_resonance_checks):
-#
-#     fermi_resonance = []
-#     X = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-#     X_cubic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-#     X_quartic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-#     X_coriolis = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-#
-#     for i in range(len(harmonic_energies)):
-#         vi = harmonic_energies[i]
-#         X[i][i] = quartic_forcefield[i][i][i][i]/16.0
-#         X_quartic[i][i] = quartic_forcefield[i][i][i][i]/16.0
-#
-#         rhs = 0
-#
-#         for k in range(len(harmonic_energies)):
-#             vk = harmonic_energies[k]
-#             kiik = cubic_forcefield[i][i][k]
-#
-#             tmp1 = 4.0/vk
-#             tmp2 = 1/(2.0*vi + vk)
-#             isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
-#             print(i, i, k, isfermi)
-#             if not isfermi or not do_resonance_checks:
-#                 tmp3 = 1/(2.0*vi - vk)
-#             else:
-#                 fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
-#                 tmp3 = 0.0
-#                 if i == 8 and k == 5:
-#                     tmp3 = 1 / (2.0 * vi - vk)
-#
-#             print('kiik, tmp1, tmp2, tmp3, +=', (i, k), kiik, tmp1, tmp2, tmp3, (kiik**2/32.0)*(tmp1 + tmp2 - tmp3))
-#
-#             rhs += (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
-#             # if i == 8:
-#             #     print('>>>>>>>>> cubic+= for', i, k)
-#             #     print('kiik, tmp1, tmp2, tmp3, +=', (i, k), kiik, tmp1, tmp2, tmp3, (kiik**2/32.0)*(tmp1 + tmp2 - tmp3))
-#
-#         # X[i][i] = X[i][i] - rhs
-#         X[i][i] += - rhs
-#         X_cubic[i][i] = - rhs
-#
-#         for j in range(i):
-#             vj = harmonic_energies[j]
-#             X[i][j] = quartic_forcefield[i][i][j][j]/4.0
-#             X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
-#
-#             A = 0
-#             for k in range(len(harmonic_energies)):
-#                 A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
-#                 if i == 8 and j == 5:
-#                     print('\n>>>>>>>>> A+= for', i, j, k)
-#                     print('Fiik, Fjjk, 4*vk, vk', cubic_forcefield[i][i][k],cubic_forcefield[j][j][k],(4.0*harmonic_energies[k]), harmonic_energies[k])
-#                     print('A+=', cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k]))
-#
-#             B = 0
-#             for k in range(len(harmonic_energies)):
-#                 vk = harmonic_energies[k]
-#                 kijk = cubic_forcefield[i][j][k]
-#
-#                 tmp1 = 1/(vi + vj + vk)
-#                 if (not is_fermi_resonance(-vi + vj + vk, kijk, k == j)) or (not do_resonance_checks):
-#                     # perturb if no fermi resonance or dont do resonance checks
-#                     tmp2 = 1/(-vi + vj + vk)
-#                 else:
-#                     # deperturbing otherwise - when resonance and do checks
-#                     fermi_resonance = add_fermi_resonance(fermi_resonance, [i, j, k, k == j])
-#                     tmp2 = 0.0
-#
-#                 if (not is_fermi_resonance(vi - vj + vk, kijk, k == i)) or (not do_resonance_checks):
-#                     # perturb if no fermi resonance or dont do resonance checks
-#                     tmp3 = 1/(vi -vj + vk)
-#
-#                 else:
-#                     if i == 8 and j == 5 and k ==8:
-#                         tmp3 = 1 / (vi - vj + vk)
-#                     else:
-#                         # deperturbing otherwise - when resonance and do checks
-#                         fermi_resonance = add_fermi_resonance(fermi_resonance, [j, k, i, k == i])
-#                         tmp3 = 0.0
-#
-#                 if (not is_fermi_resonance(vi + vj - vk, kijk, i == j)) or (not do_resonance_checks):
-#                     # perturb if no fermi resonance or dont do resonance checks
-#                     tmp4 = 1/(vi + vj - vk)
-#                 else:
-#                     # deperturbing otherwise - when resonance and do checks
-#                     fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, j, i == j])
-#                     tmp4 = 0.0
-#                 if i == 8 and j == 5:
-#                     print('kijk, tmp1, tmp2, tmp3, -tmp4, B +=', (i,j,k), kijk, tmp1, tmp2, tmp3, -tmp4, kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4))
-#                 B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
-#
-#             if i==8 and j==5:
-#                 print('>>>>>>>>> if i==8 and j==5', i, j)
-#                 print('-A, -B', -A, -B, '\n')
-#
-#             C = 0
-#
-#             for k in range(len(rotational_constant)):
-#
-#                 C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
-#                     (harmonic_energies[i]/harmonic_energies[j] +
-#                      harmonic_energies[j]/harmonic_energies[i])
-#
-#             X[i][j] = X[i][j] - A - B + C
-#             X[j][i] = np.copy(X[i][j])
-#
-#             X_coriolis[i][j] = C
-#             X_coriolis[j][i] = np.copy(X_coriolis[i][j])
-#             X_cubic[i][j] = - A - B
-#             X_cubic[j][i] = np.copy(X_cubic[i][j])
-#
-#     fermi_resonance = sorted(fermi_resonance)
-#
-#     return X, fermi_resonance, X_cubic, X_quartic, X_coriolis
 
 def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance):
@@ -322,10 +193,6 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
 
                 B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
 
-            # if i==8 and j==5:
-            #     print('>>>>>>>>> if i==8 and j==5', i, j)
-            #     print('-A, -B', -A, -B, '\n')
-
             C = 0
 
             for k in range(len(rotational_constant)):
@@ -353,7 +220,7 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
     if abs(delta) <= fermi_threshold: # in FR should be less than 200 cm-1
         if i_is_j:
             martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
-            print('martin_parameter', abs(martin_parameter), abs(martin_parameter) >= martin_threshold, martin_threshold)
+            # print('martin_parameter', abs(martin_parameter), abs(martin_parameter) >= martin_threshold, martin_threshold)
             if abs(martin_parameter) >= martin_threshold: # in FR should be greater than 1 cm-1
                 fermi = True
                 # print(abs(delta), fermi_threshold)
