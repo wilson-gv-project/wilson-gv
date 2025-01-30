@@ -40,8 +40,6 @@ class SpectrumFigure:
         if 'dmax_dict' in self.settings:
             self.d_max = self.settings['dmax_dict'][(el, mech)]
         else:
-            # print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
-            #       self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
         if 'norm_max' not in self.settings:
@@ -63,9 +61,6 @@ class SpectrumFigure:
         plt.rcParams['axes.titlepad'] = 30
         matplotlib.rc('font', **self.font_dict)
 
-        # fig = plt.figure(figsize=self.figsize)
-        # fig = plt.figure(figsize=(14,14))
-        # ax = fig.add_subplot(1, 1, 1)
         fig, ax = plt.subplots(figsize=self.figsize)
 
         import matplotlib.colors as colors
@@ -98,9 +93,6 @@ class SpectrumFigure:
             y = self.Y
         # range for color on the color bar
         colorbar_norm = colors.LogNorm(vmax=self.settings['norm_max'], vmin=self.settings['norm_min'])
-        # cont = plt.contourf(self.X, y, self.intensities,
-        #                     levels=levels, cmap='hot_r',
-        #                     norm=colorbar_norm)
         cont = ax.contourf(self.X, y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)
@@ -128,10 +120,8 @@ class SpectrumFigure:
         colorbar = plt.colorbar(cont, aspect=65, shrink=0.9,
                                 ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
 
-        # plt.xlabel(r'$\omega_1$')
-        # plt.ylabel(r'$\omega_2$')
-        # xs = self.X[0], self.X[-1]
-        # ys = self.Y[0], self.Y[-1]
+        plt.xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', labelpad=20)
+        plt.ylabel(r'$\omega_2/2\pi c, \text{cm}^{-1}$', labelpad=20)
 
         title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
                            (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
@@ -149,8 +139,6 @@ class SpectrumFigure:
         ax.set_aspect('equal', adjustable='box')
         ax.grid(True, linestyle='--', alpha=0.7)
 
-        # import shutil
-        # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
         if to_save:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
         return fig
