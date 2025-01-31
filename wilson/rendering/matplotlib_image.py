@@ -5,7 +5,7 @@ import matplotlib
 
 class SpectrumFigure:
 
-    def __init__(self, sec_hypol_data, w1_mesh, w2_mesh, settings):
+    def __init__(self, sec_hypol_data, computedSpectrum, w1_mesh, w2_mesh, settings):
 
         # figure XYZ data
         self.gamma_data = sec_hypol_data
@@ -17,9 +17,13 @@ class SpectrumFigure:
         self.X = w1_mesh
         self.Y = w2_mesh
 
+        # defaults
         self.settings = {'omega1_minus_omega2': False, 'log10': True,
-                         'font_dict': {'size': 18}, 'dpi': 200,
-                         'figsize': (12, 12)}
+                         'font_dict': {'size': 18}, 'dpi': 200, 'figsize': (12, 12),
+                         'norm_max': None, 'norm_min': None,
+                         'levels': None, 'level_ticks': None,
+                         'Gamma_rc': computedSpectrum.Gamma_rc,
+                         'electrical': computedSpectrum.e_selected, 'mechanical': computedSpectrum.m_selected}
         self.settings.update(settings)
 
         if self.settings['omega1_minus_omega2']:
@@ -28,9 +32,7 @@ class SpectrumFigure:
         # figure settings
         self.figsize = self.settings['figsize']
         self.dpi = self.settings['dpi']
-        self.font_dict = self.settings['font_dict'] # font = {'size': 18}
-        # self.settings['norm_min'] = 1e3
-        # self.settings['norm_max'] = 1e8
+        self.font_dict = self.settings['font_dict']
 
         el, mech = self.settings['electrical'], self.settings['mechanical']
 
@@ -38,19 +40,17 @@ class SpectrumFigure:
         if 'dmax_dict' in self.settings:
             self.d_max = self.settings['dmax_dict'][(el, mech)]
         else:
-            print('\nself.intensities.max()==np.max(self.intensities.flatten(), axis=0):',
-                  self.intensities.max()==np.max(self.intensities.flatten(), axis=0), '{:.4e}'.format(self.intensities.max()))
             self.d_max = self.intensities.max()
         self.settings['d_max'] = self.d_max
         if 'norm_max' not in self.settings:
             self.settings['norm_max'] = self.intensities.max()
         if 'norm_min' not in self.settings:
             self.settings['norm_min'] = self.intensities.min()
-        # dmax_dict = {(True, False): 48778401.3, (False, True): 29519537.48, (True, True): 48218929.9}
-        # d_max = dmax_dict[(el_bool, mech_bool)] # m, e, t 29519537.48  48778401.3  48218929.9
+
 
     def update_settings(self, settings: dict):
         self.settings.update(settings)
+
 
     def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '', diagonal=False, to_save=True):
 
@@ -61,30 +61,49 @@ class SpectrumFigure:
         plt.rcParams['axes.titlepad'] = 30
         matplotlib.rc('font', **self.font_dict)
 
-        fig = plt.figure(figsize=self.figsize)
-        ax = fig.add_subplot(1, 1, 1)
+        fig, ax = plt.subplots(figsize=self.figsize)
 
         import matplotlib.colors as colors
-        colorbar_norm = colors.LogNorm(vmin=self.settings['norm_min'], vmax=self.settings['norm_max'])
 
-        num_count = self.settings['dynamic_range_n']
-        dynamic_range = num_count*10 # stop plotting when lower than this (number times 10) dmax
-
+        dynamic_range = self.settings['dynamic_range_n']
+        num_color_levels = self.settings['num_color_levels']
         dynrange_log = np.log10(dynamic_range)
-        d_min = (1.0 / float(dynamic_range)) * self.intensities.max()
+        # d_max - max intensity
         dmax_log10 = float(int(np.log10(self.d_max)))
 
-        num_level_ticks = 6
-        levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
-        levels = []
-        for i in range(num_count):
-            levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_count - 1 - i) / (num_count - 1))))
+        num_level_ticks = self.settings['num_level_ticks']
 
-        cont = plt.contourf(self.X, self.Y, self.intensities,
+        if self.settings['levels_ticks'] is None:
+            # contour regions
+            levels_ticks = [10**(dmax_log10-i) for i in range(num_level_ticks)]
+        else:
+            levels_ticks = self.settings['levels_ticks']
+
+        if self.settings['levels_ticks'] is None:
+            levels = []
+            for i in range(num_color_levels):
+                levels.append(self.d_max * 10.0 ** (-1.0 * dynrange_log * (float(num_color_levels - 1 - i) / (num_color_levels - 1))))
+        else:
+            levels = self.settings['levels']
+
+        if self.settings['w1mw2']:
+            y = -(self.X - self.Y)
+            ax.set_ylabel('w2-w1', fontsize=18)
+        else:
+            y = self.Y
+        # range for color on the color bar
+        colorbar_norm = colors.LogNorm(vmax=self.settings['norm_max'], vmin=self.settings['norm_min'])
+        cont = ax.contourf(self.X, y, self.intensities,
                             levels=levels, cmap='hot_r',
                             norm=colorbar_norm)
+
         if diagonal:
             plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
+
+        if self.settings['w1mw2']:
+            # y_limits = ax.get_ylim()
+            # x_limits = ax.get_xlim()
+            ax.set_ylim(0, 3400)
 
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
@@ -98,12 +117,11 @@ class SpectrumFigure:
             return r'${} \times 10^{{{}}}$'.format(a, b)
 
         # https://stackoverflow.com/questions/25983218/scientific-notation-colorbar
-        colorbar = plt.colorbar(cont, ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
+        colorbar = plt.colorbar(cont, aspect=65, shrink=0.9,
+                                ticks=levels_ticks, format=ticker.FuncFormatter(fmt))
 
-        # plt.xlabel(r'$\omega_1$')
-        # plt.ylabel(r'$\omega_2$')
-        xs = self.X[0], self.X[-1]
-        ys = self.Y[0], self.Y[-1]
+        plt.xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', labelpad=20)
+        plt.ylabel(r'$\omega_2/2\pi c, \text{cm}^{-1}$', labelpad=20)
 
         title_type_dict = {(True, False): r'electrical anharmonicity $|\gamma^{[1,0]}|^2$ only',
                            (False, True): r'mechanical anharmonicity $|\gamma^{[0,1]}|^2$ only',
@@ -115,9 +133,13 @@ class SpectrumFigure:
         ax.annotate(text_under_the_figure, xy=(0.05, -0.11), xycoords='axes fraction',
                     ha="left", va="top", bbox=bbox_args, fontsize=12)
         plt.tight_layout()
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(True, linestyle='--', alpha=0.7)
+
         if to_save:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
-
-        # import shutil
-        # shutil.copy2(nametuple[0], '/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/svgs/'+nametuple[0])
         return fig
+

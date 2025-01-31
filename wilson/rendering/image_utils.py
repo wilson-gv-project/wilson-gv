@@ -2,19 +2,18 @@ import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=17)
 
 
-def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
-                   settings: dict, other: dict, directory: str = '.') -> tuple[str, str]:
+def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: str = '.') -> tuple[str, str]:
     """
     other = {'regions': regions, 'terms_selection': terms_selection, 'w1mw2': False, 'log10': True}
 
     """
-    terms_selection = other['terms_selection']
+    terms_selection = (computedSpectrum.e_selected, computedSpectrum.m_selected)
 
     method_name = input_data_info['files']['method']
     basis_name = input_data_info['files']['basis']
     mol_code = input_data_info['files']['mol_code']
 
-    Gamma_rc = settings['Gamma_rc']
+    Gamma_rc = computedSpectrum.Gamma_rc
 
     title_on_top = f"{method_name}/{f'{basis_name}'.replace('_', '-')}"
 
@@ -45,7 +44,7 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
     part2 = f'intensities.max() = {artist.intensities.max()} = {"{:.4e}".format(artist.intensities.max())}\n'
     part3 = f'Gamma in cm-1 = {Gamma_rc}\n'
     settings_str = ['\nSettings dict:']
-    for key, value in settings.items():
+    for key, value in artist.settings.items():
         settings_str.append(f"  {key}: {value}")
     part4 = "\n".join(settings_str)
     if artist.settings['norm_min'] is None:
@@ -63,33 +62,40 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist,
 
     return title_on_top, text_under_the_figure
 
-def make_name(input_data_info: dict, vib_levels_harmonic: bool,
-              settings: dict, other: dict, directory: str = '.') -> str:
+def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = '.', prefix: str = None) -> str:
     """
     other = {'regions': regions, 'terms_selection': terms_selection, 'w1mw2': False, 'log10': True}
 
     """
-    w1mw2 = other['w1mw2']
-    regions = other['regions']
+    w1mw2 = artist.settings['w1mw2']
+    vib_levels_harmonic = computedSpectrum.vib_levels_harmonic
 
     software = input_data_info['source']
     vibEneLevels = 'harmonicEL' if vib_levels_harmonic else 'anharmonicEL'
-    prefix = f'figObj_{vibEneLevels}_{software}'
+
+    if prefix is None:
+        prefix = f'figObj_{vibEneLevels}_{software}'
+    else:
+        prefix += f'_{vibEneLevels}_{software}'
+
+    # prefix = f'figObj_{vibEneLevels}_{software}'
     method_name = input_data_info['files']['method']
     basis_name = input_data_info['files']['basis']
     mol_code = input_data_info['files']['mol_code']
 
-    el_bool = settings['electrical']
-    mech_bool = settings['mechanical']
+    # el_bool = artist.settings['electrical']
+    # mech_bool = artist.settings['mechanical']
 
-    region = settings['region']
-    Gamma_rc = settings['Gamma_rc']
+    els_str = ''.join([str(i) for i in artist.settings['electrical']])
+    mechs_str = ''.join([str(i) for i in artist.settings['mechanical']])
 
-    step1 = regions[region][0][-1]
+    Gamma_rc = artist.settings['Gamma_rc']
     Gamma_str = f"{Gamma_rc:.2f}".replace('.', 'p')
-    step_str = f"{step1:.1f}".replace('.', 'p')
 
-    name = f'{directory}/{prefix}_{mol_code}_{method_name}_{basis_name}_el{str(el_bool)[0]}_mech{str(mech_bool)[0]}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}_reg{region}_step{step_str}.svg'
+    # step1 = regions[region][0][-1]
+    # step_str = f"{step1:.1f}".replace('.', 'p')
+
+    name = f'{directory}/{prefix}_{mol_code}_{method_name}_{basis_name}_el{els_str}_mech{mechs_str}_w1mw2{str(w1mw2)[0]}_G{Gamma_str}.svg'
 
     return name
 

@@ -363,4 +363,17 @@ class mtRspfuncs:
         return ans
 
 
+def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
+    """
+    Now is set for the EVV experiment and for ZZZZ polarization.
 
+    pol_g is a list of lists of 2 lists where the second one is empty
+          but first one contains the lists of interest
+
+    :param num_f: number of pulses
+    :return: array_of_4greekIndices - an array of arrays of 4 greek indices for second hyperpolarizability :
+             [alpha, beta, gamma, delta]
+    """
+    pol_g = get_iso_f(num_f)
+    array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
+    return array_of_4greekIndices
