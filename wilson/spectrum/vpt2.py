@@ -128,6 +128,36 @@ def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
     return fermi_resonance
 
 
+def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
+
+    fermi_resonance = []
+    for i in range(len(harmonic_energies)):
+        vi = harmonic_energies[i]
+
+        for k in range(len(harmonic_energies)):
+            vk = harmonic_energies[k]
+            kiik = cubic_forcefield[i][i][k]
+
+            isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
+            if isfermi and do_resonance_checks:
+                fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
+
+        for j in range(i):
+            vj = harmonic_energies[j]
+
+            for k in range(len(harmonic_energies)):
+                vk = harmonic_energies[k]
+                kijk = cubic_forcefield[i][j][k]
+
+                if is_fermi_resonance(-vi + vj + vk, kijk, k == j) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [i, *sorted([j, k]), k == j])
+                if is_fermi_resonance(vi - vj + vk, kijk, k == i) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [j, *sorted([k, i]), k == i])
+                if is_fermi_resonance(vi + vj - vk, kijk, i == j) and do_resonance_checks:
+                    fermi_resonance = add_fermi_resonance(fermi_resonance, [k, *sorted([i, j]), i == j])
+
+    return fermi_resonance
+
 def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance):
 
@@ -238,6 +268,32 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
 
     return fermi
 
+
+def is_fermi_resonance_c4(delta, cubic_force_ijk, i_is_j):
+    fermi = False
+    fermi_threshold = 50.0
+    martin_threshold = 1.0
+
+    if abs(delta) <= fermi_threshold: # in FR should be less than 200 cm-1
+        if i_is_j:
+            martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
+            # print('martin_parameter', abs(martin_parameter), abs(martin_parameter) >= martin_threshold, martin_threshold)
+            if abs(martin_parameter) >= martin_threshold: # in FR should be greater than 1 cm-1
+                fermi = True
+                # print(abs(delta), fermi_threshold)
+                # print(abs(martin_parameter), martin_threshold)
+            else:
+                fermi = False
+        else:
+            martin_parameter = cubic_force_ijk**4/(64.0*delta**3)
+            if abs(martin_parameter) >= martin_threshold:
+                fermi = True
+                # print(abs(delta), fermi_threshold)
+                # print(abs(martin_parameter), martin_threshold)
+            else:
+                fermi = False
+
+    return fermi
 
 def add_fermi_resonance(total_list, new_element):
     # i = new_element[0]

@@ -15,7 +15,7 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: s
 
     Gamma_rc = computedSpectrum.Gamma_rc
 
-    title_on_top = f"{method_name}/{f'{basis_name}'.replace('_', '-')}"
+    title_on_top = f"{method_name}/{f'{basis_name} {terms_selection}'.replace('_', '-')}"
 
     # here we prepare the text for the textbox
     part1 = f'{directory}\n\nMolecule: {mol_code}\nd_max = {"{:.4e}".format(artist.d_max)}\n'
@@ -56,7 +56,8 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: s
     else:
         n_max_str = '{:.2e}'.format(artist.settings['norm_max'])
 
-    part9 = f"\nsettings['norm_min'] {n_min_str}\nsettings['norm_max'] {n_max_str}\n"
+    # part9 = f"\nsettings['norm_min'] {n_min_str}\nsettings['norm_max'] {n_max_str}\n"
+    part9 = f"\nsettings['dynamic_range_n'] {artist.settings['dynamic_range_n']}\n"
 
     text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
 

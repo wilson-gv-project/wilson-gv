@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 from scipy import constants
 
@@ -86,3 +88,107 @@ def fill_subgrid(grid, seed, radius, grid_size):
     left = max(0, seed[1] - radius)
     right = min(grid_size[1], seed[1] + radius + 1)
     grid[top:bottom, left:right] += 1
+
+
+def match_modes(spectrumObj_g16, spectrumObj_c4):
+    """
+    Finds matching modes between g16 and c4 modes
+    """
+
+    g16dict, c4dict = spectrumObj_g16.normal_modes, spectrumObj_c4.normal_modes
+
+    dot_products = {}
+    dot_products_all = {}
+    keys1 = []
+    keys2 = []
+
+    for key1, array1 in g16dict.items():
+        for key2, array2 in c4dict.items():
+            dot_product = abs(np.dot(array1, array2))
+            dot_products_all[(key1, key2)] = dot_product
+
+            if abs(dot_product) > 0.6:
+                if key1 in keys1:
+                    maximum = max([v for k, v in dot_products.items() if key1 == k[0]]+[dot_product])
+                    oldthing = [k for k, v in dot_products.items() if key1 == k[0]]
+                    del dot_products[oldthing[0]]
+                    dot_products[(key1, key2)] = maximum
+
+                elif key2 in keys2:
+                    maximum = max([v for k, v in dot_products.items() if key2 == k[1]]+[dot_product])
+                    oldthing = [k for k, v in dot_products.items() if key2 == k[1]]
+                    del dot_products[oldthing[0]]
+                    dot_products[(key1, key2)] = maximum
+
+                else:
+                    keys1.append(key1)
+                    keys2.append(key2)
+                    dot_products[(key1, key2)] = dot_product
+
+    repetitions_g16 = {k: {} for k in g16dict.keys()}
+    for (key1, key2), value in dot_products.items():
+        repetitions_g16[key1][(key1, key2)] = abs(value)
+
+    # print({k:v for k,v in repetitions_g16.items() if len(v)>1})
+
+    repetitions_c4 = {k: {} for k in c4dict.keys()}
+    for (key1, key2), value in dot_products.items():
+        repetitions_c4[key2][(key1, key2)] = abs(value)
+
+    # print({k:v for k,v in repetitions_c4.items() if len(v)>1})
+
+    g16_list = list(g16dict.keys())  # key1
+    c4_list = list(c4dict.keys())  # key2
+    g16_is_c4 = {}
+    number_of_modes = len(copy.deepcopy(g16_list))
+
+    for (key1, key2), value in dot_products.items():
+        if key1 in repetitions_g16:
+            k = max(repetitions_g16[key1], key=repetitions_g16[key1].get)[1]
+            g16_is_c4[key1] = k
+            g16_list.remove(key1)
+            c4_list.remove(k)
+
+        elif key2 in repetitions_c4:
+            k = max(repetitions_c4[key2], key=repetitions_c4[key2].get)[1]
+            g16_is_c4[key1] = k
+            g16_list.remove(key1)
+            c4_list.remove(k)
+
+        else:
+            g16_is_c4[key1] = key2
+            g16_list.remove(key1)
+            c4_list.remove(key2)
+
+
+    if len(g16_list) == 1:
+        g16_is_c4[g16_list[0]] = c4_list[0]
+        g16_list.pop(0)
+        c4_list.pop(0)
+    else:
+        print('Result:', g16_is_c4)
+        print(dot_products)
+        print('Oh no, there are some ambiguities')
+        print(g16_list, c4_list)
+
+    if g16_list:
+        deltas = {}
+        for i in g16_list:
+            for j in c4_list:
+                deltaw = abs(spectrumObj_g16.all_states[(str(i),)] - spectrumObj_c4.all_states[(str(j),)])
+                if deltaw < 100.:
+                    deltas[(i,j)] = deltaw
+                    g16_is_c4[i] = j
+        print(deltas)
+
+    print('\n', dot_products_all)
+        # for t in deltas:
+        #     g16_list.remove(t[0])
+        #     c4_list.remove(t[1])
+    #
+    # if len(g16_is_c4) == number_of_modes:
+    #     return g16_is_c4
+    # else:
+    #     print(g16_is_c4)
+    #     print('Oh no, there still some ambiguities')
+    #     print(g16_list, c4_list)

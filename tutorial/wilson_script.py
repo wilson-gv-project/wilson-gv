@@ -63,7 +63,7 @@ omega2 = np.arange(1400., 5650., 3.8)
 
 Gamma_rc = 4.7
 list2exclude = []
-diag_margin_rc=180.
+diag_margin_rc=20.
 el_terms_selected, mech_terms_selected = [0, 1], [2, 3]
 # do not count the modes with resonances outside the spectrum window
 screenmodeswindow = True
@@ -87,6 +87,11 @@ spectrumObj.load_data(gParser, vpt2=vpt2, vpt2settings={'anharmonic_type': 'GVPT
 spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=False)
 spectrumObj.add_terms(el_terms_selected, mech_terms_selected)
 
+# spectrumObj.precalc_locations(list2exclude=list2exclude)
+# spectrumObj.precalc_intensities()
+spectrumObj.preview_spectrum(list2exclude)
+
+exit()
 spectrumObj.precalculate_parts(list2exclude=list2exclude,
                                preview=preview,
                                screenmodeswindow=screenmodeswindow)
@@ -113,9 +118,6 @@ if sparse!=0.:
 
 
 np.set_printoptions(precision=6)
-
-finalIntGrid = np.zeros(spectrumObj.shape2d, dtype='complex64')
-
 
 #########################################################################################################
 # ------- computing anharmonicities
