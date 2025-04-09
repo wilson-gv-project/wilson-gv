@@ -1,6 +1,6 @@
 import numpy as np
 np.set_printoptions(linewidth=250, suppress=False, precision=17)
-
+from wilson.spectrum.spectrum2D import combinations_with_permutations
 
 def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: str = '.') -> tuple[str, str]:
     """
@@ -23,11 +23,11 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: s
     part8 = f'Used vibrational energy levels: vib_levels_harmonic={computedSpectrum.vib_levels_harmonic}\n\n'
     values = list(computedSpectrum.fundamentals_harmonic.values())
     if len(values) < 10:
-        part6 = f'Fundamentals (harmonic): \n   {sorted(values)}\n\n'
+        part6 = f'\nFundamentals (harmonic): \n   {sorted(values)}\n\n'
     else:
         sorted_values = sorted(values)
         chunks = [sorted_values[i:i + 9] for i in range(0, len(sorted_values), 9)]
-        part6 = 'Fundamentals (harmonic):\n'
+        part6 = '\nFundamentals (harmonic):\n'
         for chunk in chunks:
             part6 += f"   {chunk}\n"
         part6 += '\n'
@@ -59,7 +59,23 @@ def make_texts4fig(input_data_info: dict, computedSpectrum, artist, directory: s
     # part9 = f"\nsettings['norm_min'] {n_min_str}\nsettings['norm_max'] {n_max_str}\n"
     part9 = f"\nsettings['dynamic_range_n'] {artist.settings['dynamic_range_n']}\n"
 
-    text_under_the_figure = part1+part5+part8+part6+part7+part2+part3+part4+part9
+    d = {k:v for k,v in computedSpectrum.fundamentals.items() if int(k) in computedSpectrum.mode_indices}
+    if len(d)==2:
+        part10 = f'\n{d}; {list(d.values())[1]-list(d.values())[0]}\n'
+    else:
+        part10 = f'\n{d}\n'
+
+    print(computedSpectrum.fundamentals)
+    part11 = ''
+
+    for nm in d:
+        d2 = {}
+        for i in list(combinations_with_permutations(computedSpectrum.mode_indices, 2)):
+            if nm in (str(i[0]), str(i[1])):
+                d2[tuple(sorted(i))] = computedSpectrum.all_states[tuple([str(j) for j in sorted(i)])]-d[nm]
+        part11+=f'\n{d[nm]} {d2}\n'
+    # part11 = f'\n{d2}\n'
+    text_under_the_figure = part1+part5+part8+part10+part11+part6+part7+part2+part3+part4+part9
 
     return title_on_top, text_under_the_figure
 
@@ -100,3 +116,38 @@ def make_name(input_data_info: dict, computedSpectrum, artist, directory: str = 
 
     return name
 
+
+def text_spec_fig(conditions):
+
+    title_on_top = f'{conditions.molecule} {conditions.method} {conditions.basis}'
+
+    part1 = f'\nGamma: {conditions.Gamma_rc}\n'
+    part2 = f'\ndynamic_range_n: {conditions.dynamic_range_n}\n'
+    part3 = f'\nomega1: {np.min(conditions.omega1), np.max(conditions.omega1)}, {conditions.omega1.shape}\n'
+    part4 = f'\nomega2: {np.min(conditions.omega2), np.max(conditions.omega2)}, {conditions.omega2.shape}\n'
+    part5 = f'\nel_terms_selected: {conditions.el_terms_selected}\n'
+    part6 = f'\nmech_terms_selected: {conditions.mech_terms_selected}\n'
+
+    text_under_the_figure = part1+part2+part3+part4+part5+part6
+
+    # class Conditions:
+    #     Gamma_rc: float
+    #     diag_margin_rc: float
+    #     dynamic_range_n: int|float
+    #     omega1: np.ndarray
+    #     omega2: np.ndarray
+    #     program: str
+    #     data_parser: CFOURdataParser|GaussianDataParser
+    #     molecule: str
+    #     method: str
+    #     basis: str
+    #     new_idx_dict : dict
+    #     el_terms_selected: list
+    #     mech_terms_selected: list
+    #     list2exclude: list = None
+    #     only_modes: list = None
+    #     vpt2settings: dict = field(default_factory=lambda: {'anharmonic_type': 'GVPT2'})
+    #     vib_levels_harmonic: bool = False
+    #     preview: bool = False
+
+    return title_on_top, text_under_the_figure

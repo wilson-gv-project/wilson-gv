@@ -33,7 +33,7 @@ def test_VPT2():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -67,7 +67,7 @@ def test_GVPT2():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -103,7 +103,7 @@ def test_GVPT2_b3lyp_cc_pvqz():
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
 
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -136,7 +136,7 @@ def test_GVPT2_b3lyp_cc_pvtz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
 
     freqs = []
@@ -170,7 +170,7 @@ def test_GVPT2_b3lyp_cc_pvdz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=True)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -202,7 +202,7 @@ def test_GVPT2_FOAC_hf_cc_pvqz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -235,7 +235,7 @@ def test_GVPT2_FOAC_b3lyp_cc_pvqz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -268,7 +268,7 @@ def test_GVPT2_FOAC_b3lyp_cc_pvdz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:
@@ -301,7 +301,7 @@ def test_GVPT2_OXAC2_b3lyp_cc_pvqz():
     spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=3., vib_levels_harmonic=False)
     # currently requires diag_margin_rc attribute to be set
     spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-    spectrumObj.precalculate_parts(list2exclude=list2exclude)
+    spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
     freqs = []
     for i in spectrumObj.all_states:

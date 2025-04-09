@@ -299,7 +299,7 @@ def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
     # computedSpectrum.add_terms(*terms_selection)
     # if molecule=="ACDM":
     #     computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
-    # computedSpectrum.precalculate_parts()
+    # computedSpectrum.precalculate4fullspectrum()
 
     # dataframes with resonances_args for used terms in spectrum object
     dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
@@ -418,7 +418,7 @@ def allAddedres(molecule, method, basis, data_vault,
     computedSpectrum.add_terms(*terms_selection)
     if molecule=="ACDM":
         computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
-    computedSpectrum.precalculate_parts()
+    computedSpectrum.precalculate4fullspectrum()
 
     # dataframes with resonances_args for used terms in spectrum object
     dfs4terms_el, dfs4terms_mech = get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
@@ -607,7 +607,7 @@ def allAddedres(molecule, method, basis, data_vault,
 #     computedSpectrum.set_spectrum_settings(Gamma_rc=10., diag_margin_rc=10., vib_levels_harmonic=False)
 #     computedSpectrum.add_terms(*terms_selection)
 #     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
-#     computedSpectrum.precalculate_parts()
+#     computedSpectrum.precalculate4fullspectrum()
 #
 #     # dataframes with resonances_args for used terms in spectrum object
 #     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,
@@ -727,7 +727,7 @@ def allAddedres(molecule, method, basis, data_vault,
 #     computedSpectrum.set_spectrum_settings(Gamma_rc=10., diag_margin_rc=10., vib_levels_harmonic=False)
 #     computedSpectrum.add_terms(*terms_selection)
 #     # computedSpectrum.exclude_modes([34, 35, 36, 37, 38, 39, 40, 41])
-#     computedSpectrum.precalculate_parts()
+#     computedSpectrum.precalculate4fullspectrum()
 #
 #     # dataframes with resonances_args for used terms in spectrum object
 #     dfs4terms_el, dfs4terms_mech = analysis.get_resonances_DF(computedSpectrum, rec_cm=rec_cm,

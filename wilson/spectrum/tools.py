@@ -3,10 +3,17 @@ import copy
 import numpy as np
 from scipy import constants
 
-def convNu2Ene(reciprocal_cm: float | np.ndarray) -> float | np.ndarray:
+def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> float | np.ndarray:
     """Convert wavenumber (cm-1) to energy (Hartree)"""
     hartree2J = constants.physical_constants['hartree-joule relationship'][0]
-    return reciprocal_cm * (100 * constants.h * constants.c / hartree2J)
+    if not reverse:
+        return reciprocal_cm * (100 * constants.h * constants.c / hartree2J)
+    else:
+        return reciprocal_cm / (100 * constants.h * constants.c / hartree2J)
+
+
+
+
 
 
 def avrg_abc_tensor(formula: tuple,
@@ -69,6 +76,62 @@ def avrg_abc_tensor(formula: tuple,
                         total += data['mu_Q'][i1, beta] * data['alpha_Q'][i2, alpha, delta] * data['mu_Q'][i3, gamma]
                     avrg_tensor[a, b, c] = total/15.
         return avrg_tensor
+
+
+def get_properties_avrg(formula: tuple, data: dict[str:np.ndarray],
+                        gammaCompsAll: np.array,
+                        a,b,c=None):
+
+    if type(formula[-2]) == str:
+        # True for mechanical anharmonicity terms
+        F_formula = formula[-2]      # removes the Fabc string, to deal only with the averaging part
+        formula = formula[:-2]      # removes the Fabc string, to deal only with the averaging part
+
+    # specific case of the gamma_1,0 first term
+    if [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_QQ']:
+        components = {'mu_Q': [],
+                      'alpha_Q': [],
+                      'mu_QQ': []}
+        for comps in gammaCompsAll:
+            alpha, beta, gamma, delta = comps
+            components['mu_Q'].append(data['mu_Q'][a, beta])
+            components['alpha_Q'].append(data['alpha_Q'][b, alpha, delta])
+            components['mu_QQ'].append(data['mu_QQ'][a, b, gamma])
+        return components
+
+    # specific case of the gamma_1,0 second term
+    elif [i[0] for i in formula] == ['mu_Q', 'alpha_QQ', 'mu_Q']:
+        components = {'mu_Q1': [],
+                      'alpha_QQ': [],
+                      'mu_Q2': []}
+        for comps in gammaCompsAll:
+            alpha, beta, gamma, delta = comps
+            components['mu_Q1'].append(data['mu_Q'][a, beta])
+            components['alpha_QQ'].append(data['alpha_QQ'][a, b, alpha, delta])
+            components['mu_Q2'].append(data['mu_Q'][b, gamma])
+        return components
+
+    # all terms of gamma_0,1 have this structure of averaging part
+    elif [i[0] for i in formula] == ['mu_Q', 'alpha_Q', 'mu_Q']:
+
+        abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+        ijk_indx = tuple([abc[j] for j in F_formula])
+        F = data['F_abc'][ijk_indx]
+
+        # this part is changing for different terms
+        modes_letters = [i[1] for i in formula]
+        abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+        i1, i2, i3 = [abc[j[0]] for j in modes_letters]
+        components = {'mu_Q1': [],
+                      'alpha_Q': [],
+                      'mu_Q2': []}
+        for comps in gammaCompsAll:
+            alpha, beta, gamma, delta = comps
+            components['mu_Q1'].append(data['mu_Q'][i1, beta])
+            components['alpha_Q'].append(data['alpha_Q'][i2, alpha, delta])
+            components['mu_Q2'].append(data['mu_Q'][i3, gamma])
+        components['F_'] = [F]*len(components['mu_Q1'])
+        return components
 
 
 def min_abs_preserve_sign(array):
@@ -192,3 +255,122 @@ def match_modes(spectrumObj_g16, spectrumObj_c4):
     #     print(g16_is_c4)
     #     print('Oh no, there still some ambiguities')
     #     print(g16_list, c4_list)
+
+
+def change_idx_modes(parserObj, new_idx_dict, list2exclude=None, only_modes = None):
+    """
+    new_idx_dict = {oldkey:newkey}
+
+    To change:
+        all_states - after vpt2, so no need to upd cubic_cm_1, quartic_cm_1
+        fundamentals_harmonic - because used in calculation of prefactors
+        all_states_harmonic - used if harmonic energy levels used
+
+        deriv_data, list2exclude
+
+            ddata = [parserObj.dipole_first_derivatives,
+             parserObj.dipole_second_derivatives,
+             parserObj.polarizability_first_derivatives,
+             parserObj.polarizability_second_derivatives,
+             parserObj.cubic_force_constants]
+    self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+    """
+
+    new_dict1 = {}
+    new_dict2 = {}
+    new_dict3 = {}
+    new_dict4 = {}
+
+    # upd self.all_states
+    for oldkey, val in parserObj.anharmonic_states.items():
+        # newkey = tuple(sorted([str(new_idx_dict[int(i)]) for i in oldkey]))
+        newkey = tuple([str(j) for j in sorted([new_idx_dict[int(i)]  for i in oldkey])])
+        new_dict1[newkey] = val
+
+    sorted_keys = sorted(new_dict1.keys(), key=lambda x: tuple(map(int, x)))
+    new_dict1_sort = {key: new_dict1[key] for key in sorted_keys}
+    all_states = new_dict1_sort
+
+    # upd self.all_states_harmonic
+    for oldkey, val in parserObj.harmonic_states.items():
+        # newkey = tuple(sorted([str(new_idx_dict[int(i)]) for i in oldkey]))
+        newkey = tuple([str(j) for j in sorted([new_idx_dict[int(i)]  for i in oldkey])])
+        new_dict2[newkey] = val
+
+    sorted_keys = sorted(new_dict2.keys(), key=lambda x: tuple(map(int, x)))
+    new_dict2_sort = {key: new_dict2[key] for key in sorted_keys}
+
+    all_states_harmonic = new_dict2_sort
+
+    # upd self.fundamentals_harmonic
+    for oldkey, val in parserObj.fundamentals_harmonic_str.items():
+        newkey = str(new_idx_dict[int(oldkey)])
+        new_dict3[newkey] = val
+    sortKeys = list(new_dict3.keys())
+    sortKeys.sort()
+    new_dict3_sort = {i: new_dict3[i] for i in sortKeys}
+
+    fundamentals_harmonic = new_dict3_sort
+
+    # upd self.fundamentals
+    for oldkey, val in parserObj.fundamentals_anharmonic_str.items():
+        newkey = str(new_idx_dict[int(oldkey)])
+        new_dict4[newkey] = val
+    sortKeys = list(new_dict3.keys())
+    sortKeys.sort()
+    new_dict4_sort = {i: new_dict4[i] for i in sortKeys}
+
+    fundamentals = new_dict4_sort
+
+    # for old in self.list2exclude:
+    #     new_list.append(new_idx_dict[old])
+    # self.list2exclude = new_list
+    nmodes = parserObj.nmodes
+
+    # input list2exclude and only_modes would be already with new indices
+    if list2exclude is not None:
+        mode_indices = [i for i in np.arange(nmodes) if i not in list2exclude]
+        nmodes -= len(list2exclude)
+    else:
+        if only_modes is not None:
+            mode_indices = only_modes
+        else:
+            mode_indices = [i for i in np.arange(parserObj.nmodes)]
+
+    newmu1 = np.zeros_like(parserObj.dipole_first_derivatives)
+    newmu2 = np.zeros_like(parserObj.dipole_second_derivatives)
+    newalpha1 = np.zeros_like(parserObj.polarizability_first_derivatives)
+    newalpha2 = np.zeros_like(parserObj.polarizability_second_derivatives)
+    newF = np.zeros_like(parserObj.cubic_force_constants)
+
+    # cff_cm_1_new = np.zeros_like(parserObj.cubic_cm_1)
+    # qff_cm_1_new = np.zeros_like(parserObj.quartic_cm_1)
+    # cor_c_new = np.zeros_like(parserObj.coriolis_constant)
+
+    for oldkey, newkey in new_idx_dict.items():
+        newmu1[newkey, :] = parserObj.dipole_first_derivatives[oldkey, :]
+        newalpha1[newkey, :, :] = parserObj.polarizability_first_derivatives[oldkey, :, :]
+
+    new_idx_dict_2d = {}
+    for old_i, new_i in new_idx_dict.items():
+        for old_j, new_j in new_idx_dict.items():
+            new_idx_dict_2d[(old_i, old_j)] = (new_i, new_j)
+
+    for (old_i, old_j), (new_i, new_j) in new_idx_dict_2d.items():
+        newmu2[new_i, new_j, :] = parserObj.dipole_second_derivatives[old_i, old_j, :]
+        newalpha2[new_i, new_j, :, :] = parserObj.polarizability_second_derivatives[old_i, old_j, :, :]
+
+    new_idx_dict_3d = {}
+    for old_i, new_i in new_idx_dict.items():
+        for old_j, new_j in new_idx_dict.items():
+            for old_k, new_k in new_idx_dict.items():
+                new_idx_dict_3d[(old_i, old_j, old_k)] = (new_i, new_j, new_k)
+
+    for (old_i, old_j, old_k), (new_i, new_j, new_k) in new_idx_dict_3d.items():
+        newF[new_i, new_j, new_k] = parserObj.cubic_force_constants[old_i, old_j, old_k]
+
+
+    ddata = [newmu1, newmu2, newalpha1, newalpha2, newF]
+    deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+
+    return fundamentals, fundamentals_harmonic, all_states, all_states_harmonic, deriv_data, mode_indices

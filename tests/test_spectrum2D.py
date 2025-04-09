@@ -34,7 +34,7 @@ spectrumObj.load_data(dictInputs['parserObject'], vpt2=False)
 spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=True)
 # currently requires diag_margin_rc attribute to be set
 spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-spectrumObj.precalculate_parts(list2exclude=list2exclude)
+spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
 
 
@@ -177,7 +177,7 @@ def test_compute_mech_factors():
     spectrumObj.load_data(gParser, vpt2=False)
     spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
     spectrumObj.add_terms([], [2])
-    spectrumObj.precalculate_parts(list2exclude=[])
+    spectrumObj.precalculate4fullspectrum(list2exclude=[])
 
 
     vib_ene_levels = spectrumObj.all_states_Eh
@@ -222,7 +222,7 @@ def test_get_gamma_mech():
     spectrumObj.load_data(gParser, vpt2=False)
     spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
     spectrumObj.add_terms([], [2])
-    spectrumObj.precalculate_parts(list2exclude=[], preview=False, screenmodeswindow=True)
+    spectrumObj.precalculate4fullspectrum(list2exclude=[], preview=False, screenmodeswindow=True)
 
     vib_ene_levels = copy.deepcopy(spectrumObj.all_states_Eh)
 

@@ -1,9 +1,13 @@
 import numpy as np
+import copy
 
 def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-                                   rotational_constant, coriolis_constant, anharmonic_type):
+                                   rotational_constant, coriolis_constant, anharmonic_type,
+                             list2exclude):
     """
     Takes in cm-1 unit for all the arguments:
+    UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
+
         harmonic_energies, cubic_forcefield, quartic_forcefield, rotational_constant, coriolis_constant(unit?)
         (nmodes,);   (nmodes, nmodes, nmodes);   (nmodes, nmodes, nmodes, nmodes);   [x,y,z];   (nmodes, nmodes)
 
@@ -28,50 +32,57 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
         print('Something strange has happened in anharm_corrected_vibrational_energies')
         print('Anharmonic is called, but which type isn/t specified')
         exit()
+    original_len_ene = len(harmonic_energies)
+    harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
 
-    fundamental = np.zeros((len(harmonic_energies)))
-    overtones = np.zeros((len(harmonic_energies)))
-    combotones = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-    over3q = np.zeros((len(harmonic_energies)))
-    combo3q = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
+    fundamental = np.zeros((original_len_ene))
+    overtones = np.zeros((original_len_ene))
+    combotones = np.zeros((original_len_ene, original_len_ene))
+    over3q = np.zeros((original_len_ene))
+    combo3q = np.zeros((original_len_ene, original_len_ene, original_len_ene))
 
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
     # fermi_resonance = [fermi_resonance[0]]
     X, X_cubic, X_quartic, X_coriolis = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                                   rotational_constant, coriolis_constant, do_resonance_checks,
-                                                  fermi_resonance)
+                                                  fermi_resonance, original_len_ene)
 
 
     if fermi_resonance: # if not an empty list
         print(f'Fermi identified - {len(fermi_resonance)}:' , fermi_resonance)
 
-    funds_corrections = np.zeros((len(harmonic_energies)))
-    for i in range(len(harmonic_energies)):
+    funds_corrections = np.zeros((original_len_ene))
+    # for i in range(len(harmonic_energies)):
+    for i in harmonic_energies:
         fundamental[i] += harmonic_energies[i] + 2 * X[i][i]
 
         fscr = 0
-        for j in range(len(harmonic_energies)):
+        # for j in range(len(harmonic_energies)):
+        for j in harmonic_energies:
             if j != i:
                 fscr += 0.5 * X[i][j]
 
         fundamental[i] += fscr
         funds_corrections[i] += 2 * X[i][i] + fscr
 
-    overtones_corrections = np.zeros((len(harmonic_energies)))
-    combotones_corrections = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-    over3q_corrections = np.zeros((len(harmonic_energies)))
-    combo3q_corrections = np.zeros((len(harmonic_energies), len(harmonic_energies), len(harmonic_energies)))
+    overtones_corrections = np.zeros((original_len_ene))
+    combotones_corrections = np.zeros((original_len_ene, original_len_ene))
+    over3q_corrections = np.zeros((original_len_ene))
+    combo3q_corrections = np.zeros((original_len_ene, original_len_ene, original_len_ene))
 
-    for i in range(len(harmonic_energies)):
+    # for i in range(len(harmonic_energies)):
+    for i in harmonic_energies:
         overtones[i] += 2 * fundamental[i] + 2 * X[i][i]
         overtones_corrections[i] += 2 * X[i][i]
 
         over3q[i] += 3 * fundamental[i] + 6 * X[i][i]
         over3q_corrections[i] += 6 * X[i][i]
 
-        for j in range(len(harmonic_energies)):
+        # for j in range(len(harmonic_energies)):
+        for j in harmonic_energies:
             if i == j:
-                for k in range(len(harmonic_energies)):
+                # for k in range(len(harmonic_energies)):
+                for k in harmonic_energies:
                     if k != i:
                         combo3q[i][i][k] += 2 * fundamental[i] + 2 * X[i][i] + fundamental[k] + 2 * X[i][k]
                         combo3q_corrections[i][i][k] += 2 * X[i][i] + 2 * X[i][k]
@@ -80,7 +91,8 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
                 combotones[i][j] += fundamental[i] + fundamental[j] + X[i][j]
                 combotones_corrections[i][j] += X[i][j]
 
-                for k in range(len(harmonic_energies)):
+                # for k in range(len(harmonic_energies)):
+                for k in harmonic_energies:
                     if k == i or k == j:
                         continue
                     combo3q[i][j][k] += fundamental[i] + fundamental[j] + fundamental[k] + X[i][j] + X[i][k] + X[j][k]
@@ -98,12 +110,17 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
 
 
 def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
+    """
+    UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
 
+    """
     fermi_resonance = []
-    for i in range(len(harmonic_energies)):
+    # for i in range(len(harmonic_energies)):
+    for i in harmonic_energies:
         vi = harmonic_energies[i]
 
-        for k in range(len(harmonic_energies)):
+        # for k in range(len(harmonic_energies)):
+        for k in harmonic_energies:
             vk = harmonic_energies[k]
             kiik = cubic_forcefield[i][i][k]
 
@@ -111,19 +128,22 @@ def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
             if isfermi and do_resonance_checks:
                 fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
 
+        # attention
         for j in range(i):
-            vj = harmonic_energies[j]
+            if j in harmonic_energies:
+                vj = harmonic_energies[j]
 
-            for k in range(len(harmonic_energies)):
-                vk = harmonic_energies[k]
-                kijk = cubic_forcefield[i][j][k]
+                # for k in range(len(harmonic_energies)):
+                for k in harmonic_energies:
+                    vk = harmonic_energies[k]
+                    kijk = cubic_forcefield[i][j][k]
 
-                if is_fermi_resonance(-vi + vj + vk, kijk, k == j) and do_resonance_checks:
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [i, *sorted([j, k]), k == j])
-                if is_fermi_resonance(vi - vj + vk, kijk, k == i) and do_resonance_checks:
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [j, *sorted([k, i]), k == i])
-                if is_fermi_resonance(vi + vj - vk, kijk, i == j) and do_resonance_checks:
-                    fermi_resonance = add_fermi_resonance(fermi_resonance, [k, *sorted([i, j]), i == j])
+                    if is_fermi_resonance(-vi + vj + vk, kijk, k == j) and do_resonance_checks:
+                        fermi_resonance = add_fermi_resonance(fermi_resonance, [i, *sorted([j, k]), k == j])
+                    if is_fermi_resonance(vi - vj + vk, kijk, k == i) and do_resonance_checks:
+                        fermi_resonance = add_fermi_resonance(fermi_resonance, [j, *sorted([k, i]), k == i])
+                    if is_fermi_resonance(vi + vj - vk, kijk, i == j) and do_resonance_checks:
+                        fermi_resonance = add_fermi_resonance(fermi_resonance, [k, *sorted([i, j]), i == j])
 
     return fermi_resonance
 
@@ -159,21 +179,27 @@ def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
     return fermi_resonance
 
 def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-          rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance):
+          rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance,
+              original_len_ene):
+    """
+    UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
 
-    X = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-    X_cubic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-    X_quartic = np.zeros((len(harmonic_energies), len(harmonic_energies)))
-    X_coriolis = np.zeros((len(harmonic_energies), len(harmonic_energies)))
+    """
+    X = np.zeros((original_len_ene, original_len_ene))
+    X_cubic = np.zeros((original_len_ene, original_len_ene))
+    X_quartic = np.zeros((original_len_ene, original_len_ene))
+    X_coriolis = np.zeros((original_len_ene, original_len_ene))
 
-    for i in range(len(harmonic_energies)):
+    # for i in range(len(harmonic_energies)):
+    for i in harmonic_energies:
         vi = harmonic_energies[i]
         X[i][i] = quartic_forcefield[i][i][i][i]/16.0
         X_quartic[i][i] = quartic_forcefield[i][i][i][i]/16.0
 
         rhs = 0
 
-        for k in range(len(harmonic_energies)):
+        # for k in range(len(harmonic_energies)):
+        for k in harmonic_energies:
             vk = harmonic_energies[k]
             kiik = cubic_forcefield[i][i][k]
 
@@ -190,54 +216,59 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
         X[i][i] += - rhs
         X_cubic[i][i] = - rhs
 
+        # attention
         for j in range(i):
-            vj = harmonic_energies[j]
-            X[i][j] = quartic_forcefield[i][i][j][j]/4.0
-            X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
+            if j in harmonic_energies:
 
-            A = 0
-            for k in range(len(harmonic_energies)):
-                A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
+                vj = harmonic_energies[j]
+                X[i][j] = quartic_forcefield[i][i][j][j]/4.0
+                X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
 
-            B = 0
-            for k in range(len(harmonic_energies)):
-                vk = harmonic_energies[k]
-                kijk = cubic_forcefield[i][j][k]
+                A = 0
+                # for k in range(len(harmonic_energies)):
+                for k in harmonic_energies:
+                    A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
 
-                tmp1 = 1/(vi + vj + vk)
+                B = 0
+                # for k in range(len(harmonic_energies)):
+                for k in harmonic_energies:
+                    vk = harmonic_energies[k]
+                    kijk = cubic_forcefield[i][j][k]
 
-                if [i, *sorted([j, k]), k == j] in fermi_resonance and do_resonance_checks:
-                    tmp2 = 0.0
-                else:
-                    tmp2 = 1/(-vi + vj + vk)
+                    tmp1 = 1/(vi + vj + vk)
 
-                if [j, *sorted([k, i]), k == i] in fermi_resonance and do_resonance_checks:
-                    tmp3 = 0.0
-                else:
-                    tmp3 = 1 / (vi - vj + vk)
+                    if [i, *sorted([j, k]), k == j] in fermi_resonance and do_resonance_checks:
+                        tmp2 = 0.0
+                    else:
+                        tmp2 = 1/(-vi + vj + vk)
 
-                if [k, *sorted([i, j]), i == j] in fermi_resonance and do_resonance_checks:
-                    tmp4 = 0.0
-                else:
-                    tmp4 = 1/(vi + vj - vk)
+                    if [j, *sorted([k, i]), k == i] in fermi_resonance and do_resonance_checks:
+                        tmp3 = 0.0
+                    else:
+                        tmp3 = 1 / (vi - vj + vk)
 
-                B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
+                    if [k, *sorted([i, j]), i == j] in fermi_resonance and do_resonance_checks:
+                        tmp4 = 0.0
+                    else:
+                        tmp4 = 1/(vi + vj - vk)
 
-            C = 0
+                    B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
 
-            for k in range(len(rotational_constant)):
+                C = 0
 
-                C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
-                    (harmonic_energies[i]/harmonic_energies[j] +
-                     harmonic_energies[j]/harmonic_energies[i])
+                for k in range(len(rotational_constant)):
 
-            X[i][j] = X[i][j] - A - B + C
-            X[j][i] = np.copy(X[i][j])
+                    C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                        (harmonic_energies[i]/harmonic_energies[j] +
+                         harmonic_energies[j]/harmonic_energies[i])
 
-            X_coriolis[i][j] = C
-            X_coriolis[j][i] = np.copy(X_coriolis[i][j])
-            X_cubic[i][j] = - A - B
-            X_cubic[j][i] = np.copy(X_cubic[i][j])
+                X[i][j] = X[i][j] - A - B + C
+                X[j][i] = np.copy(X[i][j])
+
+                X_coriolis[i][j] = C
+                X_coriolis[j][i] = np.copy(X_coriolis[i][j])
+                X_cubic[i][j] = - A - B
+                X_cubic[j][i] = np.copy(X_cubic[i][j])
 
     return X, X_cubic, X_quartic, X_coriolis
 
@@ -391,3 +422,156 @@ def x_matrix_position(a, b, n):
         pos += i
 
     return pos + 2*n
+
+
+# def get_vpt2_corrected_levels(specObj, parserObj, vpt2settings, list2exclude=None, print_level=0):
+#     """
+#     Returns VPT2 corrected energy levels of all states as a dictionary : {str(int): float}
+#     """
+#
+#     if vpt2settings is None:
+#         vpt2settings = {'anharmonic_type': 'VPT2'}
+#
+#     if list2exclude is None:
+#         list2exclude = []
+#
+#     if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
+#         print("Warning: found Darling-Dennison resonances_args in data:")
+#         print(f"DD 1-1: {parserObj.DD11}")
+#         print(f"DD 2-2: {parserObj.DD22}")
+#         print(f"DD 1-3: {parserObj.DD13}")
+#
+#     one = {i: specObj.all_states[i] for i in specObj.all_states if len(i) == 1}
+#     two = {i: specObj.all_states[i] for i in specObj.all_states if len(i) == 2}
+#
+#     if print_level == 1:
+#         print('\nOriginal anharm corrected:')
+#         print(dict(sorted(one.items())))
+#         print(dict(sorted(two.items())), '\n')
+#
+#     cff_cm_1 = parserObj.cubic_cm_1
+#     qff_cm_1 = parserObj.quartic_cm_1
+#     rot_c, cor_c = parserObj.rotational_constant, parserObj.coriolis_constant
+#     # list, not associated to normal mode indices
+#
+#     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
+#     # corrected_levels = anharm_corr_energiesVPT2(upd_harmonic_energies,
+#     corrected_levels = anharm_corr_energiesVPT2(parserObj.fundamentals_harmonic_int,
+#                                                 cff_cm_1, qff_cm_1, rot_c, cor_c,
+#                                                 vpt2settings['anharmonic_type'], list2exclude)
+#     all_states_corr = {}
+#     for i in range(len(parserObj.fundamentals_harmonic_int)):
+#         all_states_corr[(str(i),)] = corrected_levels[0][i]
+#
+#         for j in range(i + 1):
+#             if i == j:
+#                 all_states_corr[tuple([str(i), str(i)])] = corrected_levels[1][i]
+#             else:
+#                 all_states_corr[tuple([str(el) for el in sorted([i, j])])] = corrected_levels[2][i, j]
+#
+#             for k in range(len(parserObj.fundamentals_harmonic_int)):
+#                 if i == j == k:
+#                     all_states_corr[tuple([str(i), str(i), str(i)])] = corrected_levels[3][i]
+#                 else:
+#                     key = tuple([str(el) for el in sorted([i, j, k])])
+#                     if key not in all_states_corr:
+#                         if corrected_levels[4][i, j, k] != 0.:
+#                             all_states_corr[tuple([str(el) for el in sorted([i, j, k])])] = corrected_levels[4][
+#                                 i, j, k]
+#
+#     all_states = copy.deepcopy(all_states_corr)
+#     one = {i: all_states[i] for i in all_states if len(i) == 1}
+#     two = {i: all_states[i] for i in all_states if len(i) == 2}
+#
+#     if print_level == 1:
+#         print('\nGVPT2 anharm corrected:')
+#         print(dict(sorted(one.items())))
+#         print(dict(sorted(two.items())), '\n')
+#
+#     return all_states
+
+
+def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, print_level=0):
+    """
+    Returns VPT2 corrected energy levels of all states as a dictionary : {str(int): float}
+    """
+
+    if vpt2settings is None:
+        vpt2settings = {'anharmonic_type': 'VPT2'}
+
+    if list2exclude is None:
+        list2exclude = []
+
+    # if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
+    #     print("Warning: found Darling-Dennison resonances_args in data:")
+    #     print(f"DD 1-1: {parserObj.DD11}")
+    #     print(f"DD 2-2: {parserObj.DD22}")
+    #     print(f"DD 1-3: {parserObj.DD13}")
+
+    one = {k: v for k,v in parsed_data.vib_states.anharmonic_states.items() if len(k) == 1}
+    two = {k: v for k,v in parsed_data.vib_states.anharmonic_states.items() if len(k) == 2}
+
+    if print_level == 1:
+        print('\nOriginal anharm corrected:')
+        print(dict(sorted(one.items())))
+        print(dict(sorted(two.items())), '\n')
+
+    cff_cm_1 = parsed_data.derivatives.cubic_cm_1
+    qff_cm_1 = parsed_data.derivatives.quartic_cm_1
+    rot_c = parsed_data.anharm_correction_data.rotational_constants
+    cor_c = parsed_data.anharm_correction_data.coriolis_constants
+    # list, not associated to normal mode indices
+
+    # corrected_levels : funds, over2q, combo2q, over3q, combo3q
+    # corrected_levels = anharm_corr_energiesVPT2(upd_harmonic_energies,
+    corrected_levels = anharm_corr_energiesVPT2(parsed_data.vib_states.fundamentals_harmonic_int,
+                                                cff_cm_1, qff_cm_1, rot_c, cor_c,
+                                                vpt2settings['anharmonic_type'], list2exclude)
+    # print(corrected_levels)
+    # exit()
+    all_states_corr = {}
+    # for k, v in parsed_data.vib_states.anharmonic_states.items():
+    #     t1 = tuple([int(i) for i in k])
+    #     if len(t1)==1:
+    #         all_states_corr[k] = corrected_levels[0][t1]
+    #     elif len(t1)==2 and t1[0]==t1[1]:
+    #         all_states_corr[k] = corrected_levels[1][t1[0]]
+    #     elif len(t1)==2 and t1[0]!=t1[1]:
+    #         all_states_corr[k] = corrected_levels[2][t1]
+    #     elif len(t1)==3 and t1[0]==t1[1]==t1[2]:
+    #         all_states_corr[k] = corrected_levels[3][t1[0]]
+    #     else:
+    #         all_states_corr[k] = corrected_levels[4][t1]
+
+
+    for i in range(len(parsed_data.vib_states.fundamentals_harmonic_int)):
+        all_states_corr[(str(i),)] = corrected_levels[0][i]
+
+        for j in range(i + 1):
+            if i == j:
+                all_states_corr[tuple([str(i), str(i)])] = corrected_levels[1][i]
+            else:
+                all_states_corr[tuple([str(el) for el in sorted([i, j])])] = corrected_levels[2][i, j]
+
+            for k in range(len(parsed_data.vib_states.fundamentals_harmonic_int)):
+                # if i==0 and j==0 and k==0:
+                #     print('jhello')
+                if i == j == k:
+                    all_states_corr[tuple([str(i), str(i), str(i)])] = corrected_levels[3][i]
+                else:
+                    key = tuple([str(el) for el in sorted([i, j, k])])
+                    if key not in all_states_corr:
+                        if corrected_levels[4][i, j, k] != 0.:
+                            all_states_corr[key] = corrected_levels[4][
+                                i, j, k]
+
+    all_states = copy.deepcopy(all_states_corr)
+    one = {i: all_states[i] for i in all_states if len(i) == 1}
+    two = {i: all_states[i] for i in all_states if len(i) == 2}
+
+    if print_level == 1:
+        print('\nGVPT2 anharm corrected:')
+        print(dict(sorted(one.items())))
+        print(dict(sorted(two.items())), '\n')
+
+    return all_states

@@ -6,7 +6,9 @@ from typing import Callable
 import numpy as np
 
 from .averaging import get_AlphaBetaGammaDelta_indices
-from .tools import convNu2Ene, avrg_abc_tensor
+from .tools import convNu2Ene, avrg_abc_tensor, get_properties_avrg
+
+from CQCParse.parsing import ParsedData
 
 import itertools
 def combinations_with_permutations(iterable, k):
@@ -52,7 +54,7 @@ class Spectrum2D:
             self.w1, self.w2 = w1, w2
 
         # define the grid of spectrum (pixels)
-        self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='ij')
+        self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='xy')
         self.shape2d = self.w1_mesh.shape
 
         # initialized final spectrum pixels
@@ -75,6 +77,219 @@ class Spectrum2D:
         self.nmodes_original = None
 
 
+    def launch_sequence(self, parserObj, spectrum_settings,
+                        vpt2settings=None, preview=False, print_level=0):
+        """
+        Execute the main steps before the intensities calculation.
+        Will update the state of the object
+        """
+        # , list2exclude = None, only_modes = None
+
+        # - load data from data object
+        self.load_data(parserObj)
+
+        # - changing indices of list2exclude
+        if spectrum_settings.new_idx_dict is not None and spectrum_settings.list2exclude is not None:
+            temp_list2exclude = []
+            for new in spectrum_settings.list2exclude:
+                old_idx = list(spectrum_settings.new_idx_dict.keys())[list(spectrum_settings.new_idx_dict.values()).index(new)]
+                temp_list2exclude.append(old_idx)
+        else:
+            temp_list2exclude = None
+
+        # - get anharmonic vpt2 energies
+        if vpt2settings is not None:
+            from .vpt2 import get_vpt2_corrected_levels
+            all_states = get_vpt2_corrected_levels(self, parserObj, vpt2settings,
+                                                   temp_list2exclude, print_level=print_level)
+            self.all_states = all_states
+            self.fundamentals = {k[0]: v for k, v in all_states.items() if len(k)==1}
+        # print('after vpt2 self.fundamentals', self.fundamentals)
+        # print('after vpt2 self.fundamentals_harmonic', self.fundamentals_harmonic)
+
+        # - changing indices in all data
+        if spectrum_settings.new_idx_dict is not None:
+            from .tools import change_idx_modes
+
+            # datain =
+            (fundamentals, fundamentals_harmonic, all_states, all_states_harmonic,
+             deriv_data, mode_indices) = change_idx_modes(parserObj, spectrum_settings.new_idx_dict,
+                                                          spectrum_settings.list2exclude,
+                                                          spectrum_settings.only_modes)
+            self.fundamentals = fundamentals
+            self.fundamentals_harmonic = fundamentals_harmonic
+            self.all_states = all_states
+            self.all_states_harmonic = all_states_harmonic
+            self.deriv_data = deriv_data
+            self.mode_indices = mode_indices
+            # print(self.fundamentals)
+            # print(self.fundamentals_harmonic)
+
+        # - ensure there is list2exclude
+        if spectrum_settings.list2exclude is None:
+            spectrum_settings.list2exclude = []
+
+        # print('self.fundamentals', self.fundamentals)
+        # print('self.fundamentals_harmonic', self.fundamentals_harmonic)
+
+        # - exclude indices
+        if spectrum_settings.list2exclude:
+            self.mode_indices = [i for i in np.arange(self.nmodes) if i not in spectrum_settings.list2exclude]
+            self.nmodes -= len(spectrum_settings.list2exclude)
+        else:
+            if spectrum_settings.only_modes is not None:
+                self.mode_indices = spectrum_settings.only_modes
+            else:
+                self.mode_indices = [i for i in np.arange(self.nmodes)]
+
+
+        # adding attributes and convesion of units
+        self.set_spectrum_settings(Gamma_rc=spectrum_settings.Gamma_rc,
+                                   diag_margin_rc=spectrum_settings.diag_margin_rc,
+                                   vib_levels_harmonic=spectrum_settings.vib_levels_harmonic)
+
+        self.add_terms(spectrum_settings.el_terms_selected, spectrum_settings.mech_terms_selected)
+
+        if preview:
+            # chart, spectrumDF
+            chart, spectrumDF = self.preview_spectrum()
+            medium = spectrumDF.drop(['omega2', 'log10(Intensity)', 'gamma', 'abs el',
+                                            'abs mech', 'Intensity', 'abs gamma_clean'],
+                                            axis=1)
+            # if [0 , 1 , 2 , 3] in self.selection:
+            if {0, 1, 2, 3}.issubset(self.selection):
+                cols = ['omega1', 'w2mw1', 'a', 'b', 'type', 'abs 0', 'abs 2', 'abs 1', 'abs 3',
+                        'factor 0', 'factor 2', 'factor 1', 'factor 3',
+                        'factor 0/2', 'factor 1/3', 'factor 0/2 sign', 'factor 1/3 sign', 'factors sign', 'Intensity_clean']
+            else:
+                cols = ['omega1', 'w2mw1', 'a', 'b', 'type',
+                        'Intensity_clean']
+            medium = medium[cols]
+        else:
+            chart, spectrumDF, medium = None, None, None
+
+        self.precalculate4fullspectrum()
+
+        return {'spectrum': self,
+                'chart': chart,
+                'resonancesDF': spectrumDF,
+                'mediumDF': medium}
+
+
+    def launch_sequence1(self, parsed_data: ParsedData, spectrum_settings,
+                        print_level=0):
+        """
+        Execute the main steps before the intensities calculation.
+        Will update the state of the object
+
+        1. getting parsed_data initial, before this
+        2. change indices - to indices of cfour
+        3. exclude modes
+        4. vpt2
+        """
+        vpt2settings = spectrum_settings.vpt2settings
+        preview = spectrum_settings.preview
+
+        if spectrum_settings.list2exclude is None:
+            spectrum_settings.list2exclude = []
+        # print('before chng', parsed_data.vib_states.fundamentals_anharmonic_str)
+
+        # - 2. changing indices in list2exclude ------------------------------------------------
+        if spectrum_settings.new_idx_dict is not None:
+            newKey_oldVal = dict(zip(list(spectrum_settings.new_idx_dict.values()),
+                                     list(spectrum_settings.new_idx_dict.keys())))
+            list2exclude_vpt2 = [newKey_oldVal[i] for i in spectrum_settings.list2exclude]
+        else:
+            list2exclude_vpt2 = spectrum_settings.list2exclude
+
+        # print('parsed_data.vib_states.anharmonic_states', parsed_data.vib_states.anharmonic_states)
+        # print('after chng', parsed_data.vib_states.fundamentals_anharmonic_str)
+
+
+        from CQCParse.utils import make_modes_idx
+
+        self.mode_indices = make_modes_idx(len(parsed_data.normal_modes.normal_modes),
+                                           modes=spectrum_settings.list2exclude,
+                                           include=False)
+        self.nmodes = parsed_data.nmodes
+        self.nmodes_original = parsed_data.nmodes
+
+        # print('parsed_data.vib_states.anharmonic_states\n', parsed_data.vib_states.anharmonic_states)
+        # print(vpt2settings, parsed_data.anharm_treatment)
+        # - 4. get anharmonic vpt2 energies with exclusion of list2exclude ------------------------
+        if vpt2settings is not None:
+            parsed_data.get_vpt2(vpt2settings=vpt2settings,
+                                 list2exclude=list2exclude_vpt2,
+                                 print_level=print_level)
+
+            # upd dicts
+            self.all_states = parsed_data.vib_states.anharmonic_states
+            self.fundamentals = {k[0]: v for k, v in self.all_states.items() if len(k)==1}
+            # print('self.all_states',self.all_states)
+            # print('self.fundamentals', self.fundamentals)
+        else:
+            self.fundamentals = parsed_data.vib_states.fundamentals_anharmonic_str
+            self.all_states = parsed_data.vib_states.anharmonic_states
+
+        # print('after vpt2', parsed_data.vib_states.fundamentals_anharmonic_str)
+
+        # - 2. changing indices in all data -------------------------------------------------------
+        if spectrum_settings.new_idx_dict is not None:
+            parsed_data.vib_states.upd_indices(spectrum_settings.new_idx_dict)
+            parsed_data.derivatives.upd_indices(spectrum_settings.new_idx_dict)
+            parsed_data.anharm_correction_data.upd_indices(spectrum_settings.new_idx_dict)
+            parsed_data.list2exclude = spectrum_settings.list2exclude
+            self.fundamentals = {k[0]:v for k,v in parsed_data.vib_states.fundamentals_anharmonic_str.items()}
+            self.all_states = parsed_data.vib_states.anharmonic_states
+
+        # load or load and upd states
+        self.fundamentals_harmonic = parsed_data.vib_states.fundamentals_harmonic_str
+        self.all_states_harmonic = parsed_data.vib_states.harmonic_states
+
+        # add derivatives
+        ddata = [parsed_data.derivatives.dipole_first_derivatives,
+                 parsed_data.derivatives.dipole_second_derivatives,
+                 parsed_data.derivatives.polarizability_first_derivatives,
+                 parsed_data.derivatives.polarizability_second_derivatives,
+                 parsed_data.derivatives.cubic_force_constants]
+        deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+        self.deriv_data = deriv_data
+
+        # print(parsed_data.anharm_treatment)
+        # --- spectrum prep
+        self.set_spectrum_settings(Gamma_rc=spectrum_settings.Gamma_rc,
+                                   diag_margin_rc=spectrum_settings.diag_margin_rc,
+                                   vib_levels_harmonic=spectrum_settings.vib_levels_harmonic)
+
+        self.add_terms(spectrum_settings.el_terms_selected, spectrum_settings.mech_terms_selected)
+
+        if preview:
+            chart, spectrumDF = self.preview_spectrum()
+            medium = spectrumDF.drop(['omega2', 'log10(Intensity)', 'gamma', 'abs el',
+                                            'abs mech', 'Intensity', 'abs gamma_clean'],
+                                            axis=1)
+            if {0, 1, 2, 3}.issubset(self.selection):
+                cols = ['omega1', 'w2mw1', 'a', 'b', 'type', 'abs 0', 'abs 2', 'abs 1', 'abs 3',
+                        'factor 0', 'factor 2', 'factor 1', 'factor 3',
+                        'factor 0/2', 'factor 1/3', 'factor 0/2 sign', 'factor 1/3 sign',
+                        'factors sign', 'Intensity_clean']
+            else:
+                cols = ['omega1', 'w2mw1', 'a', 'b', 'type',
+                        'Intensity_clean']
+            medium = medium[cols]
+        else:
+            chart, spectrumDF, medium = None, None, None
+
+        self.precalculate4fullspectrum()
+
+        return {'spectrum': self,
+                'parsed_data': parsed_data,
+                'chart': chart,
+                'resonancesDF': spectrumDF,
+                'mediumDF': medium,
+                'settings': spectrum_settings}
+
+
     def get_derived_terms_evv(self):
         """
         Currently available for selection EVV terms
@@ -84,19 +299,17 @@ class Spectrum2D:
         # 1. mu_Q, mu QQ, alpha_Q - electric dipole (1st and 2nd derivatives), polarizability (1st der.)
         # 2. mu_Q, alpha_QQ - electric dipole (1st der.), polarizability (2nd der.)
         # mu_Q, alpha_Q - for all 6 terms
-        self.allterms_str = {0: ((('a+b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',)))),
-                             1: ((('b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',)))),
-                             2: ((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.)),
-                             3: ((('b,a', 'zero,a'), ('a+c,b', 'b+c,a')), (('mu_Q', ('a',)), ('alpha_Q', ('c',)), ('mu_Q', ('b',)), 'acb', 1.)),
-                             4: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc', 0.5)),
-                             5: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', 0.5)),
-                             6: ((('b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc', -0.5)),
-                             7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', -0.5))}
+        self.allterms_str = {0: ((('a+b,a', 'zero,a'), None), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_QQ', ('a', 'b',), ('G',)))),
+                             1: ((('b,a', 'zero,a'), None), (('mu_Q', ('a',), ('B',)), ('alpha_QQ', ('a', 'b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)))),
+                             2: ((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('c',), ('G',)), 'abc', 1.)),
+                             3: ((('b,a', 'zero,a'), ('a+c,b', 'b+c,a')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('c',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acb', 1.)),
+                             4: ((('a+b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('a',), ('G',)), 'bcc', 0.5)),
+                             5: ((('a+b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acc', 0.5)),
+                             6: ((('b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('a',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'bcc', -0.5)),
+                             7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acc', -0.5))}
 
 
-    def load_data(self, parserObj,
-                  list2exclude = None,
-                  vpt2=False, vpt2settings=None):
+    def load_data(self, parserObj):
         """
         Loading the data from a parser object/DataVault
             with the sources given to it
@@ -110,13 +323,6 @@ class Spectrum2D:
         """
         # TODO - make it more flexible, give an option to supply files
         # parserObj = parser(self.input_data_info)
-        self.vpt2 = vpt2
-
-        if vpt2settings is None:
-            vpt2settings = {'anharmonic_type': 'VPT2'}
-
-        if list2exclude is None:
-            list2exclude = []
 
         parserObj.getData()
         self.parserObj = parserObj
@@ -128,14 +334,6 @@ class Spectrum2D:
 
         self.nmodes = len(self.fundamentals)
         self.nmodes_original = len(self.fundamentals)
-        self.list2exclude = list2exclude
-        if list2exclude:
-            print('self.fundamentals', self.fundamentals)
-            # exclude indices
-            self.mode_indices = [i for i in np.arange(self.nmodes) if i not in list2exclude]
-            self.nmodes -= len(list2exclude)
-        else:
-            self.mode_indices = [i for i in np.arange(self.nmodes)]
 
         ddata = [parserObj.dipole_first_derivatives,
                  parserObj.dipole_second_derivatives,
@@ -147,154 +345,6 @@ class Spectrum2D:
         # (6, 3)  (6, 6, 3)  (6, 3, 3) (6, 6, 3, 3) (6, 6, 6) if nmodes = 6
 
         self.normal_modes = parserObj.normal_modes
-
-        if self.vpt2:
-            if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
-                print("Warning: found Darling-Dennison resonances_args in data:")
-                print(f"DD 1-1: {parserObj.DD11}")
-                print(f"DD 2-2: {parserObj.DD22}")
-                print(f"DD 1-3: {parserObj.DD13}")
-
-            one = {i: self.all_states[i] for i in self.all_states if len(i) == 1}
-            two = {i: self.all_states[i] for i in self.all_states if len(i) == 2}
-            if self.print_level == 1:
-                print('\nOriginal anharm corrected:')
-                print(dict(sorted(one.items())))
-                print(dict(sorted(two.items())), '\n')
-
-            cff_cm_1 = parserObj.cubic_cm_1
-            qff_cm_1 = parserObj.quartic_cm_1
-            rot_c, cor_c = parserObj.rotational_constant, parserObj.coriolis_constant
-
-            from .vpt2 import anharm_corr_energiesVPT2
-            # corrected_levels : funds, over2q, combo2q, over3q, combo3q
-            self.corrected_levels = anharm_corr_energiesVPT2(list(self.fundamentals_harmonic.values()),
-                                                             cff_cm_1, qff_cm_1, rot_c, cor_c,
-                                                             vpt2settings['anharmonic_type'])
-            self.all_states_corr = {}
-            for i in range(len(self.fundamentals)):
-                self.all_states_corr[(str(i),)] = self.corrected_levels[0][i]
-
-                for j in range(i+1):
-                    if i==j:
-                        self.all_states_corr[tuple([str(i), str(i)])] = self.corrected_levels[1][i]
-                    else:
-                        self.all_states_corr[tuple([str(el) for el in sorted([i, j])])] = self.corrected_levels[2][i, j]
-
-                    for k in range(len(self.fundamentals)):
-                        if i==j==k:
-                            self.all_states_corr[tuple([str(i), str(i), str(i)])] = self.corrected_levels[3][i]
-                        else:
-                            key = tuple([str(el) for el in sorted([i, j, k])])
-                            if key not in self.all_states_corr:
-                                if self.corrected_levels[4][i, j, k]!=0.:
-                                    self.all_states_corr[tuple([str(el) for el in sorted([i, j, k])])] = self.corrected_levels[4][i, j, k]
-
-            self.all_states = copy.deepcopy(self.all_states_corr)
-            one = {i: self.all_states[i] for i in self.all_states if len(i) == 1}
-            two = {i: self.all_states[i] for i in self.all_states if len(i) == 2}
-            if self.print_level == 1:
-                print('\nGVPT2 anharm corrected:')
-                print(dict(sorted(one.items())))
-                print(dict(sorted(two.items())), '\n')
-
-
-    def change_idx_modes(self, new_idx_dict):
-        """
-        new_idx_dict = {oldkey:newkey}
-
-        To change:
-            all_states - after vpt2, so no need to upd cubic_cm_1, quartic_cm_1
-            fundamentals_harmonic - because used in calculation of prefactors
-            all_states_harmonic - used if harmonic energy levels used
-
-            deriv_data, list2exclude
-
-                ddata = [parserObj.dipole_first_derivatives,
-                 parserObj.dipole_second_derivatives,
-                 parserObj.polarizability_first_derivatives,
-                 parserObj.polarizability_second_derivatives,
-                 parserObj.cubic_force_constants]
-        self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
-        """
-
-        new_dict1 = {}
-        new_dict2 = {}
-        new_dict3 = {}
-        new_list = []
-
-        # upd self.all_states
-        for oldkey, val in self.all_states.items():
-            # newkey = tuple(sorted([str(new_idx_dict[int(i)]) for i in oldkey]))
-            newkey = tuple([str(j) for j in sorted([new_idx_dict[int(i)]  for i in oldkey])])
-            new_dict1[newkey] = val
-
-        sorted_keys = sorted(new_dict1.keys(), key=lambda x: tuple(map(int, x)))
-        new_dict1_sort = {key: new_dict1[key] for key in sorted_keys}
-        self.all_states = new_dict1_sort
-
-        # upd self.all_states_harmonic
-        for oldkey, val in self.all_states_harmonic.items():
-            # newkey = tuple(sorted([str(new_idx_dict[int(i)]) for i in oldkey]))
-            newkey = tuple([str(j) for j in sorted([new_idx_dict[int(i)]  for i in oldkey])])
-            new_dict2[newkey] = val
-
-        sorted_keys = sorted(new_dict2.keys(), key=lambda x: tuple(map(int, x)))
-        new_dict2_sort = {key: new_dict2[key] for key in sorted_keys}
-
-        self.all_states_harmonic = new_dict2_sort
-
-        # upd self.fundamentals_harmonic
-        for oldkey, val in self.fundamentals_harmonic.items():
-            newkey = str(new_idx_dict[int(oldkey)])
-            new_dict3[newkey] = val
-        sortKeys = list(new_dict3.keys())
-        sortKeys.sort()
-        new_dict3_sort = {i: new_dict3[i] for i in sortKeys}
-
-        self.fundamentals_harmonic = new_dict3_sort
-
-        # for old in self.list2exclude:
-        #     new_list.append(new_idx_dict[old])
-        # self.list2exclude = new_list
-        if self.list2exclude:
-            self.mode_indices = [i for i in np.arange(self.nmodes) if i not in self.list2exclude]
-            self.nmodes -= len(self.list2exclude)
-        else:
-            self.mode_indices = [i for i in np.arange(self.nmodes)]
-
-        newmu1 = np.zeros_like(self.deriv_data['mu_Q'])
-        newmu2 = np.zeros_like(self.deriv_data['mu_QQ'])
-        newalpha1 = np.zeros_like(self.deriv_data['alpha_Q'])
-        newalpha2 = np.zeros_like(self.deriv_data['alpha_QQ'])
-        newF = np.zeros_like(self.deriv_data['F_abc'])
-
-        for oldkey, newkey in new_idx_dict.items():
-            newmu1[newkey, :] = self.deriv_data['mu_Q'][oldkey, :]
-            newalpha1[newkey, :, :] = self.deriv_data['alpha_Q'][oldkey, :, :]
-
-        new_idx_dict_2d = {}
-        for old_i, new_i in new_idx_dict.items():
-            for old_j, new_j in new_idx_dict.items():
-                new_idx_dict_2d[(old_i, old_j)] = (new_i, new_j)
-
-        for (old_i, old_j), (new_i, new_j) in new_idx_dict_2d.items():
-            newmu2[new_i, new_j, :] = self.deriv_data['mu_QQ'][old_i, old_j, :]
-            newalpha2[new_i, new_j, :, :] = self.deriv_data['alpha_QQ'][old_i, old_j, :, :]
-
-        new_idx_dict_3d = {}
-        for old_i, new_i in new_idx_dict.items():
-            for old_j, new_j in new_idx_dict.items():
-                for old_k, new_k in new_idx_dict.items():
-                    new_idx_dict_3d[(old_i, old_j, old_k)] = (new_i, new_j, new_k)
-
-        for (old_i, old_j, old_k), (new_i, new_j, new_k) in new_idx_dict_3d.items():
-            newF[new_i, new_j, new_k] = self.deriv_data['F_abc'][old_i, old_j, old_k]
-
-
-        ddata = [newmu1, newmu2, newalpha1, newalpha2, newF]
-        self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
-
 
 
     def set_spectrum_settings(self, Gamma_rc: float, diag_margin_rc: float = 10., vib_levels_harmonic: bool =True):
@@ -311,6 +361,7 @@ class Spectrum2D:
         self.convert_units()
         self.vib_levels_harmonic = vib_levels_harmonic
         print(f'\nUsed vibrational energy levels are harmonic? - {self.vib_levels_harmonic}')
+
 
     def convert_units(self):
         """
@@ -347,8 +398,10 @@ class Spectrum2D:
         self.nmodes = len(self.fundamentals)
 
 
-    def precalculate(self):
-
+    def precalculate4resonances(self):
+        """
+        Precalculationf of intensities parts are done for resonance points
+        """
         # self.res_dict
         self.precalc_locations()
 
@@ -383,15 +436,21 @@ class Spectrum2D:
     def preview_spectrum(self, w=1100, h=700):
 
         # dictionary with data
-        data, x_shape = self.precalculate()
+        data, x_shape = self.precalculate4resonances()
         # is a 1d array of intensities
         # Z = self.intensity_both(selectionCond=None, shape2d=x.shape, resonances_args=self.resonances_args, mechel_contrib=True)
-        if self.vpt2:
-            prefix = 'vpt2_'+self.parserObj.program+'_'+self.parserObj.molecule+'_'+str(self.selection)
-        else:
-            prefix = self.parserObj.program+'_'+self.parserObj.molecule+'_'+str(self.selection)
+        # if self.vpt2:
+        #     prefix = 'vpt2_'+self.parserObj.program+'_'+self.parserObj.molecule+'_'+str(self.selection)
+        # else:
+        #     prefix = self.parserObj.program+'_'+self.parserObj.molecule+'_'+str(self.selection)
 
         typedict = {'a+b,a; zero,a': [0, 2, 4, 5], 'b,a; zero,a': [1, 3, 6, 7]}
+        if self.e_selected:
+            data['gamma el'] = np.zeros(x_shape)
+
+        if self.m_selected:
+            data['gamma mech'] = np.zeros(x_shape)
+
 
         for t in self.e_selected:
             data[f'abs {t}'] = np.zeros(x_shape)
@@ -412,11 +471,15 @@ class Spectrum2D:
 
             for t in self.selection:
                 if t in [0,1]:
+                    addition = self.el_ab[t][(data['a'][i], data['b'][i])][i]
+                    data['gamma el'][i] += addition
                     if t in typedict[termtype]:
-                        gammaabs_clean[i] += self.el_ab[t][(data['a'][i], data['b'][i])][i]
+                        gammaabs_clean[i] += addition
                 elif t in [2,3,4,5,6,7]:
+                    addition = self.mech_ab[t][(data['a'][i], data['b'][i])][i]
+                    data['gamma mech'][i] += addition
                     if t in typedict[termtype]:
-                        gammaabs_clean[i] += self.mech_ab[t][(data['a'][i], data['b'][i])][i]
+                        gammaabs_clean[i] += addition
 
             data['gamma'] = np.append(data['gamma'], int_ab[i])
 
@@ -451,22 +514,31 @@ class Spectrum2D:
 
             data[f'factor {t}'] = [self.avrg_tensors_dict[t][data['a'][i], data['b'][i]] / self.prefac_2d[data['a'][i], data['b'][i]] / 24.
                                    if data[f'abs {t}'][i]!=0. else 0. for i in range(len(data['omega1']))]
-
+            data[f'avrg {t}'] = [self.avrg_tensors_dict[t][data['a'][i], data['b'][i]] for i in range(len(data['omega1']))]
         for t in self.mech_ab:
 
-            data[f'factor {t}'] = [self.comb_fac_dict[self.allterms_str[t]][data['a'][i], data['b'][i]]
+            data[f'factor {t}'] = [self.comb_fac_dict[self.allterms_str[t]][data['a'][i], data['b'][i]] / self.prefac_2d[data['a'][i], data['b'][i]] / (-48.)
                                    if data[f'abs {t}'][i]!=0. else 0. for i in range(len(data['omega1']))]
+            data[f'avrg {t}'] = [self.avrg_tensors_dict[t][data['a'][i], data['b'][i]] for i in range(len(data['omega1']))]
 
         import pandas as pd
         spectrumDF = pd.DataFrame(data)
+
         spectrumDF['w2mw1'] = spectrumDF['omega2'] - spectrumDF['omega1']
-
-        spectrumDF['factor 0/2'] = spectrumDF['factor 0']/spectrumDF['factor 2']
-        spectrumDF['factor 1/3'] = spectrumDF['factor 1']/spectrumDF['factor 3']
-
-        spectrumDF['factor 0/2 sign'] = np.log(abs(spectrumDF['factor 0'])/abs(spectrumDF['factor 2']))
-        spectrumDF['factor 1/3 sign'] = np.log(abs(spectrumDF['factor 1'])/abs(spectrumDF['factor 3']))
-        spectrumDF["factors sign"] = spectrumDF["factor 0/2 sign"].fillna(0) + spectrumDF["factor 1/3 sign"].fillna(0)
+        if 0 in self.selection and 2 in self.selection:
+            spectrumDF['factor 0/2'] = spectrumDF['factor 0']/spectrumDF['factor 2']
+            # spectrumDF['factor 0/2'] = spectrumDF['factor 0/2'].apply('{:.4e}'.format)
+            spectrumDF['factor 0/2 sign'] = np.log(abs(spectrumDF['factor 0'])/abs(spectrumDF['factor 2']))
+        if 1 in self.selection and 3 in self.selection:
+            spectrumDF['factor 1/3'] = spectrumDF['factor 1']/spectrumDF['factor 3']
+            # spectrumDF['factor 1/3'] = spectrumDF['factor 1/3'].apply('{:.4e}'.format)
+            spectrumDF['factor 1/3 sign'] = np.log(abs(spectrumDF['factor 1'])/abs(spectrumDF['factor 3']))
+        if "factor 0/2 sign" in spectrumDF and "factor 1/3 sign" in spectrumDF:
+            spectrumDF["factors sign"] = spectrumDF["factor 0/2 sign"].fillna(0) + spectrumDF["factor 1/3 sign"].fillna(0)
+        column_to_move = spectrumDF.pop("w2mw1")
+        spectrumDF.insert(2, "w2mw1", column_to_move)
+        for tt in self.selection:
+            spectrumDF[f'factor {tt}'] = spectrumDF[f'factor {tt}'].apply('{:.4e}'.format)
 
         import altair as alt
         import math
@@ -513,6 +585,48 @@ class Spectrum2D:
 
         return chart, spectrumDF
 
+    def preview_matplotlib(self, vpt2):
+
+        if vpt2:
+            prefix = 'vpt2_'+self.parserObj.program+'_'+self.parserObj.molecule
+        else:
+            prefix = self.parserObj.program+'_'+self.parserObj.molecule
+        # collect resonances below diagonal (without margin)
+        fromdiagonal = {('a+b,a', 'zero,a'): set(
+                            [i for i in self.res_dict[('a+b,a', 'zero,a')] if i[0][0] >= i[0][1]]),
+                        ('b,a', 'zero,a'): set(
+                            [i for i in self.res_dict[('b,a', 'zero,a')] if i[0][0] >= i[0][1]])}
+
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(18, 16))
+        x, y = zip(*(set([i[0] for i in self.res_dict[('a+b,a', 'zero,a')]])|set([i[0] for i in self.res_dict[('b,a', 'zero,a')]])))
+        x1, y2 = zip(*(fromdiagonal[('a+b,a', 'zero,a')]|fromdiagonal[('b,a', 'zero,a')]))
+
+        plt.scatter(x, y)
+        plt.scatter(x1, y2, color='r')
+        plt.plot(x,x, label=f'X=Y, diag margin {self.diagonal_margin_rc} cm-1', color='g')
+
+        x_min, x_max = min(x), max(x)
+        y_min, y_max = min(y), max(y)
+        x_ticks = np.arange(x_min - (x_min % 100), x_max + 100, 100)
+        y_ticks = np.arange(y_min - (y_min % 100), y_max + 100, 100)
+        plt.xticks(x_ticks)
+        plt.yticks(y_ticks)
+        plt.legend()
+        plt.savefig(prefix+'_resloc.svg', format='svg')
+        plt.cla()
+
+        x = np.array(x)
+        y = np.array(y)
+        plt.scatter(x, tuple(np.array(y)-np.array(x)))
+        plt.savefig(prefix+'_resloc_w1mw2.svg', format='svg')
+        plt.cla()
+
+        X, Y = np.meshgrid(x, y)
+        Z = self.intensity_both(selectionCond=None, shape2d=X.shape)
+        plt.scatter(X.flatten(), Y.flatten(), c=Z.flatten(), cmap='viridis', marker='o')
+        plt.savefig(prefix+'_resints.svg', format='svg')
+
 
     def precalc_locations(self):
 
@@ -527,7 +641,6 @@ class Spectrum2D:
 
         w_apbbma_rc = np.zeros((self.nmodes_original, self.nmodes_original))
         w_bma_rc = np.zeros((self.nmodes_original, self.nmodes_original))
-        # print(vib_ene_levels_rc)
 
         for ab in combinations_with_permutations(self.mode_indices, 2):
             a, b = ab
@@ -572,8 +685,17 @@ class Spectrum2D:
 
 
 
-    def precalc_intensities(self, w1_mesh_Eh=None, w2_mesh_Eh=None):
+    def precalc_intensities_modes(self):
+        """
+        Normal modes dependent calculations:
 
+        self.prefac_2d - Eh
+        self.prefac_3d - Eh
+        self.w_mn_dict - Eh
+        self.comb_fac_dict - mechanical factors
+        """
+
+        # general
         vib_ene_levels_harmonic = convNu2Ene(np.array([v for k,v in self.fundamentals_harmonic.items()]))
 
         if self.vib_levels_harmonic:
@@ -588,34 +710,19 @@ class Spectrum2D:
                           vib_ene_levels_harmonic[np.newaxis, :, np.newaxis] *
                           vib_ene_levels_harmonic[np.newaxis, np.newaxis, :])
 
-        self.resonancesTypes = [(-1, 2), (-1,)]
-
-        if w1_mesh_Eh is None and w2_mesh_Eh is None:
-            self.axes = {1: self.w1_mesh_Eh, 2: self.w2_mesh_Eh}
-        else:
-            self.axes = {1: w1_mesh_Eh, 2: w2_mesh_Eh}
-
-        self.w1w2Condition = self.axes[2] - self.diagonal_margin_Eh > self.axes[1]
-        # self.w1w2Condition = np.ones(self.w1_mesh_Eh.shape, dtype=bool)
-
-        # [-1, 2] and [-1] types of terms: w1-w2 or w1, without w_{m,n}
-        # these 2d arrays will be added to combinations of wm and wn when looped over combinations of a, b, (c)
-        self.resonances_args = {}
-        for typelist in self.resonancesTypes:
-            self.resonances_args[typelist] = (-1) * sum([np.sign(ix) * np.where(self.w1w2Condition,
-                                                                                self.axes[abs(ix)], 0) for ix in typelist]) - 1j * self.Gamma
-
         w_apbbma = np.zeros((self.nmodes_original, self.nmodes_original))
         w_bma = np.zeros((self.nmodes_original, self.nmodes_original))
         for ab in combinations_with_permutations(self.mode_indices, 2):
             a, b = ab
             if a in self.mode_indices and b in self.mode_indices:
-                w_apbbma[a, b] = vib_ene_levels[tuple([str(el) for el in sorted([a, b])])] - vib_ene_levels[tuple([str(a)])]
+                w_apbbma[a, b] = vib_ene_levels[tuple([str(el) for el in sorted([a, b])])] - vib_ene_levels[
+                    tuple([str(a)])]
                 w_bma[a, b] = vib_ene_levels[tuple([str(b)])] - vib_ene_levels[tuple([str(a)])]
 
         za = np.array([-vib_ene_levels[tuple([str(k)])] for k in range(self.nmodes_original)])
         self.w_mn_dict = {'a+b,a': w_apbbma, 'b,a': w_bma, 'c,a': w_bma,
                           'zero,a': np.tile(za, self.nmodes_original).reshape(self.nmodes_original, -1).T}
+
 
         if self.m_selected:
             st = time.time()
@@ -635,9 +742,122 @@ class Spectrum2D:
             print('self.comb_fac_dict collected:',
                   time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
-    def precalculate_parts(self, *,
-                           preview=False,
-                           screenmodeswindow=True):
+
+    def precalc_intensities_freqs(self, w1_mesh_Eh=None, w2_mesh_Eh=None):
+        """
+        self.resonances_args
+        self.w1w2Condition
+        """
+        # grid specific
+        self.resonancesTypes = [(-1, 2), (-1,)]
+        if w1_mesh_Eh is None and w2_mesh_Eh is None:
+            self.axes = {1: self.w1_mesh_Eh, 2: self.w2_mesh_Eh}
+        else:
+            self.axes = {1: w1_mesh_Eh, 2: w2_mesh_Eh}
+
+        self.w1w2Condition = self.axes[2] - self.diagonal_margin_Eh > self.axes[1]
+        # self.w1w2Condition = np.ones(self.w1_mesh_Eh.shape, dtype=bool)
+
+        # [-1, 2] and [-1] types of terms: w1-w2 or w1, without w_{m,n}
+        # these 2d arrays will be added to combinations of wm and wn when looped over combinations of a, b, (c)
+        self.resonances_args = {}
+        for typelist in self.resonancesTypes:
+            self.resonances_args[typelist] = (-1) * sum([np.sign(ix) * np.where(self.w1w2Condition,
+                                                                                self.axes[abs(ix)], 0) for ix in
+                                                         typelist]) - 1j * self.Gamma
+
+
+    def precalc_intensities(self, w1_mesh_Eh=None, w2_mesh_Eh=None):
+
+        # general
+        vib_ene_levels_harmonic = convNu2Ene(np.array([v for k, v in self.fundamentals_harmonic.items()]))
+
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic_Eh
+            # vib_ene_levels_rc = self.all_states_harmonic
+        else:
+            vib_ene_levels = self.all_states_Eh
+            # vib_ene_levels_rc = self.all_states
+
+        self.prefac_2d = np.outer(vib_ene_levels_harmonic, vib_ene_levels_harmonic)
+        self.prefac_3d = (vib_ene_levels_harmonic[:, np.newaxis, np.newaxis] *
+                          vib_ene_levels_harmonic[np.newaxis, :, np.newaxis] *
+                          vib_ene_levels_harmonic[np.newaxis, np.newaxis, :])
+
+        w_apbbma = np.zeros((self.nmodes_original, self.nmodes_original))
+        w_bma = np.zeros((self.nmodes_original, self.nmodes_original))
+        for ab in combinations_with_permutations(self.mode_indices, 2):
+            a, b = ab
+            if a in self.mode_indices and b in self.mode_indices:
+                w_apbbma[a, b] = vib_ene_levels[tuple([str(el) for el in sorted([a, b])])] - vib_ene_levels[
+                    tuple([str(a)])]
+                w_bma[a, b] = vib_ene_levels[tuple([str(b)])] - vib_ene_levels[tuple([str(a)])]
+
+        za = np.array([-vib_ene_levels[tuple([str(k)])] for k in range(self.nmodes_original)])
+        self.w_mn_dict = {'a+b,a': w_apbbma, 'b,a': w_bma, 'c,a': w_bma,
+                          'zero,a': np.tile(za, self.nmodes_original).reshape(self.nmodes_original, -1).T}
+
+        # grid specific
+        self.resonancesTypes = [(-1, 2), (-1,)]
+        if w1_mesh_Eh is None and w2_mesh_Eh is None:
+            self.axes = {1: self.w1_mesh_Eh, 2: self.w2_mesh_Eh}
+        else:
+            self.axes = {1: w1_mesh_Eh, 2: w2_mesh_Eh}
+
+        self.w1w2Condition = self.axes[2] - self.diagonal_margin_Eh > self.axes[1]
+        # self.w1w2Condition = np.ones(self.w1_mesh_Eh.shape, dtype=bool)
+
+        # [-1, 2] and [-1] types of terms: w1-w2 or w1, without w_{m,n}
+        # these 2d arrays will be added to combinations of wm and wn when looped over combinations of a, b, (c)
+        self.resonances_args = {}
+        for typelist in self.resonancesTypes:
+            self.resonances_args[typelist] = (-1) * sum([np.sign(ix) * np.where(self.w1w2Condition,
+                                                                                self.axes[abs(ix)], 0) for ix in
+                                                         typelist]) - 1j * self.Gamma
+
+        # precalc mech factors
+        if self.m_selected:
+            st = time.time()
+            # setting up a dict for combined mech factors - for each selected mech term
+            self.comb_fac_dict = {}
+            for key in self.m_selected:
+                self.comb_fac_dict[self.allterms_str[key]] = np.zeros((self.nmodes_original, self.nmodes_original))
+
+            # computing combined mech factors - summed over c for each a,b
+            for ab in combinations_with_permutations(self.mode_indices, 2):
+                a, b = ab
+                if a in self.mode_indices and b in self.mode_indices:
+                    for key in self.m_selected:
+                        self.comb_fac_dict[self.allterms_str[key]][a, b] = self.compute_mech_factors(a, b)[key]
+            # print(self.comb_fac_dict)
+            elapsed_time = time.time() - st
+            print('self.comb_fac_dict collected:',
+                  time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+
+            # print('FOUND! I THINK\n', self.comb_fac_dict)
+
+    def precalc_combfac_cmech(self):
+        # precalc mech factors
+        if self.m_selected:
+            st = time.time()
+            # setting up a dict for combined mech factors - for each selected mech term
+            self.comb_fac_dict = {}
+            for key in self.m_selected:
+                self.comb_fac_dict[self.allterms_str[key]] = np.zeros((self.nmodes_original, self.nmodes_original))
+
+            # computing combined mech factors - summed over c for each a,b
+            for ab in combinations_with_permutations(self.mode_indices, 2):
+                a, b = ab
+                if a in self.mode_indices and b in self.mode_indices:
+                    for key in self.m_selected:
+                        self.comb_fac_dict[self.allterms_str[key]][a, b] = self.compute_mech_factors(a, b)[key]
+            # print(self.comb_fac_dict)
+            elapsed_time = time.time() - st
+            print('self.comb_fac_dict collected:',
+                  time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+
+
+    def precalculate4fullspectrum(self):
         """
         Precalculate some parts:
             factors (1/wa/wb/wc);
@@ -651,59 +871,11 @@ class Spectrum2D:
         # self.resonances_args
         self.precalc_intensities()
 
-        # used in get_gamma_el
-        self.screenmodeswindow = screenmodeswindow
-
-        # collect resonances below diagonal (without margin)
-        fromdiagonal = {('a+b,a', 'zero,a'): set(
-                            [i for i in self.res_dict[('a+b,a', 'zero,a')] if i[0][0] >= i[0][1]]),
-                        ('b,a', 'zero,a'): set(
-                            [i for i in self.res_dict[('b,a', 'zero,a')] if i[0][0] >= i[0][1]])}
         # omega2>omega1 condition
         self.res_dict[('a+b,a', 'zero,a')] = set(
             [i for i in self.res_dict[('a+b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
         self.res_dict[('b,a', 'zero,a')] = set(
             [i for i in self.res_dict[('b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
-
-
-        if preview:
-
-            if self.vpt2:
-                prefix = 'vpt2_'+self.parserObj.program+'_'+self.parserObj.molecule
-            else:
-                prefix = self.parserObj.program+'_'+self.parserObj.molecule
-
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(18, 16))
-            x, y = zip(*(set([i[0] for i in self.res_dict[('a+b,a', 'zero,a')]])|set([i[0] for i in self.res_dict[('b,a', 'zero,a')]])))
-            x1, y2 = zip(*(fromdiagonal[('a+b,a', 'zero,a')]|fromdiagonal[('b,a', 'zero,a')]))
-
-            plt.scatter(x, y)
-            plt.scatter(x1, y2, color='r')
-            plt.plot(x,x, label=f'X=Y, diag margin {self.diagonal_margin_rc} cm-1', color='g')
-
-            x_min, x_max = min(x), max(x)
-            y_min, y_max = min(y), max(y)
-            x_ticks = np.arange(x_min - (x_min % 100), x_max + 100, 100)
-            y_ticks = np.arange(y_min - (y_min % 100), y_max + 100, 100)
-            plt.xticks(x_ticks)
-            plt.yticks(y_ticks)
-            plt.legend()
-            plt.savefig(prefix+'_resloc.svg', format='svg')
-            plt.cla()
-
-            x = np.array(x)
-            y = np.array(y)
-            plt.scatter(x, tuple(np.array(y)-np.array(x)))
-            plt.savefig(prefix+'_resloc_w1mw2.svg', format='svg')
-            plt.cla()
-
-            X, Y = np.meshgrid(x, y)
-            Z = self.intensity_both(selectionCond=None, shape2d=X.shape)
-            plt.scatter(X.flatten(), Y.flatten(), c=Z.flatten(), cmap='viridis', marker='o')
-            plt.savefig(prefix+'_resints.svg', format='svg')
-
-            exit()
 
         elapsed_time = time.time() - st0
         print('Precalculate full:',
@@ -744,6 +916,7 @@ class Spectrum2D:
             strIndY = 0
 
         return strIndX, endIndX + 1, strIndY, endIndY + 1
+
 
     def find_all_grids(self, radius_rc):
         """
@@ -790,16 +963,23 @@ class Spectrum2D:
         """
         if self.vib_levels_harmonic:
             vib_ene_levels = self.all_states_harmonic_Eh
+            # print('vib_ene_levels = self.all_states_harmonic_Eh')
         else:
             vib_ene_levels = self.all_states_Eh
+            # print('vib_ene_levels = self.all_states_Eh')
 
+        # print('vib_ene_levels', vib_ene_levels)
+        vib_ene_levels_harmonic = convNu2Ene(np.array([v for k,v in self.fundamentals_harmonic.items()]))
         factors = {}
+        # print('self.mode_indices', self.mode_indices)
         for m_idx in self.m_selected:
 
             fac = 0.
             mechterm, termavrg = self.allterms_str[m_idx]
             for c in self.mode_indices:
-                prefac_mech = self.prefac_3d[a, b, c]
+                # prefac_mech = self.prefac_3d[a, b, c]
+                prefac_mech_c = vib_ene_levels_harmonic[c]
+                # print(prefac_mech==prefac_mech_c*self.prefac_2d[a, b])
                 mechavrg = self.avrg_tensors_dict[m_idx]
                 abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
                 ijk_indx = tuple([abc[j] for j in termavrg[-2]])
@@ -823,8 +1003,7 @@ class Spectrum2D:
                 t3 = vib_ene_levels[w_fr11] - vib_ene_levels[w_fr21]
                 t4 = vib_ene_levels[w_fr12] - vib_ene_levels[w_fr22]
                 sumfrac = (1 / t3 + 1 / t4)
-
-                fac += termavrg[-1] * sumfrac / prefac_mech * mechavrg[a, b, c] * F / (-48.)
+                fac += termavrg[-1] * sumfrac / prefac_mech_c * mechavrg[a, b, c] * F #/ (-48.)
             factors[m_idx] = fac
 
         return factors
@@ -901,8 +1080,20 @@ class Spectrum2D:
 
                 if res_formula[-1] is None:
                     factor = self.avrg_tensors_dict[termID][a, b] / self.prefac_2d[a, b] / 24.
+                    # if np.isnan(factor) or np.isinf(np.abs(factor)):
+                    #     print('-------------\n', factor)
+                    #     print(a, b)
+                    #     print('self.avrg_tensors_dict[termID][a, b]', self.avrg_tensors_dict[termID][a, b])
+                    #     print('self.prefac_2d[a, b]', self.prefac_2d[a, b])
+                    #     print('\n-------------')
                 else:
-                    factor = self.comb_fac_dict[self.allterms_str[termID]][a, b]
+                    factor = self.comb_fac_dict[self.allterms_str[termID]][a, b] / self.prefac_2d[a, b] / (-48.)
+                    # if np.isnan(factor) or np.isinf(np.abs(factor)):
+                    #     print('-------------\n', factor)
+                    #     print(a, b)
+                    #     print('self.comb_fac_dict[self.allterms_str[termID]][a, b]', self.comb_fac_dict[self.allterms_str[termID]][a, b])
+                    #     print('self.prefac_2d[a, b]', self.prefac_2d[a, b])
+                    #     print('\n-------------')
 
                 if abs(factor)<1e-20:
                     count0 +=1
@@ -918,6 +1109,7 @@ class Spectrum2D:
                                                                                      w_res_dict=resonances_args,
                                                                                      abctuple=(a, b),
                                                                                      w1w2Condition=condition)
+                    # print(self.resonances_bank[res_formula[0]])
                 addition = np.where(condition, factor * self.resonances_bank[res_formula[0]], 0.)
                 intensities_grid += addition
 
@@ -1009,3 +1201,425 @@ class Spectrum2D:
 
         return compute_res_condition
 
+
+class Term2D:
+    """
+    Calculations using the expression.
+        prefactor_num
+        prefactor_ene
+        property_1
+        property_2
+        property_3
+        avrg_terms
+        CFF (optional)
+
+    {
+    0: ((('a+b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',)))),
+    1: ((('b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',)))),
+    2: ((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.)),
+    3: ((('b,a', 'zero,a'), ('a+c,b', 'b+c,a')), (('mu_Q', ('a',)), ('alpha_Q', ('c',)), ('mu_Q', ('b',)), 'acb', 1.)),
+    4: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc', 0.5)),
+    5: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', 0.5)),
+    6: ((('b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc', -0.5)),
+    7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', -0.5))
+    }
+
+    """
+
+    def __init__(self, term_id, expression):
+        """
+        expression[0] - resonance part
+            expression[0][0] - actual resonances
+            expression[0][1] - vib levels differences
+        expression[1] - orientational average part
+            expression[1][0] - property_tuple1: (property, mode indices)
+            expression[1][1] - property_tuple2: (property, mode indices)
+            expression[1][2] - property_tuple3: (property, mode indices)
+            mech: expression[1][3] - CFF indices
+            mech: expression[1][4] - term prefactor
+        >expression[2] - overall el/mech prefactor (1/24. or -1/48.)
+
+        """
+        self.term_id = term_id
+        self.expression = expression
+
+        self.resonances_expr = expression[0][0]
+        self.viblevelsdiff_expr = expression[0][1]
+        if self.viblevelsdiff_expr is not None:
+            self.term_label = 'MECH'
+            self.F_expr = expression[1][3]
+            self.prefactor_term = expression[1][4]
+
+            self.F_vals = {}
+        else:
+            self.term_label = 'EL'
+
+        self.property_tuples = expression[1][:3]
+        self.property_tuple1 = expression[1][0]
+        self.property_tuple2 = expression[1][1]
+        self.property_tuple3 = expression[1][2]
+
+        # self.part_prefactor = expression[2]
+
+
+    def get_resonance_location(self, modes_dict, a, b):
+        """
+        A resonance for this term for ab combination of modes
+        """
+        a, b = str(a), str(b)
+        modes_dict[('zero',)] = 0.
+        dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+        type12, type1 = self.resonances_expr
+        m1_str, n1_str = type1.split(',')
+
+        m1_tuple = tuple([str(dict_id[i]) for i in m1_str.split('+')])
+        n1_tuple = tuple([str(dict_id[i]) for i in n1_str.split('+')])
+        w1 = modes_dict[n1_tuple] - modes_dict[m1_tuple]
+
+        m12_str, n12_str = type12.split(',')
+        m12_tuple = tuple(sorted([str(dict_id[i]) for i in m12_str.split('+')], key=int))
+        n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
+        w2 = modes_dict[m12_tuple] - modes_dict[n12_tuple] + w1
+
+        return w1, w2
+
+
+    def get_res_factor(self, modes_dict, w1, w2, a, b, Gamma_rc, condition=None):
+        """
+        A resonance factor for this term for ab combination of modes
+        """
+        if condition is None:
+            condition = np.ones_like(w1, dtype=bool)
+
+        a, b = str(a), str(b)
+        w1, w2 = convNu2Ene(w1), convNu2Ene(w2)
+        modes_dict_Eh = {k: convNu2Ene(v) for k, v in modes_dict.items()}
+        modes_dict_Eh[('zero',)] = 0.
+        dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+        type12, type1 = self.resonances_expr
+        m1_str, n1_str = type1.split(',')
+
+        m1_tuple = tuple([str(dict_id[i]) for i in m1_str.split('+')])
+        n1_tuple = tuple([str(dict_id[i]) for i in n1_str.split('+')])
+
+        m12_str, n12_str = type12.split(',')
+        m12_tuple = tuple(sorted([str(dict_id[i]) for i in m12_str.split('+')], key=int))
+        n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
+        Gamma_Eh = convNu2Ene(Gamma_rc)
+        # print(condition)
+        r = np.where(condition,
+                     1/(modes_dict_Eh[m12_tuple] - modes_dict_Eh[n12_tuple] + w1 - w2 -1j*Gamma_Eh)/(modes_dict_Eh[m1_tuple] - modes_dict_Eh[n1_tuple] + w1 -1j*Gamma_Eh), 0.)
+        return r
+
+
+    def get_properties(self, properties_data, ABGD, a, b, c=None):
+        dict_id = {'a': a, 'b': b, 'c': c}
+        # beta, alpha, delta, gamma
+        dict_ax_id = {'A': ABGD[0], 'B': ABGD[1], 'G': ABGD[2], 'D': ABGD[3]}
+        propdict = {}
+        for nn, p in enumerate(self.property_tuples):
+            # p is ('mu_QQ', ('a', 'b',), ('G',))
+            # p is ('alpha_Q', ('c',), ('A', 'D'))
+            indices = [dict_id[i] for i in p[1]] + [dict_ax_id[i] for i in p[2]]
+            propdict[f'{nn}_'+p[0]] = properties_data[p[0]][*indices]
+
+        if self.term_label == 'MECH':
+            if (a,b,c) not in self.F_vals:
+                idx = [dict_id[i] for i in self.F_expr]
+                self.F_vals[(a,b,c)] = properties_data['F_abc'][*idx]
+            propdict['F_abc'] = self.F_vals[(a,b,c)]
+
+        return propdict
+
+
+    def get_avrg_properties(self, gammaCompsAll, properties_data, a, b, c=None):
+        components = {}
+        total = 0.
+        for ABGD in gammaCompsAll:
+            props_dict = self.get_properties(properties_data, ABGD, a, b, c)
+            addition = np.prod(np.array([v for k,v in props_dict.items() if 'mu' in k or 'alpha' in k]))
+            total += addition
+            components[tuple(ABGD)] = (addition, props_dict)
+        return total/15, components
+
+
+    def get_factor_summed(self, gammaCompsAll, properties_data, modes_dict, mode_indices, a, b):
+        """
+        Sum of full factor over c index for given a,b
+        """
+        components = {}
+        total = 0.
+        for c in mode_indices:
+            addition_2 = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b, c)
+            total += addition_2[0]
+            components[c] = addition_2
+        return total, components
+
+
+    @staticmethod
+    def get_ene_factor(modes_dict, a, b, c=None):
+        """
+        1/omega_a/omega_b/omega_c
+        """
+        modes_dict_Eh = {k: convNu2Ene(v) for k, v in modes_dict.items()}
+        modes_dict_Eh[('zero',)] = 0.
+        modes = [a, b] if c is None else [a, b, c]
+        return 1./np.prod(np.array([modes_dict_Eh[(str(m),)] for m in modes]))
+
+
+    def get_viblevelsdiff(self, modes_dict, a, b, c=None):
+        """
+        1/omega_m,n + 1/omega_k,l
+        """
+        a, b = str(a), str(b)
+        dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+        if c is not None:
+            c = str(c)
+            dict_id['c'] = c
+
+        modes_dict_Eh = {k: convNu2Ene(v) for k, v in modes_dict.items()}
+        modes_dict_Eh[('zero',)] = 0.
+
+        total = []
+        for e in self.viblevelsdiff_expr:
+            m_str, n_str = e.split(',')
+
+            l_m = [str(dict_id[i]) for i in m_str.split('+')]
+            l_n = [str(dict_id[i]) for i in n_str.split('+')]
+
+            if 'zero' not in l_m:
+                m_tuple = tuple(sorted(l_m, key=int))
+            else:
+                m_tuple = tuple(l_m)
+            if 'zero' not in l_n:
+                n_tuple = tuple(sorted(l_n, key=int))
+            else:
+                n_tuple = tuple(l_n)
+
+            total.append(modes_dict_Eh[m_tuple] - modes_dict_Eh[n_tuple])
+        total0 = 1./np.array(total)
+        return np.sum(total0), np.array(total)
+
+
+    def get_full_factor(self, gammaCompsAll, properties_data, modes_dict, a, b, c=None):
+        """
+        product of: ene_factor, avrg_properties, (F_abc, viblevelsdiff)
+        """
+        components = {}
+        ene_factor = self.get_ene_factor(modes_dict, a, b, c)
+        avrg_properties_2 = self.get_avrg_properties(gammaCompsAll, properties_data, a, b, c)
+        product_all = ene_factor*avrg_properties_2[0]
+
+        components['ene_factor'] = ene_factor
+        components['avrg_properties'] = avrg_properties_2
+
+        if self.term_label=='MECH':
+            product_all *= self.F_vals[(a,b,c)] * self.get_viblevelsdiff(modes_dict, a, b, c)[0]
+            components['F_abc'] = self.F_vals[(a,b,c)]
+            components['viblevelsdiff'] = self.get_viblevelsdiff(modes_dict, a, b, c)[0]
+
+        return product_all, components
+
+
+    def get_full_factor_tensor(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+
+        t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
+        t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
+        for a in mode_indices:
+            for b in mode_indices:
+                if self.term_label == 'EL':
+                    t2[(a, b)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b)[0]
+                else:
+                    for c in mode_indices:
+                        t3[(a, b, c)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b,c)[0]
+
+        all_zeros_t2 = not np.any(t2)
+        if all_zeros_t2:
+            return t3
+        else:
+            return t2
+
+
+    def get_term_tree(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+
+        components = {}
+        for a in mode_indices:
+            for b in mode_indices:
+                if self.term_label == 'EL':
+                    # components[((a,b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_full_factor(gammaCompsAll, properties_data,
+                    #                                          modes_dict, a,b)
+                    components[(a, b)] = self.get_full_factor(gammaCompsAll,
+                                                            properties_data,
+                                                            modes_dict, a,
+                                                            b)
+                elif self.term_label == 'MECH':
+                    # components[((a, b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_factor_summed(gammaCompsAll, properties_data,
+                    #                                             modes_dict, mode_indices, a, b)
+                    components[(a, b)] = self.get_factor_summed(gammaCompsAll,
+                                                              properties_data,
+                                                              modes_dict,
+                                                              mode_indices,
+                                                              a, b)
+        return components
+
+
+    def get_all_resonances(self, modes_dict, mode_indices, w2mw1=False):
+        res = {}
+        for a in mode_indices:
+            for b in mode_indices:
+                w1, w2 = self.get_resonance_location(modes_dict, a, b)
+
+                if w2mw1:
+                    res[(a,b)] = (w1, w2-w1)
+                else:
+                    res[(a,b)] = (w1, w2)
+        return res
+
+
+    def get_intensity(self, w1, w2, properties_data,
+                      modes_dict, mode_indices, Gamma_rc, margin,
+                      condition=None):
+        """
+        gamma = prefnum * prefene * avrg * resonance
+        """
+        result = 0.
+        # from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
+        gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+        skipped = 0
+
+        self.layers = {}
+        for a in mode_indices:
+            for b in mode_indices:
+                w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
+                # if (w1ab<np.max(w1)-50. and w1ab>np.min(w1)+50.) and (w2ab<np.max(w2)-50. and w2ab>np.min(w2)+50.):
+                if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+                        and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+                        and (w2ab-margin)>w1ab):
+                    # print('res loc', w1ab, w2ab)
+                    if self.term_label=='EL':
+                        # print(self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0])
+                        # full_prefactor * resonance
+                        product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
+                        # result += (self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0]*
+                        #            self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                        addition = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                    else:
+                        # print(self.get_factor_summed(gammaCompsAll, properties_data,
+                        #                                  modes_dict, mode_indices, a, b)[0])
+                        # full_prefactor * resonance
+                        # product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
+                        #                                  modes_dict, mode_indices, a, b)
+
+                        addition = (self.get_factor_summed(gammaCompsAll, properties_data,
+                                                         modes_dict, mode_indices, a, b)[0]*
+                                   self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
+                    self.layers[(a,b, self.term_id)] = addition
+                    result += addition
+
+                else:
+                    skipped += 1
+                    continue
+        return result
+
+
+    def get_vibdiff_tensor(self, modes_dict, mode_indices):
+
+        viblevelsdiff_tensor = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
+        viblevelsdiff_tensor2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1, 2))
+        for a in mode_indices:
+            for b in mode_indices:
+                for c in mode_indices:
+                    viblevelsdiff_tensor[a, b, c] = self.get_viblevelsdiff(modes_dict, a, b, c)[0]
+                    viblevelsdiff_tensor2[a, b, c, :] = self.get_viblevelsdiff(modes_dict, a, b, c)[1]
+
+        return viblevelsdiff_tensor, viblevelsdiff_tensor2
+
+
+    def get_dotspectrum_df(self, properties_data, modes_dict, mode_indices,
+                           Gamma_rc, margin, condition=None):
+        """
+
+        """
+        import pandas as pd
+
+        locations_dict = self.get_all_resonances(modes_dict, mode_indices, w2mw1=False)
+        from scipy.spatial import distance
+        coords = np.array(list(locations_dict.keys()))
+        distances = distance.cdist(coords, coords, 'euclidean')
+        # print(distances)
+
+        intensities_dict = {}
+
+        for k in locations_dict:
+            w1l, w2l = locations_dict[k]
+            if w2l>w1l:
+                intensities_dict[k] = self.get_intensity(w1l, w2l, properties_data,
+                                                         modes_dict,
+                                                         mode_indices,
+                                                         Gamma_rc, margin=margin,
+                                                         condition=condition)
+
+        data = {
+            'ab': [(int(i[0]), int(i[1])) for i in list(intensities_dict.keys())],
+            'intensity': [float(i) for i in list(intensities_dict.values())],
+            'log10(Intensity)': np.log10(np.array(list(intensities_dict.values()))),
+            'w1': [locations_dict[k][0] for k in intensities_dict.keys()],
+            'w2': [locations_dict[k][1] for k in intensities_dict.keys()],
+            'w2-w1': [locations_dict[k][1]-locations_dict[k][0] for k in intensities_dict.keys()]
+        }
+
+        data = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in data.items()}
+        df = pd.DataFrame(data)
+        df['term'] = self.term_id
+
+        return df, distances
+
+
+from dataclasses import dataclass, field
+
+@dataclass
+class SpectrumExperimentSetup:
+    Gamma_rc: float
+    e_selected: list
+    m_selected: list
+    fundamentals_harmonic: dict
+    fundamentals: dict
+    all_states: dict
+    mode_indices: list | np.ndarray
+    vib_levels_harmonic: bool
+    maxYX: float
+
+
+class TermStorage:
+    """Stores and manages multiple Term2D objects."""
+    def __init__(self):
+        self.terms = {}
+        self.terms_amplitudes = {}  # Dictionary: term_id -> Term2D object
+
+    def add_term(self, term: Term2D):
+        """Adds a Term2D object to storage."""
+        if term.term_id in self.terms:
+            print(f"Warning: Overwriting existing term {term.term_id}")
+        self.terms[term.term_id] = term
+
+    def calculate_all(self, settings):
+        """Runs calculations for all stored terms."""
+        for k, term in self.terms.items():
+            self.terms_amplitudes[k] = term.get_intensity(settings.w1, settings.w2,
+                                                          settings.properties_data,
+                                                          settings.modes_dict,
+                                                          settings.mode_indices,
+                                                          settings.Gamma_rc,
+                                                          settings.margin,
+                                                          condition=settings.condition)
+
+    def get_amplitude(self, term_id):
+        """Retrieves the calculated result for a specific term."""
+        return self.terms_amplitudes[term_id] if term_id in self.terms else None
+
+    def filter_terms(self, condition_fn):
+        """Filters terms based on a given function."""
+        return {tid: term for tid, term in self.terms.items() if condition_fn(term)}
+
+    def __repr__(self):
+        return f"TermStorage({len(self.terms)} terms)"

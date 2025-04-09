@@ -92,9 +92,9 @@ spectrumObj.add_terms(el_terms_selected, mech_terms_selected)
 spectrumObj.preview_spectrum(list2exclude)
 
 exit()
-spectrumObj.precalculate_parts(list2exclude=list2exclude,
-                               preview=preview,
-                               screenmodeswindow=screenmodeswindow)
+spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude,
+                                      preview=preview,
+                                      screenmodeswindow=screenmodeswindow)
 mask = None
 
 if sparse!=0.:
