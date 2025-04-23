@@ -103,10 +103,10 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
         adjusted_fundamental, adjusted_overtones, adjusted_combotones = \
             adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo3q, cubic_forcefield,
                                        [fermi_resonance[i] for i in selectedFR])
-        return adjusted_fundamental, adjusted_overtones, adjusted_combotones, over3q, combo3q
+        return (adjusted_fundamental, adjusted_overtones, adjusted_combotones, over3q, combo3q), fermi_resonance
 
     else:
-        return fundamental, overtones, combotones, over3q, combo3q
+        return (fundamental, overtones, combotones, over3q, combo3q), fermi_resonance
 
 
 def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
@@ -524,7 +524,7 @@ def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, prin
 
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
     # corrected_levels = anharm_corr_energiesVPT2(upd_harmonic_energies,
-    corrected_levels = anharm_corr_energiesVPT2(parsed_data.vib_states.fundamentals_harmonic_int,
+    corrected_levels, fermi_resonance = anharm_corr_energiesVPT2(parsed_data.vib_states.fundamentals_harmonic_int,
                                                 cff_cm_1, qff_cm_1, rot_c, cor_c,
                                                 vpt2settings['anharmonic_type'], list2exclude)
     # print(corrected_levels)
@@ -574,4 +574,4 @@ def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, prin
         print(dict(sorted(one.items())))
         print(dict(sorted(two.items())), '\n')
 
-    return all_states
+    return all_states, fermi_resonance

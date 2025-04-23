@@ -87,7 +87,7 @@ class SpectrumFigure:
 
     def plot2Dmatplotlib(self, nametuple: tuple, text_under_the_figure: str = '',
                          normalized=None, log10=False,
-                         diagonal=False, to_save=True):
+                         diagonal=False, to_save=True, textbox=False):
 
         if to_save:
             matplotlib.use('Agg')
@@ -215,9 +215,12 @@ class SpectrumFigure:
         nicetitle = f'{nametuple[2]}'
         plt.title(nicetitle)
 
+        cmap = plt.get_cmap('hot_r').copy()
+        cmap.set_extremes(over=self.settings['saturation_color'])
         cont = ax.contourf(self.X, y, intensity_plot,
-                            levels=self.levels, cmap='hot_r'
+                            levels=self.levels, cmap=cmap  #'hot_r'
                            # , norm=colorbar_norm
+                            , extend='max'
                            )
         # print('self.levels', self.levels)
         # np.set_printoptions(threshold=np.inf, linewidth=np.inf)
@@ -228,9 +231,9 @@ class SpectrumFigure:
         if self.settings['w1mw2']:
             # x_limits = ax.get_xlim()
             if 'minY' in self.settings:
-                ax.set_ylim(self.settings['minY'], self.maxYX + 300.)
+                ax.set_ylim(self.settings['minY'], self.maxYX)
             else:
-                ax.set_ylim(0, self.maxYX+300.)
+                ax.set_ylim(0, self.maxYX)
 
         # This is the fix for the white lines between contour levels
         for c in cont.collections:
@@ -263,9 +266,10 @@ class SpectrumFigure:
             colorbar = plt.colorbar(cont, aspect=65, shrink=0.9,
                                     ticks=self.levels_ticks, format=ticker.FuncFormatter(fmt))
 
-        bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
-        ax.annotate(text_under_the_figure, xy=(0.05, -0.10), xycoords='axes fraction',
-                    ha="left", va="top", bbox=bbox_args, fontsize=12)
+        if textbox:
+            bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
+            ax.annotate(text_under_the_figure, xy=(0.05, -0.10), xycoords='axes fraction',
+                        ha="left", va="top", bbox=bbox_args, fontsize=12)
 
         ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
@@ -281,7 +285,7 @@ class SpectrumFigure:
 
     def plot2Damplitudes(self, nametuple: tuple, text_under_the_figure: str = '',
                          normalized=None, log10=False,
-                         diagonal=False, to_save=True):
+                         diagonal=False, to_save=True, textbox=False):
 
         if to_save:
             matplotlib.use('Agg')
@@ -457,10 +461,11 @@ class SpectrumFigure:
             colorbar = plt.colorbar(cont, aspect=65, shrink=0.9,
                                     ticks=self.levels_ticks, format=ticker.FuncFormatter(fmt))
 
-        bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
-        ax.annotate(text_under_the_figure, xy=(0.05, -0.10), xycoords='axes fraction',
-                    ha="left", va="top", bbox=bbox_args, fontsize=12)
-
+        if textbox:
+            bbox_args = dict(boxstyle="round,pad=0.8", edgecolor='black', facecolor='lightgray')
+            ax.annotate(text_under_the_figure, xy=(0.05, -0.10), xycoords='axes fraction',
+                        ha="left", va="top", bbox=bbox_args, fontsize=12)
+        print('HELLO???')
         ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.set_aspect('equal', adjustable='box')

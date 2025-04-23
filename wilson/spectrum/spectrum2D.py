@@ -189,6 +189,8 @@ class Spectrum2D:
         """
         vpt2settings = spectrum_settings.vpt2settings
         preview = spectrum_settings.preview
+        if spectrum_settings.vib_levels_harmonic:
+            vpt2settings = None
 
         if spectrum_settings.list2exclude is None:
             spectrum_settings.list2exclude = []
@@ -1253,6 +1255,7 @@ class Term2D:
             self.F_vals = {}
         else:
             self.term_label = 'EL'
+            self.prefactor_term = 1.
 
         self.property_tuples = expression[1][:3]
         self.property_tuple1 = expression[1][0]
@@ -1284,15 +1287,15 @@ class Term2D:
         return w1, w2
 
 
-    def get_res_factor(self, modes_dict, w1, w2, a, b, Gamma_rc, condition=None):
+    def get_res_factor(self, modes_dict, w1_rc, w2_rc, a, b, Gamma_rc, condition=None):
         """
         A resonance factor for this term for ab combination of modes
         """
         if condition is None:
-            condition = np.ones_like(w1, dtype=bool)
+            condition = np.ones_like(w1_rc, dtype=bool)
 
         a, b = str(a), str(b)
-        w1, w2 = convNu2Ene(w1), convNu2Ene(w2)
+        w1, w2 = convNu2Ene(w1_rc), convNu2Ene(w2_rc)
         modes_dict_Eh = {k: convNu2Ene(v) for k, v in modes_dict.items()}
         modes_dict_Eh[('zero',)] = 0.
         dict_id = {'a': a, 'b': b, 'zero': 'zero'}
@@ -1356,6 +1359,44 @@ class Term2D:
         return total, components
 
 
+    def get_full_factor(self, gammaCompsAll, properties_data, modes_dict, a, b, c=None):
+        """
+        product of: ene_factor, avrg_properties, (F_abc, viblevelsdiff)
+        """
+        components = {}
+        ene_factor = self.get_ene_factor(modes_dict, a, b, c)
+        avrg_properties_2 = self.get_avrg_properties(gammaCompsAll, properties_data, a, b, c)
+        product_all = ene_factor*avrg_properties_2[0]
+
+        components['ene_factor'] = ene_factor
+        components['avrg_properties'] = avrg_properties_2
+
+        if self.term_label=='MECH':
+            product_all *= self.F_vals[(a,b,c)] * self.get_viblevelsdiff(modes_dict, a, b, c)[0]
+            components['F_abc'] = self.F_vals[(a,b,c)]
+            components['viblevelsdiff'] = self.get_viblevelsdiff(modes_dict, a, b, c)[0]
+
+        return product_all, components
+
+
+    def get_full_factor_tensor(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+
+        t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
+        t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
+        for a in mode_indices:
+            for b in mode_indices:
+                if self.term_label == 'EL':
+                    t2[(a, b)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b)[0]
+                else:
+                    for c in mode_indices:
+                        t3[(a, b, c)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b,c)[0]
+
+        all_zeros_t2 = not np.any(t2)
+        if all_zeros_t2:
+            return t3
+        else:
+            return t2
+
     @staticmethod
     def get_ene_factor(modes_dict, a, b, c=None):
         """
@@ -1401,44 +1442,41 @@ class Term2D:
         return np.sum(total0), np.array(total)
 
 
-    def get_full_factor(self, gammaCompsAll, properties_data, modes_dict, a, b, c=None):
-        """
-        product of: ene_factor, avrg_properties, (F_abc, viblevelsdiff)
-        """
-        components = {}
-        ene_factor = self.get_ene_factor(modes_dict, a, b, c)
-        avrg_properties_2 = self.get_avrg_properties(gammaCompsAll, properties_data, a, b, c)
-        product_all = ene_factor*avrg_properties_2[0]
+    def get_avrgprops_tensor(self, gammaCompsAll, properties_data, mode_indices, threshold=1e-18):
+        t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
+        t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
+        for a in mode_indices:
+            for b in mode_indices:
+                if self.term_label == 'EL':
+                    t2[(a, b)] = self.get_avrg_properties(gammaCompsAll, properties_data, a, b)[0]
+                else:
+                    for c in mode_indices:
+                        t3[(a, b, c)] = self.get_avrg_properties(gammaCompsAll, properties_data, a, b, c)[0]
 
-        components['ene_factor'] = ene_factor
-        components['avrg_properties'] = avrg_properties_2
-
-        if self.term_label=='MECH':
-            product_all *= self.F_vals[(a,b,c)] * self.get_viblevelsdiff(modes_dict, a, b, c)[0]
-            components['F_abc'] = self.F_vals[(a,b,c)]
-            components['viblevelsdiff'] = self.get_viblevelsdiff(modes_dict, a, b, c)[0]
-
-        return product_all, components
+        all_zeros_t2 = not np.any(t2)
+        if all_zeros_t2:
+            return np.where(np.abs(t3)>threshold, t3, 0.)
+        else:
+            return np.where(np.abs(t3)>threshold, t2, 0.)
 
 
-    def get_full_factor_tensor(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+    def get_enefactor_tensor(self, modes_dict, mode_indices):
 
         t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
         t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
         for a in mode_indices:
             for b in mode_indices:
                 if self.term_label == 'EL':
-                    t2[(a, b)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b)[0]
+                    t2[(a, b)] = self.get_ene_factor(modes_dict, a, b)
                 else:
                     for c in mode_indices:
-                        t3[(a, b, c)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b,c)[0]
+                        t3[(a, b, c)] = self.get_ene_factor(modes_dict, a, b, c)
 
         all_zeros_t2 = not np.any(t2)
         if all_zeros_t2:
             return t3
         else:
             return t2
-
 
     def get_term_tree(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
 
@@ -1478,49 +1516,95 @@ class Term2D:
 
     def get_intensity(self, w1, w2, properties_data,
                       modes_dict, mode_indices, Gamma_rc, margin,
-                      condition=None):
+                      condition=None, collect_all=False):
         """
         gamma = prefnum * prefene * avrg * resonance
         """
         result = 0.
         # from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-        gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+        # gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
         skipped = 0
 
         self.layers = {}
         for a in mode_indices:
             for b in mode_indices:
                 w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
-                # if (w1ab<np.max(w1)-50. and w1ab>np.min(w1)+50.) and (w2ab<np.max(w2)-50. and w2ab>np.min(w2)+50.):
+                # check if resonance is in window w1,w2
+                # if it's a single pair of w1,w2 -
                 if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
                         and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
-                        and (w2ab-margin)>w1ab):
-                    # print('res loc', w1ab, w2ab)
-                    if self.term_label=='EL':
-                        # print(self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0])
-                        # full_prefactor * resonance
-                        product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
-                        # result += (self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0]*
-                        #            self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
-                        addition = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
-                    else:
-                        # print(self.get_factor_summed(gammaCompsAll, properties_data,
-                        #                                  modes_dict, mode_indices, a, b)[0])
-                        # full_prefactor * resonance
-                        # product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
-                        #                                  modes_dict, mode_indices, a, b)
-
-                        addition = (self.get_factor_summed(gammaCompsAll, properties_data,
-                                                         modes_dict, mode_indices, a, b)[0]*
-                                   self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
-                    self.layers[(a,b, self.term_id)] = addition
-                    result += addition
-
+                        and (w2ab-margin)>w1ab) or collect_all:
+                    result += self.get_intensity_ab(a, b, w1, w2, properties_data,
+                          modes_dict, mode_indices, Gamma_rc, margin,
+                          condition=condition)[0]
+                # w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
+                # # if (w1ab<np.max(w1)-50. and w1ab>np.min(w1)+50.) and (w2ab<np.max(w2)-50. and w2ab>np.min(w2)+50.):
+                # if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+                #         and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+                #         and (w2ab-margin)>w1ab):
+                #     # print('res loc', w1ab, w2ab)
+                #     if self.term_label=='EL':
+                #         # print(self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0])
+                #         # full_prefactor * resonance
+                #         product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
+                #         # result += (self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0]*
+                #         #            self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                #         addition = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                #     else:
+                #         # print(self.get_factor_summed(gammaCompsAll, properties_data,
+                #         #                                  modes_dict, mode_indices, a, b)[0])
+                #         # full_prefactor * resonance
+                #         # product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
+                #         #                                  modes_dict, mode_indices, a, b)
+                #
+                #         addition = (self.get_factor_summed(gammaCompsAll, properties_data,
+                #                                          modes_dict, mode_indices, a, b)[0]*
+                #                    self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
+                #     self.layers[(a,b, self.term_id)] = addition
+                #     result += addition
+                #
                 else:
                     skipped += 1
                     continue
         return result
 
+    def get_intensity_ab(self, a, b, w1, w2, properties_data,
+                      modes_dict, mode_indices, Gamma_rc, margin,
+                      condition=None):
+        """
+        gamma = prefnum * prefene * avrg * resonance
+        """
+        # from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
+        gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+
+        # w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
+        # if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+        #         and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+        #         and (w2ab-margin)>w1ab):
+        if self.term_label=='EL':
+            # full_prefactor * resonance
+            product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
+
+            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+            return result, components
+
+        else:
+            product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
+                                             modes_dict, mode_indices, a, b)
+
+            shortcomponents = {}
+            for k,v in components.items():
+                if v[0]!=0.:
+                    shortcomponents[k] = {'full_product_abc':v[0], 'ene_factor':v[1]['ene_factor'],
+                                          'avrg_properties':v[1]['avrg_properties'][0],
+                                          'F_abc':v[1]['F_abc'],
+                                          'viblevelsdiff':v[1]['viblevelsdiff']}
+            # print(shortcomponents)
+            # print(components)
+            # quit()
+            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
+
+            return result, shortcomponents
 
     def get_vibdiff_tensor(self, modes_dict, mode_indices):
 
@@ -1533,6 +1617,8 @@ class Term2D:
                     viblevelsdiff_tensor2[a, b, c, :] = self.get_viblevelsdiff(modes_dict, a, b, c)[1]
 
         return viblevelsdiff_tensor, viblevelsdiff_tensor2
+
+
 
 
     def get_dotspectrum_df(self, properties_data, modes_dict, mode_indices,
