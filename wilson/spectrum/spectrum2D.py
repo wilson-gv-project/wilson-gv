@@ -229,9 +229,12 @@ class Spectrum2D:
             self.fundamentals = {k[0]: v for k, v in self.all_states.items() if len(k)==1}
             # print('self.all_states',self.all_states)
             # print('self.fundamentals', self.fundamentals)
+            self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
+
         else:
             self.fundamentals = parsed_data.vib_states.fundamentals_anharmonic_str
             self.all_states = parsed_data.vib_states.anharmonic_states
+            self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
 
         # print('after vpt2', parsed_data.vib_states.fundamentals_anharmonic_str)
 
@@ -240,9 +243,13 @@ class Spectrum2D:
             parsed_data.vib_states.upd_indices(spectrum_settings.new_idx_dict)
             parsed_data.derivatives.upd_indices(spectrum_settings.new_idx_dict)
             parsed_data.anharm_correction_data.upd_indices(spectrum_settings.new_idx_dict)
-            parsed_data.list2exclude = spectrum_settings.list2exclude
             self.fundamentals = {k[0]:v for k,v in parsed_data.vib_states.fundamentals_anharmonic_str.items()}
             self.all_states = parsed_data.vib_states.anharmonic_states
+            self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
+
+        parsed_data.list2exclude = spectrum_settings.list2exclude
+
+        print(f'\nFermi resonances: {self.fermi_resonances}\n')
 
         # load or load and upd states
         self.fundamentals_harmonic = parsed_data.vib_states.fundamentals_harmonic_str
@@ -874,10 +881,10 @@ class Spectrum2D:
         self.precalc_intensities()
 
         # omega2>omega1 condition
-        self.res_dict[('a+b,a', 'zero,a')] = set(
-            [i for i in self.res_dict[('a+b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
-        self.res_dict[('b,a', 'zero,a')] = set(
-            [i for i in self.res_dict[('b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
+        # self.res_dict[('a+b,a', 'zero,a')] = set(
+        #     [i for i in self.res_dict[('a+b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
+        # self.res_dict[('b,a', 'zero,a')] = set(
+        #     [i for i in self.res_dict[('b,a', 'zero,a')] if i[0][0] < i[0][1] - self.diagonal_margin_rc])
 
         elapsed_time = time.time() - st0
         print('Precalculate full:',
@@ -1060,6 +1067,10 @@ class Spectrum2D:
             self.mech_ab = {k: {} for k in self.m_selected}
             self.el_ab = {k: {} for k in self.e_selected}
 
+        print("('a+b,a', 'zero,a')", len(self.res_dict[('a+b,a', 'zero,a')]))
+        # print([i[1] for i in self.res_dict[('a+b,a', 'zero,a')]])
+        print("('b,a', 'zero,a')", len(self.res_dict[('b,a', 'zero,a')]))
+        # print([i[1] for i in self.res_dict[('b,a', 'zero,a')]])
         count0 = 0
         for ab in combinations_ab:
             import time
@@ -1071,6 +1082,7 @@ class Spectrum2D:
 
             for termID in self.selection:
                 res_formula, avrg_formula = self.allterms_str[termID]
+                # print(f"term {termID}") if termID==0 else None
                 # print(res_formula)
                 if ab not in [i[1] for i in self.res_dict[res_formula[0]]]:
                     if mechel_contrib:
@@ -1078,33 +1090,25 @@ class Spectrum2D:
                             self.el_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
                         else:
                             self.mech_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
+                    # print(f'skipping in "for termID in self.selection:": {ab, termID}')
                     continue
 
                 if res_formula[-1] is None:
                     factor = self.avrg_tensors_dict[termID][a, b] / self.prefac_2d[a, b] / 24.
-                    # if np.isnan(factor) or np.isinf(np.abs(factor)):
-                    #     print('-------------\n', factor)
-                    #     print(a, b)
-                    #     print('self.avrg_tensors_dict[termID][a, b]', self.avrg_tensors_dict[termID][a, b])
-                    #     print('self.prefac_2d[a, b]', self.prefac_2d[a, b])
-                    #     print('\n-------------')
+                    # print(f'1/self.prefac_2d[a, b] {1/self.prefac_2d[a, b]:.3e}') if termID==0 else None
+                    # print(f'1/self.prefac_2d[b, a] {1/self.prefac_2d[b, a]:.3e}') if termID==0 else None
+                    # print(f'self.avrg_tensors_dict[termID][a, b] {self.avrg_tensors_dict[termID][a, b]:.3e}') if termID==0 else None
                 else:
                     factor = self.comb_fac_dict[self.allterms_str[termID]][a, b] / self.prefac_2d[a, b] / (-48.)
-                    # if np.isnan(factor) or np.isinf(np.abs(factor)):
-                    #     print('-------------\n', factor)
-                    #     print(a, b)
-                    #     print('self.comb_fac_dict[self.allterms_str[termID]][a, b]', self.comb_fac_dict[self.allterms_str[termID]][a, b])
-                    #     print('self.prefac_2d[a, b]', self.prefac_2d[a, b])
-                    #     print('\n-------------')
 
-                if abs(factor)<1e-20:
-                    count0 +=1
-                    if mechel_contrib:
-                        if termID in [0, 1]:
-                            self.el_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
-                        else:
-                            self.mech_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
-                    continue
+                # if abs(factor)<1e-20:
+                #     count0 +=1
+                #     if mechel_contrib:
+                #         if termID in [0, 1]:
+                #             self.el_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
+                #         else:
+                #             self.mech_ab[termID][ab] = np.zeros(shapegrid, dtype='complex64')
+                #     continue
 
                 if res_formula[0] not in self.resonances_bank:
                     self.resonances_bank[res_formula[0]] = self.allfunc_dict[termID](allLevels_Eh=vib_ene_levels,
@@ -1112,6 +1116,8 @@ class Spectrum2D:
                                                                                      abctuple=(a, b),
                                                                                      w1w2Condition=condition)
                     # print(self.resonances_bank[res_formula[0]])
+                # print(f"term {termID}, a,b: {(a, b)}, factor: {factor:.2e}") if termID==0 else None
+
                 addition = np.where(condition, factor * self.resonances_bank[res_formula[0]], 0.)
                 intensities_grid += addition
 
@@ -1264,6 +1270,8 @@ class Term2D:
 
         # self.part_prefactor = expression[2]
 
+    def __repr__(self):
+        return f'{self.term_label} - {self.term_id}'
 
     def get_resonance_location(self, modes_dict, a, b):
         """
@@ -1346,30 +1354,33 @@ class Term2D:
         return total/15, components
 
 
-    def get_factor_summed(self, gammaCompsAll, properties_data, modes_dict, mode_indices, a, b):
+    def get_factor_summed(self, gammaCompsAll, properties_data, modes_dict, harm_modes_dict, mode_indices, a, b):
         """
         Sum of full factor over c index for given a,b
         """
         components = {}
         total = 0.
         for c in mode_indices:
-            addition_2 = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b, c)
+            addition_2 = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, harm_modes_dict, a, b, c)
             total += addition_2[0]
             components[c] = addition_2
         return total, components
 
 
-    def get_full_factor(self, gammaCompsAll, properties_data, modes_dict, a, b, c=None):
+    def get_full_factor(self, gammaCompsAll, properties_data, modes_dict, harm_modes_dict, a, b, c=None):
         """
         product of: ene_factor, avrg_properties, (F_abc, viblevelsdiff)
         """
         components = {}
-        ene_factor = self.get_ene_factor(modes_dict, a, b, c)
+        ene_factor = self.get_ene_factor(harm_modes_dict, a, b, c)
         avrg_properties_2 = self.get_avrg_properties(gammaCompsAll, properties_data, a, b, c)
         product_all = ene_factor*avrg_properties_2[0]
 
         components['ene_factor'] = ene_factor
         components['avrg_properties'] = avrg_properties_2
+
+        # print(f'ene_factor {(a,b,c)}, {ene_factor:.3e}')
+        # print(f'avrg_properties_2 {(a,b,c)}, {avrg_properties_2[0]:.3e}')
 
         if self.term_label=='MECH':
             product_all *= self.F_vals[(a,b,c)] * self.get_viblevelsdiff(modes_dict, a, b, c)[0]
@@ -1379,17 +1390,20 @@ class Term2D:
         return product_all, components
 
 
-    def get_full_factor_tensor(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+    def get_full_factor_tensor(self, gammaCompsAll, properties_data,
+                               modes_dict, harm_modes_dict, mode_indices):
 
         t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
         t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
         for a in mode_indices:
             for b in mode_indices:
                 if self.term_label == 'EL':
-                    t2[(a, b)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b)[0]
+                    t2[(a, b)] = self.get_full_factor(gammaCompsAll, properties_data,
+                                                      modes_dict, harm_modes_dict, a,b)[0]
                 else:
                     for c in mode_indices:
-                        t3[(a, b, c)] = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a,b,c)[0]
+                        t3[(a, b, c)] = self.get_full_factor(gammaCompsAll, properties_data,
+                                                             modes_dict, harm_modes_dict, a,b,c)[0]
 
         all_zeros_t2 = not np.any(t2)
         if all_zeros_t2:
@@ -1398,11 +1412,11 @@ class Term2D:
             return t2
 
     @staticmethod
-    def get_ene_factor(modes_dict, a, b, c=None):
+    def get_ene_factor(harm_modes_dict, a, b, c=None):
         """
         1/omega_a/omega_b/omega_c
         """
-        modes_dict_Eh = {k: convNu2Ene(v) for k, v in modes_dict.items()}
+        modes_dict_Eh = {k: convNu2Ene(v) for k, v in harm_modes_dict.items() if len(k)==1}
         modes_dict_Eh[('zero',)] = 0.
         modes = [a, b] if c is None else [a, b, c]
         return 1./np.prod(np.array([modes_dict_Eh[(str(m),)] for m in modes]))
@@ -1460,17 +1474,17 @@ class Term2D:
             return np.where(np.abs(t3)>threshold, t2, 0.)
 
 
-    def get_enefactor_tensor(self, modes_dict, mode_indices):
+    def get_enefactor_tensor(self, harm_modes_dict, mode_indices):
 
         t2 = np.zeros((max(mode_indices)+1, max(mode_indices)+1))
         t3 = np.zeros((max(mode_indices)+1, max(mode_indices)+1, max(mode_indices)+1))
         for a in mode_indices:
             for b in mode_indices:
                 if self.term_label == 'EL':
-                    t2[(a, b)] = self.get_ene_factor(modes_dict, a, b)
+                    t2[(a, b)] = self.get_ene_factor(harm_modes_dict, a, b)
                 else:
                     for c in mode_indices:
-                        t3[(a, b, c)] = self.get_ene_factor(modes_dict, a, b, c)
+                        t3[(a, b, c)] = self.get_ene_factor(harm_modes_dict, a, b, c)
 
         all_zeros_t2 = not np.any(t2)
         if all_zeros_t2:
@@ -1478,7 +1492,7 @@ class Term2D:
         else:
             return t2
 
-    def get_term_tree(self, gammaCompsAll, properties_data, modes_dict, mode_indices):
+    def get_term_tree(self, gammaCompsAll, properties_data, modes_dict, harm_modes_dict, mode_indices):
 
         components = {}
         for a in mode_indices:
@@ -1487,15 +1501,15 @@ class Term2D:
                     # components[((a,b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_full_factor(gammaCompsAll, properties_data,
                     #                                          modes_dict, a,b)
                     components[(a, b)] = self.get_full_factor(gammaCompsAll,
-                                                            properties_data,
-                                                            modes_dict, a,
-                                                            b)
+                                                              properties_data,
+                                                              modes_dict, harm_modes_dict,
+                                                              a, b)
                 elif self.term_label == 'MECH':
                     # components[((a, b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_factor_summed(gammaCompsAll, properties_data,
                     #                                             modes_dict, mode_indices, a, b)
                     components[(a, b)] = self.get_factor_summed(gammaCompsAll,
                                                               properties_data,
-                                                              modes_dict,
+                                                              modes_dict, harm_modes_dict,
                                                               mode_indices,
                                                               a, b)
         return components
@@ -1515,7 +1529,7 @@ class Term2D:
 
 
     def get_intensity(self, w1, w2, properties_data,
-                      modes_dict, mode_indices, Gamma_rc, margin,
+                      modes_dict, mode_indices, harm_modes_dict, Gamma_rc, margin,
                       condition=None, collect_all=False):
         """
         gamma = prefnum * prefene * avrg * resonance
@@ -1531,45 +1545,46 @@ class Term2D:
                 w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
                 # check if resonance is in window w1,w2
                 # if it's a single pair of w1,w2 -
-                if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
-                        and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
-                        and (w2ab-margin)>w1ab) or collect_all:
-                    result += self.get_intensity_ab(a, b, w1, w2, properties_data,
-                          modes_dict, mode_indices, Gamma_rc, margin,
-                          condition=condition)[0]
-                # w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
-                # # if (w1ab<np.max(w1)-50. and w1ab>np.min(w1)+50.) and (w2ab<np.max(w2)-50. and w2ab>np.min(w2)+50.):
-                # if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
-                #         and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
-                #         and (w2ab-margin)>w1ab):
-                #     # print('res loc', w1ab, w2ab)
-                #     if self.term_label=='EL':
-                #         # print(self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0])
-                #         # full_prefactor * resonance
-                #         product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
-                #         # result += (self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0]*
-                #         #            self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
-                #         addition = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
-                #     else:
-                #         # print(self.get_factor_summed(gammaCompsAll, properties_data,
-                #         #                                  modes_dict, mode_indices, a, b)[0])
-                #         # full_prefactor * resonance
-                #         # product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
-                #         #                                  modes_dict, mode_indices, a, b)
-                #
-                #         addition = (self.get_factor_summed(gammaCompsAll, properties_data,
-                #                                          modes_dict, mode_indices, a, b)[0]*
-                #                    self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
-                #     self.layers[(a,b, self.term_id)] = addition
-                #     result += addition
-                #
-                else:
-                    skipped += 1
-                    continue
+                if w2ab>w1ab:
+                    if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+                            and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+                            and (w2ab-margin)>w1ab) or collect_all:
+                        result += self.get_intensity_ab(a, b, w1, w2, properties_data,
+                              modes_dict, harm_modes_dict, mode_indices, Gamma_rc, margin,
+                              condition=condition)[0]
+                    # w1ab, w2ab = self.get_resonance_location(modes_dict, a, b)
+                    # # if (w1ab<np.max(w1)-50. and w1ab>np.min(w1)+50.) and (w2ab<np.max(w2)-50. and w2ab>np.min(w2)+50.):
+                    # if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+                    #         and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+                    #         and (w2ab-margin)>w1ab):
+                    #     # print('res loc', w1ab, w2ab)
+                    #     if self.term_label=='EL':
+                    #         # print(self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0])
+                    #         # full_prefactor * resonance
+                    #         product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
+                    #         # result += (self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)[0]*
+                    #         #            self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                    #         addition = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+                    #     else:
+                    #         # print(self.get_factor_summed(gammaCompsAll, properties_data,
+                    #         #                                  modes_dict, mode_indices, a, b)[0])
+                    #         # full_prefactor * resonance
+                    #         # product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
+                    #         #                                  modes_dict, mode_indices, a, b)
+                    #
+                    #         addition = (self.get_factor_summed(gammaCompsAll, properties_data,
+                    #                                          modes_dict, mode_indices, a, b)[0]*
+                    #                    self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
+                    #     self.layers[(a,b, self.term_id)] = addition
+                    #     result += addition
+                    #
+                    else:
+                        skipped += 1
+                        continue
         return result
 
     def get_intensity_ab(self, a, b, w1, w2, properties_data,
-                      modes_dict, mode_indices, Gamma_rc, margin,
+                      modes_dict, harm_mode_indices, mode_indices, Gamma_rc, margin,
                       condition=None):
         """
         gamma = prefnum * prefene * avrg * resonance
@@ -1583,15 +1598,18 @@ class Term2D:
         #         and (w2ab-margin)>w1ab):
         if self.term_label=='EL':
             # full_prefactor * resonance
-            product_all, components = self.get_full_factor(gammaCompsAll, properties_data, modes_dict, a, b)
-
-            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/24.
+            product_all, components = self.get_full_factor(gammaCompsAll, properties_data,
+                                                           modes_dict, harm_mode_indices, a, b)
+            product_all /= 24.
+            # print(f"a,b: {(a, b)}, factor: {product_all:.2e}")
+            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))
             return result, components
 
         else:
             product_all, components = self.get_factor_summed(gammaCompsAll, properties_data,
-                                             modes_dict, mode_indices, a, b)
-
+                                             modes_dict, harm_mode_indices, mode_indices, a, b)
+            product_all /= -48.
+            # print(f"a,b: {(a, b)}, factor: {product_all:.2e}")
             shortcomponents = {}
             for k,v in components.items():
                 if v[0]!=0.:
@@ -1602,7 +1620,7 @@ class Term2D:
             # print(shortcomponents)
             # print(components)
             # quit()
-            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))/(-48.)
+            result = (product_all*self.get_res_factor(modes_dict, w1, w2, a, b, Gamma_rc, condition))
 
             return result, shortcomponents
 
@@ -1621,7 +1639,7 @@ class Term2D:
 
 
 
-    def get_dotspectrum_df(self, properties_data, modes_dict, mode_indices,
+    def get_dotspectrum_df(self, properties_data, modes_dict, harm_modes_dict, mode_indices,
                            Gamma_rc, margin, condition=None):
         """
 
@@ -1640,7 +1658,7 @@ class Term2D:
             w1l, w2l = locations_dict[k]
             if w2l>w1l:
                 intensities_dict[k] = self.get_intensity(w1l, w2l, properties_data,
-                                                         modes_dict,
+                                                         modes_dict, harm_modes_dict,
                                                          mode_indices,
                                                          Gamma_rc, margin=margin,
                                                          condition=condition)
@@ -1709,3 +1727,38 @@ class TermStorage:
 
     def __repr__(self):
         return f"TermStorage({len(self.terms)} terms)"
+
+
+def get_resonance_location(resonances_expr, modes_dict, a, b):
+    """
+    A resonance for this term for ab combination of modes
+    """
+    a, b = str(a), str(b)
+    modes_dict[('zero',)] = 0.
+    dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+    type12, type1 = resonances_expr
+    m1_str, n1_str = type1.split(',')
+
+    m1_tuple = tuple([str(dict_id[i]) for i in m1_str.split('+')])
+    n1_tuple = tuple([str(dict_id[i]) for i in n1_str.split('+')])
+    w1 = modes_dict[n1_tuple] - modes_dict[m1_tuple]
+
+    m12_str, n12_str = type12.split(',')
+    m12_tuple = tuple(sorted([str(dict_id[i]) for i in m12_str.split('+')], key=int))
+    n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
+    w2 = modes_dict[m12_tuple] - modes_dict[n12_tuple] + w1
+
+    return w1, w2
+
+
+def get_all_resonances(resonances_expr, modes_dict, mode_indices, w2mw1=False):
+    res = {}
+    for a in mode_indices:
+        for b in mode_indices:
+            w1, w2 = get_resonance_location(resonances_expr, modes_dict, a, b)
+
+            if w2mw1:
+                res[(a,b)] = (w1, w2-w1)
+            else:
+                res[(a,b)] = (w1, w2)
+    return res

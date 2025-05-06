@@ -94,7 +94,7 @@ gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
 corners_cake_w2mw1 = lambda cake: np.array([cake[0][0, 0], cake[0][0, -1], cake[1][0, 0], cake[1][-1, 0]])
 high_value_slice_indices = lambda smallcake, threshold: np.where(np.any(np.abs(smallcake) > threshold, axis=(1, 2)))[0]
 
-def dicts_layers_ab(term, deriv_data, states_dict, mode_indices,
+def dicts_layers_ab(term, deriv_data, states_dict, harm_modes_dict, mode_indices,
                     w1_mesh, w2_mesh, margin, Gamma_rc,
                     w2mw1min, w2mw1max, res_thresh=3e7):
     """
@@ -117,7 +117,8 @@ def dicts_layers_ab(term, deriv_data, states_dict, mode_indices,
                     and (ys + margin <= w2ab <= ye - margin)
                     and (w2ab-margin)>w1ab):
                 if term.term_label == 'MECH':
-                    factor, dictcomp = term.get_factor_summed(gammaCompsAll, deriv_data, states_dict, mode_indices, a, b)
+                    factor, dictcomp = term.get_factor_summed(gammaCompsAll, deriv_data,
+                                                              states_dict, harm_modes_dict, mode_indices, a, b)
                     components_dict[(a,b)] = {k:v for k,v in dictcomp.items() if v[0]!=0.}
 
                 elif term.term_label == 'EL':
@@ -125,6 +126,9 @@ def dicts_layers_ab(term, deriv_data, states_dict, mode_indices,
                     components_dict[(a,b)] = dictcomp
                 w1_r, w2_r = term.get_resonance_location(states_dict, a, b)
                 print('factor', a,b, w1_r, w2_r-w1_r, factor)
+                if term.term_label == 'MECH':
+                    # print(dictcomp)
+                    print([(i, dictcomp[i][1]['viblevelsdiff']) for i in dictcomp if abs(dictcomp[i][0])>1e-15])
                 # get_res_factor(self, modes_dict, w1_rc, w2_rc, a, b, Gamma_rc, condition=None)
                 resres = term.get_res_factor(states_dict, w1_mesh, w2_mesh, a, b, Gamma_rc=Gamma_rc)
                 resonance = np.where(np.abs(resres)>res_thresh, resres, 0.)

@@ -276,7 +276,8 @@ class SpectrumFigure:
         ax.set_aspect('equal', adjustable='box')
         ax.grid(True, linestyle='--', alpha=0.7)
 
-        ax.tick_params(axis="x", bottom=True, top=True, labelbottom=True, labeltop=True)
+        ax.tick_params(axis="x", bottom=True, top=True,
+                       labelbottom=True, labeltop=True, rotation=30)
 
         if to_save:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
