@@ -89,28 +89,33 @@ class SpectrumFigure:
                          normalized=None, log10=False,
                          diagonal=False, to_save=True, textbox=False):
 
+        # prep for saving, if saving
         if to_save:
             matplotlib.use('Agg')
 
+        # prep plt
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
         plt.rcParams['axes.titlepad'] = 30
         matplotlib.rc('font', **self.font_dict)
 
+        # set up a figure, axes
         fig, ax = plt.subplots(figsize=self.figsize)
         fig.subplots_adjust(left=0.1, right=0.9, top=1.05, bottom=0.15)
 
         import matplotlib.colors as colors
 
+        # dynamic range, dynamic range max, number of levels
         dynamic_range = self.settings['dynamic_range_n']
         num_color_levels = self.settings['num_color_levels']
         dynrange_log = np.log10(dynamic_range)
         # d_max - max intensity
         dmax_log10 = float(int(np.log10(self.d_max)))
+        num_level_ticks = self.settings['num_level_ticks']
         print('d_max', self.d_max, )
         print('dmax_log10', dmax_log10)
-        num_level_ticks = self.settings['num_level_ticks']
 
+        # log10 of intensities
         if log10:
             l10 = np.log10(self.intensities)
             if normalized == '01':
@@ -130,7 +135,6 @@ class SpectrumFigure:
             intensity_plot = self.intensities
             # colorbar_norm = colors.LogNorm(vmax=self.settings['norm_max'], vmin=self.settings['norm_min'])
             colorbar_norm = colors.LogNorm(vmax=10 ** np.ceil(np.log10(self.d_max)), vmin=self.settings['norm_min'])
-
 
         # levels settings
         if log10:
@@ -203,6 +207,7 @@ class SpectrumFigure:
             else:
                 self.levels = self.settings['levels']
 
+        # stars - skewed or not; and Y axis label
         if self.settings['w1mw2']:
             y = -(self.X - self.Y)
             ax.set_ylabel(r'$(\omega_2-\omega_1)/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
@@ -212,22 +217,27 @@ class SpectrumFigure:
             # ax.set_ylabel(r'$\\omega_2/2\pi c, \\text{cm}^{-1}$', fontsize=18)
             ax.set_ylabel(r'$\omega_2/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
         ax.set_xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
+
+        # title
         nicetitle = f'{nametuple[2]}'
         plt.title(nicetitle)
 
+        # contours colors
         cmap = plt.get_cmap('hot_r').copy()
         cmap.set_extremes(over=self.settings['saturation_color'])
+
+        # contour plot
         cont = ax.contourf(self.X, y, intensity_plot,
                             levels=self.levels, cmap=cmap  #'hot_r'
                            # , norm=colorbar_norm
                             , extend='max'
                            )
-        # print('self.levels', self.levels)
-        # np.set_printoptions(threshold=np.inf, linewidth=np.inf)
-        # print(intensity_plot)
+
+        # adding diagonal line
         if diagonal:
             plt.plot(self.X[:, 0], self.X[:, 0], color='red', linestyle='--', label='x = y')
 
+        # limits of Y axis
         if self.settings['w1mw2']:
             # x_limits = ax.get_xlim()
             if 'minY' in self.settings:
@@ -281,7 +291,7 @@ class SpectrumFigure:
 
         if to_save:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
-        return fig
+        return fig, ax
 
 
     def plot2Damplitudes(self, nametuple: tuple, text_under_the_figure: str = '',
@@ -476,4 +486,4 @@ class SpectrumFigure:
 
         if to_save:
             plt.savefig(nametuple[0], dpi=self.dpi, format='svg')
-        return fig
+        return fig, ax

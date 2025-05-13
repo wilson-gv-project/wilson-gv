@@ -708,20 +708,35 @@ def find_peaks(array, dynrange=500):
     return peaks
 
 
-def assemble_point_amplitude(w1l, w2l, terms, deriv_data, all_states, harm_modes_dict,
-                             mode_indices, Gamma_rc, margin=0., condition=None):
+def assemble_point_amplitude(w1l, w2l, terms, deriv_data, all_states, harm_modes_dict, mode_indices, Gamma_rc, margin=0., condition=None):
     dict_contents = {}
+    pairs_ab = {}
     for t in terms:
+        # print('term', t)
         # dict_contents[(t.term_label, t.term_id)] = t.get_intensity(w1l, w2l, deriv_data,
-                                           # original_vpt2, mode_indices,
-                                           # Gamma_rc, margin, condition, collect_all=True)
+        # original_vpt2, mode_indices,
+        # Gamma_rc, margin, condition, collect_all=True)
+        pairs_ab[t] = []
+        countall = 0
+        countocoll = 0
         for a in mode_indices:
             for b in mode_indices:
+                countall+=1
                 w1ab, w2ab = t.get_resonance_location(all_states, a, b)
-                if w2ab>w1ab:
-                    dict_contents[(t, t.term_label, t.term_id, (a, b))] = t.get_intensity_ab(a, b, w1l, w2l, deriv_data,
-                                                                                     all_states, harm_modes_dict,
-                                                                                             mode_indices, Gamma_rc, margin,
-                                                                                     condition=condition)[0]
+                if w2ab-margin>w1ab:
+                    dict_contents[(t, (a, b))] = t.get_intensity_ab(a, b, w1l, w2l, deriv_data,
+                                                                    all_states, harm_modes_dict, mode_indices, Gamma_rc, margin,
+                                                                    condition=condition)[0]
+                    pairs_ab[t].append((a, b))
+                    countocoll += 1
+        # print(t, 'all', countall, 'collected', countocoll)
+
     total = np.sum(np.array(list(dict_contents.values())))
+    # print(np.array(list(dict_contents.values())))
+    # print(pairs_ab)
+
     return dict_contents, total
+
+def top_n_abs_values(d, n=5):
+    filtered = sorted(d.items(), key=lambda x: np.abs(x[1]), reverse=True)[:n]
+    return filtered
