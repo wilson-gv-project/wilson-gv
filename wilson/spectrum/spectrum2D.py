@@ -9,6 +9,8 @@ from .averaging import get_AlphaBetaGammaDelta_indices
 from .tools import convNu2Ene, avrg_abc_tensor, get_properties_avrg
 
 from CQCParse.parsing import ParsedData
+from CQCParse.debug import debugfunc, enabled, level
+
 
 import itertools
 def combinations_with_permutations(iterable, k):
@@ -188,6 +190,9 @@ class Spectrum2D:
         4. vpt2
         """
         vpt2settings = spectrum_settings.vpt2settings
+
+        debugfunc(f'vpt2settings are: {vpt2settings} ', tag='Spectrum2D.launch_sequence1')
+
         preview = spectrum_settings.preview
         if spectrum_settings.vib_levels_harmonic:
             vpt2settings = None
@@ -220,6 +225,7 @@ class Spectrum2D:
         # print(vpt2settings, parsed_data.anharm_treatment)
         # - 4. get anharmonic vpt2 energies with exclusion of list2exclude ------------------------
         if vpt2settings is not None:
+
             parsed_data.get_vpt2(vpt2settings=vpt2settings,
                                  list2exclude=list2exclude_vpt2,
                                  print_level=print_level)
@@ -249,7 +255,7 @@ class Spectrum2D:
 
         parsed_data.list2exclude = spectrum_settings.list2exclude
 
-        print(f'\nFermi resonances: {self.fermi_resonances}\n')
+        debugfunc(f'Fermi resonances: {self.fermi_resonances} ', tag='Spectrum2D.launch_sequence1')
 
         # load or load and upd states
         self.fundamentals_harmonic = parsed_data.vib_states.fundamentals_harmonic_str
@@ -1067,9 +1073,9 @@ class Spectrum2D:
             self.mech_ab = {k: {} for k in self.m_selected}
             self.el_ab = {k: {} for k in self.e_selected}
 
-        print("('a+b,a', 'zero,a')", len(self.res_dict[('a+b,a', 'zero,a')]))
+        # print("('a+b,a', 'zero,a')", len(self.res_dict[('a+b,a', 'zero,a')]))
         # print([i[1] for i in self.res_dict[('a+b,a', 'zero,a')]])
-        print("('b,a', 'zero,a')", len(self.res_dict[('b,a', 'zero,a')]))
+        # print("('b,a', 'zero,a')", len(self.res_dict[('b,a', 'zero,a')]))
         # print([i[1] for i in self.res_dict[('b,a', 'zero,a')]])
         count0 = 0
         for ab in combinations_ab:

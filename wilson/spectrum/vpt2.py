@@ -257,8 +257,12 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                 C = 0
 
                 for k in range(len(rotational_constant)):
-
-                    C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    # print(type(rotational_constant[k]), 'vpt2.py line 260')
+                    # print(rotational_constant[k], float(rotational_constant[k]))
+                    # C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    #     (harmonic_energies[i]/harmonic_energies[j] +
+                    #      harmonic_energies[j]/harmonic_energies[i])
+                    C += float(rotational_constant[k])*coriolis_constant[k][i][j]**2*\
                         (harmonic_energies[i]/harmonic_energies[j] +
                          harmonic_energies[j]/harmonic_energies[i])
 
