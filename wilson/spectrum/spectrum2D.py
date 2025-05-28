@@ -6,7 +6,7 @@ from typing import Callable
 import numpy as np
 
 from .averaging import get_AlphaBetaGammaDelta_indices
-from .tools import convNu2Ene, avrg_abc_tensor, get_properties_avrg
+from .tools import convNu2Ene, avrg_abc_tensor, avrg_abc_tensor_general, get_properties_avrg
 
 from CQCParse.parsing import ParsedData
 
@@ -495,6 +495,25 @@ class Spectrum2D:
                                       for i in self.selection}
         self.allfunc_dict = {i: self.generate_resonances_functions(self.allterms_str[i][0][0], self.allterms_str[i][0][1]) for i in self.selection}
         self.nmodes = len(self.fundamentals)
+
+    # Marked up for generic
+    def add_terms_generic(self, electrical_terms_selection: list, mechanical_terms_selection: list):
+        # setting up terms available for selection (all EVV terms now)
+        # Replace with convertor from Wilson main terms? Or leave them as they are and work in this convention in other routines?
+        # self.get_derived_terms_evv()
+
+        # Consider chg to use only generically added terms or group those according to mech, el anharm lvls
+        #self.e_selected, self.m_selected = electrical_terms_selection, mechanical_terms_selection
+        #self.selection = electrical_terms_selection + mechanical_terms_selection
+
+
+        # To use general averager (to be implemented)
+
+        #self.avrg_tensors_dict = {i: avrg_abc_tensor_general(self.allterms_str[i][1], self.deriv_data, self.gammaCompsAll)
+        #                              for i in self.selection}
+        #self.allfunc_dict = {i: self.generate_resonances_functions_generic(self.allterms_str[i][0][0], self.allterms_str[i][0][1]) for i in self.selection}
+        # Should be handled elsewhere (vib analysis)
+        # self.nmodes = len(self.fundamentals)
 
 
     def precalculate4resonances(self):
@@ -1053,7 +1072,7 @@ class Spectrum2D:
                 a, b = ab
                 if a in self.mode_indices and b in self.mode_indices:
                     for key in self.m_selected:
-                        self.comb_fac_dict[self.allterms_str[key]][a, b] = self.compute_mech_factors(a, b)[key]
+                        self.comb_fac_dict[self.allterms_str[key]][a, b] = self.compute_mech_factors_generic(a, b)[key]
             # print(self.comb_fac_dict)
             elapsed_time = time.time() - st
             print('self.comb_fac_dict collected:',
@@ -1191,6 +1210,59 @@ class Spectrum2D:
 
 
     def compute_mech_factors(self, a: int, b: int):
+        """
+        Precalculate prefactor of mechanical terms - summation over c for each a,b
+        """
+        if self.vib_levels_harmonic:
+            vib_ene_levels = self.all_states_harmonic_Eh
+            # print('vib_ene_levels = self.all_states_harmonic_Eh')
+        else:
+            vib_ene_levels = self.all_states_Eh
+            # print('vib_ene_levels = self.all_states_Eh')
+
+        # print('vib_ene_levels', vib_ene_levels)
+        vib_ene_levels_harmonic = convNu2Ene(np.array([v for k,v in self.fundamentals_harmonic.items()]))
+        factors = {}
+        # print('self.mode_indices', self.mode_indices)
+        for m_idx in self.m_selected:
+
+            fac = 0.
+            mechterm, termavrg = self.allterms_str[m_idx]
+            for c in self.mode_indices:
+                # prefac_mech = self.prefac_3d[a, b, c]
+                prefac_mech_c = vib_ene_levels_harmonic[c]
+                # print(prefac_mech==prefac_mech_c*self.prefac_2d[a, b])
+                mechavrg = self.avrg_tensors_dict[m_idx]
+                abc = dict(zip(['a', 'b', 'c'], [a, b, c]))
+                ijk_indx = tuple([abc[j] for j in termavrg[-2]])
+                F = self.deriv_data['F_abc'][ijk_indx]
+
+                freqDiff = [i.split(',') for i in mechterm[1]]
+                letters = ['a', 'b', 'c', 'zero']
+                dictabc = dict(zip(letters, (a, b, c) + tuple(['zero'])))
+
+                w_fr11 = tuple(sorted([str(dictabc[i]) for i in freqDiff[0][0].split('+')], key=int))
+                if 'zero' not in freqDiff[0][1]:
+                    w_fr21 = tuple(sorted([str(dictabc[i]) for i in freqDiff[0][1].split('+')], key=int))
+                else:
+                    w_fr21 = tuple([freqDiff[0][1]])
+                w_fr12 = tuple(sorted([str(dictabc[i]) for i in freqDiff[1][0].split('+')], key=int))
+                if 'zero' not in freqDiff[1][1]:
+                    w_fr22 = tuple(sorted([str(dictabc[i]) for i in freqDiff[1][1].split('+')], key=int))
+                else:
+                    w_fr22 = tuple([freqDiff[1][1]])
+
+                t3 = vib_ene_levels[w_fr11] - vib_ene_levels[w_fr21]
+                t4 = vib_ene_levels[w_fr12] - vib_ene_levels[w_fr22]
+                sumfrac = (1 / t3 + 1 / t4)
+                fac += termavrg[-1] * sumfrac / prefac_mech_c * mechavrg[a, b, c] * F #/ (-48.)
+            factors[m_idx] = fac
+
+        return factors
+
+
+    # TODO: Determine if generic form needed and if so, mark up
+    def compute_mech_factors_generic(self, a: int, b: int):
         """
         Precalculate prefactor of mechanical terms - summation over c for each a,b
         """
@@ -1492,6 +1564,73 @@ class Spectrum2D:
 
 
     def generate_resonances_functions(self, subscripts, freqDiff=None) -> Callable:
+        """
+        Generates a python function for a term given by a formula (subscripts and freqDiff);
+                varied argument of that function is abctuple (used in the loop over combinations of modes).
+        subscripts - a tuple of strings from the formula; subscripts of omega energy levels in the resonance part;
+                        e.g., ('a+b,a', 'zero,a')
+        freqDiff - a tuple of strings from the formula; subscripts of omega energy levels in the freq. difference part;
+                        e.g., ('a+b+c,0', 'c,a+b'); not None for mech. anharm.
+        """
+        if freqDiff is not None:
+            freqDiff = [i.split(',') for i in freqDiff]
+
+        def compute_res_condition(allLevels_Eh: dict, w_res_dict: dict[str:np.ndarray],
+                     abctuple: tuple[int, int] | tuple[int, int, int],
+                     w1w2Condition: np.ndarray[bool],
+                     freqDiff: list = freqDiff) -> np.ndarray:
+            """
+            allLevels_Eh_c collects all vibrational energy levels in Hartree; e.g., [('1', '2')] - combination mode
+            w_res_dict contains [-1, 2] and [-1] 2d arrays (in s-1)
+            abctuple is a tuple of normal mode indices for which current iteration is evaluating resonance term
+            """
+            # todo: lorentzian shape cutoff
+
+            letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
+            dictabc = dict(zip(letters, abctuple + tuple(['zero'])))
+            # allLevels_Eh_c = copy.deepcopy(allLevels_Eh)
+
+            if 'c' not in subscripts[0]:
+                index_wmn = (abctuple[0], abctuple[1])
+            else:
+                index_wmn = (abctuple[0], abctuple[2])
+
+            t1 = self.w_mn_dict[subscripts[0]][index_wmn] + w_res_dict[(-1, 2)]  # - 1j * Gamma_hartree
+
+            t2 = self.w_mn_dict[subscripts[1]][abctuple[0], abctuple[1]] + w_res_dict[(-1,)] #- 1j * Gamma_hartree
+
+            if freqDiff is None:
+                sumfrac = 1.
+
+            else:
+                if self.mechab:
+                    w_fr11 = tuple(sorted([str(dictabc[i]) for i in freqDiff[0][0].split('+')], key=int))
+                    if 'zero' not in freqDiff[0][1].split('+'):
+                        w_fr21 = tuple(sorted([str(dictabc[i]) for i in freqDiff[0][1].split('+')], key=int))
+                    else:
+                        w_fr21 = tuple([freqDiff[0][1]])
+
+                    w_fr12 = tuple(sorted([str(dictabc[i]) for i in freqDiff[1][0].split('+')], key=int))
+                    if 'zero' not in freqDiff[1][1].split('+'):
+                        w_fr22 = tuple(sorted([str(dictabc[i]) for i in freqDiff[1][1].split('+')], key=int))
+                    else:
+                        w_fr22 = tuple([freqDiff[1][1]])
+
+                    t3 = allLevels_Eh[w_fr11] - allLevels_Eh[w_fr21]
+                    t4 = allLevels_Eh[w_fr12] - allLevels_Eh[w_fr22]
+
+                    sumfrac = (1 / t3 + 1 / t4)
+                    # self.mechab = False
+
+                else:
+                    sumfrac = 1.
+
+            return  np.where(w1w2Condition, sumfrac / (t1 * t2), 0.)
+
+        return compute_res_condition
+
+    # TODO: Mark up for generic
+    def generate_resonances_functions_generic(self, subscripts, freqDiff=None) -> Callable:
         """
         Generates a python function for a term given by a formula (subscripts and freqDiff);
                 varied argument of that function is abctuple (used in the loop over combinations of modes).
