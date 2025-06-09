@@ -1,7 +1,6 @@
 import copy
-
 import numpy as np
-np.set_printoptions(legacy='1.25')
+# np.set_printoptions(legacy='1.25')
 
 from wilson.spectrum.spectrum2D import (convNu2Ene, avrg_abc_tensor,
                                         Spectrum2D, combinations_with_permutations)
@@ -19,6 +18,7 @@ datadict = {'source': 'gaussian', 'type': 'log',
                       'log': wilson_root+'/tests/test_database/dftGaussian/FORM/B3LYPcc_pVDZ/g16_inputFull_3q.out'}}
 gParser = GaussianDataParser(datadict)
 
+maxmax = 3.276e9
 Gamma_rc = 5.1
 diag_margin_rc=3.
 list2exclude = []
@@ -37,6 +37,8 @@ spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_sele
 spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
 
 
+def test_integration():
+    pass
 
 def test_convNu2Ene():
     """Unit conversion: from wavenumber (cm-1) to energy unit (Hartree)
