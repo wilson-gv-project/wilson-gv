@@ -6,6 +6,8 @@ from wilson.utils import Conditions, prep_data_load
 from CQCParse.parsing import GaussianParser, GaussianOutput
 from CQCParse.relay import DataVault
 
+import wilson.debug as debug
+
 print()
 
 # allterms_str =     {
@@ -114,6 +116,7 @@ enelvl = True
 #######################################################################
 ###     CQCParse use - getting calc data
 #######################################################################
+debug.level = 0
 
 data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
 dataframe_gaussian = data_vault.getting_files_DB("gaussian")
@@ -140,7 +143,7 @@ def test_instance():
 
     assert t0.expression == allterms_str[0]
     assert t0.term_label == 'EL'
-    assert t0.resonances_expr == ('a+b,a', 'zero,a')
+    assert t0.resonances_expr == (('a+b,a', (-1, 2)), ('zero,a', (-1,)))
     assert t0.viblevelsdiff_expr is None
 
 
@@ -274,9 +277,31 @@ def test_outer_product_einsum():
 
 def test_precalc_vibene_denoms():
     """
-    later
     """
-    pass
+    print()
+    import wilson.debug as debug
+    debug.level = 0
+
+    t0 = Term2D(0, allterms_str[0])
+    t1 = Term2D(1, allterms_str[1])
+    t2 = Term2D(2, allterms_str[2])
+    t3 = Term2D(3, allterms_str[3])
+
+    tts = TermsEvaluator([t0, t1, t2, t3])
+    tts.identify_to_precalculate()
+
+    freqs = np.array([2., 4., 8.])
+    res = tts.precalc_vibene_denoms(freqs)
+    assert list(res.keys()) == ([('a', 'b', 'c'), ('a', 'b')])
+    assert res[('a', 'b')][0,0] == 1./2./2.
+    assert res[('a', 'b')][0,1] == 1./2./4.
+    assert res[('a', 'b')][1,2] == 1./4./8.
+    assert res[('a', 'b')][1,2] == res[('a', 'b')][2,1]
+
+    assert res[('a', 'b', 'c')][2,2,0] == 1./8./8./2.
+    assert res[('a', 'b', 'c')][1,0,2] == 1./4./2./8.
+    assert res[('a', 'b', 'c')][1,0,2] == res[('a', 'b', 'c')][0,1,2]
+
 
 def test_precalc_avrg_tensors():
     print()
@@ -317,7 +342,25 @@ def test_precalc_avrg_tensors():
 
 
 def test_precalc_res_conds():
-    pass
+    print()
+
+    t0 = Term2D(0, allterms_str[0])
+    t1 = Term2D(1, allterms_str[1])
+    t2 = Term2D(2, allterms_str[2])
+    t3 = Term2D(3, allterms_str[3])
+    terms = [t0, t1, t2, t3]
+
+    tts = TermsEvaluator(terms)
+    tts.identify_to_precalculate()
+
+    print(tts.unique_res_conds)
+    print(set([i[1] for i in tts.unique_res_conds]))
+
+    axes_dict = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
+    r = tts.precalc_res_conds(axes_dict)
+    print(r)
+
+
 
 def test_precalculate():
     pass

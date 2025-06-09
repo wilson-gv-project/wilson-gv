@@ -716,11 +716,12 @@ class TermsEvaluator:
         # self.terms = terms
         self.terms = {t.term_id: t for t in terms}
 
+
     def identify_to_precalculate(self):
         """
         go through terms; identify parts for precalculation
 
-        abc dependent:
+        only abc dependent:
             orientational averages
             ab_factors - summed over c; separate from indices in res.conds.
 
@@ -769,7 +770,12 @@ class TermsEvaluator:
 
         # self.uProps = [AveragedProps(t.properties) for t in self.terms]
 
+
     def precalc_vibene_denoms(self, freqs):
+        """
+        requires:
+            freqs data; self.unique_vibene_denoms
+        """
         inv_freqs = 1 / freqs
         stored = {}
 
@@ -783,6 +789,10 @@ class TermsEvaluator:
         ((1, 1), (2, 1), (1, 2)) - avrg tensor coding - mu_Q, alpha_Q, mu_QQ
         ((1, 1), (2, 2), (1, 1)) - mu_Q, alpha_QQ, mu_Q
         ((1, 1), (2, 1), (1, 1)) - mu_Q, alpha_Q, mu_Q
+
+        requires:
+            self.unique_avrg_tensors_tID; self.seq_tuples; self.unique_avrg_tensors_all;
+            self.terms[tID] so it's a dict;
         """
         terms_for_avrg_tensors = self.unique_avrg_tensors_tID
         storage_tensors = {}
@@ -828,24 +838,43 @@ class TermsEvaluator:
         return storage_tensors
 
 
-    def precalc_res_conds(self):
-        pass
+    def precalc_res_conds(self, axes_dict):
+        """
+        requires:
+            self.unique_res_conds
+        """
+        result = {}
 
-    def precalculate(self):
-        pass
+        unique_pert_freq_arrangements = set([i[1] for i in self.unique_res_conds])
+        implicit_minus_one = -1
+        # set up terms to add together
+        uq_pert_freq_arrays = [implicit_minus_one*np.array(i) for i in unique_pert_freq_arrangements]
+
+        all_axes = set([abs(i) for j in unique_pert_freq_arrangements for i in j]) # should help to set up axes_dict
+        # axes_dict = {k:None for k in all_axes} # todo: how to somewhat automatically fill in this dict? intup for now
+
+        print('uq_pert_freq_arrays', uq_pert_freq_arrays)
+
+        for pfs in uq_pert_freq_arrays:
+            result[tuple(pfs)] = 0.
+
+            for pf in pfs:
+                result[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
+
+        return result
 
 
-def translate_key_value(key, value):
-    greek = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta']
-    result = {}
-    for (idx, (k1, k2)) in enumerate(key):
-        letters = list(value[idx])
-        count = k2
-        # Fill up with Greek letters if not enough in letters
-        if len(letters) < count:
-            letters += greek[:count - len(letters)]
-        result[(k1, k2)] = letters
-    return result
+    def precalculate(self, alldata):
+        """
+        requires identified parts for precalculation and external data
+
+        """
+        freqs, Nnmodes, data, avrg_terms = alldata # todo: set this up better
+
+        self.precalc_vibene_denoms(freqs)
+        self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
+        self.precalc_res_conds()
+
 
 
 def get_data_keys(input_tuple, variables, greek_dict):
@@ -859,8 +888,6 @@ def get_data_keys(input_tuple, variables, greek_dict):
     ]
     """
     prop_der_key, second_part, third_part = input_tuple
-    # print('>>> third_part', third_part)
-    # print('>>> second_part', second_part)
 
     third_part = tuple([variables[v] for v in third_part])
     second_part = tuple([greek_dict[l] for l in second_part])
@@ -876,6 +903,23 @@ def outer_product_einsum(arr, n):
     arrays = [arr] * n
 
     return np.einsum(indices, *arrays)
+
+
+def calc_vibene_diff_mn(vibene_data, m, n, symbolic=False):
+    """
+    w_{m,n}^{whatever}
+
+    if symbolic:
+        precalculates an nDarray for keeping all possible indices values
+    else:
+        vibene_data is a dict or smth, containing keys or attributes m and n
+    """
+
+    if symbolic:
+        return None
+
+    else:
+        return vibene_data[m] - vibene_data[n]
 
 
 def get_resonance_location(resonances_expr, modes_dict, a, b):
