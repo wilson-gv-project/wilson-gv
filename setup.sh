@@ -19,7 +19,8 @@ for entry in "${REPOS[@]}"; do
   # separate repo+branch from destination
   repo_branch="${entry% *}"
   dest="${entry#* }"
-
+  
+  echo ""
   echo "repo_branch:$repo_branch; dest:$dest"
 
   # separate repo and branch
