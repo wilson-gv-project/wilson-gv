@@ -25,3 +25,5 @@ import wilson_experiment as experiment
 import wilson_utils as utils
 import wilson as intensities
 ```
+
+⚠️**Attention**⚠️ `setup.sh` script clones specified branches. Modify those choices if needed. There should be a "branch compatibility checker/integration test" implemented.
