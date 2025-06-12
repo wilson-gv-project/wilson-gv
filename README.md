@@ -11,7 +11,7 @@ After cloning this repo, `cd wilson-suite`:
    - CQCParse
 2. `conda env create -f environment.yml` - set up an environment; packages will be installed.
 3. `export PYTHONPATH="${PYTHONPATH}:$(pwd)"` - add to Python path directory with Python module `wilson_suite.py`. Aliases are defined there, so `import wilson_suite.main` is possible.
-4. 'python -c "import wilson_suite"' - test if it works.
+4. `python -c "import wilson_suite"` - test if it works.
 
 
 First 2 steps automate/facilitate downloading and installation of repos (now there is one option of getting all of them but can be more flexible). The last step isn't an installation but it makes possible nested imports.
