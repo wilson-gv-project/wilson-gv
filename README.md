@@ -14,14 +14,14 @@ After cloning this repo, `cd wilson-suite`:
 4. `python -c "import wilson_suite"` - test if it works.
 
 
-First 2 steps automate/facilitate downloading and installation of repos (now there is one option of getting all of them but can be more flexible). The last step isn't an installation but it makes possible nested imports.
+First 2 steps automate/facilitate downloading and installation of repos (now there is one option of getting all of them but can be more flexible). The third step isn't an installation but it makes possible nested imports.
 
 The content of `wilson_suite.py`:
 ```python
-import wilson_analysis as wilson_analysis
-import wilson_main as wilson_main
-import wilson_derive as wilson_derive
-import wilson_experiment as wilson_experiment
-import wilson_utils as wilson_utils
-import wilson as wilson_intensities
+import wilson_analysis as analysis
+import wilson_main as main
+import wilson_derive as derive
+import wilson_experiment as experiment
+import wilson_utils as utils
+import wilson as intensities
 ```
