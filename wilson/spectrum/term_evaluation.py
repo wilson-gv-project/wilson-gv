@@ -36,6 +36,32 @@ class MolProperty:
         # return rf'\{self.name.strip("_Q")}_{','.join(list(self.cart_axes))}__dQ{','.join(list(self.nm_indices))}'
         # return f'{self.simple_tuple}'
 
+
+@dataclass
+class VibState:
+    quanta_dict: dict
+    freq: float
+
+
+@dataclass
+class VibStatesDiff:
+    diff_type: tuple
+
+    def __eq__(self, other):
+        if not isinstance(other, VibStatesDiff):
+            return False
+        return (
+            self.diff_type == other.diff_type
+        )
+
+    def __hash__(self):
+        # Since Counter doesn't have a hash, we convert it to a frozenset of items
+        return hash(self.diff_type)
+
+    def __repr__(self):
+        return f'VibStatesDiff: {self.diff_type}'
+
+
 @dataclass
 class AveragedProps:
     props: List[MolProperty] = field(default_factory=list)
@@ -144,13 +170,12 @@ class Term2D:
         self.viblevelsdiff_expr = expression['vibenediff']
         if self.viblevelsdiff_expr is not None:
             self.term_label = 'MECH'
-            self.F_expr = expression['averaged_props'][3]
-            self.prefactor_term = expression['averaged_props'][4]
-
             self.F_vals = {}
         else:
             self.term_label = 'EL'
-            self.prefactor_term = 1.
+            self.viblevelsdiff_expr = []
+
+        self.vibstates_all = []
 
         self.properties = []
         for p in expression['averaged_props'][:3]:
@@ -159,8 +184,31 @@ class Term2D:
         self.property_simple_tuples = tuple([p.simple_tuple for p in self.properties])
         self.nice_props = AveragedProps(self.properties)
         # print(self.nice_props)
-
         # self.property_tuple1, self.property_tuple2, self.property_tuple3 = self.property_tuples
+
+        # collecting vib ene diffs
+        vibstates_diffs_collection = []
+        for re in self.resonances_expr:
+            l = re[0].split(',')
+            ftuple = []
+            for ll in l:
+                if 'zero' not in ll.split('+'):
+                    ftuple.append(len(set(ll.split('+'))))
+                else:
+                    ftuple.append(0)
+            vibstates_diffs_collection.append(tuple(ftuple))
+        for vd in self.viblevelsdiff_expr:
+            l = vd.split(',')
+            ftuple = []
+            for ll in l:
+                if 'zero' not in ll.split('+'):
+                    ftuple.append(len(set(ll.split('+'))))
+                else:
+                    ftuple.append(0)
+
+            vibstates_diffs_collection.append(tuple(ftuple))
+        vibstates_diffs_collection = set(vibstates_diffs_collection)
+        self.vibstatesdiff_objs = [VibStatesDiff(i) for i in vibstates_diffs_collection]
 
         self.part_prefactor = expression['termA_pref']
 
@@ -187,15 +235,18 @@ class Term2D:
 
 
     def for_ab(self, a,b):
+        """
+
+        """
         a, b = str(a), str(b)
         dict_id = {'a': a, 'b': b, 'zero': 'zero'}
         type12, type1 = self.resonances_expr
-        m1_str, n1_str = type1.split(',')
+        m1_str, n1_str = type1[0].split(',')
 
         m1_tuple = tuple([str(dict_id[i]) for i in m1_str.split('+')])
         n1_tuple = tuple([str(dict_id[i]) for i in n1_str.split('+')])
 
-        m12_str, n12_str = type12.split(',')
+        m12_str, n12_str = type12[0].split(',')
         m12_tuple = tuple(sorted([str(dict_id[i]) for i in m12_str.split('+')], key=int))
         n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
         return {'m1_tuple': m1_tuple, 'n1_tuple': n1_tuple, 'm12_tuple': m12_tuple, 'n12_tuple': n12_tuple}
@@ -267,15 +318,16 @@ class Term2D:
         # beta, alpha, delta, gamma
         dict_ax_id = {'A': ABGD[0], 'B': ABGD[1], 'G': ABGD[2], 'D': ABGD[3]}
         propdict = {}
-        for nn, p in enumerate(self.property_tuples):
+        for nn, p in enumerate(self.expression['averaged_props']):
             # p is ('mu_QQ', ('a', 'b',), ('G',))
             # p is ('alpha_Q', ('c',), ('A', 'D'))
             indices = [dict_id[i] for i in p[1]] + [dict_ax_id[i] for i in p[2]]
             propdict[f'{nn}_'+p[0]] = self.properties_data[p[0]][*indices]
 
         if self.term_label == 'MECH':
-            if (a,b,c) not in self.F_vals:
-                idx = [dict_id[i] for i in self.F_expr]
+            # fixme
+            if (a,b,c) not in self.expression['CFF'][1]:
+                idx = [dict_id[i] for i in self.expression['CFF'][1]]
                 self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx]
             propdict['F_abc'] = self.F_vals[(a,b,c)]
 
@@ -535,6 +587,7 @@ class Term2D:
                 if sel_abs is not None:
                     if (a,b) not in sel_abs:
                         skipped+=1
+                        print('skipped', (a, b))
                         continue
 
                 w1ab, w2ab = self.get_resonance_location(a, b)
@@ -549,11 +602,12 @@ class Term2D:
                         # print('added')
                     else:
                         skipped += 1
+                        print('skipped later', (a,b))
                         continue
 
-        print('skipped', skipped)
-        ab_combinations = list(combinations_with_permutations(self.mode_indices, 2))
-        print('ab_combinations', len(ab_combinations))
+        # print('skipped', skipped)
+        # ab_combinations = list(combinations_with_permutations(self.mode_indices, 2))
+        # print('ab_combinations', len(ab_combinations))
         return result
 
     def get_intensity_ab(self, a, b, w1, w2, Gamma_rc,
@@ -665,30 +719,31 @@ class TermStorage:
         self.terms = {}
         self.terms_amplitudes = {}  # Dictionary: term_id -> Term2D object
 
-    def add_term(self, term: Term2D):
-        """Adds a Term2D object to storage."""
-        if term.term_id in self.terms:
-            print(f"Warning: Overwriting existing term {term.term_id}")
-        self.terms[term.term_id] = term
+    # def add_term(self, term: Term2D):
+    #     """Adds a Term2D object to storage."""
+    #     if term.term_id in self.terms:
+    #         print(f"Warning: Overwriting existing term {term.term_id}")
+    #     self.terms[term.term_id] = term
+    #
+    # def calculate_all(self, settings):
+    #     """Runs calculations for all stored terms."""
+    #     for k, term in self.terms.items():
+    #         self.terms_amplitudes[k] = term.get_intensity(settings.w1, settings.w2,
+    #                                                       settings.properties_data,
+    #                                                       settings.modes_dict,
+    #                                                       settings.mode_indices,
+    #                                                       settings.Gamma_rc,
+    #                                                       settings.margin,
+    #                                                       condition=settings.condition)
+    #
+    # def get_amplitude(self, term_id):
+    #     """Retrieves the calculated result for a specific term."""
+    #     return self.terms_amplitudes[term_id] if term_id in self.terms else None
+    #
+    # def filter_terms(self, condition_fn):
+    #     """Filters terms based on a given function."""
+    #     return {tid: term for tid, term in self.terms.items() if condition_fn(term)}
 
-    def calculate_all(self, settings):
-        """Runs calculations for all stored terms."""
-        for k, term in self.terms.items():
-            self.terms_amplitudes[k] = term.get_intensity(settings.w1, settings.w2,
-                                                          settings.properties_data,
-                                                          settings.modes_dict,
-                                                          settings.mode_indices,
-                                                          settings.Gamma_rc,
-                                                          settings.margin,
-                                                          condition=settings.condition)
-
-    def get_amplitude(self, term_id):
-        """Retrieves the calculated result for a specific term."""
-        return self.terms_amplitudes[term_id] if term_id in self.terms else None
-
-    def filter_terms(self, condition_fn):
-        """Filters terms based on a given function."""
-        return {tid: term for tid, term in self.terms.items() if condition_fn(term)}
 
     def __repr__(self):
         return f"TermStorage({len(self.terms)} terms)"
@@ -722,18 +777,25 @@ class TermsEvaluator:
         go through terms; identify parts for precalculation
 
         only abc dependent:
-            orientational averages
-            ab_factors - summed over c; separate from indices in res.conds.
+            orientational averages - (1)
+            vibene_denoms - (2)
+            resonances pfs - (3)
+            resonances w_mn - (4)
+
+            composite, so later - ab_factors - summed over c; separate from indices in res.conds.
+
+
+        maybe do all separately?? in case of selective precalculation or none of it
 
         """
-        # identifying unique resonance conditions
+        # (1) IDENTIFYING unique resonance conditions
         unique_res_conds = []
         for t in self.terms.values():
             for i in t.resonances_expr:
                 unique_res_conds.append(i)
         self.unique_res_conds = list(set(unique_res_conds))
 
-        # identifying unique avrg tensors - looking for unique sets on normal mode indices
+        # (2.1) IDENTIFYING unique avrg tensors - looking for unique sets on normal mode indices
         # number of these indices = number of dimensions of avrg tensor
         # now: collect relevant part
         self.seq_tuples = DoubleDict()
@@ -746,7 +808,7 @@ class TermsEvaluator:
         # print('kv', self.seq_tuples.kv)
         # print('vk', self.seq_tuples.vk)
 
-        # collecting unique normal mode indices, to know dimensionality
+        # (2.2) IDENTIFYING unique normal mode indices for avrg tensors, to know dimensionality
         # self.uni_nm_idx = []
         self.unique_avrg_tensors_all = {}
         for t in self.terms.values():
@@ -764,11 +826,14 @@ class TermsEvaluator:
         self.props_cart_ax = [[p.cart_axes for p in t.properties] for t in self.terms.values()]
         # print('self.props_cart_ax', self.props_cart_ax)
 
-        # identifying 1/omega_a/omega_b, 1/omega_a/omega_b/omega_c terms - to make nD tensors of products
+        # (3) IDENTIFYING 1/omega_a/omega_b, 1/omega_a/omega_b/omega_c terms - to make nD tensors of products
         # in precalc_vibene_denoms()
         self.unique_vibene_denoms = set([t.expression['vibene_denom'] for t in self.terms.values()])
 
         # self.uProps = [AveragedProps(t.properties) for t in self.terms]
+
+        # (4) IDENTIFYING vib states diffs types
+        self.mn_types = [i for t in self.terms.values() for i in t.vibstatesdiff_objs]
 
 
     def precalc_vibene_denoms(self, freqs):
@@ -838,30 +903,86 @@ class TermsEvaluator:
         return storage_tensors
 
 
-    def precalc_res_conds(self, axes_dict):
+    def precalc_vibdiffs(self, states, Nnmodes):
+        """
+        states - dict of state_idx_label_tuple(?) : frequency (cm-1)
+
+
+        types of vib diffs: (0, 1), (1, 0), (2, 1), (1, 2), (2, 0), (0, 2)...
+
+        """
+        res = {}
+        dims = [sum(list(t.diff_type)) for t in set(self.mn_types)]
+        print('set(dims)', set(dims))
+
+        for d in set(dims):
+            shape = (Nnmodes,) * d
+            res[d] = np.zeros(shape)
+
+        # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
+
+        """
+        >>> B-A
+        array([[0.2, 0.4, 0.6],
+               [3.8, 4. , 4.2],
+               [7.4, 7.6, 7.8]])
+        >>> B
+        array([[ 1.2,  2.4,  3.6],
+               [ 4.8,  6. ,  7.2],
+               [ 8.4,  9.6, 10.8]])
+        >>> A
+        array([1., 2., 3.])
+
+        >>> B[0,1]-A[1] == (B-A)[0,1]
+        np.True_
+        >>> B[1,0]-A[0] == (B-A)[1,0] - B contains (a+b) states B[a,b]  
+        np.True_
+        """
+
+        return res
+
+
+
+
+    def precalc_res_conds(self, axes_dict, freqs):
         """
         requires:
             self.unique_res_conds
         """
-        result = {}
+        result_pfs = {}
+        result_mns = {}
 
         unique_pert_freq_arrangements = set([i[1] for i in self.unique_res_conds])
+        unique_w_m7n = set([i[0] for i in self.unique_res_conds])
         implicit_minus_one = -1
+
         # set up terms to add together
         uq_pert_freq_arrays = [implicit_minus_one*np.array(i) for i in unique_pert_freq_arrangements]
 
-        all_axes = set([abs(i) for j in unique_pert_freq_arrangements for i in j]) # should help to set up axes_dict
-        # axes_dict = {k:None for k in all_axes} # todo: how to somewhat automatically fill in this dict? intup for now
+        # all_axes = set([abs(i) for j in unique_pert_freq_arrangements for i in j]) # should help to set up axes_dict
+        # print('all_axes', all_axes)
+        # axes_dict = {k:None for k in all_axes} # todo: how to somewhat automatically fill in this dict? input for now
 
         print('uq_pert_freq_arrays', uq_pert_freq_arrays)
 
+        # collect types of pert freqs arrangements
         for pfs in uq_pert_freq_arrays:
-            result[tuple(pfs)] = 0.
+            pfs = [int(i) for i in pfs]
+            result_pfs[tuple(pfs)] = 0.
 
             for pf in pfs:
-                result[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
+                result_pfs[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
 
-        return result
+        states_mn = []
+        for mn in unique_w_m7n:
+            m,n = mn.split(',')
+            states_mn.append(m)
+            states_mn.append(n)
+
+            # result_mns[mn] = 0.
+        print('states_mn', set(states_mn))
+
+        return result_pfs#, result_mns
 
 
     def precalculate(self, alldata):
@@ -873,7 +994,7 @@ class TermsEvaluator:
 
         self.precalc_vibene_denoms(freqs)
         self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
-        self.precalc_res_conds()
+        # self.precalc_res_conds()
 
 
 

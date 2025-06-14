@@ -1,12 +1,21 @@
+"""
+Each test creates own instances of Term2D
+
+"""
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.spectrum.term_evaluation import Term2D, TermsEvaluator
+from wilson.spectrum.term_evaluation import Term2D, TermsEvaluator, VibStatesDiff
 from wilson.utils import Conditions, prep_data_load
+
+from test_utils import require_asserts
 
 from CQCParse.parsing import GaussianParser, GaussianOutput
 from CQCParse.relay import DataVault
 
 import wilson.debug as debug
+import CQCParse.debug as cqc_debug
+debug.level = 0
+cqc_debug.level = 0
 
 print()
 
@@ -26,70 +35,63 @@ allterms_str = { 0:
                      {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': None,
                       'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_QQ', ('a', 'b',), ('G',))),
-                      'CFF': None,
+                      'non_averaged_props': None,
                       'vibene_denom': ('a','b',),
                       'termB_pref': 1.,
                       'termA_pref': 1/24},
                  1:
-                     # {'resonance': (('b,a', 'zero,a'), None),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': None,
                       'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_QQ', ('a', 'b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
-                      'CFF': None,
+                      'non_averaged_props': None,
                       'vibene_denom': ('a','b',),
                       'termB_pref': 1.,
                       'termA_pref': 1/24},
                  2:
-                     # {'resonance': (('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')),
                      {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('a+b+c,zero', 'c,a+b'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('c',), ('G',)), 'abc', 1.),
-                      'CFF': ('F', ('a', 'b', 'c',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('c',), ('G',))),
+                      'non_averaged_props': (('F', ('a', 'b', 'c',)),),
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': 1.,
                       'termA_pref': -1/48.},
                  3:
-                     # {'resonance': (('b,a', 'zero,a'), ('a+c,b', 'b+c,a')),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('a+c,b', 'b+c,a'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('c',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acb', 1.),
-                      'CFF': ('F', ('a', 'c', 'b',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('c',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                      'non_averaged_props': (('F', ('a', 'c', 'b',)),), # non_averaged_props , no empty tuple
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': 1.,
                       'termA_pref': -1/48.},
                  4:
-                     # {'resonance': (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('a,a+b', 'b,zero'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('a',), ('G',)), 'bcc', 0.5),
-                      'CFF': ('F', ('b', 'c', 'c',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('a',), ('G',))),
+                      'non_averaged_props': ('F', ('b', 'c', 'c',)),
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': 0.5,
                       'termA_pref': -1/48.},
                  5:
-                     # {'resonance': (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('b,a+b', 'a,zero'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acc', 0.5),
-                      'CFF': ('F', ('a', 'c', 'c',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                      'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': 0.5,
                       'termA_pref': -1 / 48.},
                  6:
-                     # {'resonance': (('b,a', 'zero,a'), ('a,a+b', 'b,zero')),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('a,a+b', 'b,zero'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('a',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'bcc', -0.5),
-                      'CFF': ('F', ('b', 'c', 'c',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('a',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                      'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': -0.5,
                       'termA_pref': -1 / 48.},
                  7:
-                     # {'resonance': (('b,a', 'zero,a'), ('b,a+b', 'a,zero')),
                      {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                       'vibenediff': ('b,a+b', 'a,zero'),
-                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acc', -0.5),
-                      'CFF': ('F', ('a', 'c', 'c',), tuple()),
+                      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                      'CFF': ('F', ('a', 'c', 'c',), tuple()), # fixme later
                       'vibene_denom': ('a','b','c'),
                       'termB_pref': -0.5,
                       'termA_pref': -1 / 48.}
@@ -116,7 +118,6 @@ enelvl = True
 #######################################################################
 ###     CQCParse use - getting calc data
 #######################################################################
-debug.level = 0
 
 data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
 dataframe_gaussian = data_vault.getting_files_DB("gaussian")
@@ -129,13 +130,10 @@ gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
 
 parser = GaussianParser(gout)
 parser.load()
-parsed_data = parser.parse(linear_molecule=False)
-
-deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
 #######################################################################
 
-
+@require_asserts
 def test_instance():
     print()
 
@@ -144,13 +142,30 @@ def test_instance():
     assert t0.expression == allterms_str[0]
     assert t0.term_label == 'EL'
     assert t0.resonances_expr == (('a+b,a', (-1, 2)), ('zero,a', (-1,)))
-    assert t0.viblevelsdiff_expr is None
+    assert t0.viblevelsdiff_expr == []
+
+    t3 = Term2D(3, allterms_str[3])
+    assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
+    assert t3.expression['non_averaged_props'][0] == ('F', ('a', 'c', 'b'))
+
+    for k in t0.expression:
+        print(k, t0.expression[k])
+    print()
+
+    for k in t3.expression:
+        print(k, t3.expression[k])
+    print()
+    # print(t3.expression)
+    # print(t3.vibstatesdiff_objs)
 
 
+
+@require_asserts
 def test_load_data():
     print()
 
     t0 = Term2D(0, allterms_str[0])
+    parsed_data = parser.parse(linear_molecule=False)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
@@ -168,6 +183,7 @@ def test_load_data():
     assert list(t0.properties_data.keys()) == ['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc']
     assert t0.mode_indices == [0, 1, 2, 3, 4, 5]
 
+    parsed_data = parser.parse(linear_molecule=False)
     # vpt2 freqs now
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
@@ -185,57 +201,62 @@ def test_load_data():
     assert t0.allstates[('3',)] == 1794.5406564861917
 
 
-def test_amplitude_1term_single_point():
-    print()
+# def test_amplitude_1term_single_point():
+#     print()
+#
+#     t0 = Term2D(0, allterms_str[0])
+#     parsed_data = parser.parse(linear_molecule=False)
+#
+#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+#     parsed_data.upd_indices_several_parts(old_new_dict)
+#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
+#
+#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+#     amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
+#                                         collect_all=True, sel_abs=[(5,0)])
+#     # assert
+#     print(t0.get_resonance_location(5, 0))
+#     print(amplitude_single)
+#
+#
+# def test_amplitude_1term_grid():
+#     print()
+#     parsed_data = parser.parse(linear_molecule=False)
+#
+#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+#     parsed_data.upd_indices_several_parts(old_new_dict)
+#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
+#
+#     t0 = Term2D(0, allterms_str[0])
+#     t1 = Term2D(1, allterms_str[1])
+#     t2 = Term2D(2, allterms_str[2])
+#     t3 = Term2D(3, allterms_str[3])
+#     terms = [t0, t1, t2, t3]
+#
+#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+#     t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+#     t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+#     t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+#
+#     w1, w2 = np.arange(start1, end1, step1), np.arange(start2, end2, step2)
+#     w1m, w2m = np.meshgrid(w1, w2)
+#
+#     amplitudes = 0.
+#     for t in terms:
+#         amplitudes += t.get_intensity(w1m, w2m, 3.8, 0.)
+#
+#     # print(amplitudes.shape)
+#     # print(amplitudes)
 
-    t0 = Term2D(0, allterms_str[0])
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    parsed_data.upd_indices_several_parts(old_new_dict)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    amplitude_single = t0.get_intensity(2726., 3967., 3.8, 0.,
-                                        collect_all=True, sel_abs=[(0,5)])
-    print(t0.get_resonance_location(0, 5))
-    print(amplitude_single)
-
-
-def test_amplitude_1term_grid():
-    print()
-
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    parsed_data.upd_indices_several_parts(old_new_dict)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
-
-    t0 = Term2D(0, allterms_str[0])
-    t1 = Term2D(1, allterms_str[1])
-    t2 = Term2D(2, allterms_str[2])
-    t3 = Term2D(3, allterms_str[3])
-    terms = [t0, t1, t2, t3]
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-
-    w1, w2 = np.arange(start1, end1, step1), np.arange(start2, end2, step2)
-    w1m, w2m = np.meshgrid(w1, w2)
-
-    amplitudes = 0.
-    for t in terms:
-        amplitudes += t.get_intensity(w1m, w2m, 3.8, 0.)
-
-    print(amplitudes.shape)
-    print(amplitudes)
-
-
+@require_asserts
 def test_identify_to_precalculate():
-    print()
+    print('\n\nTesting - identify_to_precalculate')
 
     t0 = Term2D(0, allterms_str[0])
     t1 = Term2D(1, allterms_str[1])
@@ -246,11 +267,23 @@ def test_identify_to_precalculate():
     tts = TermsEvaluator(terms)
     tts.identify_to_precalculate()
 
-    print('Unique types of resonace conditions: ', tts.unique_res_conds)
+    print('>> For four EVV 2D IR terms:')
+    print('Unique types of resonance conditions: ', tts.unique_res_conds)
     print('Unique indices sets in orient. avrg.: ', tts.unique_avrg_tensors_all)
     print('Unique vib. ene. denominators (1/omega_a/omega_b...): ', tts.unique_vibene_denoms)
+    print('Unique vib diff types:', set(tts.mn_types))
+    assert set(tts.mn_types) == {VibStatesDiff((0, 1)), VibStatesDiff((1, 2)),
+                                 VibStatesDiff((2, 1)), VibStatesDiff((1, 1)), VibStatesDiff((3, 0))}
+    print()
+
+    assert sorted(tts.unique_res_conds) == sorted([('a+b,a', (-1, 2)), ('b,a', (-1, 2)), ('zero,a', (-1,))])
+    assert tts.unique_avrg_tensors_all == {((1, 1), (2, 1), (1, 2)): 2,
+                                           ((1, 1), (2, 2), (1, 1)): 2,
+                                           ((1, 1), (2, 1), (1, 1)): 3}
+    assert sorted(list(tts.unique_vibene_denoms)) == sorted(list({('a', 'b'), ('a', 'b', 'c')}))
 
 
+@require_asserts
 def test_outer_product_einsum():
     print()
 
@@ -275,12 +308,11 @@ def test_outer_product_einsum():
     assert np.allclose(outer_product_einsum(1./arr, 3), expected_3d)
 
 
+@require_asserts
 def test_precalc_vibene_denoms():
     """
     """
     print()
-    import wilson.debug as debug
-    debug.level = 0
 
     t0 = Term2D(0, allterms_str[0])
     t1 = Term2D(1, allterms_str[1])
@@ -292,7 +324,7 @@ def test_precalc_vibene_denoms():
 
     freqs = np.array([2., 4., 8.])
     res = tts.precalc_vibene_denoms(freqs)
-    assert list(res.keys()) == ([('a', 'b', 'c'), ('a', 'b')])
+    assert sorted(list(res.keys())) == sorted([('a', 'b', 'c'), ('a', 'b')])
     assert res[('a', 'b')][0,0] == 1./2./2.
     assert res[('a', 'b')][0,1] == 1./2./4.
     assert res[('a', 'b')][1,2] == 1./4./8.
@@ -303,10 +335,9 @@ def test_precalc_vibene_denoms():
     assert res[('a', 'b', 'c')][1,0,2] == res[('a', 'b', 'c')][0,1,2]
 
 
+@require_asserts
 def test_precalc_avrg_tensors():
     print()
-    import wilson.debug as debug
-    debug.level = 0
 
     t0 = Term2D(0, allterms_str[0])
     tts = TermsEvaluator([t0])
@@ -315,14 +346,14 @@ def test_precalc_avrg_tensors():
     gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
     Nnmodes = 2
 
-    dat = {
+    data = {
         (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
         (1, 2): np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
         (2, 1): np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
         (2, 2): np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
 
-    stored = tts.precalc_avrg_tensors(Nnmodes, dat, gammaCompsAll[:3])
+    stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll[:3])
     assert stored[0][1,1] == 60.4
     assert stored[0][1,0] == 4.6
 
@@ -332,7 +363,7 @@ def test_precalc_avrg_tensors():
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
-    stored = tts.precalc_avrg_tensors(Nnmodes, dat, gammaCompsAll)
+    stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll)
 
     assert stored[3][1,1,1] == 392.4
     assert stored[1][0,0] == 12.
@@ -341,8 +372,9 @@ def test_precalc_avrg_tensors():
     assert list(stored.keys()) == [0,1,3]
 
 
+@require_asserts
 def test_precalc_res_conds():
-    print()
+    print('\n\nTesting - Precalculate Resonance Conditions')
 
     t0 = Term2D(0, allterms_str[0])
     t1 = Term2D(1, allterms_str[1])
@@ -353,14 +385,44 @@ def test_precalc_res_conds():
     tts = TermsEvaluator(terms)
     tts.identify_to_precalculate()
 
-    print(tts.unique_res_conds)
-    print(set([i[1] for i in tts.unique_res_conds]))
+    print('>> For four EVV 2D IR terms:')
+    print('unique_res_conds', tts.unique_res_conds)
+    assert sorted(tts.unique_res_conds) == sorted(tts.unique_res_conds)
 
-    axes_dict = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
-    r = tts.precalc_res_conds(axes_dict)
-    print(r)
+    set_rc_types = set([i[1] for i in tts.unique_res_conds])
+    print('set of res cond types', set_rc_types)
+    assert sorted(list(set_rc_types)) == sorted(list({(-1, 2), (-1,)}))
+
+    set_mn_types = set([i[0] for i in tts.unique_res_conds])
+    print('set of w_m,n types', set_mn_types)
+    print('set(self.mn_types)',  set(tts.mn_types))
 
 
+    axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
+    x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
+    axes_dict = {1: x, 2: y}
 
-def test_precalculate():
-    pass
+    freqs = np.array([2., 4., 8.])
+    pf_types = tts.precalc_res_conds(axes_dict, freqs)
+    print('\nresult of precalc', pf_types)
+    assert np.allclose(pf_types[(1, -2)], np.array([[ -6.,  -4.,   0.],
+                                                    [-14., -12.,  -8.],
+                                                    [-30., -28., -24.]]))
+
+    assert np.allclose(pf_types[(1,)], np.array([[2., 4., 8.],
+                                                 [2., 4., 8.],
+                                                 [2., 4., 8.]]))
+
+    rrr = tts.precalc_vibdiffs(freqs, 3)
+    print(rrr)
+
+    assert sorted(list(rrr.keys())) == [1, 2, 3]
+    assert rrr[1].shape == (3,)
+    assert rrr[2].shape == (3,3)
+    assert rrr[3].shape == (3,3,3)
+
+    print()
+
+
+# def test_precalculate():
+#     pass
