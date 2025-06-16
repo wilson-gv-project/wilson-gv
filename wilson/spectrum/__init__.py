@@ -7,3 +7,5 @@ from .cake_amplitudes import (FactorTensor, ComponentsLayer,
 
 from .term_evaluation import *
 from .termeval_util_classes import *
+
+from .term import Term2D

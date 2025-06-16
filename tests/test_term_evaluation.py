@@ -4,7 +4,8 @@ Each test creates own instances of Term2D
 """
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.spectrum.term_evaluation import Term2D, TermsEvaluator
+from wilson.spectrum.term_evaluation import TermsEvaluator
+from wilson.spectrum.term import Term2D
 from wilson.spectrum.termeval_util_classes import VibStatesDiff
 from wilson.utils import Conditions, prep_data_load
 
@@ -123,129 +124,6 @@ parser = GaussianParser(gout)
 parser.load()
 
 #######################################################################
-
-@require_asserts
-def test_instance():
-    print()
-
-    t0 = Term2D(0, allterms_str[0])
-
-    assert t0.expression == allterms_str[0]
-    assert t0.term_label == 'EL'
-    assert t0.resonances_expr == (('a+b,a', (-1, 2)), ('zero,a', (-1,)))
-    assert t0.viblevelsdiff_expr == []
-
-    t3 = Term2D(3, allterms_str[3])
-    assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
-    assert t3.expression['non_averaged_props'][0] == ('F', ('a', 'c', 'b'))
-
-    # for k in t0.expression:
-    #     print(k, t0.expression[k])
-    print(t0)
-    print()
-
-    # for k in t3.expression:
-    #     print(k, t3.expression[k])
-
-    print(t3)
-    print()
-    # print(t3.expression)
-    # print(t3.vibstatesdiff_objs)
-
-
-
-@require_asserts
-def test_load_data():
-    print()
-
-    t0 = Term2D(0, allterms_str[0])
-    parsed_data = parser.parse(linear_molecule=False)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-
-    assert t0.harmonic_states[('zero',)] == 0.
-    assert t0.harmonic_states_Eh[('zero',)] == 0.
-    assert t0.allstates[("zero",)] == 0.
-    assert t0.allstates_Eh[("zero",)] == 0.
-
-    assert t0.harmonic_states[('0',)] == 2878.687 # indices are unchanged yet
-    assert t0.harmonic_states[('2',)] == 1534.549 # indices are unchanged yet
-
-    assert t0.allstates[("1",)] == 1794.540 # gaussian anharmonic freqs; indices are unchanged yet
-    assert list(t0.properties_data.keys()) == ['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc']
-    assert t0.mode_indices == [0, 1, 2, 3, 4, 5]
-
-    parsed_data = parser.parse(linear_molecule=False)
-    # vpt2 freqs now
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    assert t0.allstates[('1',)] == 1794.5406564861917 # still unchanged indices
-
-    # UPDATING INDICES NOW!
-    parsed_data.upd_indices_several_parts(old_new_dict)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    assert t0.allstates[('3',)] == 1794.5406564861917
-
-
-def test_amplitude_1term_single_point():
-    print()
-
-    t0 = Term2D(0, allterms_str[0])
-    parsed_data = parser.parse(linear_molecule=False)
-
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    parsed_data.upd_indices_several_parts(old_new_dict)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-    amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
-                                        collect_all=True, sel_abs=[(5,0)])
-    # assert
-    print(t0.get_resonance_location(5, 0))
-    print(amplitude_single)
-
-
-# def test_amplitude_1term_grid():
-#     print()
-#     parsed_data = parser.parse(linear_molecule=False)
-#
-#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-#     parsed_data.upd_indices_several_parts(old_new_dict)
-#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
-#
-#     t0 = Term2D(0, allterms_str[0])
-#     t1 = Term2D(1, allterms_str[1])
-#     t2 = Term2D(2, allterms_str[2])
-#     t3 = Term2D(3, allterms_str[3])
-#     terms = [t0, t1, t2, t3]
-#
-#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-#     t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-#     t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-#     t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-#
-#     w1, w2 = np.arange(start1, end1, step1), np.arange(start2, end2, step2)
-#     w1m, w2m = np.meshgrid(w1, w2)
-#
-#     amplitudes = 0.
-#     for t in terms:
-#         amplitudes += t.get_intensity(w1m, w2m, 3.8, 0.)
-#
-#     # print(amplitudes.shape)
-#     # print(amplitudes)
 
 
 @require_asserts
@@ -527,3 +405,8 @@ def test_precalculate():
         print('   >>>', k)
         print(big_dict[k])
         print('---')
+
+
+@require_asserts
+def test_TE_compute_intensity():
+    pass

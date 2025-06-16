@@ -184,7 +184,7 @@ axes_dict_1d = {1: omega1, 2: omega2}
 x, y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
 axes_dict = {1: x, 2: y}
 
-Nnmodes = 3
+Nnmodes = 6
 
 # data = {
 #     (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
