@@ -252,3 +252,20 @@ def prep_data_load(parsed_data: ParsedData):
     mode_indices = [i for i in np.arange(parsed_data.nmodes) if i not in parsed_data.list2exclude]
 
     return deriv_data, allstates, harmonic_states, mode_indices
+
+def pairwise_differences(A, B):
+    """
+    chatgpt
+
+    for vib levels diffs tensors
+    """
+    a = np.asarray(A)
+    b = np.asarray(B)
+
+    # Reshape a to (a₁, ..., aₙ, 1, ..., 1) with m trailing 1s
+    a_broad = a.reshape(*a.shape, *([1] * b.ndim))
+
+    # Reshape B to (1, ..., 1, b₁, ..., bₘ) with n leading 1s
+    b_broad = b.reshape(*([1] * a.ndim), *b.shape)
+
+    return a_broad - b_broad

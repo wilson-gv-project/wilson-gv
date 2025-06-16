@@ -4,10 +4,11 @@ Each test creates own instances of Term2D
 """
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.spectrum.term_evaluation import Term2D, TermsEvaluator, VibStatesDiff
+from wilson.spectrum.term_evaluation import Term2D, TermsEvaluator
+from wilson.spectrum.termeval_util_classes import VibStatesDiff
 from wilson.utils import Conditions, prep_data_load
 
-from test_utils import require_asserts
+from testing_utils import require_asserts
 
 from CQCParse.parsing import GaussianParser, GaussianOutput
 from CQCParse.relay import DataVault
@@ -19,16 +20,6 @@ cqc_debug.level = 0
 
 print()
 
-# allterms_str =     {
-#     0: ((('a+b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))), 1/24),
-#     1: ((('b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))), 1/24)),
-#     2: ((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.), -1/48.),
-#     3: ((('b,a', 'zero,a'), ('a+c,b', 'b+c,a')), (('mu_Q', ('a',)), ('alpha_Q', ('c',)), ('mu_Q', ('b',)), 'acb', 1.), -1/48.),
-#     4: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc', 0.5), -1/48.),
-#     5: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', 0.5), -1/48.),
-#     6: ((('b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc', -0.5), -1/48.),
-#     7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', -0.5, -1/48.))
-#     }
 
 allterms_str = { 0:
                      # {'resonance': (('a+b,a', 'zero,a'), None),
@@ -148,12 +139,15 @@ def test_instance():
     assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
     assert t3.expression['non_averaged_props'][0] == ('F', ('a', 'c', 'b'))
 
-    for k in t0.expression:
-        print(k, t0.expression[k])
+    # for k in t0.expression:
+    #     print(k, t0.expression[k])
+    print(t0)
     print()
 
-    for k in t3.expression:
-        print(k, t3.expression[k])
+    # for k in t3.expression:
+    #     print(k, t3.expression[k])
+
+    print(t3)
     print()
     # print(t3.expression)
     # print(t3.vibstatesdiff_objs)
@@ -201,25 +195,25 @@ def test_load_data():
     assert t0.allstates[('3',)] == 1794.5406564861917
 
 
-# def test_amplitude_1term_single_point():
-#     print()
-#
-#     t0 = Term2D(0, allterms_str[0])
-#     parsed_data = parser.parse(linear_molecule=False)
-#
-#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-#     parsed_data.upd_indices_several_parts(old_new_dict)
-#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
-#
-#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-#                       mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
-#     amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
-#                                         collect_all=True, sel_abs=[(5,0)])
-#     # assert
-#     print(t0.get_resonance_location(5, 0))
-#     print(amplitude_single)
-#
-#
+def test_amplitude_1term_single_point():
+    print()
+
+    t0 = Term2D(0, allterms_str[0])
+    parsed_data = parser.parse(linear_molecule=False)
+
+    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+    parsed_data.upd_indices_several_parts(old_new_dict)
+    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
+
+    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+                      mode_indices=mode_indices, gammaCompsAll=gammaCompsAll)
+    amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
+                                        collect_all=True, sel_abs=[(5,0)])
+    # assert
+    print(t0.get_resonance_location(5, 0))
+    print(amplitude_single)
+
+
 # def test_amplitude_1term_grid():
 #     print()
 #     parsed_data = parser.parse(linear_molecule=False)
@@ -271,7 +265,9 @@ def test_identify_to_precalculate():
     print('Unique types of resonance conditions: ', tts.unique_res_conds)
     print('Unique indices sets in orient. avrg.: ', tts.unique_avrg_tensors_all)
     print('Unique vib. ene. denominators (1/omega_a/omega_b...): ', tts.unique_vibene_denoms)
-    print('Unique vib diff types:', set(tts.mn_types))
+    print('Unique vib diff types - tuples, all:', set(tts.mn_types))
+    print('Unique vib diff types - all', set([i for t in terms for i in t.vibdiff_symbolic]))
+
     assert set(tts.mn_types) == {VibStatesDiff((0, 1)), VibStatesDiff((1, 2)),
                                  VibStatesDiff((2, 1)), VibStatesDiff((1, 1)), VibStatesDiff((3, 0))}
     print()
@@ -354,8 +350,8 @@ def test_precalc_avrg_tensors():
     }
 
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll[:3])
-    assert stored[0][1,1] == 60.4
-    assert stored[0][1,0] == 4.6
+    assert stored[((1, 1), (2, 1), (1, 2))][1,1] == 60.4 # term 0
+    assert stored[((1, 1), (2, 1), (1, 2))][1,0] == 4.6 # term 0
 
     t1 = Term2D(1, allterms_str[1])
     t2 = Term2D(2, allterms_str[2])
@@ -365,11 +361,13 @@ def test_precalc_avrg_tensors():
     tts.identify_to_precalculate()
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll)
 
-    assert stored[3][1,1,1] == 392.4
-    assert stored[1][0,0] == 12.
-    assert stored[3][1,0,1] == 106.8
+    assert stored[((1, 1), (2, 1), (1, 1))][1,1,1] == 392.4
+    assert stored[((1, 1), (2, 2), (1, 1))][0,0] == 12.
+    assert stored[((1, 1), (2, 1), (1, 1))][1,0,1] == 106.8
 
-    assert list(stored.keys()) == [0,1,3]
+    assert sorted(list(stored.keys())) == sorted([((1, 1), (2, 1), (1, 2)),
+                                   ((1, 1), (2, 1), (1, 1)),
+                                   ((1, 1), (2, 2), (1, 1))])
 
 
 @require_asserts
@@ -393,10 +391,13 @@ def test_precalc_res_conds():
     print('set of res cond types', set_rc_types)
     assert sorted(list(set_rc_types)) == sorted(list({(-1, 2), (-1,)}))
 
-    set_mn_types = set([i[0] for i in tts.unique_res_conds])
-    print('set of w_m,n types', set_mn_types)
-    print('set(self.mn_types)',  set(tts.mn_types))
+    print('set(tts.mn_types)',  set(tts.mn_types))
+    print('Quanta for states involved:', set([i for v in set(tts.mn_types) for i in v.diff_type if i>0 ]))
 
+    # set_mn_types = set([i[0] for i in tts.unique_res_conds])
+    # print('set of w_m,n types', set_mn_types)
+    # Unique vib diff types - all
+    #   {'b,a', 'b+c,a', 'zero,a', 'a+b+c,zero', 'a+c,b', 'a+b,a', 'c,a+b'}
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
@@ -404,6 +405,7 @@ def test_precalc_res_conds():
 
     freqs = np.array([2., 4., 8.])
     pf_types = tts.precalc_res_conds(axes_dict, freqs)
+
     print('\nresult of precalc', pf_types)
     assert np.allclose(pf_types[(1, -2)], np.array([[ -6.,  -4.,   0.],
                                                     [-14., -12.,  -8.],
@@ -413,16 +415,115 @@ def test_precalc_res_conds():
                                                  [2., 4., 8.],
                                                  [2., 4., 8.]]))
 
-    rrr = tts.precalc_vibdiffs(freqs, 3)
-    print(rrr)
+@require_asserts
+def test_precalc_vibdiffs():
+    """
+    simple states indexing
+    """
+    print()
 
-    assert sorted(list(rrr.keys())) == [1, 2, 3]
-    assert rrr[1].shape == (3,)
-    assert rrr[2].shape == (3,3)
-    assert rrr[3].shape == (3,3,3)
+    t0 = Term2D(0, allterms_str[0])
+    t1 = Term2D(1, allterms_str[1])
+    t2 = Term2D(2, allterms_str[2])
+    t3 = Term2D(3, allterms_str[3])
+    terms = [t0, t1, t2, t3]
+
+    tts = TermsEvaluator(terms)
+    tts.identify_to_precalculate()
+
+    states = {0: 0.,
+              1: np.array([1, 100, 1000]),
+              2: np.array([[20, 200, 2000],
+                           [200, 40, 400],
+                           [2000, 400, 80]]),
+              3: np.array([[[ 1.,  2.,  3.],
+                            [ 2.,  4.,  5.],
+                            [ 3.,  5.,  6.]],
+
+                           [[ 2.,  4.,  5.],
+                            [ 4.,  7.,  8.],
+                            [ 5.,  8.,  9.]],
+
+                           [[ 3.,  5.,  6.],
+                            [ 5.,  8.,  9.],
+                            [ 6.,  9., 10.]]])}
+
+    assert states[3][1,0,1] == states[3][1,1,0] == states[3][0,1,1]
+    assert states[3][0,1,2] == states[3][1,0,2] == states[3][2,1,0] == states[3][2,0,1]
+
+    rrr = tts.precalc_vibdiffs(states)
+    assert sorted(list(rrr.keys())) == sorted([(0, 1), (1, 2), (1, 1), (0, 3)])
+    assert rrr[(0, 1)].shape == (3,)
+    assert rrr[(1, 1)].shape == (3,3)
+    assert rrr[(1, 2)].shape == (3,3,3)
+    assert rrr[(0, 3)].shape == (3,3,3)
+
+    assert rrr[(0, 1)][1] == -states[1][1]
+    assert rrr[(1, 1)][1,2] == states[1][1] - states[1][2]
+    assert rrr[(1, 1)][0,2] == states[1][0] - states[1][2]
+    assert rrr[(1, 1)][2,1] == states[1][2] - states[1][1]
+
+    assert rrr[(0, 3)][1,2,0] == -states[3][1,0,2]
+    assert rrr[(1, 2)][1,2,0] == states[1][1] - states[2][2,0]
+    assert rrr[(1, 2)][1,2,1] == states[1][1] - states[2][2,1] # repeated index
+    assert rrr[(1, 2)][1,2,0] == states[1][1] - states[2][0,2] # symmetry
+    assert rrr[(1, 2)][1,2,0] != states[1][2] - states[2][2,1] # wrong indexing
+
+    # print(t3.vibdiff_symbolic)
 
     print()
 
 
-# def test_precalculate():
-#     pass
+@require_asserts
+def test_precalculate():
+    print()
+
+    t0 = Term2D(0, allterms_str[0])
+    t1 = Term2D(1, allterms_str[1])
+    t2 = Term2D(2, allterms_str[2])
+    t3 = Term2D(3, allterms_str[3])
+    terms = [t0, t1, t2, t3]
+
+    tts = TermsEvaluator(terms)
+    tts.identify_to_precalculate()
+
+    states = {0: 0.,
+              1: np.array([1, 100, 1000]),
+              2: np.array([[20, 200, 2000],
+                           [200, 40, 400],
+                           [2000, 400, 80]]),
+              3: np.array([[[1., 2., 3.],
+                            [2., 4., 5.],
+                            [3., 5., 6.]],
+
+                           [[2., 4., 5.],
+                            [4., 7., 8.],
+                            [5., 8., 9.]],
+
+                           [[3., 5., 6.],
+                            [5., 8., 9.],
+                            [6., 9., 10.]]])}
+
+    freqs = np.array([2., 4., 8.])
+
+    axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
+    x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
+    axes_dict = {1: x, 2: y}
+    Nnmodes = 3
+    data = {
+        (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
+        (1, 2): np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
+        (2, 1): np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
+        (2, 2): np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
+    }
+    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+
+
+    alldata = [freqs, Nnmodes, data, avrg_terms, axes_dict, states]
+    big_dict = tts.precalculate(alldata)
+
+    print('\nPrecalculated stuff\n')
+    for k in big_dict:
+        print('   >>>', k)
+        print(big_dict[k])
+        print('---')

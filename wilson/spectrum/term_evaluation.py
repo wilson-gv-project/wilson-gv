@@ -4,98 +4,11 @@ import string
 import numpy as np
 from dataclasses import dataclass, field
 from collections import Counter
-from .tools import convNu2Ene, combinations_with_permutations, DoubleDict
+from .tools import convNu2Ene, combinations_with_permutations
+from .termeval_util_classes import MolProperty, AveragedProps, VibStatesDiff, DoubleDict
+from wilson.utils import pairwise_differences
 from wilson.debug import debugfunc, debug_deep
 
-@dataclass
-class MolProperty:
-    """
-    MolProperty(name='mu_Q', cart_axes=('B',), nm_indices=('a',)),
-    MolProperty(name='mu_QQ', cart_axes=('G',), nm_indices=('a', 'b'))
-
-    MolProperty(name='alpha_Q', cart_axes=('A', 'D'), nm_indices=('b',)),
-    MolProperty(name='alpha_QQ', cart_axes=('A', 'D'), nm_indices=('a', 'b')),
-
-    MolProperty(name='CFF', cart_axes=(), nm_indices=('a', 'b', 'c'))
-
-    """
-    name: str
-    cart_axes: tuple[str]
-    nm_indices: tuple[str]
-    tensor: np.ndarray = 0.
-
-    @property
-    def simple_tuple(self):
-        """
-        len(self.cart_axes) - number of EL perturbations
-        len(self.nm_indices) - number of normal coordinates derivatives
-        """
-        return tuple([len(self.cart_axes), len(self.nm_indices)])
-
-    # def __repr__(self):
-        # return rf'\{self.name.strip("_Q")}_{','.join(list(self.cart_axes))}__dQ{','.join(list(self.nm_indices))}'
-        # return f'{self.simple_tuple}'
-
-
-@dataclass
-class VibState:
-    quanta_dict: dict
-    freq: float
-
-
-@dataclass
-class VibStatesDiff:
-    diff_type: tuple
-
-    def __eq__(self, other):
-        if not isinstance(other, VibStatesDiff):
-            return False
-        return (
-            self.diff_type == other.diff_type
-        )
-
-    def __hash__(self):
-        # Since Counter doesn't have a hash, we convert it to a frozenset of items
-        return hash(self.diff_type)
-
-    def __repr__(self):
-        return f'VibStatesDiff: {self.diff_type}'
-
-
-@dataclass
-class AveragedProps:
-    props: List[MolProperty] = field(default_factory=list)
-
-    @property
-    def cart_axes(self):
-        return tuple([p.cart_axes for p in self.props])
-
-    @property
-    def nm_indices(self):
-        return tuple([p.nm_indices for p in self.props])
-
-    # def __eq__(self, other):
-    #     if not isinstance(other, AveragedProps):
-    #         return False
-    #     return (
-    #         self.cart_axes == other.cart_axes and
-    #         Counter(self.nm_indices) == Counter(other.nm_indices)
-    #     )
-
-    def __eq__(self, other):
-        if not isinstance(other, AveragedProps):
-            return False
-        return (
-            self.cart_axes == other.cart_axes and
-            sorted(self.nm_indices) == sorted(other.nm_indices)
-        )
-
-    def __hash__(self):
-        # Since Counter doesn't have a hash, we convert it to a frozenset of items
-        return hash((self.cart_axes, frozenset(Counter(self.nm_indices).items())))
-
-    def __repr__(self):
-        return f'\nAveragedProps:\n   {self.cart_axes}\n   {self.nm_indices}\n'
 
 
 class Term2D:
@@ -187,8 +100,10 @@ class Term2D:
         # self.property_tuple1, self.property_tuple2, self.property_tuple3 = self.property_tuples
 
         # collecting vib ene diffs
+        self.vibdiff_symbolic = []
         vibstates_diffs_collection = []
         for re in self.resonances_expr:
+            self.vibdiff_symbolic.append(re[0])
             l = re[0].split(',')
             ftuple = []
             for ll in l:
@@ -198,6 +113,8 @@ class Term2D:
                     ftuple.append(0)
             vibstates_diffs_collection.append(tuple(ftuple))
         for vd in self.viblevelsdiff_expr:
+            self.vibdiff_symbolic.append(vd)
+
             l = vd.split(',')
             ftuple = []
             for ll in l:
@@ -231,7 +148,11 @@ class Term2D:
 
 
     def __repr__(self):
-        return f'{self.term_label} - {self.term_id}'
+        s = f'{self.term_label} - {self.term_id}\n'
+        for p in self.expression:
+            s += f'\n    {p}'.ljust(25, ' ')+f'{self.expression[p]}'
+
+        return s
 
 
     def for_ab(self, a,b):
@@ -451,13 +372,15 @@ class Term2D:
         t2 = np.zeros((max(self.mode_indices)+1, max(self.mode_indices)+1))
         t3 = np.zeros((max(self.mode_indices)+1, max(self.mode_indices)+1, max(self.mode_indices)+1))
 
-        for a in self.mode_indices:
-            for b in self.mode_indices:
-                if self.term_label == 'EL':
-                    t2[(a, b)] = method(a, b)
-                else:
-                    for c in self.mode_indices:
-                        t3[(a, b, c)] = method(a, b, c)
+        # for a in self.mode_indices:
+        #     for b in self.mode_indices:
+        for ab in combinations_with_permutations(self.mode_indices, 2):
+            a,b = ab
+            if self.term_label == 'EL':
+                t2[(a, b)] = method(a, b)
+            else:
+                for c in self.mode_indices:
+                    t3[(a, b, c)] = method(a, b, c)
 
         all_zeros_t2 = not np.any(t2)
 
@@ -543,29 +466,33 @@ class Term2D:
     def get_term_tree(self):
 
         components = {}
-        for a in self.mode_indices:
-            for b in self.mode_indices:
-                if self.term_label == 'EL':
-                    # components[((a,b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_full_factor(gammaCompsAll, properties_data,
-                    #                                          modes_dict, a,b)
-                    components[(a, b)] = self.get_full_factor(a, b)
-                elif self.term_label == 'MECH':
-                    # components[((a, b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_factor_summed(gammaCompsAll, properties_data,
-                    #                                             modes_dict, mode_indices, a, b)
-                    components[(a, b)] = self.get_factor_summed(a, b)
+        # for a in self.mode_indices:
+        #     for b in self.mode_indices:
+        for ab in combinations_with_permutations(self.mode_indices, 2):
+            a, b = ab
+            if self.term_label == 'EL':
+                # components[((a,b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_full_factor(gammaCompsAll, properties_data,
+                #                                          modes_dict, a,b)
+                components[(a, b)] = self.get_full_factor(a, b)
+            elif self.term_label == 'MECH':
+                # components[((a, b), (self.get_resonance_location(modes_dict, a, b)))] = self.get_factor_summed(gammaCompsAll, properties_data,
+                #                                             modes_dict, mode_indices, a, b)
+                components[(a, b)] = self.get_factor_summed(a, b)
         return components
 
 
     def get_all_resonances(self, w2mw1=False):
         res = {}
-        for a in self.mode_indices:
-            for b in self.mode_indices:
-                w1, w2 = self.get_resonance_location(a, b)
+        # for a in self.mode_indices:
+        #     for b in self.mode_indices:
+        for ab in combinations_with_permutations(self.mode_indices, 2):
+            a, b = ab
+            w1, w2 = self.get_resonance_location(a, b)
 
-                if w2mw1:
-                    res[(a,b)] = (w1, w2-w1)
-                else:
-                    res[(a,b)] = (w1, w2)
+            if w2mw1:
+                res[(a,b)] = (w1, w2-w1)
+            else:
+                res[(a,b)] = (w1, w2)
         return res
 
 
@@ -576,34 +503,34 @@ class Term2D:
 
         """
         result = 0.
-
         skipped = 0
 
         # self.layers = {}
 
-        for a in self.mode_indices:
-            for b in self.mode_indices:
+        # for a in self.mode_indices:
+        #     for b in self.mode_indices:
+        for ab in combinations_with_permutations(self.mode_indices, 2):
+            a, b = ab
+            if sel_abs is not None:
+                if (a,b) not in sel_abs:
+                    skipped+=1
+                    print('skipped', (a, b))
+                    continue
 
-                if sel_abs is not None:
-                    if (a,b) not in sel_abs:
-                        skipped+=1
-                        print('skipped', (a, b))
-                        continue
-
-                w1ab, w2ab = self.get_resonance_location(a, b)
-                # check if resonance is in window w1,w2
-                # if it's a single pair of w1,w2 -
-                if w2ab>w1ab:
-                    if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
-                            and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
-                            and (w2ab-margin)>w1ab) or collect_all:
-                        result += self.get_intensity_ab(a, b, w1, w2, Gamma_rc,
-                              condition=condition)[0]
-                        # print('added')
-                    else:
-                        skipped += 1
-                        print('skipped later', (a,b))
-                        continue
+            w1ab, w2ab = self.get_resonance_location(a, b)
+            # check if resonance is in window w1,w2
+            # if it's a single pair of w1,w2 -
+            if w2ab>w1ab:
+                if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+                        and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+                        and (w2ab-margin)>w1ab) or collect_all:
+                    result += self.get_intensity_ab(a, b, w1, w2, Gamma_rc,
+                          condition=condition)[0]
+                    # print('added')
+                else:
+                    skipped += 1
+                    print('skipped later', (a,b))
+                    continue
 
         # print('skipped', skipped)
         # ab_combinations = list(combinations_with_permutations(self.mode_indices, 2))
@@ -649,11 +576,13 @@ class Term2D:
 
         viblevelsdiff_tensor = np.zeros((max(self.mode_indices)+1, max(self.mode_indices)+1, max(self.mode_indices)+1))
         viblevelsdiff_tensor2 = np.zeros((max(self.mode_indices)+1, max(self.mode_indices)+1, max(self.mode_indices)+1, 2))
-        for a in self.mode_indices:
-            for b in self.mode_indices:
-                for c in self.mode_indices:
-                    viblevelsdiff_tensor[a, b, c] = self.get_viblevelsdiff(a, b, c)[0]
-                    viblevelsdiff_tensor2[a, b, c, :] = self.get_viblevelsdiff(a, b, c)[1]
+        # for a in self.mode_indices:
+        #     for b in self.mode_indices:
+        #         for c in self.mode_indices:
+        for abc in combinations_with_permutations(self.mode_indices, 3):
+            a, b, c = abc
+            viblevelsdiff_tensor[a, b, c] = self.get_viblevelsdiff(a, b, c)[0]
+            viblevelsdiff_tensor2[a, b, c, :] = self.get_viblevelsdiff(a, b, c)[1]
 
         return viblevelsdiff_tensor, viblevelsdiff_tensor2
 
@@ -697,56 +626,6 @@ class Term2D:
         return df, distances
 
 
-
-
-
-@dataclass
-class SpectrumExperimentSetup:
-    Gamma_rc: float
-    e_selected: list
-    m_selected: list
-    fundamentals_harmonic: dict
-    fundamentals: dict
-    all_states: dict
-    mode_indices: list | np.ndarray
-    vib_levels_harmonic: bool
-    maxYX: float
-
-
-class TermStorage:
-    """Stores and manages multiple Term2D objects."""
-    def __init__(self):
-        self.terms = {}
-        self.terms_amplitudes = {}  # Dictionary: term_id -> Term2D object
-
-    # def add_term(self, term: Term2D):
-    #     """Adds a Term2D object to storage."""
-    #     if term.term_id in self.terms:
-    #         print(f"Warning: Overwriting existing term {term.term_id}")
-    #     self.terms[term.term_id] = term
-    #
-    # def calculate_all(self, settings):
-    #     """Runs calculations for all stored terms."""
-    #     for k, term in self.terms.items():
-    #         self.terms_amplitudes[k] = term.get_intensity(settings.w1, settings.w2,
-    #                                                       settings.properties_data,
-    #                                                       settings.modes_dict,
-    #                                                       settings.mode_indices,
-    #                                                       settings.Gamma_rc,
-    #                                                       settings.margin,
-    #                                                       condition=settings.condition)
-    #
-    # def get_amplitude(self, term_id):
-    #     """Retrieves the calculated result for a specific term."""
-    #     return self.terms_amplitudes[term_id] if term_id in self.terms else None
-    #
-    # def filter_terms(self, condition_fn):
-    #     """Filters terms based on a given function."""
-    #     return {tid: term for tid, term in self.terms.items() if condition_fn(term)}
-
-
-    def __repr__(self):
-        return f"TermStorage({len(self.terms)} terms)"
 
 
 class TermsEvaluator:
@@ -823,7 +702,8 @@ class TermsEvaluator:
             self.unique_avrg_tensors_all[k] = max(self.unique_avrg_tensors_all[k])
         # print('self.unique_avrg_tensors_all', self.unique_avrg_tensors_all)
 
-        self.props_cart_ax = [[p.cart_axes for p in t.properties] for t in self.terms.values()]
+        # FIXME: NOT IN USE
+        # self.props_cart_ax = [[p.cart_axes for p in t.properties] for t in self.terms.values()]
         # print('self.props_cart_ax', self.props_cart_ax)
 
         # (3) IDENTIFYING 1/omega_a/omega_b, 1/omega_a/omega_b/omega_c terms - to make nD tensors of products
@@ -832,8 +712,12 @@ class TermsEvaluator:
 
         # self.uProps = [AveragedProps(t.properties) for t in self.terms]
 
-        # (4) IDENTIFYING vib states diffs types
+        # (4) IDENTIFYING vib states diffs types - all
         self.mn_types = [i for t in self.terms.values() for i in t.vibstatesdiff_objs]
+
+        # (5) IDENTIFYING numbers of quanta in state
+        # FIXME: NOT IN USE
+        # self.quanta_numbers = set([i for v in set(self.mn_types) for i in v.diff_type if i > 0])
 
 
     def precalc_vibene_denoms(self, freqs):
@@ -860,10 +744,13 @@ class TermsEvaluator:
             self.terms[tID] so it's a dict;
         """
         terms_for_avrg_tensors = self.unique_avrg_tensors_tID
+        # print('  >>>>>>>>>>>>  terms_for_avrg_tensors', terms_for_avrg_tensors)
+        # print('  >>>>>>>>>>>>  self.unique_avrg_tensors_all', self.unique_avrg_tensors_all)
         storage_tensors = {}
 
         for tID in terms_for_avrg_tensors:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
+            print('  >>>>>>>>>>>>  simple_prop_tuple', simple_prop_tuple)
             nm_indices = self.terms[tID].nice_props.nm_indices
             cart_indices = self.terms[tID].nice_props.cart_axes
             # print('nm_indices', nm_indices)
@@ -899,45 +786,37 @@ class TermsEvaluator:
                     total += product
                 avrg_tensor[abcde_comb] = total / 15.
 
-            storage_tensors[tID] = avrg_tensor
+            # storage_tensors[tID] = avrg_tensor
+            storage_tensors[simple_prop_tuple] = avrg_tensor
         return storage_tensors
 
 
-    def precalc_vibdiffs(self, states, Nnmodes):
+    def precalc_vibdiffs(self, qstates):
         """
         states - dict of state_idx_label_tuple(?) : frequency (cm-1)
 
 
         types of vib diffs: (0, 1), (1, 0), (2, 1), (1, 2), (2, 0), (0, 2)...
 
+        states = {0: 0.,
+                  1: np.zeros(Nnmodes),
+                  2: np.zeros((Nnmodes, Nnmodes)),
+                  3: np.zeros((Nnmodes, Nnmodes, Nnmodes),}
         """
         res = {}
-        dims = [sum(list(t.diff_type)) for t in set(self.mn_types)]
-        print('set(dims)', set(dims))
 
-        for d in set(dims):
-            shape = (Nnmodes,) * d
-            res[d] = np.zeros(shape)
-
+        for d in self.mn_types:
+            sort_d = sorted(d.diff_type)
+            diff = pairwise_differences(qstates[sort_d[0]], qstates[sort_d[1]])
+            res[tuple(sort_d)] = diff
+            
         # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
+        # from 2d array subtract 1d array => from each row subtract this 1d array
+        # then it means: quant2[0,1] is quant2[a,b] - quant1[a] = diff2_1[b,a]
 
-        """
-        >>> B-A
-        array([[0.2, 0.4, 0.6],
-               [3.8, 4. , 4.2],
-               [7.4, 7.6, 7.8]])
-        >>> B
-        array([[ 1.2,  2.4,  3.6],
-               [ 4.8,  6. ,  7.2],
-               [ 8.4,  9.6, 10.8]])
-        >>> A
-        array([1., 2., 3.])
-
-        >>> B[0,1]-A[1] == (B-A)[0,1]
-        np.True_
-        >>> B[1,0]-A[0] == (B-A)[1,0] - B contains (a+b) states B[a,b]  
-        np.True_
-        """
+        # state1, state2, state2-state1
+        # harmonic state is given by index of NM
+        # complex state has a composition, and will have a new label
 
         return res
 
@@ -963,7 +842,7 @@ class TermsEvaluator:
         # print('all_axes', all_axes)
         # axes_dict = {k:None for k in all_axes} # todo: how to somewhat automatically fill in this dict? input for now
 
-        print('uq_pert_freq_arrays', uq_pert_freq_arrays)
+        # print('uq_pert_freq_arrays', uq_pert_freq_arrays)
 
         # collect types of pert freqs arrangements
         for pfs in uq_pert_freq_arrays:
@@ -980,7 +859,7 @@ class TermsEvaluator:
             states_mn.append(n)
 
             # result_mns[mn] = 0.
-        print('states_mn', set(states_mn))
+        # print('states_mn', set(states_mn))
 
         return result_pfs#, result_mns
 
@@ -990,13 +869,41 @@ class TermsEvaluator:
         requires identified parts for precalculation and external data
 
         """
-        freqs, Nnmodes, data, avrg_terms = alldata # todo: set this up better
+        freqs, Nnmodes, data, avrg_terms, axes_dict, states = alldata # todo: set this up better
+        # --> freqs so far: freqs = np.array([2., 4., 8.])
+        # axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
+        # x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
+        # --> axes_dict = {1: x, 2: y}
 
-        self.precalc_vibene_denoms(freqs)
-        self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
-        # self.precalc_res_conds()
+        a = self.precalc_vibene_denoms(freqs) # what are freqs?
+        b = self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
+        c = self.precalc_res_conds(axes_dict, freqs)
+        d = self.precalc_vibdiffs(states) # freqs should be qstates
+
+        return {'vibene_denoms': a,
+                'avrg_tensors': b,
+                'res_conds': c,
+                'vibdiffs': d}
 
 
+    def compute_intensity(self, w1, w2, Gamma_rc=3.8,margin=0.):
+
+        tot = 0.
+        for tID in self.terms:
+            tot += self.terms[tID].get_intensity(w1, w2, Gamma_rc, margin)
+            # term, w1, w2, Gamma_rc, margin,
+            #       condition=None, collect_all=False, sel_abs=None
+            # self.mode_indices should be there
+            # self.allstates should be there....
+            # self.allstates_E
+            #   dict_mn_tuples = self.for_ab(a, b)
+            # self.get_full_factor(a, b, comps=True)
+            # self.get_res_factor(w1, w2, a, b, Gamma_rc, condition)
+            # self.get_factor_summed(a, b, comps=True)
+            #  result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
+            #  result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
+            #       A resonance factor for this term for ab combination of modes
+            #         w1_rc, w2_rc - frequency arguments w1,w2 in reciprocal cm
 
 def get_data_keys(input_tuple, variables, greek_dict):
     """
@@ -1067,12 +974,14 @@ def get_resonance_location(resonances_expr, modes_dict, a, b):
 
 def get_all_resonances(resonances_expr, modes_dict, mode_indices, w2mw1=False):
     res = {}
-    for a in mode_indices:
-        for b in mode_indices:
-            w1, w2 = get_resonance_location(resonances_expr, modes_dict, a, b)
+    # for a in mode_indices:
+    #     for b in mode_indices:
+    for ab in combinations_with_permutations(mode_indices, 2):
+        a, b = ab
+        w1, w2 = get_resonance_location(resonances_expr, modes_dict, a, b)
 
-            if w2mw1:
-                res[(a,b)] = (w1, w2-w1)
-            else:
-                res[(a,b)] = (w1, w2)
+        if w2mw1:
+            res[(a,b)] = (w1, w2-w1)
+        else:
+            res[(a,b)] = (w1, w2)
     return res

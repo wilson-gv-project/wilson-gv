@@ -44,22 +44,6 @@ class Conditions:
     preview: bool = False
 
 
-class DoubleDict:
-    def __init__(self):
-        self.kv = {}
-        self.vk = {}
-
-    def add(self, k, v):
-        self.kv[k] = v
-        self.vk[v] = k
-
-    def get_by_key(self, k):
-        return self.kv.get(k)
-
-    def get_by_value(self, v):
-        return self.vk.get(v)
-
-
 def avrg_abc_tensor(formula: tuple,
                     data: dict[str:np.ndarray], gammaCompsAll: np.array) -> np.ndarray:
     """
