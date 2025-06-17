@@ -351,31 +351,14 @@ class wilsonSimulations:
 # "Plain" spectral axis for rendering response function freq arg spectra with independent lineshape functions
 class spectralAxis:
 
-	def __init__(self, freq_vars, start=None, end=None, n_pts=None, spacer=None):
+	def __init__(self, freq_vars, range_style, start=None, end=None, n_pts=None, spacer=None, custom_range=None):
+
+		# range_style: 'none', 'uniform', 'custom'
 
 		# Must be dictionary: {freq label 1 in this axis: coeff, ...}
 		self.fv = freq_vars
 
-		# Start, end, increment
-		self.start = start
-		self.end = end
-		# Only one of these may be defined
 
-		if (n_pts is not None) and (spacer is not None):
-			raise AssertionError('A maximum of one of the arguments n_pts and spacer may be specified')
-
-		if n_pts is not None:
-		
-			self.n_pts = n_pts
-			self.spacer = (self.end - self.start)/(self.n_pts + 1)
-			
-		else:
-		
-			self.spacer = spacer
-			# Underflow possible
-			self.n_pts = int((self.end - self.start)/self.spacer + 1) 
-			if not(self.end == self.start + self.spacer*(self.n_pts - 1)):
-				print('NOTE: Axis defined end', self.end, 'not precisely at spacer increment of start')
 
 
 # TODO: Implement
@@ -387,9 +370,50 @@ class spectralAxisAdvanced:
 		pass
 
 # Spectral collective axes
-class spectralAxes:
+class spectralGrid:
 
-	def __init__(self, axes, collective_grid=None):
+	def __init__(self, axes, range_style, start=None, end=None, n_pts=None, spacer=None, custom_range=None, collective_grid=None):
+
+		self.start = None
+		self.end = None
+		self.n_pts = None
+		self.range = None
+
+		if (range_style == 'uniform'):
+
+			self.start = start
+			self.end = end
+			self.n_pts = n_pts
+
+			if (n_pts is not None) and (spacer is not None):
+				raise AssertionError('A maximum of one of the arguments n_pts and spacer may be specified')
+
+			if n_pts is not None:
+
+				spacer = (self.end - self.start)/(self.n_pts + 1)
+
+			elif spacer is not None:
+
+				# Underflow possible
+				self.n_pts = int((self.end - self.start)/spacer + 1)
+				if not(self.end == self.start + spacer*(self.n_pts - 1)):
+					print('NOTE: Axis defined end', self.end, 'not precisely at spacer increment of start')
+
+			else:
+
+				raise AssertionError('For uniform grid, must specify either spacer or n_pts')
+			# fixme?
+			import numpy as np
+			self.range = np.arange(start, end, spacer)
+
+		if(range_style == 'custom'):
+
+			self.start = custom_range[0]
+			self.end = custom_range[-1]
+			self.n_pts = len(custom_range)
+
+			self.range = custom_range
+
 
 		# Axes must be a dictionary {1: spectralAxisRsp/Advanced instance, 2: ...}
 		self.a = axes
