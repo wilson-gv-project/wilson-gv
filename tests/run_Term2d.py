@@ -135,9 +135,9 @@ for k in allstates:
         states[3][int(k[2]), int(k[1]), int(k[0])] = allstates[k]
         states[3][int(k[2]), int(k[0]), int(k[1])] = allstates[k]
 
-print(states[1])
-print()
-print(states[2])
+# print(states[1])
+# print()
+# print(states[2])
 
 freqs = states[1]
 data = {
@@ -199,3 +199,7 @@ alldata = [freqs, Nnmodes, data, avrg_terms, axes_dict, states]
 
 # precalculate stuff
 big_dict = tts.precalculate(alldata)
+
+#
+# if __name__ == "__main__":
+#     main()

@@ -129,7 +129,7 @@ class TermsEvaluator:
 
         for tID in terms_for_avrg_tensors:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
-            print('  >>>>>>>>>>>>  simple_prop_tuple', simple_prop_tuple)
+            # print('  >>>>>>>>>>>>  simple_prop_tuple', simple_prop_tuple)
             nm_indices = self.terms[tID].nice_props.nm_indices
             cart_indices = self.terms[tID].nice_props.cart_axes
             # print('nm_indices', nm_indices)
@@ -206,16 +206,18 @@ class TermsEvaluator:
         """
         requires:
             self.unique_res_conds
+
+        axes_dict - ??? {1: , 2: , 3: ....} pf labels: points array/meshgrid
         """
         result_pfs = {}
-        result_mns = {}
+        # result_mns = {}
 
         unique_pert_freq_arrangements = set([i[1] for i in self.unique_res_conds])
         unique_w_m7n = set([i[0] for i in self.unique_res_conds])
         implicit_minus_one = -1
 
         # set up terms to add together
-        uq_pert_freq_arrays = [implicit_minus_one*np.array(i) for i in unique_pert_freq_arrangements]
+        uq_pert_freq_arrays = [implicit_minus_one * np.array(i) for i in unique_pert_freq_arrangements]
 
         # all_axes = set([abs(i) for j in unique_pert_freq_arrangements for i in j]) # should help to set up axes_dict
         # print('all_axes', all_axes)
@@ -229,6 +231,9 @@ class TermsEvaluator:
             result_pfs[tuple(pfs)] = 0.
 
             for pf in pfs:
+                # print('type(axes_dict[abs(pf)])', type(axes_dict[abs(pf)]))
+                # print('type(axes_dict[abs(pf)])', axes_dict[abs(pf)])
+                # print('axes_dict[abs(pf)] , np.sign(pf):', axes_dict[abs(pf)] , np.sign(pf))
                 result_pfs[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
 
         states_mn = []

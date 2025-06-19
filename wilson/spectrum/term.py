@@ -104,7 +104,7 @@ class Term2D:
                     ftuple.append(len(set(ll.split('+'))))
                 else:
                     ftuple.append(0)
-            vibstates_diffs_collection.append(tuple(ftuple))
+            vibstates_diffs_collection.append((tuple(ftuple), True, re[1], re[0]))
         for vd in self.viblevelsdiff_expr:
             self.vibdiff_symbolic.append(vd)
 
@@ -116,9 +116,9 @@ class Term2D:
                 else:
                     ftuple.append(0)
 
-            vibstates_diffs_collection.append(tuple(ftuple))
+            vibstates_diffs_collection.append((tuple(ftuple), False))
         vibstates_diffs_collection = set(vibstates_diffs_collection)
-        self.vibstatesdiff_objs = [VibStatesDiff(i) for i in vibstates_diffs_collection]
+        self.vibstatesdiff_objs = [VibStatesDiff(*i) for i in vibstates_diffs_collection]
 
         self.part_prefactor = expression['termA_pref']
 
@@ -139,6 +139,8 @@ class Term2D:
         # addition = self.FacFull * self.RESCONDS
         #            self.FacFull = self.AVG * self.GP * self.TP * self.HEP * self.CFF * self.ODEN
 
+        self.precalc_data = None
+
 
     def __repr__(self):
         s = f'{self.term_label} - {self.term_id}\n'
@@ -152,18 +154,53 @@ class Term2D:
         """
 
         """
+        # print(a,b, '--------- a,b')
         a, b = str(a), str(b)
+
         dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+
         type12, type1 = self.resonances_expr
         m1_str, n1_str = type1[0].split(',')
-
+        # print('for ab - m1_str, n1_str', m1_str, n1_str)
         m1_tuple = tuple([str(dict_id[i]) for i in m1_str.split('+')])
         n1_tuple = tuple([str(dict_id[i]) for i in n1_str.split('+')])
 
         m12_str, n12_str = type12[0].split(',')
+        # print('for ab - m12_str, n12_str', m12_str, n12_str)
+        # print(m12_str.split('+'))
+        # print([dict_id[i] for i in m12_str.split('+')], '\nyo')
+        # print(dict_id)
+        # print([i for i in m12_str.split('+')], '\nyo')
+
         m12_tuple = tuple(sorted([str(dict_id[i]) for i in m12_str.split('+')], key=int))
         n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
         return {'m1_tuple': m1_tuple, 'n1_tuple': n1_tuple, 'm12_tuple': m12_tuple, 'n12_tuple': n12_tuple}
+
+
+    def for_ab_for_vd(self, vd, indices_str):
+        # indices_str = {'a': a, 'b': b, 'zero': 'zero'}
+
+        m12_str, n12_str = vd.diff_str.split(',')
+        # print('m12_str', m12_str)
+        # print('n12_str', n12_str)
+        # print('1', [str(indices_str[i]) for i in m12_str.split('+')])
+        # print('2', [str(indices_str[i]) for i in n12_str.split('+')])
+
+        # m12_tuple = tuple(sorted([str(indices_str[i]) for i in m12_str.split('+')], key=int))
+        # n12_tuple = tuple(sorted([str(indices_str[i]) for i in n12_str.split('+')], key=int))
+
+        # m12_tuple = tuple(sorted([indices_str[i] for i in m12_str.split('+')], key=int))
+        # n12_tuple = tuple(sorted([indices_str[i] for i in n12_str.split('+')], key=int))
+
+        # m12_tuple = tuple(sorted([indices_str[i] for i in m12_str.split('+')]))
+        # n12_tuple = tuple(sorted([indices_str[i] for i in n12_str.split('+')]))
+
+        m12_tuple = tuple([indices_str[i] for i in m12_str.split('+')])
+        n12_tuple = tuple([indices_str[i] for i in n12_str.split('+')])
+
+        # print('indices_str', indices_str)
+        # print('\nm12_tuple, n12_tuple', m12_tuple, n12_tuple)
+        return m12_tuple, n12_tuple
 
 
     def load_calc_data(self, allstates: dict, harmonic_states: dict, properties_data,
@@ -174,15 +211,22 @@ class Term2D:
 
         """
         self.allstates = allstates
-        self.allstates[('zero',)] = 0.
-
         self.allstates_Eh = {k: convNu2Ene(v) for k, v in self.allstates.items()}
-        self.allstates_Eh[("zero",)] = 0.0
 
         self.harmonic_states = harmonic_states
-        self.harmonic_states[('zero',)] = 0.
-
         self.harmonic_states_Eh = {k: convNu2Ene(v) for k, v in self.harmonic_states.items() if len(k)==1}
+
+        from .termeval_util_classes import dict2arraydict
+
+
+        self.states_arrays = dict2arraydict(self.allstates)
+        self.states_arrays_Eh = dict2arraydict(self.allstates_Eh)
+        self.harmonic_arrays = dict2arraydict(self.harmonic_states)
+        self.harmonic_arrays_Eh = dict2arraydict(self.harmonic_states_Eh)
+
+        self.allstates[('zero',)] = 0.
+        self.allstates_Eh[("zero",)] = 0.0
+        self.harmonic_states[('zero',)] = 0.
         self.harmonic_states_Eh[('zero',)] = 0.
 
         self.properties_data = properties_data
@@ -203,6 +247,63 @@ class Term2D:
         w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
 
         return w1, w2
+
+
+    # for given ab - good, modes_dict can be given elsewhere maybe, as a property for an instance
+    def get_resonance_location_general(self, a, b): # spectralAxes????
+        """
+        A resonance for this term for ab combination of modes
+
+        if [-12][-1]:
+                w1 = -mn_[-1]
+                # w1 would be the axis in type_rc_mn = mn_[-x]
+                        x = np.sign(type_rc[0]) * type_rc_mn where len(type_rc)==1 and e.g., type_rc_mn = mn_[-1]
+                w2 = mn_[-12] + w1
+        """
+        # a, b = str(a), str(b)
+        idx_str = {'a': a, 'b': b, 'zero': 'zero'} # , 'c': c, 'd'
+
+        if self.precalc_data is not None:
+            sorted_vib_diffs = sorted([i for i in self.vibstatesdiff_objs if i.res_cond],
+                                      key = lambda x: len(x.pf_type))
+
+            axes_locs = []
+            signes = []
+            for vd in sorted_vib_diffs:
+                indices_h = [k for i in vd.diff_str.split(',') for k in i.split('+') if k!='zero']
+
+                if not axes_locs:
+                    # fist identified axis
+                    # q = self.for_ab_for_vd(vd, idx_str)
+                    # print('aaaaa', q)
+                    idxs = tuple([idx_str[i] for i in indices_h])
+                    first_ax = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][idxs]
+                    axes_locs.append(first_ax * np.sign(vd.pf_type[0]))
+                    signes.append(np.sign(vd.pf_type[0]))
+                else:
+                    idxs = tuple([idx_str[i] for i in indices_h])
+                    next_sgn = np.sign(vd.pf_type[-1])
+                    next_axis = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][idxs]
+                    # fixme: implicit minus here , also need to sum all
+                    prev = np.sum(np.array(axes_locs) * np.array(signes))
+                    axes_locs.append((prev + next_axis * next_sgn) * (-1) )
+                    signes.append(next_sgn)
+        # else:
+            dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
+            # print(dict_mn_tuples)
+            w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
+            w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
+            print('w1, w2', w1, w2)
+            return axes_locs
+        else:
+            dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
+            # print(dict_mn_tuples)
+            w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
+            w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
+            print('w1, w2', w1, w2)
+            return w1, w2
+        # return w1, w2
+
 
     # for given ab - good, modes_dict and others can be given elsewhere maybe, as a property for an instance?? or how
     def get_res_factor(self, w1_rc, w2_rc, a, b, Gamma_rc, condition=None):
@@ -240,16 +341,17 @@ class Term2D:
 
         if self.term_label == 'MECH':
             # fixme
-            if (a,b,c) not in self.expression['CFF'][1]:
-                idx = [dict_id[i] for i in self.expression['CFF'][1]]
-                self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx]
-            propdict['F_abc'] = self.F_vals[(a,b,c)]
+            if (a,b,c) not in self.expression['CFF'][1]: # fixme: keys don't exist
+                idx = [dict_id[i] for i in self.expression['CFF'][1]] # fixme: key doesn't exist
+                self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx] # fixme: key doesn't exist
+            propdict['F_abc'] = self.F_vals[(a,b,c)] # fixme: keys don't exist
 
         return propdict
 
     # for given ab - good, gammaCompsAll and properties_data can be given elsewhere maybe,
     #                  as a property for an instance?? or how
     #               maybe make a polarization choice which chooses then gammaCompsAll or smth
+
     def get_avrg_properties(self, a, b, c=None, comps=False):
         components = {}
         total = 0.
@@ -354,6 +456,7 @@ class Term2D:
     #         return np.where(np.abs(t3)>threshold, t2, 0.)
 
 
+    # fixme: unused
     def fill_in_tensors(self, method, threshold=1e-18, use_threshold=False):
         """
         filling in 2d or 3d tensor with given method
@@ -456,8 +559,12 @@ class Term2D:
     #     else:
     #         return t2
 
-    def get_term_tree(self):
 
+    # fixme: unused
+    def get_term_tree(self):
+        """
+        shows contributions/components
+        """
         components = {}
         # for a in self.mode_indices:
         #     for b in self.mode_indices:
@@ -474,6 +581,7 @@ class Term2D:
         return components
 
 
+    # fixme: used in unused method
     def get_all_resonances(self, w2mw1=False):
         res = {}
         # for a in self.mode_indices:
@@ -494,6 +602,10 @@ class Term2D:
         """
         gamma = prefnum * prefene * avrg * resonance
 
+            ---->  New attributes after term.load_calc_data to term:
+        {'harmonic_states', 'allstates_Eh',
+            'allstates', 'harmonic_states_Eh',
+            'properties_data', 'gammaCompsAll', 'mode_indices'}
         """
         result = 0.
         skipped = 0
@@ -507,7 +619,7 @@ class Term2D:
             if sel_abs is not None:
                 if (a,b) not in sel_abs:
                     skipped+=1
-                    print('skipped', (a, b))
+                    debug_deep(f'skipped {(a, b)}', 'Term2D.get_intensity')
                     continue
 
             w1ab, w2ab = self.get_resonance_location(a, b)
@@ -522,7 +634,7 @@ class Term2D:
                     # print('added')
                 else:
                     skipped += 1
-                    print('skipped later', (a,b))
+                    debug_deep(f'skipped later {(a,b)}', 'Term2D.get_intensity')
                     continue
 
         # print('skipped', skipped)
@@ -547,24 +659,25 @@ class Term2D:
             product_all, components= self.get_full_factor(a, b, comps=True) # , components if comps==True
             product_all /= 24.
             # print(f"a,b: {(a, b)}, factor: {product_all:.2e}")
-            result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
-            return result, components
+            # result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
+            # return result, components
 
         else:
             product_all, components = self.get_factor_summed(a, b, comps=True) # , components if comps==True
             product_all /= -48.
 
-            shortcomponents = {}
+            components = {}
             # for k,v in components.items():
             #     if v[0]!=0.:
             #         shortcomponents[k] = {'full_product_abc':v[0], 'ene_factor':v[1]['ene_factor'],
             #                               'avrg_properties':v[1]['avrg_properties'][0],
             #                               'F_abc':v[1]['F_abc'],
             #                               'viblevelsdiff':v[1]['viblevelsdiff']}
-            result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
 
-            return result, shortcomponents
+        result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
+        return result, components
 
+    # fixme: unused
     def get_vibdiff_tensor(self):
 
         viblevelsdiff_tensor = np.zeros((max(self.mode_indices)+1, max(self.mode_indices)+1, max(self.mode_indices)+1))
@@ -580,8 +693,7 @@ class Term2D:
         return viblevelsdiff_tensor, viblevelsdiff_tensor2
 
 
-
-
+    # fixme: unused
     def get_dotspectrum_df(self, Gamma_rc, margin, condition=None):
         """
 
