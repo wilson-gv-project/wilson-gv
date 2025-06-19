@@ -34,8 +34,8 @@ class SpectrumFigure:
                          'norm_max': None, 'norm_min': None,
                          'levels': None, 'level_ticks': None,
                          'num_color_levels': None,
-                         'Gamma_rc': computedSpectrum.Gamma_rc,
-                         'electrical': computedSpectrum.e_selected, 'mechanical': computedSpectrum.m_selected}
+                         'Gamma_rc': None,
+                         'electrical': None, 'mechanical': None}
         self.settings.update(settings)
 
         if self.settings['omega1_minus_omega2']:
@@ -155,7 +155,7 @@ class SpectrumFigure:
 
                 min_dynrange = np.log10(normalized[1]) - dynrange_log
                 dt = - (np.log10(normalized[1]) - min_dynrange) / num_level_ticks
-                print(np.log10(normalized[1]), min_dynrange, round(dt,4))
+                # print(np.log10(normalized[1]), min_dynrange, round(dt,4))
                 levels_before_norm = np.sort(np.arange(np.log10(normalized[1]), min_dynrange, round(dt,4)))
 
                 self.levels = np.sort(np.arange(np.log10(normalized[1]),
@@ -360,7 +360,7 @@ class SpectrumFigure:
 
                 min_dynrange = np.log10(normalized[1]) - dynrange_log
                 dt = - (np.log10(normalized[1]) - min_dynrange) / num_level_ticks
-                print(np.log10(normalized[1]), min_dynrange, round(dt,4))
+                # print(np.log10(normalized[1]), min_dynrange, round(dt,4))
                 levels_before_norm = np.sort(np.arange(np.log10(normalized[1]), min_dynrange, round(dt,4)))
 
                 self.levels = np.sort(np.arange(np.log10(normalized[1]),

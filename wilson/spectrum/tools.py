@@ -2,6 +2,10 @@ import copy
 
 import numpy as np
 from scipy import constants
+from dataclasses import dataclass, field
+from typing import Type
+from CQCParse.parsing import Parser
+
 
 def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> float | np.ndarray:
     """Convert wavenumber (cm-1) to energy (Hartree)"""
@@ -12,8 +16,32 @@ def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> floa
         return reciprocal_cm / (100 * constants.h * constants.c / hartree2J)
 
 
+import itertools
+def combinations_with_permutations(iterable, k):
+    return (comb for comb in itertools.product(iterable, repeat=k))
 
 
+
+@dataclass
+class Conditions:
+    Gamma_rc: float
+    diag_margin_rc: float
+    dynamic_range_n: int|float
+    omega1: np.ndarray
+    omega2: np.ndarray
+    program: str
+    data_parser: Type[Parser] #CFOURdataParser|GaussianDataParser
+    molecule: str
+    method: str
+    basis: str
+    new_idx_dict : dict
+    el_terms_selected: list
+    mech_terms_selected: list
+    list2exclude: list = None
+    only_modes: list = None
+    vpt2settings: dict = field(default_factory=lambda: {'anharmonic_type': 'GVPT2'})
+    vib_levels_harmonic: bool = False
+    preview: bool = False
 
 
 def avrg_abc_tensor(formula: tuple,

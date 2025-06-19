@@ -1,5 +1,7 @@
 import numpy as np
 import copy
+from CQCParse.debug import debugfunc
+
 
 def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                    rotational_constant, coriolis_constant, anharmonic_type,
@@ -49,7 +51,8 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
 
 
     if fermi_resonance: # if not an empty list
-        print(f'Fermi identified - {len(fermi_resonance)}:' , fermi_resonance)
+        debugfunc(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}',
+                  tag='vpt2.anharm_corr_energiesVPT2')
 
     funds_corrections = np.zeros((original_len_ene))
     # for i in range(len(harmonic_energies)):
@@ -257,8 +260,12 @@ def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
                 C = 0
 
                 for k in range(len(rotational_constant)):
-
-                    C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    # print(type(rotational_constant[k]), 'vpt2.py line 260')
+                    # print(rotational_constant[k], float(rotational_constant[k]))
+                    # C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
+                    #     (harmonic_energies[i]/harmonic_energies[j] +
+                    #      harmonic_energies[j]/harmonic_energies[i])
+                    C += float(rotational_constant[k])*coriolis_constant[k][i][j]**2*\
                         (harmonic_energies[i]/harmonic_energies[j] +
                          harmonic_energies[j]/harmonic_energies[i])
 
@@ -337,7 +344,7 @@ def add_fermi_resonance(total_list, new_element):
     # new_element[1] = j
     # new_element[2] = k
     # new_element[3] = l
-    if not new_element in total_list:
+    if new_element not in total_list:
         total_list.append(new_element)
 
     return total_list
