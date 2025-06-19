@@ -31,9 +31,12 @@ sim.addSystem(ws.main.abstractions.molecularSystem(name='ACAC'))
 sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm', allow_skip_eigvec=True, external_fill_from=calc_setup))
 sim.addPropEvalSetup(eval_uniform=calc_setup)
 
-axis1 = ws.main.abstractions.spectralAxis({1: 1}, start=250, end=3850, spacer=3.8)
-axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1}, start=100, end=7550, spacer=3.8)
-spec_axes = ws.main.abstractions.spectralAxes({1: axis1, 2: axis2})
+axis1 = ws.main.abstractions.spectralAxis({1: 1})
+axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
+start = {1: 250, 2: 100}
+end = {1: 3850, 2: 7550}
+spacer = {1: 3.8, 2: 3.8}
+spec_axes = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform', start=start, end=end, spacer=spacer)
 evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
 rndi = {'num_level_ticks': 15}
 eval_setup = ws.main.abstractions.specEvalSetup(axes=spec_axes, ev_info=evi, rnd_info=rndi)
