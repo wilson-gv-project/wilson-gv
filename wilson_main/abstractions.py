@@ -1,5 +1,7 @@
 
 import copy
+from wilson_utils.abstractions import prop_trivname
+
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 class molecularSystem:
@@ -351,9 +353,7 @@ class wilsonSimulations:
 # "Plain" spectral axis for rendering response function freq arg spectra with independent lineshape functions
 class spectralAxis:
 
-	def __init__(self, freq_vars, range_style, start=None, end=None, n_pts=None, spacer=None, custom_range=None):
-
-		# range_style: 'none', 'uniform', 'custom'
+	def __init__(self, freq_vars):
 
 		# Must be dictionary: {freq label 1 in this axis: coeff, ...}
 		self.fv = freq_vars
@@ -374,49 +374,61 @@ class spectralGrid:
 
 	def __init__(self, axes, range_style, start=None, end=None, n_pts=None, spacer=None, custom_range=None, collective_grid=None):
 
+		# Axes must be a dictionary {1: spectralAxisRsp/Advanced instance, 2: ...}
+		self.axes = axes
+
 		self.start = None
 		self.end = None
 		self.n_pts = None
-		self.range = None
+		self.ranges = None
 
 		if (range_style == 'uniform'):
 
+			import numpy as np
+
+			self.ranges = {}
+
 			self.start = start
 			self.end = end
-			self.n_pts = n_pts
 
-			if (n_pts is not None) and (spacer is not None):
-				raise AssertionError('A maximum of one of the arguments n_pts and spacer may be specified')
+			self.n_pts = {}
+			self.spacer = {}
 
-			if n_pts is not None:
+			for i in self.axes:
 
-				spacer = (self.end - self.start)/(self.n_pts + 1)
+				if (n_pts is None) and (spacer is None):
+					raise AssertionError('For a uniform setup, either a spacer or a n_pts dictionary must be specified')
 
-			elif spacer is not None:
+				if (n_pts is not None) and (spacer is not None):
+					raise AssertionError('Only one of the arguments n_pts and spacer may be specified')
 
-				# Underflow possible
-				self.n_pts = int((self.end - self.start)/spacer + 1)
-				if not(self.end == self.start + spacer*(self.n_pts - 1)):
-					print('NOTE: Axis defined end', self.end, 'not precisely at spacer increment of start')
+				if n_pts is not None:
 
-			else:
+					self.n_pts[i] = n_pts[i]
 
-				raise AssertionError('For uniform grid, must specify either spacer or n_pts')
-			# fixme?
-			import numpy as np
-			self.range = np.arange(start, end, spacer)
+					self.spacer[i] = (self.end[i] - self.start[i])/(self.n_pts[i] + 1)
+
+				elif spacer is not None:
+
+					self.spacer[i] = spacer[i]
+
+					# Underflow possible
+					self.n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
+					if not(self.end[i] == self.start[i] + self.spacer[i]*(self.n_pts[i] - 1)):	
+						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
+
+				else:
+
+					raise AssertionError('For uniform grid, must specify either spacer or n_pts')
+
+				# fixme: Other datatype? Should be fine for now
+				self.ranges[i] = np.arange(self.start[i], self.end[i], self.spacer[i])
 
 		if(range_style == 'custom'):
 
-			self.start = custom_range[0]
-			self.end = custom_range[-1]
-			self.n_pts = len(custom_range)
-
-			self.range = custom_range
+			pass
 
 
-		# Axes must be a dictionary {1: spectralAxisRsp/Advanced instance, 2: ...}
-		self.a = axes
 
 		# Optional collective (e.g. adaptive) grid
 		# Otherwise intended to default to full granularity grid of individual axes
@@ -440,29 +452,6 @@ class vibState:
 		# Displacements (optional)
 		self.d = d
 
-def prop_trivname(ord_geo=0, ord_el=0, ord_rot=0):
-
-	triv_el = {0: '', 1: 'dip', 2: 'pol', 3: 'hyp', 4: 'shyp', 5: 'thyp', 6: '4hyp'}
-	triv_geo = {0: '', 1: 'grad', 2: 'hess', 3: 'cff', 4: 'qff', 5: '5ff', 6: '6ff'}
-
-	if (ord_el == 0) and (ord_geo == 0) and (ord_rot == 0):
-		return 'E'
-
-	if ord_rot > 0:
-
-		if (ord_rot == 1) and (ord_geo == 0):
-			return 'B'
-
-		elif (ord_rot == 1) and (ord_geo == 2):
-			return 'coriolis'
-
-		else:
-			raise AssertionError('This property trivial name is not established in prop_trivname')
-
-	if (ord_el > 6) or (ord_geo > 6):
-			raise AssertionError('This property trivial name is not established in prop_trivname')
-
-	return triv_el[ord_el] + triv_geo[ord_geo]
 
 
 # CONTINUE HERE: Most likely rewrite to vibanaEvalSetup: Have this tell deriv. and rot. props needed (incl. xform matrix?)
