@@ -38,11 +38,14 @@ class Spectrum2D:
         a helper can be used - DataVault.make_DatainputDict with specific choice of molecule calculation
     """
 
-    def __init__(self, w1=None, w2=None, print_level=0):
+    def __init__(self, w1=None, w2=None, axes=None, print_level=0):
         """
         TODO: remove w1 and w2 from init here; clean up init
         """
         self.print_level = print_level
+
+        # MR: I think the w1 and w2 attributes should be kept here but maybe given more generic names (e.g. wa, wb)
+        # since they might in general pertain to linear combinations of frequencies
 
         if w2 is None:
             w2 = []
@@ -50,8 +53,12 @@ class Spectrum2D:
             w1 = []
         if type(w1)==list or type(w2)==list:
             self.w1, self.w2 = np.array(w1), np.array(w2)
+        elif axes is not None:
+            self.w1 = np.arange(axes.a[0].start, axes.a[0].end, axes.a[0].spacer)
+            self.w2 = np.arange(axes.a[1].start, axes.a[1].end, axes.a[1].spacer)
         else:
             self.w1, self.w2 = w1, w2
+
 
         # define the grid of spectrum (pixels)
         self.w1_mesh, self.w2_mesh = np.meshgrid(w1, w2, indexing='xy')
@@ -59,6 +66,9 @@ class Spectrum2D:
 
         # initialized final spectrum pixels
         self.intensities_grid = np.zeros(self.shape2d, dtype='complex64')
+
+
+        # MR: rm the following attributes? (not sure if they conceptually belong to spectrum)
 
         self.resonances_bank = {}
 
@@ -316,87 +326,51 @@ class Spectrum2D:
                              7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',)), 'acc', -0.5))}
 
 
-    def launch_sequence1_wmain(self, parsed_data: ParsedData, spectrum_settings,
-                        print_level=0):
-
-        # VPT2 functionality to be settled before invocation and separated out of this fn
-        # vpt2settings = spectrum_settings.vpt2settings
-        #
-        #if spectrum_settings.vib_levels_harmonic:
-        #    vpt2settings = None
-        #
-        #if spectrum_settings.list2exclude is None:
-        #    spectrum_settings.list2exclude = []
-        #
+    def launch_sequence_wmain(self, terms, props, vib_ana, spectrum_settings,
+                        diagnostics=None):
 
         # Reshuffling of mode indices to be settled before this fn and separated out,
         # assume all prev mode labeling consistent over quantities
-        # Mode exclusion should be handled as spec eval setup attribute
-        # - 2. changing indices in list2exclude ------------------------------------------------
-        #if spectrum_settings.new_idx_dict is not None:
-        #    newKey_oldVal = dict(zip(list(spectrum_settings.new_idx_dict.values()),
-        #                             list(spectrum_settings.new_idx_dict.keys())))
-        #    list2exclude_vpt2 = [newKey_oldVal[i] for i in spectrum_settings.list2exclude]
-        #else:
-        #    list2exclude_vpt2 = spectrum_settings.list2exclude
-        #
-        #
+
+        # Existing example for reference:
         # from CQCParse.utils import make_modes_idx
-        #
         # self.mode_indices = make_modes_idx(len(parsed_data.normal_modes.normal_modes),
         #                                   modes=spectrum_settings.list2exclude,
         #                                   include=False)
 
-        # Get from vib ana setup
+        # To get from vib ana setup, stage here or in precalc:
+        # - Number of modes
+        # - Harmonic and (not explicitly harmonic) states/energy levels
+        # - Fermi resonances registered
+        # - Mode exclusion list (should be handled as spec eval setup or vib ana setup attribute)
+        # - (Later: Handling scheme for intensities (GVPT2/DVPT2 etc.)
+
+        # For reference: some existing lines initializing this
+        # parsed_data.list2exclude = spectrum_settings.list2exclude
+        # self.fundamentals = parsed_data.vib_states.fundamentals_anharmonic_str
+        # self.all_states = parsed_data.vib_states.anharmonic_states
+        # self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
         # self.nmodes = parsed_data.nmodes
         # self.nmodes_original = parsed_data.nmodes
 
-        # VPT2 functionality to be settled before invocation and separated out of this fn
-        #if vpt2settings is not None:
-        #    parsed_data.get_vpt2(vpt2settings=vpt2settings,
-        #                         list2exclude=list2exclude_vpt2,
-        #                         print_level=print_level)
-        #
+        # Sketch of procedure
 
-        # Get from vib ana setup
-        #self.fundamentals = parsed_data.vib_states.fundamentals_anharmonic_str
-        #self.all_states = parsed_data.vib_states.anharmonic_states
-        # Need?
-        #self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
+        # 1: Go through terms and find what should be precalculated V (M)
+        #   - e.g. 1/wa, 1/(wa*wb), orientational averages
+        # 2: Make precalculation and have that be shared data between terms V
+        # 3: Precalculate term values for all required choices of n m indices encountered in the resonance conditions
+        # (summing up over non-res cond indices) V (M)
+        # (3b for later): Precalculate lineshape functions on smaller domain for recombination/quadrature
+        # 4a/b: a) Make stick spectrum, b) Make "full" spectrum with lineshapes V
 
-        # Reshuffling of mode indices to be settled before this fn and separated out,
-        # assume all prev mode labeling consistent over quantities
-        # Mode exclusion should be handled as spec eval setup attribute
-        #if spectrum_settings.new_idx_dict is not None:
-        #    parsed_data.vib_states.upd_indices(spectrum_settings.new_idx_dict)
-        #    parsed_data.derivatives.upd_indices(spectrum_settings.new_idx_dict)
-        #    parsed_data.anharm_correction_data.upd_indices(spectrum_settings.new_idx_dict)
-        #    self.fundamentals = {k[0]:v for k,v in parsed_data.vib_states.fundamentals_anharmonic_str.items()}
-        #    self.all_states = parsed_data.vib_states.anharmonic_states
-        #    self.fermi_resonances = parsed_data.anharm_correction_data.fermi_resonance
-        #
-        # parsed_data.list2exclude = spectrum_settings.list2exclude
-
-        # Parse from props and vib ana
-        #
-        #self.fundamentals_harmonic = parsed_data.vib_states.fundamentals_harmonic_str
-        #self.all_states_harmonic = parsed_data.vib_states.harmonic_states
-        # Upd organization? Find needed based on terms? Address based on triv name for more universal evaluator
-        #ddata = [parsed_data.derivatives.dipole_first_derivatives,
-        #         parsed_data.derivatives.dipole_second_derivatives,
-        #         parsed_data.derivatives.polarizability_first_derivatives,
-        #         parsed_data.derivatives.polarizability_second_derivatives,
-        #         parsed_data.derivatives.cubic_force_constants]
-        #deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
-        #self.deriv_data = deriv_data
+        # Adapt to take own passed term instances and translate them to present repo (string) format
+        self.add_terms_generic(terms)
 
         # From spec eval setup and/or vib ana? Duplication with earlier vib harmonic setup?
         #self.set_spectrum_settings(Gamma_rc=spectrum_settings.Gamma_rc,
         #                           diag_margin_rc=spectrum_settings.diag_margin_rc,
         #                           vib_levels_harmonic=spectrum_settings.vib_levels_harmonic)
 
-        # Adapt to take own passed term instances
-        # self.add_terms(spectrum_settings.el_terms_selected, spectrum_settings.mech_terms_selected)
 
         # Adapt for generic terms
         # self.precalculate4fullspectrum_generic()
@@ -496,8 +470,9 @@ class Spectrum2D:
         self.allfunc_dict = {i: self.generate_resonances_functions(self.allterms_str[i][0][0], self.allterms_str[i][0][1]) for i in self.selection}
         self.nmodes = len(self.fundamentals)
 
-    # Marked up for generic
-    def add_terms_generic(self, electrical_terms_selection: list, mechanical_terms_selection: list):
+    # Take Wilson main terms, convert to present code format while keeping original anharmonicity order grouping
+    def add_terms_generic(self, terms, experiment):
+
         # setting up terms available for selection (all EVV terms now)
         # Replace with convertor from Wilson main terms? Or leave them as they are and work in this convention in other routines?
         # self.get_derived_terms_evv()
@@ -506,14 +481,11 @@ class Spectrum2D:
         #self.e_selected, self.m_selected = electrical_terms_selection, mechanical_terms_selection
         #self.selection = electrical_terms_selection + mechanical_terms_selection
 
-
         # To use general averager (to be implemented)
 
         #self.avrg_tensors_dict = {i: avrg_abc_tensor_general(self.allterms_str[i][1], self.deriv_data, self.gammaCompsAll)
         #                              for i in self.selection}
         #self.allfunc_dict = {i: self.generate_resonances_functions_generic(self.allterms_str[i][0][0], self.allterms_str[i][0][1]) for i in self.selection}
-        # Should be handled elsewhere (vib analysis)
-        # self.nmodes = len(self.fundamentals)
 
 
     def precalculate4resonances(self):
@@ -1629,15 +1601,10 @@ class Spectrum2D:
 
         return compute_res_condition
 
-    # TODO: Mark up for generic
+    # TODO: Make generic
     def generate_resonances_functions_generic(self, subscripts, freqDiff=None) -> Callable:
         """
-        Generates a python function for a term given by a formula (subscripts and freqDiff);
-                varied argument of that function is abctuple (used in the loop over combinations of modes).
-        subscripts - a tuple of strings from the formula; subscripts of omega energy levels in the resonance part;
-                        e.g., ('a+b,a', 'zero,a')
-        freqDiff - a tuple of strings from the formula; subscripts of omega energy levels in the freq. difference part;
-                        e.g., ('a+b+c,0', 'c,a+b'); not None for mech. anharm.
+
         """
         if freqDiff is not None:
             freqDiff = [i.split(',') for i in freqDiff]
@@ -1647,11 +1614,9 @@ class Spectrum2D:
                      w1w2Condition: np.ndarray[bool],
                      freqDiff: list = freqDiff) -> np.ndarray:
             """
-            allLevels_Eh_c collects all vibrational energy levels in Hartree; e.g., [('1', '2')] - combination mode
-            w_res_dict contains [-1, 2] and [-1] 2d arrays (in s-1)
-            abctuple is a tuple of normal mode indices for which current iteration is evaluating resonance term
+
             """
-            # todo: lorentzian shape cutoff
+            # TODO: lorentzian shape cutoff
 
             letters = ['a', 'b', 'c', 'zero'] if len(abctuple) == 3 else ['a', 'b', 'zero']
             dictabc = dict(zip(letters, abctuple + tuple(['zero'])))

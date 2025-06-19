@@ -5,53 +5,44 @@ def parse_wmain2wpart2(term):
     return
 
 
-def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana_setup, with_diagnostics=False):
+def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana, return_diagnostics=False):
 
     # Check if the requested spectrum can be evaluated by this function
-
     if not(experiment.dim == 2):
-        raise AssertionError('This evaluator is made solely for 2D spectrum experiments')
+        raise AssertionError('This evaluator is currently only for 2D spectrum experiments')
 
     if not(len(spec_eval_setup.axes.a) == 2):
-        raise AssertionError('This evaluator is made solely for 2D spectrum evaluations')
+        raise AssertionError('This evaluator is currently only for 2D spectrum evaluations')
 
-    # CONTINUE HERE: Use and rework existing functionality as necessary
+    # TODO: Check for supported orders of anharmonicity
 
-    # - make spectrum2D instance
-    # - Do first without mask, later bring in mask functionality
+    # Make spectrum2D instance
+    spectrumObj = Spectrum2D(axes = spec_eval_setup.axes)
 
-    # - Set up conditions
-    # - Run launch sequence (or wilson main convention fn equivalent)
-    # - Run for amplitudes (or wilson main convention fn equivalent)
-    # - Square for intensity
-    # - Write diagnostics handling
+    # Take "pan-spectrum" settings (global damping if using, diag extra, etc.), extract from spec_eval_setup and make
+    # as input to precalc/calc routines
+    spec_settings = {}
 
-    # Get from wmain convention classes
-    # dynamic_range_n = conditions.dynamic_range_n
-    # omega1, omega2 = conditions.omega1, conditions.omega2
+    if return_diagnostics:
+        diagnostics = {}
+    else:
+        diagnostics = None
 
-    # Here also get from wmain convention but now props
-    # parser.load()
-    # parsed_data = parser.parse(linear_molecule=False)
+    # Set up and precalculate
+    spectrumObj.launch_sequence_wmain(terms, props, vib_ana, spec_settings, diagnostics=diagnostics)
 
-    # spectrumObj = Spectrum2D(omega1, omega2)
-    # Write wmain convention version
-    # dict0 = spectrumObj.launch_sequence1_wmain(parsed_data, conditions,
-    #                                     print_level=0)
-
-    mask = None
-
-    if compute_intensity:
-        sec_hypol_dataALL_ref = spectrumObj.intensity_generic(selectionCond=mask)
-        nan_mask = np.isnan(sec_hypol_dataALL_ref)
-        sec_hypol_dataALL_ref[nan_mask] = 0 + 0j
-
+    # Run for amplitudes (or wilson main convention fn equivalent) and square for intensity
+    # TODO: Do first without mask, later bring in mask functionality
+    # Amplitudes here considered as diagnostics
+    intensities = spectrumObj.intensity_generic(diagnostics=diagnostics)
+    nan_mask = np.isnan(intensities)
+    intensities[nan_mask] = 0 + 0j
 
     if not(with_diagnostics):
-        return []
+        return intensities
 
     else:
-        return [], []
+        return intensities, diagnostics
 
 def spectrum2D_with_diagnostics(system, experiment, terms, props, spec_eval_setup, vib_ana_setup):
 
@@ -60,7 +51,7 @@ def spectrum2D_with_diagnostics(system, experiment, terms, props, spec_eval_setu
 
 def spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana_setup):
 
-    return get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana_setup, with_diagnostics=True)
+    return get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana_setup, with_diagnostics=False)
 
 
 
