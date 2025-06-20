@@ -1,1 +1,1 @@
-from wilson_utils import abstractions
+from wilson_utils import abstractions, termdict_from_symb_term, prop_trivname
