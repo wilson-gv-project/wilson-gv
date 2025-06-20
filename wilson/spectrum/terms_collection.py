@@ -5,14 +5,14 @@ from .tools import convNu2Ene, combinations_with_permutations
 from .termeval_util_classes import DoubleDict
 from wilson.utils import pairwise_differences
 from wilson.debug import debugfunc, debug_deep
-from .term import Term2D
+from wilson.spectrum.term_nD import Term_nD
 
 class TermsEvaluator:
     """
     Takes a list(?)/collection of Term2D(?) objs and performs evaluation of amplitudes
 
     """
-    def __init__(self, terms: list[Term2D]):
+    def __init__(self, terms: list[Term_nD]):
         """
         Need to have precalculated:
             resonances locations and their ab combinations - to filter some out according to spectral window

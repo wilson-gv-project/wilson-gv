@@ -5,7 +5,7 @@ from CQCParse.relay import DataVault
 
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 
-from test_config import SimulationConfig
+from .test_config import SimulationConfig
 
 
 @pytest.fixture

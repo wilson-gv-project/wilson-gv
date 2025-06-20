@@ -4,12 +4,12 @@ Each test creates own instances of Term2D
 """
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.spectrum.term_evaluation import TermsEvaluator
-from wilson.spectrum.term import Term2D
+from wilson.spectrum.terms_collection import TermsEvaluator
+from wilson.spectrum.term_nD import Term_nD
 from wilson.spectrum.termeval_util_classes import VibStatesDiff
 from wilson.utils import Conditions, prep_data_load
 
-from testing_utils import require_asserts
+from tests.testing_utils import require_asserts
 
 from CQCParse.parsing import GaussianParser, GaussianOutput
 from CQCParse.relay import DataVault
@@ -130,10 +130,10 @@ print()
 def test_identify_to_precalculate(terms_dict_setup):
     print('\n\nTesting - identify_to_precalculate')
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t0 = Term_nD(0, terms_dict_setup[0])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -168,7 +168,7 @@ def test_outer_product_einsum():
     print()
 
     arr = np.array([1., 2., 4.])
-    from wilson.spectrum.term_evaluation import outer_product_einsum
+    from wilson.spectrum.terms_collection import outer_product_einsum
     # print(repr(outer_product_einsum(1./arr, 3)))
     expected_2d = np.array([[1., 0.5, 0.25],
                             [0.5, 0.25, 0.125],
@@ -194,10 +194,10 @@ def test_precalc_vibene_denoms(terms_dict_setup):
     """
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t0 = Term_nD(0, terms_dict_setup[0])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
@@ -219,7 +219,7 @@ def test_precalc_vibene_denoms(terms_dict_setup):
 def test_precalc_avrg_tensors(terms_dict_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
+    t0 = Term_nD(0, terms_dict_setup[0])
     tts = TermsEvaluator([t0])
     tts.identify_to_precalculate()
 
@@ -237,9 +237,9 @@ def test_precalc_avrg_tensors(terms_dict_setup):
     assert stored[((1, 1), (2, 1), (1, 2))][1,1] == 60.4 # term 0
     assert stored[((1, 1), (2, 1), (1, 2))][1,0] == 4.6 # term 0
 
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
@@ -258,10 +258,10 @@ def test_precalc_avrg_tensors(terms_dict_setup):
 def test_precalc_res_conds(terms_dict_setup):
     print('\n\nTesting - Precalculate Resonance Conditions')
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t0 = Term_nD(0, terms_dict_setup[0])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -306,10 +306,10 @@ def test_precalc_vibdiffs(terms_dict_setup):
     """
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t0 = Term_nD(0, terms_dict_setup[0])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -362,10 +362,10 @@ def test_precalc_vibdiffs(terms_dict_setup):
 def test_precalculate(terms_dict_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    t1 = Term2D(1, terms_dict_setup[1])
-    t2 = Term2D(2, terms_dict_setup[2])
-    t3 = Term2D(3, terms_dict_setup[3])
+    t0 = Term_nD(0, terms_dict_setup[0])
+    t1 = Term_nD(1, terms_dict_setup[1])
+    t2 = Term_nD(2, terms_dict_setup[2])
+    t3 = Term_nD(3, terms_dict_setup[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -401,7 +401,6 @@ def test_precalculate(terms_dict_setup):
         (2, 2): np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
-
 
     alldata = [freqs, Nnmodes, data, avrg_terms, axes_dict, states]
     big_dict = tts.precalculate(alldata)

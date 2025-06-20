@@ -4,7 +4,7 @@ from .termeval_util_classes import MolProperty, AveragedProps, VibStatesDiff, Do
 from wilson.debug import debugfunc, debug_deep
 
 
-class Term2D:
+class Term_nD:
     """
     Calculations using the expression.
         prefactor_num
@@ -288,12 +288,12 @@ class Term2D:
                     prev = np.sum(np.array(axes_locs) * np.array(signes))
                     axes_locs.append((prev + next_axis * next_sgn) * (-1) )
                     signes.append(next_sgn)
-        # else:
-            dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
+            # fixme: test against old way for the same data?
+            # dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
             # print(dict_mn_tuples)
-            w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
-            w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
-            print('w1, w2', w1, w2)
+            # w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
+            # w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
+            # print('w1, w2', w1, w2)
             return axes_locs
         else:
             dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
