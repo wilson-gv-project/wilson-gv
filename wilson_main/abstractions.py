@@ -1,6 +1,6 @@
 
 import copy
-from wilson_utils.abstractions import prop_trivname
+from wilson_utils.prop_trivname import prop_trivname
 
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
@@ -414,7 +414,7 @@ class spectralGrid:
 
 					# Underflow possible
 					self.n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
-					if not(self.end[i] == self.start[i] + self.spacer[i]*(self.n_pts[i] - 1)):	
+					if not(self.end[i] == self.start[i] + self.spacer[i]*(self.n_pts[i] - 1)):
 						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
 
 				else:
