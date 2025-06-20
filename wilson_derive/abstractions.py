@@ -410,7 +410,7 @@ class vibState:
 
 class vibDiffTerm:
 
-    def __init__(self, sl=None, sr=None):
+    def __init__(self, sl=None, sr=None, is_pert_wf_diff=False):
 
         # Must be both vibState or both harmOscState instances
         if not (isinstance(sl, vibState) and isinstance(sr, vibState) or
@@ -419,6 +419,8 @@ class vibDiffTerm:
 
         self.sl = sl
         self.sr = sr
+
+        self.is_pert_wf_diff = is_pert_wf_diff
 
     def present(self):
         print('Freq diff term')

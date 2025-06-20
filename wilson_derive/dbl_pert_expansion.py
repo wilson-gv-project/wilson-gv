@@ -96,7 +96,7 @@ def expand_term(term, order_el=0, order_mech=0):
 
                         new_term.ints.insert(j + 1, new_int)
 
-                    new_term.addFreqTerm(vibDiffTerm(copy.deepcopy(new_state), copy.deepcopy(orig_state)))
+                    new_term.addFreqTerm(vibDiffTerm(copy.deepcopy(new_state), copy.deepcopy(orig_state), is_pert_wf_diff=True))
 
                     result_terms.append(new_term)
 

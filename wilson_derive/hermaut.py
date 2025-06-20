@@ -167,7 +167,7 @@ def do_hermaut(term, inds):
 
         # Remake existing frequency (difference) terms in terms of harmonic oscillator quanta
         for j in term.freqdiff:
-            new_freqterms.append(vibDiffTerm(copy.deepcopy(res_states[j.sl.s]), copy.deepcopy(res_states[j.sr.s])))
+            new_freqterms.append(vibDiffTerm(copy.deepcopy(res_states[j.sl.s]), copy.deepcopy(res_states[j.sr.s]), is_pert_wf_diff=j.is_pert_wf_diff))
 
         # Add new freq factors from harm osc treatment
         for j in inds[:round(sumord/2)]:
