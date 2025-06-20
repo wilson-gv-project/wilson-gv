@@ -5,12 +5,12 @@ Duplicated intro in test_term_evaluation : UPD - now it's in pytest fixtured in 
 """
 import numpy as np
 
-from wilson.spectrum.term import Term2D
-from wilson.spectrum.term_evaluation import TermsEvaluator
+from wilson.spectrum.term_nD import Term_nD
+from wilson.spectrum.terms_collection import TermsEvaluator
 from wilson.utils import Conditions, prep_data_load
 from wilson_main import abstractions as abst
 
-from testing_utils import require_asserts
+from tests.testing_utils import require_asserts
 
 import wilson.debug as debug
 import CQCParse.debug as cqc_debug
@@ -25,14 +25,14 @@ print()
 def test_instance(terms_dict_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
+    t0 = Term_nD(0, terms_dict_setup[0])
 
     assert t0.expression == terms_dict_setup[0]
     assert t0.term_label == 'EL'
     assert t0.resonances_expr == (('a+b,a', (-1, 2)), ('zero,a', (-1,)))
     assert t0.viblevelsdiff_expr == []
 
-    t3 = Term2D(3, terms_dict_setup[3])
+    t3 = Term_nD(3, terms_dict_setup[3])
     assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
     assert t3.expression['non_averaged_props'] == (('F', ('a', 'c', 'b')),)
 
@@ -47,7 +47,7 @@ def test_instance(terms_dict_setup):
 def test_load_data(terms_dict_setup, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
+    t0 = Term_nD(0, terms_dict_setup[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
@@ -93,7 +93,7 @@ def test_load_data(terms_dict_setup, FORM_setup_parser, spectrum_setup):
 def test_amplitude_1term_single_point(terms_dict_setup, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
+    t0 = Term_nD(0, terms_dict_setup[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -121,25 +121,11 @@ def test_amplitude_1term_single_point(terms_dict_setup, FORM_setup_parser, spect
     print(amplitude_single)
 
 
-def test_get_resonance_location_general_mock(terms_dict_setup, FORM_setup_parser, spectrum_setup):
+def test_get_resonance_location_general_mock(terms_dict_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    t0 = Term_nD(0, terms_dict_setup[0])
 
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
-
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    # import numpy as np
-    # axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
-    # x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
-    # axes_dict = {1: x, 2: y}
-
-    # amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
-    #                                     collect_all=True, sel_abs=[(5,0)])
     import numpy as np
 
     a = {('a', 'b'): np.array([[0.25    , 0.125   , 0.0625  ],
@@ -210,7 +196,7 @@ def test_get_resonance_location_general_mock(terms_dict_setup, FORM_setup_parser
 def test_get_resonance_location_general_real(terms_dict_setup, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term2D(0, terms_dict_setup[0])
+    t0 = Term_nD(0, terms_dict_setup[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
