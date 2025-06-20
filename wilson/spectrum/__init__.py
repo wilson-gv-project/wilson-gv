@@ -9,3 +9,4 @@ from .term_evaluation import *
 from .termeval_util_classes import *
 
 from .term import Term2D
+from .spectrum2D import Spectrum2D
