@@ -378,7 +378,7 @@ class Spectrum2D:
         #self.avrg_tensors_dict = {i: avrg_abc_tensor_general(self.allterms_str[i][1], self.deriv_data, self.gammaCompsAll)
         #                              for i in self.selection}
         #self.allfunc_dict = {i: self.generate_resonances_functions_generic(self.allterms_str[i][0][0], self.allterms_str[i][0][1]) for i in self.selection}
-
+        pass
 
     def precalculate4resonances(self):
         """
