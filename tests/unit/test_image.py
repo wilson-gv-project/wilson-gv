@@ -16,9 +16,9 @@ import wilson.debug as debug
 debug.level = 0
 
 @require_asserts
-def test_amplitude_1term_grid(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)

@@ -24,17 +24,46 @@ diag_margin_rc=3.
 list2exclude = []
 terms_selection = [0,1], [2,3]
 
+from wilson.utils import pickle_objs, unpickle_objs, Conditions
+data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+molecule, method, basis = 'OXAC2', 'B3LYP', 'cc_pVQZ'
 
+dynamic_range_n = 100
+num_level_ticks = 15
+
+conditions = Conditions(Gamma_rc, diag_margin_rc, dynamic_range_n,
+                   omega1, omega2,
+                   'gaussian', None,
+                   molecule, method, basis, None,
+                   terms_selection[0], terms_selection[1], list2exclude=list2exclude, only_modes=None,
+                   vib_levels_harmonic=False, preview=False)
+dynamic_range_n = conditions.dynamic_range_n
+omega1, omega2 = conditions.omega1, conditions.omega2,
+program, data_parser = conditions.program, conditions.data_parser
+molecule, method, basis = conditions.molecule, conditions.method, conditions.basis
+
+from CQCParse.parsing import CFOURParser, CFOUROutput, GaussianParser, GaussianOutput, DataStorage
 dictInputs = {'parserObject': gParser,
               'el_terms_select': terms_selection[0], 'mech_terms_select': terms_selection[1]}
+aa = dataframe_gaussian[(dataframe_gaussian['code'] == molecule) & (dataframe_gaussian['method'] == method) & (
+        dataframe_gaussian['basis_set'] == basis)]['g16_3quanta_full']
+filename = aa.iloc[0]
+gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
+parser = GaussianParser(gout)
+
+parser.load()
+parsed_data = parser.parse(linear_molecule=False)
 
 spectrumObj = Spectrum2D(omega1, omega2)
-spectrumObj.load_data(dictInputs['parserObject'], vpt2=False)
+spectrumObj.load_data(dictInputs['parserObject'])
+dict0 = spectrumObj.launch_sequence1(parsed_data, conditions,
+                                     print_level=0)
 
 spectrumObj.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=diag_margin_rc, vib_levels_harmonic=True)
 # currently requires diag_margin_rc attribute to be set
 spectrumObj.add_terms(dictInputs['el_terms_select'], dictInputs['mech_terms_select'])
-spectrumObj.precalculate4fullspectrum(list2exclude=list2exclude)
+spectrumObj.precalculate4fullspectrum()
 
 
 def test_integration():
@@ -176,10 +205,10 @@ def test_compute_mech_factors():
     gParser = GaussianDataParser(datadict)
 
     spectrumObj = Spectrum2D(np.arange(1130., 2050., 90.), np.arange(1300., 5150., 90.))
-    spectrumObj.load_data(gParser, vpt2=False)
+    spectrumObj.load_data(gParser)
     spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
     spectrumObj.add_terms([], [2])
-    spectrumObj.precalculate4fullspectrum(list2exclude=[])
+    spectrumObj.precalculate4fullspectrum()
 
 
     vib_ene_levels = spectrumObj.all_states_Eh
@@ -221,10 +250,10 @@ def test_get_gamma_mech():
     gParser = GaussianDataParser(datadict)
 
     spectrumObj = Spectrum2D(np.array([1130., 2050., 2190.]), np.array([1300., 3150., 4590.]))
-    spectrumObj.load_data(gParser, vpt2=False)
+    spectrumObj.load_data(gParser)
     spectrumObj.set_spectrum_settings(Gamma_rc=5., diag_margin_rc=3., vib_levels_harmonic=False)
     spectrumObj.add_terms([], [2])
-    spectrumObj.precalculate4fullspectrum(list2exclude=[], preview=False, screenmodeswindow=True)
+    spectrumObj.precalculate4fullspectrum()
 
     vib_ene_levels = copy.deepcopy(spectrumObj.all_states_Eh)
 

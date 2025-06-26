@@ -81,11 +81,28 @@ def dict_8terms():
                      }
     return allterms_str
 @pytest.fixture(scope="module")
-def FORM_setup_parser():
+def MOL_setup_parser(conditions):
     """
     Fixture to set up the Gaussian parser for FORM/B3LYP/cc_pVQZ.
     """
-    molecule, method, basis = 'FORM', 'B3LYP', 'cc_pVQZ'
+    molecule, method, basis = conditions.molecule, 'B3LYP', 'cc_pVQZ'
+    data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
+    dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+    aa = dataframe_gaussian[
+        (dataframe_gaussian['code'] == molecule) &
+        (dataframe_gaussian['method'] == method) &
+        (dataframe_gaussian['basis_set'] == basis)
+    ]['g16_3quanta_full']
+    filename = aa.iloc[0]
+    gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
+    parser = GaussianParser(gout)
+    parser.load()
+    return parser
+def OXAC2_setup_parser():
+    """
+    Fixture to set up the Gaussian parser for FORM/B3LYP/cc_pVQZ.
+    """
+    molecule, method, basis = 'OXAC2', 'B3LYP', 'cc_pVQZ'
     data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
     dataframe_gaussian = data_vault.getting_files_DB("gaussian")
     aa = dataframe_gaussian[
@@ -99,7 +116,7 @@ def FORM_setup_parser():
     parser.load()
     return parser
 @pytest.fixture(scope="module")
-def spectrum_setup(avrg_xyz_indices):
+def spectrum_setup(avrg_xyz_indices, conditions):
     """
     Fixture to provide the simulation configuration.
     """
@@ -108,7 +125,7 @@ def spectrum_setup(avrg_xyz_indices):
     w1m, w2m = np.meshgrid(w1, w2)
     return SimulationConfig(
         gammaCompsAll=avrg_xyz_indices,
-        molecule='FORM',
+        molecule=conditions.molecule,
         method='B3LYP',
         basis='cc_pVQZ',
         Gamma=3.8,
@@ -119,7 +136,8 @@ def spectrum_setup(avrg_xyz_indices):
         start2=500.0,
         end2=6550.0,
         step2=3.1,
-        old_new_dict={3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5},
+        # old_new_dict={3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5},
+        old_new_dict=None,
         elevels='anharm',
         enelvl=True,
         w1m=w1m,
@@ -131,16 +149,17 @@ def avrg_xyz_indices():
     Fixture to compute averaging indices.
     """
     return get_AlphaBetaGammaDelta_indices(num_f=4)
-@pytest.fixture
-def setup_term(dict_8terms, FORM_setup_parser, spectrum_setup):
+@pytest.fixture(scope="module")
+def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup):
     """
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
     def create_term(term_id):
         term = TermND(term_id, dict_8terms[term_id])
-        parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+        parsed_data = MOL_setup_parser.parse(linear_molecule=False)
         parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-        parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
+        if spectrum_setup.old_new_dict is not None:
+            parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
         deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
         term.load_calc_data(
             properties_data=deriv_data,
@@ -151,7 +170,7 @@ def setup_term(dict_8terms, FORM_setup_parser, spectrum_setup):
         )
         return term
     return create_term
-@pytest.fixture
+@pytest.fixture(scope="module")
 def data_for_precalc(setup_term, spectrum_setup):
     """
     Fixture to prepare data for precalculation.
@@ -172,7 +191,7 @@ def data_for_precalc(setup_term, spectrum_setup):
     alldata = [Nnmodes, data, avrg_terms, axes_dict,
                term_with_data.states_arrays_Eh, term_with_data.harmonic_arrays_Eh]
     return alldata
-@pytest.fixture
+@pytest.fixture(scope="module")
 def terms_collection(data_for_precalc, setup_term):
     """
     Fixture to create a TermsEvaluator with precalculated data.
@@ -211,18 +230,19 @@ class Conditions:
     preview: bool = False
 
 # ---------------- Fixtures ----------------
-@pytest.fixture
-def conditions():
+@pytest.fixture(scope="module",params=["FORM", "OXAC2"])
+def conditions(request):
     """
     Fixture to provide the configuration for the experiment using the Conditions dataclass.
     """
     omega1 = np.linspace(850.0, 3150.0, 1050)
     omega2 = np.linspace(500.0, 6550.0, 800)
     program = 'gaussian'
-    molecule = 'FORM'
+    molecule = request.param
     method = 'B3LYP'
     basis = 'cc_pVQZ'
-    new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5}
+    # new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} FORM
+    new_idx_dict = None
     el_terms_selected = [0,1]
     mech_terms_selected = [2,3]
     data_parser = None

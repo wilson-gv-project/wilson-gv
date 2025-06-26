@@ -62,11 +62,11 @@ def test_instance(dict_8terms):
 
 
 @require_asserts
-def test_load_data(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_load_data(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
     before = set(t0.__dict__.keys())
@@ -89,7 +89,7 @@ def test_load_data(dict_8terms, FORM_setup_parser, spectrum_setup):
     assert list(t0.properties_data.keys()) == ['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc']
     assert t0.mode_indices == [0, 1, 2, 3, 4, 5]
 
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
     # vpt2 freqs now
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
@@ -109,11 +109,11 @@ def test_load_data(dict_8terms, FORM_setup_parser, spectrum_setup):
 
 
 @require_asserts
-def test_amplitude_1term_single_point(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -137,11 +137,11 @@ def test_amplitude_1term_single_point(dict_8terms, FORM_setup_parser, spectrum_s
 
 
 @require_asserts
-def test_amplitude_1term_single_point_ab(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -259,11 +259,11 @@ def test_get_resonance_location_general_mock(dict_8terms):
 
 
 @require_asserts
-def test_get_resonance_location_general_real(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -304,11 +304,11 @@ def test_get_resonance_location_general_real(dict_8terms, FORM_setup_parser, spe
 
 
 @require_asserts
-def test_amplitude_1term_single_point_ab_precalc(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -385,11 +385,11 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, FORM_setup_parser,
     debug.level = 0
 
 @require_asserts
-def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t2 = TermND(2, dict_8terms[2])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -494,9 +494,9 @@ def test_axes(spectrum_setup):
 
 
 @require_asserts
-def test_amplitude_4terms_grid(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -576,9 +576,9 @@ def test_amplitude_4terms_grid(dict_8terms, FORM_setup_parser, spectrum_setup):
 
 
 @require_asserts
-def test_amplitude_1term_grid_t2(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -656,14 +656,14 @@ def test_amplitude_1term_grid_t2(dict_8terms, FORM_setup_parser, spectrum_setup)
 
 
 @require_asserts
-def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, FORM_setup_parser, spectrum_setup):
+def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
 
     t0 = TermND(0, dict_8terms[0])
     t1 = TermND(1, dict_8terms[1])
     t2 = TermND(2, dict_8terms[2])
     t3 = TermND(3, dict_8terms[3])
-    parsed_data = FORM_setup_parser.parse(linear_molecule=False)
+    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
