@@ -1,6 +1,7 @@
 # test_config.py
 from dataclasses import dataclass
 from typing import Dict, Any
+import numpy as np
 
 @dataclass
 class SimulationConfig:
@@ -19,3 +20,8 @@ class SimulationConfig:
     old_new_dict: Dict[int, int]
     elevels: str
     enelvl: bool
+    w1m: np.ndarray
+    w2m: np.ndarray
+
+import string
+abc_list = list(string.ascii_lowercase)

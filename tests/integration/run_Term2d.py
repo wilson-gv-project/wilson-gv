@@ -195,7 +195,7 @@ Nnmodes = 6
 
 avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
 
-alldata = [freqs, Nnmodes, data, avrg_terms, axes_dict, states]
+alldata = [Nnmodes, data, avrg_terms, axes_dict, states, states]
 
 # precalculate stuff
 big_dict = tts.precalculate(alldata)

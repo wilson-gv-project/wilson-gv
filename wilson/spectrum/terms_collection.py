@@ -3,7 +3,7 @@ import string
 import numpy as np
 from .tools import convNu2Ene, combinations_with_permutations
 from .termeval_util_classes import DoubleDict
-from wilson.utils import pairwise_differences
+from wilson.utils import pairwise_differences, coolprint
 from wilson.debug import debugfunc, debug_deep
 from wilson.spectrum.term_nD import Term_nD
 
@@ -99,16 +99,19 @@ class TermsEvaluator:
         # self.quanta_numbers = set([i for v in set(self.mn_types) for i in v.diff_type if i > 0])
 
 
-    def precalc_vibene_denoms(self, freqs):
+    def precalc_vibene_denoms(self, qstates_Eh):
         """
         requires:
             freqs data; self.unique_vibene_denoms
         """
-        inv_freqs = 1 / freqs
+        freqs = qstates_Eh[1]
+        # print('freqs', freqs)
+        # inv_freqs = 1 / convNu2Ene(freqs)
         stored = {}
-
+        # print('inv_freqs', inv_freqs)
         for nm_idxs in self.unique_vibene_denoms:
-            stored[nm_idxs] = outer_product_einsum(inv_freqs, len(nm_idxs))
+            # stored[nm_idxs] = outer_product_einsum(inv_freqs, len(nm_idxs))
+            stored[nm_idxs] = outer_product_einsum(freqs, len(nm_idxs))
 
         return stored
 
@@ -163,17 +166,20 @@ class TermsEvaluator:
                         debugfunc(f'prop_key {prop_key}, idxs_key {idxs_key}, value {data[prop_key][idxs_key]}',
                                   tag='')
                     total += product
-                avrg_tensor[abcde_comb] = total / 15.
+                if abs(total)<1e-28:
+                    total = 0.
+                else:
+                    total /= 15.
+                avrg_tensor[abcde_comb] = total
 
             # storage_tensors[tID] = avrg_tensor
             storage_tensors[simple_prop_tuple] = avrg_tensor
         return storage_tensors
 
 
-    def precalc_vibdiffs(self, qstates):
+    def precalc_vibdiffs(self, qstates_Eh):
         """
         states - dict of state_idx_label_tuple(?) : frequency (cm-1)
-
 
         types of vib diffs: (0, 1), (1, 0), (2, 1), (1, 2), (2, 0), (0, 2)...
 
@@ -183,10 +189,15 @@ class TermsEvaluator:
                   3: np.zeros((Nnmodes, Nnmodes, Nnmodes),}
         """
         res = {}
-
+        # print('precalc_vibdiffs()')
         for d in self.mn_types:
             sort_d = sorted(d.diff_type)
-            diff = pairwise_differences(qstates[sort_d[0]], qstates[sort_d[1]])
+
+            diff = pairwise_differences(qstates_Eh[sort_d[0]], qstates_Eh[sort_d[1]])
+            # if tuple(sort_d)==(0, 3):
+                # print('\nqstates_Eh[sort_d[0]]\n', qstates_Eh[sort_d[0]])
+                # print('sort_d[1]', sort_d[1])
+                # print('\nqstates_Eh[sort_d[1]]\n', qstates_Eh[sort_d[1]])
             res[tuple(sort_d)] = diff
             
         # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
@@ -202,7 +213,7 @@ class TermsEvaluator:
 
 
 
-    def precalc_res_conds(self, axes_dict, freqs):
+    def precalc_res_conds(self, axes_dict):
         """
         requires:
             self.unique_res_conds
@@ -252,22 +263,40 @@ class TermsEvaluator:
         """
         requires identified parts for precalculation and external data
 
+        Nnmodes, data, avrg_terms, axes_dict, qstates = alldata
         """
-        freqs, Nnmodes, data, avrg_terms, axes_dict, states = alldata # todo: set this up better
+
+        coolprint('To precalculate some quantities, you need to provide some data:\n')
+        coolprint(r'For [dodger_blue2]vibene_denoms[/dodger_blue2]: [deep_pink3]qstates_harm dict\[q]')
+        coolprint(r'For [dodger_blue2]avrg_tensors[/dodger_blue2]: Nnmodes int, data data\[prop_key]\[idxs_key], avrg_terms')
+        coolprint('For [dodger_blue2]precalc_res_conds[/dodger_blue2]: [dark_goldenrod]axes_dict {1: x_mesh,..}[/dark_goldenrod]')
+        coolprint(r'For [dodger_blue2]precalc_vibdiffs[/dodger_blue2]: [deep_pink3]qstates_choice dict\[q]')
+        coolprint('\nOnly [dark_goldenrod]axes_dict[/dark_goldenrod] relates to spectrum pixels.')
+        coolprint('And [medium_purple1]qstates_choice, qstates_harm, Nnmodes[/medium_purple1] are related to the states.')
+        coolprint('And [medium_purple1]data, avrg_terms[/medium_purple1] are related to molecular properties.')
+
+        Nnmodes, data, avrg_terms, axes_dict, qstates_Eh, qstates_harm_Eh = alldata # todo: set this up better
+        # debugfunc(axes_dict, 'axes_dict')
+        # print('\naxes_dict', axes_dict)
         # --> freqs so far: freqs = np.array([2., 4., 8.])
         # axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
         # x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
-        # --> axes_dict = {1: x, 2: y}
+        # --> axes_dict = {1: x_mesh,..}
 
-        a = self.precalc_vibene_denoms(freqs) # what are freqs?
+        a = self.precalc_vibene_denoms(qstates_harm_Eh) # what are freqs?
+        # print('a = self.precalc_vibene_denoms(qstates)', a)
         b = self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
-        c = self.precalc_res_conds(axes_dict, freqs)
-        d = self.precalc_vibdiffs(states) # freqs should be qstates
+        c = self.precalc_res_conds(axes_dict) # fixme: not used now in the calculations
+        d = self.precalc_vibdiffs(qstates_Eh)
+        dictionary = {'vibene_denoms': a,
+                      'avrg_tensors': b,
+                      'res_conds': c,
+                      'vibdiffs': d}
+        # if add_to_terms:
+        #     for t in self.terms:
+        #         self.terms[t].precalc_data = dictionary
 
-        return {'vibene_denoms': a,
-                'avrg_tensors': b,
-                'res_conds': c,
-                'vibdiffs': d}
+        return dictionary
 
 
     def compute_intensity(self, w1, w2, Gamma_rc=3.8,margin=0.):
@@ -312,7 +341,10 @@ def get_data_keys(input_tuple, variables, greek_dict):
 
 def outer_product_einsum(arr, n):
     # for n=3 -> 'i,j,k->ijk'
+    # print('arr.shape:', arr.shape)
+
     indices = ','.join([chr(ord('i') + j) for j in range(n)]) + '->' + ''.join([chr(ord('i') + j) for j in range(n)])
+    # print('indices', indices)
     arrays = [arr] * n
 
     return np.einsum(indices, *arrays)

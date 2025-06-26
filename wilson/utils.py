@@ -269,3 +269,7 @@ def pairwise_differences(A, B):
     b_broad = b.reshape(*([1] * a.ndim), *b.shape)
 
     return a_broad - b_broad
+
+def coolprint(text):
+    from rich import print
+    print(f"[italic yellow2]{text}[/italic yellow2]")

@@ -127,13 +127,13 @@ print()
 
 
 @require_asserts
-def test_identify_to_precalculate(terms_dict_setup):
+def test_identify_to_precalculate(dict_8terms):
     print('\n\nTesting - identify_to_precalculate')
 
-    t0 = Term_nD(0, terms_dict_setup[0])
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t0 = Term_nD(0, dict_8terms[0])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -189,37 +189,39 @@ def test_outer_product_einsum():
 
 
 @require_asserts
-def test_precalc_vibene_denoms(terms_dict_setup):
+def test_precalc_vibene_denoms(dict_8terms):
     """
     """
     print()
 
-    t0 = Term_nD(0, terms_dict_setup[0])
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t0 = Term_nD(0, dict_8terms[0])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
 
     freqs = np.array([2., 4., 8.])
-    res = tts.precalc_vibene_denoms(freqs)
+    qstates = {1: freqs}
+    res = tts.precalc_vibene_denoms(qstates)
+    print(res)
     assert sorted(list(res.keys())) == sorted([('a', 'b', 'c'), ('a', 'b')])
-    assert res[('a', 'b')][0,0] == 1./2./2.
-    assert res[('a', 'b')][0,1] == 1./2./4.
-    assert res[('a', 'b')][1,2] == 1./4./8.
+    assert res[('a', 'b')][0,0] == 2.*2.
+    assert res[('a', 'b')][0,1] == 2.*4.
+    assert res[('a', 'b')][1,2] == 4.*8.
     assert res[('a', 'b')][1,2] == res[('a', 'b')][2,1]
 
-    assert res[('a', 'b', 'c')][2,2,0] == 1./8./8./2.
-    assert res[('a', 'b', 'c')][1,0,2] == 1./4./2./8.
+    assert res[('a', 'b', 'c')][2,2,0] == 8.*8.*2.
+    assert res[('a', 'b', 'c')][1,0,2] == 1.*4.*2.*8.
     assert res[('a', 'b', 'c')][1,0,2] == res[('a', 'b', 'c')][0,1,2]
 
 
 @require_asserts
-def test_precalc_avrg_tensors(terms_dict_setup):
+def test_precalc_avrg_tensors(dict_8terms):
     print()
 
-    t0 = Term_nD(0, terms_dict_setup[0])
+    t0 = Term_nD(0, dict_8terms[0])
     tts = TermsEvaluator([t0])
     tts.identify_to_precalculate()
 
@@ -237,9 +239,9 @@ def test_precalc_avrg_tensors(terms_dict_setup):
     assert stored[((1, 1), (2, 1), (1, 2))][1,1] == 60.4 # term 0
     assert stored[((1, 1), (2, 1), (1, 2))][1,0] == 4.6 # term 0
 
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
@@ -255,13 +257,13 @@ def test_precalc_avrg_tensors(terms_dict_setup):
 
 
 @require_asserts
-def test_precalc_res_conds(terms_dict_setup):
+def test_precalc_res_conds(dict_8terms):
     print('\n\nTesting - Precalculate Resonance Conditions')
 
-    t0 = Term_nD(0, terms_dict_setup[0])
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t0 = Term_nD(0, dict_8terms[0])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -286,11 +288,12 @@ def test_precalc_res_conds(terms_dict_setup):
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
     axes_dict = {1: x, 2: y}
+    print('axes_dict\n', axes_dict)
 
     freqs = np.array([2., 4., 8.])
-    pf_types = tts.precalc_res_conds(axes_dict, freqs)
+    pf_types = tts.precalc_res_conds(axes_dict)
 
-    print('\nresult of precalc', pf_types)
+    print('\nresult of precalc\n', pf_types)
     assert np.allclose(pf_types[(1, -2)], np.array([[ -6.,  -4.,   0.],
                                                     [-14., -12.,  -8.],
                                                     [-30., -28., -24.]]))
@@ -299,17 +302,33 @@ def test_precalc_res_conds(terms_dict_setup):
                                                  [2., 4., 8.],
                                                  [2., 4., 8.]]))
 
+    axes_dict = {1: 80, 2: 800}
+    print('axes_dict\n', axes_dict)
+
+    freqs = np.array([2., 4., 8.])
+    pf_types = tts.precalc_res_conds(axes_dict)
+
+    print('\nresult of precalc\n', pf_types)
+    # assert np.allclose(pf_types[(1, -2)], np.array([[ -6.,  -4.,   0.],
+    #                                                 [-14., -12.,  -8.],
+    #                                                 [-30., -28., -24.]]))
+    #
+    # assert np.allclose(pf_types[(1,)], np.array([[2., 4., 8.],
+    #                                              [2., 4., 8.],
+    #                                              [2., 4., 8.]]))
+
+
 @require_asserts
-def test_precalc_vibdiffs(terms_dict_setup):
+def test_precalc_vibdiffs(dict_8terms):
     """
     simple states indexing
     """
     print()
 
-    t0 = Term_nD(0, terms_dict_setup[0])
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t0 = Term_nD(0, dict_8terms[0])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -359,13 +378,13 @@ def test_precalc_vibdiffs(terms_dict_setup):
 
 
 @require_asserts
-def test_precalculate(terms_dict_setup):
+def test_precalculate(dict_8terms):
     print()
 
-    t0 = Term_nD(0, terms_dict_setup[0])
-    t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, terms_dict_setup[2])
-    t3 = Term_nD(3, terms_dict_setup[3])
+    t0 = Term_nD(0, dict_8terms[0])
+    t1 = Term_nD(1, dict_8terms[1])
+    t2 = Term_nD(2, dict_8terms[2])
+    t3 = Term_nD(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -402,7 +421,7 @@ def test_precalculate(terms_dict_setup):
     }
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
 
-    alldata = [freqs, Nnmodes, data, avrg_terms, axes_dict, states]
+    alldata = [Nnmodes, data, avrg_terms, axes_dict, states, states]
     big_dict = tts.precalculate(alldata)
 
     print('\nPrecalculated stuff\n')
@@ -414,4 +433,6 @@ def test_precalculate(terms_dict_setup):
 
 @require_asserts
 def test_TE_compute_intensity():
-    pass
+
+    w1 = np.array([1185.29, 1501.59])
+    w2 = np.array([2440.61, 3290.38])

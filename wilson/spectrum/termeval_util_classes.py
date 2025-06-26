@@ -143,7 +143,16 @@ def dict2arraydict(states_dict):
         states_arrs[3][(int(abc[1]), int(abc[0]), int(abc[2]))] = d3[abc]
         states_arrs[3][(int(abc[1]), int(abc[2]), int(abc[0]))] = d3[abc]
         states_arrs[3][(int(abc[2]), int(abc[0]), int(abc[1]))] = d3[abc]
-        states_arrs[3][(int(abc[2]), int(abc[1]), int(abc[2]))] = d3[abc]
+        states_arrs[3][(int(abc[2]), int(abc[1]), int(abc[0]))] = d3[abc]
 
     states_arrs[0] = 0.
     return states_arrs
+
+
+def safe_product(parts):
+    result = 1
+    for part in parts:
+        if part == 0:
+            return 0
+        result *= part
+    return result

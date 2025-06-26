@@ -1,30 +1,31 @@
 import numpy as np
+from numpy.ma.core import indices
+
 from .tools import convNu2Ene, combinations_with_permutations
 from .termeval_util_classes import MolProperty, AveragedProps, VibStatesDiff, DoubleDict
 from wilson.debug import debugfunc, debug_deep
 
 
+def for_ab_for_vd(vd, indices_str):
+    """
+    make mn tuples for given vib diff
+
+    indices_str = {'a': a, 'b': b, 'zero': 'zero'}
+    """
+
+    m12_str, n12_str = vd.diff_str.split(',')
+
+    m12_tuple = tuple([indices_str[i] for i in m12_str.split('+')])
+    n12_tuple = tuple([indices_str[i] for i in n12_str.split('+')])
+
+    # print('indices_str', indices_str)
+    # print('\nm12_tuple, n12_tuple', m12_tuple, n12_tuple)
+    return m12_tuple, n12_tuple
+
+
 class Term_nD:
     """
     Calculations using the expression.
-        prefactor_num
-        prefactor_ene
-        property_1
-        property_2
-        property_3
-        avrg_terms
-        CFF (optional)
-
-    {
-    0: ((('a+b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_QQ', ('a', 'b',))), 1/24),
-    1: ((('b,a', 'zero,a'), None), (('mu_Q', ('a',)), ('alpha_QQ', ('a', 'b',)), ('mu_Q', ('b',))), 1/24)),
-    2: ((('a+b,a', 'zero,a'), ('a+b+c,zero', 'c,a+b')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('c',)), 'abc', 1.), -1/48.),
-    3: ((('b,a', 'zero,a'), ('a+c,b', 'b+c,a')), (('mu_Q', ('a',)), ('alpha_Q', ('c',)), ('mu_Q', ('b',)), 'acb', 1.), -1/48.),
-    4: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('a',)), 'bcc', 0.5), -1/48.),
-    5: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', 0.5), -1/48.),
-    6: ((('b,a', 'zero,a'), ('a,a+b', 'b,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('a',)), ('mu_Q', ('b',)), 'bcc', -0.5), -1/48.),
-    7: ((('b,a', 'zero,a'), ('b,a+b', 'a,zero')), (('mu_Q', ('a',)), ('alpha_Q', ('b',)), ('mu_Q', ('b',)), 'acc', -0.5, -1/48.))
-    }
 
     """
 
@@ -116,7 +117,7 @@ class Term_nD:
                 else:
                     ftuple.append(0)
 
-            vibstates_diffs_collection.append((tuple(ftuple), False))
+            vibstates_diffs_collection.append((tuple(ftuple), False, None, vd))
         vibstates_diffs_collection = set(vibstates_diffs_collection)
         self.vibstatesdiff_objs = [VibStatesDiff(*i) for i in vibstates_diffs_collection]
 
@@ -152,7 +153,7 @@ class Term_nD:
 
     def for_ab(self, a,b):
         """
-
+        making mn tuples for this term for ab combination
         """
         # print(a,b, '--------- a,b')
         a, b = str(a), str(b)
@@ -176,33 +177,6 @@ class Term_nD:
         n12_tuple = tuple(sorted([str(dict_id[i]) for i in n12_str.split('+')], key=int))
         return {'m1_tuple': m1_tuple, 'n1_tuple': n1_tuple, 'm12_tuple': m12_tuple, 'n12_tuple': n12_tuple}
 
-
-    def for_ab_for_vd(self, vd, indices_str):
-        # indices_str = {'a': a, 'b': b, 'zero': 'zero'}
-
-        m12_str, n12_str = vd.diff_str.split(',')
-        # print('m12_str', m12_str)
-        # print('n12_str', n12_str)
-        # print('1', [str(indices_str[i]) for i in m12_str.split('+')])
-        # print('2', [str(indices_str[i]) for i in n12_str.split('+')])
-
-        # m12_tuple = tuple(sorted([str(indices_str[i]) for i in m12_str.split('+')], key=int))
-        # n12_tuple = tuple(sorted([str(indices_str[i]) for i in n12_str.split('+')], key=int))
-
-        # m12_tuple = tuple(sorted([indices_str[i] for i in m12_str.split('+')], key=int))
-        # n12_tuple = tuple(sorted([indices_str[i] for i in n12_str.split('+')], key=int))
-
-        # m12_tuple = tuple(sorted([indices_str[i] for i in m12_str.split('+')]))
-        # n12_tuple = tuple(sorted([indices_str[i] for i in n12_str.split('+')]))
-
-        m12_tuple = tuple([indices_str[i] for i in m12_str.split('+')])
-        n12_tuple = tuple([indices_str[i] for i in n12_str.split('+')])
-
-        # print('indices_str', indices_str)
-        # print('\nm12_tuple, n12_tuple', m12_tuple, n12_tuple)
-        return m12_tuple, n12_tuple
-
-
     def load_calc_data(self, allstates: dict, harmonic_states: dict, properties_data,
                              mode_indices: np.ndarray|list, gammaCompsAll: np.ndarray|list):
         """
@@ -217,7 +191,6 @@ class Term_nD:
         self.harmonic_states_Eh = {k: convNu2Ene(v) for k, v in self.harmonic_states.items() if len(k)==1}
 
         from .termeval_util_classes import dict2arraydict
-
 
         self.states_arrays = dict2arraydict(self.allstates)
         self.states_arrays_Eh = dict2arraydict(self.allstates_Eh)
@@ -237,7 +210,9 @@ class Term_nD:
     # for given ab - good, modes_dict can be given elsewhere maybe, as a property for an instance
     def get_resonance_location(self, a, b):
         """
-        A resonance for this term for ab combination of modes
+        A resonance for this term for ab combination of modes.
+
+        Ad hoc implementation
         """
         a, b = str(a), str(b)
 
@@ -250,7 +225,7 @@ class Term_nD:
 
 
     # for given ab - good, modes_dict can be given elsewhere maybe, as a property for an instance
-    def get_resonance_location_general(self, a, b): # spectralAxes????
+    def get_resonance_location_general(self, abc_comb): # spectralAxes????
         """
         A resonance for this term for ab combination of modes
 
@@ -260,8 +235,13 @@ class Term_nD:
                         x = np.sign(type_rc[0]) * type_rc_mn where len(type_rc)==1 and e.g., type_rc_mn = mn_[-1]
                 w2 = mn_[-12] + w1
         """
+
         # a, b = str(a), str(b)
-        idx_str = {'a': a, 'b': b, 'zero': 'zero'} # , 'c': c, 'd'
+        from tests import abc_list
+        # zip(abc_list[:len(abc_comb)], abc_comb)
+        idx_str = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        # print(idx_str)
+        # idx_str = {'a': a, 'b': b, 'zero': 'zero'} # , 'c': c, 'd'
 
         if self.precalc_data is not None:
             sorted_vib_diffs = sorted([i for i in self.vibstatesdiff_objs if i.res_cond],
@@ -274,9 +254,8 @@ class Term_nD:
 
                 if not axes_locs:
                     # fist identified axis
-                    # q = self.for_ab_for_vd(vd, idx_str)
-                    # print('aaaaa', q)
                     idxs = tuple([idx_str[i] for i in indices_h])
+                    # take care of units in precalc self.precalc_data['vibdiffs']
                     first_ax = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][idxs]
                     axes_locs.append(first_ax * np.sign(vd.pf_type[0]))
                     signes.append(np.sign(vd.pf_type[0]))
@@ -294,15 +273,15 @@ class Term_nD:
             # w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
             # w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
             # print('w1, w2', w1, w2)
-            return axes_locs
+            # return axes_locs
+            return [convNu2Ene(i, True) for i in axes_locs]
         else:
             dict_mn_tuples = self.for_ab(idx_str['a'], idx_str['b'])
             # print(dict_mn_tuples)
             w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
             w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
-            print('w1, w2', w1, w2)
+            # print('w1, w2', w1, w2)
             return w1, w2
-        # return w1, w2
 
 
     # for given ab - good, modes_dict and others can be given elsewhere maybe, as a property for an instance?? or how
@@ -314,17 +293,51 @@ class Term_nD:
         if condition is None:
             condition = np.ones_like(w1_rc, dtype=bool)
 
-        a, b = str(a), str(b)
         w1, w2 = convNu2Ene(w1_rc), convNu2Ene(w2_rc)
-
-        dict_mn_tuples = self.for_ab(a, b)
-
+        d = {'a': a, 'b': b}
         Gamma_Eh = convNu2Ene(Gamma_rc)
-        r = np.where(condition,
-                     1/(self.allstates_Eh[dict_mn_tuples['m12_tuple']] - self.allstates_Eh[dict_mn_tuples['n12_tuple']]
-                        + w1 - w2 -1j*Gamma_Eh)/(self.allstates_Eh[dict_mn_tuples['m1_tuple']]
-                                                 - self.allstates_Eh[dict_mn_tuples['n1_tuple']] + w1 -1j*Gamma_Eh), 0.)
+
+        if self.precalc_data is not None:
+            # fixme : no implied order!
+            res_conds_vds = []
+            res_conds_ax = []
+            for vd in self.vibstatesdiff_objs:
+                if vd.res_cond:
+                    indices = tuple([d[i] for i in vd.diff_str.replace('+', ',').split(',') if i in d])
+                    vd_n = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][indices]
+                    if tuple(sorted(vd.diff_type)) != vd.diff_type:
+                        vd_n *= -1
+                    res_conds_vds.append(vd_n)
+                    ax_n = self.precalc_data['res_conds'][tuple(np.array(vd.pf_type)*(-1.))]
+                    res_conds_ax.append(ax_n)
+            vibdiff1 = convNu2Ene(res_conds_vds[0]+res_conds_ax[0])
+            vibdiff2 = convNu2Ene(res_conds_vds[1]+res_conds_ax[1])
+            if np.any((vibdiff1-1j*Gamma_Eh) == 0):
+                raise ValueError("Division by zero detected!")
+            if np.any((vibdiff2-1j*Gamma_Eh) == 0):
+                raise ValueError("Division by zero detected!")
+            r = np.where(condition, 1/(vibdiff1-1j*Gamma_Eh)/(vibdiff2-1j*Gamma_Eh), 0.)
+
+            # a, b = str(a), str(b)
+            # dict_mn_tuples = self.for_ab(a, b)
+            # v1 = self.allstates_Eh[dict_mn_tuples['m12_tuple']] - self.allstates_Eh[dict_mn_tuples['n12_tuple']]
+            # v2 = self.allstates_Eh[dict_mn_tuples['m1_tuple']] - self.allstates_Eh[dict_mn_tuples['n1_tuple']]
+            # print('v1+ w1 - w2, v2+ w1 ', v1+ w1 - w2, v2+ w1 )
+            # print(convNu2Ene(res_conds_vds[0]), convNu2Ene(res_conds_vds[1]))
+        else:
+            a, b = str(a), str(b)
+            dict_mn_tuples = self.for_ab(a, b)
+
+            vibdiff1 = self.allstates_Eh[dict_mn_tuples['m12_tuple']] - self.allstates_Eh[dict_mn_tuples['n12_tuple']]
+            vibdiff2 = self.allstates_Eh[dict_mn_tuples['m1_tuple']] - self.allstates_Eh[dict_mn_tuples['n1_tuple']]
+
+            if np.any((vibdiff1 + w1 - w2 -1j*Gamma_Eh) == 0):
+                raise ValueError("Division by zero detected!")
+            if np.any((vibdiff2 + w1 -1j*Gamma_Eh) == 0):
+                raise ValueError("Division by zero detected!")
+            r = np.where(condition, 1/(vibdiff1 + w1 - w2 -1j*Gamma_Eh)/(vibdiff2 + w1 -1j*Gamma_Eh), 0.)
         return r
+
 
     # for given ab(c) and ABGD - good, properties_data can be given elsewhere maybe, as a property for an instance?? or how;
     #                        ABGD - alpha, beta, gamma, delta - so these are current choice of axes for greek indices
@@ -339,43 +352,65 @@ class Term_nD:
             indices = [dict_id[i] for i in p[1]] + [dict_ax_id[i] for i in p[2]]
             propdict[f'{nn}_'+p[0]] = self.properties_data[p[0]][*indices]
 
-        if self.term_label == 'MECH':
-            # fixme
-            if (a,b,c) not in self.expression['CFF'][1]: # fixme: keys don't exist
-                idx = [dict_id[i] for i in self.expression['CFF'][1]] # fixme: key doesn't exist
-                self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx] # fixme: key doesn't exist
-            propdict['F_abc'] = self.F_vals[(a,b,c)] # fixme: keys don't exist
+        # if self.term_label == 'MECH':
+        #     # fixme
+        #     if (a,b,c) not in self.expression['non_averaged_props'][0][1]:
+        #         idx = [dict_id[i] for i in self.expression['non_averaged_props'][0][1]]
+        #         self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx]
+        #     propdict['F_abc'] = self.F_vals[(a,b,c)]
 
         return propdict
+
+    def get_non_averaged_props(self, a, b, c=None):
+        dict_id = {'a': a, 'b': b, 'c': c}
+
+        if (a,b,c) not in self.expression['non_averaged_props'][0][1]:
+            idx = [dict_id[i] for i in self.expression['non_averaged_props'][0][1]]
+            self.F_vals[(a,b,c)] = self.properties_data['F_abc'][*idx]
+
 
     # for given ab - good, gammaCompsAll and properties_data can be given elsewhere maybe,
     #                  as a property for an instance?? or how
     #               maybe make a polarization choice which chooses then gammaCompsAll or smth
 
     def get_avrg_properties(self, a, b, c=None, comps=False):
-        components = {}
-        total = 0.
-        for ABGD in self.gammaCompsAll:
-            props_dict = self.get_properties(ABGD, a, b, c)
-            addition = np.prod(np.array([v for k,v in props_dict.items() if 'mu' in k or 'alpha' in k]))
-            total += addition
+
+        if self.precalc_data is None:
+            components = {}
+            total = 0.
+            for ABGD in self.gammaCompsAll:
+                props_dict = self.get_properties(ABGD, a, b, c)
+                # print(props_dict)
+                addition = np.prod(np.array([v for k,v in props_dict.items() if 'mu' in k or 'alpha' in k]))
+                total += addition
+                if comps:
+                    components[tuple(ABGD)] = (addition, props_dict)
+            if abs(total)<1e-28:
+                total = 0.
             if comps:
-                components[tuple(ABGD)] = (addition, props_dict)
-
-        if comps:
-            return total/15, components
+                return total/15, components
+            else:
+                return total/15
         else:
-            return total/15
+            # print("self.precalc_data['avrg_tensors'].keys()", self.precalc_data['avrg_tensors'].keys())
+            # self.precalc_data['avrg_tensors'].keys() dict_keys([((1, 1), (2, 1), (1, 2))])
+            # print('self.property_simple_tuples', self.property_simple_tuples)
+
+            if c is None:
+                return self.precalc_data['avrg_tensors'][self.property_simple_tuples][a,b]
+            else:
+                return self.precalc_data['avrg_tensors'][self.property_simple_tuples][a,b,c]
 
 
-    def get_factor_summed(self, a, b, comps=False):
+    def get_factor_summed(self, a, b, comps=False, debugprint=False):
         """
         Sum of full factor over c index for given a,b
         """
         components = {}
         total = 0.
         for c in self.mode_indices:
-            addition_2 = self.get_full_factor(a, b, c, comps)
+            # print('a,b,c', (a,b,int(c)))
+            addition_2 = self.get_full_factor(a, b, c, comps, debugprint=debugprint)
             total += addition_2[0]
             if comps:
                 components[c] = addition_2
@@ -386,27 +421,55 @@ class Term_nD:
             return total
 
 
-    def get_full_factor(self, a, b, c=None, comps=False):
+    def get_full_factor(self, a, b, c=None, comps=False, debugprint=False):
         """
         product of: ene_factor, avrg_properties, (F_abc, viblevelsdiff)
         """
+        if debugprint:
+            debugfunc('', f'get_full_factor called for {self.term_label} term')
+
         components = {}
-        ene_factor = self.get_ene_factor(a, b, c)
-        avrg_properties_2 = self.get_avrg_properties(a, b, c)
+        avrg_properties_2 = self.get_avrg_properties(a, b, c) # todo: a single value for given abc
+        if avrg_properties_2==0:
+            if comps:
+                return 0., components
+            else:
+                return 0.
+        ene_factor = self.get_ene_factor(a, b, c) # todo: a single value for given abc
         product_all = ene_factor*avrg_properties_2 # [0] if comps == True
+        if debugprint:
+            debugfunc(f'{ene_factor:.2e}', 'ene_factor')
+            debugfunc(f'{avrg_properties_2:.2e}', 'avrg_properties_2')
 
         if comps:
             components['ene_factor'] = ene_factor
             components['avrg_properties'] = avrg_properties_2
 
-        # print(f'ene_factor {(a,b,c)}, {ene_factor:.3e}')
-        # print(f'avrg_properties_2 {(a,b,c)}, {avrg_properties_2[0]:.3e}')
-
         if self.term_label=='MECH':
-            product_all *= self.F_vals[(a,b,c)] * self.get_viblevelsdiff(a, b, c)[0]
+
+            vibdiff = self.get_viblevelsdiff(a, b, c)[0]
+            if vibdiff==0:
+                if comps:
+                    return 0., components
+                else:
+                    return 0.
+            # print('>>> vibdiff', vibdiff)
+
+            self.get_non_averaged_props(a, b, c)
+
+            if self.F_vals[(a,b,c)]==0:
+                if comps:
+                    return 0., components
+                else:
+                    return 0.
+            product_all *= self.F_vals[(a,b,c)] * vibdiff
+
             if comps:
                 components['F_abc'] = self.F_vals[(a,b,c)]
                 components['viblevelsdiff'] = self.get_viblevelsdiff(a, b, c)[0]
+            if debugprint:
+                debugfunc(f'{self.F_vals[(a,b,c)]:.2e}', 'self.F_vals[(a,b,c)]')
+                debugfunc(f'{self.get_viblevelsdiff(a, b, c)[0]:.2e}', 'self.get_viblevelsdiff(a, b, c)[0]')
 
         if comps:
             return product_all, components
@@ -497,48 +560,144 @@ class Term_nD:
         """
         1/omega_a/omega_b/omega_c
         """
-
         modes = [a, b] if c is None else [a, b, c]
-        values = np.array([self.harmonic_states_Eh[(str(m),)] for m in modes])
-        # values = np.array(list(self.harmonic_states_Eh.values()))
+        if self.precalc_data is None:
+            # collect freqs in Eh for given indices
+            values = np.array([self.harmonic_states_Eh[(str(m),)] for m in modes])
 
-        return 1./ np.prod( values )
+            if np.any(np.prod( values ) == 0):
+                raise ValueError("Division by zero detected!")
+            # make inverse of product
+            return 1./ np.prod( values )
+        else:
+            # print("self.precalc_data['vibene_denoms']", self.precalc_data['vibene_denoms'])
+            # values = np.array([self.harmonic_states_Eh[(str(m),)] for m in modes])
+            # values_o = np.array([self.harmonic_states[(str(m),)] for m in modes])
+            # print('values_o', values_o)
+            tensor_label = self.expression['vibene_denom']
+            v = self.precalc_data['vibene_denoms'][tensor_label][tuple(modes)]
+            # print('v, values', v, np.prod( values ))
+            # print('v, values', 1./v, 1./np.prod( values ))
+            if np.any(v == 0):
+                raise ValueError("Division by zero detected!")
+            return 1./v
+            # return 1./np.prod( values )
+
+    # def get_ene_factor(self, a, b, c=None):
+    #     """
+    #     1/omega_a/omega_b/omega_c
+    #     """
+    #     modes = [a, b] if c is None else [a, b, c]
+    #     values = np.array([self.harmonic_states_Eh[(str(m),)] for m in modes])
+    #     # values = np.array(list(self.harmonic_states_Eh.values()))
+    #
+    #     return 1./ np.prod( values )
 
 
     def get_viblevelsdiff(self, a, b, c=None):
         """
         1/omega_m,n + 1/omega_k,l
         """
-        a, b = str(a), str(b)
-        dict_id = {'a': a, 'b': b, 'zero': 'zero'}
-        if c is not None:
-            c = str(c)
-            dict_id['c'] = c
+        d = {'a': a, 'b': b, 'c': c}
 
-        total = []
-        for e in self.viblevelsdiff_expr:
-            m_str, n_str = e.split(',')
+        if self.precalc_data is not None:
+            # print("self.precalc_data['vibdiffs']", self.precalc_data['vibdiffs'].keys())
+            calc_tensors = [tuple(sorted(vd.diff_type)) for vd in self.vibstatesdiff_objs if not vd.res_cond]
+            # for ct in calc_tensors:
+            vds = []
+            for vd in self.vibstatesdiff_objs:
+                if not vd.res_cond:
+                    # print(vd)
+                    # print('vd.diff_str', vd.diff_str)
+                    indices = tuple([d[i] for i in vd.diff_str.replace('+', ',').split(',') if i in d])
+                    # print('indices', indices)
+                    vd_n = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][indices]
+                    if tuple(sorted(vd.diff_type)) != vd.diff_type:
+                        vd_n *= -1
+                    vds.append(vd_n)
+                    if np.any(np.array(vd_n) == 0):
+                        print('\n', vd)
+                        print(vd_n)
+                        print('indices', indices)
+                        print('tuple(sorted(vd.diff_type))', tuple(sorted(vd.diff_type)))
+                        print(self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))])
+                        raise ValueError("Division by zero detected!")
+            if np.any(np.array(vds) == 0):
+                raise ValueError("Division by zero detected!")
+            return np.sum(1./np.array(vds)), np.array(vds)
 
-            l_m = [str(dict_id[i]) for i in m_str.split('+')]
-            l_n = [str(dict_id[i]) for i in n_str.split('+')]
+        else:
+            a, b = str(a), str(b)
+            dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+            if c is not None:
+                c = str(c)
+                dict_id['c'] = c
 
-            if 'zero' not in l_m:
-                m_tuple = tuple(sorted(l_m, key=int))
-            else:
-                m_tuple = tuple(l_m)
-            if 'zero' not in l_n:
-                n_tuple = tuple(sorted(l_n, key=int))
-            else:
-                n_tuple = tuple(l_n)
+            total = []
+            for e in self.viblevelsdiff_expr:
+                m_str, n_str = e.split(',')
 
-            total.append(self.allstates_Eh[m_tuple] - self.allstates_Eh[n_tuple])
-        total0 = 1./np.array(total)
+                l_m = [str(dict_id[i]) for i in m_str.split('+')]
+                l_n = [str(dict_id[i]) for i in n_str.split('+')]
 
-        # if recip:
-        #     return np.sum(total0)
-        # else:
-        #     return np.array(total)
-        return np.sum(total0), np.array(total)
+                if 'zero' not in l_m:
+                    m_tuple = tuple(sorted(l_m, key=int))
+                else:
+                    m_tuple = tuple(l_m)
+                if 'zero' not in l_n:
+                    n_tuple = tuple(sorted(l_n, key=int))
+                else:
+                    n_tuple = tuple(l_n)
+
+                total.append(self.allstates_Eh[m_tuple] - self.allstates_Eh[n_tuple])
+
+            if np.any(np.array(total) == 0):
+                raise ValueError("Division by zero detected!")
+
+            total0 = 1./np.array(total)
+
+            # if recip:
+            #     return np.sum(total0)
+            # else:
+            #     return np.array(total)
+            return np.sum(total0), np.array(total)
+
+    #
+    # def get_viblevelsdiff(self, a, b, c=None):
+    #     """
+    #     1/omega_m,n + 1/omega_k,l
+    #     """
+    #
+    #     a, b = str(a), str(b)
+    #     dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+    #     if c is not None:
+    #         c = str(c)
+    #         dict_id['c'] = c
+    #
+    #     total = []
+    #     for e in self.viblevelsdiff_expr:
+    #         m_str, n_str = e.split(',')
+    #
+    #         l_m = [str(dict_id[i]) for i in m_str.split('+')]
+    #         l_n = [str(dict_id[i]) for i in n_str.split('+')]
+    #
+    #         if 'zero' not in l_m:
+    #             m_tuple = tuple(sorted(l_m, key=int))
+    #         else:
+    #             m_tuple = tuple(l_m)
+    #         if 'zero' not in l_n:
+    #             n_tuple = tuple(sorted(l_n, key=int))
+    #         else:
+    #             n_tuple = tuple(l_n)
+    #
+    #         total.append(self.allstates_Eh[m_tuple] - self.allstates_Eh[n_tuple])
+    #     total0 = 1./np.array(total)
+    #
+    #     # if recip:
+    #     #     return np.sum(total0)
+    #     # else:
+    #     #     return np.array(total)
+    #     return np.sum(total0), np.array(total)
 
 
     # def get_enefactor_tensor(self):
@@ -598,7 +757,8 @@ class Term_nD:
 
 
     def get_intensity(self, w1, w2, Gamma_rc, margin,
-                      condition=None, collect_all=False, sel_abs=None):
+                      condition=None, collect_all=False, sel_abs=None,
+                      debugprint=False):
         """
         gamma = prefnum * prefene * avrg * resonance
 
@@ -620,22 +780,42 @@ class Term_nD:
                 if (a,b) not in sel_abs:
                     skipped+=1
                     debug_deep(f'skipped {(a, b)}', 'Term2D.get_intensity')
+                    print('skipped', a, b)
                     continue
 
-            w1ab, w2ab = self.get_resonance_location(a, b)
+            # todo: remove these; it seems to work... but make a test??
+            # w1ab_o, w2ab_o = self.get_resonance_location(a, b)
+            w1ab, w2ab = self.get_resonance_location_general(ab)
+            # assert np.allclose(w1ab, w1ab_o)
+            # assert np.allclose(w2ab, w2ab_o)
+
+            resonance_is_ordered = w2ab > w1ab
+            within_w1_window = (np.min(w1) + margin) <= w1ab <= (np.max(w1) - margin)
+            within_w2_window = (np.min(w2) + margin) <= w2ab <= (np.max(w2) - margin)
+            sufficient_margin_between = (w2ab - margin) > w1ab
+            resonance_in_window = within_w1_window and within_w2_window and sufficient_margin_between
+
+            if resonance_is_ordered and (collect_all or resonance_in_window):
+                result += self.get_intensity_ab(a, b, w1, w2, Gamma_rc,
+                                                condition=condition, debugprint=debugprint)[0]
+            else:
+                skipped += 1
+                debug_deep(f'skipped later {(a,b)}', 'Term2D.get_intensity')
+                continue
+
             # check if resonance is in window w1,w2
             # if it's a single pair of w1,w2 -
-            if w2ab>w1ab:
-                if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
-                        and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
-                        and (w2ab-margin)>w1ab) or collect_all:
-                    result += self.get_intensity_ab(a, b, w1, w2, Gamma_rc,
-                          condition=condition)[0]
-                    # print('added')
-                else:
-                    skipped += 1
-                    debug_deep(f'skipped later {(a,b)}', 'Term2D.get_intensity')
-                    continue
+            # if w2ab>w1ab:
+            #     if ((np.min(w1) + margin <= w1ab <= np.max(w1) - margin)
+            #             and (np.min(w2) + margin <= w2ab <= np.max(w2) - margin)
+            #             and (w2ab-margin)>w1ab) or collect_all:
+            #         result += self.get_intensity_ab(a, b, w1, w2, Gamma_rc,
+            #               condition=condition, debugprint=debugprint)[0]
+            #         # print('added')
+            #     else:
+            #         skipped += 1
+            #         debug_deep(f'skipped later {(a,b)}', 'Term2D.get_intensity')
+            #         continue
 
         # print('skipped', skipped)
         # ab_combinations = list(combinations_with_permutations(self.mode_indices, 2))
@@ -643,7 +823,7 @@ class Term_nD:
         return result
 
     def get_intensity_ab(self, a, b, w1, w2, Gamma_rc,
-                      condition=None):
+                      condition=None, debugprint=False):
         """
         gamma = prefnum * prefene * avrg * resonance
         """
@@ -656,15 +836,13 @@ class Term_nD:
         #         and (w2ab-margin)>w1ab):
         if self.term_label=='EL':
             # full_prefactor * resonance
-            product_all, components= self.get_full_factor(a, b, comps=True) # , components if comps==True
-            product_all /= 24.
+            product_all, components= self.get_full_factor(a, b, comps=True, debugprint=debugprint) # , components if comps==True
             # print(f"a,b: {(a, b)}, factor: {product_all:.2e}")
             # result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
             # return result, components
 
         else:
-            product_all, components = self.get_factor_summed(a, b, comps=True) # , components if comps==True
-            product_all /= -48.
+            product_all, components = self.get_factor_summed(a, b, comps=True, debugprint=debugprint) # , components if comps==True
 
             components = {}
             # for k,v in components.items():
@@ -673,8 +851,22 @@ class Term_nD:
             #                               'avrg_properties':v[1]['avrg_properties'][0],
             #                               'F_abc':v[1]['F_abc'],
             #                               'viblevelsdiff':v[1]['viblevelsdiff']}
+        if product_all==0.:
+            return 0., components
 
-        result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
+        resonance = self.get_res_factor(w1, w2, a, b, Gamma_rc, condition)
+        # print('type(resonance)', type(resonance))
+        # print('resonance', resonance)
+
+        if isinstance(w1, float):
+            debugfunc(f'{resonance:.2e}', 'resonance')
+            debugfunc(f'{product_all:.2e}', 'product_all before prefA')
+        else:
+            debugfunc(f'{np.max(np.abs(resonance)):.2e}', 'resonance')
+            debugfunc(f'{product_all:.2e}', 'product_all before prefA')
+
+        product_all *= self.expression['termA_pref']
+        result = product_all * resonance
         return result, components
 
     # fixme: unused

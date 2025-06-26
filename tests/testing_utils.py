@@ -20,3 +20,18 @@ def require_asserts(test_func):
             print(f"\n\033[33m⚠️  WARNING: {test_func.__name__} has no assert statements!\033[0m")
         return test_func(*args, **kwargs)
     return wrapper
+
+from contextlib import contextmanager
+@contextmanager
+def debug_mode(level):
+    """
+    Context manager to temporarily set the debug level.
+    """
+    import wilson.debug as debug
+
+    original_level = debug.level
+    debug.level = level
+    try:
+        yield
+    finally:
+        debug.level = original_level
