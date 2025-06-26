@@ -2,17 +2,17 @@ import string
 
 import numpy as np
 from .tools import convNu2Ene, combinations_with_permutations
-from .termeval_util_classes import DoubleDict
+from .spectrum_utils import DoubleDict
 from wilson.utils import pairwise_differences, coolprint
 from wilson.debug import debugfunc, debug_deep
-from wilson.spectrum.term_nD import Term_nD
+from wilson.spectrum.termND import TermND
 
 class TermsEvaluator:
     """
     Takes a list(?)/collection of Term2D(?) objs and performs evaluation of amplitudes
 
     """
-    def __init__(self, terms: list[Term_nD]):
+    def __init__(self, terms: list[TermND]):
         """
         Need to have precalculated:
             resonances locations and their ab combinations - to filter some out according to spectral window

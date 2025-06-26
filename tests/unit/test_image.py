@@ -2,7 +2,7 @@ import numpy as np
 from tests.testing_utils import require_asserts
 
 from wilson.utils import prep_data_load
-from wilson.spectrum.term_nD import Term_nD
+from wilson.spectrum.termND import TermND
 from wilson.spectrum.terms_collection import TermsEvaluator
 
 # import sys
@@ -24,10 +24,10 @@ def test_amplitude_1term_grid(dict_8terms, FORM_setup_parser, spectrum_setup):
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)

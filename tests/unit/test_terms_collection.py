@@ -5,8 +5,8 @@ Each test creates own instances of Term2D
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.spectrum.terms_collection import TermsEvaluator
-from wilson.spectrum.term_nD import Term_nD
-from wilson.spectrum.termeval_util_classes import VibStatesDiff
+from wilson.spectrum import TermND
+from wilson.spectrum.spectrum_utils import VibStatesDiff
 from wilson.utils import Conditions, prep_data_load
 
 from tests.testing_utils import require_asserts
@@ -130,10 +130,10 @@ print()
 def test_identify_to_precalculate(dict_8terms):
     print('\n\nTesting - identify_to_precalculate')
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -194,10 +194,10 @@ def test_precalc_vibene_denoms(dict_8terms):
     """
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
@@ -221,7 +221,7 @@ def test_precalc_vibene_denoms(dict_8terms):
 def test_precalc_avrg_tensors(dict_8terms):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     tts = TermsEvaluator([t0])
     tts.identify_to_precalculate()
 
@@ -239,9 +239,9 @@ def test_precalc_avrg_tensors(dict_8terms):
     assert stored[((1, 1), (2, 1), (1, 2))][1,1] == 60.4 # term 0
     assert stored[((1, 1), (2, 1), (1, 2))][1,0] == 4.6 # term 0
 
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
 
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
@@ -260,10 +260,10 @@ def test_precalc_avrg_tensors(dict_8terms):
 def test_precalc_res_conds(dict_8terms):
     print('\n\nTesting - Precalculate Resonance Conditions')
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -325,10 +325,10 @@ def test_precalc_vibdiffs(dict_8terms):
     """
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)
@@ -381,10 +381,10 @@ def test_precalc_vibdiffs(dict_8terms):
 def test_precalculate(dict_8terms):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
     terms = [t0, t1, t2, t3]
 
     tts = TermsEvaluator(terms)

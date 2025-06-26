@@ -3,7 +3,7 @@ import numpy as np
 from CQCParse.relay import DataVault
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.utils import prep_data_load
-from wilson.spectrum.term_nD import Term_nD
+from wilson.spectrum.termND import TermND
 from wilson.spectrum.terms_collection import TermsEvaluator
 from tests.test_config import SimulationConfig
 from tests.testing_utils import debug_mode
@@ -14,7 +14,6 @@ def dict_8terms():
     Fixture to provide the dictionary of 8 terms for testing.
     """
     allterms_str = { 0:
-                     # {'resonance': (('a+b,a', 'zero,a'), None),
                          {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
                           'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_QQ', ('a', 'b',), ('G',))),
@@ -135,10 +134,10 @@ def avrg_xyz_indices():
 @pytest.fixture
 def setup_term(dict_8terms, FORM_setup_parser, spectrum_setup):
     """
-    Factory fixture to set up a Term_nD instance with parsed data and loaded calculations.
+    Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
     def create_term(term_id):
-        term = Term_nD(term_id, dict_8terms[term_id])
+        term = TermND(term_id, dict_8terms[term_id])
         parsed_data = FORM_setup_parser.parse(linear_molecule=False)
         parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
         parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)

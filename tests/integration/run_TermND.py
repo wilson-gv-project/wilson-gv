@@ -2,7 +2,7 @@
 import numpy as np
 from pandas.tests.tseries.frequencies.test_inference import freqs
 
-from wilson.spectrum.term_evaluation import Term_nD, TermsEvaluator
+from wilson.spectrum import TermND, TermsEvaluator
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.utils import prep_data_load
 
@@ -150,10 +150,10 @@ data = {
 # exit()
 
 # set up
-t0 = Term_nD(0, allterms_str[0])
-t1 = Term_nD(1, allterms_str[1])
-t2 = Term_nD(2, allterms_str[2])
-t3 = Term_nD(3, allterms_str[3])
+t0 = TermND(0, allterms_str[0])
+t1 = TermND(1, allterms_str[1])
+t2 = TermND(2, allterms_str[2])
+t3 = TermND(3, allterms_str[3])
 terms = [t0, t1, t2, t3]
 
 tts = TermsEvaluator(terms)

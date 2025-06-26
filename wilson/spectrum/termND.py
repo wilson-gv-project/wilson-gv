@@ -1,8 +1,8 @@
 import numpy as np
-from numpy.ma.core import indices
+# from numpy.ma.core import indices
 
 from .tools import convNu2Ene, combinations_with_permutations
-from .termeval_util_classes import MolProperty, AveragedProps, VibStatesDiff, DoubleDict
+from .spectrum_utils import MolProperty, AveragedProps, VibStatesDiff, DoubleDict
 from wilson.debug import debugfunc, debug_deep
 
 
@@ -23,7 +23,7 @@ def for_ab_for_vd(vd, indices_str):
     return m12_tuple, n12_tuple
 
 
-class Term_nD:
+class TermND:
     """
     Calculations using the expression.
 
@@ -190,7 +190,7 @@ class Term_nD:
         self.harmonic_states = harmonic_states
         self.harmonic_states_Eh = {k: convNu2Ene(v) for k, v in self.harmonic_states.items() if len(k)==1}
 
-        from .termeval_util_classes import dict2arraydict
+        from .spectrum_utils import dict2arraydict
 
         self.states_arrays = dict2arraydict(self.allstates)
         self.states_arrays_Eh = dict2arraydict(self.allstates_Eh)

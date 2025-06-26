@@ -5,7 +5,7 @@ Duplicated intro in test_term_evaluation : UPD - now it's in pytest fixtured in 
 """
 import numpy as np
 
-from wilson.spectrum.term_nD import Term_nD
+from wilson.spectrum.termND import TermND
 from wilson.spectrum.terms_collection import TermsEvaluator
 from wilson.utils import Conditions, prep_data_load
 from wilson_main import abstractions as abst
@@ -22,9 +22,9 @@ print()
 
 def setup_term(term_id, terms_dict_setup, FORM_setup_parser, spectrum_setup):
     """
-    Helper function to set up a Term_nD instance with parsed data and loaded calculations.
+    Helper function to set up a TermND instance with parsed data and loaded calculations.
     """
-    term = Term_nD(term_id, terms_dict_setup[term_id])
+    term = TermND(term_id, terms_dict_setup[term_id])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
@@ -43,14 +43,14 @@ def setup_term(term_id, terms_dict_setup, FORM_setup_parser, spectrum_setup):
 def test_instance(dict_8terms):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
 
     assert t0.expression == dict_8terms[0]
     assert t0.term_label == 'EL'
     assert t0.resonances_expr == (('a+b,a', (-1, 2)), ('zero,a', (-1,)))
     assert t0.viblevelsdiff_expr == []
 
-    t3 = Term_nD(3, dict_8terms[3])
+    t3 = TermND(3, dict_8terms[3])
     assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
     assert t3.expression['non_averaged_props'] == (('F', ('a', 'c', 'b')),)
 
@@ -65,7 +65,7 @@ def test_instance(dict_8terms):
 def test_load_data(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
@@ -112,7 +112,7 @@ def test_load_data(dict_8terms, FORM_setup_parser, spectrum_setup):
 def test_amplitude_1term_single_point(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -140,7 +140,7 @@ def test_amplitude_1term_single_point(dict_8terms, FORM_setup_parser, spectrum_s
 def test_amplitude_1term_single_point_ab(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -188,7 +188,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms, FORM_setup_parser, spectru
 def test_get_resonance_location_general_mock(dict_8terms):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
 
     import numpy as np
 
@@ -262,7 +262,7 @@ def test_get_resonance_location_general_mock(dict_8terms):
 def test_get_resonance_location_general_real(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -307,7 +307,7 @@ def test_get_resonance_location_general_real(dict_8terms, FORM_setup_parser, spe
 def test_amplitude_1term_single_point_ab_precalc(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
+    t0 = TermND(0, dict_8terms[0])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -388,7 +388,7 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, FORM_setup_parser,
 def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t2 = Term_nD(2, dict_8terms[2])
+    t2 = TermND(2, dict_8terms[2])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -502,10 +502,10 @@ def test_amplitude_4terms_grid(dict_8terms, FORM_setup_parser, spectrum_setup):
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
@@ -584,10 +584,10 @@ def test_amplitude_1term_grid_t2(dict_8terms, FORM_setup_parser, spectrum_setup)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    # t0 = Term_nD(0, terms_dict_setup[0])
-    # t1 = Term_nD(1, terms_dict_setup[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    # t3 = Term_nD(3, terms_dict_setup[3])
+    # t0 = TermND(0, terms_dict_setup[0])
+    # t1 = TermND(1, terms_dict_setup[1])
+    t2 = TermND(2, dict_8terms[2])
+    # t3 = TermND(3, terms_dict_setup[3])
 
     # t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
     #                   mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
@@ -659,10 +659,10 @@ def test_amplitude_1term_grid_t2(dict_8terms, FORM_setup_parser, spectrum_setup)
 def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, FORM_setup_parser, spectrum_setup):
     print()
 
-    t0 = Term_nD(0, dict_8terms[0])
-    t1 = Term_nD(1, dict_8terms[1])
-    t2 = Term_nD(2, dict_8terms[2])
-    t3 = Term_nD(3, dict_8terms[3])
+    t0 = TermND(0, dict_8terms[0])
+    t1 = TermND(1, dict_8terms[1])
+    t2 = TermND(2, dict_8terms[2])
+    t3 = TermND(3, dict_8terms[3])
     parsed_data = FORM_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
