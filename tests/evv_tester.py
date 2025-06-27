@@ -1,3 +1,21 @@
+"""
+Notes
+
+Procedure:
+1. Set up an experiment.
+2. Set up calculation parameters/settings.
+3. Set up a simulation object which would control the whole procedure.
+4. getResultsFromCalculationBatches - here first call for using already existing data
+
+sim.findPropsAndMaxStateLvl() - ??
+sim.dressPropsWithSetup() - ??
+sim.makeCalculationBatches() - ??
+
+
+sim.evaluate(evaluator); evaluator is a function
+evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+"""
 import wilson_suite as ws
 
 pulse_ir_1 = ws.experiment.abstractions.emPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
@@ -47,7 +65,11 @@ sim.dressPropsWithSetup()
 sim.makeCalculationBatches()
 sim.getResultsFromCalculationBatches(source_type='vault', source_loc=ws.intensities.utils.get_package_root() + '/tests/test_database/mini_files_database.csv' )
 
-sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
+print('\n  >>> Going to evaluate now...\n')
+# sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
+
+terms_evaluator =
+sim.evaluate(evaluator=terms_evaluator)
 
 sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
 
