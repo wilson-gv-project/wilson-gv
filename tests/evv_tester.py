@@ -47,7 +47,7 @@ sim.dressPropsWithSetup()
 sim.makeCalculationBatches()
 sim.getResultsFromCalculationBatches(source_type='vault', source_loc=ws.intensities.utils.get_package_root() + '/tests/test_database/mini_files_database.csv' )
 
-sim.evaluate(ws.intensities.wilsonmain_integration.spectrum2D)
+sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
 
 sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
 
