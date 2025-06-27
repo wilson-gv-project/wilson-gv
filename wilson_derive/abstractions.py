@@ -83,12 +83,13 @@ class polProp:
         pass
 
     def present(self):
-
+        print('   >> polProp presents:')
         print('Operators:', [i.o for i in self.ops])
         print('Geo differentiation order:', self.dord)
         if self.inds is not None:
             print('Normal mode differentiation indices:', self.inds)
 
+        print('----')
 
 # Vibrational term in SOS expression up to but not including Hermite treatment
 class vibContribTerm:
@@ -350,6 +351,7 @@ class vibPerturbedTerm:
             return True
 
     def present(self):
+        print(' >> vibPerturbedTerm presents:')
 
         print('Coefficient:', self.coeff)
 
@@ -361,6 +363,10 @@ class vibPerturbedTerm:
 
         for i in self.res:
             i.present()
+
+        print('\nHas attributes: coeff, freqterms, res, was_sorted, props, hsh'
+              '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
+              '\nPresenting also elements of: self.props, self.freqterms, self.res')
 
 
 class harmOscState:
@@ -423,6 +429,8 @@ class vibDiffTerm:
         self.is_pert_wf_diff = is_pert_wf_diff
 
     def present(self):
+        print('   >> vibDiffTerm presents:')
+        print('self.is_pert_wf_diff', self.is_pert_wf_diff,'\n')
         print('Freq diff term')
 
         if isinstance(self.sl, vibState):
@@ -432,6 +440,8 @@ class vibDiffTerm:
         elif isinstance(self.sl, harmOscState):
             print('Bra state', self.sl.q)
             print('Ket state', self.sr.q)
+        if not self.is_pert_wf_diff:
+            print('----')
 
     def h(self):
         return hash( ( self.sl.h(), self.sr.h() ) )
@@ -459,10 +469,12 @@ class resonanceCondition:
         self.id = id
 
     def present(self):
+        print('   >> resonanceCondition presents:')
 
         print('Resonance condition states')
         self.diff.present()
         print('Resonance condition pert freqs', str(self.pf))
+        print('----')
 
     # Permute axes according to mask (used for simultaneous freq and ax ref permutation)
     def permute(self, mask):
