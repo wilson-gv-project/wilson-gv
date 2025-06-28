@@ -34,6 +34,8 @@ class specDetector:
         self.wv_filter = wv_filter
         self.ignore_collinear = ignore_collinear
 
+    def __repr__(self):
+        return f'THIS IS specDetector with detection_method - {self.dmethod}'
 
 class specScan:
 
@@ -57,7 +59,8 @@ class specScan:
         self.scan_objs = scan_objs
         self.range = range
 
-
+    def __repr__(self):
+        return f'THIS IS specScan - {self.scan_objs}'
 
 class vibExperiment:
 
@@ -179,6 +182,11 @@ class vibExperiment:
 
         pass
 
+    def __repr__(self):
+        return (f'THIS IS vibExperiment of order {self.order}; '
+                f'\n        field: {self.field}; '
+                f'\n        detector: {self.detector}; '
+                f'\n        scans: {self.scans}')
 
 # The field consists of a collection of pulses
 class electricField:
@@ -223,6 +231,8 @@ class electricField:
 
         return cfuv_dict
 
+    def __repr__(self):
+        return f'THIS IS electricField with pulses: {self.pulses}'
 
 class emPulse:
 
@@ -313,3 +323,6 @@ class emPulse:
 
         # Pulse id
         self.id = id
+
+    def __repr__(self):
+        return f'THIS IS emPulse with pulse envelope {self.env}'
