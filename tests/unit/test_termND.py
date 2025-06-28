@@ -6,7 +6,7 @@ Duplicated intro in test_term_evaluation : UPD - now it's in pytest fixtured in 
 import numpy as np
 
 from wilson.spectrum.termND import TermND
-from wilson.spectrum.terms_collection import TermsEvaluator
+from wilson.spectrum.termsEvaluator import TermsEvaluator
 from wilson.utils import Conditions, prep_data_load
 from wilson_main import abstractions as abst
 

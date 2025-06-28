@@ -7,6 +7,7 @@ from wilson.utils import pairwise_differences, coolprint
 from wilson.debug import debugfunc, debug_deep
 from wilson.spectrum.termND import TermND
 
+
 class TermsEvaluator:
     """
     Takes a list(?)/collection of Term2D(?) objs and performs evaluation of amplitudes
@@ -28,6 +29,9 @@ class TermsEvaluator:
         """
         # self.terms = terms
         self.terms = {t.term_id: t for t in terms}
+
+    def __repr__(self):
+        return f'\nTHIS IS TermsEvaluator with {len(self.terms)} terms\n'
 
 
     def identify_to_precalculate(self):
@@ -98,6 +102,15 @@ class TermsEvaluator:
         # FIXME: NOT IN USE
         # self.quanta_numbers = set([i for v in set(self.mn_types) for i in v.diff_type if i > 0])
 
+        coolprint('To precalculate some quantities, you need to provide some data:\n')
+        coolprint(r'For [dodger_blue2]vibene_denoms[/dodger_blue2]: [deep_pink3]qstates_harm dict\[q]')
+        coolprint(r'For [dodger_blue2]avrg_tensors[/dodger_blue2]: Nnmodes int, data data\[prop_key]\[idxs_key], avrg_terms')
+        coolprint('For [dodger_blue2]precalc_res_conds[/dodger_blue2]: [dark_goldenrod]axes_dict {1: x_mesh,..}[/dark_goldenrod]')
+        coolprint(r'For [dodger_blue2]precalc_vibdiffs[/dodger_blue2]: [deep_pink3]qstates_choice dict\[q]')
+        coolprint('\nOnly [dark_goldenrod]axes_dict[/dark_goldenrod] relates to spectrum pixels.')
+        coolprint('And [medium_purple1]qstates_choice, qstates_harm, Nnmodes[/medium_purple1] are related to the states.')
+        coolprint('And [medium_purple1]data, avrg_terms[/medium_purple1] are related to molecular properties.')
+
 
     def precalc_vibene_denoms(self, qstates_Eh):
         """
@@ -149,12 +162,12 @@ class TermsEvaluator:
                 names = list(string.ascii_lowercase)
                 var_names = names[:len(abcde_comb)]
                 variables = {var: val for var, val in zip(var_names, abcde_comb)}
-                debugfunc(f'---variables {variables}', tag='')
+                debug_deep(f'---variables {variables}', tag='')
 
                 for comps in avrg_terms:
                     alpha, beta, gamma, delta = comps
                     greek_dict = {'A': alpha, 'B': beta, 'G': gamma, 'D': delta}
-                    debugfunc(f'alpha, beta, gamma, delta {alpha, beta, gamma, delta}',
+                    debug_deep(f'alpha, beta, gamma, delta {alpha, beta, gamma, delta}',
                               tag='')
                     product = 1.
                     for i, pp in enumerate(simple_prop_tuple):
@@ -163,7 +176,7 @@ class TermsEvaluator:
                         debug_deep(f'idxs_key {idxs_key}', tag='')
 
                         product *= data[prop_key][idxs_key]
-                        debugfunc(f'prop_key {prop_key}, idxs_key {idxs_key}, value {data[prop_key][idxs_key]}',
+                        debug_deep(f'prop_key {prop_key}, idxs_key {idxs_key}, value {data[prop_key][idxs_key]}',
                                   tag='')
                     total += product
                 if abs(total)<1e-28:
@@ -263,19 +276,17 @@ class TermsEvaluator:
         """
         requires identified parts for precalculation and external data
 
+        alldata is DataForPrecalc
         Nnmodes, data, avrg_terms, axes_dict, qstates = alldata
         """
 
-        coolprint('To precalculate some quantities, you need to provide some data:\n')
-        coolprint(r'For [dodger_blue2]vibene_denoms[/dodger_blue2]: [deep_pink3]qstates_harm dict\[q]')
-        coolprint(r'For [dodger_blue2]avrg_tensors[/dodger_blue2]: Nnmodes int, data data\[prop_key]\[idxs_key], avrg_terms')
-        coolprint('For [dodger_blue2]precalc_res_conds[/dodger_blue2]: [dark_goldenrod]axes_dict {1: x_mesh,..}[/dark_goldenrod]')
-        coolprint(r'For [dodger_blue2]precalc_vibdiffs[/dodger_blue2]: [deep_pink3]qstates_choice dict\[q]')
-        coolprint('\nOnly [dark_goldenrod]axes_dict[/dark_goldenrod] relates to spectrum pixels.')
-        coolprint('And [medium_purple1]qstates_choice, qstates_harm, Nnmodes[/medium_purple1] are related to the states.')
-        coolprint('And [medium_purple1]data, avrg_terms[/medium_purple1] are related to molecular properties.')
+        Nnmodes = alldata.Nnmodes
+        props_data = alldata.props_data
+        avrg_terms = alldata.avrg_terms
+        axes_dict = alldata.axes_dict
+        qstates_Eh = alldata.states_arrays_Eh
+        qstates_harm_Eh = alldata.harmonic_arrays_Eh
 
-        Nnmodes, data, avrg_terms, axes_dict, qstates_Eh, qstates_harm_Eh = alldata # todo: set this up better
         # debugfunc(axes_dict, 'axes_dict')
         # print('\naxes_dict', axes_dict)
         # --> freqs so far: freqs = np.array([2., 4., 8.])
@@ -285,7 +296,7 @@ class TermsEvaluator:
 
         a = self.precalc_vibene_denoms(qstates_harm_Eh) # what are freqs?
         # print('a = self.precalc_vibene_denoms(qstates)', a)
-        b = self.precalc_avrg_tensors(Nnmodes, data, avrg_terms)
+        b = self.precalc_avrg_tensors(Nnmodes, props_data, avrg_terms)
         c = self.precalc_res_conds(axes_dict) # fixme: not used now in the calculations
         d = self.precalc_vibdiffs(qstates_Eh)
         dictionary = {'vibene_denoms': a,

@@ -118,7 +118,10 @@ class TermND:
         vibstates_diffs_collection = set(vibstates_diffs_collection)
         self.vibstatesdiff_objs = [VibStatesDiff(*i) for i in vibstates_diffs_collection]
 
-        self.part_prefactor = expression['termA_pref']
+        from fractions import Fraction
+        if isinstance(self.expression['termA_pref'], Fraction):
+            self.expression['termA_pref'] = float(self.expression['termA_pref'])
+
 
         # default numerical values of components -- ???? but they should be for given ab
         self.AVG = 1
@@ -141,7 +144,7 @@ class TermND:
 
 
     def __repr__(self):
-        s = f'{self.term_label} - {self.term_id}\n'
+        s = f'\n{self.term_label} - {self.term_id}\n'
         for p in self.expression:
             s += f'\n    {p}'.ljust(25, ' ')+f'{self.expression[p]}'
 
@@ -214,7 +217,7 @@ class TermND:
         return w1, w2
 
 
-    def get_resonance_location_general(self, abc_comb): # spectralAxes????
+    def get_resonance_location_general(self, abc_comb):
         """
         A resonance for this term for ab combination of modes
 
@@ -224,11 +227,11 @@ class TermND:
                         x = np.sign(type_rc[0]) * type_rc_mn where len(type_rc)==1 and e.g., type_rc_mn = mn_[-1]
                 w2 = mn_[-12] + w1
         """
-
+        # fixme: not quite general, fails with b and c indices, instead of a and b
         # a, b = str(a), str(b)
         from tests import abc_list
         idx_str = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
-        # print(idx_str)
+        # print('\nidx_str', idx_str)
         # idx_str = {'a': a, 'b': b, 'zero': 'zero'} # , 'c': c, 'd'
 
         if self.precalc_data is not None:
@@ -239,7 +242,7 @@ class TermND:
             signes = []
             for vd in sorted_vib_diffs:
                 indices_h = [k for i in vd.diff_str.split(',') for k in i.split('+') if k!='zero']
-
+                # print(indices_h, vd)
                 if not axes_locs:
                     # fist identified axis
                     idxs = tuple([idx_str[i] for i in indices_h])
@@ -658,6 +661,7 @@ class TermND:
         else:
             debugfunc(f'{np.max(np.abs(resonance)):.2e}', 'resonance')
             debugfunc(f'{product_all:.2e}', 'product_all before prefA')
+
 
         product_all *= self.expression['termA_pref']
         result = product_all * resonance

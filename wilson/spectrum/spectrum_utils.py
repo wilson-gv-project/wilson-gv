@@ -3,6 +3,19 @@ from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
 
+from wilson.spectrum.tools import convNu2Ene
+# alldata = [Nnmodes, data, avrg_terms, axes_dict,
+#            term_with_data.states_arrays_Eh,
+#            term_with_data.harmonic_arrays_Eh]
+@dataclass
+class DataForPrecalc:
+    Nnmodes: int
+    props_data: dict
+    avrg_terms: np.ndarray
+    axes_dict: dict
+    states_arrays_Eh: dict
+    harmonic_arrays_Eh: dict
+
 @dataclass
 class MolProperty:
     """
@@ -124,7 +137,9 @@ class DoubleDict:
 
 
 def dict2arraydict(states_dict):
-
+    """
+    format transformation for vib states freqs data
+    """
     states_arrs = {}
     d1 = {k:v for k,v in states_dict.items() if len(k)==1}
     d2 = {k:v for k,v in states_dict.items() if len(k)==2}
@@ -149,6 +164,30 @@ def dict2arraydict(states_dict):
     return states_arrs
 
 
+def mainVibStates2arraydict(listVibStates, Nnmodes):
+    """
+    vibState {('0',): 1.0}, energy is 3560.764 cm-1
+    vibState {('6', '6'): 1.0}, energy is 2591.707 cm-1
+    """
+    states_arrs = {}
+    states_arrs[1] = np.zeros(Nnmodes)
+    states_arrs[2] = np.zeros((Nnmodes, Nnmodes))
+    states_arrs[3] = np.zeros((Nnmodes, Nnmodes, Nnmodes))
+
+    from itertools import permutations
+
+    for vs in listVibStates:
+        if len(vs.s)==1:
+            for k_tuple in vs.s:
+                perms = set(permutations(tuple([int(i) for i in k_tuple])))
+                for p in perms:
+                    states_arrs[len(k_tuple)][p] = convNu2Ene(vs.e) if energy_unit_check(vs.e)=='cm-1' else vs.e
+                    # states_arrs[len(k_tuple)][p] = vs.e
+
+    states_arrs[0] = 0.
+
+    return states_arrs
+
 def safe_product(parts):
     result = 1
     for part in parts:
@@ -156,3 +195,28 @@ def safe_product(parts):
             return 0
         result *= part
     return result
+
+
+def energy_unit_check(value):
+    """
+    find a reasonable energy unit
+    """
+    if value < 1.:
+        return 'Hartree'
+    else:
+        return 'cm-1'
+
+from contextlib import contextmanager
+@contextmanager
+def debug_mode(level):
+    """
+    Context manager to temporarily set the debug level.
+    """
+    import wilson.debug as debug
+
+    original_level = debug.level
+    debug.level = level
+    try:
+        yield
+    finally:
+        debug.level = original_level

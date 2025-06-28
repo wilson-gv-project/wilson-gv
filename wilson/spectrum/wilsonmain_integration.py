@@ -5,13 +5,13 @@ def parse_wmain2wpart2(term):
     return
 
 
-def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana, return_diagnostics=False):
+def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana, with_diagnostics=False):
 
     # Check if the requested spectrum can be evaluated by this function
     if not(experiment.dim == 2):
         raise AssertionError('This evaluator is currently only for 2D spectrum experiments')
 
-    if not(len(spec_eval_setup.axes.a) == 2):
+    if not(len(spec_eval_setup.axes.axes) == 2):
         raise AssertionError('This evaluator is currently only for 2D spectrum evaluations')
 
     # TODO: Check for supported orders of anharmonicity
@@ -23,7 +23,7 @@ def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana, r
     # as input to precalc/calc routines
     spec_settings = {}
 
-    if return_diagnostics:
+    if with_diagnostics:
         diagnostics = {}
     else:
         diagnostics = None

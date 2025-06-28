@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
-from tests.testing_utils import require_asserts, debug_mode
+from tests.testing_utils import require_asserts
+from wilson.spectrum import debug_mode
+
 
 import wilson.debug as debug
 import CQCParse.debug as cqc_debug

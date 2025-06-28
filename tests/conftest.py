@@ -4,9 +4,9 @@ from CQCParse.relay import DataVault
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.utils import prep_data_load
 from wilson.spectrum.termND import TermND
-from wilson.spectrum.terms_collection import TermsEvaluator
+from wilson.spectrum.termsEvaluator import TermsEvaluator
 from tests.test_config import SimulationConfig
-from tests.testing_utils import debug_mode
+from wilson.spectrum import debug_mode
 # ---------------- Fixtures ----------------
 @pytest.fixture(scope="module")
 def dict_8terms():
@@ -83,7 +83,8 @@ def dict_8terms():
 @pytest.fixture(scope="module")
 def MOL_setup_parser(conditions):
     """
-    Fixture to set up the Gaussian parser for FORM/B3LYP/cc_pVQZ.
+    Fixture to set up the Gaussian parser for MOL/B3LYP/cc_pVQZ.
+    Molecule is taken from conditions
     """
     molecule, method, basis = conditions.molecule, 'B3LYP', 'cc_pVQZ'
     data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
@@ -189,7 +190,10 @@ def data_for_precalc(setup_term, spectrum_setup):
     w1m, w2m = np.meshgrid(w1, w2)
     axes_dict = {1: w1m, 2: w2m}
     alldata = [Nnmodes, data, avrg_terms, axes_dict,
-               term_with_data.states_arrays_Eh, term_with_data.harmonic_arrays_Eh]
+               term_with_data.states_arrays_Eh,
+               term_with_data.harmonic_arrays_Eh]
+    print('term_with_data.harmonic_arrays_Eh')
+    print(term_with_data.harmonic_arrays_Eh)
     return alldata
 @pytest.fixture(scope="module")
 def terms_collection(data_for_precalc, setup_term):

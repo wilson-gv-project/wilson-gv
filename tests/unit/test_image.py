@@ -3,7 +3,7 @@ from tests.testing_utils import require_asserts
 
 from wilson.utils import prep_data_load
 from wilson.spectrum.termND import TermND
-from wilson.spectrum.terms_collection import TermsEvaluator
+from wilson.spectrum.termsEvaluator import TermsEvaluator
 
 # import sys
 # sys.path.append('/home/vlev/wilson-suite/')
