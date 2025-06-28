@@ -29,7 +29,10 @@ order = len(pulses)
 
 epochs = field_a.findEpochs()
 
-detector_a = ws.experiment.abstractions.specDetector('freq', detector_location=[0.0, 0.0, 1.0], detection_polarization=[0.0, 0.0, 1.0], detection_range=[0.003 + 0.0001*i for i in range(101)], wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]} 
+detector_a = ws.experiment.abstractions.specDetector('freq', detector_location=[0.0, 0.0, 1.0],
+                                                     detection_polarization=[0.0, 0.0, 1.0],
+                                                     detection_range=[0.003 + 0.0001*i for i in range(101)],
+                                                     wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
 
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
@@ -44,9 +47,13 @@ calc_setup = ws.main.abstractions.externalCalcSetup(program='gaussian', lvl_theo
 sim = ws.main.abstractions.wilsonSimulation()
 
 sim.addExperiment(experiment_a)
-sim.getTerms(ws.derive.main.get_fully_enhanced_terms)
-sim.addSystem(ws.main.abstractions.molecularSystem(name='ACAC'))
-sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm', allow_skip_eigvec=True, external_fill_from=calc_setup))
+sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
+mol_system = ws.main.abstractions.molecularSystem(name='ACAC', natoms=8)
+sim.addSystem(mol_system)
+# sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm',
+#                                                     allow_skip_eigvec=True, external_fill_from=calc_setup))
+sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(system=mol_system, vib_regime='GVPT2', vibana_prop_need='none',
+                                                    allow_skip_eigvec=True, external_fill_from=calc_setup))
 sim.addPropEvalSetup(eval_uniform=calc_setup)
 
 axis1 = ws.main.abstractions.spectralAxis({1: 1})
@@ -54,22 +61,33 @@ axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
 start = {1: 250, 2: 100}
 end = {1: 3850, 2: 7550}
 spacer = {1: 3.8, 2: 3.8}
-spec_axes = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform', start=start, end=end, spacer=spacer)
+spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+                                              start=start, end=end, spacer=spacer)
 evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
 rndi = {'num_level_ticks': 15}
-eval_setup = ws.main.abstractions.specEvalSetup(axes=spec_axes, ev_info=evi, rnd_info=rndi)
+eval_setup = ws.main.abstractions.specEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 sim.addSpecEvalSetup(eval_setup)
 
-sim.findPropsAndMaxStateLvl()
+sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
+print('\nafter findPropsAndMaxStateLvl', sim.props, '\n')
+
 sim.dressPropsWithSetup()
 sim.makeCalculationBatches()
-sim.getResultsFromCalculationBatches(source_type='vault', source_loc=ws.intensities.utils.get_package_root() + '/tests/test_database/mini_files_database.csv' )
+sim.getResultsFromCalculationBatches(source_type='vault',
+                                     source_loc=ws.intensities.utils.get_package_root()
+                                                + '/tests/test_database/mini_files_database.csv' )
+print('\nafter getResultsFromCalculationBatches', sim.props, '\n')
 
-print('\n  >>> Going to evaluate now...\n')
+
+print('\n===========================================================================')
+print('  >>> Going to evaluate now...\n')
 # sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
+sim.evaluate(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=True)
+import numpy as np
+print(np.max(np.abs(sim.spec)))
 
-terms_evaluator =
-sim.evaluate(evaluator=terms_evaluator)
+print('\n===========================================================================')
+print('\n  >>> And now rendering...\n')
 
 sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
 

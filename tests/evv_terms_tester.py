@@ -84,3 +84,7 @@ print()
 print(one_term.freqterms)
 print()
 print(one_term.res)
+
+print('===========================================================================')
+print('fully_enhanced_terms\n')
+print(fully_enhanced_terms)
