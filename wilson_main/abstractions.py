@@ -6,10 +6,12 @@ from wilson_utils.prop_trivname import prop_trivname
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 class molecularSystem:
 
-	def __init__(self, name=None, geo=None, geo_extra=None):
+	def __init__(self, name=None, natoms=None, geo=None, geo_extra=None):
 
 		# String
 		self.name = name
+		self.natoms = natoms
+		self.Nnmodes = 3*natoms-6 # fixme
 
 		if (geo is not None) and (geo_extra is not None):
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
@@ -50,6 +52,9 @@ class molecularSystem:
 		# For geo_extra
 
 		pass
+
+	def __repr__(self):
+		return f'THIS IS molecularSystem {self.name}\n'
 		
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
 # Does not need to reference an actual setup and can also be used for "get from no specific calculation"
@@ -95,7 +100,8 @@ class externalCalcSetup:
 # TODO: Consider enforcing specification of units and basis when values are provided
 class molecularProperty:
 
-	def __init__(self, prop_spec, trivial_name=None, vals=None, in_basis=None, in_units=None, system=None, calc_setup=None, target_basis=None, target_units=None):
+	def __init__(self, prop_spec, trivial_name=None, vals=None, in_basis=None, in_units=None,
+				 system=None, calc_setup=None, target_basis=None, target_units=None):
 
 		# Dictionary {'attr name': val, ...}
 		# Info like perturbing operators, frequencies etc.
@@ -195,6 +201,12 @@ class molecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 		
+	def __repr__(self):
+		if self.vals is not None:
+			s = ' not'
+		else:
+			s = ''
+		return f'molecularProperty {self.triv_name}: values are{s} None'
 
 # Collects necessary calculations with one setup, makes input, collects results
 class calculationBatch:
@@ -234,8 +246,11 @@ class calculationBatch:
 		pass
 		
 	def getResultsFromVault(self, props_to_fill, vib_ana_setup_to_fill, source_loc):
-
-		from wilson.utils import get_package_root
+		"""
+		not filling in states yet or what's going on here....
+		"""
+		# TODO: write tests
+		from wilson.utils import get_package_root #fixme: should be outside somewhere?
 		wilson_root = get_package_root()
 
 		from CQCParse.relay import DataVault
@@ -277,7 +292,7 @@ class calculationBatch:
 			# Take harmonic vibrational analysis results
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
-				vib_ana_setup_to_fill.nc_sqrt_eigval = parser_obj.fundamentals_harmonic_int
+				vib_ana_setup_to_fill.nc_sqrt_eigval = parser_obj.fundamentals_harmonic_int # todo: tests...
 
 				if not vib_ana_setup_to_fill.allow_skip_eigvec:
 					# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
@@ -288,7 +303,7 @@ class calculationBatch:
 			# Take states
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
 
-				if not(vib_ana_setup_to_fill.vib_regime in ['harmonic']):
+				if not(vib_ana_setup_to_fill.regime in ['harmonic']):
 					extracted_states = parser_obj.anharmonic_states
 
 				else:
@@ -304,6 +319,8 @@ class calculationBatch:
 						# TODO: Exclusion based on mode index or freq cutoff
 						# FIXME: Change to integer indexing
 						processed_states.append(vibState({i: 1.0}, extracted_states[i]))
+				vib_ana_setup_to_fill.states = processed_states
+
 
 	def getResultsAsArrayFromFile(self):
 	
@@ -350,15 +367,26 @@ class wilsonSimulations:
 
 			pass
 
-# "Plain" spectral axis for rendering response function freq arg spectra with independent lineshape functions
-class spectralAxis:
 
+class spectralAxis:
+	"""
+	'Plain' spectral axis for rendering response function freq arg spectra;
+	with independent lineshape functions.
+
+	freq_vars is {freq label 1 in this axis: coeff, ...}
+
+	Examples:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1}) -- w1-w2
+
+	simple w1 and w2:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({2: 1})        -- w2
+	"""
 	def __init__(self, freq_vars):
 
 		# Must be dictionary: {freq label 1 in this axis: coeff, ...}
-		self.fv = freq_vars
-
-
+		self.freq_vars = freq_vars
 
 
 # TODO: Implement
@@ -371,8 +399,24 @@ class spectralAxisAdvanced:
 
 # Spectral collective axes
 class spectralGrid:
+	"""
+	Use example:
 
-	def __init__(self, axes, range_style, start=None, end=None, n_pts=None, spacer=None, custom_range=None, collective_grid=None):
+	axis1 = ws.main.abstractions.spectralAxis({1: 1})
+	axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
+	start = {1: 250, 2: 100}
+	end = {1: 3850, 2: 7550}
+	spacer = {1: 3.8, 2: 3.8}
+	spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+												  start=start, end=end, spacer=spacer)
+
+
+	"""
+
+	def __init__(self, axes, range_style, start=None, end=None,
+				 n_pts=None, spacer=None,
+				 custom_range=None, collective_grid=None):
+		import numpy as np
 
 		# Axes must be a dictionary {1: spectralAxisRsp/Advanced instance, 2: ...}
 		self.axes = axes
@@ -383,8 +427,6 @@ class spectralGrid:
 		self.ranges = None
 
 		if (range_style == 'uniform'):
-
-			import numpy as np
 
 			self.ranges = {}
 
@@ -428,17 +470,40 @@ class spectralGrid:
 
 			pass
 
-
-
 		# Optional collective (e.g. adaptive) grid
 		# Otherwise intended to default to full granularity grid of individual axes
 		self.coll_grid = collective_grid
+
+	def make_mesh_numpy(self):
+		"""
+		Okay, but how to use spectralAxis.freq_vars
+		"""
+		import numpy as np
+
+		listofmeshaxes = []
+		for ax_label in self.axes:
+			if self.spacer is not None:
+				wn = np.arange(self.start[ax_label], self.end[ax_label], self.spacer[ax_label])
+				listofmeshaxes.append(wn)
+			elif self.n_pts is not None:
+				wn = np.linspace(self.start[ax_label], self.end[ax_label], self.n_pts[ax_label])
+				listofmeshaxes.append(wn)
+		meshes = np.meshgrid(*listofmeshaxes)
+
+		mesh_dict = {}
+		for i, ax_label in enumerate(self.axes):
+			mesh_dict[ax_label] = meshes[i]
+
+		return mesh_dict
 
 	# Make collective grid from individual axes linspaces
 	def collGridFromAxes(self):
 
 		pass
 
+
+	def __repr__(self):
+		return "THIS IS spectralGrid with self.axes,self.n_pts"
 
 # State, energy, displacement
 class vibState:
@@ -451,6 +516,9 @@ class vibState:
 		self.e = e
 		# Displacements (optional)
 		self.d = d
+
+	def __repr__(self):
+		return f"vibState {self.s}, energy is {self.e} cm-1"
 
 
 
@@ -466,7 +534,8 @@ class vibState:
 class vibAnaSetup:
 
 	def __init__(self, vib_regime='harmonic', system=None, vib_regime_subinfo=None, max_state_lvl=None, states=None,
-				 nc_sqrt_eigval=None, nc_eigvec=None, allow_skip_eigvec=False, vibana_prop_need='all', external_fill_from=None):
+				 nc_sqrt_eigval=None, nc_eigvec=None, allow_skip_eigvec=False,
+				 vibana_prop_need='all', external_fill_from=None, exclude_modes=None):
 
 		self.system = system
 		self.regime = vib_regime
@@ -475,6 +544,11 @@ class vibAnaSetup:
 		self.states = states
 
 		# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
+		self.exclude_modes = exclude_modes
+		if exclude_modes is None:
+			self.exclude_modes = []
+		import numpy as np
+		self.modes_indices = [i for i in np.arange(system.Nnmodes) if i not in self.exclude_modes]
 
 		# Dictionary: {nm index: w}
 		self.nc_sqrt_eigval = nc_sqrt_eigval
@@ -493,6 +567,7 @@ class vibAnaSetup:
 		# NOTE: Refers only to vibrational properties that will be directly filled from analysis and not to
 		# properties that will be used in own doAnalysis invocation (they may have their own specification)
 		self.external_fill_from = external_fill_from
+
 
 	# Tell which molecularProperty instances are required for a specific vibrational analysis
 	# Allowed to skip eigenvectors (e.g. if all other data already in nm basis)
@@ -638,7 +713,8 @@ class vibAnaSetup:
 			else:
 				self.states = analyzer(sys_va, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
 
-
+	def __repr__(self):
+		return 'THIS IS vibAnaSetup with self.regime,self.states'
 
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
@@ -648,14 +724,16 @@ class vibAnaSetup:
 # System to run simulation on
 class specEvalSetup:
 
-	def __init__(self, axes=None, ev_info=None, rnd_info=None):
+	def __init__(self, grid=None, ev_info=None, rnd_info=None):
 
-		# Must be spectralAxes instance
-		self.axes = axes
+		# Must be spectralGrid instance
+		self.grid = grid
 
 		self.ev_info = ev_info
 		self.rnd_info = rnd_info
 
+	def __repr__(self):
+		return 'THIS IS specEvalSetup with self.grid,self.ev_info,self.rnd_info'
 
 class wilsonSimulation:
 
@@ -864,7 +942,7 @@ class wilsonSimulation:
 			self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
 		else:
-			self.spec = evaluator(self.system, self.exp, self.terms, self.props,  self.spec_eval_setup, self.vib_ana_setup)
+			self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
 	# After evaluation, render the spectral data as requested
 	def render(self, renderer):
