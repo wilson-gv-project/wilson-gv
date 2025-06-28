@@ -3,7 +3,7 @@ TODO: to be cleaned up
 """
 import copy
 
-from wilson.spectrum import spectrum2D
+from wilson.spectrum import Spectrum2D, convNu2Ene
 from CQCParse.parsing import GaussianDataParser, CFOURdataParser
 from CQCParse.relay import DataVault
 
@@ -13,7 +13,7 @@ import plotly
 import plotly.express as px
 
 # todo: needs to be updated or removed
-def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
+def get_resonances_DF(computedSpectrum: Spectrum2D,
                       rec_cm: bool = True,
                       vib_levels_harmonic: bool = False) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
     """
@@ -75,11 +75,11 @@ def get_resonances_DF(computedSpectrum: spectrum2D.Spectrum2D,
                 dict_df_term['w_1'].append(secondres)
                 dict_df_term['w_2'].append(firstres+secondres)
             else:
-                dict_df_term['w_a'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[0])])]))
-                dict_df_term['w_b'].append(spectrum2D.convNu2Ene(w_all[tuple([str(c[1])])]))
-                dict_df_term['w_2-w_1'].append(spectrum2D.convNu2Ene(firstres))
-                dict_df_term['w_1'].append(spectrum2D.convNu2Ene(secondres))
-                dict_df_term['w_2'].append(spectrum2D.convNu2Ene(firstres + secondres))
+                dict_df_term['w_a'].append(convNu2Ene(w_all[tuple([str(c[0])])]))
+                dict_df_term['w_b'].append(convNu2Ene(w_all[tuple([str(c[1])])]))
+                dict_df_term['w_2-w_1'].append(convNu2Ene(firstres))
+                dict_df_term['w_1'].append(convNu2Ene(secondres))
+                dict_df_term['w_2'].append(convNu2Ene(firstres + secondres))
             dict_df_term['avrg_g'].append(electrical_terms_avrg_dict[elTerm][(c[0], c[1])])
         dfs4terms_el.append(dict_df_term)
 
@@ -285,7 +285,7 @@ def analyse_electrical_resonances(dataframe_electric_resonances, computedSpectru
     return formatted_df
 
 
-def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
+def allResDF(computedSpectrum) -> [pd.DataFrame, Spectrum2D]:
 
     # settings
     vib_levels_harmonic = False
@@ -405,14 +405,14 @@ def allResDF(computedSpectrum) -> [pd.DataFrame, spectrum2D.Spectrum2D]:
 # todo: needs to be updated or removed
 def allAddedres(molecule, method, basis, data_vault,
                 terms_selection, Gamma_rc, plotHigherThan=1e5) -> [plotly.graph_objs.Figure,
-                                                                   pd.DataFrame, spectrum2D.Spectrum2D]:
+                                                                   pd.DataFrame, Spectrum2D]:
     # settings
     vib_levels_harmonic = False
     rec_cm = True
     datain = data_vault.make_DatainputDict('gaussian', (molecule, method, basis), '')
 
     # spectrum object
-    computedSpectrum = spectrum2D.Spectrum2D([], [])
+    computedSpectrum = Spectrum2D([], [])
     computedSpectrum.load_data(GaussianDataParser(datain))
     computedSpectrum.set_spectrum_settings(Gamma_rc=Gamma_rc, diag_margin_rc=10., vib_levels_harmonic=False)
     computedSpectrum.add_terms(*terms_selection)
