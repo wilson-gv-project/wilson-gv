@@ -114,3 +114,74 @@ def dict_from_term(term):
 
     return result_dict
 
+
+def derived_terms_dict_to_dicts(derived_terms):
+    """
+    Example:
+    derived_terms = {
+        1: {(1, 0): [<wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b223b260>,
+                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b223b650>],
+            (0, 1): [<wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b22582c0>,
+                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b2258830>,
+                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b2258110>]},
+        0: {(0, 0): []}}
+
+    result_list = []
+    """
+
+    result_list = []
+    for key_num_anharms in derived_terms:
+        for anharms_tuple in derived_terms[key_num_anharms]:
+            for term in derived_terms[key_num_anharms][anharms_tuple]:
+                result_list.append(dict_from_term(term))
+
+    return result_list
+
+
+def flip_modes_indices(term_dict, upd_dict):
+    """
+    take the result of dict_from_term(term) and flip some abc indices
+
+    uniq_res_conds_idx {'c', 'b'}
+{'termA_pref': 0.125,
+ 'termB_pref': 1.0,
+
+ 'averaged_props': (('polgrad', ('a',), ('A', 'D')), ('dipgrad', ('b',), ('B',)), ('dipgrad', ('c',), ('G',))),
+ 'non_averaged_props': (('cff', ('a', 'b', 'c')),),
+ 'vibene_denom': ('a', 'b', 'c'),
+ 'vibenediff': ('a+b,c',),
+ 'resonances': (('zero,b', (-1,)), ('c,b', (-1, 2)))}
+
+ example here: upd_dict = {'b':'a', 'c':'b'}
+    """
+
+    upd_term_dict = {}
+    locidxs = ['averaged_props', 'non_averaged_props', 'vibene_denom', 'vibenediff', 'resonances']
+
+    for k in term_dict:
+        if k not in locidxs:
+            upd_term_dict[k] = term_dict[k]
+        else:
+            upd_term_dict[k] = replace_nested(term_dict[k], upd_dict)
+
+    return upd_term_dict
+
+
+# chatUiT
+def replace_chars(s, replacements):
+    # Create a translation table for single-pass replacement
+    translation_table = str.maketrans(replacements)
+    return s.translate(translation_table)
+# Recursive function to apply replacements selectively
+def replace_nested(data, replacements):
+    if isinstance(data, str):  # If it's a string, apply replacements
+        return replace_chars(data, replacements)
+    elif isinstance(data, tuple):  # If it's a tuple, process each element
+        # Skip replacements for the first element of the top-level tuple
+        if len(data) > 0 and isinstance(data[0], str) and data[0] in ('polgrad', 'dipgrad',
+                                                                      'polhess', 'diphess', 'cff', 'qff'):
+            return (data[0],) + tuple(replace_nested(item, replacements) for item in data[1:])
+        else:
+            return tuple(replace_nested(item, replacements) for item in data)
+    else:  # If it's not a string or tuple, return it as is
+        return data
