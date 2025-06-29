@@ -13,12 +13,17 @@ from wilson.utils import prep_data_load
 
 # TermND with TermsEvaluator
 # with_diagnostics=True because WTF... wilsonSimulation.evaluate() - FIXME please!
+# fixme? no need to know 'experiment'?
 def terms_evaluator(system, experiment,
                     derived_terms, props,
                     spec_eval_setup, vib_ana_setup,
                     with_diagnostics=True):
     """
-    called in wilsonSimulation class instance:
+      >> Orchestrating spectrum amplitudes evaluation with TermND setup.
+      Should ultimately return: spectrum array (and diagnostics)
+      Diagnostics: ?? (spectrum calculation related)
+
+    Called in wilsonSimulation class instance:
         evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
     - system - ws.main.abstractions.molecularSystem(name='ACAC')
@@ -42,8 +47,19 @@ def terms_evaluator(system, experiment,
     - spec_eval_setup - wilson_main.abstractions.specEvalSetup instance
     - vib_ana_setup - wilson_main.abstractions.vibAnaSetup instance
 
-
     data: props
+
+
+        What should be done?
+
+    1. set up evaluation terms - from derived_terms
+    2. load data into terms??? or smth
+    3. make TermsEvaluator instance
+    4. identify what to precalculate with TermsEvaluator
+    5. precalculate if any with TermsEvaluator
+    5.1. prepare data_for_precalc (related to 2.) - postprocess loaded data?..
+    6. calculate amplitudes - loop over terms in TermsEvaluator(?), use precalculated data
+
     """
     from wilson.spectrum import TermND, TermsEvaluator, DataForPrecalc
     from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
@@ -51,44 +67,34 @@ def terms_evaluator(system, experiment,
     amplitudes = 0. + 0.j
     print('\nws.intensities.spectrum.evaluators.terms_evaluator:    Just doing nothing for now\n')
 
-    # print('\nPrinting system:')
-    # print(system)
-    #
-    # print('\nPrinting experiment:')
-    # print(experiment)
-    #
-    # print('\nPrinting derived_terms:')
-    # print(derived_terms)
-
-    # print('\nPrinting props:')
-    # print(props)
-
-    print('\n--- Printing spec_eval_setup:')
-    print(spec_eval_setup)
-    print('  spec_eval_setup.grid:', spec_eval_setup.grid)
+    # print('\n--- Printing spec_eval_setup:')
+    # print(spec_eval_setup)
+    # print('  spec_eval_setup.grid:', spec_eval_setup.grid)
 
     # print('\n--- Printing vib_ana_setup:')
     # print(vib_ana_setup)
     # print('vib_ana_setup.nc_sqrt_eigval', vib_ana_setup.nc_sqrt_eigval)
 
-    print("""
-    What should be done?
-    
-    1. set up evaluation terms - from derived_terms
-    2. load data into terms??? or smth
-    3. make TermsEvaluator instance
-    4. identify what to precalculate
-    5. precalculate if any
-    5.1. prepare data_for_precalc (related to 2.)
-    6. calculate amplitudes
-    """)
-
+    # fixme: logging decorator instead?
     if with_diagnostics:
+        """
+    # Step 1: Set up terms
+    evaluation_terms = setup_terms(exp, terms, props)
+    # Step 2: Load data
+    data = load_data(evaluation_terms)
+    # Step 3: Precalculate
+    precalc_data = precalculate(data, evaluation_terms)
+    # Step 4: Calculate amplitudes
+    amplitudes = calculate_amplitudes(precalc_data, evaluation_terms)
+    # Step 5: Postprocess results
+    result = postprocess_results(amplitudes)
+    # Step 6: Generate diagnostics
+    diagnostics = generate_diagnostics(precalc_data, amplitudes)
+        """
         diagn = {}
 
-        # 1.1
+        #! 1.1 transform terms from derive to evaluate form
         dict_terms = derived_terms_dict_to_dicts(derived_terms)
-        # print(dict_terms, '\n')
 
         # 1 complete
         terms_to_eval = [TermND(i, dict_terms[i]) for i in range(len(dict_terms))]
@@ -98,11 +104,8 @@ def terms_evaluator(system, experiment,
             if i==3:
                 terms_to_eval[3] = TermND(3, f)
 
-        # print(terms_to_eval)
-
         # 3 complete
         te = TermsEvaluator(terms_to_eval)
-        # print(te)
 
         # 4 complete
         te.identify_to_precalculate()
@@ -128,7 +131,6 @@ def terms_evaluator(system, experiment,
                                           axes_dict=axes_dict,
                                           states_arrays_Eh=states_arrays_Eh,
                                           harmonic_arrays_Eh=harmonic_arrays_Eh)
-        # deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
         # 5 - complete
         precalculated_data = te.precalculate(data_for_precalc)

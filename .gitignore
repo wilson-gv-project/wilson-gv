@@ -2,6 +2,8 @@ spectra/*
 !spectra/*.py
 !spectra/**/*.py
 
+hidden_**
+
 .idea/
 *.svg
 *.txt

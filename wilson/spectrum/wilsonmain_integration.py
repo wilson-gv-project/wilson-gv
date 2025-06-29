@@ -19,7 +19,8 @@ def get_spectrum2D(system, experiment, terms, props, spec_eval_setup, vib_ana, w
     # Make spectrum2D instance
     spectrumObj = Spectrum2D(axes = spec_eval_setup.axes)
 
-    # Take "pan-spectrum" settings (global damping if using, diag extra, etc.), extract from spec_eval_setup and make
+    # Take "pan-spectrum" settings (global damping if using, diag extra, etc.),
+    # extract from spec_eval_setup and make
     # as input to precalc/calc routines
     spec_settings = {}
 

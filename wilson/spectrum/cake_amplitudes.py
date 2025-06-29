@@ -94,7 +94,8 @@ gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
 corners_cake_w2mw1 = lambda cake: np.array([cake[0][0, 0], cake[0][0, -1], cake[1][0, 0], cake[1][-1, 0]])
 high_value_slice_indices = lambda smallcake, threshold: np.where(np.any(np.abs(smallcake) > threshold, axis=(1, 2)))[0]
 
-def dicts_layers_ab(term, deriv_data, states_dict, harm_modes_dict, mode_indices,
+def dicts_layers_ab(term, deriv_data, states_dict,
+                    harm_modes_dict, mode_indices,
                     w1_mesh, w2_mesh, margin, Gamma_rc,
                     w2mw1min, w2mw1max, res_thresh=3e7):
     """

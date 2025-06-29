@@ -1,5 +1,4 @@
 import numpy as np
-# from numpy.ma.core import indices
 
 from .tools import convNu2Ene, combinations_with_permutations
 from .spectrum_utils import MolProperty, AveragedProps, VibStatesDiff, DoubleDict
@@ -22,14 +21,12 @@ def for_ab_for_vd(vd, indices_str):
 
 
 class TermND:
-    """
-    Calculations using the expression.
-    TermND object would have a dict-mathematical expression representation.
-
-    """
 
     def __init__(self, term_id, expression):
         """
+        Calculations using the expression.
+        TermND object would have a dict-mathematical expression representation.
+
         expressions = {term_id: expression}
         expressions = {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
@@ -87,12 +84,11 @@ class TermND:
 
         self.property_simple_tuples = tuple([p.simple_tuple for p in self.properties])
         self.nice_props = AveragedProps(self.properties)
-        # print(self.nice_props)
-        # self.property_tuple1, self.property_tuple2, self.property_tuple3 = self.property_tuples
 
         # collecting vib ene diffs
         self.vibdiff_symbolic = []
         vibstates_diffs_collection = []
+        # vib diffs with pert freqs
         for re in self.resonances_expr:
             self.vibdiff_symbolic.append(re[0])
             l = re[0].split(',')
@@ -103,9 +99,9 @@ class TermND:
                 else:
                     ftuple.append(0)
             vibstates_diffs_collection.append((tuple(ftuple), True, re[1], re[0]))
+        # vib diffs withou pert freqs
         for vd in self.viblevelsdiff_expr:
             self.vibdiff_symbolic.append(vd)
-
             l = vd.split(',')
             ftuple = []
             for ll in l:
@@ -122,24 +118,6 @@ class TermND:
         if isinstance(self.expression['termA_pref'], Fraction):
             self.expression['termA_pref'] = float(self.expression['termA_pref'])
 
-
-        # default numerical values of components -- ???? but they should be for given ab
-        self.AVG = 1
-        self.GP = 1
-        self.TP = 1
-        self.HEP = 1 # ab(c) indices
-        self.CFF = 1 # abc indices
-        self.RESCONDS = 1
-        self.ODEN = 1
-
-        if self.term_label != 'MECH':
-            self.FacFull = self.AVG * self.GP * self.TP * self.HEP * self.CFF * self.ODEN
-        else:
-            self.FacFull = 1 # because should be summed over index c
-
-        # addition = self.FacFull * self.RESCONDS
-        #            self.FacFull = self.AVG * self.GP * self.TP * self.HEP * self.CFF * self.ODEN
-
         self.precalc_data = None
 
 
@@ -147,7 +125,6 @@ class TermND:
         s = f'\n{self.term_label} - {self.term_id}\n'
         for p in self.expression:
             s += f'\n    {p}'.ljust(25, ' ')+f'{self.expression[p]}'
-
         return s
 
 
@@ -155,7 +132,6 @@ class TermND:
         """
         making mn tuples for this term for ab combination
         """
-        # print(a,b, '--------- a,b')
         a, b = str(a), str(b)
 
         dict_id = {'a': a, 'b': b, 'zero': 'zero'}
