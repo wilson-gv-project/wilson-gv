@@ -99,7 +99,7 @@ class TermND:
                 else:
                     ftuple.append(0)
             vibstates_diffs_collection.append((tuple(ftuple), True, re[1], re[0]))
-        # vib diffs withou pert freqs
+        # vib diffs without pert freqs
         for vd in self.viblevelsdiff_expr:
             self.vibdiff_symbolic.append(vd)
             l = vd.split(',')
@@ -177,20 +177,20 @@ class TermND:
         self.gammaCompsAll = gammaCompsAll
 
 
-    def get_resonance_location(self, a, b):
-        """
-        A resonance for this term for ab combination of modes.
-
-        Ad hoc implementation
-        """
-        a, b = str(a), str(b)
-
-        dict_mn_tuples = self.for_ab(a, b)
-
-        w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
-        w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
-
-        return w1, w2
+    # def get_resonance_location(self, a, b):
+    #     """
+    #     A resonance for this term for ab combination of modes.
+    #
+    #     Ad hoc implementation
+    #     """
+    #     a, b = str(a), str(b)
+    #
+    #     dict_mn_tuples = self.for_ab(a, b)
+    #
+    #     w1 = self.allstates[dict_mn_tuples['n1_tuple']] - self.allstates[dict_mn_tuples['m1_tuple']]
+    #     w2 = self.allstates[dict_mn_tuples['m12_tuple']] - self.allstates[dict_mn_tuples['n12_tuple']] + w1
+    #
+    #     return w1, w2
 
 
     def get_resonance_location_general(self, abc_comb):
@@ -207,8 +207,6 @@ class TermND:
         # a, b = str(a), str(b)
         from tests import abc_list
         idx_str = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
-        # print('\nidx_str', idx_str)
-        # idx_str = {'a': a, 'b': b, 'zero': 'zero'} # , 'c': c, 'd'
 
         if self.precalc_data is not None:
             sorted_vib_diffs = sorted([i for i in self.vibstatesdiff_objs if i.res_cond],
@@ -218,7 +216,6 @@ class TermND:
             signes = []
             for vd in sorted_vib_diffs:
                 indices_h = [k for i in vd.diff_str.split(',') for k in i.split('+') if k!='zero']
-                # print(indices_h, vd)
                 if not axes_locs:
                     # fist identified axis
                     idxs = tuple([idx_str[i] for i in indices_h])
@@ -326,7 +323,6 @@ class TermND:
             total = 0.
             for ABGD in self.gammaCompsAll:
                 props_dict = self.get_properties(ABGD, a, b, c)
-                # print(props_dict)
                 addition = np.prod(np.array([v for k,v in props_dict.items() if 'mu' in k or 'alpha' in k]))
                 total += addition
                 if comps:
@@ -452,7 +448,6 @@ class TermND:
                 return t2
 
 
-    # @staticmethod
     def get_ene_factor(self, a, b, c=None):
         """
         1/omega_a/omega_b/omega_c
@@ -481,8 +476,7 @@ class TermND:
         d = {'a': a, 'b': b, 'c': c}
 
         if self.precalc_data is not None:
-            calc_tensors = [tuple(sorted(vd.diff_type)) for vd in self.vibstatesdiff_objs if not vd.res_cond]
-            # for ct in calc_tensors:
+            # calc_tensors = [tuple(sorted(vd.diff_type)) for vd in self.vibstatesdiff_objs if not vd.res_cond]
             vds = []
             for vd in self.vibstatesdiff_objs:
                 if not vd.res_cond:
@@ -613,7 +607,6 @@ class TermND:
         """
 
         if self.term_label=='EL':
-            # full_prefactor * resonance
             product_all, components= self.get_full_factor(a, b, comps=True, debugprint=debugprint) # , components if comps==True
 
         else:

@@ -352,7 +352,7 @@ class Spectrum2D:
         # setting up terms available for selection (all EVV terms now)
         self.get_derived_terms_evv()
 
-        # now used in the analysis
+        # now used in the examples
         self.e_selected, self.m_selected = electrical_terms_selection, mechanical_terms_selection
         self.selection = electrical_terms_selection + mechanical_terms_selection
 

@@ -7,8 +7,9 @@ import numpy as np
 
 from wilson.spectrum.termND import TermND
 from wilson.spectrum.termsEvaluator import TermsEvaluator
-from wilson.utils import Conditions, prep_data_load
-from wilson_main import abstractions as abst
+from wilson.utils import prep_data_load
+# from wilson_main import abstractions as abst
+from wilson.spectrum import DataForPrecalc
 
 from tests.testing_utils import require_asserts
 
@@ -64,6 +65,8 @@ def test_instance(dict_8terms):
 @require_asserts
 def test_load_data(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -111,6 +114,8 @@ def test_load_data(dict_8terms, MOL_setup_parser, spectrum_setup):
 @require_asserts
 def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -124,11 +129,8 @@ def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_se
 
     amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
                                         collect_all=True, sel_abs=[(5,0)])
-    # term.get_intensity is using:
-    #       self.mode_indices;
-    #       self.get_resonance_location(); self.get_intensity_ab()[0];
     a,b = 5,0 # (4,5), (2,3), (2,5), (0,0)
-    w1,w2 = t0.get_resonance_location(a,b)
+    w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     print(amplitude_single)
     ampl_single_ab = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None)[0]
@@ -139,6 +141,8 @@ def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_se
 @require_asserts
 def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -149,13 +153,10 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    #  ---->  New attributes after term.load_calc_data to term:
-    #     {'harmonic_states', 'allstates_Eh',
-    #      'allstates', 'harmonic_states_Eh',
-    #      'properties_data', 'gammaCompsAll', 'mode_indices'}
+
     print('t0.precalc_data', t0.precalc_data)
     a,b = 0,0 # (4,5), (2,3), (2,5)
-    w1,w2 = t0.get_resonance_location(a,b)
+    w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
     ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
@@ -165,7 +166,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
     print('----------------------------------------------')
 
     a,b = 0,1 # (4,5), (2,3), (2,5)
-    w1,w2 = t0.get_resonance_location(a,b)
+    w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
     ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
@@ -175,7 +176,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
     print('----------------------------------------------')
 
     a,b = 2,3 # (4,5), (2,3), (2,5)
-    w1,w2 = t0.get_resonance_location(a,b)
+    w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
     ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
@@ -261,6 +262,8 @@ def test_get_resonance_location_general_mock(dict_8terms):
 @require_asserts
 def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -276,7 +279,7 @@ def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spec
     freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     print(t0.properties_data.keys())
-    data = {
+    props_data_ready = {
         (1, 1): t0.properties_data['mu_Q'],
         (1, 2): t0.properties_data['mu_QQ'],
         (2, 1): t0.properties_data['alpha_Q'],
@@ -284,20 +287,19 @@ def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spec
     }
     avrg_terms = spectrum_setup.gammaCompsAll
 
-    axis1 = abst.spectralAxis({1: 1}, range_style='custom')
-    axis1.range = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    axis2 = abst.spectralAxis({2: 1}, range_style='custom')
-    axis2.range = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    axes = abst.spectralGrid({1: axis1, 2: axis2}, range_style='custom')
-
-    # print('::::::: ', type(axes.a[1])) # wilson_main.abstractions.spectralAxis
-    x,y = np.meshgrid(axes.a[1].range, axes.a[2].range)
+    axis1 = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
+    axis2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
+    x,y = np.meshgrid(axis1, axis2)
     axes_dict = {1: x, 2: y}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays, t0.harmonic_arrays] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
-    # print('big_dict.keys()', big_dict.keys())
 
     t0.precalc_data = big_dict
     print(t0.get_resonance_location_general((4, 4)))
@@ -306,6 +308,8 @@ def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spec
 @require_asserts
 def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -323,7 +327,7 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
     te = TermsEvaluator([t0])
     freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
-    data = {
+    props_data_ready = {
         (1, 1): t0.properties_data['mu_Q'],
         (1, 2): t0.properties_data['mu_QQ'],
         (2, 1): t0.properties_data['alpha_Q'],
@@ -333,14 +337,15 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
     axes_dict = {1: w1, 2: w2}
 
     print()
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     print(t0.states_arrays[1][a],t0.states_arrays[1][b])
-    # {'vibene_denoms': a,
-    #  'avrg_tensors': b,
-    #  'res_conds': c,
-    #  'vibdiffs': d}
     t0.precalc_data = big_dict
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
@@ -355,7 +360,12 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
     w1,w2 = t0.get_resonance_location_general((a,b))
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     t0.precalc_data = big_dict
@@ -372,7 +382,12 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
     w1,w2 = t0.get_resonance_location_general((a,b))
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata) # make it external to each term ,
     t0.precalc_data = big_dict
@@ -387,6 +402,8 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
 @require_asserts
 def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t2 = TermND(2, dict_8terms[2])
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
@@ -404,7 +421,7 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
     te = TermsEvaluator([t2])
     freqs = np.array([t2.allstates[k] for k in t2.allstates if len(k)==1])
     Nnmodes = 6
-    data = {
+    props_data_ready = {
         (1, 1): t2.properties_data['mu_Q'],
         (1, 2): t2.properties_data['mu_QQ'],
         (2, 1): t2.properties_data['alpha_Q'],
@@ -414,14 +431,15 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
     axes_dict = {1: w1, 2: w2}
 
     print()
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t2.states_arrays_Eh,
+                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     print(t2.states_arrays[1][a],t2.states_arrays[1][b])
-    # {'vibene_denoms': a,
-    #  'avrg_tensors': b,
-    #  'res_conds': c,
-    #  'vibdiffs': d}
     t2.precalc_data = big_dict
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
@@ -438,7 +456,12 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t2.states_arrays_Eh,
+                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     t2.precalc_data = big_dict
@@ -457,7 +480,12 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t2.states_arrays_Eh,
+                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata) # make it external to each term ,
     t2.precalc_data = big_dict
@@ -471,31 +499,11 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
 
 @require_asserts
-def test_axes(spectrum_setup):
-    """
-    spectralAxis, spectralGrid: FIXME: should be in wilson_main
-    """
-    axis1 = abst.spectralAxis({1: 1}, range_style='custom')
-    axis1.range = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    axis2 = abst.spectralAxis({2: 1}, range_style='custom')
-    axis2.range = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    axes = abst.spectralGrid({1: axis1, 2: axis2}, range_style='custom')
-
-    r_expr = (('b,a', (-1, 2)), ('zero,a', (-1,)))
-    res_conds = sorted([i[1] for i in r_expr],key=len)
-
-    print(res_conds)
-    # print(sorted([(2,), (1, 2), (-1, 3)],key=len)) # todo: test case
-    print('axes', axes)
-    # print('axes.a', axes.a)
-    # for aa in axes.a:
-        # print('aa, axes.a[aa], axes.a[aa].fv', aa, axes.a[aa], axes.a[aa].fv)
-        # print(axes.a[aa].range)
-
-
-@require_asserts
 def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -522,7 +530,7 @@ def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
 
     Nnmodes = 6
     print(t0.properties_data.keys())
-    data = {
+    props_data_ready = {
         (1, 1): t0.properties_data['mu_Q'],
         (1, 2): t0.properties_data['mu_QQ'],
         (2, 1): t0.properties_data['alpha_Q'],
@@ -534,17 +542,14 @@ def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
     w1m, w2m = np.meshgrid(w1, w2)
 
-    # axis1 = abst.spectralAxis({1: 1}, range_style='custom')
-    # axis1.range = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    # axis2 = abst.spectralAxis({2: 1}, range_style='custom')
-    # axis2.range = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    # axes = abst.spectralGrid({1: axis1, 2: axis2}, range_style='custom')
-    #
-    # x,y = np.meshgrid(axes.a[1].range, axes.a[2].range)
-    # axes_dict = {1: x, 2: y}
     axes_dict = {1: w1m, 2: w2m}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t2.states_arrays_Eh,
+                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     for t in terms:
@@ -571,32 +576,23 @@ def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     print(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
     print(w1m.shape)
     print(w1m)
-    # print(amplitudes.shape)
-    # print(amplitudes)
 
 
 @require_asserts
 def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
     parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    # t0 = TermND(0, terms_dict_setup[0])
-    # t1 = TermND(1, terms_dict_setup[1])
     t2 = TermND(2, dict_8terms[2])
-    # t3 = TermND(3, terms_dict_setup[3])
-
-    # t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-    #                   mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    # t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-    #                   mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
     t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    # t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-    #                   mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
 
     ###########################################################################################################
     # terms = [t0, t1, t2, t3]
@@ -605,7 +601,7 @@ def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
 
     Nnmodes = 6
     print(t2.properties_data.keys())
-    data = {
+    props_data_ready = {
         (1, 1): t2.properties_data['mu_Q'],
         (1, 2): t2.properties_data['mu_QQ'],
         (2, 1): t2.properties_data['alpha_Q'],
@@ -617,20 +613,17 @@ def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
     w1m, w2m = np.meshgrid(w1, w2)
 
-    # axis1 = abst.spectralAxis({1: 1}, range_style='custom')
-    # axis1.range = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    # axis2 = abst.spectralAxis({2: 1}, range_style='custom')
-    # axis2.range = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    # axes = abst.spectralGrid({1: axis1, 2: axis2}, range_style='custom')
-    # x,y = np.meshgrid(axes.a[1].range, axes.a[2].range)
-    # axes_dict = {1: x, 2: y}
-
     a,b = 0,2 # (4,5), (2,3), (2,5)
     w1,w2 = t2.get_resonance_location_general((a,b))
     print(w1,w2)
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t2.states_arrays_Eh,
+                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     for t in terms:
@@ -658,6 +651,8 @@ def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
 @require_asserts
 def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
 
     t0 = TermND(0, dict_8terms[0])
     t1 = TermND(1, dict_8terms[1])
@@ -678,7 +673,7 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     te = TermsEvaluator([t0, t1, t2, t3])
     freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
-    data = {
+    props_data_ready = {
         (1, 1): t0.properties_data['mu_Q'],
         (1, 2): t0.properties_data['mu_QQ'],
         (2, 1): t0.properties_data['alpha_Q'],
@@ -688,14 +683,15 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     axes_dict = {1: w1, 2: w2}
 
     print()
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     print(t0.states_arrays[1][a],t0.states_arrays[1][b])
-    # {'vibene_denoms': a,
-    #  'avrg_tensors': b,
-    #  'res_conds': c,
-    #  'vibdiffs': d}
     t0.precalc_data = big_dict
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
@@ -710,7 +706,12 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     w1,w2 = t0.get_resonance_location_general((a,b))
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     t0.precalc_data = big_dict
@@ -727,7 +728,12 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     w1,w2 = t0.get_resonance_location_general((a,b))
     axes_dict = {1: w1, 2: w2}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t0.states_arrays_Eh, t0.harmonic_arrays_Eh] # todo: set this up better
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata) # make it external to each term ,
     t0.precalc_data = big_dict
@@ -738,11 +744,3 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
                       debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
-    # print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
-    # debug.level = 1
-    # ampl = 0.
-    # for i, t in te.terms.items():
-    #     ampl += t.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-    #                       debugprint=True)[0]
-    # print(f'ampl = {ampl:.2e}')
-    # debug.level = 0

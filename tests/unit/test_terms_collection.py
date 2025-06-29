@@ -7,12 +7,9 @@ from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 from wilson.spectrum import TermND
 from wilson.spectrum.spectrum_utils import VibStatesDiff
-from wilson.utils import Conditions, prep_data_load
 
 from tests.testing_utils import require_asserts
 
-from CQCParse.parsing import GaussianParser, GaussianOutput
-from CQCParse.relay import DataVault
 
 import wilson.debug as debug
 import CQCParse.debug as cqc_debug
@@ -177,10 +174,6 @@ def test_precalc_res_conds(dict_8terms):
     print('set(tts.mn_types)',  set(tts.mn_types))
     print('Quanta for states involved:', set([i for v in set(tts.mn_types) for i in v.diff_type if i>0 ]))
 
-    # set_mn_types = set([i[0] for i in tts.unique_res_conds])
-    # print('set of w_m,n types', set_mn_types)
-    # Unique vib diff types - all
-    #   {'b,a', 'b+c,a', 'zero,a', 'a+b+c,zero', 'a+c,b', 'a+b,a', 'c,a+b'}
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
@@ -206,13 +199,6 @@ def test_precalc_res_conds(dict_8terms):
     pf_types = tts.precalc_res_conds(axes_dict)
 
     print('\nresult of precalc\n', pf_types)
-    # assert np.allclose(pf_types[(1, -2)], np.array([[ -6.,  -4.,   0.],
-    #                                                 [-14., -12.,  -8.],
-    #                                                 [-30., -28., -24.]]))
-    #
-    # assert np.allclose(pf_types[(1,)], np.array([[2., 4., 8.],
-    #                                              [2., 4., 8.],
-    #                                              [2., 4., 8.]]))
 
 
 @require_asserts
@@ -310,7 +296,7 @@ def test_precalculate(dict_8terms):
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
     axes_dict = {1: x, 2: y}
     Nnmodes = 3
-    data = {
+    props_data_ready = {
         (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
         (1, 2): np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
         (2, 1): np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
@@ -318,7 +304,14 @@ def test_precalculate(dict_8terms):
     }
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, states, states]
+    from wilson.spectrum import DataForPrecalc
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=states,
+                             harmonic_arrays_Eh=states)
+
     big_dict = tts.precalculate(alldata)
 
     print('\nPrecalculated stuff\n')

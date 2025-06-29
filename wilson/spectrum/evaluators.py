@@ -1,6 +1,4 @@
-# spectrum2D
 import numpy as np
-
 
 def eval_spec2D():
     from wilson.spectrum import wilsonmain_integration
@@ -9,10 +7,10 @@ def eval_spec2D():
 
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict
-from wilson.utils import prep_data_load
+# from wilson.utils import prep_data_load
 
 # TermND with TermsEvaluator
-# with_diagnostics=True because WTF... wilsonSimulation.evaluate() - FIXME please!
+# with_diagnostics=True because wilsonSimulation.evaluate() - FIXME please!
 # fixme? no need to know 'experiment'?
 def terms_evaluator(system, experiment,
                     derived_terms, props,
@@ -102,6 +100,7 @@ def terms_evaluator(system, experiment,
         f = flip_modes_indices(terms_to_eval[3].expression,{'b':'a', 'c':'b','a':'c'})
         for i, t in enumerate(terms_to_eval):
             if i==3:
+                # because res conds have indices b,c instead of a,b
                 terms_to_eval[3] = TermND(3, f)
 
         # 3 complete
@@ -134,21 +133,6 @@ def terms_evaluator(system, experiment,
 
         # 5 - complete
         precalculated_data = te.precalculate(data_for_precalc)
-
-        # for t in te.terms.values():
-        #     print(t)
-        #     res_vibdiffs = [i.diff_str for i in t.vibstatesdiff_objs if i.res_cond]
-        #     res_conds_idx = [k for vd_diff_str in res_vibdiffs for i in vd_diff_str.split(',')
-        #                           for k in i.split('+') if k!='zero']
-        #     uniq_res_conds_idx = set(res_conds_idx)
-        #     print('uniq_res_conds_idx', uniq_res_conds_idx)
-        #     print(t.expression)
-
-        # print(te.terms[3])
-        # print(te.terms[3].expression)
-        # from wilson_utils.termdict_from_symb_term import flip_modes_indices
-        # f = flip_modes_indices(te.terms[3].expression,{'b':'a', 'c':'b','a':'c'})
-        # print('flip_modes_indices\n', f) # its a workaround now
 
         # 6
         from wilson.spectrum import debug_mode

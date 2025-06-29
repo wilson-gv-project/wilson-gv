@@ -86,19 +86,22 @@ def MOL_setup_parser(conditions):
     Fixture to set up the Gaussian parser for MOL/B3LYP/cc_pVQZ.
     Molecule is taken from conditions
     """
-    molecule, method, basis = conditions.molecule, 'B3LYP', 'cc_pVQZ'
-    data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
-    dataframe_gaussian = data_vault.getting_files_DB("gaussian")
-    aa = dataframe_gaussian[
-        (dataframe_gaussian['code'] == molecule) &
-        (dataframe_gaussian['method'] == method) &
-        (dataframe_gaussian['basis_set'] == basis)
-    ]['g16_3quanta_full']
-    filename = aa.iloc[0]
-    gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
-    parser = GaussianParser(gout)
-    parser.load()
-    return parser
+    parsers = {}
+    for mol,cond in conditions.items():
+        molecule, method, basis = cond.molecule, 'B3LYP', 'cc_pVQZ'
+        data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
+        dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+        aa = dataframe_gaussian[
+            (dataframe_gaussian['code'] == molecule) &
+            (dataframe_gaussian['method'] == method) &
+            (dataframe_gaussian['basis_set'] == basis)
+        ]['g16_3quanta_full']
+        filename = aa.iloc[0]
+        gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
+        parser = GaussianParser(gout)
+        parser.load()
+        parsers[molecule] = parser
+    return parsers
 def OXAC2_setup_parser():
     """
     Fixture to set up the Gaussian parser for FORM/B3LYP/cc_pVQZ.
@@ -121,29 +124,35 @@ def spectrum_setup(avrg_xyz_indices, conditions):
     """
     Fixture to provide the simulation configuration.
     """
-    w1 = np.linspace(850.0, 3150.0, 1050)
-    w2 = np.linspace(500.0, 6550.0, 800)
-    w1m, w2m = np.meshgrid(w1, w2)
-    return SimulationConfig(
-        gammaCompsAll=avrg_xyz_indices,
-        molecule=conditions.molecule,
-        method='B3LYP',
-        basis='cc_pVQZ',
-        Gamma=3.8,
-        diag_margin=0.0,
-        start1=850.0,
-        end1=3150.0,
-        step1=3.1,
-        start2=500.0,
-        end2=6550.0,
-        step2=3.1,
-        # old_new_dict={3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5},
-        old_new_dict=None,
-        elevels='anharm',
-        enelvl=True,
-        w1m=w1m,
-        w2m=w2m,
-    )
+    setupsdict = {}
+    for mol,conds in conditions.items():
+        w1 = np.linspace(850.0, 3150.0, 1050)
+        w2 = np.linspace(500.0, 6550.0, 800)
+        w1m, w2m = np.meshgrid(w1, w2)
+        if mol=='FORM':
+            new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
+        else:
+            new_idx_dict = None
+        setupsdict[mol] = SimulationConfig(
+            gammaCompsAll=avrg_xyz_indices,
+            molecule=mol,
+            method='B3LYP',
+            basis='cc_pVQZ',
+            Gamma=3.8,
+            diag_margin=0.0,
+            start1=850.0,
+            end1=3150.0,
+            step1=3.1,
+            start2=500.0,
+            end2=6550.0,
+            step2=3.1,
+            old_new_dict=new_idx_dict,
+            elevels='anharm',
+            enelvl=True,
+            w1m=w1m,
+            w2m=w2m,
+        )
+    return setupsdict
 @pytest.fixture(scope="module")
 def avrg_xyz_indices():
     """
@@ -155,56 +164,72 @@ def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup):
     """
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
-    def create_term(term_id):
-        term = TermND(term_id, dict_8terms[term_id])
-        parsed_data = MOL_setup_parser.parse(linear_molecule=False)
-        parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-        if spectrum_setup.old_new_dict is not None:
-            parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
-        deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-        term.load_calc_data(
-            properties_data=deriv_data,
-            allstates=allstates,
-            harmonic_states=harmonic_states,
-            mode_indices=mode_indices,
-            gammaCompsAll=spectrum_setup.gammaCompsAll
-        )
-        return term
-    return create_term
+    term_funcs = {}
+    for mol,spec_setup in spectrum_setup.items():
+        def create_term(term_id):
+            term = TermND(term_id, dict_8terms[term_id])
+            parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
+            parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+            if spectrum_setup[mol].old_new_dict is not None:
+                parsed_data.upd_indices_several_parts(spectrum_setup[mol].old_new_dict)
+            deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
+            term.load_calc_data(
+                properties_data=deriv_data,
+                allstates=allstates,
+                harmonic_states=harmonic_states,
+                mode_indices=mode_indices,
+                gammaCompsAll=spectrum_setup[mol].gammaCompsAll
+            )
+            return term
+        term_funcs[mol] = create_term
+    return term_funcs
 @pytest.fixture(scope="module")
 def data_for_precalc(setup_term, spectrum_setup):
     """
     Fixture to prepare data for precalculation.
     """
-    term_with_data = setup_term(0)  # Create term 0
-    Nnmodes = 6
-    data = {
-        (1, 1): term_with_data.properties_data['mu_Q'],
-        (1, 2): term_with_data.properties_data['mu_QQ'],
-        (2, 1): term_with_data.properties_data['alpha_Q'],
-        (2, 2): term_with_data.properties_data['alpha_QQ'],
-    }
-    avrg_terms = spectrum_setup.gammaCompsAll
-    w1 = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    w1m, w2m = np.meshgrid(w1, w2)
-    axes_dict = {1: w1m, 2: w2m}
-    alldata = [Nnmodes, data, avrg_terms, axes_dict,
-               term_with_data.states_arrays_Eh,
-               term_with_data.harmonic_arrays_Eh]
-    print('term_with_data.harmonic_arrays_Eh')
-    print(term_with_data.harmonic_arrays_Eh)
-    return alldata
+    precalcs = {}
+    for mol,spec_setup in spectrum_setup.items():
+        term_with_data = setup_term[mol](0)  # Create term 0
+        Nnmodes = 6
+        props_data_ready = {
+            (1, 1): term_with_data.properties_data['mu_Q'],
+            (1, 2): term_with_data.properties_data['mu_QQ'],
+            (2, 1): term_with_data.properties_data['alpha_Q'],
+            (2, 2): term_with_data.properties_data['alpha_QQ'],
+        }
+        avrg_terms = spectrum_setup[mol].gammaCompsAll
+        w1 = np.arange(spectrum_setup[mol].start1,
+                       spectrum_setup[mol].end1, spectrum_setup[mol].step1)
+        w2 = np.arange(spectrum_setup[mol].start2,
+                       spectrum_setup[mol].end2, spectrum_setup[mol].step2)
+        w1m, w2m = np.meshgrid(w1, w2)
+        axes_dict = {1: w1m, 2: w2m}
+
+        from wilson.spectrum import DataForPrecalc
+        alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                                 props_data=props_data_ready,
+                                 avrg_terms=avrg_terms,
+                                 axes_dict=axes_dict,
+                                 states_arrays_Eh=term_with_data.states_arrays_Eh,
+                                 harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
+        print('term_with_data.harmonic_arrays_Eh')
+        print(term_with_data.harmonic_arrays_Eh)
+        precalcs[mol] = alldata
+    return precalcs
 @pytest.fixture(scope="module")
 def terms_collection(data_for_precalc, setup_term):
     """
     Fixture to create a TermsEvaluator with precalculated data.
     """
-    terms = [setup_term(i) for i in range(4)]  # Create terms 0 to 3
-    te = TermsEvaluator(terms)
-    te.identify_to_precalculate()
-    big_dict = te.precalculate(data_for_precalc)
-    return te, big_dict
+    terms_cols = {}
+    for mol,spec_setup in setup_term.items():
+        terms = [setup_term[mol](i) for i in range(4)]  # Create terms 0 to 3
+        te = TermsEvaluator(terms)
+        te.identify_to_precalculate()
+        big_dict = te.precalculate(data_for_precalc[mol])
+        terms_cols[mol] = (te, big_dict)
+    return terms_cols
 
 ###################################################################################################
 from wilson.spectrum.spectrum2D import Spectrum2D
@@ -234,42 +259,48 @@ class Conditions:
     preview: bool = False
 
 # ---------------- Fixtures ----------------
-@pytest.fixture(scope="module",params=["FORM", "OXAC2"])
-def conditions(request):
+# @pytest.fixture(scope="module",params=["FORM", "OXAC2"])
+@pytest.fixture(scope="module")
+def conditions():
     """
     Fixture to provide the configuration for the experiment using the Conditions dataclass.
     """
-    omega1 = np.linspace(850.0, 3150.0, 1050)
-    omega2 = np.linspace(500.0, 6550.0, 800)
-    program = 'gaussian'
-    molecule = request.param
-    method = 'B3LYP'
-    basis = 'cc_pVQZ'
-    # new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} FORM
-    new_idx_dict = None
-    el_terms_selected = [0,1]
-    mech_terms_selected = [2,3]
-    data_parser = None
 
-    return Conditions(
-        Gamma_rc=3.8,
-        diag_margin_rc=0.0,
-        dynamic_range_n=100,
-        omega1=omega1,
-        omega2=omega2,
-        program=program,
-        data_parser=data_parser,
-        molecule=molecule,
-        method=method,
-        basis=basis,
-        new_idx_dict=new_idx_dict,
-        el_terms_selected=el_terms_selected,
-        mech_terms_selected=mech_terms_selected,
-        list2exclude=None,
-        only_modes=None,
-        vpt2settings={'anharmonic_type': 'GVPT2'},
-        vib_levels_harmonic=False,
-        preview=False)
+    resdict = {}
+    for mol in ["FORM", "OXAC2"]:
+        omega1 = np.linspace(850.0, 3150.0, 1050)
+        omega2 = np.linspace(500.0, 6550.0, 800)
+        program = 'gaussian'
+        molecule = mol
+        method = 'B3LYP'
+        basis = 'cc_pVQZ'
+        if mol=='FORM':
+            new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
+        else:
+            new_idx_dict = None
+        el_terms_selected = [0,1]
+        mech_terms_selected = [2,3]
+
+        resdict[mol] = Conditions(
+                            Gamma_rc=3.8,
+                            diag_margin_rc=0.0,
+                            dynamic_range_n=100,
+                            omega1=omega1,
+                            omega2=omega2,
+                            program=program,
+                            data_parser=None,
+                            molecule=molecule,
+                            method=method,
+                            basis=basis,
+                            new_idx_dict=new_idx_dict,
+                            el_terms_selected=el_terms_selected,
+                            mech_terms_selected=mech_terms_selected,
+                            list2exclude=None,
+                            only_modes=None,
+                            vpt2settings={'anharmonic_type': 'GVPT2'},
+                            vib_levels_harmonic=False,
+                            preview=False)
+    return resdict
 
 @pytest.fixture
 def dataframe_gaussian():
@@ -287,48 +318,58 @@ def parsed_data(conditions, dataframe_gaussian, dataframe_cfour):
     """
     Fixture to parse data based on the program (Gaussian or CFOUR).
     """
-    program = conditions.program
-    molecule, method, basis = conditions.molecule, conditions.method, conditions.basis
-    if program == 'gaussian':
-        aa = dataframe_gaussian[
-            (dataframe_gaussian['code'] == molecule) &
-            (dataframe_gaussian['method'] == method) &
-            (dataframe_gaussian['basis_set'] == basis)
-        ]['g16_3quanta_full']
-        filename = aa.iloc[0]
-        gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
-        parser = GaussianParser(gout)
-    elif program == 'cfour':
-        aa = dataframe_cfour[
-            (dataframe_cfour['code'] == molecule) &
-            (dataframe_cfour['method'] == method) &
-            (dataframe_cfour['basis_set'] == basis)
-        ]
-        gout = CFOUROutput(
-            molecule, method, basis, 'cfour',
-            aa['c4_out'].iloc[0], aa['molden'].iloc[0],
-            aa['c4_cubic'].iloc[0], aa['c4_quartic'].iloc[0],
-            aa['c4_dipolexyz'].iloc[0][:-1], aa['pkl_polar'].iloc[0]
-        )
-        parser = CFOURParser(gout)
-    else:
-        raise ValueError("Unsupported program: {}".format(program))
-    parser.load()
-    return parser.parse(linear_molecule=False)
+    parsed_data_dict = {}
+    for mol,cond in conditions.items():
+        program = cond.program
+        molecule, method, basis = mol, cond.method, cond.basis
+        if program == 'gaussian':
+            aa = dataframe_gaussian[
+                (dataframe_gaussian['code'] == molecule) &
+                (dataframe_gaussian['method'] == method) &
+                (dataframe_gaussian['basis_set'] == basis)
+            ]['g16_3quanta_full']
+            filename = aa.iloc[0]
+            gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
+            parser = GaussianParser(gout)
+        elif program == 'cfour':
+            aa = dataframe_cfour[
+                (dataframe_cfour['code'] == molecule) &
+                (dataframe_cfour['method'] == method) &
+                (dataframe_cfour['basis_set'] == basis)
+            ]
+            gout = CFOUROutput(
+                molecule, method, basis, 'cfour',
+                aa['c4_out'].iloc[0], aa['molden'].iloc[0],
+                aa['c4_cubic'].iloc[0], aa['c4_quartic'].iloc[0],
+                aa['c4_dipolexyz'].iloc[0][:-1], aa['pkl_polar'].iloc[0]
+            )
+            parser = CFOURParser(gout)
+        else:
+            raise ValueError("Unsupported program: {}".format(program))
+        parser.load()
+        parsed_data_dict[mol] = parser.parse(linear_molecule=False)
+    return parsed_data_dict
 @pytest.fixture
-def spectrum2d(parsed_data, conditions):
+def spectrum2d(conditions):
     """
     Fixture to set up a Spectrum2D object.
     """
-    omega1, omega2 = conditions.omega1, conditions.omega2
-    spectrum_obj = Spectrum2D(omega1, omega2)
-    return spectrum_obj
+    spectrum_objects = {}
+    for mol,cond in conditions.items():
+        omega1, omega2 = cond.omega1, cond.omega2
+        spectrum_obj = Spectrum2D(omega1, omega2)
+        spectrum_objects[mol] = spectrum_obj
+    return spectrum_objects
 @pytest.fixture
 def spectrum_sequence(spectrum2d, parsed_data, conditions):
     """
     Fixture to launch the spectrum sequence and return the resulting dictionary.
     """
-    return spectrum2d.launch_sequence1(parsed_data, conditions, print_level=0)
+    preps = {}
+    for mol,cond in conditions.items():
+        preps[mol] = spectrum2d[mol].launch_sequence1(parsed_data[mol],
+                                                      cond, print_level=0)
+    return preps
 @pytest.fixture
 def intensity_data(spectrum2d, spectrum_sequence):
     """
@@ -346,31 +387,38 @@ def intensity_data(spectrum2d, spectrum_sequence):
     #     spectrum2d.w2_mesh_Eh = new_w2_mesh
     #     mask = spectrum2d.w1_mesh_Eh != 0.
     # else:
-    mask = None
-    sec_hypol_dataALL_ref = spectrum2d.intensity_both(selectionCond=mask)
-    nan_mask = np.isnan(sec_hypol_dataALL_ref)
+    sec_hypol_data_dict = {}
+    for mol,spec_preps in spectrum_sequence.items():
+        mask = None
+        sec_hypol_dataALL_ref = spectrum2d[mol].intensity_both(selectionCond=mask)
+        nan_mask = np.isnan(sec_hypol_dataALL_ref)
 
-    has_nan = np.any(nan_mask)
-    print(f"Are there any NaN values? {has_nan}")
-    num_nan = np.sum(nan_mask)
-    print(f"Number of NaN values: {num_nan}")
+        has_nan = np.any(nan_mask)
+        print(f"Are there any NaN values? {has_nan}")
+        num_nan = np.sum(nan_mask)
+        print(f"Number of NaN values: {num_nan}")
 
-    sec_hypol_dataALL_ref[nan_mask] = 0 + 0j
+        sec_hypol_dataALL_ref[nan_mask] = 0 + 0j
 
-    return sec_hypol_dataALL_ref
+        sec_hypol_data_dict[mol] = sec_hypol_dataALL_ref
+    return sec_hypol_data_dict
 
 @pytest.fixture
 def terms_amplitudes(terms_collection, spectrum_setup):
     """
     Fixture to calculate amplitudes using TermsEvaluator.
     """
-    te, _ = terms_collection
-    with debug_mode(0):
-        amplitudes = sum(
-            term.get_intensity(
-                spectrum_setup.w1m, spectrum_setup.w2m,
-                3.8, 0.0, debugprint=False, collect_all=False
+
+    ampls = {}
+    for mol,spec_setup in spectrum_setup.items():
+        te, _ = terms_collection[mol]
+        with debug_mode(0):
+            amplitudes = sum(
+                term.get_intensity(
+                    spec_setup.w1m, spec_setup.w2m,
+                    3.8, 0.0, debugprint=False, collect_all=False
+                )
+                for term in te.terms.values()
             )
-            for term in te.terms.values()
-        )
-    return amplitudes
+        ampls[mol] = amplitudes
+    return ampls

@@ -5,11 +5,6 @@ from wilson.utils import prep_data_load
 from wilson.spectrum.termND import TermND
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 
-# import sys
-# sys.path.append('/home/vlev/wilson-suite/')
-# import wilson_suite as ws
-# print(dir(ws))
-# from ws.analysis import render
 from wilson_analysis import render
 
 import wilson.debug as debug
@@ -18,6 +13,9 @@ debug.level = 0
 @require_asserts
 def test_amplitude_1term_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     print()
+    MOL_setup_parser = MOL_setup_parser['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -44,7 +42,7 @@ def test_amplitude_1term_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
 
     Nnmodes = 6
     print(t0.properties_data.keys())
-    data = {
+    props_data_ready = {
         (1, 1): t0.properties_data['mu_Q'],
         (1, 2): t0.properties_data['mu_QQ'],
         (2, 1): t0.properties_data['alpha_Q'],
@@ -58,7 +56,14 @@ def test_amplitude_1term_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
 
     axes_dict = {1: w1m, 2: w2m}
 
-    alldata = [Nnmodes, data, avrg_terms, axes_dict, t2.states_arrays_Eh, t2.harmonic_arrays_Eh] # todo: set this up better
+    from wilson.spectrum import DataForPrecalc
+    alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                             props_data=props_data_ready,
+                             avrg_terms=avrg_terms,
+                             axes_dict=axes_dict,
+                             states_arrays_Eh=t0.states_arrays_Eh,
+                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
+
     te.identify_to_precalculate()
     big_dict = te.precalculate(alldata)
     for t in terms:

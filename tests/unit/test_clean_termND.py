@@ -75,14 +75,15 @@ def compare_amplitudes(amplitudes1, amplitudes2):
     print(f"Maximum difference between amplitudes: {max_diff:.2e}")
     assert max_diff < 1e-6, "Amplitudes differ significantly"
 
-# @pytest.mark.parametrize("molecule", ["FORM", "OXAC2"])
 @require_asserts
 def test_terms_collection_calculation(terms_collection, spectrum_setup):
     """
     get a spectrum figure
     """
     # terms_collection is a fixture
-    te, big_dict = terms_collection
+    te, big_dict = terms_collection['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
 
     expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
@@ -93,7 +94,8 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup):
     with debug_mode(0):
         amplitudes = 0.0
         for id, term in te.terms.items():
-            intensity = term.get_intensity(spectrum_setup.w1m, spectrum_setup.w2m,
+            intensity = term.get_intensity(spectrum_setup.w1m,
+                                           spectrum_setup.w2m,
                                            3.8, 0.0, debugprint=True, collect_all=False)
             amplitudes += intensity
 
@@ -112,10 +114,13 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup):
                     filename=f'yo_terms_{spectrum_setup.molecule}.svg', nicetitle='TermsEvaluator')
 
 
-def test_spectrum2d_calculation(intensity_data, spectrum2d, spectrum_setup):
+def test_spectrum2d_calculation(intensity_data, spectrum_setup):
     """
     Test the intensity calculation and rendering of the spectrum.
     """
+    intensity_data = intensity_data['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     print(intensity_data.shape)
     print(f"Maximum amplitude: {np.max(abs(intensity_data)):.2e}")
 
@@ -138,6 +143,10 @@ def test_compare_amplitudes(terms_amplitudes, intensity_data, spectrum_setup):
     """
     Compare amplitudes calculated using TermsEvaluator and Spectrum2D.
     """
+    terms_amplitudes = terms_amplitudes['FORM']
+    intensity_data = intensity_data['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+
     # Validate TermsEvaluator amplitudes
     assert terms_amplitudes is not None, "TermsEvaluator amplitudes are None"
     assert np.isfinite(terms_amplitudes).all(), "TermsEvaluator amplitudes contain NaN or Inf values"
@@ -171,48 +180,11 @@ def test_compare_amplitudes(terms_amplitudes, intensity_data, spectrum_setup):
     # Check the statistics of the masked data
     print("Masked Spectrum2D Data Statistics:")
     print(f"Min: {np.min(masked_int_data)}, Max: {np.max(masked_int_data)}, Mean: {np.mean(masked_int_data)}")
-    # import matplotlib.pyplot as plt
-    # Visualize the zero mask
-    # plt.figure(figsize=(10, 8))
-    # plt.imshow(non_zero_mask, cmap='gray', interpolation='none')
-    # plt.title("Zero Mask for Spectrum2D Data")
-    # plt.colorbar(label="Non-Zero (1) vs Zero (0)")
-    # plt.savefig("zero_mask_spectrum2d.svg", dpi=300)
-    # # Flatten the data to 1D arrays for histogram plotting
-    # terms_abs_values = np.abs(terms_amplitudes).flatten()
-    # spectrum2d_abs_values = np.abs(intensity_data).flatten()
-    # # Plot histograms
-    # plt.figure(figsize=(12, 6))
-    # plt.hist(terms_abs_values, bins=100, alpha=0.7, label='TermsEvaluator', color='green')
-    # plt.hist(spectrum2d_abs_values, bins=100, alpha=0.3, label='Spectrum2D', color='red')
-    # plt.yscale('log')  # Use a log scale to better visualize the distribution
-    # plt.xlabel('Absolute Value')
-    # plt.ylabel('Frequency (log scale)')
-    # plt.title('Distribution of Absolute Values')
-    # plt.legend()
-    # plt.savefig("hist.svg", dpi=300)
-    # Calculate the difference
-    # difference = np.abs(terms_amplitudes - intensity_data)
-    # Render the difference
-    # render_spectrum(difference, spectrum_setup.w1m, spectrum_setup.w2m, filename='yo_difference.svg', nicetitle='Difference')
-
-    # intensities_terms = np.abs(terms_amplitudes) ** 2
-    # intensities_spectrum2d = np.abs(intensity_data) ** 2
-
-    # render_spectrum_with_debug(intensities_terms, spectrum_setup.w1m, spectrum_setup.w2m,
-    #                 filename='yo_terms_comparison.svg', nicetitle='TermsEvaluator')
-    # render_spectrum_with_debug(intensities_spectrum2d, spectrum_setup.w1m, spectrum_setup.w2m,
-    #                 filename='yo_spectrum2d_comparison.svg', nicetitle='Spectrum2D')
-    # render_spectrum(intensities_terms, spectrum_setup.w1m, spectrum_setup.w2m,
-    #                 filename=f'yo_terms_comparison_{spectrum_setup.molecule}.svg', nicetitle='TermsEvaluator')
-    # render_spectrum(intensities_spectrum2d, spectrum_setup.w1m, spectrum_setup.w2m,
-    #                 filename=f'yo_spectrum2d_comparison_{spectrum_setup.molecule}.svg', nicetitle='Spectrum2D')
 
     diff_indices = np.unravel_index(np.argmax(diff), diff.shape)
     print(f"Largest difference at index: {diff_indices}")
 
     max_diff = np.max(diff)
     print(f"Maximum difference between datasets: {max_diff:.2e}")
-    # assert max_diff < 1e-6, "Datasets differ significantly"
 
 

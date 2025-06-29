@@ -27,7 +27,6 @@ class TermsEvaluator:
             amplitudes += factor * resonance product
 
         """
-        # self.terms = terms
         self.terms = {t.term_id: t for t in terms}
 
     def __repr__(self):
@@ -118,12 +117,8 @@ class TermsEvaluator:
             freqs data; self.unique_vibene_denoms
         """
         freqs = qstates_Eh[1]
-        # print('freqs', freqs)
-        # inv_freqs = 1 / convNu2Ene(freqs)
         stored = {}
-        # print('inv_freqs', inv_freqs)
         for nm_idxs in self.unique_vibene_denoms:
-            # stored[nm_idxs] = outer_product_einsum(inv_freqs, len(nm_idxs))
             stored[nm_idxs] = outer_product_einsum(freqs, len(nm_idxs))
 
         return stored
@@ -139,17 +134,12 @@ class TermsEvaluator:
             self.terms[tID] so it's a dict;
         """
         terms_for_avrg_tensors = self.unique_avrg_tensors_tID
-        # print('  >>>>>>>>>>>>  terms_for_avrg_tensors', terms_for_avrg_tensors)
-        # print('  >>>>>>>>>>>>  self.unique_avrg_tensors_all', self.unique_avrg_tensors_all)
         storage_tensors = {}
 
         for tID in terms_for_avrg_tensors:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
-            # print('  >>>>>>>>>>>>  simple_prop_tuple', simple_prop_tuple)
             nm_indices = self.terms[tID].nice_props.nm_indices
             cart_indices = self.terms[tID].nice_props.cart_axes
-            # print('nm_indices', nm_indices)
-            # print('cart_indices', cart_indices)
 
             num_dims = self.unique_avrg_tensors_all[simple_prop_tuple]
             shape = (Nnmodes,) * num_dims
@@ -185,7 +175,6 @@ class TermsEvaluator:
                     total /= 15.
                 avrg_tensor[abcde_comb] = total
 
-            # storage_tensors[tID] = avrg_tensor
             storage_tensors[simple_prop_tuple] = avrg_tensor
         return storage_tensors
 
@@ -202,15 +191,10 @@ class TermsEvaluator:
                   3: np.zeros((Nnmodes, Nnmodes, Nnmodes),}
         """
         res = {}
-        # print('precalc_vibdiffs()')
         for d in self.mn_types:
             sort_d = sorted(d.diff_type)
 
             diff = pairwise_differences(qstates_Eh[sort_d[0]], qstates_Eh[sort_d[1]])
-            # if tuple(sort_d)==(0, 3):
-                # print('\nqstates_Eh[sort_d[0]]\n', qstates_Eh[sort_d[0]])
-                # print('sort_d[1]', sort_d[1])
-                # print('\nqstates_Eh[sort_d[1]]\n', qstates_Eh[sort_d[1]])
             res[tuple(sort_d)] = diff
             
         # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
@@ -247,17 +231,12 @@ class TermsEvaluator:
         # print('all_axes', all_axes)
         # axes_dict = {k:None for k in all_axes} # todo: how to somewhat automatically fill in this dict? input for now
 
-        # print('uq_pert_freq_arrays', uq_pert_freq_arrays)
-
         # collect types of pert freqs arrangements
         for pfs in uq_pert_freq_arrays:
             pfs = [int(i) for i in pfs]
             result_pfs[tuple(pfs)] = 0.
 
             for pf in pfs:
-                # print('type(axes_dict[abs(pf)])', type(axes_dict[abs(pf)]))
-                # print('type(axes_dict[abs(pf)])', axes_dict[abs(pf)])
-                # print('axes_dict[abs(pf)] , np.sign(pf):', axes_dict[abs(pf)] , np.sign(pf))
                 result_pfs[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
 
         states_mn = []
@@ -266,10 +245,7 @@ class TermsEvaluator:
             states_mn.append(m)
             states_mn.append(n)
 
-            # result_mns[mn] = 0.
-        # print('states_mn', set(states_mn))
-
-        return result_pfs#, result_mns
+        return result_pfs
 
 
     def precalculate(self, alldata):
@@ -287,15 +263,7 @@ class TermsEvaluator:
         qstates_Eh = alldata.states_arrays_Eh
         qstates_harm_Eh = alldata.harmonic_arrays_Eh
 
-        # debugfunc(axes_dict, 'axes_dict')
-        # print('\naxes_dict', axes_dict)
-        # --> freqs so far: freqs = np.array([2., 4., 8.])
-        # axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
-        # x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
-        # --> axes_dict = {1: x_mesh,..}
-
         a = self.precalc_vibene_denoms(qstates_harm_Eh) # what are freqs?
-        # print('a = self.precalc_vibene_denoms(qstates)', a)
         b = self.precalc_avrg_tensors(Nnmodes, props_data, avrg_terms)
         c = self.precalc_res_conds(axes_dict) # fixme: not used now in the calculations
         d = self.precalc_vibdiffs(qstates_Eh)
@@ -303,9 +271,6 @@ class TermsEvaluator:
                       'avrg_tensors': b,
                       'res_conds': c,
                       'vibdiffs': d}
-        # if add_to_terms:
-        #     for t in self.terms:
-        #         self.terms[t].precalc_data = dictionary
 
         return dictionary
 
@@ -316,19 +281,6 @@ class TermsEvaluator:
         for tID in self.terms:
             tot += self.terms[tID].get_intensity(w1, w2, Gamma_rc, margin)
 
-            # term, w1, w2, Gamma_rc, margin,
-            #       condition=None, collect_all=False, sel_abs=None
-            # self.mode_indices should be there
-            # self.allstates should be there....
-            # self.allstates_E
-            #   dict_mn_tuples = self.for_ab(a, b)
-            # self.get_full_factor(a, b, comps=True)
-            # self.get_res_factor(w1, w2, a, b, Gamma_rc, condition)
-            # self.get_factor_summed(a, b, comps=True)
-            #  result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
-            #  result = (product_all*self.get_res_factor(w1, w2, a, b, Gamma_rc, condition))
-            #       A resonance factor for this term for ab combination of modes
-            #         w1_rc, w2_rc - frequency arguments w1,w2 in reciprocal cm
 
 def get_data_keys(input_tuple, variables, greek_dict):
     """
@@ -352,10 +304,8 @@ def get_data_keys(input_tuple, variables, greek_dict):
 
 def outer_product_einsum(arr, n):
     # for n=3 -> 'i,j,k->ijk'
-    # print('arr.shape:', arr.shape)
 
     indices = ','.join([chr(ord('i') + j) for j in range(n)]) + '->' + ''.join([chr(ord('i') + j) for j in range(n)])
-    # print('indices', indices)
     arrays = [arr] * n
 
     return np.einsum(indices, *arrays)
@@ -402,8 +352,6 @@ def get_resonance_location(resonances_expr, modes_dict, a, b):
 
 def get_all_resonances(resonances_expr, modes_dict, mode_indices, w2mw1=False):
     res = {}
-    # for a in mode_indices:
-    #     for b in mode_indices:
     for ab in combinations_with_permutations(mode_indices, 2):
         a, b = ab
         w1, w2 = get_resonance_location(resonances_expr, modes_dict, a, b)
