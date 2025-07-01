@@ -86,7 +86,6 @@ def get_fully_enhanced_terms(experiment, total_anharm_limit=1, el_anharm_limit=1
     R_sos = R_sos_int
 
     anharm_orders = make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
-    print('anharm orders', anharm_orders)
 
     final_terms = {}
 
@@ -95,8 +94,6 @@ def get_fully_enhanced_terms(experiment, total_anharm_limit=1, el_anharm_limit=1
         final_terms[i] = {}
 
         for j in anharm_orders[i]:
-
-            print('entry i j', i, j)
 
             final_terms[i][j] = []
 

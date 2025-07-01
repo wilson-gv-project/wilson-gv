@@ -184,8 +184,7 @@ class vibPerturbedTerm:
         self.hsh = None
 
 
-    # FIXME: Make test for this
-    def nmRenameAndResort(self, mask):
+    def nmRenameAndInternalResort(self, mask):
 
         # Rename according to mask in all props, freq diff, res conditions
 
@@ -211,6 +210,36 @@ class vibPerturbedTerm:
             self.res[i].diff.sr.q = sorted(self.res[i].diff.sr.q)
 
     def sort(self, nm_inds):
+
+        # Sort resonance conditions in increasing order of number of perturbing frequencies, which should be sufficient
+        self.res = sorted(self.res, key=lambda j:len(j.pf))
+
+        # Make normal mode index sorting mask:
+        # First gather according to encountered state labels in resonance conditions
+        # Then get remaining indices as encountered in derivatives (FIXME: Likely degree of freedom)
+
+        nm_labels = []
+
+        for i in self.res:
+
+            for j in i.diff.sl.q:
+                if not j in nm_labels:
+                    nm_labels.append(j)
+
+            for j in i.diff.sr.q:
+                if not j in nm_labels:
+                    nm_labels.append(j)
+
+        for i in self.props:
+            for j in i.inds:
+                if not j in nm_labels:
+                    nm_labels.append(j)
+
+        # If the label progression doesn't correspond to the canonical progression, then rename to make canonical
+        # and re-sort (FIXME: Could be remaining sorting "slack" after this)
+        if not (nm_labels == nm_inds[:len(nm_labels)]):
+            nm_mask = {nm_labels[i]: nm_inds[i] for i in range(len(nm_labels))}
+            self.nmRenameAndInternalResort(nm_mask)
 
         # Internal sorting: Operators in each property in increasing order
         for i in self.props:
@@ -241,20 +270,6 @@ class vibPerturbedTerm:
                 if not dord_starts[i + 1] == dord_starts[i] + 1:
                     self.props[dord_starts[i]:dord_starts[i+1]] = sorted(self.props[dord_starts[i]:dord_starts[i+1]],
                                                                          key=lambda j: [k.o for k in j.ops])
-
-        # Then get mask to relabel mode diff indices to be in strictly increasing encountered nm index order
-        nm_labels = []
-
-        for i in self.props:
-            for j in i.inds:
-                if not j in nm_labels:
-                    nm_labels.append(j)
-
-        # If the label progression doesn't correspond to the canonical progression, then rename to make canonical
-        # and re-sort (FIXME: I don't know if there is some sorting "slack" after this but I believe not)
-        if not(nm_labels == nm_inds[:len(nm_labels)]):
-            nm_mask = {nm_labels[i]: nm_inds[i] for i in range(len(nm_labels))}
-            self.nmRenameAndResort(nm_mask)
 
         # Sort all freq term bras and kets
 
@@ -298,10 +313,6 @@ class vibPerturbedTerm:
             if not ketq_starts[i] == len(self.freqterms):
                 self.freqterms[ketq_starts[i]:ketq_starts[i + 1]] = \
                     sorted(self.freqterms[ketq_starts[i]:ketq_starts[i + 1]], key=lambda j: j.sl.q)
-
-
-        # Sort resonance conditions in increasing order of number of perturbing frequencies, which should be sufficient
-        self.res = sorted(self.res, key=lambda j:len(j.pf))
 
         # WARNING: This flag doesn't update if any subsequent changes are made
         self.was_sorted = True
