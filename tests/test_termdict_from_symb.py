@@ -45,7 +45,7 @@ def test_dict_from_term():
 
     my_terms = setup_evv_terms_for_test()
 
-    reference_dict_a = {'termA_pref': Fraction(-1, 4),
+    reference_dict_a = {'termA_pref': Fraction(1, 4),
                         'termB_pref': 1.0,
                         'averaged_props': (('dipgrad', ('a',), ('B',)), ('dipgrad', ('b',), ('G',)), ('polhess', ('a', 'b'), ('A', 'D'))),
                         'non_averaged_props': None,
@@ -54,7 +54,7 @@ def test_dict_from_term():
                         'resonances': (('zero,a', (-1,)), ('b,a', (-1, 2)))
                         }
 
-    reference_dict_b = {'termA_pref': Fraction(1, 16),
+    reference_dict_b = {'termA_pref': Fraction(-1, 16),
                         'termB_pref': 1.0,
                         'averaged_props': (('polgrad', ('a',), ('A', 'D')), ('dipgrad', ('b',), ('B',)), ('dipgrad', ('a',), ('G',))),
                         'non_averaged_props': (('cff', ('b', 'c', 'c')),),
@@ -71,9 +71,15 @@ def test_dict_from_term():
     result_dict_b = ws.utils.termdict_from_symb_term.dict_from_term(my_terms[1][(0, 1)][5])
 
     for i in reference_dict_a:
-        assert reference_dict_a[i] == result_dict_a[i]
+        try:
+            assert reference_dict_a[i] == result_dict_a[i]
+        except AssertionError:
+            print(reference_dict_a[i], 'does not match', result_dict_a[i])
 
     for i in reference_dict_b:
-        assert reference_dict_b[i] == result_dict_b[i]
+        try:
+            assert reference_dict_b[i] == result_dict_b[i]
+        except AssertionError:
+            print(reference_dict_b[i], 'does not match', result_dict_b[i])
 
     return

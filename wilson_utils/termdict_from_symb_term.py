@@ -23,11 +23,6 @@ def dict_from_term(term):
 
     result_dict = {}
 
-    # Prefactors
-
-    result_dict['termA_pref'] = term.coeff
-    result_dict['termB_pref'] = 1.
-
     # Properties
 
     # wilson-derive convention is operators as integers, wilson-intensities convention
@@ -37,13 +32,21 @@ def dict_from_term(term):
     averaged_props = []
     non_averaged_props = []
 
-    # FIXME: Handle polarizability vs pure rsp fn sign convention here?
+    # To keep track of sign convention in electric multipole expansion factor
+    # FIXME: Settle if this applies for properties that are not pure electric dipole properties
+    # Currently assuming all even nonzero orders involve a factor -1
+    rsp_to_mult_exp_conv_fact = 1
+
     for i in term.props:
 
         curr_ops = tuple([numalpha[j.o] for j in i.ops])
         curr_diff_inds = tuple(i.inds)
 
         if len(curr_ops) > 0:
+
+            if (len(curr_ops) % 2) == 0:
+                rsp_to_mult_exp_conv_fact *= -1
+
 
             averaged_props.append((
                 prop_trivname(len(curr_diff_inds), len(curr_ops)),
@@ -65,6 +68,11 @@ def dict_from_term(term):
         non_averaged_props = tuple(non_averaged_props)
 
     result_dict['non_averaged_props'] = non_averaged_props
+
+    # Prefactors
+
+    result_dict['termA_pref'] = term.coeff * rsp_to_mult_exp_conv_fact
+    result_dict['termB_pref'] = 1.
 
     # Frequency (difference) terms
 
