@@ -56,11 +56,11 @@ def test_dict_from_term():
 
     reference_dict_b = {'termA_pref': Fraction(-1, 16),
                         'termB_pref': 1.0,
-                        'averaged_props': (('polgrad', ('a',), ('A', 'D')), ('dipgrad', ('b',), ('B',)), ('dipgrad', ('a',), ('G',))),
-                        'non_averaged_props': (('cff', ('b', 'c', 'c')),),
+                        'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('dipgrad', ('b',), ('G',))),
+                        'non_averaged_props': (('cff', ('a', 'c', 'c')),),
                         'vibene_denom': ('a', 'b', 'c'),
-                        'vibenediff': ('a+b,a',),
-                        'resonances': (('zero,b', (-1,)), ('a,b', (-1, 2)))
+                        'vibenediff': ('a+b,b',),
+                        'resonances': (('zero,a', (-1,)), ('b,a', (-1, 2)))
                         }
 
     # Choosing a reasonably representative sample
