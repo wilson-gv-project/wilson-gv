@@ -16,7 +16,7 @@ def state_list_to_str(stl):
     else:
         return return_str[:len(return_str) - 1]
 
-def dict_from_term(term):
+def dict_from_term(term, floats=True):
 
     if not isinstance(term, vibPerturbedTerm):
         raise AssertionError('Term being converted must be a vibPerturbedTerm instance')
@@ -71,7 +71,11 @@ def dict_from_term(term):
 
     # Prefactors
 
-    result_dict['termA_pref'] = term.coeff * rsp_to_mult_exp_conv_fact
+    if floats:
+        result_dict['termA_pref'] = float(term.coeff * rsp_to_mult_exp_conv_fact)
+    else:
+        result_dict['termA_pref'] = term.coeff * rsp_to_mult_exp_conv_fact
+
     result_dict['termB_pref'] = 1.
 
     # Frequency (difference) terms
