@@ -3,6 +3,8 @@ from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
 
+from numpy.ma.core import indices
+
 from wilson.spectrum.tools import convNu2Ene
 # alldata = [Nnmodes, data, avrg_terms, axes_dict,
 #            term_with_data.states_arrays_Eh,
@@ -145,20 +147,22 @@ def dict2arraydict(states_dict):
     d2 = {k:v for k,v in states_dict.items() if len(k)==2}
     d3 = {k:v for k,v in states_dict.items() if len(k)==3}
 
-    states_arrs[1] = np.array(list(d1.values()))
-    states_arrs[2] = np.zeros((len(d1), len(d1)))
-    for ab in d2:
-        states_arrs[2][(int(ab[0]), int(ab[1]))] = d2[ab]
-        states_arrs[2][(int(ab[1]), int(ab[0]))] = d2[ab]
-
-    states_arrs[3] = np.zeros((len(d1), len(d1), len(d1)))
-    for abc in d3:
-        states_arrs[3][(int(abc[0]), int(abc[1]), int(abc[2]))] = d3[abc]
-        states_arrs[3][(int(abc[0]), int(abc[2]), int(abc[1]))] = d3[abc]
-        states_arrs[3][(int(abc[1]), int(abc[0]), int(abc[2]))] = d3[abc]
-        states_arrs[3][(int(abc[1]), int(abc[2]), int(abc[0]))] = d3[abc]
-        states_arrs[3][(int(abc[2]), int(abc[0]), int(abc[1]))] = d3[abc]
-        states_arrs[3][(int(abc[2]), int(abc[1]), int(abc[0]))] = d3[abc]
+    if d1:
+        states_arrs[1] = np.array(list(d1.values()))
+    if d2:
+        states_arrs[2] = np.zeros((len(d1), len(d1)))
+        for ab in d2:
+            states_arrs[2][(int(ab[0]), int(ab[1]))] = d2[ab]
+            states_arrs[2][(int(ab[1]), int(ab[0]))] = d2[ab]
+    if d3:
+        states_arrs[3] = np.zeros((len(d1), len(d1), len(d1)))
+        for abc in d3:
+            states_arrs[3][(int(abc[0]), int(abc[1]), int(abc[2]))] = d3[abc]
+            states_arrs[3][(int(abc[0]), int(abc[2]), int(abc[1]))] = d3[abc]
+            states_arrs[3][(int(abc[1]), int(abc[0]), int(abc[2]))] = d3[abc]
+            states_arrs[3][(int(abc[1]), int(abc[2]), int(abc[0]))] = d3[abc]
+            states_arrs[3][(int(abc[2]), int(abc[0]), int(abc[1]))] = d3[abc]
+            states_arrs[3][(int(abc[2]), int(abc[1]), int(abc[0]))] = d3[abc]
 
     states_arrs[0] = 0.
     return states_arrs
@@ -181,7 +185,7 @@ def mainVibStates2arraydict(listVibStates, Nnmodes):
             for k_tuple in vs.s:
                 perms = set(permutations(tuple([int(i) for i in k_tuple])))
                 for p in perms:
-                    states_arrs[len(k_tuple)][p] = convNu2Ene(vs.e) if energy_unit_check(vs.e)=='cm-1' else vs.e
+                    states_arrs[len(k_tuple)][p] = convNu2Ene(vs.e) if check_energy_unit(vs.e) == 'cm-1' else vs.e
                     # states_arrs[len(k_tuple)][p] = vs.e
 
     states_arrs[0] = 0.
@@ -197,7 +201,7 @@ def safe_product(parts):
     return result
 
 
-def energy_unit_check(value):
+def check_energy_unit(value):
     """
     find a reasonable energy unit
     """
@@ -220,3 +224,82 @@ def debug_mode(level):
         yield
     finally:
         debug.level = original_level
+
+
+def make_abc_tuple(in_tuple, final_len):
+    """
+    extend ab tuple to abc tuple - num_rescond_abc to num_unique_abc
+    num_unique_abc >= num_rescond_abc
+    extend tuple with None values
+    """
+    return tuple([*in_tuple]+[None]*(final_len-len(in_tuple)))
+
+
+def get_indices(term):
+    """
+     {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
+      'vibenediff': ('a+b+c,zero', 'c,a+b'),
+      'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('c',), ('G',))),
+      'non_averaged_props': (('F', ('a', 'b', 'c',)),),
+      'vibene_denom': ('a','b','c'),
+      'termB_pref': 1.,
+      'termA_pref': -1/48.}
+
+    indices are in tuples in tuples: resonances, averaged_props, non_averaged_props
+    but vibenediff has str in tuples
+    """
+    res_idx = [[j.split('+') for j in i[0].split(',')] for i in term['resonances']]
+    if term['vibenediff'] is not None:
+        vd_idx = [[j.split('+') for j in i.split(',')] for i in term['vibenediff']]
+    else:
+        vd_idx = []
+    arvrg_idx = [list(i[1]) for i in term['averaged_props']]
+    if term['non_averaged_props'] is not None:
+        non_arvrg_idx = [list(i[1]) for i in term['non_averaged_props']]
+    else:
+        non_arvrg_idx = []
+    vibene_idx = list(term['vibene_denom'])
+
+    return {'resonances': res_idx,
+            'vibenediff': vd_idx,
+            'arvrg_idx': arvrg_idx,
+            'non_arvrg_idx': non_arvrg_idx,
+            'vibene': vibene_idx}
+
+
+def flatten_list(nested_list):
+    import itertools
+    newlist = list(itertools.chain(*nested_list))
+    if list in [type(l) for l in newlist]:
+        return flatten_list(newlist)
+    else:
+        return newlist
+
+def get_allparts_indices(term):
+
+    resultdict = get_indices(term)
+
+    s1 = set(flatten_list(resultdict['vibenediff']))
+    s2 = set(flatten_list(resultdict['resonances']))
+    s3 = set(flatten_list(resultdict['arvrg_idx']))
+    s4 = set(flatten_list(resultdict['non_arvrg_idx']))
+    s5 = set(resultdict['vibene'])
+    sets = {'vibenediff': s1,
+            'resonances': s2,
+            'arvrg_idx': s3,
+            'non_arvrg_idx': s4,
+            'vibene_idx': s5}
+    for s in sets:
+        sets[s].discard("zero")
+
+    allidx = len(set([j for i in sets for j in sets[i]]))
+    res_idx = len(sets['resonances'])
+    return allidx, res_idx
+
+import string
+abc_list = list(string.ascii_lowercase)
+num_Greek = {0: 'A', 1: 'B', 2: 'G', 3: 'D', 4: 'E', 5: 'Z', 6: 'H', 7: 'T', 8: 'I'}
+greek_list = list(num_Greek.values())
+
+def make_abc_dict(abc_comb):
+    return {l: n for l, n in zip(abc_list[: len(abc_comb)], abc_comb)}

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from tests.testing_utils import require_asserts
 from wilson.spectrum import debug_mode
-
+from wilson_analysis.render import render_spectrum
 
 import wilson.debug as debug
 import CQCParse.debug as cqc_debug
@@ -10,61 +10,12 @@ import CQCParse.debug as cqc_debug
 debug.level = 0
 cqc_debug.level = 0
 
-np.set_printoptions(precision=4)
+
+np.set_printoptions(precision=4,suppress=False)
+
 
 from wilson_analysis import render
-def render_spectrum_with_debug(intensities, w1m, w2m, filename, nicetitle='yes'):
-    """
-    Helper function to render the spectrum figure with debugging.
-    """
-    print(f"Rendering spectrum: {filename}")
-    print(f"Intensity data stats - Min: {np.min(intensities)}, Max: {np.max(intensities)}, Mean: {np.mean(intensities)}")
-    # Normalize intensities for rendering
-    normalized_intensities = intensities / np.max(intensities)
-    print(f"Normalized intensity stats - Min: {np.min(normalized_intensities)}, Max: {np.max(normalized_intensities)}")
-    fig, ax = render.set_figure(figsize=(40, 60), font_dict={'size': 20}, to_save=True)
-    levels_nums, levels_ticks, levels_nums_str = render.prep_levels(
-        d_max=np.max(normalized_intensities),
-        dynamic_range=100,
-        num_level_ticks=10
-    )
-    print(f"Levels: {levels_nums}")
-    print(f"Ticks: {levels_ticks}")
-    intensity_plot = render.prep_intensity_log10(normalized_intensities, normalized='01')
-    render.set_xyz(
-        w1m, w2m, intensity_plot, fig, ax,
-        w1mw2=True, nicetitle=nicetitle,
-        levels=levels_ticks, saturation_color='#FF00FF',
-        levels_ticks=levels_ticks,
-        levels_nums_str=levels_nums_str,
-        maxYX=3000., minY=None
-    )
-    render.finilize_ax(ax, filename=filename, dpi=250, to_save=True)
-def render_spectrum(intensities, w1m, w2m, filename, nicetitle='yes'):
-    """
-    Helper function to render the spectrum figure.
-    """
-    fig, ax = render.set_figure(figsize=(40, 60), font_dict={'size': 20}, to_save=True)
-    levels_nums, levels_ticks, levels_nums_str = render.prep_levels(
-        d_max=np.max(intensities),
-        dynamic_range=100,
-        num_level_ticks=10
-    )
-    assert all(upper > lower for upper, lower in zip(levels_nums[1:], levels_nums[:-1])), "Invalid contour"
-    print('\nlevels_nums', levels_nums)
-    print('levels_ticks', levels_ticks, '\n')
-    # print('levels_nums_str', levels_nums_str)
 
-    intensity_plot = render.prep_intensity_log10(intensities, normalized='01')
-    render.set_xyz(
-        w1m, w2m, intensity_plot, fig, ax,
-        w1mw2=True, nicetitle=nicetitle,
-        levels=levels_ticks, saturation_color='#FF00FF',
-        levels_ticks=levels_ticks,
-        levels_nums_str=levels_nums_str,
-        maxYX=3000., minY=None
-    )
-    render.finilize_ax(ax, filename=filename, dpi=250, to_save=True)
 def compare_amplitudes(amplitudes1, amplitudes2):
     """
     Helper function to compare two sets of amplitudes.
@@ -76,50 +27,295 @@ def compare_amplitudes(amplitudes1, amplitudes2):
     assert max_diff < 1e-6, "Amplitudes differ significantly"
 
 @require_asserts
-def test_terms_collection_calculation(terms_collection, spectrum_setup):
+def test_terms_collection_calculation(terms_collection, spectrum_setup, conditions):
     """
     get a spectrum figure
     """
     # terms_collection is a fixture
     te, big_dict = terms_collection['FORM']
     spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
 
-    assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
+    # print(te.terms)
+    # exit()
+    # print(spectrum_setup.molecule)
+    # print(big_dict['vibene_denoms'])
+    # print(terms_collection.keys())
+    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
 
     expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
     for key in expected_keys:
         assert key in big_dict, f"Key '{key}' missing in precalculated data"
     assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
 
+    from rich import print as rprint
+    print('\n')
+    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    # rprint(big_dict)
+    print('\n')
+
     with debug_mode(0):
         amplitudes = 0.0
         for id, term in te.terms.items():
-            intensity = term.get_intensity(spectrum_setup.w1m,
-                                           spectrum_setup.w2m,
-                                           3.8, 0.0, debugprint=True, collect_all=False)
+            term.precalc_data = big_dict
+            with np.printoptions(precision=2,legacy='1.25'):
+                formatted_resonances = {
+                    key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                    for key, value in term.get_all_resonances(w2mw1=True).items()
+                }
+                df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
+                print(df)
+                print('_____________________')
+                print(term)
+                print(formatted_resonances)
+            with debug_mode(2):
+                intensity = term.get_amplitudes(spectrum_setup.w1m,
+                                                spectrum_setup.w2m,
+                                                3.8, 1.0, debugprint=True, collect_all=False)
             amplitudes += intensity
+
+    print(amplitudes.shape)
 
     assert np.isfinite(amplitudes).all(), "Amplitudes contain non-finite values (NaN or Inf)"
     max_amplitude = np.max(np.abs(amplitudes))
     print(f"Maximum amplitude: {max_amplitude:.2e}")
     print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
 
-    print(amplitudes.shape)
-
     np.set_printoptions(precision=4)
-    print(amplitudes)
+    # print(amplitudes)
 
     intensities = np.abs(amplitudes)**2
+
+    hist, bin_edges = np.histogram(intensities, bins=10)
+    print('\nintensities from test:')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges)
+
     render_spectrum(intensities, spectrum_setup.w1m, spectrum_setup.w2m,
-                    filename=f'yo_terms_{spectrum_setup.molecule}.svg', nicetitle='TermsEvaluator')
+                    filename=f'yo_terms_{spectrum_setup.molecule}.svg',
+                    dynamic_range=conditions.dynamic_range_n,
+                    nicetitle='TermsEvaluator')
 
 
-def test_spectrum2d_calculation(intensity_data, spectrum_setup):
+@require_asserts
+def test_terms_EL_calculation(terms_collection, spectrum_setup, conditions):
+    """
+    get a spectrum figure
+    """
+    # terms_collection is a fixture
+    te, big_dict = terms_collection['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
+
+    # print(te.terms)
+    # exit()
+    # print(spectrum_setup.molecule)
+    # print(big_dict['vibene_denoms'])
+    # print(terms_collection.keys())
+    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
+
+    expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
+    for key in expected_keys:
+        assert key in big_dict, f"Key '{key}' missing in precalculated data"
+    assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
+
+    from rich import print as rprint
+    print('\n')
+    rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    rprint(big_dict)
+    print('\n')
+
+    with debug_mode(0):
+        amplitudes = 0.0
+        for id, term in te.terms.items():
+            if term.term_label == 'EL' and ('b,a', (-1, 2)) in term.expression['resonances']:
+                term.precalc_data = big_dict
+                with np.printoptions(precision=2,legacy='1.25'):
+                    formatted_resonances = {
+                        key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                        for key, value in term.get_all_resonances(w2mw1=True).items()
+                    }
+                    df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
+                    print(df)
+                    print('_____________________')
+                    print(term)
+                    print(formatted_resonances)
+                with debug_mode(2):
+                    intensity = term.get_amplitudes(spectrum_setup.w1m,
+                                                    spectrum_setup.w2m,
+                                                    3.8, 1.0, debugprint=True, collect_all=False)
+                amplitudes += intensity
+
+    print(amplitudes.shape)
+
+    assert np.isfinite(amplitudes).all(), "Amplitudes contain non-finite values (NaN or Inf)"
+    max_amplitude = np.max(np.abs(amplitudes))
+    print(f"Maximum amplitude: {max_amplitude:.2e}")
+    print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
+
+    np.set_printoptions(precision=4)
+    # print(amplitudes)
+
+    intensities = np.abs(amplitudes)**2
+
+    hist, bin_edges = np.histogram(intensities, bins=15)
+    print('\nintensities from test:')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges, '\n')
+
+    render_spectrum(intensities, spectrum_setup.w1m, spectrum_setup.w2m,
+                    filename=f'yo_terms_{spectrum_setup.molecule}.svg',
+                    dynamic_range=conditions.dynamic_range_n,
+                    nicetitle='TermsEvaluator')
+
+
+@require_asserts
+def test_terms_collection_calculation_derived(terms_collection_derived, spectrum_setup, conditions):
+    """
+    get a spectrum figure
+    """
+    # terms_collection is a fixture
+    te, big_dict = terms_collection_derived['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
+
+    # print(te.terms)
+    # exit()
+    # print(spectrum_setup.molecule)
+    # print(big_dict['vibene_denoms'])
+    # print(terms_collection.keys())
+    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
+
+    expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
+    for key in expected_keys:
+        assert key in big_dict, f"Key '{key}' missing in precalculated data"
+    assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
+
+    from rich import print as rprint
+    print('\n')
+    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    # rprint(big_dict)
+    print('\n')
+
+    with debug_mode(0):
+        amplitudes = 0.0
+        for id, term in te.terms.items():
+            term.precalc_data = big_dict
+            with np.printoptions(precision=2,legacy='1.25'):
+                formatted_resonances = {
+                    key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                    for key, value in term.get_all_resonances(w2mw1=True).items()
+                }
+                print('_____________________')
+                print(term)
+                print(formatted_resonances)
+            with debug_mode(2):
+                intensity = term.get_amplitudes(spectrum_setup.w1m,
+                                                spectrum_setup.w2m,
+                                                3.8, 1.0, debugprint=True, collect_all=False)
+            amplitudes += intensity
+
+    print(amplitudes.shape)
+
+    assert np.isfinite(amplitudes).all(), "Amplitudes contain non-finite values (NaN or Inf)"
+    max_amplitude = np.max(np.abs(amplitudes))
+    print(f"Maximum amplitude: {max_amplitude:.2e}")
+    print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
+
+    np.set_printoptions(precision=4)
+    # print(amplitudes)
+
+    intensities = np.abs(amplitudes)**2
+
+    hist, bin_edges = np.histogram(intensities, bins=10)
+    print('\n')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges)
+
+    render_spectrum(intensities, spectrum_setup.w1m, spectrum_setup.w2m,
+                    filename=f'yo_terms_derived_{spectrum_setup.molecule}.svg',
+                    dynamic_range=conditions.dynamic_range_n,
+                    nicetitle='TermsEvaluator')
+
+
+@require_asserts
+def test_terms_EL_calculation_derived(terms_collection_derived, spectrum_setup, conditions):
+    """
+    get a spectrum figure
+    """
+    # terms_collection is a fixture
+    te, big_dict = terms_collection_derived['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
+
+    # print(te.terms)
+    # exit()
+    # print(spectrum_setup.molecule)
+    # print(big_dict['vibene_denoms'])
+    # print(terms_collection.keys())
+    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
+
+    expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
+    for key in expected_keys:
+        assert key in big_dict, f"Key '{key}' missing in precalculated data"
+    assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
+
+    from rich import print as rprint
+    print('\n')
+    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    # rprint(big_dict)
+    print('\n')
+
+    with debug_mode(0):
+        amplitudes = 0.0
+        for id, term in te.terms.items():
+            if term.term_label == 'EL' and ('b,a', (-1, 2)) in term.expression['resonances']:
+                term.precalc_data = big_dict
+                with np.printoptions(precision=2,legacy='1.25'):
+                    formatted_resonances = {
+                        key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                        for key, value in term.get_all_resonances(w2mw1=True).items()
+                    }
+                    print('_____________________')
+                    print(term)
+                    print(formatted_resonances)
+                with debug_mode(2):
+                    intensity = term.get_amplitudes(spectrum_setup.w1m,
+                                                    spectrum_setup.w2m,
+                                                    3.8, 1.0, debugprint=True, collect_all=False)
+                amplitudes += intensity
+
+    print(amplitudes.shape)
+
+    assert np.isfinite(amplitudes).all(), "Amplitudes contain non-finite values (NaN or Inf)"
+    max_amplitude = np.max(np.abs(amplitudes))
+    print(f"Maximum amplitude: {max_amplitude:.2e}")
+    print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
+
+    np.set_printoptions(precision=4)
+    # print(amplitudes)
+
+    intensities = np.abs(amplitudes)**2
+
+    hist, bin_edges = np.histogram(intensities, bins=10)
+    print('\n')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges)
+
+    render_spectrum(intensities, spectrum_setup.w1m, spectrum_setup.w2m,
+                    filename=f'yo_terms_derived_{spectrum_setup.molecule}.svg',
+                    dynamic_range=conditions.dynamic_range_n,
+                    nicetitle='TermsEvaluator')
+
+
+
+def test_spectrum2d_calculation(intensity_data, spectrum_setup, conditions):
     """
     Test the intensity calculation and rendering of the spectrum.
     """
     intensity_data = intensity_data['FORM']
     spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
 
     print(intensity_data.shape)
     print(f"Maximum amplitude: {np.max(abs(intensity_data)):.2e}")
@@ -132,11 +328,19 @@ def test_spectrum2d_calculation(intensity_data, spectrum_setup):
     np.set_printoptions(precision=4)
 
     intensities = np.abs(intensity_data) ** 2
+
+    hist, bin_edges = np.histogram(intensities, bins=10)
+    print('\n')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges)
+
     assert np.all(np.isfinite(intensities)), "Data contains NaN or Inf"
     assert np.min(intensities) >= 0, "Negative intensities detected!"
 
     render_spectrum(intensities, spectrum_setup.w1m, spectrum_setup.w2m,
-                    filename=f'yo_spec2d_{spectrum_setup.molecule}.svg', nicetitle='Spectrum2D')
+                    filename=f'yo_spec2d_{spectrum_setup.molecule}.svg',
+                    dynamic_range=conditions.dynamic_range_n,
+                    nicetitle='Spectrum2D')
 
 @require_asserts
 def test_compare_amplitudes(terms_amplitudes, intensity_data, spectrum_setup):
@@ -188,3 +392,62 @@ def test_compare_amplitudes(terms_amplitudes, intensity_data, spectrum_setup):
     print(f"Maximum difference between datasets: {max_diff:.2e}")
 
 
+def test_termevaluator():
+    from wilson.spectrum.evaluators import terms_evaluator
+
+    # terms_evaluator(system, experiment,
+    #                 derived_terms, props,
+    #                 spec_eval_setup, vib_ana_setup,
+    #                 with_diagnostics=True)
+    import json
+
+    with open('/home/vlev/wilson-suite/tests/terms.json') as json_file:
+        data = json.load(json_file)
+        print("Type:", type(data))
+        print(data)
+
+def test_compute_vibdiff():
+    print()
+    from wilson.spectrum import compute_vibdiff
+    print(compute_vibdiff((0,1), (3,)))
+    print(compute_vibdiff((0,1), (6,)))
+    print(compute_vibdiff((1,1), (3,2)))
+    print(compute_vibdiff((1,1), (3,0)))
+    print(compute_vibdiff((2,1), (3,0,1)))
+    print(compute_vibdiff((2,1), (3,1,0)))
+
+
+
+def test_dotspectrum_df(terms_collection, spectrum_setup, conditions):
+    """
+    get a spectrum figure
+    """
+    # terms_collection is a fixture
+    te, big_dict = terms_collection['FORM']
+    spectrum_setup = spectrum_setup['FORM']
+    conditions = conditions['FORM']
+
+    # expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
+    # for key in expected_keys:
+    #     assert key in big_dict, f"Key '{key}' missing in precalculated data"
+    # assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
+
+    from rich import print as rprint
+    print('\n')
+    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    # rprint(big_dict)
+    print('\n')
+
+    with debug_mode(0):
+        for id, term in te.terms.items():
+            term.precalc_data = big_dict
+            with np.printoptions(precision=2,legacy='1.25'):
+                # formatted_resonances = {
+                #     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                #     for key, value in term.get_all_resonances(w2mw1=True).items()
+                # }
+                df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
+                print(df)
+                print('_____________________')
+                print(term)
+                # print(formatted_resonances)

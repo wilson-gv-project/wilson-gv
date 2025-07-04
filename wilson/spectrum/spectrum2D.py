@@ -171,6 +171,7 @@ class Spectrum2D:
                                    vib_levels_harmonic=spectrum_settings.vib_levels_harmonic)
 
         self.add_terms(spectrum_settings.el_terms_selected, spectrum_settings.mech_terms_selected)
+        print('terms', spectrum_settings.el_terms_selected, spectrum_settings.mech_terms_selected)
 
         if preview:
             chart, spectrumDF = self.preview_spectrum()

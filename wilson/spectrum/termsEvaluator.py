@@ -45,16 +45,45 @@ class TermsEvaluator:
 
             composite, so later - ab_factors - summed over c; separate from indices in res.conds.
 
-
         maybe do all separately?? in case of selective precalculation or none of it
 
+            {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
+                          'vibenediff': None,
+                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_QQ', ('a', 'b',), ('G',))),
+                          'non_averaged_props': None,
+                          'vibene_denom': ('a','b',),
+                          'termB_pref': 1.,
+                          'termA_pref': 1/24}
         """
+        # IDENTIFY INDICES
+        collect_n_idx_rescond = []
+        collect_n_idx_max = []
+        for tid, t in self.terms.items():
+            collect_n_idx_max.append(t.collective_n_idx_max)
+            collect_n_idx_rescond.append(t.collective_n_idx_rescond)
+        # print('collect_n_idx_rescond', collect_n_idx_rescond)
+        for tid, t in self.terms.items():
+            t.collective_n_idx_max = max(collect_n_idx_max)
+            t.collective_n_idx_rescond = max(collect_n_idx_rescond)
+            # print(tid, t.collective_n_idx_max, t.collective_n_idx_rescond)
+            # print('self.collective_n_idx_rescond', t.collective_n_idx_rescond)
+            t.collective_idx_counted = True
+
         # (1) IDENTIFYING unique resonance conditions
         unique_res_conds = []
         for t in self.terms.values():
             for i in t.resonances_expr:
                 unique_res_conds.append(i)
         self.unique_res_conds = list(set(unique_res_conds))
+        # self.unique_res_conds = [('b,a', (-1, 2)), ('a+b,a', (-1, 2)), ('zero,a', (-1,))]
+        idx_res_conds_inter1 = [i[0].split(',') for i in self.unique_res_conds]
+        idx_res_conds_inter2 = [j.split('+') for i in idx_res_conds_inter1 for j in i]
+        idx_res_conds = set([j for i in idx_res_conds_inter2 for j in i if j!='zero'])
+
+        # counting indices in resonance conditions
+        # for t in self.terms.values():
+        #     t.collective_n_idx_rescond = len(idx_res_conds)
+
 
         # (2.1) IDENTIFYING unique avrg tensors - looking for unique sets on normal mode indices
         # number of these indices = number of dimensions of avrg tensor
@@ -120,8 +149,12 @@ class TermsEvaluator:
         stored = {}
         for nm_idxs in self.unique_vibene_denoms:
             stored[nm_idxs] = outer_product_einsum(freqs, len(nm_idxs))
-
+        # print('\nPRECALC VIB ENE DENOMS')
+        # print(freqs)
+        # print('self.unique_vibene_denoms')
+        # print(self.unique_vibene_denoms)
         return stored
+
 
     def precalc_avrg_tensors(self, Nnmodes, data, avrg_terms):
         """
@@ -146,6 +179,8 @@ class TermsEvaluator:
 
             avrg_tensor = np.zeros(shape)
             abcde_combs = combinations_with_permutations(range(Nnmodes), num_dims)
+            # print('abcde_combs: ', list(abcde_combs))
+
             for abcde_comb in abcde_combs:
                 total = 0.
 
@@ -154,7 +189,11 @@ class TermsEvaluator:
                 variables = {var: val for var, val in zip(var_names, abcde_comb)}
                 debug_deep(f'---variables {variables}', tag='')
 
+                # print('\nvar_names', var_names)
+                # print('variables', variables)
+
                 for comps in avrg_terms:
+                    # todo: generalize greek indices
                     alpha, beta, gamma, delta = comps
                     greek_dict = {'A': alpha, 'B': beta, 'G': gamma, 'D': delta}
                     debug_deep(f'alpha, beta, gamma, delta {alpha, beta, gamma, delta}',
@@ -163,25 +202,33 @@ class TermsEvaluator:
                     for i, pp in enumerate(simple_prop_tuple):
                         input_tuple = (pp, cart_indices[i], nm_indices[i])
                         prop_key, idxs_key = get_data_keys(input_tuple, variables, greek_dict)
+                        # if prop_key == (2,1):
+                        #     print('input_tuple', input_tuple)
+                        #     print('\nprop_key', prop_key)
+                        #     print('idxs_key', idxs_key)
                         debug_deep(f'idxs_key {idxs_key}', tag='')
 
                         product *= data[prop_key][idxs_key]
                         debug_deep(f'prop_key {prop_key}, idxs_key {idxs_key}, value {data[prop_key][idxs_key]}',
                                   tag='')
+                        # print('product =', product)
                     total += product
+                # print('total: ', total)
                 if abs(total)<1e-28:
                     total = 0.
                 else:
                     total /= 15.
                 avrg_tensor[abcde_comb] = total
 
+
             storage_tensors[simple_prop_tuple] = avrg_tensor
+        # print('storage_tensors: \n', storage_tensors)
         return storage_tensors
 
 
     def precalc_vibdiffs(self, qstates_Eh):
         """
-        states - dict of state_idx_label_tuple(?) : frequency (cm-1)
+        states - dict of state_idx_label_tuple(?) : frequency (Eh)
 
         types of vib diffs: (0, 1), (1, 0), (2, 1), (1, 2), (2, 0), (0, 2)...
 
@@ -279,7 +326,7 @@ class TermsEvaluator:
 
         tot = 0.
         for tID in self.terms:
-            tot += self.terms[tID].get_intensity(w1, w2, Gamma_rc, margin)
+            tot += self.terms[tID].get_amplitudes(w1, w2, Gamma_rc, margin)
 
 
 def get_data_keys(input_tuple, variables, greek_dict):
@@ -291,8 +338,14 @@ def get_data_keys(input_tuple, variables, greek_dict):
         ((2, 1), ('A', 'D'), ('a',)),
         ((2, 2), ('A', 'D'), ('a', 'b'))
     ]
+    in term:
+    (('mu_Q', ('a',), ('B',)),
+     ('alpha_Q', ('b',), ('A', 'D')),
+     ('mu_Q', ('c',), ('G',)))
     """
     prop_der_key, second_part, third_part = input_tuple
+    # print('\nget_data_keys()')
+    # print(prop_der_key, second_part, third_part)
 
     third_part = tuple([variables[v] for v in third_part])
     second_part = tuple([greek_dict[l] for l in second_part])

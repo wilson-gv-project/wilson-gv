@@ -127,13 +127,13 @@ def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_se
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
 
-    amplitude_single = t0.get_intensity(2682.766, 3916.797, 3.8, 0.,
-                                        collect_all=True, sel_abs=[(5,0)])
+    amplitude_single = t0.get_amplitudes(2682.766, 3916.797, 3.8, 0.,
+                                         collect_all=True, sel_abs=[(5,0)])
     a,b = 5,0 # (4,5), (2,3), (2,5), (0,0)
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     print(amplitude_single)
-    ampl_single_ab = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None)[0]
+    ampl_single_ab = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None)[0]
     print(ampl_single_ab)
     assert amplitude_single ==ampl_single_ab
 
@@ -159,8 +159,8 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -169,8 +169,8 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -179,8 +179,8 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
 
@@ -350,8 +350,8 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -372,8 +372,8 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -394,8 +394,8 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
 
@@ -444,8 +444,8 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t2.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t2.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -468,8 +468,8 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t2.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t2.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -492,8 +492,8 @@ def test_amplitude_1term_single_point_ab_precalc_t2(dict_8terms, MOL_setup_parse
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t2.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t2.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
 
@@ -562,7 +562,7 @@ def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
     # print(w1m)
     amplitudes = 0.
     for t in terms:
-        e = t.get_intensity(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
+        e = t.get_amplitudes(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
         print('\n-----', t)
         print(e)
         print('any nan???? ', np.isnan(e).any())  # True if there's at least one NaN
@@ -637,7 +637,7 @@ def test_amplitude_1term_grid_t2(dict_8terms, MOL_setup_parser, spectrum_setup):
     amplitudes = 0.
     for t in terms:
         # e = t.get_intensity(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
-        e = t.get_intensity(w1, w2, 3.8, 0., debugprint=True, collect_all=True)
+        e = t.get_amplitudes(w1, w2, 3.8, 0., debugprint=True, collect_all=True)
         print('\n-----', t)
         print(e)
         print('any nan???? ', np.isnan(e).any())  # True if there's at least one NaN
@@ -696,8 +696,8 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -718,8 +718,8 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0
     print('----------------------------------------------')
@@ -740,7 +740,7 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}, resonance in t0')
     debug.level = 1
-    ampl = t0.get_intensity_ab(a,b, w1,w2, 3.8, condition=None,
-                      debugprint=True)[0]
+    ampl = t0.get_amplitudes_ab(a, b, w1, w2, 3.8, condition=None,
+                                debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
     debug.level = 0

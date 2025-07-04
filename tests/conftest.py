@@ -8,6 +8,21 @@ from wilson.spectrum.termsEvaluator import TermsEvaluator
 from tests.test_config import SimulationConfig
 from wilson.spectrum import debug_mode
 # ---------------- Fixtures ----------------
+def convert_lists_to_tuples(data):
+    if isinstance(data, list):
+        return tuple(convert_lists_to_tuples(item) for item in data)
+    elif isinstance(data, dict):
+        return {key: convert_lists_to_tuples(value) for key, value in data.items()}
+    else:
+        return data
+
+@pytest.fixture(scope='module')
+def derived_terms_json():
+    import json
+    with open('/home/vlev/wilson-suite/tests/terms.json') as json_file:
+        list_terms = json.load(json_file)
+    d = {i:t for i,t in enumerate(list_terms)}
+    return convert_lists_to_tuples(d)
 @pytest.fixture(scope="module")
 def dict_8terms():
     """
@@ -16,68 +31,83 @@ def dict_8terms():
     allterms_str = { 0:
                          {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_QQ', ('a', 'b',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('b',), ('A', 'D')),
+                                             ('mu_QQ', ('a', 'b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
                           'termB_pref': 1.,
-                          'termA_pref': 1/24},
+                          'termA_pref': 1/4},
                      1:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_QQ', ('a', 'b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_QQ', ('a', 'b',), ('A', 'D')),
+                                             ('mu_Q', ('b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
                           'termB_pref': 1.,
-                          'termA_pref': 1/24},
+                          'termA_pref': 1/4},
                      2:
                          {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a+b+c,zero', 'c,a+b'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('c',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('b',), ('A', 'D')),
+                                             ('mu_Q', ('c',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'b', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 1.,
-                          'termA_pref': -1/48.},
+                          'termA_pref': -1/8.},
                      3:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a+c,b', 'b+c,a'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('c',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('c',), ('A', 'D')),
+                                             ('mu_Q', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'b',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 1.,
-                          'termA_pref': -1/48.},
+                          'termA_pref': -1/8.},
                      4:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a,a+b', 'b,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('a',), ('G',))),
-                          'non_averaged_props': ('F', ('b', 'c', 'c',)),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('b',), ('A', 'D')),
+                                             ('mu_Q', ('a',), ('G',))),
+                          'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 0.5,
-                          'termA_pref': -1/48.},
+                          'termA_pref': -1/8.},
                      5:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('b,a+b', 'a,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('b',), ('A', 'D')),
+                                             ('mu_Q', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 0.5,
-                          'termA_pref': -1 / 48.},
+                          'termA_pref': -1/8.},
                      6:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a,a+b', 'b,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('a',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('a',), ('A', 'D')),
+                                             ('mu_Q', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': -0.5,
-                          'termA_pref': -1 / 48.},
+                          'termA_pref': -1/8.},
                      7:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('b,a+b', 'a,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)), ('alpha_Q', ('b',), ('A', 'D')), ('mu_Q', ('b',), ('G',))),
-                          # 'CFF': ('F', ('a', 'c', 'c',), tuple()), # old
+                          'averaged_props': (('mu_Q', ('a',), ('B',)),
+                                             ('alpha_Q', ('b',), ('A', 'D')),
+                                             ('mu_Q', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': -0.5,
-                          'termA_pref': -1 / 48.}
+                          'termA_pref': -1/8.}
                      }
     return allterms_str
 @pytest.fixture(scope="module")
@@ -87,7 +117,10 @@ def MOL_setup_parser(conditions):
     Molecule is taken from conditions
     """
     parsers = {}
+    # print(conditions.keys())
+
     for mol,cond in conditions.items():
+        # print(mol)
         molecule, method, basis = cond.molecule, 'B3LYP', 'cc_pVQZ'
         data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
         dataframe_gaussian = data_vault.getting_files_DB("gaussian")
@@ -102,44 +135,32 @@ def MOL_setup_parser(conditions):
         parser.load()
         parsers[molecule] = parser
     return parsers
-def OXAC2_setup_parser():
-    """
-    Fixture to set up the Gaussian parser for FORM/B3LYP/cc_pVQZ.
-    """
-    molecule, method, basis = 'OXAC2', 'B3LYP', 'cc_pVQZ'
-    data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
-    dataframe_gaussian = data_vault.getting_files_DB("gaussian")
-    aa = dataframe_gaussian[
-        (dataframe_gaussian['code'] == molecule) &
-        (dataframe_gaussian['method'] == method) &
-        (dataframe_gaussian['basis_set'] == basis)
-    ]['g16_3quanta_full']
-    filename = aa.iloc[0]
-    gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
-    parser = GaussianParser(gout)
-    parser.load()
-    return parser
 @pytest.fixture(scope="module")
 def spectrum_setup(avrg_xyz_indices, conditions):
     """
     Fixture to provide the simulation configuration.
     """
     setupsdict = {}
+    # print(conditions.keys())
     for mol,conds in conditions.items():
-        w1 = np.linspace(850.0, 3150.0, 1050)
-        w2 = np.linspace(500.0, 6550.0, 800)
-        w1m, w2m = np.meshgrid(w1, w2)
-        if mol=='FORM':
-            new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
-        else:
-            new_idx_dict = None
+        print(mol)
+        w1 = np.arange(850.0, 3150.0, 3.1)
+        w2 = np.arange(500.0, 6550.0, 3.1)
+        # w1 = np.linspace(850.0, 3150.0, 1050)
+        # w2 = np.linspace(500.0, 6550.0, 800)
+        w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
+        # if mol=='FORM':
+        #     new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
+        # else:
+        #     new_idx_dict = None
+        new_idx_dict = None
         setupsdict[mol] = SimulationConfig(
             gammaCompsAll=avrg_xyz_indices,
             molecule=mol,
             method='B3LYP',
             basis='cc_pVQZ',
             Gamma=3.8,
-            diag_margin=0.0,
+            diag_margin=1.0,
             start1=850.0,
             end1=3150.0,
             step1=3.1,
@@ -160,14 +181,17 @@ def avrg_xyz_indices():
     """
     return get_AlphaBetaGammaDelta_indices(num_f=4)
 @pytest.fixture(scope="module")
-def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup):
+def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup): #! dict_8terms or derived_terms_json
     """
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
     term_funcs = {}
+    # print(spectrum_setup.keys())
+
     for mol,spec_setup in spectrum_setup.items():
+        print(mol)
         def create_term(term_id):
-            term = TermND(term_id, dict_8terms[term_id])
+            term = TermND(term_id, dict_8terms[term_id]) #! dict_8terms or derived_terms_json
             parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
             parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
             if spectrum_setup[mol].old_new_dict is not None:
@@ -184,12 +208,42 @@ def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup):
         term_funcs[mol] = create_term
     return term_funcs
 @pytest.fixture(scope="module")
+def setup_term_derived(derived_terms_json, MOL_setup_parser, spectrum_setup): #! dict_8terms or derived_terms_json
+    """
+    Factory fixture to set up a TermND instance with parsed data and loaded calculations.
+    """
+    term_funcs = {}
+    # print(spectrum_setup.keys())
+
+    for mol,spec_setup in spectrum_setup.items():
+        print(mol)
+        def create_term(term_id):
+            term = TermND(term_id, derived_terms_json[term_id]) #! dict_8terms or derived_terms_json
+            parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
+            parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+            if spectrum_setup[mol].old_new_dict is not None:
+                parsed_data.upd_indices_several_parts(spectrum_setup[mol].old_new_dict)
+            deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
+            term.load_calc_data(
+                properties_data=deriv_data,
+                allstates=allstates,
+                harmonic_states=harmonic_states,
+                mode_indices=mode_indices,
+                gammaCompsAll=spectrum_setup[mol].gammaCompsAll
+            )
+            return term
+        term_funcs[mol] = create_term
+    return term_funcs
+
+@pytest.fixture(scope="module")
 def data_for_precalc(setup_term, spectrum_setup):
     """
     Fixture to prepare data for precalculation.
     """
     precalcs = {}
+    # print(spectrum_setup.keys())
     for mol,spec_setup in spectrum_setup.items():
+        # print(mol)
         term_with_data = setup_term[mol](0)  # Create term 0
         Nnmodes = 6
         props_data_ready = {
@@ -203,8 +257,14 @@ def data_for_precalc(setup_term, spectrum_setup):
                        spectrum_setup[mol].end1, spectrum_setup[mol].step1)
         w2 = np.arange(spectrum_setup[mol].start2,
                        spectrum_setup[mol].end2, spectrum_setup[mol].step2)
-        w1m, w2m = np.meshgrid(w1, w2)
+        w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
         axes_dict = {1: w1m, 2: w2m}
+
+        # from rich import print as rprint
+        # rprint('\n[deep_pink3]term_with_data.states_arrays_Eh[/deep_pink3]')
+        # rprint(term_with_data.states_arrays_Eh)
+        # rprint('\n[deep_pink3]term_with_data.harmonic_arrays_Eh[/deep_pink3]')
+        # rprint(term_with_data.harmonic_arrays_Eh)
 
         from wilson.spectrum import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
@@ -213,21 +273,82 @@ def data_for_precalc(setup_term, spectrum_setup):
                                  axes_dict=axes_dict,
                                  states_arrays_Eh=term_with_data.states_arrays_Eh,
                                  harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
-        print('term_with_data.harmonic_arrays_Eh')
-        print(term_with_data.harmonic_arrays_Eh)
+        # print('term_with_data.harmonic_arrays_Eh')
+        # print(term_with_data.harmonic_arrays_Eh)
         precalcs[mol] = alldata
     return precalcs
 @pytest.fixture(scope="module")
-def terms_collection(data_for_precalc, setup_term):
+def data_for_precalc_derived(setup_term_derived, spectrum_setup):
+    """
+    Fixture to prepare data for precalculation.
+    """
+    precalcs = {}
+    # print(spectrum_setup.keys())
+    for mol,spec_setup in spectrum_setup.items():
+        # print(mol)
+        term_with_data = setup_term_derived[mol](0)  # Create term 0
+        Nnmodes = 6
+        props_data_ready = {
+            (1, 1): term_with_data.properties_data['mu_Q'],
+            (1, 2): term_with_data.properties_data['mu_QQ'],
+            (2, 1): term_with_data.properties_data['alpha_Q'],
+            (2, 2): term_with_data.properties_data['alpha_QQ'],
+        }
+        avrg_terms = spectrum_setup[mol].gammaCompsAll
+        w1 = np.arange(spectrum_setup[mol].start1,
+                       spectrum_setup[mol].end1, spectrum_setup[mol].step1)
+        w2 = np.arange(spectrum_setup[mol].start2,
+                       spectrum_setup[mol].end2, spectrum_setup[mol].step2)
+        w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
+        axes_dict = {1: w1m, 2: w2m}
+
+        # from rich import print as rprint
+        # rprint('\n[deep_pink3]term_with_data.states_arrays_Eh[/deep_pink3]')
+        # rprint(term_with_data.states_arrays_Eh)
+        # rprint('\n[deep_pink3]term_with_data.harmonic_arrays_Eh[/deep_pink3]')
+        # rprint(term_with_data.harmonic_arrays_Eh)
+
+        from wilson.spectrum import DataForPrecalc
+        alldata = DataForPrecalc(Nnmodes=Nnmodes,
+                                 props_data=props_data_ready,
+                                 avrg_terms=avrg_terms,
+                                 axes_dict=axes_dict,
+                                 states_arrays_Eh=term_with_data.states_arrays_Eh,
+                                 harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
+        # print('term_with_data.harmonic_arrays_Eh')
+        # print(term_with_data.harmonic_arrays_Eh)
+        precalcs[mol] = alldata
+    return precalcs
+@pytest.fixture(scope="module")
+def terms_collection(data_for_precalc, setup_term, dict_8terms): #! dict_8terms or derived_terms_json
     """
     Fixture to create a TermsEvaluator with precalculated data.
     """
     terms_cols = {}
-    for mol,spec_setup in setup_term.items():
-        terms = [setup_term[mol](i) for i in range(4)]  # Create terms 0 to 3
+    # print(setup_term.keys())
+
+    for mol,term_setup in setup_term.items():
+        # print(mol)
+        terms = [term_setup(i) for i in range(len(dict_8terms))] #! dict_8terms or derived_terms_json
         te = TermsEvaluator(terms)
         te.identify_to_precalculate()
         big_dict = te.precalculate(data_for_precalc[mol])
+        terms_cols[mol] = (te, big_dict)
+    return terms_cols
+@pytest.fixture(scope="module")
+def terms_collection_derived(data_for_precalc_derived, setup_term_derived, derived_terms_json): #! dict_8terms or derived_terms_json
+    """
+    Fixture to create a TermsEvaluator with precalculated data.
+    """
+    terms_cols = {}
+    # print(setup_term_derived.keys())
+
+    for mol,term_setup in setup_term_derived.items():
+        # print(mol)
+        terms = [term_setup(i) for i in range(len(derived_terms_json))] #! dict_8terms or derived_terms_json
+        te = TermsEvaluator(terms)
+        te.identify_to_precalculate()
+        big_dict = te.precalculate(data_for_precalc_derived[mol])
         terms_cols[mol] = (te, big_dict)
     return terms_cols
 
@@ -267,24 +388,30 @@ def conditions():
     """
 
     resdict = {}
-    for mol in ["FORM", "OXAC2"]:
-        omega1 = np.linspace(850.0, 3150.0, 1050)
-        omega2 = np.linspace(500.0, 6550.0, 800)
+
+    # for mol in ["FORM", "OXAC2"]:
+    for mol in ["FORM"]:
+        # print(mol)
+        # omega1 = np.linspace(850.0, 3150.0, 1050)
+        # omega2 = np.linspace(500.0, 6550.0, 800)
+        omega1 = np.arange(850.0, 3150.0, 3.1)
+        omega2 = np.arange(500.0, 6550.0, 3.1)
         program = 'gaussian'
         molecule = mol
         method = 'B3LYP'
         basis = 'cc_pVQZ'
         if mol=='FORM':
-            new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
+            # new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
+            new_idx_dict = None #FORM
         else:
             new_idx_dict = None
         el_terms_selected = [0,1]
-        mech_terms_selected = [2,3]
+        mech_terms_selected = [2,3,4,5,6,7]
 
         resdict[mol] = Conditions(
                             Gamma_rc=3.8,
-                            diag_margin_rc=0.0,
-                            dynamic_range_n=100,
+                            diag_margin_rc=1.0,
+                            dynamic_range_n=4500,
                             omega1=omega1,
                             omega2=omega2,
                             program=program,
@@ -319,7 +446,10 @@ def parsed_data(conditions, dataframe_gaussian, dataframe_cfour):
     Fixture to parse data based on the program (Gaussian or CFOUR).
     """
     parsed_data_dict = {}
+    # print(conditions.keys())
+
     for mol,cond in conditions.items():
+        # print(mol)
         program = cond.program
         molecule, method, basis = mol, cond.method, cond.basis
         if program == 'gaussian':
@@ -355,7 +485,10 @@ def spectrum2d(conditions):
     Fixture to set up a Spectrum2D object.
     """
     spectrum_objects = {}
+    # print(conditions.keys())
+
     for mol,cond in conditions.items():
+        # print(mol)
         omega1, omega2 = cond.omega1, cond.omega2
         spectrum_obj = Spectrum2D(omega1, omega2)
         spectrum_objects[mol] = spectrum_obj
@@ -366,7 +499,10 @@ def spectrum_sequence(spectrum2d, parsed_data, conditions):
     Fixture to launch the spectrum sequence and return the resulting dictionary.
     """
     preps = {}
+    # print(conditions.keys())
+
     for mol,cond in conditions.items():
+        # print(mol)
         preps[mol] = spectrum2d[mol].launch_sequence1(parsed_data[mol],
                                                       cond, print_level=0)
     return preps
@@ -375,20 +511,12 @@ def intensity_data(spectrum2d, spectrum_sequence):
     """
     Fixture to calculate intensity for the Spectrum2D object.
     """
-    # if sparse != 0.:
-    #     d1 = spectrum2d.find_all_grids(sparse)
-    #     new_w1_mesh = np.zeros(spectrum2d.w1_mesh.shape, dtype='complex64')
-    #     new_w2_mesh = np.zeros(spectrum2d.w2_mesh.shape, dtype='complex64')
-    #     # Placement
-    #     for r in d1:
-    #         new_w1_mesh[r[1][0]: r[1][1], r[1][2]: r[1][3]] = d1[r][2]
-    #         new_w2_mesh[r[1][0]: r[1][1], r[1][2]: r[1][3]] = d1[r][3]
-    #     spectrum2d.w1_mesh_Eh = new_w1_mesh
-    #     spectrum2d.w2_mesh_Eh = new_w2_mesh
-    #     mask = spectrum2d.w1_mesh_Eh != 0.
-    # else:
+
     sec_hypol_data_dict = {}
+    # print(spectrum_sequence.keys())
+
     for mol,spec_preps in spectrum_sequence.items():
+        # print(mol)
         mask = None
         sec_hypol_dataALL_ref = spectrum2d[mol].intensity_both(selectionCond=mask)
         nan_mask = np.isnan(sec_hypol_dataALL_ref)
@@ -410,13 +538,16 @@ def terms_amplitudes(terms_collection, spectrum_setup):
     """
 
     ampls = {}
+    # print(spectrum_setup.keys())
+
     for mol,spec_setup in spectrum_setup.items():
+        # print(mol)
         te, _ = terms_collection[mol]
         with debug_mode(0):
             amplitudes = sum(
-                term.get_intensity(
+                term.get_amplitudes(
                     spec_setup.w1m, spec_setup.w2m,
-                    3.8, 0.0, debugprint=False, collect_all=False
+                    3.8, 1.0, debugprint=False, collect_all=False
                 )
                 for term in te.terms.values()
             )

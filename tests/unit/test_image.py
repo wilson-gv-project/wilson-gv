@@ -74,7 +74,7 @@ def test_amplitude_1term_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
 
     amplitudes = 0.
     for t in terms:
-        e = t.get_intensity(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
+        e = t.get_amplitudes(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
         print('\n-----', t)
         print(e)
         print('any nan???? ', np.isnan(e).any())  # True if there's at least one NaN

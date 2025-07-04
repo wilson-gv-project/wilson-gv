@@ -3,6 +3,7 @@ spectra/*
 !spectra/**/*.py
 
 hidden_**
+*Zone.Identifier*
 
 .idea/
 *.svg

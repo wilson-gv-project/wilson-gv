@@ -6,12 +6,12 @@ def eval_spec2D():
 
 
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from wilson.spectrum import mainVibStates2arraydict
+from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
 # from wilson.utils import prep_data_load
 
 # TermND with TermsEvaluator
-# with_diagnostics=True because wilsonSimulation.evaluate() - FIXME please!
-# fixme? no need to know 'experiment'?
+# with_diagnostics=True because wilsonSimulation.evaluate() - FIXME
+# fixme? no need to know 'experiment'? -
 def terms_evaluator(system, experiment,
                     derived_terms, props,
                     spec_eval_setup, vib_ana_setup,
@@ -74,78 +74,111 @@ def terms_evaluator(system, experiment,
     # print('vib_ana_setup.nc_sqrt_eigval', vib_ana_setup.nc_sqrt_eigval)
 
     # fixme: logging decorator instead?
+    diagn = {}
+
+    """
+# Step 1: Set up terms
+evaluation_terms = setup_terms(exp, terms, props)
+# Step 2: Load data
+data = load_data(evaluation_terms)
+# Step 3: Precalculate
+precalc_data = precalculate(data, evaluation_terms)
+# Step 4: Calculate amplitudes
+amplitudes = calculate_amplitudes(precalc_data, evaluation_terms)
+# Step 5: Postprocess results
+result = postprocess_results(amplitudes)
+# Step 6: Generate diagnostics
+diagnostics = generate_diagnostics(precalc_data, amplitudes)
+    """
+    print('\n\n EVALUATOR \n')
+    #! 1.1 transform terms from derive to evaluate form
+    dict_terms = derived_terms_dict_to_dicts(derived_terms)
+
+    # 1 complete
+    terms_to_eval = [TermND(i, dict_terms[i]) for i in range(len(dict_terms))]
+    # from wilson_utils.termdict_from_symb_term import flip_modes_indices
+    # to be removed when resolved
+    # f3 = flip_modes_indices(terms_to_eval[3].expression,{'b':'a', 'c':'b','a':'c'})
+    # f6 = flip_modes_indices(terms_to_eval[6].expression,{'b':'a', 'c':'b','a':'c'})
+    # for i, t in enumerate(terms_to_eval):
+    #     if i==3 or i==6:
+    #         print('\nWeird ones?\n')
+    #         print(t)
+            # because res conds have indices b,c instead of a,b
+        # terms_to_eval[3] = TermND(3, f3)
+        # terms_to_eval[6] = TermND(6, f6)
+
+    # 3 complete
+    te = TermsEvaluator(terms_to_eval)
+    print(te.terms)
+    # exit()
+    # 4 complete
+    te.identify_to_precalculate()
+
+    # 5.1
+    props_data = {prop.triv_name: prop.vals for prop in props}
+    props_dict = {'dipgrad':(1, 1),
+                  'diphess':(1, 2),
+                  'polgrad':(2, 1),
+                  'polhess':(2, 2)}
+    # format transformation
+    props_data_ready = {props_dict[p]:props_data[p] for p in props_dict}
+    # format transformation
+    # fixme general
+    cff_data = {'F_abc': props_data['cff']}
+
+    # todo: make a func for checking units - cm-1 vs Eh - energy_unit_check in spectrum_utils
+    # format transformation
+    harm_states_arr = np.array(list(vib_ana_setup.nc_sqrt_eigval.values()))
+
+    if check_energy_unit(harm_states_arr[1]) == 'cm-1':
+        harmonic_arrays_Eh = {1: convNu2Ene(harm_states_arr)}
+    else:
+        harmonic_arrays_Eh = {1: harm_states_arr}
+
+    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+    axes_dict = spec_eval_setup.grid.make_mesh_numpy()
+
+    # format transformation
+    states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
+
+    from rich import print as rprint
+    rprint('\n[deep_pink3]states_arrays_Eh[/deep_pink3]')
+    rprint(states_arrays_Eh)
+    rprint('\n[deep_pink3]harmonic_arrays_Eh[/deep_pink3]')
+    rprint(harmonic_arrays_Eh)
+
+    data_for_precalc = DataForPrecalc(Nnmodes=system.Nnmodes,
+                                      props_data=props_data_ready,
+                                      avrg_terms=avrg_terms,
+                                      axes_dict=axes_dict,
+                                      states_arrays_Eh=states_arrays_Eh,
+                                      harmonic_arrays_Eh=harmonic_arrays_Eh)
+
+    # 5 - complete
+    precalculated_data = te.precalculate(data_for_precalc)
+    # exit()
+
+    from rich import print as rprint
+    print('\n')
+    rprint("[deep_pink3]Precalculated data[/deep_pink3]")
+    rprint(precalculated_data)
+    print('\n')
+
+    # 6
+    from wilson.spectrum import debug_mode
+    for id, term in te.terms.items():
+    # for id, term in [(3, te.terms[3])]:
+    #     print(f'term {term} starting')
+        term.properties_data = cff_data
+        term.precalc_data = precalculated_data
+        term.mode_indices = vib_ana_setup.modes_indices
+        with debug_mode(2):
+            a_intermediate = term.get_amplitudes(axes_dict[1], axes_dict[2],  # get_amplitude
+                                                 3.8, 0.0, debugprint=True, collect_all=False)
+        amplitudes += a_intermediate
+
     if with_diagnostics:
-        """
-    # Step 1: Set up terms
-    evaluation_terms = setup_terms(exp, terms, props)
-    # Step 2: Load data
-    data = load_data(evaluation_terms)
-    # Step 3: Precalculate
-    precalc_data = precalculate(data, evaluation_terms)
-    # Step 4: Calculate amplitudes
-    amplitudes = calculate_amplitudes(precalc_data, evaluation_terms)
-    # Step 5: Postprocess results
-    result = postprocess_results(amplitudes)
-    # Step 6: Generate diagnostics
-    diagnostics = generate_diagnostics(precalc_data, amplitudes)
-        """
-        diagn = {}
-
-        #! 1.1 transform terms from derive to evaluate form
-        dict_terms = derived_terms_dict_to_dicts(derived_terms)
-
-        # 1 complete
-        terms_to_eval = [TermND(i, dict_terms[i]) for i in range(len(dict_terms))]
-        from wilson_utils.termdict_from_symb_term import flip_modes_indices
-        f = flip_modes_indices(terms_to_eval[3].expression,{'b':'a', 'c':'b','a':'c'})
-        for i, t in enumerate(terms_to_eval):
-            if i==3:
-                # because res conds have indices b,c instead of a,b
-                terms_to_eval[3] = TermND(3, f)
-
-        # 3 complete
-        te = TermsEvaluator(terms_to_eval)
-
-        # 4 complete
-        te.identify_to_precalculate()
-
-        # 5.1
-        props_data = {prop.triv_name: prop.vals for prop in props}
-        props_dict = {'dipgrad':(1, 1),
-                      'diphess':(1, 2),
-                      'polgrad':(2, 1),
-                      'polhess':(2, 2)}
-        props_data_ready = {props_dict[p]:props_data[p] for p in props_dict}
-        cff_data = {'F_abc': props_data['cff']}
-        # todo: make a func for checking units - cm-1 vs Eh - energy_unit_check in spectrum_utils
-        harmonic_arrays_Eh = {1: np.array(list(vib_ana_setup.nc_sqrt_eigval.values()))}
-
-        avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
-        axes_dict = spec_eval_setup.grid.make_mesh_numpy()
-        states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
-
-        data_for_precalc = DataForPrecalc(Nnmodes=system.Nnmodes,
-                                          props_data=props_data_ready,
-                                          avrg_terms=avrg_terms,
-                                          axes_dict=axes_dict,
-                                          states_arrays_Eh=states_arrays_Eh,
-                                          harmonic_arrays_Eh=harmonic_arrays_Eh)
-
-        # 5 - complete
-        precalculated_data = te.precalculate(data_for_precalc)
-
-        # 6
-        from wilson.spectrum import debug_mode
-        # for id, term in te.terms.items():
-        for id, term in [(3, te.terms[3])]:
-            print(f'term {term} starting')
-            term.properties_data = cff_data
-            term.precalc_data = precalculated_data
-            term.mode_indices = vib_ana_setup.modes_indices
-            with debug_mode(0):
-                intensity = term.get_intensity(axes_dict[1], axes_dict[2],
-                                               3.8, 0.0, debugprint=True, collect_all=False)
-            amplitudes += intensity
         return amplitudes, diagn
 
     else:
