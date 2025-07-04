@@ -83,15 +83,32 @@ def fmt(x, pos=''):
 
 
 def prep_levels(d_max, dynamic_range, num_level_ticks):
-    dynrange_log = np.log10(dynamic_range)
 
+    dynrange_log = np.log10(dynamic_range)
     min_dynrange = np.log10(d_max) - dynrange_log
     dt = - (np.log10(d_max) - min_dynrange) / num_level_ticks
 
-    levels_before_norm = np.sort(np.arange(np.log10(d_max), min_dynrange, round(dt,4)))
-    levels_ticks = levels_before_norm/np.log10(d_max)
+    print('min_dynrange', min_dynrange)
+    print('dynrange_log', dynrange_log)
 
-    levels_nums = [10**i for i in levels_before_norm]
+    if d_max > 1:
+        print(np.log10(d_max), min_dynrange, -round(dt, 4))
+        levels_before_norm = np.arange(np.log10(d_max), min_dynrange, round(dt, 4))
+    else:
+        print(np.log10(d_max), min_dynrange, round(dt, 4))
+        levels_before_norm = np.arange(np.log10(d_max), min_dynrange, round(dt, 4))
+
+    # levels_before_norm = np.sort(np.arange(np.log10(d_max), min_dynrange, round(dt,4)))
+    print('levels_before_norm with log10', levels_before_norm)
+    # print('np.log10(d_max)', np.log10(d_max))
+    # levels_ticks = np.sort(levels_before_norm/np.log10(d_max))
+    levels_ticks = np.sort(levels_before_norm/np.max(levels_before_norm))
+    # levels_ticks = (levels_before_norm - min(levels_before_norm)) / (max(levels_before_norm) - min(levels_before_norm))
+    levels_ticks = np.sort(levels_ticks)
+    # print('levels_ticks', np.sort(levels_ticks))
+
+    levels_nums = np.sort([float(10**i) for i in levels_before_norm])
+    # print('levels_nums', levels_nums)
     # levels_nums_str = [f'{tick:.2e}' for tick in levels_nums]
     levels_nums_str = [fmt(tick) for tick in levels_nums]
 
@@ -166,3 +183,80 @@ def finilize_ax(ax, filename, dpi=250, to_save=True):
 
     if to_save:
         plt.savefig(filename, dpi=dpi, format='svg')
+
+
+def render_spectrum_with_debug(intensities, w1m, w2m, filename, nicetitle='yes'):
+    """
+    Helper function to render the spectrum figure with debugging.
+    """
+    print(f"Rendering spectrum: {filename}")
+    print(f"Intensity data stats - Min: {np.min(intensities)}, Max: {np.max(intensities)}, Mean: {np.mean(intensities)}")
+    # Normalize intensities for rendering
+    normalized_intensities = intensities / np.max(intensities)
+    print(f"Normalized intensity stats - Min: {np.min(normalized_intensities)}, Max: {np.max(normalized_intensities)}")
+    fig, ax = set_figure(figsize=(40, 60), font_dict={'size': 20}, to_save=True)
+    levels_nums, levels_ticks, levels_nums_str = prep_levels(
+        d_max=np.max(normalized_intensities),
+        dynamic_range=100,
+        num_level_ticks=10
+    )
+    print(f"Levels: {levels_nums}")
+    print(f"Ticks: {levels_ticks}")
+    intensity_plot = prep_intensity_log10(normalized_intensities, normalized='01')
+    set_xyz(
+        w1m, w2m, intensity_plot, fig, ax,
+        w1mw2=True, nicetitle=nicetitle,
+        levels=levels_ticks, saturation_color='#FF00FF',
+        levels_ticks=levels_ticks,
+        levels_nums_str=levels_nums_str,
+        maxYX=3000., minY=None
+    )
+    finilize_ax(ax, filename=filename, dpi=250, to_save=True)
+
+
+def render_spectrum(intensities, w1m, w2m, filename, dynamic_range, num_level_ticks=10, nicetitle='yes'):
+    """
+    Helper function to render the spectrum figure.
+    """
+    # from rich import print
+    from wilson.utils import coolprint
+
+    coolprint('1. Setting figure...')
+    fig, ax = set_figure(figsize=(35, 45), font_dict={'size': 20}, to_save=True)
+
+    coolprint('2. Setting levels, level ticks and level labels...')
+    levels_nums, levels_ticks, levels_nums_str = prep_levels(
+        d_max=np.max(intensities),
+        dynamic_range=dynamic_range,
+        num_level_ticks=num_level_ticks
+    )
+    assert all(upper > lower for upper, lower in zip(levels_nums[1:], levels_nums[:-1])), "Invalid contour"
+
+    np.set_printoptions(precision=4,suppress=False)
+
+    # print('\nlevels_nums', np.array(levels_nums))
+    print('\nlevels_nums_str', levels_nums_str)
+    print('levels_ticks', np.array(levels_ticks), '\n')
+
+    coolprint('3. Log10 of intensity and normalization...')
+    intensity_plot = prep_intensity_log10(intensities, normalized='01')
+    print('intensity_plot', intensity_plot)
+
+    hist, bin_edges = np.histogram(intensity_plot, bins=10)
+    print('\nintensity_plot log10 from render_spectrum:')
+    print("Histogram counts:", hist)
+    print("Bin edges:", bin_edges, '\n')
+
+    coolprint('4. Prepare XYZ, make contourf and colorbar... '
+              'Using previously configured intensity, levels_ticks, levels_nums_str...')
+    fig, ax = set_xyz(
+        w1m, w2m, intensity_plot, fig, ax,
+        w1mw2=True, nicetitle=nicetitle,
+        levels=levels_ticks, saturation_color='#FF00FF',
+        levels_ticks=levels_ticks,
+        levels_nums_str=levels_nums_str,
+        maxYX=3000., minY=None
+    )
+
+    coolprint('5. Finish axes settings...')
+    finilize_ax(ax, filename=filename, dpi=250, to_save=True)
