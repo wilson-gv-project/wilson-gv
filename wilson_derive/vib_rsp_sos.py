@@ -1,61 +1,46 @@
-
-from .abstractions import vibDiffTerm, resonanceCondition, vibContribTerm, polProp, transitionIntegral
+from .abstractions import VibDiffTerm, ResonanceCondition, VibContribTerm, PolProp, TransitionIntegral, QOperator, VibState
 from fractions import Fraction
 import itertools
 import copy
 
-class rspTermSOSRecursion:
+# FIXME: The functionality in this file needs a refactoring/cleanup
 
-    def __init__(self, a, rsp_omega, b, freq, k):
-
-        # Integrals ("properties") to the left of the integral containing the operator omega
-        self.a = a
-        # An integral containing the operator omega
-        self.rsp_omega = rsp_omega
-        # Integrals ("properties") to the right of the integral containing the operator omega
-        self.b = b
-        # Resonance conditions
-        self.freq = freq
-        # Integral operator order argument (for combinatorics summation)
-        self.k = k
-
-        self.hbar = 0
-        self.coeff = 1
-
-    # Print information about self
-    def presentab(self):
-
-        print('Overall coefficient', self.coeff)
-
-        for i in self.a:
-            i.presentProp()
-
-        self.rsp_omega.presentProp()
-
-        for i in self.b:
-            i.presentProp()
-
-        for i in self.freq:
-            i.present()
-
-# (Electronic) polarization property for use in SOS recursion
-class polPropSOSRecursion:
+class PolPropSOSRecursion:
+    """
+    (Electronic) polarization property for use in SOS recursion
+    """
 
     # Takes set of operators, bra and ket vibrational states left and right
-    def __init__(self, order, left, right):
+    def __init__(self, order: int, left, right):
+        """
+        order: Integer: Order of property
+        left: VibState: Bra state of integral
+        right: VibState: Ket state of integral
+        """
+
+        # Integer: order of property
         self.order = order
-        # FIXME: Is omega here vestigial?
-        self.omega = 1
         self.left = left
         self.right = right
+
+        # FIXME: Is omega here vestigial?
+        self.omega = 1
+
+        # Operators associated with self
         self.ops = []
 
     def addOperator(self, op):
+        """
+        Add operator
+
+        op: QOperator: The operator to be added
+        """
         self.ops.append(op)
 
-
-    # Print information about self
-    def presentProp(self):
+    def present(self):
+        """
+        Formatted printing of own attributes
+        """
 
         if self.omega:
             print('('  + str(self.order + 1) + ')' +  ' ' + self.left.s + ',' + self.right.s + ' (a)')
@@ -65,11 +50,69 @@ class polPropSOSRecursion:
 
         print('Operators:', [i.o for i in self.ops])
 
-# Get "uncombinatorized" form of SOS vibrational contributions up to order 'maxord' with vibrational states 'states'
-def vib_contribs_abstract(maxord, states, ops):
+
+class RspTermSOSRecursion:
+    """
+    Auxiliary class to represent a response function term undergoing recursion (only used during this recursion)
+    FIXME: This class is possibly redundant and replacement with VibContribTerm can be considered
+    """
+
+    def __init__(self, a: list, rsp_omega: PolPropSOSRecursion, b: list, freq: list, k: list):
+        """
+        a: List: Integrals to the left of the integral containing the "omega" operator
+        rsp_omega: PolPropSOSRecursion instance denoting the integral containing the
+        operator coupling to the detected field
+        b: List: Integrals to the right of the integral containing the "omega" operator
+        freq: List of (dummy) frequency arguments denoting the n-th interaction with the field
+        k: List: Integral operator order argument (for combinatorics summation) FIXME: Possibly outdated
+        """
+
+        self.a = a
+        self.rsp_omega = rsp_omega
+        self.b = b
+        self.freq = freq
+        self.k = k
+
+        # Power of 1/hbar
+        self.hbar = 0
+
+        # Coefficient of self
+        self.coeff = 1
+
+    def present(self):
+        """
+        Formatted printing of own attributes
+        """
+
+        print('Overall coefficient', self.coeff)
+
+        for i in self.a:
+            i.present()
+
+        self.rsp_omega.present()
+
+        for i in self.b:
+            i.present()
+
+        for i in self.freq:
+            i.present()
+
+
+
+def vib_contribs_abstract(maxord: int, states: list[VibState], ops: tuple[QOperator]) -> list:
+    """
+    Get "uncombinatorized" form of SOS vibrational contributions up to order
+
+    maxord: Requested maximum order of response
+    states: List of VibState instances: Canonically ordered state references used during recursion
+    ops: Tuple of QOperator instances: Perturbing operators
+
+    Returns: List [[order 1 term 1, order 1 term 2, ...], [order 2 term 1, ...], ...]
+
+    """
 
     # Initial order 0 term
-    R = [[rspTermSOSRecursion([], polPropSOSRecursion(0, states[0], states[0]), [], [], [maxord])]]
+    R = [[RspTermSOSRecursion([], PolPropSOSRecursion(0, states[0], states[0]), [], [], [maxord])]]
 
     for p in range(maxord):
 
@@ -89,13 +132,14 @@ def vib_contribs_abstract(maxord, states, ops):
             # New resonance conditions for "D" type terms
             r_D_1.hbar += 1
             r_D_1.coeff *= -1
-            r_D_1.freq.append(resonanceCondition(vibDiffTerm(states[p + 1], r.rsp_omega.left), [(j + 1) for j in range(p + 1)]))
+            r_D_1.freq.append(ResonanceCondition(VibDiffTerm(states[p + 1], r.rsp_omega.left), [(j + 1) for j in range(p + 1)]))
 
             r_D_2.hbar += 1
             r_D_2.coeff *= 1
-            r_D_2.freq.append(resonanceCondition(vibDiffTerm(r.rsp_omega.right, states[p + 1]), [(j + 1) for j in range(p + 1)]))
+            r_D_2.freq.append(ResonanceCondition(VibDiffTerm(r.rsp_omega.right, states[p + 1]), [(j + 1) for j in range(p + 1)]))
 
             # FIXME: Create the new terms according to recursion in manuscript - document when manuscript updated
+            # FIXME (2025): Don't understand prev. comment
             if (r_E.rsp_omega.order < 1):
                 r_E.k.append(1)
 
@@ -116,19 +160,14 @@ def vib_contribs_abstract(maxord, states, ops):
             else:
                 r_D_1.k[len(r_D_1.k) - 1] += 1
 
-
-
-
             r_D_1_new.omega = 0
             r_D_1_new.order += 1
             r_D_1_new.left = states[p + 1]
 
-            # NEW
             r_D_1_new.addOperator(ops[p])
-            # END NEW
 
             r_D_1.b = [r_D_1_new] + r_D_1.b
-            r_D_1.rsp_omega = polPropSOSRecursion(0, r_D_1.rsp_omega.left, states[p + 1])
+            r_D_1.rsp_omega = PolPropSOSRecursion(0, r_D_1.rsp_omega.left, states[p + 1])
             r_D_1.k[0] -= 1
 
             # Making new integral for D2 term
@@ -140,18 +179,14 @@ def vib_contribs_abstract(maxord, states, ops):
             else:
                 r_D_2.k[len(r_D_2.k) - 1] += 1
 
-
-
             r_D_2_new.order += 1
             r_D_2_new.omega = 0
             r_D_2_new.right = states[p + 1]
 
-            # NEW
             r_D_2_new.addOperator(ops[p])
-            # END NEW
 
             r_D_2.a = r_D_2.a + [r_D_2_new]
-            r_D_2.rsp_omega = polPropSOSRecursion(0, states[p + 1], r_D_2.rsp_omega.right)
+            r_D_2.rsp_omega = PolPropSOSRecursion(0, states[p + 1], r_D_2.rsp_omega.right)
             r_D_2.k[0] -= 1
 
             R[p + 1].append(r_E)
@@ -165,9 +200,14 @@ def vib_contribs_abstract(maxord, states, ops):
 
     return R
 
-# FIXME: I need to reacquaint myself with this function (see manuscript): It could be obsolete (only first comb needed)
-# Get "permutation" combinations of perturbing operators
 def get_op_combs_rec_t(ops, curr, k, lvl, res, noncomb=False):
+    """
+    Get "permutation" combinations of perturbing operators
+    Tail recursive
+    FIXME: This function may be obsolete (only first comb actually currently needed since they
+    are dummy indices and I am later dressing with actual pulse interactions)
+    Further documentation postponed until settled
+    """
 
     if (lvl == len(k)):
         res.append(copy.deepcopy(curr))
@@ -182,9 +222,12 @@ def get_op_combs_rec_t(ops, curr, k, lvl, res, noncomb=False):
             if noncomb:
                 return
 
-
-# Recursion helper function
-def make_op_sel_set(all_ops, taken):
+def make_op_sel_set(all_ops, taken) -> list:
+    """
+    Recursion helper function
+    FIXME: May be obsolete for same reason as get_op_combs_rec_t
+    Further documentation postponed until settled
+    """
     sel_set = []
 
     for i in all_ops:
@@ -199,9 +242,18 @@ def make_op_sel_set(all_ops, taken):
 
     return sel_set
 
-# Get vibrational SOS expressions at order 'maxord' for omega operator 'op_omega' and perturbing operators 'ops'"
-# with vibrational states 'states'
-def get_vib_sos(op_omega, ops, maxord, states, noncomb=False):
+
+def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator], maxord: int, states: list[VibState], noncomb: bool=False):
+    """
+    Get vibrational SOS expressions at order 'maxord' for omega operator 'op_omega' and perturbing operators 'ops'"
+    with vibrational states 'states'
+
+    op_omega: QOperator: The operator representing interaction with the detected field
+    ops: Tuple of QOperator instances: Perturbing operators
+    maxord: Integer: Requested order of sum-over-states expression
+    states: List of VibState instances: Canonically ordered vibrational states used during recursion
+    noncomb: Boolean: Abstain from (True) or permute (False) dummy frequency indices
+    """
 
     # Frequency references and (operator, freq) pairs structure
     # FIXME: Possible disconnect between op keys and "template" (1,2,3..) freq args in vib_contribs_abstract
@@ -212,6 +264,8 @@ def get_vib_sos(op_omega, ops, maxord, states, noncomb=False):
     R = vib_contribs_abstract(maxord, states, ops)
     R_comb = []
 
+    # FIXME: The combinatorics part of the remainder of this function may be redundant (permuting dummy indices)
+    # Additionally, the structure (two deepest levels of nesting?) could be simplified out if not doing permutation
 
     # Get operator combinatorics information
     for i in range(len(R[maxord])):
@@ -242,12 +296,11 @@ def get_vib_sos(op_omega, ops, maxord, states, noncomb=False):
             # FIXME 2024: Clean up after October fixes (operator permutations, no symmetry)
 
             # Make transition integrals for a, omega, b parts
-
             for m in R[maxord][i].a:
 
                 new_ints.append(
-                    transitionIntegral(m.left, m.right,
-                                       polProp(m.ops))
+                    TransitionIntegral(m.left, m.right,
+                                       PolProp(m.ops))
                                        )
 
                 oc += 1
@@ -259,22 +312,22 @@ def get_vib_sos(op_omega, ops, maxord, states, noncomb=False):
                 new_ops.extend(R[maxord][i].rsp_omega.ops)
 
                 new_ints.append(
-                    transitionIntegral(R[maxord][i].rsp_omega.left, R[maxord][i].rsp_omega.right,
-                                       polProp(new_ops))
+                    TransitionIntegral(R[maxord][i].rsp_omega.left, R[maxord][i].rsp_omega.right,
+                                       PolProp(new_ops))
                 )
                 oc += 1
 
             else:
                 new_ints.append(
-                    transitionIntegral(R[maxord][i].rsp_omega.left, R[maxord][i].rsp_omega.right,
-                                       polProp([op_omega])
+                    TransitionIntegral(R[maxord][i].rsp_omega.left, R[maxord][i].rsp_omega.right,
+                                       PolProp([op_omega])
                                        )
                 )
 
             for m in R[maxord][i].b:
                 new_ints.append(
-                    transitionIntegral(m.left, m.right,
-                                       polProp(m.ops))
+                    TransitionIntegral(m.left, m.right,
+                                       PolProp(m.ops))
                                        )
                 oc += 1
 
@@ -286,7 +339,7 @@ def get_vib_sos(op_omega, ops, maxord, states, noncomb=False):
                 one_new_res.permute(freq_mask)
                 new_res.append(one_new_res)
 
-            R_vibContrib.append(vibContribTerm(
+            R_vibContrib.append(VibContribTerm(
                 Fraction(R[maxord][i].coeff),
                 new_ints,
                 new_res

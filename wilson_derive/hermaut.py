@@ -1,13 +1,28 @@
 import copy
-from .abstractions import harmOscState, vibPerturbedTerm, vibDiffTerm, resonanceCondition
+from .abstractions import HarmOscState, VibPerturbedTerm, VibDiffTerm, ResonanceCondition, VibContribTerm
 from fractions import Fraction
 
-# Walk L to R (not R to L)
-def all_uneq_walks(curr_walk, N, unstarted, closed, result):
+# FIXME: The routines in this file need verification and harmonization with respect to theory manuscript
+
+def all_uneq_walks(curr_walk: list, N: int, unstarted: list, closed: list, result: list):
+    """
+    Generate all Hermite "walks" for a given number of pairs of unique raise/lower operators
+    Tail-recursive
+
+    curr_walk: List of [a, b] pairs: Walk currently being generated (a is the normal mode
+    index and b is "raise or lower" flag (resp. 1 and -1)
+    N: Total number of unique raise/lower pairs
+    Unstarted: List of pair references not yet encountered in current walk
+    Closed: List of pair references already represented with both raise and lower in current walk  ("closed")
+    Result: List: Results accumulator for all curr_walks at end of recursion
+    """
+
+    # Termination condition
     if len(curr_walk) == N * 2:
 
         result.append(curr_walk)
 
+    # Otherwise recurse further
     else:
 
         for i in curr_walk:
@@ -30,15 +45,21 @@ def all_uneq_walks(curr_walk, N, unstarted, closed, result):
 
     return
 
-# Traverse a Hermite walk with a term and return a collection of (vibState, harmOscState) pairs
-# and normal mode indices for each derivative
-def go_for_a_walk(term, walk):
+def go_for_a_walk(term: VibContribTerm, walk):
+    """
+    Traverse a Hermite walk with a term and return a collection of (vibState, harmOscState) pairs
+    and normal mode indices for each derivative
+
+    term: VibContribTerm instance being "walked"
+    walk: The raise/lower progression (the "walk") w.r.t. which term will be subjected (see curr_walk)
+    definition in all_uneq_walks
+    """
 
     res_states = {}
     res_deriv_inds = []
 
     # Assign ground-state vibState to ground-state harmOscState
-    res_states[term.ints[-1].ket.s] = harmOscState([])
+    res_states[term.ints[-1].ket.s] = HarmOscState([])
 
     # Reversing order of integrals for walk
     ints = copy.deepcopy(term.ints)
@@ -81,18 +102,28 @@ def go_for_a_walk(term, walk):
 
         # Otherwise make a new state entry
         else:
-            res_states[i.bra.s] = harmOscState(quanta)
+            res_states[i.bra.s] = HarmOscState(quanta)
 
         # Record the used derivative indices for this integral
         res_deriv_inds.insert(0, copy.deepcopy(this_deriv_inds))
 
     return res_states, res_deriv_inds
 
+def do_hermaut(term: VibContribTerm, inds: list):
+    """
+    Do a Hermite evaluation of a VibContribTerm to generate a list of valid VibPerturbedTerm instances resulting
+    from the "Hermite walks" evaluation
 
-# TODO: Rework: Make this keep track of orig states too (instead of pure harm osc, go with "character of...")
-# Evaluator must loop over states and their character (so both loop over states and nm indices)
-# Non-variationally-re-resolved states will trivially reduce (state, nm) summation to nm like before
-def do_hermaut(term, inds):
+    TODO: Rework for re-resolved states: Make this keep track of orig states too
+    (instead of pure harm osc, go with "character of...")
+    Evaluator must then loop over states and their character (so both loop over states and nm indices)
+    Non-variationally-re-resolved states will trivially reduce (state, nm) summation to nm like before
+
+    term: VibContribTerm: the term to be evaluated
+    inds: list: Symbolic normal mode indices
+
+    Returns a list of VibPerturbedTerm instances
+    """
 
     # Count up derivative orders: Return empty if odd
 
@@ -136,7 +167,7 @@ def do_hermaut(term, inds):
 
     finished_terms = []
 
-    # Go on each walk and construct a vibPerturbedTerm instance
+    # Go on each walk and construct a VibPerturbedTerm instance
     for i in walks:
 
         # Go on this walk
@@ -152,7 +183,7 @@ def do_hermaut(term, inds):
             if not(j.ket.mbuFulfilled(res_states)):
                 raise AssertionError('Not all must-be-unequal-to states are unequal to their assumed-unequal-to states')
 
-        # Prepare vibPerturbedTerm instance
+        # Prepare VibPerturbedTerm instance
 
         # Make properties and insert the identified differentiation indices
         new_props = []
@@ -167,11 +198,11 @@ def do_hermaut(term, inds):
 
         # Remake existing frequency (difference) terms in terms of harmonic oscillator quanta
         for j in term.freqdiff:
-            new_freqterms.append(vibDiffTerm(copy.deepcopy(res_states[j.sl.s]), copy.deepcopy(res_states[j.sr.s]), is_pert_wf_diff=j.is_pert_wf_diff))
+            new_freqterms.append(VibDiffTerm(copy.deepcopy(res_states[j.sl.s]), copy.deepcopy(res_states[j.sr.s]), is_pert_wf_diff=j.is_pert_wf_diff))
 
         # Add new freq factors from harm osc treatment
         for j in inds[:round(sumord/2)]:
-            new_freqterms.append(vibDiffTerm(harmOscState([j]), harmOscState([])))
+            new_freqterms.append(VibDiffTerm(HarmOscState([j]), HarmOscState([])))
 
         # Update coefficient w.r.t. the 1/(2 w_a)-style factors
         new_coeff = term.coeff * Fraction(1, 2**(round(sumord/2)))
@@ -180,12 +211,11 @@ def do_hermaut(term, inds):
         new_res = []
 
         for j in term.res:
-            new_res.append(resonanceCondition(
-                vibDiffTerm(copy.deepcopy(res_states[j.diff.sl.s]), copy.deepcopy(res_states[j.diff.sr.s])),
+            new_res.append(ResonanceCondition(
+                VibDiffTerm(copy.deepcopy(res_states[j.diff.sl.s]), copy.deepcopy(res_states[j.diff.sr.s])),
                 j.pf, j.id))
 
-        # Create the vibPerturbedTerm instance
-        finished_terms.append(vibPerturbedTerm(new_coeff, new_props, new_freqterms, new_res))
-
+        # Create the VibPerturbedTerm instance
+        finished_terms.append(VibPerturbedTerm(new_coeff, new_props, new_freqterms, new_res))
 
     return finished_terms

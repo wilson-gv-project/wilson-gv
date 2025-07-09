@@ -1,4 +1,4 @@
-
+from wilson_experiment.abstractions import VibExperiment
 from . import abstractions as abst
 from . import dbl_pert_expansion
 from . import hermaut
@@ -8,68 +8,40 @@ import copy
 
 
 # Operator and state labels initialization
+# FIXME: Consider moving these common definitions to utils
 
 nm_inds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
-states = [abst.vibState('0', is_ground=True), abst.vibState('m'), abst.vibState('n'), abst.vibState('p'), abst.vibState('q'),
-          abst.vibState('r'), abst.vibState('s'), abst.vibState('t'), abst.vibState('u'), abst.vibState('v')]
+states = [abst.VibState('0', is_ground=True), abst.VibState('m'), abst.VibState('n'), abst.VibState('p'), abst.VibState('q'),
+          abst.VibState('r'), abst.VibState('s'), abst.VibState('t'), abst.VibState('u'), abst.VibState('v')]
 
-op_omega = abst.qOperator(0, 1)
+op_omega = abst.QOperator(0, 1)
 
 ops_pert = (
-abst.qOperator(1, 1),
-abst.qOperator(2, 1),
-abst.qOperator(3, 1),
-abst.qOperator(4, 1),
-abst.qOperator(5, 1),
-abst.qOperator(6, 1),
-abst.qOperator(7, 1),
-abst.qOperator(8, 1),
+abst.QOperator(1, 1),
+abst.QOperator(2, 1),
+abst.QOperator(3, 1),
+abst.QOperator(4, 1),
+abst.QOperator(5, 1),
+abst.QOperator(6, 1),
+abst.QOperator(7, 1),
+abst.QOperator(8, 1),
 )
 
-def make_anharm_orders_rec(total, limit_el, limit_mech, new_entry, orders):
+def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=1, el_anharm_limit: int=1,
+                             mech_anharm_limit: int=1) -> dict:
+    """
+    Take an experiment instance and requested maximal order(s) of anharmonicity and return
+    all terms that may be fully enhanced under this experiment at the requested orders of anharmonicity
+    or lower. Returns a dictionary {0: {[0,0]: [...], ...}, 1: {[1,0]: [...], ...}, ...} where [...]
+    is a list of VibPerturedTerm instances
 
-    if total == 0:
+    experiment: VibExperiment instance from wilson-experiment
 
-        if not(sum(new_entry) in orders):
-            orders[sum(new_entry)] = [tuple(new_entry)]
-
-        else:
-            if not(new_entry in orders[sum(new_entry)]):
-                orders[sum(new_entry)].append(tuple(new_entry))
-
-    else:
-
-        if not(new_entry[0] > limit_el):
-
-            # Give to el
-            next_entry = copy.deepcopy(new_entry)
-            next_entry[0] += 1
-            make_anharm_orders_rec(total - 1, limit_el, limit_mech, next_entry, orders)
-
-        if not(new_entry[1] > limit_mech):
-
-            # Give to mech
-            next_entry = copy.deepcopy(new_entry)
-            next_entry[1] += 1
-            make_anharm_orders_rec(total - 1, limit_el, limit_mech, next_entry, orders)
-
-        # Do nothing (for registering lower orders)
-        next_entry = copy.deepcopy(new_entry)
-        make_anharm_orders_rec(total - 1, limit_el, limit_mech, next_entry, orders)
-
-    return
-
-def make_anharm_orders(total, limit_el, limit_mech):
-
-    orders = {}
-    new_entry = [0, 0]
-
-    make_anharm_orders_rec(total, limit_el, limit_mech, new_entry, orders)
-
-    return orders
-
-def get_fully_enhanced_terms(experiment, total_anharm_limit=1, el_anharm_limit=1, mech_anharm_limit=1):
+    total: integer: Limitation on total order of anharmonicity (default = 1)
+    el_anharm_limit: integer: Limitation on electrical order of anharmonicity (default = 1)
+    mech_anharm_limit: integer: Limitation on mechanical order of anharmonicity (default = 1)
+    """
 
     R_sos = vib_rsp_sos.get_vib_sos(op_omega, ops_pert, experiment.order, states, noncomb=True)
 
@@ -85,7 +57,7 @@ def get_fully_enhanced_terms(experiment, total_anharm_limit=1, el_anharm_limit=1
 
     R_sos = R_sos_int
 
-    anharm_orders = make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
+    anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
 
     final_terms = {}
 
