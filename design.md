@@ -27,26 +27,6 @@ Concise description of what this software will do.
 
 ---
 
-### `vibrational_model.py`
-**Responsibility**: Define system energy levels & couplings
-
-#### Classes & Key Functions
-
-##### `VibrationalSystem`
-- **Attributes**:
-  - `hamiltonian_matrix`
-  - `dipole_matrix`
-  - `coupling_constants`
-- **Design Note**:
-  - Use `@dataclass` for readability and immutability
-  - Maybe split into a builder (`VibrationalSystemBuilder`) vs pure data object
-
-##### `diagonalize_hamiltonian(H)`
-- Should be a pure function
-- 🔍 *Edge case*: Degeneracy handling unclear — needs test
-
----
-
 ## 🔁 Data Flow
 
 1. `VibrationalSystem` → `SpectrumSimulator`
@@ -74,12 +54,6 @@ Concise description of what this software will do.
 
 ---
 
-## ❓ Open Questions
-
-- Should we cache diagonalization results if Hamiltonian doesn’t change?
-- Do we want full OO design or hybrid with functional helpers?
-
----
 
 ## 🛠️ Implementation Roadmap
 
@@ -92,23 +66,23 @@ Concise description of what this software will do.
 ------------------------------------------------
 # Notes from 30.06.2025
 
-1. externalCalcSetup: dataclass + immutable. other_setup: custom data from user? input_generation functionality - separate class
-2. wilsonSimulation: report method; saving instances/setups; saving results
-3. evaluate: self.spec - np.ndarray, self.diagn - dict;
+1. **wilson-main**: externalCalcSetup: dataclass + immutable. other_setup: custom data from user? input_generation functionality - separate class
+2. **wilson-main**: wilsonSimulation: report method; saving instances/setups; saving results
+3. **wilson-main**: evaluate: self.spec - np.ndarray, self.diagn - dict;
 4. more general evaluator would take experiment info. Other evaluator (evaluate_as_response) just evaluates response function
 5. Canonical indices in terms
-6. Identification in TermsEvalua - clean up
-7. Use dictionaries to hold properties values? - lower priority
-8. terms_evaluator: always identify and precalculate? - check if it actually works without precalc;
-9. TermsEvaluator.precalc_avrg_tensors: generalize greek indices -- dict of greek letters
-10. make indices abc into tuples 
-11. Non-averaged data - check namings and functions
-12. calculationBatch.getResultsFromVault - VL
-13. vibAnaSetup clarifications: class name, external_fill_from name; 
-14. basic renderer
-15. harmonic precal data - fix
-16. test_clean_termND  - produces different molecule????
-17. include renderer to evv_tester
-18. wilson_suite: update.sh file to go to specific commit on a specific branch for each repo
-19. another look at signs of perturbing freqs in terms and signs of spectroscopic axes
+6. **wilson-intensities**: Identification in TermsEvaluate - clean up
+7. **wilson-intensities**: Use dictionaries to hold properties values? - lower priority
+8. **wilson-intensities**: terms_evaluator: always identify and precalculate? - check if it actually works without precalc;
+9. **wilson-intensities**: TermsEvaluator.precalc_avrg_tensors: generalize greek indices -- dict of greek letters
+10. **wilson-intensities**: make indices abc into tuples 
+11. **wilson-intensities/CQCParse**: Non-averaged data - check namings and functions
+12. **wilson-main**: calculationBatch.getResultsFromVault - VL
+13. **wilson-main**: vibAnaSetup clarifications: class name, external_fill_from name; 
+14. **wilson-analysis/suite test**: basic renderer
+15. **wilson-intensities**: harmonic precal data - fix
+16. **wilson-intensities**: test_clean_termND  - produces different molecule????
+17. **wilson-analysis/suite test**: include renderer to evv_tester
+18. **wilson_suite**: update.sh file to go to specific commit on a specific branch for each repo
+19. **wilson-derive**: another look at signs of perturbing freqs in terms and signs of spectroscopic axes
 
