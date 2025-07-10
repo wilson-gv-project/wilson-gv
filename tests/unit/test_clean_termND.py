@@ -58,17 +58,17 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup, conditio
         amplitudes = 0.0
         for id, term in te.terms.items():
             term.precalc_data = big_dict
-            with np.printoptions(precision=2,legacy='1.25'):
-                formatted_resonances = {
-                    key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
-                    for key, value in term.get_all_resonances(w2mw1=True).items()
-                }
-                df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
-                print(df)
-                print('_____________________')
-                print(term)
-                print(formatted_resonances)
-            with debug_mode(2):
+            # with np.printoptions(precision=2,legacy='1.25'):
+            #     formatted_resonances = {
+            #         key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+            #         for key, value in term.get_all_resonances(w2mw1=True).items()
+            #     }
+                # df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
+                # print(df)
+                # print('_____________________')
+                # print(term)
+                # print(formatted_resonances)
+            with debug_mode(0):
                 intensity = term.get_amplitudes(spectrum_setup.w1m,
                                                 spectrum_setup.w2m,
                                                 3.8, 1.0, debugprint=True, collect_all=False)
@@ -179,23 +179,16 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
     spectrum_setup = spectrum_setup['FORM']
     conditions = conditions['FORM']
 
-    # print(te.terms)
-    # exit()
-    # print(spectrum_setup.molecule)
-    # print(big_dict['vibene_denoms'])
-    # print(terms_collection.keys())
-    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
-
     expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
     for key in expected_keys:
         assert key in big_dict, f"Key '{key}' missing in precalculated data"
     assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
 
-    from rich import print as rprint
-    print('\n')
+    # from rich import print as rprint
+    # print('\n')
     # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
     # rprint(big_dict)
-    print('\n')
+    # print('\n')
 
     with debug_mode(0):
         amplitudes = 0.0
@@ -451,3 +444,71 @@ def test_dotspectrum_df(terms_collection, spectrum_setup, conditions):
                 print('_____________________')
                 print(term)
                 # print(formatted_resonances)
+
+
+from wilson.spectrum.termND import sum_over_suffixes
+
+def test_sum_over_suffixes():
+    pass
+
+
+def test_get_factor_summed(terms_collection):
+    print()
+
+    te, big_dict = terms_collection['FORM']
+    term3 = te.terms[3]
+    term3.precalc_data = big_dict
+    # print(' jimr', term3.precalc_data)
+
+    ab_comb = (0,0)
+    total = 0.
+    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+    total2 = sum_over_suffixes(ab_comb,
+                               remaining_length,
+                               term3.mode_indices,
+                               term3.get_full_factor)
+    for c in term3.mode_indices:
+        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+        total += addition_2
+
+    assert total2==total, "sum_over_suffixes didn't work out"
+
+    ab_comb = (0,1)
+    total = 0.
+    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+    total2 = sum_over_suffixes(ab_comb,
+                               remaining_length,
+                               term3.mode_indices,
+                               term3.get_full_factor)
+    for c in term3.mode_indices:
+        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+        total += addition_2
+
+    assert total2==total, "sum_over_suffixes didn't work out"
+
+    ab_comb = (1,0)
+    total = 0.
+    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+    total2 = sum_over_suffixes(ab_comb,
+                               remaining_length,
+                               term3.mode_indices,
+                               term3.get_full_factor)
+    for c in term3.mode_indices:
+        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+        total += addition_2
+
+    assert total2==total, "sum_over_suffixes didn't work out"
+
+    ab_comb = (2,1)
+    total = 0.
+    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+    total2 = sum_over_suffixes(ab_comb,
+                               remaining_length,
+                               term3.mode_indices,
+                               term3.get_full_factor)
+    for c in term3.mode_indices:
+        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+        total += addition_2
+
+    assert total2==total, "sum_over_suffixes didn't work out"
+

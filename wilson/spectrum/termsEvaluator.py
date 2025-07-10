@@ -59,8 +59,8 @@ class TermsEvaluator:
         collect_n_idx_rescond = []
         collect_n_idx_max = []
         for tid, t in self.terms.items():
-            collect_n_idx_max.append(t.collective_n_idx_max)
-            collect_n_idx_rescond.append(t.collective_n_idx_rescond)
+            collect_n_idx_max.append(t.n_idx_max)
+            collect_n_idx_rescond.append(t.n_idx_rescond)
         # print('collect_n_idx_rescond', collect_n_idx_rescond)
         for tid, t in self.terms.items():
             t.collective_n_idx_max = max(collect_n_idx_max)
