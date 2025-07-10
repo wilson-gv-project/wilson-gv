@@ -69,20 +69,20 @@ Concise description of what this software will do.
 1. **wilson-main**: externalCalcSetup: dataclass + immutable. other_setup: custom data from user? input_generation functionality - separate class
 2. **wilson-main**: wilsonSimulation: report method; saving instances/setups; saving results
 3. **wilson-main**: evaluate: self.spec - np.ndarray, self.diagn - dict;
-4. more general evaluator would take experiment info. Other evaluator (evaluate_as_response) just evaluates response function
-5. Canonical indices in terms
-6. **wilson-intensities**: Identification in TermsEvaluate - clean up
-7. **wilson-intensities**: Use dictionaries to hold properties values? - lower priority
-8. **wilson-intensities**: terms_evaluator: always identify and precalculate? - check if it actually works without precalc;
-9. **wilson-intensities**: TermsEvaluator.precalc_avrg_tensors: generalize greek indices -- dict of greek letters
-10. **wilson-intensities**: make indices abc into tuples 
-11. **wilson-intensities/CQCParse**: Non-averaged data - check namings and functions
-12. **wilson-main**: calculationBatch.getResultsFromVault - VL
+4. **😺❔wilson-main**: more general evaluator would take experiment info. Other evaluator (evaluate_as_response) just evaluates response function
+5. **wilson-derive**: Canonical indices in terms
+6. **😺wilson-intensities**: Identification in TermsEvaluate - clean up
+7. **😺wilson-intensities**: Use dictionaries to hold properties values? - lower priority
+8. **😺wilson-intensities**: terms_evaluator: always identify and precalculate? - check if it actually works without precalc;
+9. **😺wilson-intensities**: TermsEvaluator.precalc_avrg_tensors: generalize greek indices -- dict of greek letters
+10. **😺wilson-intensities**: make indices abc into tuples 
+11. **😺wilson-intensities/CQCParse**: Non-averaged data - check namings and functions
+12. **😺wilson-main**: calculationBatch.getResultsFromVault - VL
 13. **wilson-main**: vibAnaSetup clarifications: class name, external_fill_from name; 
 14. **wilson-analysis/suite test**: basic renderer
-15. **wilson-intensities**: harmonic precal data - fix
-16. **wilson-intensities**: test_clean_termND  - produces different molecule????
-17. **wilson-analysis/suite test**: include renderer to evv_tester
-18. **wilson_suite**: update.sh file to go to specific commit on a specific branch for each repo
+15. **😺wilson-intensities**: harmonic precal data - fix
+16. **😺wilson-intensities**: test_clean_termND  - produces different molecule????
+17. **😺wilson-analysis/suite test**: include renderer to evv_tester
+18. **😺wilson_suite**: update.sh file to go to specific commit on a specific branch for each repo
 19. **wilson-derive**: another look at signs of perturbing freqs in terms and signs of spectroscopic axes
 
