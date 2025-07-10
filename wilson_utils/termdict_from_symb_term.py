@@ -57,6 +57,7 @@ def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
             if (len(curr_ops) % 2) == 0:
                 rsp_to_mult_exp_conv_fact *= -1
 
+
             averaged_props.append((
                 prop_trivname(len(curr_diff_inds), len(curr_ops)),
                 curr_diff_inds,
