@@ -1,7 +1,12 @@
-from wilson_derive.abstractions import vibPerturbedTerm
+from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_utils.prop_trivname import prop_trivname
 
-def state_list_to_str(stl):
+def state_list_to_str(stl: list):
+    """
+    Helper function: Generate a string taking a list of vibrational quanta ['a', 'b', ...] and making 'a+b+...'
+
+    stl: List of vibrational quanta
+    """
 
     return_str = ''
 
@@ -16,10 +21,15 @@ def state_list_to_str(stl):
     else:
         return return_str[:len(return_str) - 1]
 
-def dict_from_term(term, floats=True):
+def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
+    """
+    Take a VibPerturbedTerm instance and generate a dictionary representation of it for use in wilson-intensities
 
-    if not isinstance(term, vibPerturbedTerm):
-        raise AssertionError('Term being converted must be a vibPerturbedTerm instance')
+    term: The VibPerturbedTerm instance to be so represented
+    """
+
+    if not isinstance(term, VibPerturbedTerm):
+        raise AssertionError('Term being converted must be a VibPerturbedTerm instance')
 
     result_dict = {}
 
@@ -46,7 +56,6 @@ def dict_from_term(term, floats=True):
 
             if (len(curr_ops) % 2) == 0:
                 rsp_to_mult_exp_conv_fact *= -1
-
 
             averaged_props.append((
                 prop_trivname(len(curr_diff_inds), len(curr_ops)),
@@ -131,11 +140,11 @@ def derived_terms_dict_to_dicts(derived_terms):
     """
     Example:
     derived_terms = {
-        1: {(1, 0): [<wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b223b260>,
-                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b223b650>],
-            (0, 1): [<wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b22582c0>,
-                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b2258830>,
-                     <wilson_derive.abstractions.vibPerturbedTerm object at 0x7ff3b2258110>]},
+        1: {(1, 0): [<wilson_derive.abstractions.VibPerturbedTerm object at 0x7ff3b223b260>,
+                     <wilson_derive.abstractions.VibPerturbedTerm object at 0x7ff3b223b650>],
+            (0, 1): [<wilson_derive.abstractions.VibPerturbedTerm object at 0x7ff3b22582c0>,
+                     <wilson_derive.abstractions.VibPerturbedTerm object at 0x7ff3b2258830>,
+                     <wilson_derive.abstractions.VibPerturbedTerm object at 0x7ff3b2258110>]},
         0: {(0, 0): []}}
 
     result_list = []

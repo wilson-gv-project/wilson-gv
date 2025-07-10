@@ -1,6 +1,9 @@
 import pytest
 
 def setup_evv_terms_for_test():
+    """
+    Helper function: Set up EVV-2D-IR terms for use in other test(s)
+    """
 
     import wilson_suite as ws
 
@@ -39,6 +42,9 @@ def setup_evv_terms_for_test():
 
 
 def test_dict_from_term():
+    """
+    Testing of dict_form_term
+    """
 
     import wilson_suite as ws
     from fractions import Fraction
