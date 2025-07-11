@@ -199,10 +199,8 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
                     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
                     for key, value in term.get_all_resonances(w2mw1=True).items()
                 }
-                print('_____________________')
-                print(term)
-                print(formatted_resonances)
-            with debug_mode(2):
+                # print(formatted_resonances)
+            with debug_mode(0):
                 intensity = term.get_amplitudes(spectrum_setup.w1m,
                                                 spectrum_setup.w2m,
                                                 3.8, 1.0, debugprint=True, collect_all=False)
@@ -241,23 +239,16 @@ def test_terms_EL_calculation_derived(terms_collection_derived, spectrum_setup, 
     spectrum_setup = spectrum_setup['FORM']
     conditions = conditions['FORM']
 
-    # print(te.terms)
-    # exit()
-    # print(spectrum_setup.molecule)
-    # print(big_dict['vibene_denoms'])
-    # print(terms_collection.keys())
-    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
-
     expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
     for key in expected_keys:
         assert key in big_dict, f"Key '{key}' missing in precalculated data"
     assert big_dict['vibene_denoms'], "vibene_denoms data is empty"
 
     from rich import print as rprint
-    print('\n')
+    # print('\n')
     # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
     # rprint(big_dict)
-    print('\n')
+    # print('\n')
 
     with debug_mode(0):
         amplitudes = 0.0

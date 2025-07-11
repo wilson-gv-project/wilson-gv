@@ -19,7 +19,7 @@ def convert_lists_to_tuples(data):
 @pytest.fixture(scope='module')
 def derived_terms_json():
     import json
-    with open('/home/vlev/wilson-suite/tests/terms.json') as json_file:
+    with open('/home/vlev/wilson-suite/wilson_intensities/tests/unit/terms.json') as json_file:
         list_terms = json.load(json_file)
     d = {i:t for i,t in enumerate(list_terms)}
     return convert_lists_to_tuples(d)
@@ -31,9 +31,9 @@ def dict_8terms():
     allterms_str = { 0:
                          {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('b',), ('A', 'D')),
-                                             ('mu_QQ', ('a', 'b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('b',), ('A', 'D')),
+                                             ('diphess', ('a', 'b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
                           'termB_pref': 1.,
@@ -41,9 +41,9 @@ def dict_8terms():
                      1:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': None,
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_QQ', ('a', 'b',), ('A', 'D')),
-                                             ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polhess', ('a', 'b',), ('A', 'D')),
+                                             ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
                           'termB_pref': 1.,
@@ -51,9 +51,9 @@ def dict_8terms():
                      2:
                          {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a+b+c,zero', 'c,a+b'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('b',), ('A', 'D')),
-                                             ('mu_Q', ('c',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('b',), ('A', 'D')),
+                                             ('dipgrad', ('c',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'b', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 1.,
@@ -61,9 +61,9 @@ def dict_8terms():
                      3:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a+c,b', 'b+c,a'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('c',), ('A', 'D')),
-                                             ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('c',), ('A', 'D')),
+                                             ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'b',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 1.,
@@ -71,9 +71,9 @@ def dict_8terms():
                      4:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a,a+b', 'b,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('b',), ('A', 'D')),
-                                             ('mu_Q', ('a',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('b',), ('A', 'D')),
+                                             ('dipgrad', ('a',), ('G',))),
                           'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 0.5,
@@ -81,9 +81,9 @@ def dict_8terms():
                      5:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('b,a+b', 'a,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('b',), ('A', 'D')),
-                                             ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('b',), ('A', 'D')),
+                                             ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': 0.5,
@@ -91,9 +91,9 @@ def dict_8terms():
                      6:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('a,a+b', 'b,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('a',), ('A', 'D')),
-                                             ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('a',), ('A', 'D')),
+                                             ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': -0.5,
@@ -101,9 +101,9 @@ def dict_8terms():
                      7:
                          {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
                           'vibenediff': ('b,a+b', 'a,zero'),
-                          'averaged_props': (('mu_Q', ('a',), ('B',)),
-                                             ('alpha_Q', ('b',), ('A', 'D')),
-                                             ('mu_Q', ('b',), ('G',))),
+                          'averaged_props': (('dipgrad', ('a',), ('B',)),
+                                             ('polgrad', ('b',), ('A', 'D')),
+                                             ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
                           'termB_pref': -0.5,
@@ -246,11 +246,12 @@ def data_for_precalc(setup_term, spectrum_setup):
         # print(mol)
         term_with_data = setup_term[mol](0)  # Create term 0
         Nnmodes = 6
+        # now here keys change; fixme: it the change needed??
         props_data_ready = {
-            (1, 1): term_with_data.properties_data['mu_Q'],
-            (1, 2): term_with_data.properties_data['mu_QQ'],
-            (2, 1): term_with_data.properties_data['alpha_Q'],
-            (2, 2): term_with_data.properties_data['alpha_QQ'],
+            'dipgrad': term_with_data.properties_data['dipgrad'],
+            'diphess': term_with_data.properties_data['diphess'],
+            'polgrad': term_with_data.properties_data['polgrad'],
+            'polhess': term_with_data.properties_data['polhess'],
         }
         avrg_terms = spectrum_setup[mol].gammaCompsAll
         w1 = np.arange(spectrum_setup[mol].start1,
@@ -289,10 +290,10 @@ def data_for_precalc_derived(setup_term_derived, spectrum_setup):
         term_with_data = setup_term_derived[mol](0)  # Create term 0
         Nnmodes = 6
         props_data_ready = {
-            (1, 1): term_with_data.properties_data['mu_Q'],
-            (1, 2): term_with_data.properties_data['mu_QQ'],
-            (2, 1): term_with_data.properties_data['alpha_Q'],
-            (2, 2): term_with_data.properties_data['alpha_QQ'],
+            'dipgrad': term_with_data.properties_data['dipgrad'],
+            'diphess': term_with_data.properties_data['diphess'],
+            'polgrad': term_with_data.properties_data['polgrad'],
+            'polhess': term_with_data.properties_data['polhess'],
         }
         avrg_terms = spectrum_setup[mol].gammaCompsAll
         w1 = np.arange(spectrum_setup[mol].start1,

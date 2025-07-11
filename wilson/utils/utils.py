@@ -238,13 +238,15 @@ class Conditions:
 
 
 def prep_data_load(parsed_data: ParsedData):
-
+    # todo? refactor these attribute names?
     ddata = [parsed_data.derivatives.dipole_first_derivatives,
              parsed_data.derivatives.dipole_second_derivatives,
              parsed_data.derivatives.polarizability_first_derivatives,
              parsed_data.derivatives.polarizability_second_derivatives,
              parsed_data.derivatives.cubic_force_constants]
-    deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
+    # naming starts here, internal wilson_intensities naming,
+    # later used to set up props data for DataForPrecalc
+    deriv_data = dict(zip(['dipgrad', 'diphess', 'polgrad', 'polhess', 'F_abc'], ddata))
 
     allstates = parsed_data.vib_states.anharmonic_states
     harmonic_states = parsed_data.vib_states.harmonic_states

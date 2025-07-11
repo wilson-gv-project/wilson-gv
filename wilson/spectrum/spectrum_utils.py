@@ -2,13 +2,9 @@ import numpy as np
 from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
-
-from numpy.ma.core import indices
-
 from wilson.spectrum.tools import convNu2Ene
-# alldata = [Nnmodes, data, avrg_terms, axes_dict,
-#            term_with_data.states_arrays_Eh,
-#            term_with_data.harmonic_arrays_Eh]
+
+
 @dataclass
 class DataForPrecalc:
     Nnmodes: int
@@ -89,6 +85,11 @@ class VibStatesDiff:
 
 @dataclass
 class AveragedProps:
+    """
+    #! used in get_avrg_properties(); props together in one tuple; is a key for precalc dict
+    self.property_simple_tuples = tuple([p.simple_tuple for p in self.properties])
+    self.nice_props = AveragedProps(self.properties)
+    """
     props: List[MolProperty] = field(default_factory=list)
 
     @property

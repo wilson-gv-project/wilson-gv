@@ -3,6 +3,7 @@ import numpy as np
 from wilson.spectrum.tools import convNu2Ene, combinations_with_permutations
 from wilson.spectrum.spectrum_utils import MolProperty, AveragedProps, VibStatesDiff
 from wilson.spectrum.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
+from wilson.spectrum.spectrum_utils import abc_list, greek_list
 from wilson.utils.tagger import tag
 from wilson.debug import debugfunc, debug_deep
 
@@ -91,19 +92,20 @@ class TermND:
         self.vibene_denom_expr = self.expression['vibene_denom']
 
         # collected avrg properties
-        self.properties = []
+        self.properties = [] #! unused later in class but used in TermsEvaluator.identify_to_precalculate()
         for p in self.avrg_props_expr:
             self.properties.append(MolProperty(name=p[0], cart_axes=p[2], nm_indices=p[1]))
 
-        self.property_simple_tuples = tuple([p.simple_tuple for p in self.properties])
+        #! used in get_avrg_properties(); props together in one tuple; is a key for precalc dict
         self.nice_props = AveragedProps(self.properties)
 
+        print('properties', self.properties)
+        print('self.avrg_props_expr', self.avrg_props_expr, '\n')
+
         # collecting all vib ene diffs
-        self.vibdiff_symbolic = [] #! unused
         vibstates_diffs_collection = []
         # vib diffs with pert freqs
         for re in self.resonances_expr:
-            self.vibdiff_symbolic.append(re[0])
             l = re[0].split(',')
             ftuple = []
             for ll in l:
@@ -114,7 +116,6 @@ class TermND:
             vibstates_diffs_collection.append((tuple(ftuple), True, re[1], re[0]))
         # vib diffs without pert freqs
         for vd in self.viblevelsdiff_expr:
-            self.vibdiff_symbolic.append(vd)
             l = vd.split(',')
             ftuple = []
             for ll in l:
@@ -124,8 +125,7 @@ class TermND:
                     ftuple.append(0)
             vibstates_diffs_collection.append((tuple(ftuple), False, None, vd))
 
-        vibstates_diffs_collection = set(vibstates_diffs_collection)
-        self.vibstatesdiff_objs = [VibStatesDiff(*i) for i in vibstates_diffs_collection]
+        self.vibstatesdiff_objs = [VibStatesDiff(*i) for i in set(vibstates_diffs_collection)]
 
         from fractions import Fraction
         if isinstance(self.prefactorA, Fraction):
@@ -133,10 +133,12 @@ class TermND:
 
         # to be filled in after processing
         self.precalc_data = None
-        allidx, res_idx = get_allparts_indices(self.expression)
+
         self.collective_n_idx_rescond = None
         self.collective_n_idx_max = None
 
+        # for current term
+        allidx, res_idx = get_allparts_indices(self.expression)
         self.n_idx_rescond = res_idx
         self.n_idx_max = allidx
         self.collective_idx_counted = False
@@ -154,10 +156,7 @@ class TermND:
         making mn tuples for this term for ab combination
         #! not general; used when precalc_data is None
         """
-        # a, b = str(a), str(b)
-        from tests import abc_list
         dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
-        # dict_id = {'a': a, 'b': b, 'zero': 'zero'}
         dict_id['zero'] = 'zero'
 
         type12, type1 = self.resonances_expr
@@ -215,7 +214,6 @@ class TermND:
                 w2 = mn_[-12] + w1
         """
         # fixme: not quite general, fails with b and c indices, instead of a and b - ?
-        from tests import abc_list
         # make dict with indices from rescond
         idx_str = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
@@ -267,7 +265,6 @@ class TermND:
             condition = np.ones_like(w1_rc, dtype=bool)
         w1, w2 = convNu2Ene(w1_rc), convNu2Ene(w2_rc)
 
-        from tests import abc_list
         d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
         Gamma_Eh = convNu2Ene(Gamma_rc)
 
@@ -324,7 +321,6 @@ class TermND:
         A step in calculation of averaged properties
         ABGD - alpha, beta, gamma, delta - so these are current choice of axes for greek indices
         """
-        from wilson.spectrum.spectrum_utils import abc_list, greek_list
         dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         # beta, alpha, delta, gamma ...
@@ -342,10 +338,7 @@ class TermND:
 
     @tag('general','naming!')
     def get_non_averaged_props(self, abc_comb):
-        # a, b, c=None
-        # a, b, c = abc_comb
         # dict_id = {'a': a, 'b': b, 'c': c}
-        from wilson.spectrum.spectrum_utils import abc_list
         dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         if abc_comb not in self.non_avrg_props_expr[0][1]:
@@ -383,12 +376,9 @@ class TermND:
                 return total/15
         else:
             idxs = tuple([i for i in indices_dict.values() if i is not None])
-            # print(idxs)
-            print(self.term_id, self.term_label)
-            print('abc_comb', abc_comb)
-            print('idxs get_avrg_properties', idxs)
-            print('indices_dict', indices_dict)
-            return self.precalc_data['avrg_tensors'][self.property_simple_tuples][idxs]
+            print(self.precalc_data['avrg_tensors'].keys())
+            priv_names_tuple = tuple(sorted([p[0] for p in self.avrg_props_expr]))
+            return self.precalc_data['avrg_tensors'][priv_names_tuple][idxs]
 
 
     @tag('almost_general')
@@ -398,19 +388,11 @@ class TermND:
         ab_comb - rest of indices, index c is being summed over...
         remaining_length - number of indices to be summed over
         """
-        from rich import print as rprint
-        rprint(f'[chartreuse1]summing in get_factor_summed {ab_comb}')
 
         components = {}
         remaining_length = self.n_idx_max - self.collective_n_idx_rescond # fixme? be careful ...
-        # print()
-        # remaining_length = sum([1 for i in ab_comb if i is None])
 
         ab_comb = tuple([i for i in ab_comb if i is not None])
-
-        print('remaining_length', remaining_length)
-        print(self.n_idx_max - self.collective_n_idx_rescond)
-        print('ab_comb', ab_comb)
 
         total = sum_over_suffixes(ab_comb,
                                   remaining_length,
@@ -437,13 +419,6 @@ class TermND:
 
         components = {}
         avrg_properties = self.get_avrg_properties(abc_comb, comps=comps)
-        from rich import print as rprint
-        rprint('[chartreuse1]    <<<<<<<   get full fac')
-
-        print(self.term_id, self.term_label)
-        print('avrg_properties', avrg_properties)
-        print('avrg_properties', type(avrg_properties))
-        print('avrg_properties inp', abc_comb)
 
         if avrg_properties==0:
             if comps:
@@ -462,8 +437,6 @@ class TermND:
             components['ene_factor'] = ene_factor
             components['avrg_properties'] = avrg_properties
 
-        # if self.term_label=='MECH':
-        # if self.vibstatesdiff_objs:
         if self.viblevelsdiff_expr:
 
             self.get_non_averaged_props(abc_comb)
@@ -502,7 +475,6 @@ class TermND:
         1/omega_a/omega_b/omega_c
         """
 
-        from tests import abc_list
         d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
         modes = [i for i in d.values() if i is not None]
 
@@ -526,26 +498,21 @@ class TermND:
         1/omega_m,n + 1/omega_k,l
         a, b, c=None
         """
-        from tests import abc_list
         d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         if self.precalc_data is not None:
-            # calc_tensors = [tuple(sorted(vd.diff_type)) for vd in self.vibstatesdiff_objs if not vd.res_cond]
             vds = []
             for vd in self.vibstatesdiff_objs:
                 if not vd.res_cond:
                     indices = tuple([d[i] for i in vd.diff_str.replace('+', ',').split(',') if i in d])
                     vd_n = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][indices]
+                    # opposite sign for reversed vib diff
                     if tuple(sorted(vd.diff_type)) != vd.diff_type:
                         vd_n *= -1
                     vds.append(vd_n)
                     if np.any(np.array(vd_n) == 0):
-                        print('\n', vd)
-                        print(vd_n)
-                        print('indices', indices)
-                        print('tuple(sorted(vd.diff_type))', tuple(sorted(vd.diff_type)))
-                        print(self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))])
                         raise ValueError("Division by zero detected!")
+
             if np.any(np.array(vds) == 0):
                 raise ValueError("Division by zero detected!")
             return np.sum(1./np.array(vds)), np.array(vds)
@@ -602,17 +569,12 @@ class TermND:
         #! should get number of indices to sum over
         #! ab - are the indices from resonance conditions but ab should have others as None
 
-        # print('self.collective_n_idx_rescond', self.collective_n_idx_rescond)
-        # print('self.term_id',  self.term_id)
-        # print('self.collective_idx_counted', self.collective_idx_counted)
-
         for ab in combinations_with_permutations(self.mode_indices, self.collective_n_idx_rescond):
             # full_abc = make_abc_tuple(ab, 3)
             if sel_abs is not None:
                 if ab not in sel_abs:
                     skipped+=1
                     debug_deep(f'skipped {ab}', 'Term2D.get_intensity')
-                    # print('skipped', ab)
                     continue
 
             w1ab, w2ab = self.get_resonance_location_general(ab) #! this line isn't general
@@ -643,14 +605,8 @@ class TermND:
 
         """
 
-        # ab_comb are inddices of res condition
+        # ab_comb are indices of res condition
         full_abc = make_abc_tuple(ab_comb, self.collective_n_idx_max)
-
-        from rich import print as rprint
-        rprint(f'[red1]get_amplitudes_ab full_abc {full_abc}')
-        rprint(f'[red1]get_amplitudes_ab ab_comb {ab_comb}')
-        rprint(self.term_label)
-        print(self.collective_n_idx_max, self.collective_idx_counted)
 
         product_all = self.get_factor_summed(full_abc, comps=False,
                                              debugprint=debugprint)  # , components if comps==True
