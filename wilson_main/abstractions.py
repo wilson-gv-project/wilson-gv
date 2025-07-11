@@ -1,14 +1,30 @@
 
 import copy
 from wilson_utils.prop_trivname import prop_trivname
-
+from typing import Callable, Any
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
-class molecularSystem:
+class MolecularSystem:
+	"""
+	Class to represent a molecular system
+	"""
 
-	def __init__(self, name=None, natoms=None, geo=None, geo_extra=None):
+	def __init__(self, name: str, natoms: int=None, geo=None, geo_extra=None):
+		"""
+		name: String: System name
 
-		# String
+		geo: Currently not fully fixed form but must specify system geometry in a form
+		[[atom name, [x, y, z](Ångström)], ...], where atom_name must be and element name and where
+		default isotopes are assumed
+
+		natoms: integer: Number of atoms
+
+		geo_extra: Currently not fixed form but reserved for situations where extra information is needed
+		Speculated example format: # [[atom name, [x, y, z] (Ångström), (# protons, # neutrons)], ...]
+		and possibly more attributes if needed
+		"""
+
+
 		self.name = name
 		self.natoms = natoms
 		self.Nnmodes = 3*natoms-6 # fixme
@@ -19,33 +35,30 @@ class molecularSystem:
 			print('Note: Molecular system was instantiated without geometry information')
 
 
-		# Default geometry specification
-		# atom_name must be element name
-		# default isotopes assumed
-		# [[atom name, [x, y, z](Ångström)], ...]
+
 		if geo is not None:
 
 			self.geo = geo
 			self.geo_extra = None
 
-		# Extended geometry specification
-		# atom_name has no implication for element
-		# Must specify number of protons and neutrons in nucleus
-		# [[atom name, [x, y, z] (Ångström), (# protons, # neutrons)], ...]
 		if geo_extra is not None:
 
 			self.geo_extra = geo_extra
 			self.geo = None
 
-	# Hash
 	def h(self):
+		"""
+		Hashing function
+		"""
 
 		# For now only returning by name
-
 		return hash(self.name)
 
-	# Here: Various routines to give geo, name as e.g. xyz file
+
 	def asXyz(self):
+		"""
+		Convert geometry to e.g. xyz file - unwritten but keep shell here for now
+		"""
 
 		# For default geo
 
@@ -54,13 +67,29 @@ class molecularSystem:
 		pass
 
 	def __repr__(self):
-		return f'THIS IS molecularSystem {self.name}\n'
-		
+		return f'THIS IS MolecularSystem {self.name}\n'
+
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
 # Does not need to reference an actual setup and can also be used for "get from no specific calculation"
-class externalCalcSetup:
+class ExternalCalcSetup:
+	"""
+	Class to represent computational setups for properties obtained external to Wilson
+	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
+	"get from file"
+	"""
 
-	def __init__(self, program=None, lvl_theory=None, basis=None, other_setup=None, other_setup_identifier=None):
+	def __init__(self, program: str='', lvl_theory: str='', basis: str='', other_setup: dict={}, other_setup_identifier: dict={}):
+		"""
+		program: String: Program name if relevant (alt. names like 'from_file' are also fine)
+		# FIXME: Consider other name "source" instead of "program"
+		lvl_theory: String: Level of theory
+		basis: String: Basis set
+
+		NOTE: Other setup parameters currently not used/handled
+		other_setup: Dictionary {attribute: value, ...}
+		other_setup_identifier: Dictionary {attribute: name (not required to be hashable), ...}
+		# FIXME: Not sure how I want this to work, return to it if needed
+		"""
 
 		# Strings
 		self.program = program
@@ -82,60 +111,70 @@ class externalCalcSetup:
 
 		self.other_setup_id = other_setup_identifier
 
-
-	# Hash
 	def h(self):
+		"""
+		Hashing function
+		"""
 
 		return hash((self.program, self.lvl_theory, self.basis, self.other_setup_id))
 
 
-# Properties as derivatives
-# Can both be used "head only" (only is_derivative, prop_spec, target_basis, target_units) to specify only a property
-# and "full" (system, calc_setup) for a particular realization (optional with/without values)
-# TODO: Hash a) "head only" information (only hash(prop_spec)),
-# TODO  b) hash "head only" information (also tgt basis, tgt units),
-# TODO: c) hash "full" (also system, calc_setup),
-# TODO: d) hash "full" (also system, calc_setup, in_basis, in_units)
-# TODO: Check for adequate property specification and values format when known
-# TODO: Consider enforcing specification of units and basis when values are provided
-class molecularProperty:
+class MolecularProperty:
+	"""
+	Class to represent a molecular (energy derivative or similar) property
+	Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
+    and "full" (system, calc_setup) for a particular realization (optional with/without values)
+	"""
 
-	def __init__(self, prop_spec, trivial_name=None, vals=None, in_basis=None, in_units=None,
-				 system=None, calc_setup=None, target_basis=None, target_units=None):
+	def __init__(self, prop_spec, trivial_name: str=None, vals: Any=None, in_basis: str=None, in_units: str=None,
+				 system: MolecularSystem=None, calc_setup: ExternalCalcSetup=None,
+				 target_basis: str=None, target_units:str=None):
+		"""
+		prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
+		triv_name: String: Trivial name For simplified reference
+		vals: Form not specified: Values of properties - could be array or dictionary
+		in_basis: String: In which basis (e.g. "Cartesian" or "normal modes")?
+		in_units: String: In which units?
+		system: MolecularSystem instance: For which system?
+		calc_setup: ExternalCalcSetup instance: For which calculation setup?
+		target_basis: String: In which basis should this property be specified (if not matching in_basis, it means that
+		it should be transformed)
+		target_units: String: In which units should this property be specified (if not matching in_units, it means that
+		it should be converted)
+		"""
 
-		# Dictionary {'attr name': val, ...}
-		# Info like perturbing operators, frequencies etc.
-		# All vals must be hashable
 		self.prop_spec = prop_spec
-
-		# Trivial name (string): For simplified reference
 		self.triv_name = trivial_name
-
-		# Values (several valid forms)
-		# Should be arrays for energy derivatives
-		# Could be dictionary {state ref: energy} for energy levels
 		self.vals = vals
 
-		# Strings
 		self.in_basis = in_basis
 		self.in_units = in_units
 
-		# molecularSystem instance
 		self.system = system
-
-		# externalCalcSetup instance
 		self.calc_setup = calc_setup
 
-		# Strings
 		self.target_basis = target_basis
 		self.target_units = target_units
 
-	# Hash
-	def h(self, htype):
+	def h(self, int: htype) -> int:
+		"""
+		Hashing function with four hash types
+
+		htype: integer: Hash type: Valid choices are
+
+		1: "head only" information (only hash(prop_spec))
+		2: hash involves attributes from 1) but also tgt basis, tgt units
+		3: hash involves attributes from 2) but also system, calc_setup
+		4: hash involves attributes from 3) but also in_basis, in_units
+		# TODO: Check for adequate property specification and values format when known
+		# TODO: Consider enforcing specification of units and basis when values are provided
+
+		Returns an integer hash value
+		"""
 
 		hlist = []
 
-		if htype < 1:
+		if (htype < 1) or (htype > 4):
 
 			raise AssertionError('Property hash must be requested with type argument (1-4)')
 
@@ -161,24 +200,35 @@ class molecularProperty:
 			hlist.append(self.in_basis)
 			hlist.append(self.in_units)
 
-		if htype > 4:
-
-			raise AssertionError('Property hash must be requested with type argument (1-4)')
-	
 		return hash(tuple(hlist))
 
-	# Attach a molecularSystem instance
-	def addSystem(self, system):
+	def addSystem(self, system: MolecularSystem):
+		"""
+		Associate a MolecularSystem instance
+
+		system:	MolecularSystem instance: The system to be attached
+		"""
 
 		self.system = system
 
-	# Attach an externalCalcSetup instance
 	def addCalcSetup(self, calc_setup):
-	
+		"""
+		Associate an ExternalCalcSetup instance
+
+		calc_setup: ExternalCalcSetup instance: The setup to be attached
+		"""
+
 		self.calc_setup = calc_setup
 	
 	# Add values (usually scalars or a numPy array)
-	def addValues(self, values, in_basis=None, in_units=None):
+	def addValues(self, values: Any, in_basis: str=None, in_units: str=None):
+		"""
+		Associate values to this property
+
+		values: Undetermined form: The values to be added
+		in_basis: string: In which basis are these values?
+		in_units: string: In which units are these values?
+		"""
 
 		self.vals = values
 
@@ -187,7 +237,15 @@ class molecularProperty:
 	
 	# convertor is a function reference (must take system, basis, units and convertor_info)
 	# convertor_info is further information for the convertor
-	def convertValues(self, convertor, convertor_info):
+	def convertValues(self, convertor: Callable[[MolecularSystem, dict, Any, str, str, str, str, dict], Any],
+					  convertor_info: dict={}):
+		"""
+		Convert values from the current basis and units to the target basis and units
+
+		convertor: A function reference of the form specified in the declaration: Will be assumed to be able to
+		convert to target basis and units and must fail if unable
+		convertor_info: dictionary {attribute: value(s)}: Further information for the convertor if needed
+		"""
 
 		# Call convertor
 		# Will be assumed to be able to convert to target basis and units and must fail if unable
@@ -206,12 +264,21 @@ class molecularProperty:
 			s = ' not'
 		else:
 			s = ''
-		return f'molecularProperty {self.triv_name}: values are{s} None'
+		return f'MolecularProperty {self.triv_name}: values are{s} None'
 
-# Collects necessary calculations with one setup, makes input, collects results
-class calculationBatch:
+class CalculationBatch:
+	"""
+	Class to collect (external) calculations with one setup, make input and collect results
+	TODO: Add functionality to make input
+	TODO: Extend functinality to collect results
+	"""
 
-	def __init__(self, system, calc_setup, properties=None):
+	def __init__(self, system: MolecularSystem, calc_setup: ExternalCalcSetup, properties: list[MolecularProperty]=None):
+		"""
+		system: MolecularSystem instance: The system for which calclulation is sought/defined
+		calc_setup: ExternalCalcSetup: The calculation setup with respect to which calclulation is sought/defined
+		properties: List of MolecularProperty instances: The properties for which calculation is sought/defined
+		"""
 
 		self.system = system
 		self.calc_setup = calc_setup
@@ -223,16 +290,45 @@ class calculationBatch:
 			self.properties = properties
 
 	def addProperty(self, prop):
+		"""
+		Add a property to the list of requested properties
+
+		prop: MolecularProperty instance: The property to be added
+		"""
 
 		self.properties.append(prop)
 
 	def makeInputs(self):
-	
+		"""
+		Make input(s) for calculation(s)
+		TODO: Implement
+		"""
+
 		pass
 
+	def getResults(self, props_to_fill: list[MolecularProperty],
+				   vib_ana_setup_to_fill: VibAnaSetup=None, source_type: str='',
+				   source_types: list[str]=[], source_loc: Any=None):
+		"""
+		Get results (values for properties) from a specified source or sources and fill them into the
+		MolecularProperty instances in props_to_fill for all such instances that match what self can provide. Also
+		optionally fill data when applicable into a provided vibrational analysis setup.
 
+		FIXME: This functionality could do with some cleaning up. Maybe it's better to fill the vibrational analysis
+		data in a separate method? Also source type/types and source loc are a bit messy: Maybe use just plural and let
+		source_loc be a list of lists of strings.
 
-	def getResults(self, props_to_fill, vib_ana_setup_to_fill=None, source_type=None, source_types=None, source_loc=None):
+		props_to_fill: list of MolecularProperty instances: Properties for which filling is to be attempted
+		vib_ana_setup_to_fill: VibAnaSetup instance: Vibrational analysis setup for which filling is to be
+		attempted. Typically involved if the external program can calculate e.g. energy levels directly.
+
+		source_type: string: Type of data source. Could be e.g. "vault" or "file". Intended for use when only one
+		kind of location is relevant.
+
+		source_types: list of strings: Types of data source (in decreasing order of priority).
+
+		source_loc: Format not specified: Location(s) of data source(s).
+		"""
 
 		# Currently only vault retrieval
 		if not source_type == 'vault':
@@ -242,15 +338,21 @@ class calculationBatch:
 			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, source_loc)
 
 	def getResultsFromOutputs(self):
-	
-		pass
-		
-	def getResultsFromVault(self, props_to_fill, vib_ana_setup_to_fill, source_loc):
 		"""
-		not filling in states yet or what's going on here....
+		Get results from program output file(s): Not yet implemented.
 		"""
-		# TODO: write tests
-		from wilson.utils import get_package_root #fixme: should be outside somewhere?
+		raise NotImplementedError('Results from program output file(s) not yet implemented')
+
+	def getResultsFromVault(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,
+							source_loc: Any):
+		"""
+		Get results from data vault. See get_results declarations for argument explanations.
+		"""
+
+		# FIXME: There might be ways to make this cleaner. Return to this after vault functionality (e.g. trivial names
+		# throughout) is settled more fully.
+
+		from wilson.utils import get_package_root
 		wilson_root = get_package_root()
 
 		from CQCParse.relay import DataVault
@@ -322,30 +424,32 @@ class calculationBatch:
 				vib_ana_setup_to_fill.states = processed_states
 
 
-	def getResultsAsArrayFromFile(self):
-	
-		pass			
+class CollEvalSetup:
+	"""
+	Class to hold information about how to process several jobs together. Not yet implemented.
 
+	FIXME: Consider merging with WilsonSimulations
 
-# A collective evaluation setup contains information about how to process several jobs together
-#
-# Examples of relevant information here:
-# Render spectra from each job as a tiled image or as an animation?
-# Norm all spectra w.r.t. a collective max?
-class collEvalSetup:
+	Examples of relevant information here:
+	Render spectra from each job as a tiled image or as an animation?
+	Norm all spectra w.r.t. a collective max?
+	"""
 
 	def __init__(self):
 		pass
 
-# TODO: Add collective jobs instructions (i.e. instructions for collections of jobs, not for individual jobs)
-class wilsonSimulations:
+class WilsonSimulations:
+	"""
+	Class to hold collective jobs instructions (i.e. instructions for collections of jobs, not for individual jobs)
+	# FIXME: Not implemented and form not yet settled, skipping further documentation for now
+	"""
 
 	def __init__(self, jobs=None, coll_instructions=None):
 
 		self.jobs = jobs
 		self.coll_instructions = None
 
-	# A job is a wilsonSimulation instance
+	# A job is a WilsonSimulation instance
 	def addJob(self, job):
 	
 		pass
@@ -368,7 +472,7 @@ class wilsonSimulations:
 			pass
 
 
-class spectralAxis:
+class SpectralAxis:
 	"""
 	'Plain' spectral axis for rendering response function freq arg spectra;
 	with independent lineshape functions.
@@ -391,14 +495,14 @@ class spectralAxis:
 
 # TODO: Implement
 # For "advanced" axes: Variation of experiment parameters or possibly other attributes
-class spectralAxisAdvanced:
+class SpectralAxisAdvanced:
 
 	def __init__(self):
 
 		pass
 
 # Spectral collective axes
-class spectralGrid:
+class SpectralGrid:
 	"""
 	Use example:
 
@@ -503,10 +607,10 @@ class spectralGrid:
 
 
 	def __repr__(self):
-		return "THIS IS spectralGrid with self.axes,self.n_pts"
+		return "THIS IS SpectralGrid with self.axes,self.n_pts"
 
 # State, energy, displacement
-class vibState:
+class VibState:
 
 	def __init__(self, s, e, d=None):
 
@@ -531,7 +635,7 @@ class vibState:
 # Setup for vibrational analysis and storage of the resulting information
 # Under which regime to describe the vibrational states
 # props is for "derivative-style props"
-class vibAnaSetup:
+class VibAnaSetup:
 
 	def __init__(self, vib_regime='harmonic', system=None, vib_regime_subinfo=None, max_state_lvl=None, states=None,
 				 nc_sqrt_eigval=None, nc_eigvec=None, allow_skip_eigvec=False,
@@ -722,7 +826,7 @@ class vibAnaSetup:
 # Examples of relevant information here:
 # Evaluation grid
 # System to run simulation on
-class specEvalSetup:
+class SpecEvalSetup:
 
 	def __init__(self, grid=None, ev_info=None, rnd_info=None):
 
@@ -735,7 +839,7 @@ class specEvalSetup:
 	def __repr__(self):
 		return 'THIS IS specEvalSetup with self.grid,self.ev_info,self.rnd_info'
 
-class wilsonSimulation:
+class WilsonSimulation:
 
 	def __init__(self, exp=None, terms=None, vib_ana_setup=None, spec_eval_setup=None,
 				 system=None, eval_uniform=None, eval_by_prop_name=None, props=None, calc_batches=None,
@@ -744,7 +848,7 @@ class wilsonSimulation:
 		if import_from is None:
 
 			self.exp = exp
-			# Must for now be vibPerturbedTerm instances
+			# Must for now be VibPerturbedTerm instances
 			self.terms = terms
 			self.vib_ana_setup = vib_ana_setup
 			self.spec_eval_setup = spec_eval_setup
