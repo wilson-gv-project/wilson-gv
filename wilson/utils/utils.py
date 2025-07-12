@@ -246,7 +246,7 @@ def prep_data_load(parsed_data: ParsedData):
              parsed_data.derivatives.cubic_force_constants]
     # naming starts here, internal wilson_intensities naming,
     # later used to set up props data for DataForPrecalc
-    deriv_data = dict(zip(['dipgrad', 'diphess', 'polgrad', 'polhess', 'F_abc'], ddata))
+    deriv_data = dict(zip(['dipgrad', 'diphess', 'polgrad', 'polhess', 'cff'], ddata))
 
     allstates = parsed_data.vib_states.anharmonic_states
     harmonic_states = parsed_data.vib_states.harmonic_states
