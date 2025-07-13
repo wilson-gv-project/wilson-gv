@@ -1,10 +1,9 @@
-import copy
-
 import numpy as np
 from scipy import constants
 from dataclasses import dataclass, field
 from typing import Type
 from CQCParse.parsing import Parser
+import itertools
 
 
 def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> float | np.ndarray:
@@ -16,7 +15,6 @@ def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> floa
         return reciprocal_cm / (100 * constants.h * constants.c / hartree2J)
 
 
-import itertools
 def combinations_with_permutations(iterable, k):
     return (comb for comb in itertools.product(iterable, repeat=k))
 
@@ -60,7 +58,7 @@ def avrg_abc_tensor(formula: tuple,
     """
     nmodes = data['mu_Q'].shape[0]
 
-    if type(formula[-2]) == str:
+    if type(formula[-2]) is str:
         # True for mechanical anharmonicity terms
         formula = formula[:-2]      # removes the Fabc string, to deal only with the averaging part
 
@@ -122,7 +120,7 @@ def avrg_abc_tensor_general(formula: tuple,
     """
     nmodes = data['mu_Q'].shape[0]
 
-    if type(formula[-2]) == str:
+    if type(formula[-2]) is str:
         # True for mechanical anharmonicity terms
         formula = formula[:-2]      # removes the Fabc string, to deal only with the averaging part
 
@@ -171,7 +169,7 @@ def get_properties_avrg(formula: tuple, data: dict[str:np.ndarray],
                         gammaCompsAll: np.array,
                         a,b,c=None):
 
-    if type(formula[-2]) == str:
+    if type(formula[-2]) is str:
         # True for mechanical anharmonicity terms
         F_formula = formula[-2]      # removes the Fabc string, to deal only with the averaging part
         formula = formula[:-2]      # removes the Fabc string, to deal only with the averaging part
@@ -292,7 +290,7 @@ def match_modes(spectrumObj_g16, spectrumObj_c4):
     g16_list = list(g16dict.keys())  # key1
     c4_list = list(c4dict.keys())  # key2
     g16_is_c4 = {}
-    number_of_modes = len(copy.deepcopy(g16_list))
+    # number_of_modes = len(copy.deepcopy(g16_list))
 
     for (key1, key2), value in dot_products.items():
         if key1 in repetitions_g16:

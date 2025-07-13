@@ -1,5 +1,5 @@
 # tagger.py
-from functools import wraps
+# from functools import wraps
 
 TAG_REGISTRY = {}
 

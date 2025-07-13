@@ -17,12 +17,13 @@ Module checklist:
 import numpy as np
 
 from wilson.spectrum.tools import convNu2Ene, combinations_with_permutations
-from wilson.spectrum.spectrum_utils import MolProperty, AveragedProps, VibStatesDiff
+from wilson.spectrum.spectrum_utils import MolProperty, VibStatesDiff
 from wilson.spectrum.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
 from wilson.spectrum.spectrum_utils import abc_list, greek_list
 from wilson.utils.tagger import tag
 from wilson.debug import debugfunc, debug_deep
 from collections.abc import Callable
+from itertools import product
 
 @tag('used in get_resonance_location_general for NO PRECALC')
 def compute_vibdiff(vibdiff_type: tuple, idx: tuple) -> list:
@@ -126,21 +127,21 @@ class TermND:
         vibstates_diffs_collection = []
         # vib diffs with pert freqs
         for re in self.resonances_expr:
-            l = re[0].split(',')
+            mn_str = re[0].split(',')
             ftuple = []
-            for ll in l:
-                if 'zero' not in ll.split('+'):
-                    ftuple.append(len(set(ll.split('+'))))
+            for indices_state in mn_str:
+                if 'zero' not in indices_state.split('+'):
+                    ftuple.append(len(set(indices_state.split('+'))))
                 else:
                     ftuple.append(0)
             vibstates_diffs_collection.append((tuple(ftuple), True, re[1], re[0]))
         # vib diffs without pert freqs
         for vd in self.viblevelsdiff_expr:
-            l = vd.split(',')
+            mn_str = vd.split(',')
             ftuple = []
-            for ll in l:
-                if 'zero' not in ll.split('+'):
-                    ftuple.append(len(set(ll.split('+'))))
+            for indices_state in mn_str:
+                if 'zero' not in indices_state.split('+'):
+                    ftuple.append(len(set(indices_state.split('+'))))
                 else:
                     ftuple.append(0)
             vibstates_diffs_collection.append((tuple(ftuple), False, None, vd))
@@ -176,7 +177,7 @@ class TermND:
         making mn tuples for this term for ab combination
         #! not general; used when precalc_data is None
         """
-        dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
         dict_id['zero'] = 'zero'
 
         type12, type1 = self.resonances_expr
@@ -236,7 +237,7 @@ class TermND:
         # todo: vectorize??
 
         # make dict with indices from rescond
-        idx_str = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        idx_str = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         sorted_vib_diffs = sorted([i for i in self.vibstatesdiff_objs if i.res_cond],
                                   key = lambda x: len(x.pf_type))
@@ -286,7 +287,7 @@ class TermND:
             condition = np.ones_like(w1_rc, dtype=bool)
         w1, w2 = convNu2Ene(w1_rc), convNu2Ene(w2_rc)
 
-        d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
         Gamma_Eh = convNu2Ene(Gamma_rc)
 
         if self.precalc_data is not None and precalc:
@@ -342,11 +343,11 @@ class TermND:
         A step in calculation of averaged properties
         ABGD - alpha, beta, gamma, delta - so these are current choice of axes for greek indices
         """
-        dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         # beta, alpha, delta, gamma ...
         # dict_ax_id = {'A': ABGD[0], 'B': ABGD[1], 'G': ABGD[2], 'D': ABGD[3]}
-        dict_ax_id = {l: n for l,n in zip( greek_list[:len(ABGD)], ABGD)}
+        dict_ax_id = {letter_idx: number_idx for letter_idx, number_idx in zip( greek_list[:len(ABGD)], ABGD)}
 
         propdict = {}
         for nn, p in enumerate(self.avrg_props_expr):
@@ -364,7 +365,7 @@ class TermND:
         collects values into self.F_vals
         """
         # dict_id = {'a': a, 'b': b, 'c': c}
-        dict_id = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         # fixme: could be more general
         if abc_comb not in self.non_avrg_props_expr[0][1]:
@@ -495,7 +496,7 @@ class TermND:
         1/omega_a/omega_b/omega_c
         """
 
-        d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
         modes = [i for i in d.values() if i is not None]
 
         if self.precalc_data is None:
@@ -518,7 +519,7 @@ class TermND:
         1/omega_m,n + 1/omega_k,l
         a, b, c=None
         """
-        d = {l: n for l,n in zip( abc_list[:len(abc_comb)], abc_comb)}
+        d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
 
         if self.precalc_data is not None:
             vds = []
@@ -540,36 +541,36 @@ class TermND:
         else:
             raise NotImplementedError('get_viblevelsdiff not implemented without precalc data')
 
-            a, b = str(a), str(b)
-            dict_id = {'a': a, 'b': b, 'zero': 'zero'}
-            if c is not None:
-                c = str(c)
-                dict_id['c'] = c
+            # a, b = str(a), str(b)
+            # dict_id = {'a': a, 'b': b, 'zero': 'zero'}
+            # if c is not None:
+            #     c = str(c)
+            #     dict_id['c'] = c
 
-            total = []
-            for e in self.viblevelsdiff_expr:
-                m_str, n_str = e.split(',')
+            # total = []
+            # for e in self.viblevelsdiff_expr:
+            #     m_str, n_str = e.split(',')
 
-                l_m = [str(dict_id[i]) for i in m_str.split('+')]
-                l_n = [str(dict_id[i]) for i in n_str.split('+')]
+            #     l_m = [str(dict_id[i]) for i in m_str.split('+')]
+            #     l_n = [str(dict_id[i]) for i in n_str.split('+')]
 
-                if 'zero' not in l_m:
-                    m_tuple = tuple(sorted(l_m, key=int))
-                else:
-                    m_tuple = tuple(l_m)
-                if 'zero' not in l_n:
-                    n_tuple = tuple(sorted(l_n, key=int))
-                else:
-                    n_tuple = tuple(l_n)
+            #     if 'zero' not in l_m:
+            #         m_tuple = tuple(sorted(l_m, key=int))
+            #     else:
+            #         m_tuple = tuple(l_m)
+            #     if 'zero' not in l_n:
+            #         n_tuple = tuple(sorted(l_n, key=int))
+            #     else:
+            #         n_tuple = tuple(l_n)
 
-                total.append(self.allstates_Eh[m_tuple] - self.allstates_Eh[n_tuple])
+            #     total.append(self.allstates_Eh[m_tuple] - self.allstates_Eh[n_tuple])
 
-            if np.any(np.array(total) == 0):
-                raise ValueError("Division by zero detected in TermND.get_vibenediff!")
+            # if np.any(np.array(total) == 0):
+            #     raise ValueError("Division by zero detected in TermND.get_vibenediff!")
 
-            total0 = 1./np.array(total)
+            # total0 = 1./np.array(total)
 
-            return np.sum(total0), np.array(total)
+            # return np.sum(total0), np.array(total)
 
 
     @tag('general')
@@ -762,9 +763,6 @@ class TermND:
 
         return df, distances
 
-
-
-from itertools import product
 
 def sum_over_suffixes(fixed_prefix: tuple, remaining_length: int,
                       mode_indices: list|tuple|np.ndarray, func: Callable):

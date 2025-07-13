@@ -1,13 +1,13 @@
+from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+# from wilson.utils import prep_data_load
+
 import numpy as np
 
 def eval_spec2D():
     from wilson.spectrum import wilsonmain_integration
     return wilsonmain_integration.spectrum2D
 
-
-from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
-# from wilson.utils import prep_data_load
 
 # TermND with TermsEvaluator
 # with_diagnostics=True because wilsonSimulation.evaluate()
@@ -47,7 +47,6 @@ def terms_evaluator(system, experiment,
 
     data: props
 
-
         What should be done?
 
     1. set up evaluation terms - from derived_terms
@@ -58,6 +57,19 @@ def terms_evaluator(system, experiment,
     5.1. prepare data_for_precalc (related to 2.) - postprocess loaded data?..
     6. calculate amplitudes - loop over terms in TermsEvaluator(?), use precalculated data
 
+    
+    - Step 1: Set up terms
+    evaluation_terms = setup_terms(exp, terms, props)
+    - Step 2: Load data
+    data = load_data(evaluation_terms)
+    - Step 3: Precalculate
+    precalc_data = precalculate(data, evaluation_terms)
+    - Step 4: Calculate amplitudes
+    amplitudes = calculate_amplitudes(precalc_data, evaluation_terms)
+    - Step 5: Postprocess results
+    result = postprocess_results(amplitudes)
+    - Step 6: Generate diagnostics
+    diagnostics = generate_diagnostics(precalc_data, amplitudes)
     """
     from wilson.spectrum import TermND, TermsEvaluator, DataForPrecalc
     from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
@@ -67,20 +79,6 @@ def terms_evaluator(system, experiment,
     # fixme: logging decorator instead?
     diagn = {}
 
-    """
-# Step 1: Set up terms
-evaluation_terms = setup_terms(exp, terms, props)
-# Step 2: Load data
-data = load_data(evaluation_terms)
-# Step 3: Precalculate
-precalc_data = precalculate(data, evaluation_terms)
-# Step 4: Calculate amplitudes
-amplitudes = calculate_amplitudes(precalc_data, evaluation_terms)
-# Step 5: Postprocess results
-result = postprocess_results(amplitudes)
-# Step 6: Generate diagnostics
-diagnostics = generate_diagnostics(precalc_data, amplitudes)
-    """
     print('\n\n EVALUATOR \n')
     #! 1.1 transform terms from derive to evaluate form
     dict_terms = derived_terms_dict_to_dicts(derived_terms)
@@ -96,14 +94,8 @@ diagnostics = generate_diagnostics(precalc_data, amplitudes)
 
     # 5.1
     props_data = {prop.triv_name: prop.vals for prop in props}
-    props_dict = {'dipgrad':(1, 1),
-                  'diphess':(1, 2),
-                  'polgrad':(2, 1),
-                  'polhess':(2, 2)}
-    # format transformation
-    props_data_ready = {props_dict[p]:props_data[p] for p in props_dict}
-    # format transformation
-    # fixme general
+
+    # format transformation 
     cff_data = {'cff': props_data['cff']}
 
     # todo: make a func for checking units - cm-1 vs Eh - energy_unit_check in spectrum_utils
@@ -150,6 +142,7 @@ diagnostics = generate_diagnostics(precalc_data, amplitudes)
         term.properties_data = cff_data
         term.precalc_data = precalculated_data
         term.mode_indices = vib_ana_setup.modes_indices
+        # context manager - setting debug level
         with debug_mode(0):
             a_intermediate = term.get_amplitudes(axes_dict[1], axes_dict[2],
                                                  3.8, 0.0, debugprint=True, collect_all=False)

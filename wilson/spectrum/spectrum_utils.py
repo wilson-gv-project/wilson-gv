@@ -3,6 +3,8 @@ from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
 from wilson.spectrum.tools import convNu2Ene
+import string
+from contextlib import contextmanager
 
 
 @dataclass
@@ -86,7 +88,7 @@ class VibStatesDiff:
 @dataclass
 class AveragedProps:
     """
-    #! used in get_avrg_properties(); props together in one tuple; is a key for precalc dict
+    props together in one tuple; is a key for precalc dict
     self.property_simple_tuples = tuple([p.simple_tuple for p in self.properties])
     self.nice_props = AveragedProps(self.properties)
     """
@@ -211,7 +213,6 @@ def check_energy_unit(value):
     else:
         return 'cm-1'
 
-from contextlib import contextmanager
 @contextmanager
 def debug_mode(level):
     """
@@ -271,7 +272,7 @@ def get_indices(term):
 def flatten_list(nested_list):
     import itertools
     newlist = list(itertools.chain(*nested_list))
-    if list in [type(l) for l in newlist]:
+    if list in [type(list_in) for list_in in newlist]:
         return flatten_list(newlist)
     else:
         return newlist
@@ -297,10 +298,9 @@ def get_allparts_indices(term):
     res_idx = len(sets['resonances'])
     return allidx, res_idx
 
-import string
 abc_list = list(string.ascii_lowercase)
 num_Greek = {0: 'A', 1: 'B', 2: 'G', 3: 'D', 4: 'E', 5: 'Z', 6: 'H', 7: 'T', 8: 'I'}
 greek_list = list(num_Greek.values())
 
 def make_abc_dict(abc_comb):
-    return {l: n for l, n in zip(abc_list[: len(abc_comb)], abc_comb)}
+    return {letter: number for letter, number in zip(abc_list[: len(abc_comb)], abc_comb)}

@@ -4,7 +4,7 @@ import numpy as np
 from .tools import combinations_with_permutations
 from .spectrum_utils import DoubleDict
 from wilson.utils import pairwise_differences, coolprint
-from wilson.spectrum.spectrum_utils import abc_list, greek_list
+from wilson.spectrum.spectrum_utils import greek_list
 from wilson.spectrum.termND import TermND
 # from wilson.debug import debugfunc, debug_deep
 
@@ -177,7 +177,7 @@ class TermsEvaluator:
                 variables = {var: val for var, val in zip(var_names, abcde_comb)}
 
                 for comps in avrg_terms:
-                    greek_dict = {l: n for l, n in zip(greek_list[:len(comps)], comps)}
+                    greek_dict = {L: n for L, n in zip(greek_list[:len(comps)], comps)}
 
                     product = 1.
 
@@ -280,7 +280,7 @@ def get_data_keys(input_tuple, variables, greek_dict):
     prop_der_key, second_part, third_part = input_tuple
 
     second_part = tuple([variables[v] for v in second_part])
-    third_part = tuple([greek_dict[l] for l in third_part])
+    third_part = tuple([greek_dict[L] for L in third_part])
     # combine third_part and second_part to make the second-level index
     idxs_key = tuple(second_part) + tuple(third_part)
 

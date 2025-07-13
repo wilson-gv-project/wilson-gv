@@ -1,11 +1,17 @@
 import numpy as np
 
+from wilson.spectrum.spectrum2D import Spectrum2D
+from CQCParse.parsing import CFOURParser, CFOUROutput, GaussianParser, GaussianOutput
+import pickle
+
+from CQCParse.parsing import GaussianDataParser, CFOURdataParser, ParsedData
+from dataclasses import dataclass, field
+
 import os
 # Get the root directory of the package dynamically
 PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-from wilson.spectrum.spectrum2D import Spectrum2D
-from CQCParse.parsing import CFOURParser, CFOUROutput, GaussianParser, GaussianOutput, DataStorage
+
 
 
 def get_package_root():
@@ -73,7 +79,6 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
     if sparse!=0.:
         d1 = spectrumObj.find_all_grids(sparse)
 
-        import json
         with open('convert.txt', 'w') as convert_file:
             convert_file.write(str(d1[list(d1.keys())[0]]))
 
@@ -143,10 +148,7 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
             settings_figure['dynamic_range_n'] = dynamic_range_n
             if reference_intensity_plot is None:
                 np.set_printoptions(legacy=False)  # or fully reset with defaults
-                from numpy.core.arrayprint import _format_options
-                # print(_format_options)
 
-                # print(sec_hypol_dataALL_ref)
                 artist_ref = rendering.SpectrumFigure(sec_hypol_dataALL_ref, spectrumObj,
                                                       spectrumObj.w1_mesh,
                                                       spectrumObj.w2_mesh,
@@ -185,7 +187,6 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
 
     return dict0
 
-import pickle
 
 def pickle_objs(dictobjs, filename):
     try:
@@ -212,8 +213,6 @@ def unpickle_objs(filename):
         dictobjs = pickle.load(f)
     return dictobjs
 
-from CQCParse.parsing import GaussianDataParser, CFOURdataParser, ParsedData
-from dataclasses import dataclass, field
 
 @dataclass
 class Conditions:

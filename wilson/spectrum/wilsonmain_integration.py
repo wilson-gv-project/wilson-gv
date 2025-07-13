@@ -1,4 +1,5 @@
-from .spectrum2D import Spectrum2D, numcombperm
+from .spectrum2D import Spectrum2D
+import numpy as np
 
 def parse_wmain2wpart2(term):
 
