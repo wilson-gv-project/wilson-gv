@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import Dict, Any
 import numpy as np
+import string
 
 @dataclass
 class SimulationConfig:
@@ -23,5 +24,4 @@ class SimulationConfig:
     w1m: np.ndarray
     w2m: np.ndarray
 
-import string
 abc_list = list(string.ascii_lowercase)

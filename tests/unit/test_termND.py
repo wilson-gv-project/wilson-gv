@@ -11,6 +11,8 @@ from wilson.utils import prep_data_load
 # from wilson_main import abstractions as abst
 from wilson.spectrum import DataForPrecalc
 
+from wilson.spectrum.termND import sum_over_suffixes
+
 from tests.testing_utils import require_asserts
 
 from wilson.spectrum import debug_mode
@@ -339,7 +341,7 @@ def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spec
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
     import numpy as np
     te = TermsEvaluator([t0])
-    freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
+    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     print(t0.properties_data.keys())
     props_data_ready = {
@@ -388,7 +390,7 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
     w1,w2 = t0.get_resonance_location_general((a,b))
 
     te = TermsEvaluator([t0])
-    freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
+    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
@@ -565,7 +567,7 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     w1,w2 = t0.get_resonance_location_general((a,b))
 
     te = TermsEvaluator([t0, t1, t2, t3])
-    freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
+    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
@@ -695,9 +697,6 @@ def test_dotspectrum_df(terms_collection, spectrum_setup, conditions):
                 print('_____________________')
                 print(term)
                 # print(formatted_resonances)
-
-
-from wilson.spectrum.termND import sum_over_suffixes
 
 
 def test_get_factor_summed(terms_collection):

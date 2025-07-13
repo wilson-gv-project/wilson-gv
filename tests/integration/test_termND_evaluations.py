@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from tests.testing_utils import require_asserts
 from wilson.spectrum import debug_mode
 from wilson_analysis.render import render_spectrum
@@ -13,8 +12,6 @@ cqc_debug.level = 0
 
 np.set_printoptions(precision=4,suppress=False)
 
-
-from wilson_analysis import render
 
 def compare_amplitudes(amplitudes1, amplitudes2):
     """
@@ -36,38 +33,24 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup, conditio
     spectrum_setup = spectrum_setup['FORM']
     conditions = conditions['FORM']
 
-    # print(te.terms)
-    # exit()
-    # print(spectrum_setup.molecule)
-    # print(precalc_dict['vibene_denoms'])
-    # print(terms_collection.keys())
-    # assert len(te.terms) == 4, "Expected 4 terms in the TermsEvaluator"
-
     expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
     for key in expected_keys:
         assert key in precalc_dict, f"Key '{key}' missing in precalculated data"
     assert precalc_dict['vibene_denoms'], "vibene_denoms data is empty"
 
-    from rich import print as rprint
-    print('\n')
+    # from rich import print as rprint
+    # print('\n')
     # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
     # rprint(precalc_dict)
-    print('\n')
-
+    # print('\n')
+    
+    # can run with debug prints if > 0
     with debug_mode(0):
         amplitudes = 0.0
         for id, term in te.terms.items():
             term.precalc_data = precalc_dict
-            # with np.printoptions(precision=2,legacy='1.25'):
-            #     formatted_resonances = {
-            #         key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
-            #         for key, value in term.get_all_resonances(w2mw1=True).items()
-            #     }
-                # df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
-                # print(df)
-                # print('_____________________')
-                # print(term)
-                # print(formatted_resonances)
+            
+            # can run with debug prints if > 0
             with debug_mode(0):
                 intensity = term.get_amplitudes(spectrum_setup.w1m,
                                                 spectrum_setup.w2m,
@@ -82,7 +65,6 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup, conditio
     print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
 
     np.set_printoptions(precision=4)
-    # print(amplitudes)
 
     intensities = np.abs(amplitudes)**2
 
@@ -118,6 +100,7 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
     # rprint(precalc_dict)
     # print('\n')
 
+    # can run with debug prints if > 0
     with debug_mode(0):
         amplitudes = 0.0
         for id, term in te.terms.items():
@@ -127,7 +110,8 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
                     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
                     for key, value in term.get_all_resonances(w2mw1=True).items()
                 }
-                # print(formatted_resonances)
+                print(formatted_resonances)
+            # can run with debug prints if > 0
             with debug_mode(0):
                 intensity = term.get_amplitudes(spectrum_setup.w1m,
                                                 spectrum_setup.w2m,

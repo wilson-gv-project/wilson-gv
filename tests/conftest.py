@@ -7,6 +7,12 @@ from wilson.spectrum.termND import TermND
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 from tests.test_config import SimulationConfig
 from wilson.spectrum import debug_mode
+
+from wilson.spectrum.spectrum2D import Spectrum2D
+from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
+from CQCParse.parsing import GaussianDataParser, CFOURdataParser
+from dataclasses import dataclass, field
+
 # ---------------- Fixtures ----------------
 def convert_lists_to_tuples(data):
     if isinstance(data, list):
@@ -354,10 +360,6 @@ def terms_collection_derived(data_for_precalc_derived, setup_term_derived, deriv
     return terms_cols
 
 ###################################################################################################
-from wilson.spectrum.spectrum2D import Spectrum2D
-from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
-from CQCParse.parsing import GaussianDataParser, CFOURdataParser
-from dataclasses import dataclass, field
 
 @dataclass
 class Conditions:

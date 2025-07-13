@@ -184,7 +184,7 @@ def test_precalc_res_conds(dict_8terms):
     axes_dict = {1: x, 2: y}
     print('axes_dict\n', axes_dict)
 
-    freqs = np.array([2., 4., 8.])
+    # freqs = np.array([2., 4., 8.])
     pf_types = tts.precalc_res_conds(axes_dict)
 
     print('\nresult of precalc\n', pf_types)
@@ -199,7 +199,7 @@ def test_precalc_res_conds(dict_8terms):
     axes_dict = {1: 80, 2: 800}
     print('axes_dict\n', axes_dict)
 
-    freqs = np.array([2., 4., 8.])
+    # freqs = np.array([2., 4., 8.])
     pf_types = tts.precalc_res_conds(axes_dict)
 
     print('\nresult of precalc\n', pf_types)
@@ -294,7 +294,7 @@ def test_precalculate(dict_8terms):
                             [5., 8., 9.],
                             [6., 9., 10.]]])}
 
-    freqs = np.array([2., 4., 8.])
+    # freqs = np.array([2., 4., 8.])
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])

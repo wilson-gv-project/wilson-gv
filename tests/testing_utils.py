@@ -1,6 +1,7 @@
 # ChatGPT
 import ast
 import inspect
+from functools import wraps
 
 def has_asserts(func):
     source = inspect.getsource(func)
@@ -10,8 +11,6 @@ def has_asserts(func):
             return True
     return False
 
-
-from functools import wraps
 def require_asserts(test_func):
     """Decorator to ensure the test function contains assert statements."""
     @wraps(test_func)

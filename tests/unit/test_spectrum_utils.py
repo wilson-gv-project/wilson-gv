@@ -1,6 +1,4 @@
-from wilson.spectrum.spectrum_utils import (get_indices,
-                                            flatten_list,
-                                            get_allparts_indices,
+from wilson.spectrum.spectrum_utils import (get_allparts_indices,
                                             make_abc_tuple)
 
 def test_get_indices():
