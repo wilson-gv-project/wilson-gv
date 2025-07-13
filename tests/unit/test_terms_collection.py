@@ -35,13 +35,12 @@ def test_identify_to_precalculate(dict_8terms):
 
     print('>> For four EVV 2D IR terms:')
     print('Unique types of resonance conditions: ', tts.unique_res_conds)
-    print('Unique indices sets in orient. avrg.: ', tts.unique_avrg_tensors_all)
+    print('Unique indices sets in orient. avrg.: ', tts.unique_avrg_tensors_all_expr)
     print('Unique vib. ene. denominators (1/omega_a/omega_b...): ', tts.unique_vibene_denoms)
     print('Unique vib diff types - tuples, all:\n', set(tts.mn_types))
     print('Unique vib diff types - tuples, all:')
     for k in set(tts.mn_types):
         print(k)
-    print('\nUnique vib diff types - all', set([i for t in terms for i in t.vibdiff_symbolic]))
 
     assert set(tts.mn_types) == {VibStatesDiff((0, 1), True, (-1,), 'zero,a'),
                                  VibStatesDiff((1, 2), False),
@@ -51,9 +50,9 @@ def test_identify_to_precalculate(dict_8terms):
     print()
 
     assert sorted(tts.unique_res_conds) == sorted([('a+b,a', (-1, 2)), ('b,a', (-1, 2)), ('zero,a', (-1,))])
-    assert tts.unique_avrg_tensors_all == {((1, 1), (2, 1), (1, 2)): 2,
-                                           ((1, 1), (2, 2), (1, 1)): 2,
-                                           ((1, 1), (2, 1), (1, 1)): 3}
+    assert tts.unique_avrg_tensors_all_expr == {('dipgrad', 'diphess', 'polgrad'): 2,
+                                                ('dipgrad', 'dipgrad', 'polhess'): 2,
+                                                ('dipgrad', 'dipgrad', 'polgrad'): 3}
     assert sorted(list(tts.unique_vibene_denoms)) == sorted(list({('a', 'b'), ('a', 'b', 'c')}))
 
 
@@ -123,15 +122,17 @@ def test_precalc_avrg_tensors(dict_8terms):
     Nnmodes = 2
 
     data = {
-        (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
-        (1, 2): np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
-        (2, 1): np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
-        (2, 2): np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
+        'dipgrad': np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
+        'diphess': np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
+        'polgrad': np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
+        'polhess': np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
 
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll[:3])
-    assert stored[((1, 1), (2, 1), (1, 2))][1,1] == 60.4 # term 0
-    assert stored[((1, 1), (2, 1), (1, 2))][1,0] == 4.6 # term 0
+    print('\nstored.keys()', stored.keys())
+
+    assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,1] == 60.4 # term 0
+    assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,0] == 4.6 # term 0
 
     t1 = TermND(1, dict_8terms[1])
     t2 = TermND(2, dict_8terms[2])
@@ -141,13 +142,16 @@ def test_precalc_avrg_tensors(dict_8terms):
     tts.identify_to_precalculate()
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll)
 
-    assert stored[((1, 1), (2, 1), (1, 1))][1,1,1] == 392.4
-    assert stored[((1, 1), (2, 2), (1, 1))][0,0] == 12.
-    assert stored[((1, 1), (2, 1), (1, 1))][1,0,1] == 106.8
+    assert stored[tuple(sorted(['dipgrad', 'polgrad', 'dipgrad']))][1,1,1] == 392.4
+    assert stored[tuple(sorted(['dipgrad', 'polhess', 'dipgrad']))][0,0] == 12.
+    assert stored[tuple(sorted(['dipgrad', 'polgrad', 'dipgrad']))][1,0,1] == 106.8
 
-    assert sorted(list(stored.keys())) == sorted([((1, 1), (2, 1), (1, 2)),
-                                   ((1, 1), (2, 1), (1, 1)),
-                                   ((1, 1), (2, 2), (1, 1))])
+    # assert sorted(list(stored.keys())) == sorted([((1, 1), (2, 1), (1, 2)),
+    #                                ((1, 1), (2, 1), (1, 1)),
+    #                                ((1, 1), (2, 2), (1, 1))])
+    assert sorted(list(stored.keys())) == [('dipgrad', 'dipgrad', 'polgrad'),
+                                           ('dipgrad', 'dipgrad', 'polhess'),
+                                           ('dipgrad', 'diphess', 'polgrad')]
 
 
 @require_asserts
@@ -297,10 +301,10 @@ def test_precalculate(dict_8terms):
     axes_dict = {1: x, 2: y}
     Nnmodes = 3
     props_data_ready = {
-        (1, 1): np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
-        (1, 2): np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
-        (2, 1): np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
-        (2, 2): np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
+        'dipgrad': np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
+        'diphess': np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
+        'polgrad': np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
+        'polhess': np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
 
@@ -312,17 +316,11 @@ def test_precalculate(dict_8terms):
                              states_arrays_Eh=states,
                              harmonic_arrays_Eh=states)
 
-    big_dict = tts.precalculate(alldata)
+    precalc_dict = tts.precalculate(alldata)
 
     print('\nPrecalculated stuff\n')
-    for k in big_dict:
+    for k in precalc_dict:
         print('   >>>', k)
-        print(big_dict[k])
+        print(precalc_dict[k])
         print('---')
 
-
-@require_asserts
-def test_TE_compute_intensity():
-
-    w1 = np.array([1185.29, 1501.59])
-    w2 = np.array([2440.61, 3290.38])

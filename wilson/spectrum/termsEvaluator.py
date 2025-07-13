@@ -160,7 +160,6 @@ class TermsEvaluator:
             self.terms[tID] so it's a dict;
         """
         storage_tensors = {}
-
         for tID in self.unique_avrg_tensors_tID:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
 

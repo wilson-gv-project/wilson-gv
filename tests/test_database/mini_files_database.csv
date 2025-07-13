@@ -5,3 +5,4 @@ FORM,B3LYP,cc_pVDZ,,,,,,,,,,,,,/../tests/test_database/dftGaussian/FORM/B3LYPcc_
 FORM,B3LYP,cc_pVQZ,,,,,,,,,,,,,/../tests/test_database/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out
 FORM,B3LYP,cc_pVDZ,,,,,,,,,,,,,/../tests/test_database/dftGaussian/FORM/B3LYPcc_pVDZ/g16_inputFull_3q.out
 FORM,B3LYP,cc_pVDZ,,,,,,,,,,,,,/../tests/test_database/dftGaussian/FORM/B3LYPcc_pVDZ/g16_inputFull_3q.out
+ACAC,B3LYP,cc_pVQZ,,,,,,,,,,,,,/../tests/test_database/dftGaussian/ACAC/B3LYPcc-pVQZ/g16_inputFull_3q.out

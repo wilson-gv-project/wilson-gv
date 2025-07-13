@@ -333,8 +333,8 @@ def terms_collection(data_for_precalc, setup_term, dict_8terms): #! dict_8terms 
         terms = [term_setup(i) for i in range(len(dict_8terms))] #! dict_8terms or derived_terms_json
         te = TermsEvaluator(terms)
         te.identify_to_precalculate()
-        big_dict = te.precalculate(data_for_precalc[mol])
-        terms_cols[mol] = (te, big_dict)
+        precalc_dict = te.precalculate(data_for_precalc[mol])
+        terms_cols[mol] = (te, precalc_dict)
     return terms_cols
 @pytest.fixture(scope="module")
 def terms_collection_derived(data_for_precalc_derived, setup_term_derived, derived_terms_json): #! dict_8terms or derived_terms_json
@@ -349,8 +349,8 @@ def terms_collection_derived(data_for_precalc_derived, setup_term_derived, deriv
         terms = [term_setup(i) for i in range(len(derived_terms_json))] #! dict_8terms or derived_terms_json
         te = TermsEvaluator(terms)
         te.identify_to_precalculate()
-        big_dict = te.precalculate(data_for_precalc_derived[mol])
-        terms_cols[mol] = (te, big_dict)
+        precalc_dict = te.precalculate(data_for_precalc_derived[mol])
+        terms_cols[mol] = (te, precalc_dict)
     return terms_cols
 
 ###################################################################################################

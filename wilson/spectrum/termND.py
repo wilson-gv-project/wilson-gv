@@ -25,7 +25,7 @@ from wilson.debug import debugfunc, debug_deep
 from collections.abc import Callable
 
 @tag('used in get_resonance_location_general for NO PRECALC')
-def compute_vibdiff(vibdiff_type: tuple[int], idx: tuple[int]) -> list:
+def compute_vibdiff(vibdiff_type: tuple, idx: tuple) -> list:
     """
     vibdiff_types: (0,1), (1,1), (2,1)
     idx - one per 1 in vibdiff_type
@@ -171,7 +171,7 @@ class TermND:
         return s
 
     @tag('not_general', 'self.precalc_data is None')
-    def for_ab(self, abc_comb: tuple[int]):
+    def for_ab(self, abc_comb: tuple):
         """
         making mn tuples for this term for ab combination
         #! not general; used when precalc_data is None
@@ -222,7 +222,7 @@ class TermND:
 
 
     @tag('general', 'restructure?')
-    def get_resonance_location_general(self, abc_comb: tuple[int]) -> list:
+    def get_resonance_location_general(self, abc_comb: tuple) -> list:
         """
         A resonance for this term for ab combination of modes
 
@@ -274,7 +274,7 @@ class TermND:
 
     @tag('general?')
     def get_res_factor(self, w1_rc: float|np.ndarray, w2_rc: float|np.ndarray,
-                       abc_comb: tuple[int], Gamma_rc: float,
+                       abc_comb: tuple, Gamma_rc: float,
                        condition=None, precalc=True):
         """
         A resonance factor for this term for ab combination of modes
@@ -337,7 +337,7 @@ class TermND:
 
 
     @tag('general')
-    def get_properties_xyz(self, ABGD: list|np.ndarray|tuple, abc_comb: tuple[int]) -> dict:
+    def get_properties_xyz(self, ABGD: list|np.ndarray|tuple, abc_comb: tuple) -> dict:
         """
         A step in calculation of averaged properties
         ABGD - alpha, beta, gamma, delta - so these are current choice of axes for greek indices
@@ -359,7 +359,7 @@ class TermND:
 
 
     @tag('general?','naming!')
-    def get_non_averaged_props(self, abc_comb: tuple[int]):
+    def get_non_averaged_props(self, abc_comb: tuple):
         """
         collects values into self.F_vals
         """
@@ -373,7 +373,7 @@ class TermND:
 
 
     @tag('almost_general', 'make averg formula general')
-    def get_avrg_properties(self, abc_comb: tuple[int], comps=False) -> float | tuple[float, dict]:
+    def get_avrg_properties(self, abc_comb: tuple, comps=False) -> float | tuple[float, dict]:
         """
         todo: maybe make a polarization choice which chooses then gammaCompsAll or smth
         """
@@ -403,7 +403,7 @@ class TermND:
 
 
     @tag('almost_general')
-    def get_factor_summed(self, ab_comb: tuple[int], comps=False, debugprint=False):
+    def get_factor_summed(self, ab_comb: tuple, comps=False, debugprint=False):
         """
         Sum of full factor over c index for given a,b
         ab_comb - rest of indices, index c is being summed over...
@@ -490,7 +490,7 @@ class TermND:
 
 
     @tag('general', 'complete?')
-    def get_ene_factor(self, abc_comb: tuple[int]):
+    def get_ene_factor(self, abc_comb: tuple):
         """
         1/omega_a/omega_b/omega_c
         """
@@ -513,7 +513,7 @@ class TermND:
 
 
     @tag('general')
-    def get_viblevelsdiff(self, abc_comb: tuple[int]):
+    def get_viblevelsdiff(self, abc_comb: tuple):
         """
         1/omega_m,n + 1/omega_k,l
         a, b, c=None
@@ -618,7 +618,7 @@ class TermND:
 
 
     @tag('general')
-    def get_amplitudes_ab(self, ab_comb: tuple[int], w1: float|np.ndarray, w2: float|np.ndarray,
+    def get_amplitudes_ab(self, ab_comb: tuple, w1: float|np.ndarray, w2: float|np.ndarray,
                           Gamma_rc: float,
                           condition=None, debugprint=False):
         """

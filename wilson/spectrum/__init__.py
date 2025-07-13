@@ -1,5 +1,5 @@
 from .averaging import get_iso_f, get_AlphaBetaGammaDelta_indices
-from .vpt2 import anharm_corr_energiesVPT2, get_XVPT2
+from .vpt2 import anharm_corr_energies, get_X
 from .tools import convNu2Ene, match_modes, change_idx_modes, Conditions
 
 from .hidden_cake_amplitudes import (FactorTensor, ComponentsLayer,

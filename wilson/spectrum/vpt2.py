@@ -3,9 +3,9 @@ import copy
 from CQCParse.debug import debugfunc
 
 
-def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-                                   rotational_constant, coriolis_constant, anharmonic_type,
-                             list2exclude):
+def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield,
+                         rotational_constant, coriolis_constant, anharmonic_type,
+                         list2exclude):
     """
     Takes in cm-1 unit for all the arguments:
     UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
@@ -45,14 +45,14 @@ def anharm_corr_energiesVPT2(harmonic_energies, cubic_forcefield, quartic_forcef
 
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
     # fermi_resonance = [fermi_resonance[0]]
-    X, X_cubic, X_quartic, X_coriolis = get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
-                                                  rotational_constant, coriolis_constant, do_resonance_checks,
-                                                  fermi_resonance, original_len_ene)
+    X, X_cubic, X_quartic, X_coriolis = get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
+                                              rotational_constant, coriolis_constant, do_resonance_checks,
+                                              fermi_resonance, original_len_ene)
 
 
     if fermi_resonance: # if not an empty list
         debugfunc(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}',
-                  tag='vpt2.anharm_corr_energiesVPT2')
+                  tag='vpt2.anharm_corr_energies')
 
     funds_corrections = np.zeros((original_len_ene))
     # for i in range(len(harmonic_energies)):
@@ -181,9 +181,9 @@ def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
     return fermi_resonance
 
-def get_XVPT2(harmonic_energies, cubic_forcefield, quartic_forcefield,
+def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance,
-              original_len_ene):
+          original_len_ene):
     """
     UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
 
@@ -431,73 +431,6 @@ def x_matrix_position(a, b, n):
     return pos + 2*n
 
 
-# def get_vpt2_corrected_levels(specObj, parserObj, vpt2settings, list2exclude=None, print_level=0):
-#     """
-#     Returns VPT2 corrected energy levels of all states as a dictionary : {str(int): float}
-#     """
-#
-#     if vpt2settings is None:
-#         vpt2settings = {'anharmonic_type': 'VPT2'}
-#
-#     if list2exclude is None:
-#         list2exclude = []
-#
-#     if parserObj.DD11 or parserObj.DD13 or parserObj.DD22:
-#         print("Warning: found Darling-Dennison resonances_args in data:")
-#         print(f"DD 1-1: {parserObj.DD11}")
-#         print(f"DD 2-2: {parserObj.DD22}")
-#         print(f"DD 1-3: {parserObj.DD13}")
-#
-#     one = {i: specObj.all_states[i] for i in specObj.all_states if len(i) == 1}
-#     two = {i: specObj.all_states[i] for i in specObj.all_states if len(i) == 2}
-#
-#     if print_level == 1:
-#         print('\nOriginal anharm corrected:')
-#         print(dict(sorted(one.items())))
-#         print(dict(sorted(two.items())), '\n')
-#
-#     cff_cm_1 = parserObj.cubic_cm_1
-#     qff_cm_1 = parserObj.quartic_cm_1
-#     rot_c, cor_c = parserObj.rotational_constant, parserObj.coriolis_constant
-#     # list, not associated to normal mode indices
-#
-#     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
-#     # corrected_levels = anharm_corr_energiesVPT2(upd_harmonic_energies,
-#     corrected_levels = anharm_corr_energiesVPT2(parserObj.fundamentals_harmonic_int,
-#                                                 cff_cm_1, qff_cm_1, rot_c, cor_c,
-#                                                 vpt2settings['anharmonic_type'], list2exclude)
-#     all_states_corr = {}
-#     for i in range(len(parserObj.fundamentals_harmonic_int)):
-#         all_states_corr[(str(i),)] = corrected_levels[0][i]
-#
-#         for j in range(i + 1):
-#             if i == j:
-#                 all_states_corr[tuple([str(i), str(i)])] = corrected_levels[1][i]
-#             else:
-#                 all_states_corr[tuple([str(el) for el in sorted([i, j])])] = corrected_levels[2][i, j]
-#
-#             for k in range(len(parserObj.fundamentals_harmonic_int)):
-#                 if i == j == k:
-#                     all_states_corr[tuple([str(i), str(i), str(i)])] = corrected_levels[3][i]
-#                 else:
-#                     key = tuple([str(el) for el in sorted([i, j, k])])
-#                     if key not in all_states_corr:
-#                         if corrected_levels[4][i, j, k] != 0.:
-#                             all_states_corr[tuple([str(el) for el in sorted([i, j, k])])] = corrected_levels[4][
-#                                 i, j, k]
-#
-#     all_states = copy.deepcopy(all_states_corr)
-#     one = {i: all_states[i] for i in all_states if len(i) == 1}
-#     two = {i: all_states[i] for i in all_states if len(i) == 2}
-#
-#     if print_level == 1:
-#         print('\nGVPT2 anharm corrected:')
-#         print(dict(sorted(one.items())))
-#         print(dict(sorted(two.items())), '\n')
-#
-#     return all_states
-
-
 def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, print_level=0):
     """
     Returns VPT2 corrected energy levels of all states as a dictionary : {str(int): float}
@@ -530,10 +463,10 @@ def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, prin
     # list, not associated to normal mode indices
 
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
-    # corrected_levels = anharm_corr_energiesVPT2(upd_harmonic_energies,
-    corrected_levels, fermi_resonance = anharm_corr_energiesVPT2(parsed_data.vib_states.fundamentals_harmonic_int,
-                                                cff_cm_1, qff_cm_1, rot_c, cor_c,
-                                                vpt2settings['anharmonic_type'], list2exclude)
+    # corrected_levels = anharm_corr_energies(upd_harmonic_energies,
+    corrected_levels, fermi_resonance = anharm_corr_energies(parsed_data.vib_states.fundamentals_harmonic_int,
+                                                             cff_cm_1, qff_cm_1, rot_c, cor_c,
+                                                             vpt2settings['anharmonic_type'], list2exclude)
     # print(corrected_levels)
     # exit()
     all_states_corr = {}
