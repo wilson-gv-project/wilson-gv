@@ -1,9 +1,17 @@
-# ChatGPT
+"""
+Cahtgpt
+
+Utilities for testing
+"""
 import ast
 import inspect
 from functools import wraps
+from typing import Callable
 
-def has_asserts(func):
+def has_asserts(func: Callable) -> bool:
+    """
+    Suplementary function to check for asserts
+    """
     source = inspect.getsource(func)
     tree = ast.parse(source)
     for node in ast.walk(tree):
@@ -11,7 +19,7 @@ def has_asserts(func):
             return True
     return False
 
-def require_asserts(test_func):
+def require_asserts(test_func: Callable):
     """Decorator to ensure the test function contains assert statements."""
     @wraps(test_func)
     def wrapper(*args, **kwargs):

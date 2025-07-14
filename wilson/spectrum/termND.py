@@ -15,6 +15,7 @@ Module checklist:
 """
 
 import numpy as np
+import pandas as pd
 
 from wilson.utils.tools import convNu2Ene, combinations_with_permutations
 from wilson.utils.spectrum_utils import MolProperty, VibStatesDiff
@@ -56,7 +57,7 @@ def compute_vibdiff(vibdiff_type: tuple, idx: tuple) -> list:
 
 class TermND:
 
-    def __init__(self, term_id, expression: dict):
+    def __init__(self, term_id: int|str, expression: dict):
         """
         Calculations using the expression.
         TermND object would have a dict-mathematical expression representation.
@@ -172,9 +173,10 @@ class TermND:
         return s
 
     @tag('not_general', 'self.precalc_data is None')
-    def for_ab(self, abc_comb: tuple):
+    def for_ab(self, abc_comb: tuple) -> dict:
         """
         making mn tuples for this term for ab combination
+
         #! not general; used when precalc_data is None
         """
         dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
@@ -193,11 +195,12 @@ class TermND:
 
 
     @tag('ok?')
-    def load_calc_data(self, allstates: dict, harmonic_states: dict, properties_data,
-                             mode_indices: np.ndarray|list, gammaCompsAll: np.ndarray|list):
+    def load_calc_data(self, allstates: dict, harmonic_states: dict, properties_data: dict,
+                             mode_indices: np.ndarray|list, gammaCompsAll: np.ndarray|list) -> None:
         """
-        Data for calculations
+        Load data for calculations
 
+        TODO: fix properties_data, used for cff, but is awkward now
         """
         self.allstates = allstates
         self.allstates_Eh = {k: convNu2Ene(v) for k, v in self.allstates.items()}
@@ -276,12 +279,13 @@ class TermND:
     @tag('general?')
     def get_res_factor(self, w1_rc: float|np.ndarray, w2_rc: float|np.ndarray,
                        abc_comb: tuple, Gamma_rc: float,
-                       condition=None, precalc=True):
+                       condition: np.ndarray = None, precalc: bool =True) -> np.ndarray:
         """
         A resonance factor for this term for ab combination of modes
         w1_rc, w2_rc - frequency arguments w1,w2 in reciprocal cm
 
         precalc - turns on or off precalculated resonance perturbing frequencies
+        TODO: does it work for w1,w2 as single value, not np.ndarray?
         """
         if condition is None:
             condition = np.ones_like(w1_rc, dtype=bool)
@@ -360,9 +364,11 @@ class TermND:
 
 
     @tag('general?','naming!')
-    def get_non_averaged_props(self, abc_comb: tuple):
+    def get_non_averaged_props(self, abc_comb: tuple) -> None:
         """
         collects values into self.F_vals
+
+        TODO: should be similar to get_avrg_properties
         """
         # dict_id = {'a': a, 'b': b, 'c': c}
         dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
@@ -374,7 +380,7 @@ class TermND:
 
 
     @tag('almost_general', 'make averg formula general')
-    def get_avrg_properties(self, abc_comb: tuple, comps=False) -> float | tuple[float, dict]:
+    def get_avrg_properties(self, abc_comb: tuple, comps: bool = False) -> float | tuple[float, dict]:
         """
         todo: maybe make a polarization choice which chooses then gammaCompsAll or smth
         """
@@ -404,9 +410,10 @@ class TermND:
 
 
     @tag('almost_general')
-    def get_factor_summed(self, ab_comb: tuple, comps=False, debugprint=False):
+    def get_factor_summed(self, ab_comb: tuple, comps: bool = False, debugprint: bool = False) -> tuple[float,dict]|float:
         """
         Sum of full factor over c index for given a,b
+
         ab_comb - rest of indices, index c is being summed over...
         remaining_length - number of indices to be summed over
         """
@@ -428,7 +435,7 @@ class TermND:
 
 
     @tag('almost_general', 'naming!')
-    def get_full_factor(self, abc_comb, comps=False, debugprint=False):
+    def get_full_factor(self, abc_comb: tuple, comps: bool = False, debugprint: bool = False) -> tuple[float,dict]|float:
         """
         product of: ene_factor, avrg_properties, (cff, viblevelsdiff)
         a, b, c=None
@@ -491,7 +498,7 @@ class TermND:
 
 
     @tag('general', 'complete?')
-    def get_ene_factor(self, abc_comb: tuple):
+    def get_ene_factor(self, abc_comb: tuple) -> float|np.ndarray:
         """
         1/omega_a/omega_b/omega_c
         """
@@ -514,7 +521,7 @@ class TermND:
 
 
     @tag('general')
-    def get_viblevelsdiff(self, abc_comb: tuple):
+    def get_viblevelsdiff(self, abc_comb: tuple) -> tuple[float, np.ndarray]:
         """
         1/omega_m,n + 1/omega_k,l
         a, b, c=None
@@ -540,6 +547,7 @@ class TermND:
 
         else:
             raise NotImplementedError('get_viblevelsdiff not implemented without precalc data')
+            # TODO: to be continued based on the commented out section
 
             # a, b = str(a), str(b)
             # dict_id = {'a': a, 'b': b, 'zero': 'zero'}
@@ -576,8 +584,8 @@ class TermND:
     @tag('general')
     def get_amplitudes(self, w1: float|np.ndarray, w2: float|np.ndarray,
                        Gamma_rc: float, margin: float,
-                       condition=None, collect_all=False, sel_abs=None,
-                       debugprint=False):
+                       condition: np.ndarray = None, collect_all: bool = False, sel_abs: list|tuple = None,
+                       debugprint: bool = False) -> float|complex|np.ndarray:
         """
         gamma = prefnum * prefene * avrg * resonance
 
@@ -621,9 +629,10 @@ class TermND:
     @tag('general')
     def get_amplitudes_ab(self, ab_comb: tuple, w1: float|np.ndarray, w2: float|np.ndarray,
                           Gamma_rc: float,
-                          condition=None, debugprint=False):
+                          condition: np.ndarray = None, debugprint: bool = False) -> tuple[float|np.ndarray, dict]:
         """
         gamma = prefnum * prefene * avrg * resonance
+
         ab_comb are all except the ones to be summed over
 
         """
@@ -659,9 +668,11 @@ class TermND:
 
     # fixme: unused; diagnostics?
     @tag('unused', 'diagnostics')
-    def get_term_tree(self):
+    def get_term_tree(self) -> dict:
         """
         shows contributions/components
+
+        TODO: should be rewritten
         """
         components = {}
         for ab in combinations_with_permutations(self.mode_indices, 2):
@@ -675,7 +686,12 @@ class TermND:
 
     # fixme: used in unused method; diagnostics?
     @tag('unused', 'diagnostics')
-    def get_all_resonances(self, w2mw1: bool = False):
+    def get_all_resonances(self, w2mw1: bool = False) -> dict:
+        """
+        Collect all resonance locations in dict.
+
+        NOT GENERAL... 
+        """
         res = {}
         for ab in combinations_with_permutations(self.mode_indices, self.collective_n_idx_rescond):
             w1, w2 = self.get_resonance_location_general(ab)
@@ -689,7 +705,7 @@ class TermND:
 
     # fixme: unused
     @tag('unused')
-    def fill_in_tensors(self, method: Callable, threshold=1e-18, use_threshold=False):
+    def fill_in_tensors(self, method: Callable, threshold: float = 1e-18, use_threshold: bool = False) -> np.ndarray:
         """
         filling in 2d or 3d tensor with given method
 
@@ -724,11 +740,12 @@ class TermND:
 
     # fixme: unused; diagnostics?
     @tag('unused', 'diagnostics')
-    def get_dotspectrum_df(self, Gamma_rc: float, margin: float, condition=None):
+    def get_dotspectrum_df(self, Gamma_rc: float, margin: float, condition: np.ndarray = None) -> tuple[pd.DataFrame, np.ndarray]:
         """
+        Collect into a dataframe all resonance locations
+
 
         """
-        import pandas as pd
 
         locations_dict = self.get_all_resonances(w2mw1=False)
         # print('locations_dict', locations_dict)
@@ -765,7 +782,7 @@ class TermND:
 
 
 def sum_over_suffixes(fixed_prefix: tuple, remaining_length: int,
-                      mode_indices: list|tuple|np.ndarray, func: Callable):
+                      mode_indices: list|tuple|np.ndarray, func: Callable) -> float|np.ndarray:
     """
     Given a fixed_prefix like (0, 0) and remaining_length = 3,
     compute:

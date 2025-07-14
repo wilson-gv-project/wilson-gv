@@ -1,3 +1,7 @@
+"""
+OLD FUNCTIONALITY: WILL BE REMOVED in the future PR
+"""
+
 import time
 from datetime import timedelta
 from typing import Callable

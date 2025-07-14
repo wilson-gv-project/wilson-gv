@@ -1,9 +1,18 @@
+"""
+Fixtures for pytests.
+
+Each of fixtures returns a dictionary where keys are molecular code strings.
+So for each molecule there could be a setup. Method is B3LYP and basis set cc_pVQZ.
+Initial use of list_of_molucules is in conditions()
+"""
 import pytest
 import numpy as np
+import pandas as pd
 from CQCParse.relay import DataVault
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.utils import prep_data_load
 from wilson.spectrum.termND import TermND
+from wilson.spectrum import DataForPrecalc
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 from wilson.utils.spectrum_utils import SimulationConfig
 from wilson.spectrum import debug_mode
@@ -13,8 +22,11 @@ from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOURO
 
 from wilson.utils import Conditions
 
+# list of molucules to set up fixtures for
+list_of_molecules = ["FORM"]
+
 # ---------------- Fixtures ----------------
-def convert_lists_to_tuples(data):
+def convert_lists_to_tuples(data: list|dict) -> tuple|dict:
     if isinstance(data, list):
         return tuple(convert_lists_to_tuples(item) for item in data)
     elif isinstance(data, dict):
@@ -23,14 +35,14 @@ def convert_lists_to_tuples(data):
         return data
 
 @pytest.fixture(scope='module')
-def derived_terms_json():
+def derived_terms_json() -> dict:
     import json
     with open('/home/vlev/wilson-suite/wilson_intensities/tests/unit/terms.json') as json_file:
         list_terms = json.load(json_file)
     d = {i:t for i,t in enumerate(list_terms)}
     return convert_lists_to_tuples(d)
 @pytest.fixture(scope="module")
-def dict_8terms():
+def dict_8terms() -> dict:
     """
     Fixture to provide the dictionary of 8 terms for testing.
     """
@@ -117,16 +129,14 @@ def dict_8terms():
                      }
     return allterms_str
 @pytest.fixture(scope="module")
-def MOL_setup_parser(conditions):
+def MOL_setup_parser(conditions: dict) -> dict:
     """
     Fixture to set up the Gaussian parser for MOL/B3LYP/cc_pVQZ.
     Molecule is taken from conditions
     """
     parsers = {}
-    # print(conditions.keys())
 
     for mol,cond in conditions.items():
-        # print(mol)
         molecule, method, basis = cond.molecule, 'B3LYP', 'cc_pVQZ'
         data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
         dataframe_gaussian = data_vault.getting_files_DB("gaussian")
@@ -142,7 +152,7 @@ def MOL_setup_parser(conditions):
         parsers[molecule] = parser
     return parsers
 @pytest.fixture(scope="module")
-def spectrum_setup(avrg_xyz_indices, conditions):
+def spectrum_setup(avrg_xyz_indices: list|np.ndarray, conditions: dict) -> dict:
     """
     Fixture to provide the simulation configuration.
     """
@@ -152,9 +162,8 @@ def spectrum_setup(avrg_xyz_indices, conditions):
         print(mol)
         w1 = np.arange(850.0, 3150.0, 3.1)
         w2 = np.arange(500.0, 6550.0, 3.1)
-        # w1 = np.linspace(850.0, 3150.0, 1050)
-        # w2 = np.linspace(500.0, 6550.0, 800)
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
+        # for now not changing indices
         # if mol=='FORM':
         #     new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
         # else:
@@ -181,13 +190,13 @@ def spectrum_setup(avrg_xyz_indices, conditions):
         )
     return setupsdict
 @pytest.fixture(scope="module")
-def avrg_xyz_indices():
+def avrg_xyz_indices() -> np.ndarray|list:
     """
     Fixture to compute averaging indices.
     """
     return get_AlphaBetaGammaDelta_indices(num_f=4)
 @pytest.fixture(scope="module")
-def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup): #! dict_8terms or derived_terms_json
+def setup_term(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
@@ -196,7 +205,7 @@ def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup): #! dict_8terms or
 
     for mol,spec_setup in spectrum_setup.items():
         print(mol)
-        def create_term(term_id):
+        def create_term(term_id: int|str) -> TermND:
             term = TermND(term_id, dict_8terms[term_id]) #! dict_8terms or derived_terms_json
             parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
             parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -214,16 +223,19 @@ def setup_term(dict_8terms, MOL_setup_parser, spectrum_setup): #! dict_8terms or
         term_funcs[mol] = create_term
     return term_funcs
 @pytest.fixture(scope="module")
-def setup_term_derived(derived_terms_json, MOL_setup_parser, spectrum_setup): #! dict_8terms or derived_terms_json
+def setup_term_derived(derived_terms_json: dict, 
+                       MOL_setup_parser: dict, 
+                       spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
+
     """
     term_funcs = {}
     # print(spectrum_setup.keys())
 
     for mol,spec_setup in spectrum_setup.items():
         print(mol)
-        def create_term(term_id):
+        def create_term(term_id: int|str) -> TermND:
             term = TermND(term_id, derived_terms_json[term_id]) #! dict_8terms or derived_terms_json
             parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
             parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
@@ -242,7 +254,7 @@ def setup_term_derived(derived_terms_json, MOL_setup_parser, spectrum_setup): #!
     return term_funcs
 
 @pytest.fixture(scope="module")
-def data_for_precalc(setup_term, spectrum_setup):
+def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
     """
     Fixture to prepare data for precalculation.
     """
@@ -285,7 +297,7 @@ def data_for_precalc(setup_term, spectrum_setup):
         precalcs[mol] = alldata
     return precalcs
 @pytest.fixture(scope="module")
-def data_for_precalc_derived(setup_term_derived, spectrum_setup):
+def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> dict:
     """
     Fixture to prepare data for precalculation.
     """
@@ -315,7 +327,6 @@ def data_for_precalc_derived(setup_term_derived, spectrum_setup):
         # rprint('\n[deep_pink3]term_with_data.harmonic_arrays_Eh[/deep_pink3]')
         # rprint(term_with_data.harmonic_arrays_Eh)
 
-        from wilson.spectrum import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
                                  avrg_terms=avrg_terms,
@@ -327,7 +338,7 @@ def data_for_precalc_derived(setup_term_derived, spectrum_setup):
         precalcs[mol] = alldata
     return precalcs
 @pytest.fixture(scope="module")
-def terms_collection(data_for_precalc, setup_term, dict_8terms): #! dict_8terms or derived_terms_json
+def terms_collection(data_for_precalc: dict, setup_term: dict, dict_8terms: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Fixture to create a TermsEvaluator with precalculated data.
     """
@@ -343,7 +354,8 @@ def terms_collection(data_for_precalc, setup_term, dict_8terms): #! dict_8terms 
         terms_cols[mol] = (te, precalc_dict)
     return terms_cols
 @pytest.fixture(scope="module")
-def terms_collection_derived(data_for_precalc_derived, setup_term_derived, derived_terms_json): #! dict_8terms or derived_terms_json
+def terms_collection_derived(data_for_precalc_derived: dict, setup_term_derived: dict, 
+                             derived_terms_json: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Fixture to create a TermsEvaluator with precalculated data.
     """
@@ -363,7 +375,7 @@ def terms_collection_derived(data_for_precalc_derived, setup_term_derived, deriv
 # ---------------- Fixtures ----------------
 # @pytest.fixture(scope="module",params=["FORM", "OXAC2"])
 @pytest.fixture(scope="module")
-def conditions():
+def conditions() -> dict[str: Conditions]:
     """
     Fixture to provide the configuration for the experiment using the Conditions dataclass.
     """
@@ -371,7 +383,7 @@ def conditions():
     resdict = {}
 
     # for mol in ["FORM", "OXAC2"]:
-    for mol in ["FORM"]:
+    for mol in list_of_molecules:
         # print(mol)
         # omega1 = np.linspace(850.0, 3150.0, 1050)
         # omega2 = np.linspace(500.0, 6550.0, 800)
@@ -411,18 +423,19 @@ def conditions():
     return resdict
 
 @pytest.fixture
-def dataframe_gaussian():
+def dataframe_gaussian() -> pd.DataFrame:
     data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
     dataframe_gaussian = data_vault.getting_files_DB("gaussian")
     return dataframe_gaussian
 @pytest.fixture
-def dataframe_cfour():
+def dataframe_cfour() -> pd.DataFrame:
     data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
     dataframe_cfour = data_vault.getting_files_DB("cfour")
     return dataframe_cfour
 
 @pytest.fixture
-def parsed_data(conditions, dataframe_gaussian, dataframe_cfour):
+def parsed_data(conditions: dict, 
+                dataframe_gaussian: pd.DataFrame, dataframe_cfour: pd.DataFrame) -> dict:
     """
     Fixture to parse data based on the program (Gaussian or CFOUR).
     """
@@ -461,7 +474,7 @@ def parsed_data(conditions, dataframe_gaussian, dataframe_cfour):
         parsed_data_dict[mol] = parser.parse(linear_molecule=False)
     return parsed_data_dict
 @pytest.fixture
-def spectrum2d(conditions):
+def spectrum2d(conditions: dict) -> dict:
     """
     Fixture to set up a Spectrum2D object.
     """
@@ -475,7 +488,7 @@ def spectrum2d(conditions):
         spectrum_objects[mol] = spectrum_obj
     return spectrum_objects
 @pytest.fixture
-def spectrum_sequence(spectrum2d, parsed_data, conditions):
+def spectrum_sequence(spectrum2d: dict, parsed_data: dict, conditions: dict) -> dict:
     """
     Fixture to launch the spectrum sequence and return the resulting dictionary.
     """
@@ -488,7 +501,7 @@ def spectrum_sequence(spectrum2d, parsed_data, conditions):
                                                       cond, print_level=0)
     return preps
 @pytest.fixture
-def intensity_data(spectrum2d, spectrum_sequence):
+def intensity_data(spectrum2d: dict, spectrum_sequence: dict) -> dict:
     """
     Fixture to calculate intensity for the Spectrum2D object.
     """
@@ -513,7 +526,7 @@ def intensity_data(spectrum2d, spectrum_sequence):
     return sec_hypol_data_dict
 
 @pytest.fixture
-def terms_amplitudes(terms_collection, spectrum_setup):
+def terms_amplitudes(terms_collection: dict, spectrum_setup: dict) -> dict:
     """
     Fixture to calculate amplitudes using TermsEvaluator.
     """

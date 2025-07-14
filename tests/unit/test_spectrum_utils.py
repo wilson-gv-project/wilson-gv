@@ -1,7 +1,6 @@
-from wilson.utils.spectrum_utils import (get_allparts_indices,
-                                            make_abc_tuple)
+from wilson.utils.spectrum_utils import get_allparts_indices, make_abc_tuple
 
-def test_get_indices():
+def test_get_indices() -> None:
     print()
     term = {'resonances': (('a+b,a', (-1, 2)), ('zero,a', (-1,))),
               'vibenediff': ('a+b+c,zero', 'c,a+b'),
@@ -17,14 +16,14 @@ def test_get_indices():
     assert res_idx == 2
 
 
-def test_make_abc_tuple():
+def test_make_abc_tuple() -> None:
     print()
     a = make_abc_tuple((1, 2), 4)
     print(a)
     assert a == (1, 2, None, None)
 
 
-def test_abc_list():
+def test_abc_list() -> None:
     print()
     from wilson.utils.spectrum_utils import make_abc_dict
     abc_comb = (1, 2, 3, 4)

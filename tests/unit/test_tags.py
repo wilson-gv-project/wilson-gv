@@ -1,5 +1,5 @@
 
-def test_tags():
+def test_tags() -> None:
     print("\n")
     from wilson.utils.tagger import TAG_REGISTRY
 

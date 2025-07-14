@@ -1,3 +1,6 @@
+"""
+Documentation and tests will be added in the future PR, also style imporvements
+"""
 import numpy as np
 import copy
 from CQCParse.debug import debugfunc

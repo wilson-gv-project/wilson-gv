@@ -1,3 +1,6 @@
+"""
+Evaluator functions for WilsonSimulation
+"""
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
 # from wilson.utils import prep_data_load
@@ -12,12 +15,12 @@ def eval_spec2D():
 # TermND with TermsEvaluator
 # with_diagnostics=True because wilsonSimulation.evaluate()
 # fixme? no need to know 'experiment'? -
-def terms_evaluator(system, experiment,
+def terms_evaluator(system,
                     derived_terms, props,
-                    spec_eval_setup, vib_ana_setup,
-                    with_diagnostics=True):
+                    spec_eval_setup, vib_ana_setup) -> complex|float|np.ndarray:
     """
-      >> Orchestrating spectrum amplitudes evaluation with TermND setup.
+    >> Orchestrating spectrum amplitudes evaluation with TermND setup.
+
       Should ultimately return: spectrum array (and diagnostics)
       Diagnostics: ?? (spectrum calculation related)
 
@@ -148,8 +151,8 @@ def terms_evaluator(system, experiment,
                                                  3.8, 0.0, debugprint=True, collect_all=False)
         amplitudes += a_intermediate
 
-    if with_diagnostics:
-        return amplitudes, diagn
-
-    else:
-        return amplitudes
+    # if with_diagnostics:
+        # return amplitudes, diagn
+    # else:
+    
+    return amplitudes

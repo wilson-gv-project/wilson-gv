@@ -8,7 +8,6 @@ import numpy as np
 from wilson.spectrum.termND import TermND
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 from wilson.utils import prep_data_load
-# from wilson_main import abstractions as abst
 from wilson.spectrum import DataForPrecalc
 
 from wilson.spectrum.termND import sum_over_suffixes
@@ -24,7 +23,7 @@ cqc_debug.level = 0
 
 print()
 
-def setup_term(term_id, terms_dict_setup, FORM_setup_parser, spectrum_setup):
+def setup_term(term_id: int, terms_dict_setup: dict, FORM_setup_parser, spectrum_setupØ) -> TermND:
     """
     Helper function to set up a TermND instance with parsed data and loaded calculations.
     """
@@ -44,7 +43,7 @@ def setup_term(term_id, terms_dict_setup, FORM_setup_parser, spectrum_setup):
 
 
 @require_asserts
-def test_instance(dict_8terms):
+def test_instance(dict_8terms: dict) -> None:
     print()
 
     t0 = TermND(0, dict_8terms[0])
@@ -66,7 +65,7 @@ def test_instance(dict_8terms):
 
 
 @require_asserts
-def test_load_data(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_load_data(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -116,7 +115,7 @@ def test_load_data(dict_8terms, MOL_setup_parser, spectrum_setup):
 
 
 @require_asserts
-def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -174,7 +173,7 @@ def test_amplitude_1term_single_point(dict_8terms, MOL_setup_parser, spectrum_se
 
 
 @require_asserts
-def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -251,7 +250,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms, MOL_setup_parser, spectrum
 
 
 @require_asserts
-def test_get_resonance_location_general_mock(dict_8terms):
+def test_get_resonance_location_general_mock(dict_8terms: dict) -> None:
     print()
 
     t0 = TermND(0, dict_8terms[0])
@@ -325,7 +324,7 @@ def test_get_resonance_location_general_mock(dict_8terms):
 
 
 @require_asserts
-def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_get_resonance_location_general_real(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -371,7 +370,7 @@ def test_get_resonance_location_general_real(dict_8terms, MOL_setup_parser, spec
 
 
 @require_asserts
-def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -467,7 +466,7 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms, MOL_setup_parser, 
 
 
 @require_asserts
-def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -545,7 +544,7 @@ def test_amplitude_4terms_grid(dict_8terms, MOL_setup_parser, spectrum_setup):
 
 
 @require_asserts
-def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser, spectrum_setup):
+def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
     print()
     MOL_setup_parser = MOL_setup_parser['FORM']
     spectrum_setup = spectrum_setup['FORM']
@@ -642,7 +641,7 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms, MOL_setup_parser,
     debug.level = 0
 
 
-def test_termevaluator():
+def test_termevaluator() -> None:
 
     import json
 
@@ -652,7 +651,7 @@ def test_termevaluator():
         print(data)
 
 
-def test_compute_vibdiff():
+def test_compute_vibdiff() -> None:
     print()
     from wilson.spectrum import compute_vibdiff
     print(compute_vibdiff((0,1), (3,)))
@@ -664,7 +663,7 @@ def test_compute_vibdiff():
 
 
 
-def test_dotspectrum_df(terms_collection, spectrum_setup, conditions):
+def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions: dict) -> None:
     """
     get a spectrum figure
     """
@@ -699,7 +698,7 @@ def test_dotspectrum_df(terms_collection, spectrum_setup, conditions):
                 # print(formatted_resonances)
 
 
-def test_get_factor_summed(terms_collection):
+def test_get_factor_summed(terms_collection: dict) -> None:
     print()
 
     te, precalc_dict = terms_collection['FORM']

@@ -1,3 +1,8 @@
+"""
+Utility functions and classes. Related to different parts of calculations and setup.
+
+
+"""
 import numpy as np
 
 from wilson.spectrum.spectrum2D import Spectrum2D
@@ -12,15 +17,69 @@ import os
 PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def get_package_root():
+def get_package_root() -> str:
     """Returns the absolute path to the package root."""
     return PACKAGE_ROOT
 
 
-def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
-                    reference_intensity_plot: float = None, compute_intensity: bool = False, figmake: bool = True):
+def pickle_objs(dictobjs: dict, filename: str) -> str:
+    """Pickle into a dict."""
+    try:
+        with open(filename, 'rb') as file:
+            existing_data = {}
+            while True:
+                try:
+                    existing_data = pickle.load(file)
+                except EOFError:
+                    break
+    except FileNotFoundError:
+        existing_data = {}
+
+    existing_data = existing_data | dictobjs
+
+    with open(filename, 'wb') as f:
+        pickle.dump(existing_data, f)
+
+    return filename
+
+
+def unpickle_objs(filename: str) -> dict:
+    """Unpickle a dictionary of data."""
+    with open(filename, 'rb') as f:
+        dictobjs = pickle.load(f)
+    return dictobjs
+
+
+@dataclass
+class Conditions:
+    """Dataclass that collects spectrum simulation configs."""
+
+    Gamma_rc: float
+    diag_margin_rc: float
+    dynamic_range_n: int|float
+    omega1: np.ndarray
+    omega2: np.ndarray
+    program: str
+    data_parser: CFOURdataParser|GaussianDataParser
+    molecule: str
+    method: str
+    basis: str
+    new_idx_dict : dict
+    el_terms_selected: list
+    mech_terms_selected: list
+    list2exclude: list = None
+    only_modes: list = None
+    vpt2settings: dict = field(default_factory=lambda: {'anharmonic_type': 'GVPT2'})
+    vib_levels_harmonic: bool = False
+    preview: bool = False
+
+
+def run_experiment1(conditions: Conditions, settings_figure: dict, 
+                    get_max: bool = False, sparse: float = 0.,
+                    reference_intensity_plot: float = None, 
+                    compute_intensity: bool = False, figmake: bool = True) -> dict:
     """
-    This was a wrapper function for Spectrum2D calculations.
+    Wrapper function for Spectrum2D calculations.
 
     reference_intensity_plot - a value, float
 
@@ -33,7 +92,6 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
                 'maximum_intensity': None, 'sec_hypol_dataALL_ref': None}
     """
     from wilson import rendering
-    # from utils import pickle_objs, unpickle_objs
     from CQCParse.relay import DataVault
     data_vault = DataVault(
         "/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv"
@@ -41,15 +99,13 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
     dataframe_gaussian = data_vault.getting_files_DB("gaussian")
     dataframe_cfour = data_vault.getting_files_DB("cfour")
 
-    # Gamma_rc, diag_margin_rc = conditions.Gamma_rc, conditions.diag_margin_rc
     dynamic_range_n = conditions.dynamic_range_n
     omega1, omega2 = conditions.omega1, conditions.omega2,
     program, data_parser = conditions.program, conditions.data_parser
     molecule, method, basis = conditions.molecule, conditions.method, conditions.basis
-    # el_terms_selected, mech_terms_selected = conditions.el_terms_selected, conditions.mech_terms_selected
 
     print('Start', molecule)
-    # # setup
+
     datadict1 = data_vault.make_DatainputDict(program, (molecule, method, basis), '')
 
     if program=='gaussian':
@@ -125,8 +181,8 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
                     print({k: f'{v:.3e}' for k,v in allmaxdict.items() if molecule in k})
 
                 # if no max in a pickle file,
-                #       either find the maximum now, save it and use for this spectrum
-                #       or use own maximum simply
+                #     either find the maximum now, save it and use for this spectrum
+                #     or use own maximum simply
                 else:
 
                     if get_max:
@@ -189,60 +245,10 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
     return dict0
 
 
-def pickle_objs(dictobjs, filename):
+def prep_data_load(parsed_data: ParsedData) -> tuple:
     """
-    Pickle into a dict.
-    """
-    try:
-        with open(filename, 'rb') as file:
-            existing_data = {}
-            while True:
-                try:
-                    existing_data = pickle.load(file)
-                except EOFError:
-                    break
-    except FileNotFoundError:
-        existing_data = {}
-
-    existing_data = existing_data | dictobjs
-
-    with open(filename, 'wb') as f:
-        pickle.dump(existing_data, f)
-
-    return filename
-
-
-def unpickle_objs(filename):
-    with open(filename, 'rb') as f:
-        dictobjs = pickle.load(f)
-    return dictobjs
-
-
-@dataclass
-class Conditions:
-    Gamma_rc: float
-    diag_margin_rc: float
-    dynamic_range_n: int|float
-    omega1: np.ndarray
-    omega2: np.ndarray
-    program: str
-    data_parser: CFOURdataParser|GaussianDataParser
-    molecule: str
-    method: str
-    basis: str
-    new_idx_dict : dict
-    el_terms_selected: list
-    mech_terms_selected: list
-    list2exclude: list = None
-    only_modes: list = None
-    vpt2settings: dict = field(default_factory=lambda: {'anharmonic_type': 'GVPT2'})
-    vib_levels_harmonic: bool = False
-    preview: bool = False
-
-
-def prep_data_load(parsed_data: ParsedData):
-    """
-    Collecting data from parser result, ParsedData. 
+    Collect data from parser result, ParsedData. 
+    
     Used with TermND.
     """
     # todo? refactor these attribute names?
@@ -263,11 +269,20 @@ def prep_data_load(parsed_data: ParsedData):
     return deriv_data, allstates, harmonic_states, mode_indices
 
 
-def pairwise_differences(A, B):
+def pairwise_differences(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """
-    chatgpt
+    Chatgpt.
 
     for vib levels diffs tensors
+
+    # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
+    # from 2d array subtract 1d array => from each row subtract this 1d array
+    # then it means: quant2[0,1] is quant2[a,b] - quant1[a] = diff2_1[b,a]
+
+    # state1, state2, state2-state1
+    # harmonic state is given by index of NM
+    # complex state has a composition, and will have a new label
+    
     """
     a = np.asarray(A)
     b = np.asarray(B)
@@ -281,9 +296,7 @@ def pairwise_differences(A, B):
     return a_broad - b_broad
 
 
-def coolprint(text):
-    """
-    Print yellow text.
-    """
+def coolprint(text: str) -> None:
+    """Print yellow text."""
     from rich import print
     print(f"[italic yellow2]{text}[/italic yellow2]")

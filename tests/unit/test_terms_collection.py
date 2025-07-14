@@ -1,6 +1,9 @@
 """
-Each test creates own instances of Term2D
+Testing TermsEvaluator.
 
+Each test creates own instances of Term2D.
+dict_8terms is a fixture dictionary defined in wilson_intensities/tests/conftest.py. 
+It contains 8 terms expressions in dict format.
 """
 import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
@@ -21,7 +24,7 @@ print()
 
 
 @require_asserts
-def test_identify_to_precalculate(dict_8terms):
+def test_identify_to_precalculate(dict_8terms: dict) -> None:
     print('\n\nTesting - identify_to_precalculate')
 
     t0 = TermND(0, dict_8terms[0])
@@ -57,7 +60,7 @@ def test_identify_to_precalculate(dict_8terms):
 
 
 @require_asserts
-def test_outer_product_einsum():
+def test_outer_product_einsum() -> None:
     print()
 
     arr = np.array([1., 2., 4.])
@@ -82,7 +85,7 @@ def test_outer_product_einsum():
 
 
 @require_asserts
-def test_precalc_vibene_denoms(dict_8terms):
+def test_precalc_vibene_denoms(dict_8terms: dict) -> None:
     """
     """
     print()
@@ -111,7 +114,7 @@ def test_precalc_vibene_denoms(dict_8terms):
 
 
 @require_asserts
-def test_precalc_avrg_tensors(dict_8terms):
+def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     print()
 
     t0 = TermND(0, dict_8terms[0])
@@ -155,7 +158,7 @@ def test_precalc_avrg_tensors(dict_8terms):
 
 
 @require_asserts
-def test_precalc_res_conds(dict_8terms):
+def test_precalc_res_conds(dict_8terms: dict) -> None:
     print('\n\nTesting - Precalculate Resonance Conditions')
 
     t0 = TermND(0, dict_8terms[0])
@@ -206,7 +209,7 @@ def test_precalc_res_conds(dict_8terms):
 
 
 @require_asserts
-def test_precalc_vibdiffs(dict_8terms):
+def test_precalc_vibdiffs(dict_8terms: dict) -> None:
     """
     simple states indexing
     """
@@ -265,7 +268,7 @@ def test_precalc_vibdiffs(dict_8terms):
 
 
 @require_asserts
-def test_precalculate(dict_8terms):
+def test_precalculate(dict_8terms: dict) -> None:
     print()
 
     t0 = TermND(0, dict_8terms[0])

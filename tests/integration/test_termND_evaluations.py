@@ -1,3 +1,6 @@
+"""
+Integration tests for full procedure with figure rendering using TermND functionality.
+"""
 import numpy as np
 from tests.testing_utils import require_asserts
 from wilson.spectrum import debug_mode
@@ -13,7 +16,7 @@ cqc_debug.level = 0
 np.set_printoptions(precision=4,suppress=False)
 
 
-def compare_amplitudes(amplitudes1, amplitudes2):
+def compare_amplitudes(amplitudes1: np.ndarray, amplitudes2: np.ndarray) -> None:
     """
     Helper function to compare two sets of amplitudes.
     """
@@ -24,7 +27,7 @@ def compare_amplitudes(amplitudes1, amplitudes2):
     assert max_diff < 1e-6, "Amplitudes differ significantly"
 
 @require_asserts
-def test_terms_collection_calculation(terms_collection, spectrum_setup, conditions):
+def test_terms_collection_calculation(terms_collection: dict, spectrum_setup: dict, conditions: dict) -> None:
     """
     get a spectrum figure
     """
@@ -80,7 +83,8 @@ def test_terms_collection_calculation(terms_collection, spectrum_setup, conditio
 
 
 @require_asserts
-def test_terms_collection_calculation_derived(terms_collection_derived, spectrum_setup, conditions):
+def test_terms_collection_calculation_derived(terms_collection_derived: dict, 
+                                              spectrum_setup: dict, conditions: dict) -> None:
     """
     get a spectrum figure
     """
@@ -105,12 +109,12 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
         amplitudes = 0.0
         for id, term in te.terms.items():
             term.precalc_data = precalc_dict
-            with np.printoptions(precision=2,legacy='1.25'):
-                formatted_resonances = {
-                    key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
-                    for key, value in term.get_all_resonances(w2mw1=True).items()
-                }
-                print(formatted_resonances)
+            # with np.printoptions(precision=2,legacy='1.25'):
+                # formatted_resonances = {
+                    # key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+                    # for key, value in term.get_all_resonances(w2mw1=True).items()
+                # }
+                # print(formatted_resonances)
             # can run with debug prints if > 0
             with debug_mode(0):
                 intensity = term.get_amplitudes(spectrum_setup.w1m,
@@ -142,7 +146,7 @@ def test_terms_collection_calculation_derived(terms_collection_derived, spectrum
 
 
 
-def test_spectrum2d_calculation(intensity_data, spectrum_setup, conditions):
+def test_spectrum2d_calculation(intensity_data: dict, spectrum_setup: dict, conditions: dict) -> None:
     """
     Test the intensity calculation and rendering of the spectrum.
     """
@@ -176,13 +180,12 @@ def test_spectrum2d_calculation(intensity_data, spectrum_setup, conditions):
                     nicetitle='Spectrum2D')
 
 @require_asserts
-def test_compare_amplitudes(terms_amplitudes, intensity_data, spectrum_setup):
+def test_compare_amplitudes(terms_amplitudes: dict, intensity_data: dict) -> None:
     """
     Compare amplitudes calculated using TermsEvaluator and Spectrum2D.
     """
     terms_amplitudes = terms_amplitudes['FORM']
-    intensity_data = intensity_data['FORM'].T
-    # spectrum_setup = spectrum_setup['FORM']
+    intensity_data = intensity_data['FORM'].T # a bug there; this is a quick fix
 
     # Validate TermsEvaluator amplitudes
     assert terms_amplitudes is not None, "TermsEvaluator amplitudes are None"

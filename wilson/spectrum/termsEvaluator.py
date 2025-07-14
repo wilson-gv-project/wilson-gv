@@ -5,6 +5,7 @@ from ..utils.tools import combinations_with_permutations
 from ..utils.spectrum_utils import DoubleDict
 from wilson.utils import pairwise_differences, coolprint
 from wilson.utils.spectrum_utils import greek_list
+from wilson.utils.spectrum_utils import DataForPrecalc
 from wilson.spectrum.termND import TermND
 # from wilson.debug import debugfunc, debug_deep
 
@@ -35,7 +36,7 @@ class TermsEvaluator:
         return f'\nTHIS IS TermsEvaluator with {len(self.terms)} terms\n'
 
 
-    def identify_to_precalculate(self):
+    def identify_to_precalculate(self) -> None:
         """
         go through terms; identify parts for precalculation
 
@@ -110,7 +111,7 @@ class TermsEvaluator:
         coolprint('And [medium_purple1]data, avrg_terms[/medium_purple1] are related to molecular properties.')
 
 
-    def precalculate(self, alldata):
+    def precalculate(self, alldata: DataForPrecalc) -> dict:
         """
         requires identified parts for precalculation and external data
 
@@ -137,10 +138,12 @@ class TermsEvaluator:
         return dictionary
 
 
-    def precalc_vibene_denoms(self, qstates_Eh):
+    def precalc_vibene_denoms(self, qstates_Eh: dict) -> dict:
         """
         requires:
             freqs data; self.unique_vibene_denoms
+        
+        key is a number of quanta in the states in values
         """
         freqs = qstates_Eh[1]
         stored = {}
@@ -149,7 +152,7 @@ class TermsEvaluator:
         return stored
 
 
-    def precalc_avrg_tensors(self, Nnmodes, data, avrg_terms):
+    def precalc_avrg_tensors(self, Nnmodes: int, data: dict, avrg_terms: list|np.ndarray) -> dict[tuple: np.ndarray]:
         """
         ((1, 1), (2, 1), (1, 2)) - avrg tensor coding - mu_Q, alpha_Q, mu_QQ
         ((1, 1), (2, 2), (1, 1)) - mu_Q, alpha_QQ, mu_Q
@@ -198,7 +201,7 @@ class TermsEvaluator:
         return storage_tensors
 
 
-    def precalc_vibdiffs(self, qstates_Eh):
+    def precalc_vibdiffs(self, qstates_Eh: dict) -> dict[tuple:np.ndarray]:
         """
         states - dict of state_idx_label_tuple(?) : frequency (Eh)
 
@@ -227,12 +230,14 @@ class TermsEvaluator:
         return res
 
 
-    def precalc_res_conds(self, axes_dict):
+    def precalc_res_conds(self, axes_dict: dict) -> dict:
         """
         requires:
             self.unique_res_conds
 
         axes_dict - ??? {1: , 2: , 3: ....} pf labels: points array/meshgrid
+
+        precalculates pf combinations accorging to given signes - [-1], [-1, 2] ...
         """
         implicit_minus_one = -1
         result_pfs = {}
@@ -253,8 +258,12 @@ class TermsEvaluator:
         return result_pfs
 
 
-    def compute_intensity(self, w1, w2, Gamma_rc=3.8,margin=0.):
+    def compute_intensity(self, w1: float|np.ndarray, w2: float|np.ndarray, Gamma_rc: float = 3.8, margin: float = 0.) -> float|complex|np.ndarray:
+        """
+        Computing intensity for all terms in the instance.
 
+        Loops over terms and adds results inplace.
+        """
         tot = 0.
         for tID in self.terms:
             tot += self.terms[tID].get_amplitudes(w1, w2, Gamma_rc, margin)
@@ -262,7 +271,7 @@ class TermsEvaluator:
         return tot
 
 
-def get_data_keys(input_tuple, variables, greek_dict):
+def get_data_keys(input_tuple: tuple, variables: dict, greek_dict: dict) -> tuple[str, tuple]:
     """
     tuple_input = ((1, 1), ('B',), ('a',))
 
@@ -275,6 +284,10 @@ def get_data_keys(input_tuple, variables, greek_dict):
     (('mu_Q', ('a',), ('B',)),
      ('alpha_Q', ('b',), ('A', 'D')),
      ('mu_Q', ('c',), ('G',)))
+
+    prop_der_key is a trivial name string
+    second_part contains normal mode indices
+    third part contains cartesian axes Greek indices
     """
 
     prop_der_key, second_part, third_part = input_tuple
@@ -287,7 +300,7 @@ def get_data_keys(input_tuple, variables, greek_dict):
     return prop_der_key, idxs_key
 
 
-def outer_product_einsum(arr, n):
+def outer_product_einsum(arr: np.ndarray, n: int) -> np.ndarray:
     # for n=3 -> 'i,j,k->ijk'
 
     indices = ','.join([chr(ord('i') + j) for j in range(n)]) + '->' + ''.join([chr(ord('i') + j) for j in range(n)])
@@ -297,7 +310,7 @@ def outer_product_einsum(arr, n):
 
 
 #! not used
-def calc_vibene_diff_mn(vibene_data, m, n, symbolic=False):
+def calc_vibene_diff_mn(vibene_data: dict, m: tuple|str, n: tuple|str, symbolic: bool = False) -> None|float:
     """
     w_{m,n}^{whatever}
 
@@ -314,9 +327,11 @@ def calc_vibene_diff_mn(vibene_data, m, n, symbolic=False):
         return vibene_data[m] - vibene_data[n]
 
 
-def get_resonance_location(resonances_expr, modes_dict, a, b):
+def get_resonance_location(resonances_expr: tuple, modes_dict: dict, a: int, b: int) -> tuple[float, float]:
     """
-    A resonance for this term for ab combination of modes
+    A resonance for this term for ab combination of modes.
+
+    NOT GENERAL; 2D
     """
     a, b = str(a), str(b)
     modes_dict[('zero',)] = 0.
@@ -336,10 +351,11 @@ def get_resonance_location(resonances_expr, modes_dict, a, b):
     return w1, w2
 
 
-def get_all_resonances(resonances_expr, modes_dict, mode_indices, w2mw1=False):
+def get_all_resonances(resonances_expr: tuple, modes_dict: dict, mode_indices: list|tuple, w2mw1: bool = False) -> dict:
     """
-    Function that collects all resonance locations
-    for a given resonance expression and given set of states with indices
+    Function that collects all resonance locations for a given resonance expression and given set of states with indices.
+
+    Returns a dictionary headed by a tuple abc.. combination with tuple of (x,y) location. NOT GENERAL; 2D
     """
     res = {}
     for ab in combinations_with_permutations(mode_indices, 2):

@@ -1,3 +1,7 @@
+"""
+OLD FUNCTIONALITY: WILL BE REMOVED in the future PR
+"""
+
 from .spectrum2D import Spectrum2D
 import numpy as np
 

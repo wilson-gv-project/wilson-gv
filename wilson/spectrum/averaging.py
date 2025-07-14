@@ -1,3 +1,6 @@
+"""
+Documentation and tests will be added in the future PR, also style imporvements
+"""
 # Author: Magnus Ringholm
 
 import numpy as np

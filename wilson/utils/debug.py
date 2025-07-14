@@ -1,6 +1,11 @@
+"""
+Debug print functions
+
+
+"""
 level = 0
 
-def debugfunc(msgs, tag=""):
+def debugfunc(msgs: str, tag: str = "") -> None:
     """
     debug print with tags at level >= 1
     """
@@ -10,7 +15,7 @@ def debugfunc(msgs, tag=""):
     # if level >= 1:
     #     print(f"\033[95m[INFO][{tag}] \033[0m {msgs}".ljust(45, ' '))
 
-def debug_deep(msgs, tag=""):
+def debug_deep(msgs: str, tag: str = "") -> None:
     """
     debug print with tags at level >= 2
     """
