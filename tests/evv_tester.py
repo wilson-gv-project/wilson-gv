@@ -80,13 +80,22 @@ print('\nafter getResultsFromCalculationBatches', sim.props, '\n')
 
 
 print('\n===========================================================================')
-print('  >>> Going to evaluate now...\n')
-# sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
-sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=False)
-
 import numpy as np
-intensities_spec = np.abs(sim.spec)**2
-print(np.max(np.abs(sim.spec)**2))
+np.set_printoptions(precision=4)
+from pathlib import Path
+my_file = Path("./spec.npy")
+
+if my_file.is_file():
+    print('  >>> sim.spec data loaded from spec.npy file...\n')
+    ampl = np.load('spec.npy')
+    intensities_spec = np.abs(ampl)**2
+else:
+    print('  >>> Going to evaluate now...\n')
+    # sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
+    sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=False)
+    intensities_spec = np.abs(sim.spec)**2
+    print(np.max(np.abs(sim.spec)**2))
+    np.save('spec.npy', sim.spec)
 
 print('\n===========================================================================')
 print('\n  >>> And now rendering...\n')
