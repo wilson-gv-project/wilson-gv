@@ -1225,57 +1225,82 @@ class WilsonSimulation:
 			else:
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc)
 
-	def evaluateAsResponseFunction(self, evaluator: Callable, include_diagnostics: bool=False):
+	def evaluateAsResponseFunction(self,
+								   evaluator: Callable[[
+								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
 		"""
 		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
 		experiment pulse strength information and without regard to further experiment information except terms)
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		evaluator: Callable: A function to carry out the evaluation
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 
-		if include_diagnostics:
-			self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
-		else:
-			self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+	def evaluateAsResponseFunctionWithDiagnostics(self, evaluator: Callable[[
+								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
+		"""
+		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
+		experiment pulse strength information and without regard to further experiment information except terms)
 
-	def evaluateFull(self, evaluator: Callable, include_diagnostics: bool=False):
+		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
+		"""
+
+		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+	def evaluateFull(self, evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
 		"""
 		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		evaluator: Callable: A function to carry out the evaluation
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 
-		if include_diagnostics:
-			self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
-		else:
-			self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
-	def render(self, renderer: Callable, include_diagnostics: bool=False):
+	def evaluateFullWithDiagnostics(self, evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
+		"""
+		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
+
+		evaluator: Callable: As in evaluateFull but must additionally return a dictionary of diagnostics information.
+		"""
+
+		self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props,
+										  self.spec_eval_setup, self.vib_ana_setup)
+
+	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
+		"""
+		Render the spectral data.
+
+		renderer: Callable: A function to carry out the rendering. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return
+		"""
+
+		# Consider extending arguments to provide even more info to renderer
+		self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+
+	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
+														dict, str, SpecEvalSetup], tuple[Any, dict]]):
 		"""
 		Render the spectral data
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		renderer: Callable: A function to carry out the rendering
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		renderer: Callable: A function to carry out the rendering. As in render but must additionally return a
+		dictionary of diagnostics information.
 		"""
 
-		if include_diagnostics:
-
-			# Consider extending arguments to give even more info
-			self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
-
-		else:
-
-			# Consider extending arguments to give even more info
-			self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		# Consider extending arguments to provide even more info to renderer
+		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn,
+											  self.name, self.spec_eval_setup)
 
 
