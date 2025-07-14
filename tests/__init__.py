@@ -28,4 +28,3 @@ https://swcarpentry.github.io/python-novice-inflammation/10-defensive.html
 """
 
 from tests.testing_utils import *
-from tests.test_config import *
