@@ -1,4 +1,3 @@
-import copy
 import time
 from datetime import timedelta
 from typing import Callable
@@ -6,7 +5,7 @@ from typing import Callable
 import numpy as np
 
 from .averaging import get_AlphaBetaGammaDelta_indices
-from .tools import convNu2Ene, avrg_abc_tensor, avrg_abc_tensor_general, combinations_with_permutations
+from ..utils.tools import convNu2Ene, avrg_abc_tensor, combinations_with_permutations
 
 from CQCParse.parsing import ParsedData
 from CQCParse.debug import debugfunc, debug_deep

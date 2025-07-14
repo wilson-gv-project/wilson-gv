@@ -1,4 +1,4 @@
-from wilson.spectrum.spectrum_utils import (get_allparts_indices,
+from wilson.utils.spectrum_utils import (get_allparts_indices,
                                             make_abc_tuple)
 
 def test_get_indices():
@@ -26,7 +26,7 @@ def test_make_abc_tuple():
 
 def test_abc_list():
     print()
-    from wilson.spectrum.spectrum_utils import make_abc_dict
+    from wilson.utils.spectrum_utils import make_abc_dict
     abc_comb = (1, 2, 3, 4)
     idx_str = make_abc_dict(abc_comb)
     print(idx_str)

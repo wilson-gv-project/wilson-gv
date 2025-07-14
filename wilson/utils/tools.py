@@ -19,7 +19,6 @@ def combinations_with_permutations(iterable, k):
     return (comb for comb in itertools.product(iterable, repeat=k))
 
 
-
 @dataclass
 class Conditions:
     Gamma_rc: float
@@ -344,7 +343,8 @@ def match_modes(spectrumObj_g16, spectrumObj_c4):
     #     print(g16_list, c4_list)
 
 
-def change_idx_modes(parserObj, new_idx_dict, list2exclude=None, only_modes = None):
+def change_idx_modes(parserObj, new_idx_dict, 
+                     list2exclude=None, only_modes = None):
     """
     new_idx_dict = {oldkey:newkey}
 

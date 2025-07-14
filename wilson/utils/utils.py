@@ -12,15 +12,16 @@ import os
 PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-
-
 def get_package_root():
     """Returns the absolute path to the package root."""
     return PACKAGE_ROOT
 
+
 def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
                     reference_intensity_plot: float = None, compute_intensity: bool = False, figmake: bool = True):
     """
+    This was a wrapper function for Spectrum2D calculations.
+
     reference_intensity_plot - a value, float
 
                {'spectrum': self,
@@ -189,6 +190,9 @@ def run_experiment1(conditions, settings_figure, get_max=False, sparse=0.,
 
 
 def pickle_objs(dictobjs, filename):
+    """
+    Pickle into a dict.
+    """
     try:
         with open(filename, 'rb') as file:
             existing_data = {}
@@ -237,6 +241,10 @@ class Conditions:
 
 
 def prep_data_load(parsed_data: ParsedData):
+    """
+    Collecting data from parser result, ParsedData. 
+    Used with TermND.
+    """
     # todo? refactor these attribute names?
     ddata = [parsed_data.derivatives.dipole_first_derivatives,
              parsed_data.derivatives.dipole_second_derivatives,
@@ -253,6 +261,7 @@ def prep_data_load(parsed_data: ParsedData):
     mode_indices = [i for i in np.arange(parsed_data.nmodes) if i not in parsed_data.list2exclude]
 
     return deriv_data, allstates, harmonic_states, mode_indices
+
 
 def pairwise_differences(A, B):
     """
@@ -271,6 +280,10 @@ def pairwise_differences(A, B):
 
     return a_broad - b_broad
 
+
 def coolprint(text):
+    """
+    Print yellow text.
+    """
     from rich import print
     print(f"[italic yellow2]{text}[/italic yellow2]")

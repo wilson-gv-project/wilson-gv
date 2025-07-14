@@ -2,9 +2,30 @@ import numpy as np
 from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
-from wilson.spectrum.tools import convNu2Ene
+from wilson.utils.tools import convNu2Ene
 import string
 from contextlib import contextmanager
+from typing import Dict, Any
+
+@dataclass
+class SimulationConfig:
+    gammaCompsAll: Any
+    molecule: str
+    method: str
+    basis: str
+    Gamma: float
+    diag_margin: float
+    start1: float
+    end1: float
+    step1: float
+    start2: float
+    end2: float
+    step2: float
+    old_new_dict: Dict[int, int]
+    elevels: str
+    enelvl: bool
+    w1m: np.ndarray
+    w2m: np.ndarray
 
 
 @dataclass
@@ -15,6 +36,7 @@ class DataForPrecalc:
     axes_dict: dict
     states_arrays_Eh: dict
     harmonic_arrays_Eh: dict
+
 
 @dataclass
 class MolProperty:
@@ -125,6 +147,7 @@ class AveragedProps:
     def __repr__(self):
         return f'\nAveragedProps:\n   {self.cart_axes}\n   {self.nm_indices}\n'
 
+
 class DoubleDict:
     def __init__(self):
         self.kv = {}
@@ -195,6 +218,7 @@ def mainVibStates2arraydict(listVibStates, Nnmodes):
 
     return states_arrs
 
+
 def safe_product(parts):
     result = 1
     for part in parts:
@@ -213,12 +237,13 @@ def check_energy_unit(value):
     else:
         return 'cm-1'
 
+
 @contextmanager
 def debug_mode(level):
     """
     Context manager to temporarily set the debug level.
     """
-    import wilson.debug as debug
+    import wilson.utils.debug as debug
 
     original_level = debug.level
     debug.level = level
@@ -277,6 +302,7 @@ def flatten_list(nested_list):
     else:
         return newlist
 
+
 def get_allparts_indices(term):
 
     resultdict = get_indices(term)
@@ -298,9 +324,11 @@ def get_allparts_indices(term):
     res_idx = len(sets['resonances'])
     return allidx, res_idx
 
+
 abc_list = list(string.ascii_lowercase)
 num_Greek = {0: 'A', 1: 'B', 2: 'G', 3: 'D', 4: 'E', 5: 'Z', 6: 'H', 7: 'T', 8: 'I'}
 greek_list = list(num_Greek.values())
+
 
 def make_abc_dict(abc_comb):
     return {letter: number for letter, number in zip(abc_list[: len(abc_comb)], abc_comb)}

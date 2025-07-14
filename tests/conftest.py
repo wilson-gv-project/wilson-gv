@@ -5,13 +5,13 @@ from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.utils import prep_data_load
 from wilson.spectrum.termND import TermND
 from wilson.spectrum.termsEvaluator import TermsEvaluator
-from tests.test_config import SimulationConfig
+from wilson.utils.spectrum_utils import SimulationConfig
 from wilson.spectrum import debug_mode
 
 from wilson.spectrum.spectrum2D import Spectrum2D
 from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
-from CQCParse.parsing import GaussianDataParser, CFOURdataParser
-from dataclasses import dataclass, field
+
+from wilson.utils import Conditions
 
 # ---------------- Fixtures ----------------
 def convert_lists_to_tuples(data):
@@ -359,28 +359,6 @@ def terms_collection_derived(data_for_precalc_derived, setup_term_derived, deriv
         terms_cols[mol] = (te, precalc_dict)
     return terms_cols
 
-###################################################################################################
-
-@dataclass
-class Conditions:
-    Gamma_rc: float
-    diag_margin_rc: float
-    dynamic_range_n: int|float
-    omega1: np.ndarray
-    omega2: np.ndarray
-    program: str
-    data_parser: CFOURdataParser|GaussianDataParser
-    molecule: str
-    method: str
-    basis: str
-    new_idx_dict : dict
-    el_terms_selected: list
-    mech_terms_selected: list
-    list2exclude: list = None
-    only_modes: list = None
-    vpt2settings: dict = field(default_factory=lambda: {'anharmonic_type': 'GVPT2'})
-    vib_levels_harmonic: bool = False
-    preview: bool = False
 
 # ---------------- Fixtures ----------------
 # @pytest.fixture(scope="module",params=["FORM", "OXAC2"])

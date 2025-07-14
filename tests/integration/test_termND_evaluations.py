@@ -3,7 +3,7 @@ from tests.testing_utils import require_asserts
 from wilson.spectrum import debug_mode
 from wilson_analysis.render import render_spectrum
 
-import wilson.debug as debug
+import wilson.utils.debug as debug
 import CQCParse.debug as cqc_debug
 
 debug.level = 0

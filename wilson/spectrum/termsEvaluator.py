@@ -1,10 +1,10 @@
 import string
 
 import numpy as np
-from .tools import combinations_with_permutations
-from .spectrum_utils import DoubleDict
+from ..utils.tools import combinations_with_permutations
+from ..utils.spectrum_utils import DoubleDict
 from wilson.utils import pairwise_differences, coolprint
-from wilson.spectrum.spectrum_utils import greek_list
+from wilson.utils.spectrum_utils import greek_list
 from wilson.spectrum.termND import TermND
 # from wilson.debug import debugfunc, debug_deep
 

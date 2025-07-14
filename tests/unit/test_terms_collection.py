@@ -6,12 +6,12 @@ import numpy as np
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
 from wilson.spectrum.termsEvaluator import TermsEvaluator
 from wilson.spectrum import TermND
-from wilson.spectrum.spectrum_utils import VibStatesDiff
+from wilson.utils.spectrum_utils import VibStatesDiff
 
 from tests.testing_utils import require_asserts
 
 
-import wilson.debug as debug
+import wilson.utils.debug as debug
 import CQCParse.debug as cqc_debug
 debug.level = 0
 cqc_debug.level = 0

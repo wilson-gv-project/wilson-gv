@@ -16,12 +16,12 @@ Module checklist:
 
 import numpy as np
 
-from wilson.spectrum.tools import convNu2Ene, combinations_with_permutations
-from wilson.spectrum.spectrum_utils import MolProperty, VibStatesDiff
-from wilson.spectrum.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
-from wilson.spectrum.spectrum_utils import abc_list, greek_list
+from wilson.utils.tools import convNu2Ene, combinations_with_permutations
+from wilson.utils.spectrum_utils import MolProperty, VibStatesDiff
+from wilson.utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
+from wilson.utils.spectrum_utils import abc_list, greek_list
 from wilson.utils.tagger import tag
-from wilson.debug import debugfunc, debug_deep
+from wilson.utils.debug import debugfunc, debug_deep
 from collections.abc import Callable
 from itertools import product
 
@@ -205,7 +205,7 @@ class TermND:
         self.harmonic_states = harmonic_states
         self.harmonic_states_Eh = {k: convNu2Ene(v) for k, v in self.harmonic_states.items() if len(k)==1}
 
-        from .spectrum_utils import dict2arraydict
+        from ..utils.spectrum_utils import dict2arraydict
         # changing format of storing states data
         self.states_arrays = dict2arraydict(self.allstates)
         self.states_arrays_Eh = dict2arraydict(self.allstates_Eh)
