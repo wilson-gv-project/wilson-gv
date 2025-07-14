@@ -75,21 +75,37 @@ sim.dressPropsWithSetup()
 sim.makeCalculationBatches()
 sim.getResultsFromCalculationBatches(source_type='vault',
                                      source_loc=ws.intensities.utils.get_package_root()
-                                                + '/tests/test_database/mini_files_database.csv' )
+                                                + '/../tests/test_database/mini_files_database.csv' )
 print('\nafter getResultsFromCalculationBatches', sim.props, '\n')
 
 
 print('\n===========================================================================')
 print('  >>> Going to evaluate now...\n')
 # sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
-sim.evaluate(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=True)
+sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=False)
+
 import numpy as np
-print(np.max(np.abs(sim.spec)))
+intensities_spec = np.abs(sim.spec)**2
+print(np.max(np.abs(sim.spec)**2))
 
 print('\n===========================================================================')
 print('\n  >>> And now rendering...\n')
 
-sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
+# sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
+from wilson_analysis.render import render_spectrum
+
+hist, bin_edges = np.histogram(intensities_spec, bins=10)
+print("Histogram counts:", hist)
+print("Bin edges:", bin_edges)
+print('\n')
+
+# sim.render(ws.intensities.wilsonmain_render_integration.render_spectrum)
+print(f'np.max(intensities): {np.max(intensities_spec):.4e}')
+
+dict_meshes = spec_grid.make_mesh_numpy()
+render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
+                filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
+                nicetitle='TermsEvaluator')
 
 '''
 
