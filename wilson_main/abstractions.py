@@ -302,7 +302,7 @@ class VibAnaSetup:
     Class for setup for vibrational analysis and storage of the resulting information
 	"""
 
-	def __init__(self, vib_regime: str='harmonic', system: MolecularSystem=None, vib_regime_subinfo: dict=None,
+	def __init__(self, vib_regime: str=None, system: MolecularSystem=None, vib_regime_subinfo: dict=None,
 				 max_state_lvl: int=None, states: list[VibState]=None,
 				 nc_sqrt_eigval: dict=None, nc_eigvec: dict=None, allow_skip_eigvec: bool=False,
 				 vibana_prop_need: str='all', external_fill_from: ExternalCalcSetup=None,
@@ -456,24 +456,62 @@ class VibAnaSetup:
 
 		self.states = states
 
-	def doAnalysis(self, props: list[MolecularProperty], analyzer: Callable,
-				   system: MolecularSystem=None, preanalyzer_harmonic: Callable=None,
-				   with_conversion: bool=False, convert_in_preanalyzer: bool=False):
+	def doAnalysis(self, props: list[MolecularProperty],
+				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
+				   tuple[list[VibState], dict, dict]],
+				   system: MolecularSystem = None):
 		"""
-		Carry out vibrational analysis as set up
-		FIXME: The argument list and the fact that the analyzer takes different I/O depending on the situation
-		makes it difficult to type decorate the arguments. Consider splitting the different run cases into different
-		methods and thereby unwind the below selection logic
+		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
+		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
+		self.nc_eigvec) and the (regime-specific) vibrational states
 
 		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		analyzer: Callable: A reference to an analyzer function - I/O structure as per the different cases below
-		system: MolecularSystem instance: The system for which analysis is sought
-		preanalyzer_harmonic: Callable: Optional function reference for (only) harmonic vibrational analysis for
-		the case where it is needed to first do a harmonic analysis and then carry out anharmonic corrections
-		with_conversion: Boolean: Should the analyzer also carry out basis/unit conversion?
-		convert_in_preanalyzer: Boolean: If also doing conversion and if using a preanalyzer, should the conversion
-		take place in the preanalyzer (True) or in the analyzer (False)?
+		analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
+		__init__ for detailed argument specification: Must take as input a system, a set of properties,
+		a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
+		the associated eigenvectors and the vibrational states as VibState instances
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
 		"""
+
+		if self.regime is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+
+		if system is None:
+			if self.system is None:
+				raise AssertionError('No system specified as argument or stored for vibrational analysis')
+			else:
+				sys_va = self.system
+		else:
+			if self.system is not None:
+				raise AssertionError(
+					'Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
+			else:
+				sys_va = system
+
+
+
+		self.nc_sqrt_eigval, self.nc_eigvec, self.states = analyzer(sys_va, props, self.regime, self.regime_subinfo)
+
+	def doHarmonicAnalysis(self, props: list[MolecularProperty],
+						   harmonic_analyzer: Callable[[MolecularSystem, list[MolecularProperty]], tuple[dict, dict]],
+						   system: MolecularSystem = None):
+		"""
+		Carry out a harmonic vibrational analysis (regardless of chosen regime) and keep only
+		the (harmonic) fundamental vibrational energy levels (stored in self.nc_sqrt_eigval) and
+		associated eigenvectors (stored in self.nc_eigvec), but not vibrational state VibState instances.
+
+		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+		harmonic_analyzer: Callable: A reference to a harmonic analyzer function. See function definition and
+		attribute explanation in __init__ for detailed argument specification: Must take as input a system,
+		a set of properties, a choice of regime (and subinfo as relevant) and return
+		fundamental harmonic energy levels and associated eigenvectors.
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
+		"""
+
+		if self.regime is None:
+			print('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
 
 		if system is None:
 			if self.system is None:
@@ -486,40 +524,44 @@ class VibAnaSetup:
 			else:
 				sys_va = system
 
-		if preanalyzer_harmonic is not None:
+		self.nc_sqrt_eigval, self.nc_eigvec = harmonic_analyzer(sys_va, props)
 
-			if with_conversion:
+	def doAnharmonicAnalysis(self, props: list[MolecularProperty], anharmonic_analyzer:
+							Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
+							tuple[list[VibState], dict, dict]], system: MolecularSystem = None):
+		"""
+		Carry out anharmonic vibrational analysis as set up
 
-				if convert_in_preanalyzer:
+		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+		analyzer: Callable: A reference to an anharmonic analyzer function. See function definition and attribute 
+		explanation in __init__ for detailed argument specification: Must take as input a system, a set of properties,
+		a choice of regime (and subinfo as relevant), harmonic fundamental energy levels and associated eigenvectors,
+		and return the anharmonically corrected vibrational states as VibState instances.
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
+		"""
 
-					self.nc_sqrt_eigval, self.nc_eigvec, props = preanalyzer_harmonic(sys_va, props)
-					self.states = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval,
-										   self.nc_eigvec)
+		if self.regime is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-				else:
-
-					self.nc_sqrt_eigval, self.nc_eigvec = preanalyzer_harmonic(sys_va, props)
-					self.states, props = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval,
-										   self.nc_eigvec)
-
+		if system is None:
+			if self.system is None:
+				raise AssertionError('No system specified as argument or stored for vibrational analysis')
 			else:
-
-				print('CAUTION: No property basis conversion requested but harmonic preanalysis requested')
-				self.nc_sqrt_eigval, self.nc_eigvec = preanalyzer_harmonic(sys_va, props)
-				self.states = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
-
+				sys_va = self.system
 		else:
-
-			# One-stop shop
-			if with_conversion:
-				self.states, self.nc_sqrt_eigval, self.nc_eigvec, props = analyzer(sys_va, props, self.regime, self.regime_subinfo)
-
-			# Otherwise, will assume that harmonic analysis was already done and properties already in correct basis
+			if self.system is not None:
+				raise AssertionError(
+					'Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
 			else:
-				self.states = analyzer(sys_va, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
+				sys_va = system
+
+		self.states = anharmonic_analyzer(sys_va, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
 
 	def __repr__(self):
 		return 'THIS IS vibAnaSetup with self.regime,self.states'
+
+
 
 class CalculationBatch:
 	"""
