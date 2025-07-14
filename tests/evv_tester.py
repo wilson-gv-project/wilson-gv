@@ -92,7 +92,7 @@ if my_file.is_file():
 else:
     print('  >>> Going to evaluate now...\n')
     # sim.evaluate(ws.intensities.spectrum.wilsonmain_integration.spectrum2D)
-    sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator, include_diagnostics=False)
+    sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator)
     intensities_spec = np.abs(sim.spec)**2
     print(np.max(np.abs(sim.spec)**2))
     np.save('spec.npy', sim.spec)
