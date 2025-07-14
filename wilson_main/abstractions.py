@@ -2,6 +2,7 @@
 import copy
 from wilson_utils.prop_trivname import prop_trivname
 from typing import Callable, Any
+import numpy as np
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 class MolecularSystem:
@@ -156,7 +157,7 @@ class MolecularProperty:
 		self.target_basis = target_basis
 		self.target_units = target_units
 
-	def h(self, int: htype) -> int:
+	def h(self, htype: int) -> int:
 		"""
 		Hashing function with four hash types
 
@@ -420,7 +421,7 @@ class CalculationBatch:
 
 						# TODO: Exclusion based on mode index or freq cutoff
 						# FIXME: Change to integer indexing
-						processed_states.append(vibState({i: 1.0}, extracted_states[i]))
+						processed_states.append(VibState({i: 1.0}, extracted_states[i]))
 				vib_ana_setup_to_fill.states = processed_states
 
 
@@ -493,17 +494,20 @@ class SpectralAxis:
 		self.freq_vars = freq_vars
 
 
-# TODO: Implement
-# For "advanced" axes: Variation of experiment parameters or possibly other attributes
 class SpectralAxisAdvanced:
+	"""
+	Class to represent an "advanced" spectral axis (involving e.g. variation of experiment parameters
+	or possibly other attributes). Not yet implemented.
+	"""
 
 	def __init__(self):
 
 		pass
 
-# Spectral collective axes
 class SpectralGrid:
 	"""
+	Class to represent a collective set of spectral axes.
+
 	Use example:
 
 	axis1 = ws.main.abstractions.spectralAxis({1: 1})
@@ -514,15 +518,23 @@ class SpectralGrid:
 	spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
 												  start=start, end=end, spacer=spacer)
 
-
 	"""
 
-	def __init__(self, axes, range_style, start=None, end=None,
-				 n_pts=None, spacer=None,
-				 custom_range=None, collective_grid=None):
-		import numpy as np
+	def __init__(self, axes: dict, range_style: str, start: dict=None, end: dict=None,
+				 n_pts: dict=None, spacer: dict=None,
+				 custom_range: dict=None, collective_grid: Any=None):
+		"""
+		axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
+		instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
+		range_style: String: What sort of range? Intended options at least "uniform" or "custom"
+		start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
+		end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
+		n_pts: Dictionary {axis 1 ID: number of points (int), ...}: Number of points by axis
+		spacer: Dictionary {axis 1 ID: spacer (float), ...}: Spacers by axis
+		custom_range: Type not specified: Custom range for each axis. Not yet implemented
+		collective_grid: Type not specified (but most likely will be ndarray): (Custom) collective grid for all axes.
+		"""
 
-		# Axes must be a dictionary {1: spectralAxisRsp/Advanced instance, 2: ...}
 		self.axes = axes
 
 		self.start = None
@@ -578,11 +590,12 @@ class SpectralGrid:
 		# Otherwise intended to default to full granularity grid of individual axes
 		self.coll_grid = collective_grid
 
-	def make_mesh_numpy(self):
+	def make_mesh_numpy(self) -> tuple[np.ndarray]:
 		"""
-		Okay, but how to use spectralAxis.freq_vars
+		Make a numpy meshgrid using the axes information
+
+		Returns: A numpy meshgrid
 		"""
-		import numpy as np
 
 		listofmeshaxes = []
 		for ax_label in self.axes:
@@ -600,46 +613,70 @@ class SpectralGrid:
 
 		return mesh_dict
 
-	# Make collective grid from individual axes linspaces
 	def collGridFromAxes(self):
+		"""
+		Make collective grid from individual axes linspaces. Not yet implemented
+		"""
 
 		pass
-
 
 	def __repr__(self):
 		return "THIS IS SpectralGrid with self.axes,self.n_pts"
 
 # State, energy, displacement
 class VibState:
+	"""
+	Class to represent a vibrational state.
+	This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
+	TODO: Consider moving this class to wilson-utils.
+	"""
 
-	def __init__(self, s, e, d=None):
+	def __init__(self, s: dict, e: float, d: Any=None):
+		"""
+		s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+		e: float: State energy level
+		d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates.
+		"""
 
-		# s: {(harm. quanta): coeff, (harm. quanta): coeff, ...}
 		self.s = s
-		# Energy: Units must be ??
 		self.e = e
-		# Displacements (optional)
 		self.d = d
 
 	def __repr__(self):
 		return f"vibState {self.s}, energy is {self.e} cm-1"
 
 
-
 # CONTINUE HERE: Most likely rewrite to vibanaEvalSetup: Have this tell deriv. and rot. props needed (incl. xform matrix?)
 # Includes keywords for energy lvl regime
-# Tighter definition for property class?
-# Also adapt rest of code to this
 
-
-# Setup for vibrational analysis and storage of the resulting information
+#
 # Under which regime to describe the vibrational states
-# props is for "derivative-style props"
 class VibAnaSetup:
+	"""
+    Class for setup for vibrational analysis and storage of the resulting information
+	"""
 
-	def __init__(self, vib_regime='harmonic', system=None, vib_regime_subinfo=None, max_state_lvl=None, states=None,
-				 nc_sqrt_eigval=None, nc_eigvec=None, allow_skip_eigvec=False,
-				 vibana_prop_need='all', external_fill_from=None, exclude_modes=None):
+	def __init__(self, vib_regime: str='harmonic', system: MolecularSystem=None, vib_regime_subinfo: dict=None,
+				 max_state_lvl: int=None, states: list[VibState]=None,
+				 nc_sqrt_eigval: dict=None, nc_eigvec: dict=None, allow_skip_eigvec: bool=False,
+				 vibana_prop_need: str='all', external_fill_from: ExternalCalcSetup=None,
+				 exclude_modes: list=None):
+		"""
+		vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
+		system: MolecularSystem instance: System to which this instance pertains
+		vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
+		max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
+		states: List of VibState instances: Specification of each vibrational state in scope
+		nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
+		nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
+		allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
+		vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
+		vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+		"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
+		data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
+		external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
+		exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
+		"""
 
 		self.system = system
 		self.regime = vib_regime
@@ -664,7 +701,6 @@ class VibAnaSetup:
 		# 'all': Will need properties for both harmonic and anharmonic analysis
 		# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
 		# 'none': All results will be provided by external program
-		# FIXME: Maybe do away with 'harm' option, could be implied by other setup choices
 		self.vibana_prop_need = vibana_prop_need
 
 		# externalCalcSetup instance
@@ -673,9 +709,12 @@ class VibAnaSetup:
 		self.external_fill_from = external_fill_from
 
 
-	# Tell which molecularProperty instances are required for a specific vibrational analysis
-	# Allowed to skip eigenvectors (e.g. if all other data already in nm basis)
-	def tellNeededProps(self):
+	def tellNeededProps(self) -> list[MolecularProperty]:
+		"""
+		Tell which molecularProperty instances are required for a specific vibrational analysis
+
+		Returns a list of MolecularProperty instances detailing which properties are required
+		"""
 
 		needed_props = []
 
@@ -690,7 +729,7 @@ class VibAnaSetup:
 			if (self.vibana_prop_need == 'all'):
 
 				# FIXME: Not sure about target units
-				needed_props.append( molecularProperty(
+				needed_props.append(MolecularProperty(
 					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
 					trivial_name=prop_trivname(ord_geo=2),
 					target_basis='cart',
@@ -703,7 +742,7 @@ class VibAnaSetup:
 			if (self.vibana_prop_need  == 'all'):
 
 				# FIXME: Not sure about target units
-				needed_props.append(molecularProperty(
+				needed_props.append(MolecularProperty(
 					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
 					trivial_name=prop_trivname(ord_geo=2),
 					target_basis='cart',
@@ -718,7 +757,7 @@ class VibAnaSetup:
 				if not reg_hess:
 
 					# FIXME: Not sure about target units
-					needed_props.append(molecularProperty(
+					needed_props.append(MolecularProperty(
 						{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
 						trivial_name=prop_trivname(ord_geo=2),
 						target_basis='cart',
@@ -731,7 +770,7 @@ class VibAnaSetup:
 
 				if (self.vibana_prop_need == 'anharm') or (self.vibana_prop_need == 'all'):
 
-					needed_props.append(molecularProperty(
+					needed_props.append(MolecularProperty(
 						{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
 						trivial_name=prop_trivname(ord_geo=3),
 						target_basis='nm',
@@ -739,21 +778,21 @@ class VibAnaSetup:
 					)
 
 					# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
-					needed_props.append(molecularProperty(
+					needed_props.append(MolecularProperty(
 						{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
 						trivial_name=prop_trivname(ord_geo=4),
 						target_basis='nm',
 						target_units='au')
 					)
 
-					needed_props.append(molecularProperty(
+					needed_props.append(MolecularProperty(
 						{'ops': tuple(['r']), 'freq': (0.0)},
 						trivial_name=prop_trivname(ord_rot=1),
 						target_basis='nm',
 						target_units='au')
 					)
 
-					needed_props.append(molecularProperty(
+					needed_props.append(MolecularProperty(
 						{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
 						trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
 						target_basis='nm',
@@ -762,17 +801,19 @@ class VibAnaSetup:
 
 		return needed_props
 
-	def setStates(self, states):
+	def setStates(self, states: list[VibState]):
+		"""
+		Set vibrational states
+
+		states: List of VibState instances: The states to be set
+		"""
 
 		self.states = states
 
-	def setMaxStateLvl(self, lvl):
-
-		self.max_state_lvl = lvl
-
-	# Use preanalyzer_harmonic only if the (main) analyzer requires the harmonic part to be done first and the
+	# Use preanalyzer_harmonic only if the (main) analyzer requires the harmonic part to be done first
 	# Use the with_conversion flag if the analyzer (alt. will also be requested to carry out basis conversion
 	def doAnalysis(self, props, analyzer, system=None, preanalyzer_harmonic=None, with_conversion=False, convert_in_preanalyzer=False):
+
 
 		if system is None:
 			if self.system is None:
@@ -946,7 +987,7 @@ class WilsonSimulation:
 							else:
 								raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
 
-							new_prop = molecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
+							new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
 														 target_basis='nm', target_units='au')
 
 							if not new_prop.h(1) in [k.h(1) for k in self.props]:
@@ -1021,7 +1062,7 @@ class WilsonSimulation:
 				calc_batches[ih].addProperty(copy.deepcopy(i))
 
 			else:
-				calc_batches[ih] = calculationBatch(self.system, i.calc_setup, [copy.deepcopy(i)])
+				calc_batches[ih] = CalculationBatch(self.system, i.calc_setup, [copy.deepcopy(i)])
 
 		self.calc_batches = calc_batches
 
