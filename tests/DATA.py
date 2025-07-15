@@ -1,5 +1,6 @@
 import numpy as np
 
+# generated derivatives data with the generateDerivs() which is below
 mu_Q = np.array([[0.5864, 0.    , 0.6642],
                    [0.    , 0.    , 0.5725],
                    [0.8658, 0.3108, 0.0144],
