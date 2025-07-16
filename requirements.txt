@@ -3,7 +3,6 @@
   ipython
   ipykernel
   pip
-  python
   matplotlib
   scipy
   rich
