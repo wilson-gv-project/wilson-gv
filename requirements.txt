@@ -1,0 +1,11 @@
+  numpy
+  pandas
+  ipython
+  ipykernel
+  pip
+  python
+  matplotlib
+  scipy
+  rich
+  altair
+  plotly

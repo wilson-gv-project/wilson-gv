@@ -7,7 +7,6 @@ hidden_**
 
 .idea/
 *.svg
-*.txt
 *.csv
 
 .ruff_cache
