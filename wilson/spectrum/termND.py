@@ -327,7 +327,6 @@ class TermND:
         else:
             #! not general
 
-            # a, b = str(a), str(b)
             dict_mn_tuples = self.for_ab(abc_comb)
 
             vibdiff1 = self.allstates_Eh[dict_mn_tuples['m12_tuple']] - self.allstates_Eh[dict_mn_tuples['n12_tuple']]
@@ -600,7 +599,6 @@ class TermND:
         #! ab - are the indices from resonance conditions but ab should have others as None
 
         for ab in combinations_with_permutations(self.mode_indices, self.collective_n_idx_rescond):
-            # full_abc = make_abc_tuple(ab, 3)
             if sel_abs is not None:
                 if ab not in sel_abs:
                     skipped+=1
@@ -748,7 +746,6 @@ class TermND:
         """
 
         locations_dict = self.get_all_resonances(w2mw1=False)
-        # print('locations_dict', locations_dict)
         from scipy.spatial import distance
         coords = np.array(list(locations_dict.keys()))
         distances = distance.cdist(coords, coords, 'euclidean')
@@ -763,7 +760,6 @@ class TermND:
                                                           Gamma_rc, margin=0.,
                                                           condition=condition,
                                                           sel_abs=[k])
-                # print('intensities_dict[k]', intensities_dict[k], k)
 
         data = {
             'ab': [(int(i[0]), int(i[1])) for i in list(intensities_dict.keys())],

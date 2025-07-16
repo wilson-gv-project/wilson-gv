@@ -10,7 +10,6 @@ def test_get_indices() -> None:
               'termB_pref': 1.,
               'termA_pref': -1/48.}
 
-    print(term)
     allidx, res_idx = get_allparts_indices(term)
     assert allidx == 3
     assert res_idx == 2
@@ -19,7 +18,6 @@ def test_get_indices() -> None:
 def test_make_abc_tuple() -> None:
     print()
     a = make_abc_tuple((1, 2), 4)
-    print(a)
     assert a == (1, 2, None, None)
 
 
@@ -28,4 +26,4 @@ def test_abc_list() -> None:
     from wilson.utils.spectrum_utils import make_abc_dict
     abc_comb = (1, 2, 3, 4)
     idx_str = make_abc_dict(abc_comb)
-    print(idx_str)
+    assert idx_str == {'a': 1, 'b': 2, 'c': 3, 'd': 4}

@@ -41,11 +41,6 @@ def test_terms_collection_calculation(terms_collection: dict, spectrum_setup: di
         assert key in precalc_dict, f"Key '{key}' missing in precalculated data"
     assert precalc_dict['vibene_denoms'], "vibene_denoms data is empty"
 
-    # from rich import print as rprint
-    # print('\n')
-    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
-    # rprint(precalc_dict)
-    # print('\n')
     
     # can run with debug prints if > 0
     with debug_mode(0):
@@ -98,12 +93,6 @@ def test_terms_collection_calculation_derived(terms_collection_derived: dict,
         assert key in precalc_dict, f"Key '{key}' missing in precalculated data"
     assert precalc_dict['vibene_denoms'], "vibene_denoms data is empty"
 
-    # from rich import print as rprint
-    # print('\n')
-    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
-    # rprint(precalc_dict)
-    # print('\n')
-
     # can run with debug prints if > 0
     with debug_mode(0):
         amplitudes = 0.0
@@ -130,7 +119,6 @@ def test_terms_collection_calculation_derived(terms_collection_derived: dict,
     print(f"Maximum intensity: {np.max(np.abs(amplitudes)**2):.3e}")
 
     np.set_printoptions(precision=4)
-    # print(amplitudes)
 
     intensities = np.abs(amplitudes)**2
 

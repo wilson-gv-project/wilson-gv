@@ -11,6 +11,8 @@ TODO in next iteration
 #
 # path_to_files = '' # set up your path to the directory shared on OneDrive
 # # https://universitetetitromso-my.sharepoint.com/:f:/g/personal/vle014_uit_no/EgH4Rjk0_YtNvH1BXVMdh3gBnB5H5j68lDC7EROXiBM3Ag?email=magnus.ringholm%40uit.no&e=ScmRmw
+# minidatabase_csv = get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+
 # data_vault = DataVault('/files_fram/files_database.csv')
 #
 # omega1 = np.arange(1130., 2050., 2.91)

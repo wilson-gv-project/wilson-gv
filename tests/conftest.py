@@ -5,12 +5,13 @@ Each of fixtures returns a dictionary where keys are molecular code strings.
 So for each molecule there could be a setup. Method is B3LYP and basis set cc_pVQZ.
 Initial use of list_of_molucules is in conditions()
 """
+import os
 import pytest
 import numpy as np
 import pandas as pd
 from CQCParse.relay import DataVault
 from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.utils import prep_data_load
+from wilson.utils import prep_data_load, get_package_root
 from wilson.spectrum.termND import TermND
 from wilson.spectrum import DataForPrecalc
 from wilson.spectrum.termsEvaluator import TermsEvaluator
@@ -24,6 +25,9 @@ from wilson.utils import Conditions
 
 # list of molucules to set up fixtures for
 list_of_molecules = ["FORM"]
+minidatabase_csv = get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+terms_json = ''
+directory = os.path.dirname(os.path.abspath(__file__))
 
 # ---------------- Fixtures ----------------
 def convert_lists_to_tuples(data: list|dict) -> tuple|dict:
@@ -36,8 +40,10 @@ def convert_lists_to_tuples(data: list|dict) -> tuple|dict:
 
 @pytest.fixture(scope='module')
 def derived_terms_json() -> dict:
+    import os
+    directory = os.path.dirname(os.path.abspath(__file__))
     import json
-    with open('/home/vlev/wilson-suite/wilson_intensities/tests/unit/terms.json') as json_file:
+    with open(directory+'/unit/terms.json') as json_file:
         list_terms = json.load(json_file)
     d = {i:t for i,t in enumerate(list_terms)}
     return convert_lists_to_tuples(d)
@@ -138,14 +144,15 @@ def MOL_setup_parser(conditions: dict) -> dict:
 
     for mol,cond in conditions.items():
         molecule, method, basis = cond.molecule, 'B3LYP', 'cc_pVQZ'
-        data_vault = DataVault("/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv")
+        data_vault = DataVault(minidatabase_csv)
         dataframe_gaussian = data_vault.getting_files_DB("gaussian")
         aa = dataframe_gaussian[
             (dataframe_gaussian['code'] == molecule) &
             (dataframe_gaussian['method'] == method) &
             (dataframe_gaussian['basis_set'] == basis)
         ]['g16_3quanta_full']
-        filename = aa.iloc[0]
+        filename = directory+aa.iloc[0]
+
         gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
         parser = GaussianParser(gout)
         parser.load()
@@ -157,17 +164,10 @@ def spectrum_setup(avrg_xyz_indices: list|np.ndarray, conditions: dict) -> dict:
     Fixture to provide the simulation configuration.
     """
     setupsdict = {}
-    # print(conditions.keys())
     for mol,conds in conditions.items():
-        print(mol)
         w1 = np.arange(850.0, 3150.0, 3.1)
         w2 = np.arange(500.0, 6550.0, 3.1)
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-        # for now not changing indices
-        # if mol=='FORM':
-        #     new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
-        # else:
-        #     new_idx_dict = None
         new_idx_dict = None
         setupsdict[mol] = SimulationConfig(
             gammaCompsAll=avrg_xyz_indices,
@@ -201,10 +201,8 @@ def setup_term(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) 
     Factory fixture to set up a TermND instance with parsed data and loaded calculations.
     """
     term_funcs = {}
-    # print(spectrum_setup.keys())
 
     for mol,spec_setup in spectrum_setup.items():
-        print(mol)
         def create_term(term_id: int|str) -> TermND:
             term = TermND(term_id, dict_8terms[term_id]) #! dict_8terms or derived_terms_json
             parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
@@ -231,10 +229,8 @@ def setup_term_derived(derived_terms_json: dict,
 
     """
     term_funcs = {}
-    # print(spectrum_setup.keys())
 
     for mol,spec_setup in spectrum_setup.items():
-        print(mol)
         def create_term(term_id: int|str) -> TermND:
             term = TermND(term_id, derived_terms_json[term_id]) #! dict_8terms or derived_terms_json
             parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
@@ -259,9 +255,7 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
     Fixture to prepare data for precalculation.
     """
     precalcs = {}
-    # print(spectrum_setup.keys())
     for mol,spec_setup in spectrum_setup.items():
-        # print(mol)
         term_with_data = setup_term[mol](0)  # Create term 0
         Nnmodes = 6
         # now here keys change; fixme: it the change needed??
@@ -279,12 +273,6 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
         axes_dict = {1: w1m, 2: w2m}
 
-        # from rich import print as rprint
-        # rprint('\n[deep_pink3]term_with_data.states_arrays_Eh[/deep_pink3]')
-        # rprint(term_with_data.states_arrays_Eh)
-        # rprint('\n[deep_pink3]term_with_data.harmonic_arrays_Eh[/deep_pink3]')
-        # rprint(term_with_data.harmonic_arrays_Eh)
-
         from wilson.spectrum import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
@@ -292,8 +280,6 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
                                  axes_dict=axes_dict,
                                  states_arrays_Eh=term_with_data.states_arrays_Eh,
                                  harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
-        # print('term_with_data.harmonic_arrays_Eh')
-        # print(term_with_data.harmonic_arrays_Eh)
         precalcs[mol] = alldata
     return precalcs
 @pytest.fixture(scope="module")
@@ -302,9 +288,7 @@ def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> 
     Fixture to prepare data for precalculation.
     """
     precalcs = {}
-    # print(spectrum_setup.keys())
     for mol,spec_setup in spectrum_setup.items():
-        # print(mol)
         term_with_data = setup_term_derived[mol](0)  # Create term 0
         Nnmodes = 6
         props_data_ready = {
@@ -321,20 +305,12 @@ def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> 
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
         axes_dict = {1: w1m, 2: w2m}
 
-        # from rich import print as rprint
-        # rprint('\n[deep_pink3]term_with_data.states_arrays_Eh[/deep_pink3]')
-        # rprint(term_with_data.states_arrays_Eh)
-        # rprint('\n[deep_pink3]term_with_data.harmonic_arrays_Eh[/deep_pink3]')
-        # rprint(term_with_data.harmonic_arrays_Eh)
-
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
                                  avrg_terms=avrg_terms,
                                  axes_dict=axes_dict,
                                  states_arrays_Eh=term_with_data.states_arrays_Eh,
                                  harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
-        # print('term_with_data.harmonic_arrays_Eh')
-        # print(term_with_data.harmonic_arrays_Eh)
         precalcs[mol] = alldata
     return precalcs
 @pytest.fixture(scope="module")
@@ -343,10 +319,8 @@ def terms_collection(data_for_precalc: dict, setup_term: dict, dict_8terms: dict
     Fixture to create a TermsEvaluator with precalculated data.
     """
     terms_cols = {}
-    # print(setup_term.keys())
 
     for mol,term_setup in setup_term.items():
-        # print(mol)
         terms = [term_setup(i) for i in range(len(dict_8terms))] #! dict_8terms or derived_terms_json
         te = TermsEvaluator(terms)
         te.identify_to_precalculate()
@@ -360,10 +334,8 @@ def terms_collection_derived(data_for_precalc_derived: dict, setup_term_derived:
     Fixture to create a TermsEvaluator with precalculated data.
     """
     terms_cols = {}
-    # print(setup_term_derived.keys())
 
     for mol,term_setup in setup_term_derived.items():
-        # print(mol)
         terms = [term_setup(i) for i in range(len(derived_terms_json))] #! dict_8terms or derived_terms_json
         te = TermsEvaluator(terms)
         te.identify_to_precalculate()
@@ -384,9 +356,6 @@ def conditions() -> dict[str: Conditions]:
 
     # for mol in ["FORM", "OXAC2"]:
     for mol in list_of_molecules:
-        # print(mol)
-        # omega1 = np.linspace(850.0, 3150.0, 1050)
-        # omega2 = np.linspace(500.0, 6550.0, 800)
         omega1 = np.arange(850.0, 3150.0, 3.1)
         omega2 = np.arange(500.0, 6550.0, 3.1)
         program = 'gaussian'
@@ -394,7 +363,6 @@ def conditions() -> dict[str: Conditions]:
         method = 'B3LYP'
         basis = 'cc_pVQZ'
         if mol=='FORM':
-            # new_idx_dict = {3: 0, 5: 1, 2: 2, 1: 3, 0: 4, 4: 5} #FORM
             new_idx_dict = None #FORM
         else:
             new_idx_dict = None
@@ -424,12 +392,12 @@ def conditions() -> dict[str: Conditions]:
 
 @pytest.fixture
 def dataframe_gaussian() -> pd.DataFrame:
-    data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+    data_vault = DataVault(minidatabase_csv)
     dataframe_gaussian = data_vault.getting_files_DB("gaussian")
     return dataframe_gaussian
 @pytest.fixture
 def dataframe_cfour() -> pd.DataFrame:
-    data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
+    data_vault = DataVault(minidatabase_csv)
     dataframe_cfour = data_vault.getting_files_DB("cfour")
     return dataframe_cfour
 
@@ -440,10 +408,8 @@ def parsed_data(conditions: dict,
     Fixture to parse data based on the program (Gaussian or CFOUR).
     """
     parsed_data_dict = {}
-    # print(conditions.keys())
 
     for mol,cond in conditions.items():
-        # print(mol)
         program = cond.program
         molecule, method, basis = mol, cond.method, cond.basis
         if program == 'gaussian':
@@ -452,7 +418,8 @@ def parsed_data(conditions: dict,
                 (dataframe_gaussian['method'] == method) &
                 (dataframe_gaussian['basis_set'] == basis)
             ]['g16_3quanta_full']
-            filename = aa.iloc[0]
+            filename = directory+aa.iloc[0]
+
             gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
             parser = GaussianParser(gout)
         elif program == 'cfour':
@@ -479,10 +446,8 @@ def spectrum2d(conditions: dict) -> dict:
     Fixture to set up a Spectrum2D object.
     """
     spectrum_objects = {}
-    # print(conditions.keys())
 
     for mol,cond in conditions.items():
-        # print(mol)
         omega1, omega2 = cond.omega1, cond.omega2
         spectrum_obj = Spectrum2D(omega1, omega2)
         spectrum_objects[mol] = spectrum_obj
@@ -493,10 +458,8 @@ def spectrum_sequence(spectrum2d: dict, parsed_data: dict, conditions: dict) -> 
     Fixture to launch the spectrum sequence and return the resulting dictionary.
     """
     preps = {}
-    # print(conditions.keys())
 
     for mol,cond in conditions.items():
-        # print(mol)
         preps[mol] = spectrum2d[mol].launch_sequence1(parsed_data[mol],
                                                       cond, print_level=0)
     return preps
@@ -507,18 +470,14 @@ def intensity_data(spectrum2d: dict, spectrum_sequence: dict) -> dict:
     """
 
     sec_hypol_data_dict = {}
-    # print(spectrum_sequence.keys())
 
     for mol,spec_preps in spectrum_sequence.items():
-        # print(mol)
         mask = None
         sec_hypol_dataALL_ref = spectrum2d[mol].intensity_both(selectionCond=mask)
         nan_mask = np.isnan(sec_hypol_dataALL_ref)
 
         has_nan = np.any(nan_mask)
-        print(f"Are there any NaN values? {has_nan}")
         num_nan = np.sum(nan_mask)
-        print(f"Number of NaN values: {num_nan}")
 
         sec_hypol_dataALL_ref[nan_mask] = 0 + 0j
 
@@ -532,10 +491,8 @@ def terms_amplitudes(terms_collection: dict, spectrum_setup: dict) -> dict:
     """
 
     ampls = {}
-    # print(spectrum_setup.keys())
 
     for mol,spec_setup in spectrum_setup.items():
-        # print(mol)
         te, _ = terms_collection[mol]
         with debug_mode(0):
             amplitudes = sum(

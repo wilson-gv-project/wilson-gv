@@ -42,8 +42,6 @@ def test_identify_to_precalculate(dict_8terms: dict) -> None:
     print('Unique vib. ene. denominators (1/omega_a/omega_b...): ', tts.unique_vibene_denoms)
     print('Unique vib diff types - tuples, all:\n', set(tts.mn_types))
     print('Unique vib diff types - tuples, all:')
-    for k in set(tts.mn_types):
-        print(k)
 
     assert set(tts.mn_types) == {VibStatesDiff((0, 1), True, (-1,), 'zero,a'),
                                  VibStatesDiff((1, 2), False),
@@ -65,7 +63,6 @@ def test_outer_product_einsum() -> None:
 
     arr = np.array([1., 2., 4.])
     from wilson.spectrum.termsEvaluator import outer_product_einsum
-    # print(repr(outer_product_einsum(1./arr, 3)))
     expected_2d = np.array([[1., 0.5, 0.25],
                             [0.5, 0.25, 0.125],
                             [0.25, 0.125, 0.0625]])
@@ -101,7 +98,6 @@ def test_precalc_vibene_denoms(dict_8terms: dict) -> None:
     freqs = np.array([2., 4., 8.])
     qstates = {1: freqs}
     res = tts.precalc_vibene_denoms(qstates)
-    print(res)
     assert sorted(list(res.keys())) == sorted([('a', 'b', 'c'), ('a', 'b')])
     assert res[('a', 'b')][0,0] == 2.*2.
     assert res[('a', 'b')][0,1] == 2.*4.
@@ -132,7 +128,6 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     }
 
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll[:3])
-    print('\nstored.keys()', stored.keys())
 
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,1] == 60.4 # term 0
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,0] == 4.6 # term 0
@@ -149,9 +144,6 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     assert stored[tuple(sorted(['dipgrad', 'polhess', 'dipgrad']))][0,0] == 12.
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'dipgrad']))][1,0,1] == 106.8
 
-    # assert sorted(list(stored.keys())) == sorted([((1, 1), (2, 1), (1, 2)),
-    #                                ((1, 1), (2, 1), (1, 1)),
-    #                                ((1, 1), (2, 2), (1, 1))])
     assert sorted(list(stored.keys())) == [('dipgrad', 'dipgrad', 'polgrad'),
                                            ('dipgrad', 'dipgrad', 'polhess'),
                                            ('dipgrad', 'diphess', 'polgrad')]
@@ -178,7 +170,6 @@ def test_precalc_res_conds(dict_8terms: dict) -> None:
     print('set of res cond types', set_rc_types)
     assert sorted(list(set_rc_types)) == sorted(list({(-1, 2), (-1,)}))
 
-    print('set(tts.mn_types)',  set(tts.mn_types))
     print('Quanta for states involved:', set([i for v in set(tts.mn_types) for i in v.diff_type if i>0 ]))
 
 
@@ -187,7 +178,6 @@ def test_precalc_res_conds(dict_8terms: dict) -> None:
     axes_dict = {1: x, 2: y}
     print('axes_dict\n', axes_dict)
 
-    # freqs = np.array([2., 4., 8.])
     pf_types = tts.precalc_res_conds(axes_dict)
 
     print('\nresult of precalc\n', pf_types)
@@ -202,7 +192,6 @@ def test_precalc_res_conds(dict_8terms: dict) -> None:
     axes_dict = {1: 80, 2: 800}
     print('axes_dict\n', axes_dict)
 
-    # freqs = np.array([2., 4., 8.])
     pf_types = tts.precalc_res_conds(axes_dict)
 
     print('\nresult of precalc\n', pf_types)
@@ -262,8 +251,6 @@ def test_precalc_vibdiffs(dict_8terms: dict) -> None:
     assert rrr[(1, 2)][1,2,0] == states[1][1] - states[2][0,2] # symmetry
     assert rrr[(1, 2)][1,2,0] != states[1][2] - states[2][2,1] # wrong indexing
 
-    # print(t3.vibdiff_symbolic)
-
     print()
 
 
@@ -296,8 +283,6 @@ def test_precalculate(dict_8terms: dict) -> None:
                            [[3., 5., 6.],
                             [5., 8., 9.],
                             [6., 9., 10.]]])}
-
-    # freqs = np.array([2., 4., 8.])
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])

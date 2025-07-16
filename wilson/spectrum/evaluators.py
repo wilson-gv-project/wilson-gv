@@ -3,7 +3,6 @@ Evaluator functions for WilsonSimulation
 """
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
-# from wilson.utils import prep_data_load
 
 import numpy as np
 
@@ -116,14 +115,7 @@ def terms_evaluator(system,
     # format transformation
     states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
 
-    # from rich import print as rprint
-    # rprint('\n[deep_pink3]states_arrays_Eh[/deep_pink3]')
-    # rprint(states_arrays_Eh)
-    # rprint('\n[deep_pink3]harmonic_arrays_Eh[/deep_pink3]')
-    # rprint(harmonic_arrays_Eh)
-
     data_for_precalc = DataForPrecalc(Nnmodes=system.Nnmodes,
-                                      # props_data=props_data_ready,
                                       props_data=props_data,
                                       avrg_terms=avrg_terms,
                                       axes_dict=axes_dict,
@@ -132,12 +124,6 @@ def terms_evaluator(system,
 
     # 5 - complete
     precalculated_data = te.precalculate(data_for_precalc)
-
-    # from rich import print as rprint
-    # print('\n')
-    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
-    # rprint(precalculated_data)
-    # print('\n')
 
     # 6
     from wilson.spectrum import debug_mode
@@ -150,9 +136,5 @@ def terms_evaluator(system,
             a_intermediate = term.get_amplitudes(axes_dict[1], axes_dict[2],
                                                  3.8, 0.0, debugprint=True, collect_all=False)
         amplitudes += a_intermediate
-
-    # if with_diagnostics:
-        # return amplitudes, diagn
-    # else:
     
     return amplitudes

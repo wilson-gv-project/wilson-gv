@@ -25,6 +25,8 @@
 # terms_selection = [0,1], [2,3]
 #
 # from wilson.utils import pickle_objs, unpickle_objs, Conditions
+# minidatabase_csv = get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+
 # data_vault = DataVault('/mnt/c/Users/vle014/OneDrive - UiT Office 365/Documents/files_fram/files_database.csv')
 # dataframe_gaussian = data_vault.getting_files_DB("gaussian")
 # molecule, method, basis = 'OXAC2', 'B3LYP', 'cc_pVQZ'

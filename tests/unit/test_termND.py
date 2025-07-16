@@ -23,7 +23,7 @@ cqc_debug.level = 0
 
 print()
 
-def setup_term(term_id: int, terms_dict_setup: dict, FORM_setup_parser, spectrum_setupØ) -> TermND:
+def setup_term(term_id: int, terms_dict_setup: dict, FORM_setup_parser, spectrum_setup) -> TermND:
     """
     Helper function to set up a TermND instance with parsed data and loaded calculations.
     """
@@ -57,11 +57,6 @@ def test_instance(dict_8terms: dict) -> None:
     assert t3.viblevelsdiff_expr == ('a+c,b', 'b+c,a')
     assert t3.expression['non_averaged_props'] == (('F', ('a', 'c', 'b')),)
 
-    print(t0)
-    print()
-
-    print(t3)
-    print()
 
 
 @require_asserts
@@ -104,13 +99,11 @@ def test_load_data(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: di
 
     assert t0.allstates[('1',)] == 1794.5406564861917 # still unchanged indices
 
-    # UPDATING INDICES NOW!
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
+    # if UPDATING INDICES, do it NOW
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    # assert t0.allstates[('3',)] == 1794.5406564861917
     assert t0.allstates[('3',)] == 1185.288187960807
 
 
@@ -124,7 +117,6 @@ def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict,
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
@@ -182,7 +174,6 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
@@ -218,7 +209,6 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
     precalc_dict = te.precalculate(alldata)
     t0.precalc_data = precalc_dict
 
-    print('t0.precalc_data', t0.precalc_data)
     a,b = 0,0 # (4,5), (2,3), (2,5)
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
@@ -319,8 +309,7 @@ def test_get_resonance_location_general_mock(dict_8terms: dict) -> None:
                     'res_conds': c,
                     'vibdiffs': d}
     t0.precalc_data = precalc_data
-    print(t0.get_resonance_location_general((0,2)))
-    # assert
+    assert t0.get_resonance_location_general((0,2)) == [np.float64(219474.63136314112), np.float64(438949262.72628224)]
 
 
 @require_asserts
@@ -333,16 +322,13 @@ def test_get_resonance_location_general_real(dict_8terms: dict, MOL_setup_parser
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
     import numpy as np
     te = TermsEvaluator([t0])
-    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
-    print(t0.properties_data.keys())
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
         'diphess': t0.properties_data['diphess'],
@@ -366,7 +352,7 @@ def test_get_resonance_location_general_real(dict_8terms: dict, MOL_setup_parser
     precalc_dict = te.precalculate(alldata)
 
     t0.precalc_data = precalc_dict
-    print(t0.get_resonance_location_general((4, 4)))
+    assert t0.get_resonance_location_general((4, 4)) == [np.float64(2682.7657620974974), np.float64(5428.690420415495)]
 
 
 @require_asserts
@@ -379,7 +365,6 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
@@ -389,7 +374,6 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
     w1,w2 = t0.get_resonance_location_general((a,b))
 
     te = TermsEvaluator([t0])
-    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
@@ -474,7 +458,6 @@ def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectr
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0 = TermND(0, dict_8terms[0])
@@ -496,7 +479,6 @@ def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectr
     te = TermsEvaluator(terms)
 
     Nnmodes = 6
-    print(t0.properties_data.keys())
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
         'diphess': t0.properties_data['diphess'],
@@ -523,10 +505,6 @@ def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectr
         t.precalc_data = precalc_dict
     ###########################################################################################################
 
-    # debug.level = 2
-    # debug.debugfunc(t0.properties_data.keys(), 'self.properties_data.keys()')
-
-    # print(w1m)
     amplitudes = 0.
     for t in terms:
         e = t.get_amplitudes(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
@@ -556,7 +534,6 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    # parsed_data.upd_indices_several_parts(spectrum_setup.old_new_dict)
     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
@@ -566,7 +543,6 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
     w1,w2 = t0.get_resonance_location_general((a,b))
 
     te = TermsEvaluator([t0, t1, t2, t3])
-    # freqs = np.array([t0.allstates[k] for k in t0.allstates if len(k)==1])
     Nnmodes = 6
     props_data_ready = {
         'dipgrad': t0.properties_data['dipgrad'],
@@ -644,8 +620,10 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
 def test_termevaluator() -> None:
 
     import json
+    import os
+    directory = os.path.dirname(os.path.abspath(__file__))
 
-    with open('/home/vlev/wilson-suite/tests/terms.json') as json_file:
+    with open(directory+'/terms.json') as json_file:
         data = json.load(json_file)
         print("Type:", type(data))
         print(data)
@@ -654,12 +632,11 @@ def test_termevaluator() -> None:
 def test_compute_vibdiff() -> None:
     print()
     from wilson.spectrum import compute_vibdiff
-    print(compute_vibdiff((0,1), (3,)))
-    print(compute_vibdiff((0,1), (6,)))
-    print(compute_vibdiff((1,1), (3,2)))
-    print(compute_vibdiff((1,1), (3,0)))
-    print(compute_vibdiff((2,1), (3,0,1)))
-    print(compute_vibdiff((2,1), (3,1,0)))
+    assert compute_vibdiff((0,1), (3,)) == [('zero',), ('3',)]
+    assert compute_vibdiff((0,1), (6,)) == [('zero',), ('6',)]
+    assert compute_vibdiff((1,1), (3,2)) == [('3',), ('2',)]
+    assert compute_vibdiff((1,1), (3,0)) == [('3',), ('0',)]
+    assert compute_vibdiff((2,1), (3,0,1)) == [('3', '1'), ('0',)]
 
 
 
@@ -669,19 +646,6 @@ def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions
     """
     # terms_collection is a fixture
     te, precalc_dict = terms_collection['FORM']
-    # spectrum_setup = spectrum_setup['FORM']
-    # conditions = conditions['FORM']
-
-    # expected_keys = ['vibene_denoms', 'avrg_tensors', 'res_conds', 'vibdiffs']
-    # for key in expected_keys:
-    #     assert key in precalc_dict, f"Key '{key}' missing in precalculated data"
-    # assert precalc_dict['vibene_denoms'], "vibene_denoms data is empty"
-
-    # from rich import print as rprint
-    # print('\n')
-    # rprint("[deep_pink3]Precalculated data[/deep_pink3]")
-    # rprint(precalc_dict)
-    # print('\n')
 
     with debug_mode(0):
         for id, term in te.terms.items():
@@ -691,11 +655,9 @@ def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions
                 #     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
                 #     for key, value in term.get_all_resonances(w2mw1=True).items()
                 # }
+                # print(formatted_resonances)
                 df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
                 print(df)
-                print('_____________________')
-                print(term)
-                # print(formatted_resonances)
 
 
 def test_get_factor_summed(terms_collection: dict) -> None:
@@ -704,7 +666,6 @@ def test_get_factor_summed(terms_collection: dict) -> None:
     te, precalc_dict = terms_collection['FORM']
     term3 = te.terms[3]
     term3.precalc_data = precalc_dict
-    # print(' jimr', term3.precalc_data)
 
     ab_comb = (0,0)
     total = 0.

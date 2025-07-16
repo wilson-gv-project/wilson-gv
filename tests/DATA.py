@@ -133,7 +133,6 @@ def generateDerivs() -> None:
     mu_QQ = np.zeros((4, 4, 3))
     for i in range(4):
         for j in range(i, 4):  # Only fill upper triangle for symmetry
-            # values = np.random.rand(3)
             values = random_with_zeros((3,), zero_prob=0.6)
 
             mu_QQ[i, j, :] = values
@@ -142,7 +141,6 @@ def generateDerivs() -> None:
     # (4, 3, 3) array with symmetric (3, 3) sub-arrays
     alpha_Q = np.zeros((4, 3, 3))
     for i in range(4):
-        # matrix = np.random.rand(3, 3)
         matrix = random_with_zeros((3,3), zero_prob=0.65)
         symmetric_matrix = (matrix + matrix.T) / 2  # Make it symmetric
         alpha_Q[i] = symmetric_matrix
@@ -151,7 +149,6 @@ def generateDerivs() -> None:
     alpha_QQ = np.zeros((4, 4, 3, 3))
     for i in range(4):
         for j in range(i, 4):  # Only fill upper triangle for symmetry
-            # matrix = np.random.rand(3, 3)
             matrix = random_with_zeros((3,3), zero_prob=0.7)
             symmetric_matrix = (matrix + matrix.T) / 2  # Make it symmetric
             alpha_QQ[i, j] = symmetric_matrix

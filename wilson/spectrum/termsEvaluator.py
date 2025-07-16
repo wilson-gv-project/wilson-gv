@@ -7,7 +7,6 @@ from wilson.utils import pairwise_differences, coolprint
 from wilson.utils.spectrum_utils import greek_list
 from wilson.utils.spectrum_utils import DataForPrecalc
 from wilson.spectrum.termND import TermND
-# from wilson.debug import debugfunc, debug_deep
 
 
 class TermsEvaluator:
@@ -79,7 +78,6 @@ class TermsEvaluator:
 
         # now: IDENTIFYING unique normal mode indices for avrg tensors, to know dimensionality
         #! used in precalc_avrg_tensors()
-        # self.unique_avrg_tensors_all = {}
         self.unique_avrg_tensors_all_expr = {}
         for t in self.terms.values():
             nms_exp = [i for p in t.avrg_props_expr for i in p[1]]
@@ -90,7 +88,6 @@ class TermsEvaluator:
 
         for k in self.unique_avrg_tensors_all_expr:
             self.unique_avrg_tensors_all_expr[k] = max(self.unique_avrg_tensors_all_expr[k])
-        print('\nself.unique_avrg_tensors_all_expr', self.unique_avrg_tensors_all_expr, '\n')
 
         # (3) IDENTIFYING 1/omega_a/omega_b, 1/omega_a/omega_b/omega_c terms - to make nD tensors of products
         #! in precalc_vibene_denoms()
@@ -301,6 +298,12 @@ def get_data_keys(input_tuple: tuple, variables: dict, greek_dict: dict) -> tupl
 
 
 def outer_product_einsum(arr: np.ndarray, n: int) -> np.ndarray:
+    """
+    Make einsum of input arrays arr
+    
+    For multiplying one array with itself n times to get an nd matrix.
+
+    """
     # for n=3 -> 'i,j,k->ijk'
 
     indices = ','.join([chr(ord('i') + j) for j in range(n)]) + '->' + ''.join([chr(ord('i') + j) for j in range(n)])
