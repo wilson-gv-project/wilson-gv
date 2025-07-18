@@ -160,11 +160,11 @@ class Spectrum2D:
         self.all_states_harmonic = parsed_data.vib_states.harmonic_states
 
         # add derivatives
-        ddata = [parsed_data.derivatives.dipole_first_derivatives,
-                 parsed_data.derivatives.dipole_second_derivatives,
-                 parsed_data.derivatives.polarizability_first_derivatives,
-                 parsed_data.derivatives.polarizability_second_derivatives,
-                 parsed_data.derivatives.cubic_force_constants]
+        ddata = [parsed_data.derivatives.dipgrad,
+                 parsed_data.derivatives.diphess,
+                 parsed_data.derivatives.polgrad,
+                 parsed_data.derivatives.polhess,
+                 parsed_data.derivatives.cff]
         deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
         self.deriv_data = deriv_data
 
@@ -304,11 +304,11 @@ class Spectrum2D:
         self.nmodes = len(self.fundamentals)
         self.nmodes_original = len(self.fundamentals)
 
-        ddata = [parserObj.dipole_first_derivatives,
-                 parserObj.dipole_second_derivatives,
-                 parserObj.polarizability_first_derivatives,
-                 parserObj.polarizability_second_derivatives,
-                 parserObj.cubic_force_constants]
+        ddata = [parserObj.dipgrad,
+                 parserObj.diphess,
+                 parserObj.polgrad,
+                 parserObj.polhess,
+                 parserObj.cff]
         self.deriv_data = dict(zip(['mu_Q', 'mu_QQ', 'alpha_Q', 'alpha_QQ', 'F_abc'], ddata))
         # 'mu_Q',  'mu_QQ',  'alpha_Q', 'alpha_QQ', 'F_abc'
         # (6, 3)  (6, 6, 3)  (6, 3, 3) (6, 6, 3, 3) (6, 6, 6) if nmodes = 6

@@ -380,3 +380,13 @@ def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
     pol_g = get_iso_f(num_f)
     array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
     return array_of_4greekIndices
+
+
+def getPolarizationAveragingExpression(polarization: str):
+    """
+    Get the arrays of indices to be summed and a prefactor of the averaging expression
+
+    """
+    if polarization=="ZZZZ":
+        return get_AlphaBetaGammaDelta_indices(num_f=4), 1./15
+

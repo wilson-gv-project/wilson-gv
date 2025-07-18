@@ -159,7 +159,7 @@ def MOL_setup_parser(conditions: dict) -> dict:
         parsers[molecule] = parser
     return parsers
 @pytest.fixture(scope="module")
-def spectrum_setup(avrg_xyz_indices: list|np.ndarray, conditions: dict) -> dict:
+def spectrum_setup(avrg_xyz_indices: tuple[list|np.ndarray, float], conditions: dict) -> dict:
     """
     Fixture to provide the simulation configuration.
     """
@@ -190,15 +190,16 @@ def spectrum_setup(avrg_xyz_indices: list|np.ndarray, conditions: dict) -> dict:
         )
     return setupsdict
 @pytest.fixture(scope="module")
-def avrg_xyz_indices() -> np.ndarray|list:
+def avrg_xyz_indices() -> tuple[np.ndarray|list, float]:
     """
     Fixture to compute averaging indices.
     """
-    return get_AlphaBetaGammaDelta_indices(num_f=4)
+    return get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
 @pytest.fixture(scope="module")
 def setup_term(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
     """
-    Factory fixture to set up a TermND instance with parsed data and loaded calculations.
+    Factory fixture to set up TermND instances with parsed data and loaded calculations.
+    Uses a hardcoded dictionary of terms from EVV pen-and-paper derivations
     """
     term_funcs = {}
 
@@ -225,7 +226,9 @@ def setup_term_derived(derived_terms_json: dict,
                        MOL_setup_parser: dict, 
                        spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
     """
-    Factory fixture to set up a TermND instance with parsed data and loaded calculations.
+    Factory fixture to set up TermND instances with parsed data and loaded calculations.
+    Uses terms derived with wilson_derive and saved into a json file 
+    then retrieved from it as a dictionary of terms like in the previous function
 
     """
     term_funcs = {}
@@ -253,6 +256,7 @@ def setup_term_derived(derived_terms_json: dict,
 def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
     """
     Fixture to prepare data for precalculation.
+    Based on pen-and-paper derived terms. See setup_term above
     """
     precalcs = {}
     for mol,spec_setup in spectrum_setup.items():
@@ -286,6 +290,7 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
 def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> dict:
     """
     Fixture to prepare data for precalculation.
+    Based on terms derived with wilson_derived. See setup_term_derived above
     """
     precalcs = {}
     for mol,spec_setup in spectrum_setup.items():
@@ -317,6 +322,7 @@ def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> 
 def terms_collection(data_for_precalc: dict, setup_term: dict, dict_8terms: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Fixture to create a TermsEvaluator with precalculated data.
+    Based on pen-and-paper derived terms. See setup_term above
     """
     terms_cols = {}
 
@@ -332,6 +338,7 @@ def terms_collection_derived(data_for_precalc_derived: dict, setup_term_derived:
                              derived_terms_json: dict) -> dict: #! dict_8terms or derived_terms_json
     """
     Fixture to create a TermsEvaluator with precalculated data.
+    Based on terms derived with wilson_derived. See setup_term_derived above
     """
     terms_cols = {}
 
@@ -493,7 +500,9 @@ def terms_amplitudes(terms_collection: dict, spectrum_setup: dict) -> dict:
     ampls = {}
 
     for mol,spec_setup in spectrum_setup.items():
-        te, _ = terms_collection[mol]
+        te, precalc_data = terms_collection[mol]
+        for tid in te.terms:
+            te.terms[tid].precalc_data = precalc_data
         with debug_mode(0):
             amplitudes = sum(
                 term.get_amplitudes(

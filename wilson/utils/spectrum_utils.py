@@ -43,7 +43,7 @@ class DataForPrecalc:
 
     Nnmodes: int
     props_data: dict
-    avrg_terms: np.ndarray
+    avrg_terms: tuple | np.ndarray # fixme
     axes_dict: dict
     states_arrays_Eh: dict
     harmonic_arrays_Eh: dict

@@ -134,7 +134,7 @@ def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict,
         'polhess': t0.properties_data['polhess'],
     }
     from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     w1 = np.arange(spectrum_setup.start1,
                    spectrum_setup.end1, spectrum_setup.step1)
     w2 = np.arange(spectrum_setup.start2,
@@ -191,7 +191,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
         'polhess': t0.properties_data['polhess'],
     }
     from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     w1 = np.arange(spectrum_setup.start1,
                    spectrum_setup.end1, spectrum_setup.step1)
     w2 = np.arange(spectrum_setup.start2,
@@ -719,3 +719,9 @@ def test_get_factor_summed(terms_collection: dict) -> None:
 
     assert total2==total, "sum_over_suffixes didn't work out"
 
+
+def test_prod():
+    from itertools import product
+    
+    r = product([1,2,3,4], repeat=2)
+    print(list(r))

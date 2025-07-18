@@ -12,8 +12,6 @@ def eval_spec2D():
 
 
 # TermND with TermsEvaluator
-# with_diagnostics=True because wilsonSimulation.evaluate()
-# fixme? no need to know 'experiment'? -
 def terms_evaluator(system,
                     derived_terms, props,
                     spec_eval_setup, vib_ana_setup) -> complex|float|np.ndarray:
@@ -51,14 +49,6 @@ def terms_evaluator(system,
 
         What should be done?
 
-    1. set up evaluation terms - from derived_terms
-    2. load data into terms??? or smth
-    3. make TermsEvaluator instance
-    4. identify what to precalculate with TermsEvaluator
-    5. precalculate if any with TermsEvaluator
-    5.1. prepare data_for_precalc (related to 2.) - postprocess loaded data?..
-    6. calculate amplitudes - loop over terms in TermsEvaluator(?), use precalculated data
-
     
     - Step 1: Set up terms
     evaluation_terms = setup_terms(exp, terms, props)
@@ -73,8 +63,9 @@ def terms_evaluator(system,
     - Step 6: Generate diagnostics
     diagnostics = generate_diagnostics(precalc_data, amplitudes)
     """
-    from wilson.spectrum import TermND, TermsEvaluator, DataForPrecalc
-    from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
+    from wilson.spectrum import TermND, TermsEvaluator
+    from wilson.utils.spectrum_utils import DataForPrecalc
+    from wilson.spectrum.averaging import getPolarizationAveragingExpression
 
     amplitudes = 0. + 0.j
 
@@ -109,7 +100,7 @@ def terms_evaluator(system,
     else:
         harmonic_arrays_Eh = {1: harm_states_arr}
 
-    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+    avrg_terms, prefactorAvrg = getPolarizationAveragingExpression("ZZZZ") # "ZZZZ" should come from some setup dataobject
     axes_dict = spec_eval_setup.grid.make_mesh_numpy()
 
     # format transformation
@@ -117,7 +108,7 @@ def terms_evaluator(system,
 
     data_for_precalc = DataForPrecalc(Nnmodes=system.Nnmodes,
                                       props_data=props_data,
-                                      avrg_terms=avrg_terms,
+                                      avrg_terms=(avrg_terms, prefactorAvrg),
                                       axes_dict=axes_dict,
                                       states_arrays_Eh=states_arrays_Eh,
                                       harmonic_arrays_Eh=harmonic_arrays_Eh)

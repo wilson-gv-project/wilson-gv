@@ -252,11 +252,11 @@ def prep_data_load(parsed_data: ParsedData) -> tuple:
     Used with TermND.
     """
     # todo? refactor these attribute names?
-    ddata = [parsed_data.derivatives.dipole_first_derivatives,
-             parsed_data.derivatives.dipole_second_derivatives,
-             parsed_data.derivatives.polarizability_first_derivatives,
-             parsed_data.derivatives.polarizability_second_derivatives,
-             parsed_data.derivatives.cubic_force_constants]
+    ddata = [parsed_data.derivatives.dipgrad,
+             parsed_data.derivatives.diphess,
+             parsed_data.derivatives.polgrad,
+             parsed_data.derivatives.polhess,
+             parsed_data.derivatives.cff]
     # naming starts here, internal wilson_intensities naming,
     # later used to set up props data for DataForPrecalc
     deriv_data = dict(zip(['dipgrad', 'diphess', 'polgrad', 'polhess', 'cff'], ddata))

@@ -196,7 +196,7 @@ class TermND:
 
     @tag('ok?')
     def load_calc_data(self, allstates: dict, harmonic_states: dict, properties_data: dict,
-                             mode_indices: np.ndarray|list, gammaCompsAll: np.ndarray|list) -> None:
+                             mode_indices: np.ndarray|list, gammaCompsAll: tuple[np.ndarray|list, float]) -> None:
         """
         Load data for calculations
 
@@ -222,7 +222,7 @@ class TermND:
 
         self.properties_data = properties_data
         self.mode_indices = mode_indices
-        self.gammaCompsAll = gammaCompsAll
+        self.gammaCompsAll, self.prefactorAvrg = gammaCompsAll
 
 
     @tag('general', 'restructure?')
@@ -273,7 +273,7 @@ class TermND:
                 axes_locs.append((prev + next_axis * next_sgn) * (-1) )
                 signes.append(next_sgn)
 
-        return [convNu2Ene(i, True) for i in axes_locs]
+        return [convNu2Ene(i, reverse=True) for i in axes_locs]
 
 
     @tag('general?')
@@ -345,6 +345,9 @@ class TermND:
         """
         A step in calculation of averaged properties
         ABGD - alpha, beta, gamma, delta - so these are current choice of axes for greek indices
+
+        A function for computations on the fly (without precaltulated data)
+        self.properties_data now should contain all the properties needed
         """
         dict_id = {letter_idx: number_index for letter_idx, number_index in zip( abc_list[:len(abc_comb)], abc_comb)}
 
@@ -382,6 +385,7 @@ class TermND:
     def get_avrg_properties(self, abc_comb: tuple, comps: bool = False) -> float | tuple[float, dict]:
         """
         todo: maybe make a polarization choice which chooses then gammaCompsAll or smth
+
         """
         # c is None if not given
         indices_dict = make_abc_dict(abc_comb)
@@ -390,7 +394,7 @@ class TermND:
             total = 0.
             for ABGD in self.gammaCompsAll: #! is this general?
                 props_dict = self.get_properties_xyz(ABGD, abc_comb)
-                addition = np.prod(np.array([v for k,v in props_dict.items()])) # if 'mu' in k or 'alpha' in k
+                addition = np.prod(np.array([v for k,v in props_dict.items()]))
                 total += addition
                 if comps:
                     components[tuple(ABGD)] = (addition, props_dict)
@@ -398,9 +402,9 @@ class TermND:
                 total = 0.
 
             if comps:
-                return total/15, components #! denominator should come with self.gammaCompsAll
+                return total*self.prefactorAvrg, components
             else:
-                return total/15
+                return total*self.prefactorAvrg
         else:
             idxs = tuple([i for i in indices_dict.values() if i is not None])
             priv_names_tuple = tuple(sorted([p[0] for p in self.avrg_props_expr]))
@@ -416,7 +420,7 @@ class TermND:
         ab_comb - rest of indices, index c is being summed over...
         remaining_length - number of indices to be summed over
         """
-
+        # has no real use now
         components = {}
         remaining_length = self.n_idx_max - self.collective_n_idx_rescond # fixme? smth more careful?..
 
@@ -606,7 +610,10 @@ class TermND:
                     continue
 
             w1ab, w2ab = self.get_resonance_location_general(ab) #! this line isn't general
+            # is a list of axes values of the resonance
+            axes_resonance = self.get_resonance_location_general(ab) #! this line isn't general
 
+            # todo: window_check should be a utility function
             resonance_is_ordered = w2ab > w1ab #! this line isn't general; should get from experiment?
             within_w1_window = (np.min(w1) + margin) <= w1ab <= (np.max(w1) - margin)
             within_w2_window = (np.min(w2) + margin) <= w2ab <= (np.max(w2) - margin)
@@ -784,6 +791,8 @@ def sum_over_suffixes(fixed_prefix: tuple, remaining_length: int,
     compute:
         sum(func(fixed_prefix + suffix))
     over all suffix ∈ product(mode_indices, repeat=remaining_length)
+
+    Implies that core indices are going first, start with a, b ...
     """
     total = 0
 

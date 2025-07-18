@@ -117,7 +117,7 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     tts = TermsEvaluator([t0])
     tts.identify_to_precalculate()
 
-    gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4)
+    gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     Nnmodes = 2
 
     data = {
@@ -127,7 +127,7 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
         'polhess': np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
 
-    stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll[:3])
+    stored = tts.precalc_avrg_tensors(Nnmodes, data, (gammaCompsAll[0][:3], gammaCompsAll[1]))
 
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,1] == 60.4 # term 0
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,0] == 4.6 # term 0
@@ -294,7 +294,7 @@ def test_precalculate(dict_8terms: dict) -> None:
         'polgrad': np.arange(Nnmodes * 3 * 3).reshape((Nnmodes, 3, 3)),
         'polhess': np.arange(Nnmodes * Nnmodes * 3 * 3).reshape((Nnmodes, Nnmodes, 3, 3)),
     }
-    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4)
+    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
 
     from wilson.spectrum import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,

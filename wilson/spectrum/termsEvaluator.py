@@ -123,16 +123,11 @@ class TermsEvaluator:
         qstates_Eh = alldata.states_arrays_Eh
         qstates_harm_Eh = alldata.harmonic_arrays_Eh
 
-        a = self.precalc_vibene_denoms(qstates_harm_Eh) # what are freqs?
-        b = self.precalc_avrg_tensors(Nnmodes, props_data, avrg_terms)
-        c = self.precalc_res_conds(axes_dict) # fixme: not used now in the calculations??
-        d = self.precalc_vibdiffs(qstates_Eh)
-        dictionary = {'vibene_denoms': a,
-                      'avrg_tensors': b,
-                      'res_conds': c,
-                      'vibdiffs': d}
+        return {'vibene_denoms': self.precalc_vibene_denoms(qstates_harm_Eh),
+                'avrg_tensors': self.precalc_avrg_tensors(Nnmodes, props_data, avrg_terms),
+                'res_conds': self.precalc_res_conds(axes_dict),
+                'vibdiffs': self.precalc_vibdiffs(qstates_Eh)}
 
-        return dictionary
 
 
     def precalc_vibene_denoms(self, qstates_Eh: dict) -> dict:
@@ -149,7 +144,7 @@ class TermsEvaluator:
         return stored
 
 
-    def precalc_avrg_tensors(self, Nnmodes: int, data: dict, avrg_terms: list|np.ndarray) -> dict[tuple: np.ndarray]:
+    def precalc_avrg_tensors(self, Nnmodes: int, data: dict, avrg_terms: tuple[list|np.ndarray, float]) -> dict[tuple: np.ndarray]:
         """
         ((1, 1), (2, 1), (1, 2)) - avrg tensor coding - mu_Q, alpha_Q, mu_QQ
         ((1, 1), (2, 2), (1, 1)) - mu_Q, alpha_QQ, mu_Q
@@ -159,6 +154,7 @@ class TermsEvaluator:
             self.unique_avrg_tensors_tID; self.seq_tuples; self.unique_avrg_tensors_all_expr;
             self.terms[tID] so it's a dict;
         """
+        avrg_terms_list, prefactorAvrg = avrg_terms
         storage_tensors = {}
         for tID in self.unique_avrg_tensors_tID:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
@@ -176,7 +172,7 @@ class TermsEvaluator:
                 var_names = names[:len(abcde_comb)]
                 variables = {var: val for var, val in zip(var_names, abcde_comb)}
 
-                for comps in avrg_terms:
+                for comps in avrg_terms_list:
                     greek_dict = {L: n for L, n in zip(greek_list[:len(comps)], comps)}
 
                     product = 1.
@@ -190,7 +186,7 @@ class TermsEvaluator:
                 if abs(total)<1e-28:
                     total = 0.
                 else:
-                    total /= 15. # fixme - averaging formula
+                    total *= prefactorAvrg
                 avrg_tensor[abcde_comb] = total
 
             storage_tensors[simple_prop_tuple] = avrg_tensor
@@ -311,23 +307,6 @@ def outer_product_einsum(arr: np.ndarray, n: int) -> np.ndarray:
 
     return np.einsum(indices, *arrays)
 
-
-#! not used
-def calc_vibene_diff_mn(vibene_data: dict, m: tuple|str, n: tuple|str, symbolic: bool = False) -> None|float:
-    """
-    w_{m,n}^{whatever}
-
-    if symbolic:
-        precalculates an nDarray for keeping all possible indices values
-    else:
-        vibene_data is a dict or smth, containing keys or attributes m and n
-    """
-
-    if symbolic:
-        return None
-
-    else:
-        return vibene_data[m] - vibene_data[n]
 
 
 def get_resonance_location(resonances_expr: tuple, modes_dict: dict, a: int, b: int) -> tuple[float, float]:
