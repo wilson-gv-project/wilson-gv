@@ -3,7 +3,7 @@
 1. **wilson-main**: externalCalcSetup: dataclass + immutable. other_setup: custom data from user? input_generation functionality - separate class
 2. **wilson-main**: wilsonSimulation: report method; saving instances/setups; saving results
 3. **wilson-main**: evaluate: self.spec - np.ndarray, self.diagn - dict;
-4. **😺❔wilson-main**: more general evaluator would take experiment info. Other evaluator (evaluate_as_response) just evaluates response function
+4. **wilson-main**: more general evaluator would take experiment info. Other evaluator (evaluate_as_response) just evaluates response function
 5. **wilson-derive**: Canonical indices in terms
 6. **😺wilson-intensities**: Identification in TermsEvaluate - clean up
 7. **😺wilson-intensities**: Use dictionaries to hold properties values? - lower priority
@@ -23,6 +23,70 @@
 
 ------------------------------------------------
 
+# Notes from 16.07.2025
+
+## Discussion points:
+
+1. return datatype(s) from evaluator
+   Several arrays: when precalc data is reused -> batch evaluator (return precalc data and several spec ranges);  return ndarray always now
+2. what should be diagnostics info: dictionary
+   get_factor_summed() result... will be accumulated in a dict, should not be strict. we'll see what we need. empty now. 
+3. output and logging: configs for wilsonsimulations; make "bare bones" output. print_level settings (logging) and diagnostics_settings: issue for wilson-main and utils: set also sdtout -> VL move utils out of wilson-intensities; MR make infrastructure in WilsonSimulation
+4. general names for indices and stuff (e.g. get_full_factor)
+
+all indices                 -> nm_full_indices
+non-summation indices       -> nm_nonsumm_indices
+summation indices           -> nm_summ_indices
+ABGD greek                  -> cart_indices
+
+clear the uses of indices in terms, distinction between
+
+5. responsibilities
+6. conversions of units
+
+
+## Issues
+
+1. conftest.py - clear up
+2. test_vpt2_new.py - write vpt2 module tests
+3. reorganize utils
+4. spectral grid in get_amplitudes -> arbitrary number of axes
+5. modes comparison, mode indices in CQCParse; make a canonical labeling of normal modes: two parts (short term CQCPArse fix and long term canonical labels)
+6. window_check should be a generalized utility function
+7. Stored data in a dictionary (set of spec points)
+8. write anharmonic_analyzer to use vpt2.py
+9. conversions of units
+10. tests/checks about precission of energy unit conversions
+11. product_all = self.get_factor_summed() - should have stored all prefactor - atribute for each term: after precalculate assemble full factors all combinations of core indices
+
+precalculated_data contains all unique precalc data, right? So why register it as an attribute of each term? Only some of the data in precalculated_data is relevant for each term, right? (Maybe instead pass precalculated as a "bank of data" to term.get_amplitudes?)
+
+
+12. get_factor_summed rename: 
+13. make uses of wilson-main abstractions of properties
+14. fix weirdness about cff
+15. clear up init of TermND
+16. make general: get_resonance_location_general for diff indices in res conds
+17. collective_n_idx_max
+
+wasnt self.collective_n_idx_max an attribute of all the terms? We might rework this to look in each term by itself which indices are represented in the resonance conditions and which ones are not (i.e. the latter can be summed over)
+
+18. precalc_avrg_tensors
+
+Stored appears to now contain both 2-index (i.e. a, b) and 3-index (i.e. a, b,c) quantities? I think I need a demonstration of the addressing
+
+
+
+
+
+## Conclusion for now:
+
+1. Do what's trivial for the PR
+2. Make issues for all other things needed
+
+
+
+------------------------------------------------
 
 # 🧠 Conceptual Design: Wilson
 
