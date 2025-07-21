@@ -458,8 +458,7 @@ class VibAnaSetup:
 
 	def doAnalysis(self, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
-				   tuple[list[VibState], dict, dict]],
-				   system: MolecularSystem = None):
+				   tuple[list[VibState], dict, dict]]):
 		"""
 		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
 		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
@@ -477,25 +476,14 @@ class VibAnaSetup:
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if system is None:
-			if self.system is None:
-				raise AssertionError('No system specified as argument or stored for vibrational analysis')
-			else:
-				sys_va = self.system
-		else:
-			if self.system is not None:
-				raise AssertionError(
-					'Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
-			else:
-				sys_va = system
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+		self.nc_sqrt_eigval, self.nc_eigvec, self.states = analyzer(self.system, props,
+																	self.regime, self.regime_subinfo)
 
-
-
-		self.nc_sqrt_eigval, self.nc_eigvec, self.states = analyzer(sys_va, props, self.regime, self.regime_subinfo)
 
 	def doHarmonicAnalysis(self, props: list[MolecularProperty],
-						   harmonic_analyzer: Callable[[MolecularSystem, list[MolecularProperty]], tuple[dict, dict]],
-						   system: MolecularSystem = None):
+						   harmonic_analyzer: Callable[[MolecularSystem, list[MolecularProperty]], tuple[dict, dict]]):
 		"""
 		Carry out a harmonic vibrational analysis (regardless of chosen regime) and keep only
 		the (harmonic) fundamental vibrational energy levels (stored in self.nc_sqrt_eigval) and
@@ -513,22 +501,14 @@ class VibAnaSetup:
 		if self.regime is None:
 			print('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
 
-		if system is None:
-			if self.system is None:
-				raise AssertionError('No system specified as argument or stored for vibrational analysis')
-			else:
-				sys_va = self.system
-		else:
-			if self.system is not None:
-				raise AssertionError('Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
-			else:
-				sys_va = system
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-		self.nc_sqrt_eigval, self.nc_eigvec = harmonic_analyzer(sys_va, props)
+		self.nc_sqrt_eigval, self.nc_eigvec = harmonic_analyzer(self.system, props)
 
 	def doAnharmonicAnalysis(self, props: list[MolecularProperty], anharmonic_analyzer:
 							Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
-							tuple[list[VibState], dict, dict]], system: MolecularSystem = None):
+							tuple[list[VibState], dict, dict]]):
 		"""
 		Carry out anharmonic vibrational analysis as set up
 
@@ -544,19 +524,11 @@ class VibAnaSetup:
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if system is None:
-			if self.system is None:
-				raise AssertionError('No system specified as argument or stored for vibrational analysis')
-			else:
-				sys_va = self.system
-		else:
-			if self.system is not None:
-				raise AssertionError(
-					'Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
-			else:
-				sys_va = system
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-		self.states = anharmonic_analyzer(sys_va, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
+		self.states = anharmonic_analyzer(self.system, props, self.regime, self.regime_subinfo,
+										  self.nc_sqrt_eigval, self.nc_eigvec)
 
 	def __repr__(self):
 		return 'THIS IS vibAnaSetup with self.regime,self.states'
