@@ -1212,6 +1212,9 @@ class WilsonSimulation:
 
 		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
 	def evaluateAsResponseFunctionWithDiagnostics(self, evaluator: Callable[[
 								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
 								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
@@ -1223,6 +1226,12 @@ class WilsonSimulation:
 		"""
 
 		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
 
 	def evaluateFull(self, evaluator: Callable[[
 								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
@@ -1237,6 +1246,9 @@ class WilsonSimulation:
 
 		self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
 
 	def evaluateFullWithDiagnostics(self, evaluator: Callable[[
 								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
@@ -1249,6 +1261,12 @@ class WilsonSimulation:
 
 		self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props,
 										  self.spec_eval_setup, self.vib_ana_setup)
+
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
 		"""
@@ -1274,5 +1292,8 @@ class WilsonSimulation:
 		# Consider extending arguments to provide even more info to renderer
 		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn,
 											  self.name, self.spec_eval_setup)
+
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
 
 
