@@ -1287,4 +1287,15 @@ class WilsonSimulation:
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
 
-
+	def to_dict(self):
+		return {
+            "name": self.name,
+            "age": self.age,
+            "active": self.active
+        }
+	
+	def writeToJsonFile(self, filename: str = "WilsonSimulation.json"):
+		import json
+		print(self.to_dict())
+		with open(filename, "w") as f:
+			json.dump(self.to_dict(), f, indent=4)
