@@ -383,5 +383,4 @@ class VibExperiment:
 
         return int_sequences
 
-    def __repr__(self):
-        return f'THIS IS electricField with pulses: {self.pulses}'
+
