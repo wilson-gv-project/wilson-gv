@@ -1,5 +1,6 @@
 import numpy as np
 
+# generated derivatives data with the generateDerivs() which is below
 mu_Q = np.array([[0.5864, 0.    , 0.6642],
                    [0.    , 0.    , 0.5725],
                    [0.8658, 0.3108, 0.0144],
@@ -106,7 +107,11 @@ alpha_QQ = np.array([[[[0.5223, 0.2507, 0.6181],
                          [0.1261, 0.316 , 0.087 ]]]])
 
 
-def random_with_zeros(shape, zero_prob=0.5):
+def random_with_zeros(shape: tuple, zero_prob: float=0.5) -> np.ndarray:
+    """
+    Chatgpt
+
+    """
     # Generate a mask with True at places that should be zero, based on zero_prob
     mask = np.random.rand(*shape) < zero_prob
     # Generate random values in the desired shape
@@ -116,14 +121,18 @@ def random_with_zeros(shape, zero_prob=0.5):
     return random_values
 
 
-def generateDerivs():
+def generateDerivs() -> None:
+    """
+    Generate derivatives data
+
+    mu_Q, mu_QQ, alpha_Q, alpha_QQ
+    """
     # (4, 3) array
     mu_Q = random_with_zeros((4, 3), zero_prob=0.55)
     # (4, 4, 3) array with symmetric (4, 3) slices
     mu_QQ = np.zeros((4, 4, 3))
     for i in range(4):
         for j in range(i, 4):  # Only fill upper triangle for symmetry
-            # values = np.random.rand(3)
             values = random_with_zeros((3,), zero_prob=0.6)
 
             mu_QQ[i, j, :] = values
@@ -132,7 +141,6 @@ def generateDerivs():
     # (4, 3, 3) array with symmetric (3, 3) sub-arrays
     alpha_Q = np.zeros((4, 3, 3))
     for i in range(4):
-        # matrix = np.random.rand(3, 3)
         matrix = random_with_zeros((3,3), zero_prob=0.65)
         symmetric_matrix = (matrix + matrix.T) / 2  # Make it symmetric
         alpha_Q[i] = symmetric_matrix
@@ -141,7 +149,6 @@ def generateDerivs():
     alpha_QQ = np.zeros((4, 4, 3, 3))
     for i in range(4):
         for j in range(i, 4):  # Only fill upper triangle for symmetry
-            # matrix = np.random.rand(3, 3)
             matrix = random_with_zeros((3,3), zero_prob=0.7)
             symmetric_matrix = (matrix + matrix.T) / 2  # Make it symmetric
             alpha_QQ[i, j] = symmetric_matrix
