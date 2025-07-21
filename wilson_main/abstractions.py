@@ -302,7 +302,7 @@ class VibAnaSetup:
     Class for setup for vibrational analysis and storage of the resulting information
 	"""
 
-	def __init__(self, vib_regime: str='harmonic', system: MolecularSystem=None, vib_regime_subinfo: dict=None,
+	def __init__(self, vib_regime: str=None, system: MolecularSystem=None, vib_regime_subinfo: dict=None,
 				 max_state_lvl: int=None, states: list[VibState]=None,
 				 nc_sqrt_eigval: dict=None, nc_eigvec: dict=None, allow_skip_eigvec: bool=False,
 				 vibana_prop_need: str='all', external_fill_from: ExternalCalcSetup=None,
@@ -456,70 +456,84 @@ class VibAnaSetup:
 
 		self.states = states
 
-	def doAnalysis(self, props: list[MolecularProperty], analyzer: Callable,
-				   system: MolecularSystem=None, preanalyzer_harmonic: Callable=None,
-				   with_conversion: bool=False, convert_in_preanalyzer: bool=False):
+	def doAnalysis(self, props: list[MolecularProperty],
+				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
+				   tuple[list[VibState], dict, dict]]):
 		"""
-		Carry out vibrational analysis as set up
-		FIXME: The argument list and the fact that the analyzer takes different I/O depending on the situation
-		makes it difficult to type decorate the arguments. Consider splitting the different run cases into different
-		methods and thereby unwind the below selection logic
+		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
+		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
+		self.nc_eigvec) and the (regime-specific) vibrational states
 
 		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		analyzer: Callable: A reference to an analyzer function - I/O structure as per the different cases below
-		system: MolecularSystem instance: The system for which analysis is sought
-		preanalyzer_harmonic: Callable: Optional function reference for (only) harmonic vibrational analysis for
-		the case where it is needed to first do a harmonic analysis and then carry out anharmonic corrections
-		with_conversion: Boolean: Should the analyzer also carry out basis/unit conversion?
-		convert_in_preanalyzer: Boolean: If also doing conversion and if using a preanalyzer, should the conversion
-		take place in the preanalyzer (True) or in the analyzer (False)?
+		analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
+		__init__ for detailed argument specification: Must take as input a system, a set of properties,
+		a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
+		the associated eigenvectors and the vibrational states as VibState instances
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
 		"""
 
-		if system is None:
-			if self.system is None:
-				raise AssertionError('No system specified as argument or stored for vibrational analysis')
-			else:
-				sys_va = self.system
-		else:
-			if self.system is not None:
-				raise AssertionError('Definition conflict: System specified both as argument and stored in vibAnaSetup class instance')
-			else:
-				sys_va = system
+		if self.regime is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if preanalyzer_harmonic is not None:
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+		self.nc_sqrt_eigval, self.nc_eigvec, self.states = analyzer(self.system, props,
+																	self.regime, self.regime_subinfo)
 
-			if with_conversion:
 
-				if convert_in_preanalyzer:
+	def doHarmonicAnalysis(self, props: list[MolecularProperty],
+						   harmonic_analyzer: Callable[[MolecularSystem, list[MolecularProperty]], tuple[dict, dict]]):
+		"""
+		Carry out a harmonic vibrational analysis (regardless of chosen regime) and keep only
+		the (harmonic) fundamental vibrational energy levels (stored in self.nc_sqrt_eigval) and
+		associated eigenvectors (stored in self.nc_eigvec), but not vibrational state VibState instances.
 
-					self.nc_sqrt_eigval, self.nc_eigvec, props = preanalyzer_harmonic(sys_va, props)
-					self.states = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval,
-										   self.nc_eigvec)
+		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+		harmonic_analyzer: Callable: A reference to a harmonic analyzer function. See function definition and
+		attribute explanation in __init__ for detailed argument specification: Must take as input a system,
+		a set of properties, a choice of regime (and subinfo as relevant) and return
+		fundamental harmonic energy levels and associated eigenvectors.
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
+		"""
 
-				else:
+		if self.regime is None:
+			print('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
 
-					self.nc_sqrt_eigval, self.nc_eigvec = preanalyzer_harmonic(sys_va, props)
-					self.states, props = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval,
-										   self.nc_eigvec)
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-			else:
+		self.nc_sqrt_eigval, self.nc_eigvec = harmonic_analyzer(self.system, props)
 
-				print('CAUTION: No property basis conversion requested but harmonic preanalysis requested')
-				self.nc_sqrt_eigval, self.nc_eigvec = preanalyzer_harmonic(sys_va, props)
-				self.states = analyzer(system, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
+	def doAnharmonicAnalysis(self, props: list[MolecularProperty], anharmonic_analyzer:
+							Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
+							tuple[list[VibState], dict, dict]]):
+		"""
+		Carry out anharmonic vibrational analysis as set up
 
-		else:
+		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+		analyzer: Callable: A reference to an anharmonic analyzer function. See function definition and attribute 
+		explanation in __init__ for detailed argument specification: Must take as input a system, a set of properties,
+		a choice of regime (and subinfo as relevant), harmonic fundamental energy levels and associated eigenvectors,
+		and return the anharmonically corrected vibrational states as VibState instances.
+		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+		with self as self.system
+		"""
 
-			# One-stop shop
-			if with_conversion:
-				self.states, self.nc_sqrt_eigval, self.nc_eigvec, props = analyzer(sys_va, props, self.regime, self.regime_subinfo)
+		if self.regime is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-			# Otherwise, will assume that harmonic analysis was already done and properties already in correct basis
-			else:
-				self.states = analyzer(sys_va, props, self.regime, self.regime_subinfo, self.nc_sqrt_eigval, self.nc_eigvec)
+		if self.system is None:
+			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+
+		self.states = anharmonic_analyzer(self.system, props, self.regime, self.regime_subinfo,
+										  self.nc_sqrt_eigval, self.nc_eigvec)
 
 	def __repr__(self):
 		return 'THIS IS vibAnaSetup with self.regime,self.states'
+
+
 
 class CalculationBatch:
 	"""
@@ -1174,57 +1188,103 @@ class WilsonSimulation:
 			else:
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc)
 
-	def evaluateAsResponseFunction(self, evaluator: Callable, include_diagnostics: bool=False):
+	def evaluateAsResponseFunction(self,
+								   evaluator: Callable[[
+								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
 		"""
 		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
 		experiment pulse strength information and without regard to further experiment information except terms)
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		evaluator: Callable: A function to carry out the evaluation
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 
-		if include_diagnostics:
-			self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
-		else:
-			self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
-	def evaluateFull(self, evaluator: Callable, include_diagnostics: bool=False):
+	def evaluateAsResponseFunctionWithDiagnostics(self, evaluator: Callable[[
+								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
+		"""
+		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
+		experiment pulse strength information and without regard to further experiment information except terms)
+
+		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
+		"""
+
+		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
+
+	def evaluateFull(self, evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
 		"""
 		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		evaluator: Callable: A function to carry out the evaluation
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 
-		if include_diagnostics:
-			self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
-		else:
-			self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
-	def render(self, renderer: Callable, include_diagnostics: bool=False):
+
+	def evaluateFullWithDiagnostics(self, evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
+		"""
+		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
+
+		evaluator: Callable: As in evaluateFull but must additionally return a dictionary of diagnostics information.
+		"""
+
+		self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props,
+										  self.spec_eval_setup, self.vib_ana_setup)
+
+		if not isinstance(self.spec, np.ndarray):
+			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
+
+	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
+		"""
+		Render the spectral data.
+
+		renderer: Callable: A function to carry out the rendering. Uses attributes described in __init__ of this
+		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		vibrational analysis setup and return
+		"""
+
+		# Consider extending arguments to provide even more info to renderer
+		self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+
+	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
+														dict, str, SpecEvalSetup], tuple[Any, dict]]):
 		"""
 		Render the spectral data
-		FIXME: Consider separating with/without diagnostics as separate methods for more explicit
-		type declarations in evaluator
 
-		renderer: Callable: A function to carry out the rendering
-		include_diagnostics: Boolean: Also gather diagnostic information (default: False)?
+		renderer: Callable: A function to carry out the rendering. As in render but must additionally return a
+		dictionary of diagnostics information.
 		"""
 
-		if include_diagnostics:
+		# Consider extending arguments to provide even more info to renderer
+		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn,
+											  self.name, self.spec_eval_setup)
 
-			# Consider extending arguments to give even more info
-			self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
-
-		else:
-
-			# Consider extending arguments to give even more info
-			self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		if not isinstance(self.diagn, dict):
+			raise AssertionError('Diagnostics result must be dictionary')
 
 
