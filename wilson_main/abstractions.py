@@ -626,15 +626,6 @@ class CalculationBatch:
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 
-		trivname_translation = {'dipgrad' : 'dipole_first_derivatives',
-								'diphess' : 'dipole_second_derivatives',
-								'polgrad' : 'polarizability_first_derivatives',
-								'polhess' : 'polarizability_second_derivatives',
-								'cff' : 'cubic_force_constants',
-								'qff' : 'quartic_force_constants',
-								'B' : 'rotational_constant',
-								'coriolis' : 'coriolis_constant'
-								}
 
 		print([i.triv_name for i in props_to_fill])
 		print(dir(parser_obj))
@@ -642,7 +633,7 @@ class CalculationBatch:
 
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				i.addValues(getattr(parser_obj, trivname_translation[i.triv_name]))
+				i.addValues(getattr(parser_obj, i.triv_name))
 
 		if vib_ana_setup_to_fill is not None:
 
