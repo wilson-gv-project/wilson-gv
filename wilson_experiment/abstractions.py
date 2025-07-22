@@ -4,26 +4,10 @@ import copy
 # TODO: SpecDetector and SpecScan as dataclasses?
 # TODO: Expand functionality according to below TODOs
 
-from dataclasses import dataclass, field, asdict, is_dataclass
-from typing import List, Optional, Iterable
+from dataclasses import asdict, is_dataclass
 
-@dataclass
+
 class SpecDetector:
-    detection_method: str
-    detector_location: Optional[List[float]] = None
-    detection_polarization: Optional[List[float]] = None
-    detection_range: Optional[List[float]] = None
-    wv_filter: Optional[List[dict]] = None
-    ignore_collinear: bool = True
-
-    def __post_init__(self):
-        if self.detection_method not in {'time', 'freq', 'int'}:
-            raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
-
-        if self.detection_range is None and (self.detection_method in ['time']):
-            raise AssertionError("The detection range must be specified when the detector is set to 'time' or 'freq' detection")
-
-class SpecDetector_reg:
     """
     Class to represent a spectral detector
     """
@@ -107,24 +91,9 @@ class SpecDetector_reg:
                    wv_filter=data['wv_filter'], 
                    ignore_collinear=data['ignore_collinear'])
 
-@dataclass
+
+
 class SpecScan:
-    scan_objs: List
-    range: Iterable
-
-    def __post_init__(self):
-        valid_scan_objs = ['pulse', 'detector']
-        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
-
-        for i in self.scan_objs:
-            print('scan obj i', i)
-            if i[0] not in valid_scan_objs:
-                raise AssertionError("The scan object must be one of", valid_scan_objs, 'but is instead', i[0])
-            if i[2] not in valid_scan_attributes[i[0]]:
-                raise AssertionError("The scan attribute for", i[0], 'must be one of', valid_scan_attributes[i[0]], 'but is instead', i[2])
-
-
-class SpecScan_reg:
     """
     Class to represent a spectral scan (adding to the dimensionality of a spectrum)
     """
@@ -172,80 +141,8 @@ class SpecScan_reg:
             d['detection_range'] = None
         return d
 
-@dataclass
+
 class EmPulse:
-    env: str
-    maxstr: float
-    tc: float = None
-    cf: float = None
-    cf_uv: float = 0.0
-    dev: float = None
-    wv: List[float] = None
-    pol: List[float] = None
-    id: int = None
-
-    def __post_init__(self):
-        
-        allowed_envelopes = ['impulsive', 'ideal', 'cw', 'gaussian']
-
-        if self.env not in allowed_envelopes:
-            raise AssertionError('Allowed pulse envelope choices are: "impulsive", "ideal", "cw", "gaussian"')
-
-        if not (self.cf_uv == 0.0):
-            if not (self.cf == 0.0):
-                raise AssertionError('Pulses with non-zero UV/VIS carrier freqs. must have IR carrier freq part set to zero')
-
-        if self.env == "gaussian":
-            if self.cf == None or self.dev == None:
-                raise AssertionError('A Gaussian pulse must have a carrier frequency and a deviation parameter')
-
-        if self.env == "ideal":
-            if self.cf == None:
-                raise AssertionError('An pulse of the "ideal" type must have a (monochromatic) "carrier" frequency')
-
-        # Wavevector: In which unit vector direction is the pulse wave travelling
-        if self.wv is None:
-            print('No wavevector was specified for pulse, defaulting to unit z direction wavevector')
-            self.wv = [0.0, 0.0, 1.0]
-        else:
-            if isinstance(self.wv, list):
-                if len(self.wv) == 3:
-                    if all([isinstance(i, float) for i in self.wv]):
-                        wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
-                        if not wv_len == 1.0:
-                            print('Wavevector was normalized')
-                        self.wv = [i/wv_len for i in self.wv]
-
-                    else:
-                        raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-                else:
-                    raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-            else:
-                raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-
-        # Polarization: Specify the polarization of the pulse
-        # Currently supports unit linear polarization (TODO: Add support for circular polarization (as function)?)
-        if self.pol is None:
-            print('No polarization was specified for pulse, defaulting to unit z direction wavevector')
-            self.pol = [0.0, 0.0, 1.0]
-        else:
-            if isinstance(self.pol, list):
-                if len(self.pol) == 3:
-                    if all([isinstance(i, float) for i in self.pol]):
-                        pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
-                        if not pol_len == 1.0:
-                            print('Wavevector was normalized')
-                        self.pol = [i/pol_len for i in self.pol]
-
-                    else:
-                        raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-                else:
-                    raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-            else:
-                raise AssertionError('The pulse wavevector must be a len 3 list of floats')
-
-
-class EmPulse_reg:
     """
     Class to represent an electromagnetic pulse
     """
@@ -369,55 +266,9 @@ class EmPulse_reg:
                    tc=data['tc'], cf=cf, cf_uv=data['cf_uv'], dev=dev,
                    wv=data['wv'], pol=data['pol'], id=data['id'])
 
-@dataclass
-class ElectricField:
-    pulses: List[EmPulse]
-
-    def findEpochs(self, tol: float=0.0) -> list:
-        """
-        Divide field into epochs either with zero or finite tolerance
-        Currently only supported for a field consisting of ideal or impulsive pulses
-
-        tol: Float: Tolerance for non-temporal coincidence (currently not supported)
-        # TODO: Add support for tolerance
-
-        Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
-        """
-
-        for i in self.pulses:
-            if i.env not in ['ideal', 'impulsive']:
-                raise AssertionError('Can currently only determine epochs for fields consisting of only ideal or impulsive pulses')
-            if i.id is None:
-                raise AssertionError('All pulses must have IDs for valid epoch determination')
-
-        times_ids = sorted([(i.tc, i.id) for i in self.pulses], key=itemgetter(0))
-        epochs = [[]]
-        epoch = 0
-        curr_time = times_ids[0][0]
-
-        for i in times_ids:
-            if not(i[0] == curr_time):
-                epochs.append([])
-                epoch += 1
-                curr_time = i[0]
-            epochs[epoch].append(i[1])
-
-        return epochs
-    
-    def getCarrierFreqsUV(self) -> dict:
-        """
-        Get dictionary of UV/VIS-range part of carrier frequencies
-
-        Returns: Dictionary {pulse 1: UV/VIS carrier freq., ...}
-        """
-        cfuv_dict = {}
-        for i in self.pulses:
-            cfuv_dict[i.id] = i.cf_uv
-
-        return cfuv_dict
 
 # The field consists of a collection of pulses
-class ElectricField_reg:
+class ElectricField:
     """
     Class to represent an electromagnetic field consisting of one or more pulses
     """
@@ -488,6 +339,7 @@ class ElectricField_reg:
         pulses = [EmPulse.from_dict(pulse_dict) for pulse_dict in data['pulses']]
         return cls(pulses = pulses)
 
+
 class VibExperiment:
     """
     Class to represent a vibrational wave-mixing experiment
@@ -538,12 +390,10 @@ class VibExperiment:
         d = 0
         d += len(self.scans)
 
-        # if self.detector.dmethod == 'time':
-        if self.detector.detection_method == 'time':
+        if self.detector.dmethod == 'time':
             return d + 1
         
-        # elif self.detector.dmethod == 'freq':
-        elif self.detector.detection_method == 'freq':
+        elif self.detector.dmethod == 'freq':
             if self.detector.detection_range is not None:
                 return d + 1
 
