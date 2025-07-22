@@ -1,5 +1,5 @@
 import copy
-from .abstractions import PolProp, VibState, TransitionIntegral, VibDiffTerm, VibContribTerm
+from .abstractions import PolProp, VibStateSymbolic, TransitionIntegral, VibDiffTerm, VibContribTerm
 from fractions import Fraction
 
 # TODO: Implement arbitrary-order electrical/mechanical expansion
@@ -85,7 +85,7 @@ def expand_term(term: VibContribTerm, order_el: int=0, order_mech: int=0):
                     if (bk == 'bra'):
 
                         orig_state = copy.deepcopy(new_term.ints[j].bra)
-                        new_state = VibState('A', mbu=[orig_state])
+                        new_state = VibStateSymbolic('A', mbu=[orig_state])
                         new_term.ints[j].setBra(copy.deepcopy(new_state))
 
                         new_int = TransitionIntegral(copy.deepcopy(orig_state), copy.deepcopy(new_state),
@@ -96,7 +96,7 @@ def expand_term(term: VibContribTerm, order_el: int=0, order_mech: int=0):
 
                     elif (bk == 'ket'):
                         orig_state = copy.deepcopy(new_term.ints[j].ket)
-                        new_state = VibState('A', mbu=[orig_state])
+                        new_state = VibStateSymbolic('A', mbu=[orig_state])
                         new_term.ints[j].setKet(copy.deepcopy(new_state))
 
                         new_int = TransitionIntegral(copy.deepcopy(new_state), copy.deepcopy(orig_state),

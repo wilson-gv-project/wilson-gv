@@ -1,5 +1,5 @@
 import copy
-from .abstractions import HarmOscState, VibPerturbedTerm, VibDiffTerm, ResonanceCondition, VibContribTerm
+from .abstractions import HarmOscStateSymbolic, VibPerturbedTerm, VibDiffTerm, ResonanceCondition, VibContribTerm
 from fractions import Fraction
 
 # FIXME: The routines in this file need verification and harmonization with respect to theory manuscript
@@ -59,7 +59,7 @@ def go_for_a_walk(term: VibContribTerm, walk):
     res_deriv_inds = []
 
     # Assign ground-state vibState to ground-state harmOscState
-    res_states[term.ints[-1].ket.s] = HarmOscState([])
+    res_states[term.ints[-1].ket.s] = HarmOscStateSymbolic([])
 
     # Reversing order of integrals for walk
     ints = copy.deepcopy(term.ints)
@@ -102,7 +102,7 @@ def go_for_a_walk(term: VibContribTerm, walk):
 
         # Otherwise make a new state entry
         else:
-            res_states[i.bra.s] = HarmOscState(quanta)
+            res_states[i.bra.s] = HarmOscStateSymbolic(quanta)
 
         # Record the used derivative indices for this integral
         res_deriv_inds.insert(0, copy.deepcopy(this_deriv_inds))
@@ -202,7 +202,7 @@ def do_hermaut(term: VibContribTerm, inds: list):
 
         # Add new freq factors from harm osc treatment
         for j in inds[:round(sumord/2)]:
-            new_freqterms.append(VibDiffTerm(HarmOscState([j]), HarmOscState([])))
+            new_freqterms.append(VibDiffTerm(HarmOscStateSymbolic([j]), HarmOscStateSymbolic([])))
 
         # Update coefficient w.r.t. the 1/(2 w_a)-style factors
         new_coeff = term.coeff * Fraction(1, 2**(round(sumord/2)))

@@ -1,4 +1,4 @@
-from .abstractions import VibDiffTerm, ResonanceCondition, VibContribTerm, PolProp, TransitionIntegral, QOperator, VibState
+from .abstractions import VibDiffTerm, ResonanceCondition, VibContribTerm, PolProp, TransitionIntegral, QOperator, VibStateSymbolic
 from fractions import Fraction
 import itertools
 import copy
@@ -14,8 +14,8 @@ class PolPropSOSRecursion:
     def __init__(self, order: int, left, right):
         """
         order: Integer: Order of property
-        left: VibState: Bra state of integral
-        right: VibState: Ket state of integral
+        left: VibStateSymbolic: Bra state of integral
+        right: VibStateSymbolic: Ket state of integral
         """
 
         # Integer: order of property
@@ -99,12 +99,12 @@ class RspTermSOSRecursion:
 
 
 
-def vib_contribs_abstract(maxord: int, states: list[VibState], ops: tuple[QOperator]) -> list:
+def vib_contribs_abstract(maxord: int, states: list[VibStateSymbolic], ops: tuple[QOperator]) -> list:
     """
     Get "uncombinatorized" form of SOS vibrational contributions up to order
 
     maxord: Requested maximum order of response
-    states: List of VibState instances: Canonically ordered state references used during recursion
+    states: List of VibStateSymbolic instances: Canonically ordered state references used during recursion
     ops: Tuple of QOperator instances: Perturbing operators
 
     Returns: List [[order 1 term 1, order 1 term 2, ...], [order 2 term 1, ...], ...]
@@ -243,7 +243,7 @@ def make_op_sel_set(all_ops, taken) -> list:
     return sel_set
 
 
-def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator], maxord: int, states: list[VibState], noncomb: bool=False):
+def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator], maxord: int, states: list[VibStateSymbolic], noncomb: bool=False):
     """
     Get vibrational SOS expressions at order 'maxord' for omega operator 'op_omega' and perturbing operators 'ops'"
     with vibrational states 'states'
@@ -251,7 +251,7 @@ def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator], maxord: int, states:
     op_omega: QOperator: The operator representing interaction with the detected field
     ops: Tuple of QOperator instances: Perturbing operators
     maxord: Integer: Requested order of sum-over-states expression
-    states: List of VibState instances: Canonically ordered vibrational states used during recursion
+    states: List of VibStateSymbolic instances: Canonically ordered vibrational states used during recursion
     noncomb: Boolean: Abstain from (True) or permute (False) dummy frequency indices
     """
 

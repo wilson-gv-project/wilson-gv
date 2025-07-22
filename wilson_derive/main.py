@@ -12,8 +12,8 @@ import copy
 
 nm_inds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
-states = [abst.VibState('0', is_ground=True), abst.VibState('m'), abst.VibState('n'), abst.VibState('p'), abst.VibState('q'),
-          abst.VibState('r'), abst.VibState('s'), abst.VibState('t'), abst.VibState('u'), abst.VibState('v')]
+states = [abst.VibStateSymbolic('0', is_ground=True), abst.VibStateSymbolic('m'), abst.VibStateSymbolic('n'), abst.VibStateSymbolic('p'), abst.VibStateSymbolic('q'),
+          abst.VibStateSymbolic('r'), abst.VibStateSymbolic('s'), abst.VibStateSymbolic('t'), abst.VibStateSymbolic('u'), abst.VibStateSymbolic('v')]
 
 op_omega = abst.QOperator(0, 1)
 
