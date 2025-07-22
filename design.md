@@ -92,10 +92,10 @@ WilsonSimulation:
     - what was needed for evaluation?
          --- system, derived_terms, props, spec_eval_setup, vib_ana_setup
             - system <- WilsonSimulation.system
-            - derived_terms <- WilsonSimulation.terms but translated
+            - derived_terms <- WilsonSimulation.terms but translated <- how were they derived <- experiment
             - props <- WilsonSimulation.props with vals <- WilsonSimulation.eval_uniform
             - spec_eval_setup <- WilsonSimulation.spec_eval_setup
-            - vib_ana_setup <- WilsonSimulation.vib_ana_setup ---- states info, system, 
+            - vib_ana_setup <- WilsonSimulation.vib_ana_setup ---- states info, system, calc info (external_fill_from <- ExternalCalcSetup)
     - what is needed for rendering?
          --- spec, system, exp, diagn, name, spec_eval_setup ---- why exp? why diag?
             - spec <- evaluator
@@ -104,16 +104,23 @@ WilsonSimulation:
             - spec_eval_setup <- WilsonSimulation.spec_eval_setup
 terms <- 
 
-exp                 dict_keys(['order', 'field', 'detector', 'scans', 'magn_conditions'])
+Should be possible:
+  1. to set up and run a calculation from json file starting from derivation (experiment and calc setups info)
+  2. to set up and run a calculation from json file starting from derived terms (terms and calc setups info)
+  3. to set up and run a calculation from json file starting from derived terms, vibdata and props, spec_eval_setup 
+Inputs generation is not supported yet, so it is also not mentioned for now
+
+
+exp                 dict_keys(['order', 'field', 'detector', 'scans', 'magn_conditions']) ---- VibExperiment
 -------
 vib_ana_setup       dict_keys(['regime', 'system', 'regime_subinfo', 'max_state_lvl', 'states', 
-                                'nc_sqrt_eigval', 'nc_eigvec', 'allow_skip_eigvec', 'vibana_prop_need', 'external_fill_from', 'exclude_modes'])
+                                'nc_sqrt_eigval', 'nc_eigvec', 'allow_skip_eigvec', 'vibana_prop_need', 'external_fill_from', 'exclude_modes']) ---- VibAnaSetup
 -------
-spec_eval_setup     dict_keys(['grid', 'ev_info', 'rnd_info'])
+spec_eval_setup     dict_keys(['grid', 'ev_info', 'rnd_info']) ---- SpecEvalSetup
 -------
 system              dict_keys(['name', 'natoms', 'geo', 'geo_extra'])
 -------
-eval_uniform        dict_keys(['program', 'lvl_theory', 'basis', 'other_setup', 'other_setup_identifier'])
+eval_uniform        dict_keys(['program', 'lvl_theory', 'basis', 'other_setup', 'other_setup_identifier']) ---- ExternalCalcSetup
 -------
 eval_by_prop_name   None
 -------
@@ -125,7 +132,7 @@ calc_batches        dict_keys(['system', 'calc_setup', 'properties'])
 dict_keys(['system', 'calc_setup', 'properties'])
 {-830484654937960533: {'system': {'name': 'ACAC', 'natoms': 8, 'geo': None, 'geo_extra': None}, 
                        
-                       'calc_setup': {'program': 'gaussian', 'lvl_theory': 'B3LYP', 'basis': 'cc_pVQZ', 'other_setup': {}, 'other_setup_identifier': {}}, 
+                       'calc_setup': {'program': 'gaussian', 'lvl_theory': 'B3LYP', 'basis': 'cc_pVQZ', 'other_setup': {}, 'other_setup_identifier': {}}, ---- ExternalCalcSetup
                        
                        'properties': [{'prop_spec': {'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 'trivial_name': 'dipgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 'trivial_name': 'polhess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}]}}
 -------
@@ -142,68 +149,15 @@ terms                dict_keys(['averaged_props', 'non_averaged_props', 'termA_p
 
 ------------------------------------------------
 
-# 🧠 Conceptual Design: Wilson
+# Notes from 23.07.2025 
 
-## 🎯 Goal
-Concise description of what this software will do.
+Finding sysytems with relatively small effects , to show off the ability to find differences with broad dynamic range.
+Rotamers? what are the weak effect?
 
+Propene - rotate CH3.
 
-## 📦 Modules and Responsibilities
-
-### `spectrum_simulator.py`
-**Responsibility**: Core nonlinear signal simulation (rephasing, non-rephasing)
-
-#### Classes & Key Functions
-
-##### `SpectrumSimulator`
-- **Role**: Main class for computing time-domain IR signals
-- **Methods**:
-  - `simulate_signal(...)`
-    - **Inputs**: energy states, dipoles, dephasing params
-    - **Output**: 2D time-domain array
-    - **Notes**: Should be stateless if possible for testability
-    - 🔧 *Idea*: Consider functional API in parallel to OO for flexibility
-
-  - `apply_lineshape(...)`
-    - Apply damping window; could be extracted into utility module
-    - ❗ *Performance bottleneck* if FFTs are used poorly
-
----
-
-## 🔁 Data Flow
-
-1. `VibrationalSystem` → `SpectrumSimulator`
-2. → Simulate signal
-3. → Apply FT + lineshape
-4. → Plot / export
-
----
-
-## 🔗 Inter-module Interfaces
-
-| From | To | Data |
-|------|----|------|
-| `vibrational_model` | `spectrum_simulator` | `energy_states`, `mu_matrix` |
-| `spectrum_simulator` | `plotting.py` | 2D array |
-| All | `utils/units.py` | frequency/energy conversion |
-
----
-
-## 🚧 Design Notes (General or Cross-Cutting)
-
-- **Memory model**: avoid keeping raw time-domain and FT arrays in memory at once
-- **Parallelism**: explore `joblib` or `numba` for FFT sections
-- **Logging**: allow optional verbose/debug modes for numerical tracking
-
----
+### More calculations
 
 
-## 🛠️ Implementation Roadmap
+1. Formic acid -  CCSD(T) with TZ
 
-1. Define `VibrationalSystem` as immutable container
-2. Stub out `SpectrumSimulator.simulate_signal`
-3. Write test for expected dipole input/output dimensions
-4. Design plotting and file export API last
-
-
-------------------------------------------------

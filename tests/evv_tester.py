@@ -118,28 +118,14 @@ render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
                 filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
                 nicetitle='TermsEvaluator')
 
+ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
-'''
+import pickle
+with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
+    pickle.dump(sim, f)
 
+with open(ws_root+"/tests/wilsonsim0.pkl", "rb") as f:
+    loaded_wilsonsim0 = pickle.load(f)
 
+assert sim.spec == loaded_wilsonsim0.spec
 
-#fully_enhanced_terms = wdrv_main.get_fully_enhanced_terms(experiment_a)
-
-for i in sim.terms:
-
-	for j in sim.terms[i]:
-	
-		print('Anharmonicity order', j)
-	
-		if len(sim.terms[i][j]) == 0:
-			print('No terms')
-			print(' ')
-			
-		else:
-			for k in sim.terms[i][j]:
-				print('')
-				print('New term')
-				k.present()
-				print('')
-	 
-'''

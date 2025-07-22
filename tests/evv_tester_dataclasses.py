@@ -145,8 +145,11 @@ ws_root = ws.intensities.utils.get_package_root() + '/../../'
 print(ws_root)
 sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
 
-v = {'system': {'name': 'ACAC', 'natoms': 8, 'geo': None, 'geo_extra': None}, 
-                       'calc_setup': {'program': 'gaussian', 'lvl_theory': 'B3LYP', 'basis': 'cc_pVQZ', 'other_setup': {}, 'other_setup_identifier': {}}, 
-                       'properties': [{'prop_spec': {'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 'trivial_name': 'dipgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 'trivial_name': 'polhess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'polgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'diphess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'cff', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}]}
+import pickle
+with open("wilsonsim0.pkl", "wb") as f:
+    pickle.dump(sim, f)
 
-print(v.keys())
+with open("wilsonsim0.pkl", "rb") as f:
+    loaded_wilsonsim0 = pickle.load(f)
+
+assert sim.spec == loaded_wilsonsim0.spec
