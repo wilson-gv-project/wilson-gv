@@ -54,7 +54,7 @@ mol_system = ws.main.abstractions.MolecularSystem(name='ACAC', natoms=8)
 sim.addSystem(mol_system)
 # sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm',
 #                                                     allow_skip_eigvec=True, external_fill_from=calc_setup))
-sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, vib_regime='GVPT2', vibana_prop_need='none',
+sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
                                                     allow_skip_eigvec=True, external_fill_from=calc_setup))
 sim.addPropEvalSetup(eval_uniform=calc_setup)
 
@@ -120,30 +120,27 @@ render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
 
 from wilson_utils.serialization import check_if_jsonsafe
 
+# print(sim.props[0].vals)
+# exit()
+for i in sim.props:
+    i.make_serial_vals()
+print(sim.props[0].serial_vals)
+
 check_if_jsonsafe(sim.to_dict())
-sim.writeToJsonFile()
+simdict = sim.to_dict()
+for k in simdict:
+    print(k)
+    if isinstance(simdict[k], dict):
+        print(simdict[k].keys())
+        if k=='calc_batches':
+            print(simdict['calc_batches'])
+    elif isinstance(simdict[k], list) and simdict[k]:
+        if isinstance(simdict[k][0], dict):
+            print(simdict[k][0].keys())
+    else:
+        print(simdict[k])
+    print('-------')
 
-'''
-
-
-
-#fully_enhanced_terms = wdrv_main.get_fully_enhanced_terms(experiment_a)
-
-for i in sim.terms:
-
-	for j in sim.terms[i]:
-	
-		print('Anharmonicity order', j)
-	
-		if len(sim.terms[i][j]) == 0:
-			print('No terms')
-			print(' ')
-			
-		else:
-			for k in sim.terms[i][j]:
-				print('')
-				print('New term')
-				k.present()
-				print('')
-	 
-'''
+ws_root = ws.intensities.utils.get_package_root() + '/../../'
+print(ws_root)
+sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
