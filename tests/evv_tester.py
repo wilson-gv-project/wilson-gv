@@ -118,10 +118,6 @@ render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
                 filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
                 nicetitle='TermsEvaluator')
 
-from wilson_utils.serialization import check_if_jsonsafe
-
-check_if_jsonsafe(sim.to_dict())
-sim.writeToJsonFile()
 
 '''
 

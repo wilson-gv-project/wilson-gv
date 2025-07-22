@@ -76,14 +76,68 @@ wasnt self.collective_n_idx_max an attribute of all the terms? We might rework t
 Stored appears to now contain both 2-index (i.e. a, b) and 3-index (i.e. a, b,c) quantities? I think I need a demonstration of the addressing
 
 
-
-
-
 ## Conclusion for now:
 
 1. Do what's trivial for the PR
 2. Make issues for all other things needed
 
+
+------------------------------------------------
+
+# Notes from 22.07.2025 - VL
+
+WilsonSimulation: 
+    - what is the metadata for a spectrum result? 
+    - what is needed to reproduce this result?
+    - what was needed for evaluation?
+         --- system, derived_terms, props, spec_eval_setup, vib_ana_setup
+            - system <- WilsonSimulation.system
+            - derived_terms <- WilsonSimulation.terms but translated
+            - props <- WilsonSimulation.props with vals <- WilsonSimulation.eval_uniform
+            - spec_eval_setup <- WilsonSimulation.spec_eval_setup
+            - vib_ana_setup <- WilsonSimulation.vib_ana_setup ---- states info, system, 
+    - what is needed for rendering?
+         --- spec, system, exp, diagn, name, spec_eval_setup ---- why exp? why diag?
+            - spec <- evaluator
+            - system <- WilsonSimulation.system
+            - exp <- WilsonSimulation.exp; why optional for eval but not for render?
+            - spec_eval_setup <- WilsonSimulation.spec_eval_setup
+terms <- 
+
+exp                 dict_keys(['order', 'field', 'detector', 'scans', 'magn_conditions'])
+-------
+vib_ana_setup       dict_keys(['regime', 'system', 'regime_subinfo', 'max_state_lvl', 'states', 
+                                'nc_sqrt_eigval', 'nc_eigvec', 'allow_skip_eigvec', 'vibana_prop_need', 'external_fill_from', 'exclude_modes'])
+-------
+spec_eval_setup     dict_keys(['grid', 'ev_info', 'rnd_info'])
+-------
+system              dict_keys(['name', 'natoms', 'geo', 'geo_extra'])
+-------
+eval_uniform        dict_keys(['program', 'lvl_theory', 'basis', 'other_setup', 'other_setup_identifier'])
+-------
+eval_by_prop_name   None
+-------
+props               dict_keys(['prop_spec', 'trivial_name', 'in_basis', 'in_units', 
+                                'target_basis', 'target_units', 'serial_vals'])
+-------
+calc_batches        dict_keys(['system', 'calc_setup', 'properties'])
+
+dict_keys(['system', 'calc_setup', 'properties'])
+{-830484654937960533: {'system': {'name': 'ACAC', 'natoms': 8, 'geo': None, 'geo_extra': None}, 
+                       
+                       'calc_setup': {'program': 'gaussian', 'lvl_theory': 'B3LYP', 'basis': 'cc_pVQZ', 'other_setup': {}, 'other_setup_identifier': {}}, 
+                       
+                       'properties': [{'prop_spec': {'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 'trivial_name': 'dipgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 'trivial_name': 'polhess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}]}}
+-------
+spec                 None
+-------
+diagn                None
+-------
+rendering            None
+-------
+name                 None
+-------
+terms                dict_keys(['averaged_props', 'non_averaged_props', 'termA_pref', 'termB_pref', 'vibene_denom', 'vibenediff', 'resonances'])
 
 
 ------------------------------------------------

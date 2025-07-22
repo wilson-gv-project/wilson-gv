@@ -20,18 +20,18 @@ import wilson_suite as ws
 
 print('\nevv_tester.py')
 
-pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
-pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
-pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
+pulse_ir_1 = ws.experiment.abstractions_dataclasses.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
+pulse_ir_2 = ws.experiment.abstractions_dataclasses.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
+pulse_uvvis_1 = ws.experiment.abstractions_dataclasses.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
 
 pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
 
-field_a = ws.experiment.abstractions.ElectricField(pulses)
+field_a = ws.experiment.abstractions_dataclasses.ElectricField(pulses)
 order = len(pulses)
 
 epochs = field_a.findEpochs()
 
-detector_a = ws.experiment.abstractions.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
+detector_a = ws.experiment.abstractions_dataclasses.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001*i for i in range(101)],
                                                      wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
@@ -39,35 +39,35 @@ detector_a = ws.experiment.abstractions.SpecDetector('freq', detector_location=[
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
 scan_range_a = [0.0001*i for i in range(101)]
-scan_a = ws.experiment.abstractions.SpecScan(scan_obj_a, scan_range_a)
+scan_a = ws.experiment.abstractions_dataclasses.SpecScan(scan_obj_a, scan_range_a)
 
-experiment_a = ws.experiment.abstractions.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
+experiment_a = ws.experiment.abstractions_dataclasses.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
 print('\nexperiment_a.__dict__', experiment_a.__dict__, '\n')
 
-calc_setup = ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
+calc_setup = ws.main.abstractions_dataclasses.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
 
-sim = ws.main.abstractions.WilsonSimulation()
+sim = ws.main.abstractions_dataclasses.WilsonSimulation()
 
 sim.addExperiment(experiment_a)
 sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
-mol_system = ws.main.abstractions.MolecularSystem(name='ACAC', natoms=8)
+mol_system = ws.main.abstractions_dataclasses.MolecularSystem(name='ACAC', natoms=8)
 sim.addSystem(mol_system)
-# sim.addVibAnaSetup(ws.main.abstractions.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm',
+# sim.addVibAnaSetup(ws.main.abstractions_dataclasses.vibAnaSetup(vib_regime='GVPT2', vibana_prop_need='anharm',
 #                                                     allow_skip_eigvec=True, external_fill_from=calc_setup))
-sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
+sim.addVibAnaSetup(ws.main.abstractions_dataclasses.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
                                                     allow_skip_eigvec=True, external_fill_from=calc_setup))
 sim.addPropEvalSetup(eval_uniform=calc_setup)
 
-axis1 = ws.main.abstractions.SpectralAxis({1: 1})
-axis2 = ws.main.abstractions.SpectralAxis({1: 1, 2: -1})
+axis1 = ws.main.abstractions_dataclasses.SpectralAxis({1: 1})
+axis2 = ws.main.abstractions_dataclasses.SpectralAxis({1: 1, 2: -1})
 start = {1: 250, 2: 100}
 end = {1: 3850, 2: 7550}
 spacer = {1: 3.8, 2: 3.8}
-spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+spec_grid = ws.main.abstractions_dataclasses.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
                                               start=start, end=end, spacer=spacer)
 evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
 rndi = {'num_level_ticks': 15}
-eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+eval_setup = ws.main.abstractions_dataclasses.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 sim.addSpecEvalSetup(eval_setup)
 
 sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
@@ -144,3 +144,9 @@ for k in simdict:
 ws_root = ws.intensities.utils.get_package_root() + '/../../'
 print(ws_root)
 sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+
+v = {'system': {'name': 'ACAC', 'natoms': 8, 'geo': None, 'geo_extra': None}, 
+                       'calc_setup': {'program': 'gaussian', 'lvl_theory': 'B3LYP', 'basis': 'cc_pVQZ', 'other_setup': {}, 'other_setup_identifier': {}}, 
+                       'properties': [{'prop_spec': {'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 'trivial_name': 'dipgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 'trivial_name': 'polhess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'polgrad', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'diphess', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}, {'prop_spec': {'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, 'trivial_name': 'cff', 'in_basis': None, 'in_units': None, 'target_basis': 'nm', 'target_units': 'au', 'serial_vals': None}]}
+
+print(v.keys())
