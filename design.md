@@ -156,8 +156,17 @@ Rotamers? what are the weak effect?
 
 Propene - rotate CH3.
 
-### More calculations
+### Calculations (suggestions and smth that is done but not in the draft)
 
-
-1. Formic acid -  CCSD(T) with TZ
-
+1. Formic acid dimer -  CCSD(T) with TZ:
+  a. FOAC dimer - anharm parallel CCSDT/cc-pVTZ - ran out of time at 290 h (12.08 day); max (14d) wouldn't be enough (rough estimation; need about 400h? rough estimation based on the output file??..). This calculation would generate normal mode displacements that further need to be calculated
+  b. FOAC dimer - anharm parallel CCSDT/cc-pVDZ finished in 20.8 hours ; displacements  are generated but not yet run further
+2. Propene -  CCSD(T) with TZ?
+3. Propene - other conformation (rotation of CH3 group)
+4. "DFT runs (a couple of diff basis sets? aug vs non-aug?) for a couple of larger systems - maybe one ”simple” and one ”complicated” (e.g. H bonding)?":
+  a. which larger systems??
+5. "Vary the functional for a couple of systems (but probably just one basis set), maybe also for the larger systems?"
+  a. CAM-B3LYP, LC-BLYP functionals? PBE0 - tried but couldn't get all the necessary data (not all derivatives)
+6. paradifluorobenzene - done with B3LYP/cc-pVQZ
+7. Formaldehyde dimer (CCSD(T))
+8. FOMA - formamide: CCSD(T)/cc-pVQZ - all done? not sure if all polarizability derivs
