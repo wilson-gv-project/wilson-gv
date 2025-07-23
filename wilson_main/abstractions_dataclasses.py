@@ -14,10 +14,14 @@ class MolecularSystem:
 	natoms: int = None
 	geo: Any = None
 	geo_extra: Any = None
+	linear: bool = False
 
 	@property
 	def Nnmodes(self):
-		return 3*self.natoms-6
+		if self.linear:
+			return 3*self.natoms-5
+		else:
+			return 3*self.natoms-6
 
 	def __post_init__(self):
 		if (self.geo is not None) and (self.geo_extra is not None):
