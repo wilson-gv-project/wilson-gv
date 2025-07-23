@@ -5,6 +5,8 @@ import numpy as np
 def find_non_json_safe(obj, path=""):
     """
     Recursively find non-JSON-serializable elements in an object.
+
+    chatgpt
     """
     if isinstance(obj, dict):
         for key, value in obj.items():
@@ -46,7 +48,6 @@ def check_if_jsonsafe(obj):
         print("✅ JSON-safe")
         return True
     except TypeError as e:
-        print("❌ Not JSON-safe:", e)
         print("🔍 Offending object:", dict_obj)
         print("❌ Not JSON-safe:", e)
         # find_non_json_safe(dict_obj)
@@ -57,6 +58,11 @@ def check_if_jsonsafe(obj):
 
 
 def ndarray_to_dict(arr, serial=True):
+    """
+    Converts a numpy array into a dict headed by tuple of indices of values. 
+
+    If serial then tuples are turned into strings (tuples can't be keys for JSON)
+    """
     if serial:
         return {
             str(idx): arr[idx].item() if hasattr(arr[idx], 'item') else arr[idx]
