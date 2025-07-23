@@ -4,6 +4,7 @@ import copy
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 from wilson_utils.prop_trivname import prop_trivname
+from wilson_utils.abstractions import VibState
 from typing import Callable, Any
 import numpy as np
 
@@ -270,32 +271,6 @@ class MolecularProperty:
 		else:
 			s = ''
 		return f'MolecularProperty {self.triv_name}: values are{s} None'
-
-
-# State, energy, displacement
-class VibState:
-	"""
-	Class to represent a vibrational state.
-	This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
-	TODO: Consider moving this class to wilson-utils.
-	"""
-
-	def __init__(self, s: dict, e: float, d: Any=None):
-		"""
-		s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
-		e: float: State energy level
-		d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates.
-		"""
-
-		self.s = s
-		self.e = e
-		self.d = d
-
-	def __repr__(self):
-		return f"vibState {self.s}, energy is {self.e} cm-1"
-
-
-
 
 class VibAnaSetup:
 	"""
@@ -640,10 +615,8 @@ class CalculationBatch:
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 
-
 		print([i.triv_name for i in props_to_fill])
 		print(dir(parser_obj))
-
 
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
