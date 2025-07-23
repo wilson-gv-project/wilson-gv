@@ -81,7 +81,7 @@ class SpecDetector:
     @classmethod
     def from_dict(cls, data):
         """
-
+        Construct class instance from data which contains values of class init parameters
         """
 
         return cls(detection_method=data['detection_method'], 
@@ -129,17 +129,11 @@ class SpecScan:
 
     def to_dict(self):
         """
+        Get a dictionary of init parameters
+
         __init__(self, scan_objs: list, range)
         """
-        d = {'detection_method': self.dmethod, 'detector_location': self.dloc,
-             'detection_polarization': self.dpol, 'wv_filter': self.wv_filter,
-             'ignore_collinear': self.ignore_collinear}
-        
-        if hasattr(self, 'detection_range'):
-            d['detection_range'] = self.detection_range
-        else:
-            d['detection_range'] = None
-        return d
+        return {'scan_objs': self.scan_objs, 'range': self.range}
 
 
 class EmPulse:

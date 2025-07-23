@@ -207,10 +207,10 @@ class VibExperiment:
             d += 1
             print('Dimension', i, 'is a scan:', i.scan_objs, 'over the range', i.range)
 
-        if self.detector.dmethod == 'time':
+        if self.detector.detection_method == 'time':
             print('Dimension', i, 'is a scan over the time-domain detection range', self.detector.detection_range)
 
-        elif self.detector.dmethod == 'freq':
+        elif self.detector.detection_method == 'freq':
             if self.detector.detection_range is not None:
                 print('Dimension', i, 'is a scan over the frequency-domain detection range', self.detector.detection_range)
 

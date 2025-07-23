@@ -76,7 +76,7 @@ def test_dict_SpecScan():
     scan_range_a = [0.0001*i for i in range(101)]
     scan_a = we_abst.SpecScan(scan_obj_a, scan_range_a)
 
-    print(scan_a)
+    print(scan_a.to_dict())
 
 def test_dict_VibExperiment():
 
@@ -103,5 +103,3 @@ def test_dict_VibExperiment():
 
     experiment_a = we_abst.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
     print('\nexperiment_a.__dict__', experiment_a.__dict__, '\n')
-
-    pass
