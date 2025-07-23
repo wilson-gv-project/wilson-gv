@@ -142,14 +142,12 @@ for k in simdict:
     print('-------')
 
 ws_root = ws.intensities.utils.get_package_root() + '/../../'
-print(ws_root)
-sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
 
 import pickle
-with open("wilsonsim0.pkl", "wb") as f:
+with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
     pickle.dump(sim, f)
 
-with open("wilsonsim0.pkl", "rb") as f:
+with open(ws_root+"/tests/wilsonsim0.pkl", "rb") as f:
     loaded_wilsonsim0 = pickle.load(f)
 
 assert sim.spec == loaded_wilsonsim0.spec
