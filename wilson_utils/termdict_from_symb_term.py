@@ -35,9 +35,12 @@ def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
 
     # Properties
 
-    # wilson-derive convention is operators as integers, wilson-intensities convention
-    # is operators as (latinized Greek) letters
-    numalpha = {0: 'A', 1: 'B', 2: 'G', 3: 'D', 4: 'E', 5: 'Z', 6: 'H', 7: 'T', 8: 'I'}
+    # wilson-derive convention is operator labels as integers, wilson-intensities convention
+    # is operator labels as (latinized Greek) letters
+    from . import common_labels
+    numalpha = {common_labels.op_omega_label_int: common_labels.op_omega_label_greek}
+    for i in range(min(len(common_labels.op_labels_int), len(common_labels.op_labels_greek))):
+        numalpha[common_labels.op_labels_int[i]] = common_labels.op_labels_greek[i]
 
     averaged_props = []
     non_averaged_props = []
