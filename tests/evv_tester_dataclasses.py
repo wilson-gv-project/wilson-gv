@@ -143,6 +143,10 @@ for k in simdict:
 
 ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
+# writing JSON file
+sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+
+# pickling
 import pickle
 with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
     pickle.dump(sim, f)
