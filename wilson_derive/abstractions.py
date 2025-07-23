@@ -6,16 +6,34 @@ class QOperator:
     Quantum-mechanical operator denoting an interaction with the field
     """
 
-    def __init__(self, o: int, ax: int):
+    def __init__(self, o: int, op_type: str=None, ax: tuple=None):
         """
         o: Operator label (integer)
-        ax: Number of components (currently unused)
+
+        The next arguments are optional since derivations may be carried out without their specification and generating
+        the specific terms arising from a choice of multipole expansion regime can be carried out at a later stage
+        (avoiding repetitive derivations of similarly structured terms)
+
+        op_type: String (default None): Optional specification of operator type
+        ax: Tuple (default None): Optional specification of Cartesian axis composition of operator (for the
+        electric dipole operator, this would be (3,), while for e.g. the electric quadrupole operator, this would
+        be (3, 3))
         """
 
         if not(isinstance(o, int)):
             raise TypeError('All operator labels in qOperator must be integers')
 
         self.o = o
+
+        self.op_type = op_type
+        self.ax = ax
+
+    def setOperatorType(self, op_type: str, ax: tuple):
+        """
+        Set the operator type with associated axis argument. See __init__ for argument explanation
+        """
+
+        self.op_type = op_type
         self.ax = ax
 
     def permute(self, mask):
@@ -30,12 +48,12 @@ class QOperator:
         Hash function
         """
 
-        return hash( ( self.o, self.ax ) )
+        return hash( ( self.o, self.op_type, self.ax ) )
 
 
 class HarmOscStateSymbolic:
     """
-    Harmonic oscillator state class
+    Symbol-described harmonic oscillator state class
     """
 
     def __init__(self, q: list):
@@ -57,7 +75,7 @@ class HarmOscStateSymbolic:
 
 class VibStateSymbolic:
     """
-    Vibrational state class (less specific than HarmOscStateSymbolic)
+    Symbol-described vibrational state class (less specific than HarmOscStateSymbolic)
     """
 
     def __init__(self, s: str, mbu: list=[], is_ground: bool=False):
@@ -76,7 +94,7 @@ class VibStateSymbolic:
         """
         Check if states wrt. which the present state is required to be unequal are in fact unequal
 
-        states_as_quanta: dictionary {state_label: quanta, }
+        states_as_quanta: dictionary {state_label: quanta, ...}
         """
 
         if self.mbu == []:
@@ -123,6 +141,7 @@ class PolProp:
             raise TypeError('Differentiation order in PolProp must be integer')
         self.dord = dord
 
+        # To be used as list of characters symbolizing indices of differentiation
         self.inds = None
 
     def setDerivOrder(self, dord):
