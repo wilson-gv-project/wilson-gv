@@ -1,6 +1,7 @@
 import json
 from dataclasses import is_dataclass, asdict
 import numpy as np
+import pickle
 
 def find_non_json_safe(obj, path=""):
     """
@@ -70,3 +71,22 @@ def ndarray_to_dict(arr, serial=True):
         }
     else:
         return {idx: arr[idx].item() for idx in np.ndindex(arr.shape)}
+    
+
+def pickle_this_to(obj, filenamepkl=str, save_to: str = ''):
+    import os
+    filepath = os.path.abspath(os.path.join(save_to, filenamepkl))
+
+    with open(filepath, "wb") as f:
+        pickle.dump(obj, f)
+
+    return
+
+def unpickle_smth_from(filenamepkl: str, load_from: str = ''):
+    import os
+    filepath = os.path.abspath(os.path.join(load_from, filenamepkl))
+
+    with open(filepath, "rb") as f:
+        loaded_obj = pickle.load(f)
+
+    return loaded_obj
