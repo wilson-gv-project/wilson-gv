@@ -86,7 +86,7 @@ def terms_evaluator(system,
     te.identify_to_precalculate()
 
     # 5.1
-    props_data = {prop.triv_name: prop.vals for prop in props}
+    props_data = {prop.trivial_name: prop.vals for prop in props}
 
     # format transformation 
     cff_data = {'cff': props_data['cff']}

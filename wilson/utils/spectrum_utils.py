@@ -227,8 +227,9 @@ def mainVibStates2arraydict(listVibStates: list[VibState], Nnmodes: int) -> dict
     from itertools import permutations
 
     for vs in listVibStates:
-        if len(vs.s)==1:
-            for k_tuple in vs.s:
+        statedict = vs.deserialize_state_dict()
+        if len(statedict)==1:
+            for k_tuple in statedict:
                 perms = set(permutations(tuple([int(i) for i in k_tuple])))
                 for p in perms:
                     states_arrs[len(k_tuple)][p] = convNu2Ene(vs.e) if check_energy_unit(vs.e) == 'cm-1' else vs.e
