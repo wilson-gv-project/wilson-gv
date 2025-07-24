@@ -40,8 +40,13 @@ def check_if_jsonsafe(obj):
     try:
         if is_dataclass(obj):
             dict_obj = asdict(obj)
+        # check if to_dict() method is implemented
+        elif hasattr(obj, "to_dict"):
+            dict_obj = obj.to_dict()
+        # as the last resort, use __dict__
         elif hasattr(obj, "__dict__"):
             dict_obj = obj.__dict__
+        # should be fine then
         else:
             dict_obj = obj
 
@@ -51,19 +56,22 @@ def check_if_jsonsafe(obj):
     except TypeError as e:
         print("🔍 Offending object:", dict_obj)
         print("❌ Not JSON-safe:", e)
-        # find_non_json_safe(dict_obj)
+        # for more infor here can do: find_non_json_safe(dict_obj)
         return False
     except Exception as e:
         print("⚠️ Other error:", e)
         return False
 
 
-def ndarray_to_dict(arr, serial=True):
+def ndarray_to_dict(arr: np.ndarray, serial=True):
     """
     Converts a numpy array into a dict headed by tuple of indices of values. 
 
     If serial then tuples are turned into strings (tuples can't be keys for JSON)
     """
+    if not isinstance(arr, np.ndarray):
+        raise TypeError("ndarray_to_dict() accepts only numpy arrays.")
+
     if serial:
         return {
             str(idx): arr[idx].item() if hasattr(arr[idx], 'item') else arr[idx]
