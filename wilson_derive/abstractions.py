@@ -6,16 +6,34 @@ class QOperator:
     Quantum-mechanical operator denoting an interaction with the field
     """
 
-    def __init__(self, o: int, ax: int):
+    def __init__(self, o: int, op_type: str=None, ax: tuple=None):
         """
         o: Operator label (integer)
-        ax: Number of components (currently unused)
+
+        The next arguments are optional since derivations may be carried out without their specification and generating
+        the specific terms arising from a choice of multipole expansion regime can be carried out at a later stage
+        (avoiding repetitive derivations of similarly structured terms)
+
+        op_type: String (default None): Optional specification of operator type
+        ax: Tuple (default None): Optional specification of Cartesian axis composition of operator (for the
+        electric dipole operator, this would be (3,), while for e.g. the electric quadrupole operator, this would
+        be (3, 3))
         """
 
         if not(isinstance(o, int)):
             raise TypeError('All operator labels in qOperator must be integers')
 
         self.o = o
+
+        self.op_type = op_type
+        self.ax = ax
+
+    def setOperatorType(self, op_type: str, ax: tuple):
+        """
+        Set the operator type with associated axis argument. See __init__ for argument explanation
+        """
+
+        self.op_type = op_type
         self.ax = ax
 
     def permute(self, mask):
@@ -30,12 +48,12 @@ class QOperator:
         Hash function
         """
 
-        return hash( ( self.o, self.ax ) )
+        return hash( ( self.o, self.op_type, self.ax ) )
 
 
-class HarmOscState:
+class HarmOscStateSymbolic:
     """
-    Harmonic oscillator state class
+    Symbol-described harmonic oscillator state class
     """
 
     def __init__(self, q: list):
@@ -55,9 +73,9 @@ class HarmOscState:
         """
         return hash(tuple(self.q))
 
-class VibState:
+class VibStateSymbolic:
     """
-    Vibrational state class (less specific than HarmOscState)
+    Symbol-described vibrational state class (less specific than HarmOscStateSymbolic)
     """
 
     def __init__(self, s: str, mbu: list=[], is_ground: bool=False):
@@ -76,7 +94,7 @@ class VibState:
         """
         Check if states wrt. which the present state is required to be unequal are in fact unequal
 
-        states_as_quanta: dictionary {state_label: quanta, }
+        states_as_quanta: dictionary {state_label: quanta, ...}
         """
 
         if self.mbu == []:
@@ -123,6 +141,7 @@ class PolProp:
             raise TypeError('Differentiation order in PolProp must be integer')
         self.dord = dord
 
+        # To be used as list of characters symbolizing indices of differentiation
         self.inds = None
 
     def setDerivOrder(self, dord):
@@ -205,16 +224,16 @@ class VibDiffTerm:
 
     def __init__(self, sl=None, sr=None, is_pert_wf_diff=False):
         """
-        sl: VibState or HarmOscState instance: Bra ("left-hand") state
-        sl: VibState or HarmOscState instance: Ket ("right-hand") state
+        sl: VibStateSymbolic or HarmOscStateSymbolic instance: Bra ("left-hand") state
+        sl: VibStateSymbolic or HarmOscStateSymbolic instance: Ket ("right-hand") state
         is_pert_wf_diff: Boolean: Flag: Does this term come from an expression for
         a perturbed (vibrational) wavefunction? (Alternative: from Hermite integration)
         """
 
         # Must be both vibState or both harmOscState instances
-        if not (isinstance(sl, VibState) and isinstance(sr, VibState) or
-                isinstance(sl, HarmOscState) and isinstance(sr, HarmOscState)):
-            raise TypeError('Both sl and sr must be either both VibState instances or both HarmOscState instances')
+        if not (isinstance(sl, VibStateSymbolic) and isinstance(sr, VibStateSymbolic) or
+                isinstance(sl, HarmOscStateSymbolic) and isinstance(sr, HarmOscStateSymbolic)):
+            raise TypeError('Both sl and sr must be either both VibStateSymbolic instances or both HarmOscStateSymbolic instances')
 
         self.sl = sl
         self.sr = sr
@@ -229,11 +248,11 @@ class VibDiffTerm:
         print('self.is_pert_wf_diff', self.is_pert_wf_diff,'\n')
         print('Freq diff term')
 
-        if isinstance(self.sl, VibState):
+        if isinstance(self.sl, VibStateSymbolic):
             print('Bra state', self.sl.s)
             print('Ket state', self.sr.s)
 
-        elif isinstance(self.sl, HarmOscState):
+        elif isinstance(self.sl, HarmOscStateSymbolic):
             print('Bra state', self.sl.q)
             print('Ket state', self.sr.q)
         if not self.is_pert_wf_diff:
@@ -881,9 +900,9 @@ class TransitionIntegral:
     Transition integral class
     """
 
-    def __init__(self, bra: VibState, ket: VibState, prop: PolProp):
+    def __init__(self, bra: VibStateSymbolic, ket: VibStateSymbolic, prop: PolProp):
         """
-        bra and ket (each VibState): Resp. bra and ket states of integral
+        bra and ket (each VibStateSymbolic): Resp. bra and ket states of integral
         prop (PolProp instance): Polarization property
         """
 
@@ -892,22 +911,22 @@ class TransitionIntegral:
 
         self.prop = prop
 
-        if not (isinstance(bra, VibState)):
-            raise TypeError('transitionIntegral bra state must be VibState instance')
+        if not (isinstance(bra, VibStateSymbolic)):
+            raise TypeError('transitionIntegral bra state must be VibStateSymbolic instance')
 
         self.bra = bra
 
-        if not (isinstance(ket, VibState)):
-            raise TypeError('transitionIntegral ket state must be VibState instance')
+        if not (isinstance(ket, VibStateSymbolic)):
+            raise TypeError('transitionIntegral ket state must be VibStateSymbolic instance')
         self.ket = ket
 
-    def setBra(self, new_bra: VibState):
+    def setBra(self, new_bra: VibStateSymbolic):
         """
         Set a new_bra new bra state
         """
 
-        if not (isinstance(new_bra, VibState)):
-            raise TypeError('transitionIntegral bra state must be VibState instance')
+        if not (isinstance(new_bra, VibStateSymbolic)):
+            raise TypeError('transitionIntegral bra state must be VibStateSymbolic instance')
 
         self.bra = new_bra
 
@@ -916,8 +935,8 @@ class TransitionIntegral:
         Set a new_ket new ket state
         """
 
-        if not (isinstance(new_ket, VibState)):
-            raise TypeError('transitionIntegral ket state must be VibState instance')
+        if not (isinstance(new_ket, VibStateSymbolic)):
+            raise TypeError('transitionIntegral ket state must be VibStateSymbolic instance')
 
         self.ket = new_ket
 
