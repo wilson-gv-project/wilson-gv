@@ -7,30 +7,17 @@ Skipped from abstraction.py: CollEvalSetup, WilsonSimulations, SpectralAxisAdvan
 
 Integration test is in wilson_suitetests/evv_tester_dataclasses.py (different from wilson_suitetests/evv_tester.py only by the import from different abstractions module)
 """
-import wilson_main.abstractions_dataclasses as wm_abst_dataclass
-import wilson_main.abstractions as wm_abst
-from wilson_utils.serialization import check_if_jsonsafe
-from dataclasses import asdict
+import wilson_main.abstractions as wm_abst_dataclass
 import numpy as np
 
 def test_MolecularSystem():
-    mol_system_reg = wm_abst.MolecularSystem(name='Mock_reg', natoms=3)
-    assert not hasattr(mol_system_reg, 'geo')
-    mol_system_reg.geo = np.array([[1., -0.3, 2.2], [-1.3, 0.0, -2.1], [0.0, 0.0, -0.1]])
 
     mol_system_datacls = wm_abst_dataclass.MolecularSystem(name='Mock_datacls', natoms=3)
     assert mol_system_datacls.geo is None
     mol_system_datacls.geo = np.array([[1., -0.3, 2.2], [-1.3, 0.0, -2.1], [0.0, 0.0, -0.1]])
 
-    assert np.array_equal(mol_system_reg.geo, mol_system_datacls.geo)
-
-    assert hasattr(mol_system_reg, 'h')
     assert hasattr(mol_system_datacls, 'h')
-    assert mol_system_reg.Nnmodes == 3*3-6
     assert mol_system_datacls.Nnmodes == 3*3-6
-
-    mol_system_reg2 = wm_abst.MolecularSystem(name='Mock_reg', natoms=2, geo=np.array([[1., -0.3, 2.2], [0.0, 0.0, -0.1]]))
-    assert mol_system_reg2.Nnmodes != 3*3-5
 
 
 def test_ExternalCalcSetup():
