@@ -7,6 +7,9 @@ import numpy as np
 
 
 def test_evv_tester_dataclasses():
+    """
+    simple run with no pickling
+    """
     import evv_tester_dataclasses
     evv_tester_dataclasses.TO_PICKLES = []
     wilsim = evv_tester_dataclasses.run()
@@ -42,7 +45,7 @@ def test_evv_tester_dataclasses_vibexp():
     assert load_vibexp.detector.detection_range == wilsim.exp.detector.detection_range
     assert load_vibexp.epochs == wilsim.exp.epochs
 
-    from wilson_experiment.abstractions_dataclasses import EmPulse, ElectricField
+    from wilson_experiment.abstractions import EmPulse, ElectricField
     # field_ref comes from print: print(wilsim.exp.field)
     field_ref = ElectricField(pulses=[EmPulse(env='ideal', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1), 
                                       EmPulse(env='impulsive', maxstr=1e-05, tc=100.0, cf=None, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2), 
@@ -69,7 +72,7 @@ def test_evv_tester_dataclasses_calcsetup():
     load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/tests/')
     assert load_calcsetup == wilsim2.eval_uniform
 
-    from wilson_main.abstractions_dataclasses import ExternalCalcSetup
+    from wilson_main.abstractions import ExternalCalcSetup
     calcsetup_ref = ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={})
 
     assert load_calcsetup == calcsetup_ref
@@ -90,15 +93,15 @@ def test_evv_tester_dataclasses_wilsonsim():
     """
     import evv_tester_dataclasses
 
-    topickles_2 = ['WilsonSimulation_init']
+    topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_final']
     evv_tester_dataclasses.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim3, wilsim_pklfile = evv_tester_dataclasses.run()
+    wilsim3 = evv_tester_dataclasses.run()
 
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
     load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=wilsim_pklfile, load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
 
     assert load_wilsonsim_init.spec is None
     assert isinstance(load_wilsonsim_final.spec, np.ndarray)
@@ -106,16 +109,16 @@ def test_evv_tester_dataclasses_wilsonsim():
     assert np.allclose(np.abs(load_wilsonsim_final.spec), np.abs(wilsim3.spec))
 
     # optional pickling at init and before evaluation
-    topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_mid']
+    topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_mid', 'WilsonSimulation_final']
     evv_tester_dataclasses.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim3, wilsim_pklfile = evv_tester_dataclasses.run()
+    wilsim3 = evv_tester_dataclasses.run()
 
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
     load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
     load_wilsonsim_mid = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_mid'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=wilsim_pklfile, load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
 
     assert load_wilsonsim_init.spec is None
     assert load_wilsonsim_mid.spec is None
@@ -125,7 +128,7 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     assert np.allclose(np.abs(load_wilsonsim_final.spec), np.abs(wilsim3.spec))
 
-    from wilson_main.abstractions_dataclasses import VibAnaSetup, MolecularSystem, ExternalCalcSetup
+    from wilson_main.abstractions import VibAnaSetup, MolecularSystem, ExternalCalcSetup
     vibanasetup_ref = VibAnaSetup(regime='GVPT2', system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
                                   regime_subinfo=None, max_state_lvl=3, nc_sqrt_eigval={0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
                                   nc_eigvec=None, allow_skip_eigvec=True, vibana_prop_need='none', 
