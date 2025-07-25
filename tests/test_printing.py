@@ -6,6 +6,7 @@ from wilson_utils.printing import (
     separatorprint,
     coolprint,
 )
+
 from wilson_utils.paths import UTILS_ROOT
 TESTFILESDIR = UTILS_ROOT + "/tests/"
 
@@ -26,16 +27,23 @@ def test_set_print_target():
     infoprint('hello again')
 
 def test_infoprint():
-    pass
+    separatorprint()
+    with use_print_target(open(TESTFILESDIR+"logfile.txt", "a")):
+        infoprint('hello test_infoprint')
+    infoprint('hello test_infoprint again')
 
 def test_debugprint():
-    pass
+    separatorprint()
+    with use_print_target(open(TESTFILESDIR+"logfile.txt", "a")):
+        debugprint('hello test_infoprint')
+    debugprint('hello test_infoprint again')
 
 def test_printtest():
-    pass
+    separatorprint()
+    with use_print_target(open(TESTFILESDIR+"logfile.txt", "a")):
+        printtest('hello test_infoprint')
+    printtest('hello test_infoprint again')
 
-def test_separatorprint():
-    pass
 
 def test_coolprint():
     separatorprint()
@@ -50,3 +58,4 @@ def test_coolprint():
         coolprint("This is a cool print test", colorinfo='red', file=f)
 
     pass
+
