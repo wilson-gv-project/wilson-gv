@@ -502,8 +502,11 @@ class VibAnaSetup:
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-		self.states = anharmonic_analyzer(self.system, props, self.regime, self.regime_subinfo,
-										  self.nc_sqrt_eigval, self.nc_eigvec)
+		context = {'system': self.system, 'props': props, 
+			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
+					'nc_sqrt_eigval': self.nc_sqrt_eigval, 'nc_eigvec': self.nc_eigvec,
+					'exclude_modes': self.exclude_modes}
+		self.states = anharmonic_analyzer(**context)
 
 	def __repr__(self):
 		return 'THIS IS vibAnaSetup with self.regime,self.states'
@@ -616,11 +619,15 @@ class CalculationBatch:
 		parser_obj.getData()
 
 		print([i.triv_name for i in props_to_fill])
-		print(dir(parser_obj))
+		print('-----------------<<<<<', dir(parser_obj))
+		print('-----------------<<<<<', parser_obj.__dict__.keys())
 
+		# ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'hess', 'qff', 'B', 'coriolis']
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				i.addValues(getattr(parser_obj, i.triv_name))
+				# if i.triv_name in ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'coriolis', 'B']:
+				if i.triv_name != 'hess':
+					i.addValues(getattr(parser_obj, i.triv_name))
 
 		if vib_ana_setup_to_fill is not None:
 
