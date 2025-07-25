@@ -10,9 +10,9 @@ def test_evv_tester_dataclasses():
     """
     simple run with no pickling
     """
-    import evv_tester_dataclasses
-    evv_tester_dataclasses.TO_PICKLES = []
-    wilsim = evv_tester_dataclasses.run()
+    import evv_tester as evv_tester
+    evv_tester.TO_PICKLES = []
+    wilsim = evv_tester.run()
 
     assert hasattr(wilsim, 'spec')
 
@@ -29,15 +29,15 @@ def test_evv_tester_dataclasses_vibexp():
     pickled VibExperiment is then unpickled in the script and calculation continues.
     Now comparing loaded from file VibExperiment to the one saved in WilsonSimulation instance (after all calculation is done).
     """
-    import evv_tester_dataclasses
+    import evv_tester as evv_tester
     
     topickles_1 = ['VibExperiment']
-    evv_tester_dataclasses.TO_PICKLES = topickles_1
+    evv_tester.TO_PICKLES = topickles_1
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim = evv_tester_dataclasses.run()
+    wilsim = evv_tester.run()
     # loading saved VibExperiment in that calculation from the file (file name was saved in a dict)
-    load_vibexp = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['VibExperiment'], load_from=SUITE_ROOT+'/tests/')
+    load_vibexp = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['VibExperiment'], load_from=SUITE_ROOT+'/tests/')
     
     # now this is not working: evv_tester_dataclasses.PKL_FILES['VibExperiment'] == wilsim.exp; comparison not implemented but it could be # TODO?
     
@@ -60,16 +60,16 @@ def test_evv_tester_dataclasses_calcsetup():
     pickled ExternalCalcSetup is then unpickled in the script and calculation continues.
     Now comparing loaded from file ExternalCalcSetup to the one saved in WilsonSimulation instance (after all calculation is done).
     """
-    import evv_tester_dataclasses
+    import evv_tester as evv_tester
 
     topickles_2 = ['ExternalCalcSetup']
-    evv_tester_dataclasses.TO_PICKLES = topickles_2
+    evv_tester.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim2 = evv_tester_dataclasses.run()
+    wilsim2 = evv_tester.run()
 
     # loading saved ExternalCalcSetup in that calculation from the file (file name was saved in a dict)
-    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/tests/')
+    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/tests/')
     assert load_calcsetup == wilsim2.eval_uniform
 
     from wilson_main.abstractions import ExternalCalcSetup
@@ -91,17 +91,17 @@ def test_evv_tester_dataclasses_wilsonsim():
     load_wilsonsim_init would not have some atributes which were set later in script
 
     """
-    import evv_tester_dataclasses
+    import evv_tester as evv_tester
 
     topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_final']
-    evv_tester_dataclasses.TO_PICKLES = topickles_2
+    evv_tester.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim3 = evv_tester_dataclasses.run()
+    wilsim3 = evv_tester.run()
 
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
-    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
 
     assert load_wilsonsim_init.spec is None
     assert isinstance(load_wilsonsim_final.spec, np.ndarray)
@@ -110,15 +110,15 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     # optional pickling at init and before evaluation
     topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_mid', 'WilsonSimulation_final']
-    evv_tester_dataclasses.TO_PICKLES = topickles_2
+    evv_tester.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
-    wilsim3 = evv_tester_dataclasses.run()
+    wilsim3 = evv_tester.run()
 
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
-    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_mid = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_mid'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester_dataclasses.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_mid = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_mid'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
 
     assert load_wilsonsim_init.spec is None
     assert load_wilsonsim_mid.spec is None
