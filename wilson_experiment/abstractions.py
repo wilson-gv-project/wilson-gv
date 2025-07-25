@@ -3,12 +3,45 @@ from typing import List, Optional, Iterable
 from operator import itemgetter
 import copy
 
+# TODO: SpecDetector and SpecScan as dataclasses?
+# TODO: Expand functionality according to below TODOs
 
 @dataclass
 class SpecDetector:
+    """
+    Class to represent a spectral detector
+
+    ----
+    detection_method: String: A detection method: "integrated", "time", "freq"
+    If detection_method is "time" or "freq", then the detection data is one spectral dimension
+    If detection_method is "integrated", then the detection data is a scalar
+    Currently, only "freq" (frequency-range) detection is supported.
+
+    detector_location: List of floats: Optional explicit vector location in space. Currently not used.
+
+    detection_polarization: List of floats: Detect only light with this specific polarization vector.
+    Currently not used.
+
+    detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
+    in either t/E space as relevant the data is collected
+
+    wv_filter: List of dictionaries {pulse label: [sign], ...}:  Detect only light along this/these particular
+    phase-matching direction(s)
+    # FIXME: Putting sign in a list seems unnecessary, consider rm and rework. Or maybe OK if considering multiple
+    directions for same puls at once?
+
+    ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
+    Currently not used.
+    """
     detection_method: str
+    
+    # TODO add check (len 3 array or list)
     detector_location: Optional[List[float]] = None
+    
+    # TODO add check
     detection_polarization: Optional[List[float]] = None
+    
+    # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
     detection_range: Optional[List[float]] = None
     wv_filter: Optional[List[dict]] = None
     ignore_collinear: bool = True
@@ -22,6 +55,19 @@ class SpecDetector:
 
 @dataclass
 class SpecScan:
+    """
+    Class to represent a spectral scan (adding to the dimensionality of a spectrum)
+
+    ----
+    scan_objs: [['object 1 category', 'object 1 id' [or dummy], 'object 1 attribute', 'multiplier'],
+                ['object 2 category', ...]]: Tells what is being scanned here
+
+    range: Iterable of numbers over which scan objects are varied (scaled by their multipliers)
+    """
+
+    # TODO: Later the scans could involve a greater variety of parameters that can be varied on a range
+    
+    # TODO: Check if ranges are valid
     scan_objs: List
     range: Iterable
 
@@ -30,7 +76,6 @@ class SpecScan:
         valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
 
         for i in self.scan_objs:
-            print('scan obj i', i)
             if i[0] not in valid_scan_objs:
                 raise AssertionError("The scan object must be one of", valid_scan_objs, 'but is instead', i[0])
             if i[2] not in valid_scan_attributes[i[0]]:
@@ -39,9 +84,30 @@ class SpecScan:
 
 @dataclass
 class EmPulse:
+    """
+    Class to represent an electromagnetic pulse
+    
+    ----
+    env: String: Pulse time-domain envelope: Valid choices are "impulsive", "ideal" (frequency-domain impulsive and
+    time-domain impulsive), "cw" (continuous wave, currently not supported), and "gaussian".
+    maxstr: Float: Pulse amplitude at maximum of envelope
+    tc: Float: Point in time at which pulse envelope is at maximum
+    cf: float: (Infrared-range) Carrier frequency
+    cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation)
+    For pulses where cf_uv != 0.0, then cf must be 0.0
+    dev: float: Deviation parameter (e.g. broadness of Gaussian pulse)
+    wv: float: Wavevector travel direction
+    pol: float: Polarization (only linearly polarized light currently countenanced)
+    id: integer: Pulse ID label
+    """
     env: str
+    
+    # Maximum of temporal envelope
     maxstr: float
+    
+    # Centerpoint of temporal envelope
     tc: float = None
+    
     cf: float = None
     cf_uv: float = 0.0
     dev: float = None
@@ -50,6 +116,8 @@ class EmPulse:
     id: int = None
 
     def __post_init__(self):
+        
+        # TODO: Generalize to arbitrary pulses and chirped pulses
         
         allowed_envelopes = ['impulsive', 'ideal', 'cw', 'gaussian']
 
@@ -63,11 +131,24 @@ class EmPulse:
         if self.env == "gaussian":
             if self.cf is None or self.dev is None:
                 raise AssertionError('A Gaussian pulse must have a carrier frequency and a deviation parameter')
+            
+            # VL. FIXME This is not compatible with dataclass init (no variables called cf or dev, there is self.cf and self.dev),
+            # but also - is it needed?
+            # cf and dev are optional arguments, None by default; if specified with value, they will be not None.
+            # original code here:
 
+            # self.cf = cf
+            # self.dev = dev
+        
         if self.env == "ideal":
             if self.cf is None:
                 raise AssertionError('An pulse of the "ideal" type must have a (monochromatic) "carrier" frequency')
+            
+            # VL. FIXME This is not compatible with dataclass init, but also - is it needed? Same as above
+            # original code here:
 
+            # self.cf = cf
+        
         # Wavevector: In which unit vector direction is the pulse wave travelling
         if self.wv is None:
             print('No wavevector was specified for pulse, defaulting to unit z direction wavevector')
@@ -110,8 +191,16 @@ class EmPulse:
                 raise AssertionError('The pulse wavevector must be a len 3 list of floats')
 
 
+# The field consists of a collection of pulses
 @dataclass
 class ElectricField:
+    """
+    Class to represent an electromagnetic field consisting of one or more pulses
+    
+    ----
+    pulses: List of EmPulse instances: The pulses making up the field
+    """
+    # FIXME: Consider: Pulses as dictionary with IDs?
     pulses: List[EmPulse]
 
     def findEpochs(self, tol: float=0.0) -> list:
@@ -161,6 +250,24 @@ class ElectricField:
 
 @dataclass
 class VibExperiment:
+    """
+    Class to represent a vibrational wave-mixing experiment
+
+    ----
+    field: ElectricField instance: A "base" perturbing field (upon which scans may be imposed)
+    detector: SpecDetector instance: The detector for this experiment
+    scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
+    magn_conditions: List of lists [[sign*pulse i (is always of lower frequency than...), sign*pulse j], ...]:
+    Magnitude conditions for later use in identifying terms that will not become fully resononant in this experiment
+    """
+
+    # field should be an electricField instance:
+
+    # scans is a list of specRange instances
+    # Each scan adds a spectral dimension
+    # magn_conditions is a list of imposed pulse magnitude conditions
+    # Format: [[(i, -j, k], ...]: w_i - w_j + w_k sign. > 0, ...
+
     order: int
     field: ElectricField
     detector: SpecDetector
@@ -169,6 +276,16 @@ class VibExperiment:
 
 
     def __post_init__(self):
+
+        # VL: FIXME: commenting it out now because it complicates dataclass setup, 
+        #   but also it has no effect: self.scans will never be not empty?
+        # Maybe I missed smth?
+        
+        # self.scans = []
+        #      
+        # if scans is not None:
+        #     self.scans.extend(scans)
+        
         self.dim = self.findDimensionality()
         self.epochs = self.field.findEpochs()
         self.int_sequences = self.findInteractionSequences()
@@ -185,11 +302,9 @@ class VibExperiment:
         d = 0
         d += len(self.scans)
 
-        # if self.detector.dmethod == 'time':
         if self.detector.detection_method == 'time':
             return d + 1
         
-        # elif self.detector.dmethod == 'freq':
         elif self.detector.detection_method == 'freq':
             if self.detector.detection_range is not None:
                 return d + 1
