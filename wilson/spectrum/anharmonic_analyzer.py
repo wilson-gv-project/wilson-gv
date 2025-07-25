@@ -3,7 +3,7 @@
 """
 import copy
 from wilson_main.abstractions import VibState, MolecularSystem, MolecularProperty
-from wilson.utils.debug import info_message, separator_print, colordebug
+from wilson.utils.debug import infoprint, separator_print, debugprint
 
 def anharm_analyzer(system:MolecularSystem = None, props: list[MolecularProperty] = None, 
                     nc_sqrt_eigval: dict = None, 
@@ -23,7 +23,7 @@ def anharm_analyzer(system:MolecularSystem = None, props: list[MolecularProperty
         exclude_modes = []
 
     prop_dict = {i.triv_name: i.vals for i in props}
-    colordebug(f'prop_dict {prop_dict.keys()}')
+    debugprint(f'prop_dict {prop_dict.keys()}')
 
     # list, not associated to normal mode indices
 
@@ -57,8 +57,8 @@ def anharm_analyzer(system:MolecularSystem = None, props: list[MolecularProperty
     one = {i: all_states[i] for i in all_states if len(i) == 1}
     two = {i: all_states[i] for i in all_states if len(i) == 2}
 
-    info_message('GVPT2 anharm corrected:')
-    info_message('\n'+repr(dict(sorted(one.items()))))
-    info_message('\n'+repr(dict(sorted(two.items()))))
+    infoprint('GVPT2 anharm corrected:')
+    infoprint('\n'+repr(dict(sorted(one.items()))))
+    infoprint('\n'+repr(dict(sorted(two.items()))))
 
     return all_states, fermi_resonance

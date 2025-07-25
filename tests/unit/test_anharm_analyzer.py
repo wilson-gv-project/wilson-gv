@@ -1,3 +1,5 @@
+from wilson.utils.debug import printtest
+
 def evv_experiment():
     import wilson_suite as ws
     pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
@@ -32,7 +34,7 @@ def test_anharm_analyzer():
     # omg, need vibana_prop_need='anharm' for nc_sqrt_eigval to be retrieved
     vibana = ws.main.abstractions.VibAnaSetup(system=mol_system, vib_regime='GVPT2', vibana_prop_need='anharm',
                                                     allow_skip_eigvec=True, external_fill_from=calc_setup)
-    print(vibana.vibana_prop_need)
+    printtest(vibana.vibana_prop_need)
 
     experiment_a = evv_experiment()
 
@@ -46,23 +48,24 @@ def test_anharm_analyzer():
     sim.addPropEvalSetup(eval_uniform=calc_setup)
     # should take care of when props are there, because needed for vib analyzer
     sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
-    print([i.triv_name for i in sim.props])
+    printtest([i.triv_name for i in sim.props])
     sim.dressPropsWithSetup()
     sim.makeCalculationBatches()
     sim.getResultsFromCalculationBatches(source_type='vault',
                                         source_loc=ws.intensities.utils.get_package_root()
                                                     + '/../tests/test_database/mini_files_database.csv' )
-    print(sim.props)
-    print(sim.props[0].__dict__.keys())
-    print([i.triv_name for i in sim.props])
+    printtest(sim.props)
+    printtest(sim.props[0].__dict__.keys())
+    printtest([i.triv_name for i in sim.props])
     for i in sim.props:
         if i.triv_name == 'cff':
-            print(i.vals.shape)
-    print(sim.vib_ana_setup.regime)
-    print(sim.vib_ana_setup.vibana_prop_need)
-    # ['prop_spec', 'triv_name', 'vals', 'in_basis', 'in_units', 'system', 'calc_setup', 'target_basis', 'target_units']
-    # anharm_analyzer(mol_system, sim.props, sim.vib_ana_setup.nc_sqrt_eigval, regime='VPT2')
-    print(sim.vib_ana_setup.nc_sqrt_eigval)
-    print(len(sim.vib_ana_setup.nc_sqrt_eigval))
+            printtest(i.vals.shape)
+    printtest(sim.vib_ana_setup.regime)
+    printtest(sim.vib_ana_setup.vibana_prop_need)
+    
+    # ['prop_spec', 'triv_name', 'vals', 'in_basis', 'in_units', 
+    # 'system', 'calc_setup', 'target_basis', 'target_units']
+    printtest(sim.vib_ana_setup.nc_sqrt_eigval)
+    printtest(len(sim.vib_ana_setup.nc_sqrt_eigval))
 
     sim.vib_ana_setup.doAnharmonicAnalysis(sim.props, anharmonic_analyzer=anharm_analyzer)

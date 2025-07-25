@@ -3,7 +3,7 @@ Documentation and tests will be added in the future PR, also style imporvements
 """
 import numpy as np
 import copy
-from wilson.utils.debug import debugfunc, info_message, separator_print
+from wilson.utils.debug import debugfunc, infoprint, separator_print
 
 
 def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield,
@@ -34,8 +34,8 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
         do_variational_correction = False
     else:
         separator_print(title='')
-        info_message('Something strange has happened in anharm_corrected_vibrational_energies')
-        info_message('Anharmonic is called, but which type isn/t specified')
+        infoprint('Something strange has happened in anharm_corrected_vibrational_energies')
+        infoprint('Anharmonic is called, but which type isn/t specified')
         exit()
     original_len_ene = len(harmonic_energies)
     harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
