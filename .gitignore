@@ -4,6 +4,8 @@ CQCParse/
 
 *.svg
 *.npy
+*.pkl
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
