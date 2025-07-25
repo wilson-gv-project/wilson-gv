@@ -132,22 +132,9 @@ class EmPulse:
             if self.cf is None or self.dev is None:
                 raise AssertionError('A Gaussian pulse must have a carrier frequency and a deviation parameter')
             
-            # VL. FIXME This is not compatible with dataclass init (no variables called cf or dev, there is self.cf and self.dev),
-            # but also - is it needed?
-            # cf and dev are optional arguments, None by default; if specified with value, they will be not None.
-            # original code here:
-
-            # self.cf = cf
-            # self.dev = dev
-        
         if self.env == "ideal":
             if self.cf is None:
                 raise AssertionError('An pulse of the "ideal" type must have a (monochromatic) "carrier" frequency')
-            
-            # VL. FIXME This is not compatible with dataclass init, but also - is it needed? Same as above
-            # original code here:
-
-            # self.cf = cf
         
         # Wavevector: In which unit vector direction is the pulse wave travelling
         if self.wv is None:
