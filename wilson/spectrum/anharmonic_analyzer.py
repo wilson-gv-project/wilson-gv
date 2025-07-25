@@ -3,10 +3,11 @@
 """
 import copy
 from wilson_main.abstractions import VibState, MolecularSystem, MolecularProperty
+from wilson.utils.debug import info_message, separator_print, colordebug
 
-def anharm_analyzer(system:MolecularSystem, props: list[MolecularProperty], 
-                    nc_sqrt_eigval: dict, 
-                    regime: dict, regime_subinfo: dict = None, 
+def anharm_analyzer(system:MolecularSystem = None, props: list[MolecularProperty] = None, 
+                    nc_sqrt_eigval: dict = None, 
+                    regime: dict = None, regime_subinfo: dict = None, 
                     exclude_modes: list = None) -> list[VibState]:
     """
     returns self.states for VibAnaSetup, 
@@ -15,21 +16,14 @@ def anharm_analyzer(system:MolecularSystem, props: list[MolecularProperty],
             Returns VPT2 corrected energy levels of all states as a dictionary : {str(int): float}
 
     """
-    print('--------------- anharm_analyzer ----------------')
+    separator_print('anharm_analyzer')
     from wilson.spectrum.vpt2 import anharm_corr_energies
 
     if exclude_modes is None:
         exclude_modes = []
 
-    # one = {k: v for k,v in parsed_data.vib_states.anharmonic_states.items() if len(k) == 1}
-    # two = {k: v for k,v in parsed_data.vib_states.anharmonic_states.items() if len(k) == 2}
-
-    # print('\nOriginal anharm corrected:')
-    # print(dict(sorted(one.items())))
-    # print(dict(sorted(two.items())), '\n')
-
     prop_dict = {i.triv_name: i.vals for i in props}
-    print('prop_dict', prop_dict.keys())
+    colordebug(f'prop_dict {prop_dict.keys()}')
 
     # list, not associated to normal mode indices
 
@@ -63,8 +57,8 @@ def anharm_analyzer(system:MolecularSystem, props: list[MolecularProperty],
     one = {i: all_states[i] for i in all_states if len(i) == 1}
     two = {i: all_states[i] for i in all_states if len(i) == 2}
 
-    print('\nGVPT2 anharm corrected:')
-    print(dict(sorted(one.items())))
-    print(dict(sorted(two.items())), '\n')
+    info_message('GVPT2 anharm corrected:')
+    info_message('\n'+repr(dict(sorted(one.items()))))
+    info_message('\n'+repr(dict(sorted(two.items()))))
 
     return all_states, fermi_resonance

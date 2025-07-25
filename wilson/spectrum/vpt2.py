@@ -3,7 +3,7 @@ Documentation and tests will be added in the future PR, also style imporvements
 """
 import numpy as np
 import copy
-from CQCParse.debug import debugfunc
+from wilson.utils.debug import debugfunc, info_message, separator_print
 
 
 def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield,
@@ -33,9 +33,9 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
         do_resonance_checks = True
         do_variational_correction = False
     else:
-        print('\n')
-        print('Something strange has happened in anharm_corrected_vibrational_energies')
-        print('Anharmonic is called, but which type isn/t specified')
+        separator_print(title='')
+        info_message('Something strange has happened in anharm_corrected_vibrational_energies')
+        info_message('Anharmonic is called, but which type isn/t specified')
         exit()
     original_len_ene = len(harmonic_energies)
     harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
@@ -47,7 +47,7 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
     combo3q = np.zeros((original_len_ene, original_len_ene, original_len_ene))
 
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
-    # fermi_resonance = [fermi_resonance[0]]
+    # selecting resonances fermi_resonance = [fermi_resonance[0]]
     X, X_cubic, X_quartic, X_coriolis = get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                               rotational_constant, coriolis_constant, do_resonance_checks,
                                               fermi_resonance, original_len_ene)
@@ -128,8 +128,6 @@ def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
         # for k in range(len(harmonic_energies)):
         for k in harmonic_energies:
             vk = harmonic_energies[k]
-            print('cubic_forcefield', cubic_forcefield)
-            print('kiik = cubic_forcefield[i][i][k]', i,i,k)
             kiik = cubic_forcefield[i][i][k]
             isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
             if isfermi and do_resonance_checks:

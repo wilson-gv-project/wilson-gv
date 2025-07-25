@@ -29,7 +29,7 @@ def test_anharm_analyzer():
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     calc_setup = ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
     # for gvpt2 need both vib_regime and vibana_prop_need='all', otherwise no coriolis and rot
-    # omg, need 'anharm' for nc_sqrt_eigval to be retrieved
+    # omg, need vibana_prop_need='anharm' for nc_sqrt_eigval to be retrieved
     vibana = ws.main.abstractions.VibAnaSetup(system=mol_system, vib_regime='GVPT2', vibana_prop_need='anharm',
                                                     allow_skip_eigvec=True, external_fill_from=calc_setup)
     print(vibana.vibana_prop_need)
@@ -64,4 +64,5 @@ def test_anharm_analyzer():
     # anharm_analyzer(mol_system, sim.props, sim.vib_ana_setup.nc_sqrt_eigval, regime='VPT2')
     print(sim.vib_ana_setup.nc_sqrt_eigval)
     print(len(sim.vib_ana_setup.nc_sqrt_eigval))
-    anharm_analyzer(mol_system, sim.props, sim.vib_ana_setup.nc_sqrt_eigval, regime='VPT2')
+
+    sim.vib_ana_setup.doAnharmonicAnalysis(sim.props, anharmonic_analyzer=anharm_analyzer)
