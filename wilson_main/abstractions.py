@@ -618,14 +618,9 @@ class CalculationBatch:
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 
-		print([i.triv_name for i in props_to_fill])
-		print('-----------------<<<<<', dir(parser_obj))
-		print('-----------------<<<<<', parser_obj.__dict__.keys())
-
-		# ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'hess', 'qff', 'B', 'coriolis']
+		# props_to_fill are ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'hess', 'qff', 'B', 'coriolis']
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				# if i.triv_name in ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'coriolis', 'B']:
 				if i.triv_name != 'hess':
 					i.addValues(getattr(parser_obj, i.triv_name))
 
@@ -645,7 +640,7 @@ class CalculationBatch:
 			# Take states
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
 
-				if not(vib_ana_setup_to_fill.regime in ['harmonic']):
+				if vib_ana_setup_to_fill.regime not in ['harmonic']:
 					extracted_states = parser_obj.anharmonic_states
 
 				else:
