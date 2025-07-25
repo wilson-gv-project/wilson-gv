@@ -504,7 +504,7 @@ class VibAnaSetup:
 
 		context = {'system': self.system, 'props': props, 
 			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
-					'nc_sqrt_eigval': self.nc_sqrt_eigval, 'nc_eigvec': self.nc_eigvec,
+					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
 					'exclude_modes': self.exclude_modes}
 		self.states = anharmonic_analyzer(**context)
 
