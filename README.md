@@ -1,5 +1,7 @@
 # wilson-suite
 
+## First installation
+
 After cloning this repo, `cd wilson-suite`:
 1. Get required repos with `setup.sh`:
    - wilson_main
@@ -27,3 +29,13 @@ import wilson as intensities
 ```
 
 ⚠️**Attention**⚠️ `setup.sh` script clones specified branches. Modify those choices if needed. There should be a "branch compatibility checker/integration test" implemented.
+
+## Update repos configuration
+
+Use `update.sh` script and `repo_config.txt` with specification of branches /and commits.
+
+## 🔴 Running tests
+
+**To run all tests, do the following:**
+- In `wilson_suite` main branch do: `conda env update --file environment_devel.yml --name wilsonsuite` - to install missing libraries (pytest, pytest-cov and rich) - will be done once, to upd environment with libraries for tests
+- Go to `wilson_suite/` and execute `./suitests` script - to run `pytest` in subrepos with tests

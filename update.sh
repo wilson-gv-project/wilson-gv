@@ -4,16 +4,43 @@
 
 set -e
 
-echo ""
-echo "📦 Updating Wilson Suite repositories from repo_config.txt..."
-
 BASE_DIR=$(pwd)
-CONFIG_FILE="repo_config.txt"
+
+echo ""
+echo "Base dir is $BASE_DIR"
+echo ""
+
+CONFIG_FILE=$1
+
+echo ""
+echo "📦 Updating Wilson Suite repositories from $CONFIG_FILE..."
+
+# Check if file path was given
+if [ -z "$CONFIG_FILE" ]; then
+    echo "❌ No config file path provided."
+    echo "Usage: $0 <path_to_config_file>"
+    exit 1
+fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "❌ Configuration file '$CONFIG_FILE' not found!"
   exit 1
 fi
+
+# Print file contents
+echo "✅ Found config file: $CONFIG_FILE"
+echo "-----------------------------"
+cat "$CONFIG_FILE"
+echo "-----------------------------"
+
+# Ask for confirmation
+read -p "❓ Do you want to proceed with these settings? [y/N] " confirm
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "⛔ Aborting as requested."
+    exit 0
+fi
+
+echo "🚀 Proceeding with update..."
 
 while IFS= read -r line || [[ -n "$line" ]]; do
   # Skip empty lines and comments
