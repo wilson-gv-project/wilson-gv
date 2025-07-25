@@ -264,15 +264,6 @@ class VibExperiment:
 
     def __post_init__(self):
 
-        # VL: FIXME: commenting it out now because it complicates dataclass setup, 
-        #   but also it has no effect: self.scans will never be not empty?
-        # Maybe I missed smth?
-        
-        # self.scans = []
-        #      
-        # if scans is not None:
-        #     self.scans.extend(scans)
-        
         self.dim = self.findDimensionality()
         self.epochs = self.field.findEpochs()
         self.int_sequences = self.findInteractionSequences()
