@@ -8,8 +8,22 @@ from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 
+# A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 @dataclass
 class MolecularSystem:
+	"""
+	name: String: System name
+
+	geo: Currently not fully fixed form but must specify system geometry in a form
+	[[atom name, [x, y, z](Ångström)], ...], where atom_name must be and element name and where
+	default isotopes are assumed
+
+	natoms: integer: Number of atoms
+
+	geo_extra: Currently not fixed form but reserved for situations where extra information is needed
+	Speculated example format: # [[atom name, [x, y, z] (Ångström), (# protons, # neutrons)], ...]
+	and possibly more attributes if needed
+	"""
 	name: str
 	natoms: int = None
 	geo: Any = None
@@ -37,13 +51,57 @@ class MolecularSystem:
 		# For now only returning by name
 		return hash(self.name)
 	
+	def asXyz(self):
+		"""
+		Convert geometry to e.g. xyz file - unwritten but keep shell here for now
+		"""
+
+		# For default geo
+
+		# For geo_extra
+
+		pass
+
+
+# Program, level of theory, basis set, other setup info (environment for QM/MM?)
+# Does not need to reference an actual setup and can also be used for "get from no specific calculation"
 @dataclass
 class ExternalCalcSetup:
+	"""
+	Class to represent computational setups for properties obtained external to Wilson
+	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
+	"get from file"
+
+	----
+	program: String: Program name if relevant (alt. names like 'from_file' are also fine)
+	# FIXME: Consider other name "source" instead of "program"
+	lvl_theory: String: Level of theory
+	basis: String: Basis set
+
+	NOTE: Other setup parameters currently not used/handled
+	other_setup: Dictionary {attribute: value, ...}
+	other_setup_identifier: Dictionary {attribute: name (not required to be hashable), ...}
+	# FIXME: Not sure how I want this to work, return to it if needed
+	"""
+	# Strings
 	program: str = ''
 	lvl_theory: str = ''
 	basis: str = ''
+	
+	# Arbitrary data structure (user-managed)
 	other_setup: dict = field(default_factory=lambda: dict())
 	other_setup_identifier: dict = field(default_factory=lambda: dict())
+
+	def __post_init__(self):
+		if self.other_setup is not None:
+
+			if self.other_setup_identifier is None:
+				raise AssertionError('Other setup identifier string must accompany other setup for hashing purposes')
+
+		else:
+
+			if self.other_setup_identifier is not None:
+				raise AssertionError('No other setup identifier string may be given if no other setup is given')
 
 	def h(self) -> int:
 		"""
@@ -55,6 +113,27 @@ class ExternalCalcSetup:
 
 @dataclass
 class MolecularProperty:
+	"""
+	Class to represent a molecular (energy derivative or similar) property
+	Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
+    and "full" (system, calc_setup) for a particular realization (optional with/without values)
+	
+	----
+	prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
+	triv_name: String: Trivial name For simplified reference
+	vals: Form not specified: Values of properties - could be array or dictionary
+	in_basis: String: In which basis (e.g. "Cartesian" or "normal modes")?
+	in_units: String: In which units?
+	system: MolecularSystem instance: For which system?
+	calc_setup: ExternalCalcSetup instance: For which calculation setup?
+	target_basis: String: In which basis should this property be specified (if not matching in_basis, it means that
+	it should be transformed)
+	target_units: String: In which units should this property be specified (if not matching in_units, it means that
+	it should be converted)
+
+	serial_vals: Any = field(init=False) - serializable dict of vals
+	see more in test_main_dataclasses.py::test_MolecularProperty
+	"""
 	prop_spec: dict
 	trivial_name: str=None
 	vals: InitVar[Any] = field(default=None, repr=False)
@@ -65,10 +144,18 @@ class MolecularProperty:
 	serial_vals: Any = field(init=False)
 
 	def __post_init__(self, vals):
+		"""
+		Turning ndarray to dict when vals were given during init.
+		Can be skipped alltogether is vals would be in dict?
+		"""
 		from wilson_utils.serialization import ndarray_to_dict
 		self.serial_vals = ndarray_to_dict(vals, serial=True) if vals is not None else None
 
 	def make_serial_vals(self):
+		"""
+		An option to make serial vals from self.vals
+		see test_main_dataclasses.py::test_MolecularProperty
+		"""
 		from wilson_utils.serialization import ndarray_to_dict
 		self.serial_vals = ndarray_to_dict(self.vals, serial=True) if self.vals is not None else None
 
@@ -187,23 +274,44 @@ class MolecularProperty:
 			self.in_units = self.target_units
 
 class MolecularPropertyEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, MolecularProperty):
-            # Convert the MolecularProperty object to a dictionary
-            return {
-                "prop_spec": o.prop_spec,
-                "trivial_name": o.trivial_name,
-                "in_basis": o.in_basis,
-                "in_units": o.in_units,
-                "target_basis": o.target_basis,
-                "target_units": o.target_units,
-                "serial_vals": o.serial_vals,
-            }
-        # Let the base class handle other types
-        return super().default(o)
+	"""
+	Helper for JSON encoding of MolecularProperty
+	"""
+	def default(self, o):
+		if isinstance(o, MolecularProperty):
+			# Convert the MolecularProperty object to a dictionary
+			return {
+				"prop_spec": o.prop_spec,
+				"trivial_name": o.trivial_name,
+				"in_basis": o.in_basis,
+				"in_units": o.in_units,
+				"target_basis": o.target_basis,
+				"target_units": o.target_units,
+				"serial_vals": o.serial_vals,
+			}
+		# Let the base class handle other types
+		return super().default(o)
 
 @dataclass
 class VibState:
+	"""
+	Class to represent a vibrational state.
+	This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
+
+	----
+	s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+	e: float: State energy level
+	d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
+	
+	UPD:
+	dictionary self.s is not JSON-serializable (tuples can't be keys), but self.serial_s is.
+	self.serial_s is set up in post_init; deserialize_state_dict will return original self.s based on self.serial_s.
+
+	Notes:
+	s: InitVar[dict] = field(repr=False) - means that this atribute will not be in repr() of the class instance
+	InitVar - is an init-only variable
+	This seems to be okay for now, but should mind this feature
+	"""
 	s: InitVar[dict] = field(repr=False)
 	e: float = 0.0
 	d: Any = None
@@ -212,22 +320,56 @@ class VibState:
 	def __post_init__(self, s):
 		self.serial_s = {",".join(k): v for k, v in s.items()}
 
+	# def __post_init__(self):
+		# self.serial_s = {",".join(k): v for k, v in self.s.items()}
+
 	def deserialize_state_dict(self) -> dict:
 		return {tuple(k.split(",")): v for k, v in self.serial_s.items()}
 
 
 @dataclass
 class VibAnaSetup:
+	"""
+    Class for setup for vibrational analysis and storage of the resulting information
+	
+	----
+	vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
+	system: MolecularSystem instance: System to which this instance pertains
+	vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
+	max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
+	states: List of VibState instances: Specification of each vibrational state in scope
+	nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
+	nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
+	allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
+	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
+	vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+	"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
+	data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
+	external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
+	exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
+	"""
 	regime: str=None
 	system: MolecularSystem=None
 	regime_subinfo: dict=None
 	max_state_lvl: int=None
 	states: list[VibState]=field(default=None, repr=False)
+
+	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
 	allow_skip_eigvec: bool=False
+
+	# 'all': Will need properties for both harmonic and anharmonic analysis
+	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
+	# 'none': All results will be provided by external program
 	vibana_prop_need: str='all'
+
+	# externalCalcSetup instance
+	# NOTE: Refers only to vibrational properties that will be directly filled from analysis and not to
+	# properties that will be used in own doAnalysis invocation (they may have their own specification)
 	external_fill_from: ExternalCalcSetup=None
+
+	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
 	exclude_modes: list=None
 
 	def __post_init__(self):
@@ -420,7 +562,23 @@ class VibAnaSetup:
 
 @dataclass
 class SpectralAxis:
+	"""
+	'Plain' spectral axis for rendering response function freq arg spectra;
+	with independent lineshape functions.
+
+	freq_vars is {freq label 1 in this axis: coeff, ...}
+
+	Examples:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1}) -- w1-w2
+
+	simple w1 and w2:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({2: 1})        -- w2
+	"""
+	# Must be dictionary: {freq label 1 in this axis: coeff, ...}
 	freq_vars: dict
+
 
 # simply copying old sketch for now
 class SpectralAxisAdvanced:
@@ -435,6 +593,30 @@ class SpectralAxisAdvanced:
 
 @dataclass
 class SpectralGrid:
+	"""
+	Class to represent a collective set of spectral axes.
+
+	Use example:
+
+	axis1 = ws.main.abstractions.spectralAxis({1: 1})
+	axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
+	start = {1: 250, 2: 100}
+	end = {1: 3850, 2: 7550}
+	spacer = {1: 3.8, 2: 3.8}
+	spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+												  start=start, end=end, spacer=spacer)
+	
+	----
+	axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
+	instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
+	range_style: String: What sort of range? Intended options at least "uniform" or "custom"
+	start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
+	end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
+	n_pts: Dictionary {axis 1 ID: number of points (int), ...}: Number of points by axis
+	spacer: Dictionary {axis 1 ID: spacer (float), ...}: Spacers by axis
+	custom_range: Type not specified: Custom range for each axis. Not yet implemented
+	collective_grid: Type not specified (but most likely will be ndarray): (Custom) collective grid for all axes.
+	"""
 	axes: dict
 	range_style: str
 	start: dict=None
@@ -442,6 +624,8 @@ class SpectralGrid:
 	n_pts: dict=None
 	spacer: dict=None
 	custom_range: dict=None
+	# Optional collective (e.g. adaptive) grid
+	# Otherwise intended to default to full granularity grid of individual axes
 	collective_grid: Any=None
 
 	def __post_init__(self):
@@ -468,7 +652,6 @@ class SpectralGrid:
 
 					# Underflow possible
 					n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
-					print(self.start, self.spacer, self.end, self.n_pts)
 					if not(self.end[i] == self.start[i] + self.spacer[i]*(n_pts[i] - 1)):
 						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
 
@@ -517,11 +700,30 @@ class SpectralGrid:
 		pass
 
 
+# An evaluation setup contains various visualization configuration information
+# and information about other relevant evaluation-related choices for a wilsonSimulation instance
+#
+# Examples of relevant information here:
+# Evaluation grid
+# System to run simulation on
 @dataclass
 class SpecEvalSetup:
+	"""
+	Class for setup information related to spectrum evaluation and rendering
+	FIXME: Consider making this into a dataclass
+	
+	----
+	grid: SpectralGrid instance: The grid on which the spectrum is to be evaluated
+	ev_info: dict: Setup information which is principally evaluation-related (e.g. dynamic range, relaxation
+	parameters etc.)
+	rnd_info: dict: Setup information which is principally rendering-related (e.g. number of level ticks, other
+	plotting-/visualization-related information)
+	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
+	"""
 	grid: SpectralGrid=None
 	ev_info: dict=None
 	rnd_info: dict=None
+
 
 class CalculationBatch:
 	"""
