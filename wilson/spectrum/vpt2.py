@@ -128,8 +128,9 @@ def identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks):
         # for k in range(len(harmonic_energies)):
         for k in harmonic_energies:
             vk = harmonic_energies[k]
+            print('cubic_forcefield', cubic_forcefield)
+            print('kiik = cubic_forcefield[i][i][k]', i,i,k)
             kiik = cubic_forcefield[i][i][k]
-
             isfermi = is_fermi_resonance(2 * vi - vk, kiik, True)
             if isfermi and do_resonance_checks:
                 fermi_resonance = add_fermi_resonance(fermi_resonance, [k, i, i, True])
