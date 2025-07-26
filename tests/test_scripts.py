@@ -142,3 +142,25 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     assert vibanasetup_ref.nc_sqrt_eigval == wilsim3.vib_ana_setup.nc_sqrt_eigval
     assert vibanasetup_ref.nc_sqrt_eigval == load_wilsonsim_final.vib_ana_setup.nc_sqrt_eigval
+
+def test_logger_evv_tester():
+    import logging
+    from wilson_utils.logger import setup_logger
+    setup_logger("wilson", level=logging.DEBUG, log_to_file='./tests/out.log')
+    
+    import evv_tester
+    evv_tester.run()
+
+    with open("./tests/out.log", "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    
+    assert len(lines) == 20
+
+    without_timestamp_0 = " - ".join(lines[0].split(" - ")[1:]).strip()
+    assert without_timestamp_0 == "wilson. - INFO - evv_tester_dataclasses.py"
+    
+    without_timestamp_m1 = " - ".join(lines[-1].split(" - ")[1:]).strip()
+    assert without_timestamp_m1 == "wilson.wilson_utils.serialization - INFO - ✅ JSON-safe"
+    without_timestamp_m2 = " - ".join(lines[-2].split(" - ")[1:]).strip()
+    assert without_timestamp_m2 == "wilson. - DEBUG - np.max(intensities): 4.2029e+11"
+    
