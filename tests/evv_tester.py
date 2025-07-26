@@ -21,6 +21,7 @@ from wilson_utils.serialization import pickle_this_to, unpickle_smth_from
 from wilson_utils.paths import SUITE_ROOT
 
 import logging
+# wilson. - for hierarchy of loggers
 logger = logging.getLogger("wilson.")
 
 logger.info('evv_tester_dataclasses.py')
