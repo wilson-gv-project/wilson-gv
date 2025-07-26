@@ -1,56 +1,51 @@
-
+from dataclasses import dataclass, field, asdict, is_dataclass, InitVar
+from typing import Callable, Any
+import json
+import numpy as np
 import copy
 
+from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
-from wilson_utils.prop_trivname import prop_trivname
 from wilson_utils.abstractions import VibState
 from typing import Callable, Any
 import numpy as np
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
+@dataclass
 class MolecularSystem:
 	"""
-	Class to represent a molecular system
+	name: String: System name
+
+	geo: Currently not fully fixed form but must specify system geometry in a form
+	[[atom name, [x, y, z](Ångström)], ...], where atom_name must be and element name and where
+	default isotopes are assumed
+
+	natoms: integer: Number of atoms
+
+	geo_extra: Currently not fixed form but reserved for situations where extra information is needed
+	Speculated example format: # [[atom name, [x, y, z] (Ångström), (# protons, # neutrons)], ...]
+	and possibly more attributes if needed
 	"""
+	name: str
+	natoms: int = None
+	geo: Any = None
+	geo_extra: Any = None
+	linear: bool = False
 
-	def __init__(self, name: str, natoms: int=None, geo=None, geo_extra=None):
-		"""
-		name: String: System name
+	@property
+	def Nnmodes(self):
+		if self.linear:
+			return 3*self.natoms-5
+		else:
+			return 3*self.natoms-6
 
-		geo: Currently not fully fixed form but must specify system geometry in a form
-		[[atom name, [x, y, z](Ångström)], ...], where atom_name must be and element name and where
-		default isotopes are assumed
-
-		natoms: integer: Number of atoms
-
-		geo_extra: Currently not fixed form but reserved for situations where extra information is needed
-		Speculated example format: # [[atom name, [x, y, z] (Ångström), (# protons, # neutrons)], ...]
-		and possibly more attributes if needed
-		"""
-
-
-		self.name = name
-		self.natoms = natoms
-		self.Nnmodes = 3*natoms-6 # fixme
-
-		if (geo is not None) and (geo_extra is not None):
+	def __post_init__(self):
+		if (self.geo is not None) and (self.geo_extra is not None):
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
-		if (geo is None) and (geo_extra is None):
+		if (self.geo is None) and (self.geo_extra is None):
 			print('Note: Molecular system was instantiated without geometry information')
-
-
-
-		if geo is not None:
-
-			self.geo = geo
-			self.geo_extra = None
-
-		if geo_extra is not None:
-
-			self.geo_extra = geo_extra
-			self.geo = None
-
+	
 	def h(self):
 		"""
 		Hashing function
@@ -58,8 +53,7 @@ class MolecularSystem:
 
 		# For now only returning by name
 		return hash(self.name)
-
-
+	
 	def asXyz(self):
 		"""
 		Convert geometry to e.g. xyz file - unwritten but keep shell here for now
@@ -71,50 +65,46 @@ class MolecularSystem:
 
 		pass
 
-	def __repr__(self):
-		return f'THIS IS MolecularSystem {self.name}\n'
 
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
 # Does not need to reference an actual setup and can also be used for "get from no specific calculation"
+@dataclass
 class ExternalCalcSetup:
 	"""
 	Class to represent computational setups for properties obtained external to Wilson
 	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
 	"get from file"
+
+	----
+	program: String: Program name if relevant (alt. names like 'from_file' are also fine)
+	# FIXME: Consider other name "source" instead of "program"
+	lvl_theory: String: Level of theory
+	basis: String: Basis set
+
+	NOTE: Other setup parameters currently not used/handled
+	other_setup: Dictionary {attribute: value, ...}
+	other_setup_identifier: Dictionary {attribute: name (not required to be hashable), ...}
+	# FIXME: Not sure how I want this to work, return to it if needed
 	"""
+	# Strings
+	program: str = ''
+	lvl_theory: str = ''
+	basis: str = ''
+	
+	# Arbitrary data structure (user-managed)
+	other_setup: dict = field(default_factory=lambda: dict())
+	other_setup_identifier: dict = field(default_factory=lambda: dict())
 
-	def __init__(self, program: str='', lvl_theory: str='', basis: str='', other_setup: dict={}, other_setup_identifier: dict={}):
-		"""
-		program: String: Program name if relevant (alt. names like 'from_file' are also fine)
-		# FIXME: Consider other name "source" instead of "program"
-		lvl_theory: String: Level of theory
-		basis: String: Basis set
+	def __post_init__(self):
+		if self.other_setup is not None:
 
-		NOTE: Other setup parameters currently not used/handled
-		other_setup: Dictionary {attribute: value, ...}
-		other_setup_identifier: Dictionary {attribute: name (not required to be hashable), ...}
-		# FIXME: Not sure how I want this to work, return to it if needed
-		"""
-
-		# Strings
-		self.program = program
-		self.lvl_theory = lvl_theory
-		self.basis = basis
-
-		# Arbitrary data structure (user-managed)
-		self.other_setup = other_setup
-
-		if other_setup is not None:
-
-			if other_setup_identifier is None:
+			if self.other_setup_identifier is None:
 				raise AssertionError('Other setup identifier string must accompany other setup for hashing purposes')
 
 		else:
 
-			if other_setup_identifier is not None:
+			if self.other_setup_identifier is not None:
 				raise AssertionError('No other setup identifier string may be given if no other setup is given')
-
-		self.other_setup_id = other_setup_identifier
 
 	def h(self) -> int:
 		"""
@@ -124,43 +114,64 @@ class ExternalCalcSetup:
 		# FIXME: Only using other setup keys in hash for now, need to complete this for full hash consistency
 		return hash((self.program, self.lvl_theory, self.basis, tuple(self.other_setup.keys())))
 
-
+@dataclass
 class MolecularProperty:
 	"""
 	Class to represent a molecular (energy derivative or similar) property
 	Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
     and "full" (system, calc_setup) for a particular realization (optional with/without values)
+	
+	----
+	prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
+	triv_name: String: Trivial name For simplified reference
+	vals: Form not specified: Values of properties - could be array or dictionary
+	in_basis: String: In which basis (e.g. "Cartesian" or "normal modes")?
+	in_units: String: In which units?
+	system: MolecularSystem instance: For which system?
+	calc_setup: ExternalCalcSetup instance: For which calculation setup?
+	target_basis: String: In which basis should this property be specified (if not matching in_basis, it means that
+	it should be transformed)
+	target_units: String: In which units should this property be specified (if not matching in_units, it means that
+	it should be converted)
+
+	serial_vals: Any = field(init=False) - serializable dict of vals
+	see more in test_main_dataclasses.py::test_MolecularProperty
 	"""
+	prop_spec: dict
+	trivial_name: str=None
+	vals: InitVar[Any] = field(default=None, repr=False)
+	in_basis: str=None
+	in_units: str=None
+	target_basis: str=None
+	target_units:str=None
+	serial_vals: Any = field(init=False)
 
-	def __init__(self, prop_spec, trivial_name: str=None, vals: Any=None, in_basis: str=None, in_units: str=None,
-				 system: MolecularSystem=None, calc_setup: ExternalCalcSetup=None,
-				 target_basis: str=None, target_units:str=None):
+	def __post_init__(self, vals):
 		"""
-		prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
-		triv_name: String: Trivial name For simplified reference
-		vals: Form not specified: Values of properties - could be array or dictionary
-		in_basis: String: In which basis (e.g. "Cartesian" or "normal modes")?
-		in_units: String: In which units?
-		system: MolecularSystem instance: For which system?
-		calc_setup: ExternalCalcSetup instance: For which calculation setup?
-		target_basis: String: In which basis should this property be specified (if not matching in_basis, it means that
-		it should be transformed)
-		target_units: String: In which units should this property be specified (if not matching in_units, it means that
-		it should be converted)
+		Turning ndarray to dict when vals were given during init.
+		Can be skipped alltogether is vals would be in dict?
 		"""
+		from wilson_utils.serialization import ndarray_to_dict
+		self.serial_vals = ndarray_to_dict(vals, serial=True) if vals is not None else None
 
-		self.prop_spec = prop_spec
-		self.triv_name = trivial_name
-		self.vals = vals
+	def make_serial_vals(self):
+		"""
+		An option to make serial vals from self.vals
+		see test_main_dataclasses.py::test_MolecularProperty
+		"""
+		from wilson_utils.serialization import ndarray_to_dict
+		self.serial_vals = ndarray_to_dict(self.vals, serial=True) if self.vals is not None else None
 
-		self.in_basis = in_basis
-		self.in_units = in_units
-
-		self.system = system
-		self.calc_setup = calc_setup
-
-		self.target_basis = target_basis
-		self.target_units = target_units
+	def to_dict(self):
+		return {
+			"prop_spec": self.prop_spec,
+			"trivial_name": self.trivial_name,
+			"in_basis": self.in_basis,
+			"in_units": self.in_units,
+			"target_basis": self.target_basis,
+			"target_units": self.target_units,
+			"serial_vals": self.serial_vals,
+		}
 
 	def h(self, htype: int) -> int:
 		"""
@@ -264,71 +275,84 @@ class MolecularProperty:
 			
 		if self.target_units is not None:
 			self.in_units = self.target_units
-		
-	def __repr__(self):
-		if self.vals is not None:
-			s = ' not'
-		else:
-			s = ''
-		return f'MolecularProperty {self.triv_name}: values are{s} None'
 
+class MolecularPropertyEncoder(json.JSONEncoder):
+	"""
+	Helper for JSON encoding of MolecularProperty
+	"""
+	def default(self, o):
+		if isinstance(o, MolecularProperty):
+			# Convert the MolecularProperty object to a dictionary
+			return {
+				"prop_spec": o.prop_spec,
+				"trivial_name": o.trivial_name,
+				"in_basis": o.in_basis,
+				"in_units": o.in_units,
+				"target_basis": o.target_basis,
+				"target_units": o.target_units,
+				"serial_vals": o.serial_vals,
+			}
+		# Let the base class handle other types
+		return super().default(o)
+
+
+
+@dataclass
 class VibAnaSetup:
 	"""
     Class for setup for vibrational analysis and storage of the resulting information
+	
+	----
+	vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
+	system: MolecularSystem instance: System to which this instance pertains
+	vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
+	max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
+	states: List of VibState instances: Specification of each vibrational state in scope
+	nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
+	nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
+	allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
+	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
+	vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+	"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
+	data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
+	external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
+	exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
 	"""
+	regime: str=None
+	system: MolecularSystem=None
+	regime_subinfo: dict=None
+	max_state_lvl: int=None
+	states: list[VibState]=field(default=None, repr=False)
 
-	def __init__(self, vib_regime: str=None, system: MolecularSystem=None, vib_regime_subinfo: dict=None,
-				 max_state_lvl: int=None, states: list[VibState]=None,
-				 nc_sqrt_eigval: dict=None, nc_eigvec: dict=None, allow_skip_eigvec: bool=False,
-				 vibana_prop_need: str='all', external_fill_from: ExternalCalcSetup=None,
-				 exclude_modes: list=None):
-		"""
-		vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
-		system: MolecularSystem instance: System to which this instance pertains
-		vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
-		max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
-		states: List of VibState instances: Specification of each vibrational state in scope
-		nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
-		nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
-		allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
-		vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
-		vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
-		"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
-		data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
-		external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
-		exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
-		"""
+	# Dictionary: {nm index: w}
+	nc_sqrt_eigval: dict=None
+	nc_eigvec: dict=None
+	allow_skip_eigvec: bool=False
 
-		self.system = system
-		self.regime = vib_regime
-		self.regime_subinfo = vib_regime_subinfo
-		self.max_state_lvl = max_state_lvl
-		self.states = states
+	# 'all': Will need properties for both harmonic and anharmonic analysis
+	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
+	# 'none': All results will be provided by external program
+	vibana_prop_need: str='all'
 
-		# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-		self.exclude_modes = exclude_modes
-		if exclude_modes is None:
+	# externalCalcSetup instance
+	# NOTE: Refers only to vibrational properties that will be directly filled from analysis and not to
+	# properties that will be used in own doAnalysis invocation (they may have their own specification)
+	external_fill_from: ExternalCalcSetup=None
+
+	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
+	exclude_modes: list=None
+
+	def __post_init__(self):
+		if self.exclude_modes is None:
 			self.exclude_modes = []
+		
 		import numpy as np
-		self.modes_indices = [i for i in np.arange(system.Nnmodes) if i not in self.exclude_modes]
-
-		# Dictionary: {nm index: w}
-		self.nc_sqrt_eigval = nc_sqrt_eigval
-		# Matrix
-		self.nc_eigvec = nc_eigvec
-
-		self.allow_skip_eigvec = allow_skip_eigvec
-
-		# 'all': Will need properties for both harmonic and anharmonic analysis
-		# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
-		# 'none': All results will be provided by external program
-		self.vibana_prop_need = vibana_prop_need
-
-		# externalCalcSetup instance
-		# NOTE: Refers only to vibrational properties that will be directly filled from analysis and not to
-		# properties that will be used in own doAnalysis invocation (they may have their own specification)
-		self.external_fill_from = external_fill_from
-
+		self.modes_indices = [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
+	
+	@property
+	def serial_states(self):
+		return [{'s': vibst.serial_s, 
+		   'e': vibst.e, 'd': vibst.d} for vibst in getattr(self, 'states')]
 
 	def tellNeededProps(self) -> list[MolecularProperty]:
 		"""
@@ -508,9 +532,170 @@ class VibAnaSetup:
 					'exclude_modes': self.exclude_modes}
 		self.states = anharmonic_analyzer(**context)
 
-	def __repr__(self):
-		return 'THIS IS vibAnaSetup with self.regime,self.states'
 
+@dataclass
+class SpectralAxis:
+	"""
+	'Plain' spectral axis for rendering response function freq arg spectra;
+	with independent lineshape functions.
+
+	freq_vars is {freq label 1 in this axis: coeff, ...}
+
+	Examples:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1}) -- w1-w2
+
+	simple w1 and w2:
+		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
+		axis2 = ws.main.abstractions.spectralAxis({2: 1})        -- w2
+	"""
+	# Must be dictionary: {freq label 1 in this axis: coeff, ...}
+	freq_vars: dict
+
+
+# simply copying old sketch for now
+class SpectralAxisAdvanced:
+	"""
+	Class to represent an "advanced" spectral axis (involving e.g. variation of experiment parameters
+	or possibly other attributes). Not yet implemented.
+	"""
+
+	def __init__(self):
+
+		pass
+
+@dataclass
+class SpectralGrid:
+	"""
+	Class to represent a collective set of spectral axes.
+
+	Use example:
+
+	axis1 = ws.main.abstractions.spectralAxis({1: 1})
+	axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
+	start = {1: 250, 2: 100}
+	end = {1: 3850, 2: 7550}
+	spacer = {1: 3.8, 2: 3.8}
+	spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+												  start=start, end=end, spacer=spacer)
+	
+	----
+	axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
+	instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
+	range_style: String: What sort of range? Intended options at least "uniform" or "custom"
+	start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
+	end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
+	n_pts: Dictionary {axis 1 ID: number of points (int), ...}: Number of points by axis
+	spacer: Dictionary {axis 1 ID: spacer (float), ...}: Spacers by axis
+	custom_range: Type not specified: Custom range for each axis. Not yet implemented
+	collective_grid: Type not specified (but most likely will be ndarray): (Custom) collective grid for all axes.
+	"""
+	axes: dict
+	range_style: str
+	start: dict=None
+	end: dict=None
+	n_pts: dict=None
+	spacer: dict=None
+	custom_range: dict=None
+	# Optional collective (e.g. adaptive) grid
+	# Otherwise intended to default to full granularity grid of individual axes
+	collective_grid: Any=None
+
+	def __post_init__(self):
+	
+		if (self.range_style == 'uniform'):
+
+			self.ranges = {}
+			n_pts = {}
+			spacer = {}
+
+			for i in self.axes:
+
+				if (self.n_pts is None) and (self.spacer is None):
+					raise AssertionError('For a uniform setup, either a spacer or a n_pts dictionary must be specified')
+
+				if (self.n_pts is not None) and (self.spacer is not None):
+					raise AssertionError('Only one of the arguments n_pts and spacer may be specified')
+
+				if self.n_pts is not None:
+
+					spacer[i] = (self.end[i] - self.start[i])/(self.n_pts[i] + 1)
+
+				elif self.spacer is not None:
+
+					# Underflow possible
+					n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
+					if not(self.end[i] == self.start[i] + self.spacer[i]*(n_pts[i] - 1)):
+						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
+
+				else:
+
+					raise AssertionError('For uniform grid, must specify either spacer or n_pts')
+
+				# fixme: Other datatype? Should be fine for now
+				self.ranges[i] = np.arange(self.start[i], self.end[i], self.spacer[i])
+			
+			if spacer:
+				self.spacer = spacer
+			if n_pts:
+				self.n_pts = n_pts
+
+		if(self.range_style == 'custom'):
+			pass
+
+
+	def make_mesh_numpy(self) -> dict:
+		"""
+		Make a meshgrid using the axes information
+		"""
+
+		listofmeshaxes = []
+		for ax_label in self.axes:
+			if self.spacer is not None:
+				wn = np.arange(self.start[ax_label], self.end[ax_label], self.spacer[ax_label])
+				listofmeshaxes.append(wn)
+			elif self.n_pts is not None:
+				wn = np.linspace(self.start[ax_label], self.end[ax_label], self.n_pts[ax_label])
+				listofmeshaxes.append(wn)
+		meshes = np.meshgrid(*listofmeshaxes)
+
+		mesh_dict = {}
+		for i, ax_label in enumerate(self.axes):
+			mesh_dict[ax_label] = meshes[i]
+
+		return mesh_dict
+
+	def collGridFromAxes(self):
+		"""
+		Make collective grid from individual axes linspaces. Not yet implemented
+		"""
+
+		pass
+
+
+# An evaluation setup contains various visualization configuration information
+# and information about other relevant evaluation-related choices for a wilsonSimulation instance
+#
+# Examples of relevant information here:
+# Evaluation grid
+# System to run simulation on
+@dataclass
+class SpecEvalSetup:
+	"""
+	Class for setup information related to spectrum evaluation and rendering
+	FIXME: Consider making this into a dataclass
+	
+	----
+	grid: SpectralGrid instance: The grid on which the spectrum is to be evaluated
+	ev_info: dict: Setup information which is principally evaluation-related (e.g. dynamic range, relaxation
+	parameters etc.)
+	rnd_info: dict: Setup information which is principally rendering-related (e.g. number of level ticks, other
+	plotting-/visualization-related information)
+	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
+	"""
+	grid: SpectralGrid=None
+	ev_info: dict=None
+	rnd_info: dict=None
 
 
 class CalculationBatch:
@@ -622,7 +807,7 @@ class CalculationBatch:
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
 				if i.triv_name != 'hess':
-					i.addValues(getattr(parser_obj, i.triv_name))
+					i.addValues(getattr(parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
 
@@ -655,10 +840,35 @@ class CalculationBatch:
 
 						# TODO: Exclusion based on mode index or freq cutoff
 						# FIXME: Change to integer indexing
-						processed_states.append(VibState({i: 1.0}, extracted_states[i]))
+						processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
 				vib_ana_setup_to_fill.states = processed_states
 
+	def to_dict(self):
+		"""
+		"""
+		attributes = ['system', 'calc_setup', 'properties']
+		result = {}
+		for key in attributes:
+			value = getattr(self, key)
+			if is_dataclass(value):
+				result[key] = asdict(value)
+			elif hasattr(value, "to_dict"):  # if a custom object
+				result[key] = value.to_dict()
+			elif isinstance(value, (list, tuple)):
+				result[key] = [
+					item.to_dict() if hasattr(item, "to_dict") else item for item in value
+				]
+			elif isinstance(value, dict):
+				result[key] = {
+					k: v.to_dict() if hasattr(v, "to_dict") else v for k, v in value.items()
+				}
+			else:
+				result[key] = value
 
+		return result
+
+
+# simply copying old sketch for now
 class CollEvalSetup:
 	"""
 	Class to hold information about how to process several jobs together. Not yet implemented.
@@ -673,217 +883,6 @@ class CollEvalSetup:
 	def __init__(self):
 		pass
 
-class WilsonSimulations:
-	"""
-	Class to hold collective jobs instructions (i.e. instructions for collections of jobs, not for individual jobs)
-	# FIXME: Not implemented and form not yet settled, skipping further documentation for now
-	"""
-
-	def __init__(self, jobs=None, coll_instructions=None):
-
-		self.jobs = jobs
-		self.coll_instructions = None
-
-	# A job is a WilsonSimulation instance
-	def addJob(self, job):
-	
-		pass
-		
-	# Make calculation batches needed to fulfill tasks
-	def makeCalculationBatches(self):
-	
-		# Walk through simulations and collect into calculation batches for each setup
-		# Implement union of these batches
-	
-		pass
-
-	def evaluate(self):
-
-			#spectra = wilsonpart2.evaluate(self.exp.get_terms(), self.properties, self.eval_setup.visualization_setup)
-			pass
-
-	def render(self):
-
-			pass
-
-
-class SpectralAxis:
-	"""
-	'Plain' spectral axis for rendering response function freq arg spectra;
-	with independent lineshape functions.
-
-	freq_vars is {freq label 1 in this axis: coeff, ...}
-
-	Examples:
-		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
-		axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1}) -- w1-w2
-
-	simple w1 and w2:
-		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
-		axis2 = ws.main.abstractions.spectralAxis({2: 1})        -- w2
-	"""
-	def __init__(self, freq_vars):
-
-		# Must be dictionary: {freq label 1 in this axis: coeff, ...}
-		self.freq_vars = freq_vars
-
-
-class SpectralAxisAdvanced:
-	"""
-	Class to represent an "advanced" spectral axis (involving e.g. variation of experiment parameters
-	or possibly other attributes). Not yet implemented.
-	"""
-
-	def __init__(self):
-
-		pass
-
-class SpectralGrid:
-	"""
-	Class to represent a collective set of spectral axes.
-
-	Use example:
-
-	axis1 = ws.main.abstractions.spectralAxis({1: 1})
-	axis2 = ws.main.abstractions.spectralAxis({1: 1, 2: -1})
-	start = {1: 250, 2: 100}
-	end = {1: 3850, 2: 7550}
-	spacer = {1: 3.8, 2: 3.8}
-	spec_grid = ws.main.abstractions.spectralGrid({1: axis1, 2: axis2}, range_style='uniform',
-												  start=start, end=end, spacer=spacer)
-
-	"""
-
-	def __init__(self, axes: dict, range_style: str, start: dict=None, end: dict=None,
-				 n_pts: dict=None, spacer: dict=None,
-				 custom_range: dict=None, collective_grid: Any=None):
-		"""
-		axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
-		instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
-		range_style: String: What sort of range? Intended options at least "uniform" or "custom"
-		start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
-		end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
-		n_pts: Dictionary {axis 1 ID: number of points (int), ...}: Number of points by axis
-		spacer: Dictionary {axis 1 ID: spacer (float), ...}: Spacers by axis
-		custom_range: Type not specified: Custom range for each axis. Not yet implemented
-		collective_grid: Type not specified (but most likely will be ndarray): (Custom) collective grid for all axes.
-		"""
-
-		self.axes = axes
-
-		self.start = None
-		self.end = None
-		self.n_pts = None
-		self.ranges = None
-
-		if (range_style == 'uniform'):
-
-			self.ranges = {}
-
-			self.start = start
-			self.end = end
-
-			self.n_pts = {}
-			self.spacer = {}
-
-			for i in self.axes:
-
-				if (n_pts is None) and (spacer is None):
-					raise AssertionError('For a uniform setup, either a spacer or a n_pts dictionary must be specified')
-
-				if (n_pts is not None) and (spacer is not None):
-					raise AssertionError('Only one of the arguments n_pts and spacer may be specified')
-
-				if n_pts is not None:
-
-					self.n_pts[i] = n_pts[i]
-
-					self.spacer[i] = (self.end[i] - self.start[i])/(self.n_pts[i] + 1)
-
-				elif spacer is not None:
-
-					self.spacer[i] = spacer[i]
-
-					# Underflow possible
-					self.n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
-					if not(self.end[i] == self.start[i] + self.spacer[i]*(self.n_pts[i] - 1)):
-						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
-
-				else:
-
-					raise AssertionError('For uniform grid, must specify either spacer or n_pts')
-
-				# fixme: Other datatype? Should be fine for now
-				self.ranges[i] = np.arange(self.start[i], self.end[i], self.spacer[i])
-
-		if(range_style == 'custom'):
-
-			pass
-
-		# Optional collective (e.g. adaptive) grid
-		# Otherwise intended to default to full granularity grid of individual axes
-		self.coll_grid = collective_grid
-
-	def make_mesh_numpy(self) -> dict:
-		"""
-		Make a meshgrid using the axes information
-		"""
-
-		listofmeshaxes = []
-		for ax_label in self.axes:
-			if self.spacer is not None:
-				wn = np.arange(self.start[ax_label], self.end[ax_label], self.spacer[ax_label])
-				listofmeshaxes.append(wn)
-			elif self.n_pts is not None:
-				wn = np.linspace(self.start[ax_label], self.end[ax_label], self.n_pts[ax_label])
-				listofmeshaxes.append(wn)
-		meshes = np.meshgrid(*listofmeshaxes)
-
-		mesh_dict = {}
-		for i, ax_label in enumerate(self.axes):
-			mesh_dict[ax_label] = meshes[i]
-
-		return mesh_dict
-
-	def collGridFromAxes(self):
-		"""
-		Make collective grid from individual axes linspaces. Not yet implemented
-		"""
-
-		pass
-
-	def __repr__(self):
-		return "THIS IS SpectralGrid with self.axes,self.n_pts"
-
-
-# An evaluation setup contains various visualization configuration information
-# and information about other relevant evaluation-related choices for a wilsonSimulation instance
-#
-# Examples of relevant information here:
-# Evaluation grid
-# System to run simulation on
-class SpecEvalSetup:
-	"""
-	Class for setup information related to spectrum evaluation and rendering
-	FIXME: Consider making this into a dataclass
-	"""
-
-	def __init__(self, grid: SpectralGrid=None, ev_info: dict=None, rnd_info: dict=None):
-		"""
-		grid: SpectralGrid instance: The grid on which the spectrum is to be evaluated
-		ev_info: dict: Setup information which is principally evaluation-related (e.g. dynamic range, relaxation
-		parameters etc.)
-		rnd_info: dict: Setup information which is principally rendering-related (e.g. number of level ticks, other
-		plotting-/visualization-related information)
-		FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
-		"""
-
-		self.grid = grid
-		self.ev_info = ev_info
-		self.rnd_info = rnd_info
-
-	def __repr__(self):
-		return 'THIS IS specEvalSetup with self.grid,self.ev_info,self.rnd_info'
 
 class WilsonSimulation:
 	"""
@@ -897,6 +896,7 @@ class WilsonSimulation:
 				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		"""
+		FIXME: terms: list[VibPerturbedTerm]=[] - that's not true
 		FIXME: Consider changing ordering of these arguments
 		exp: VibExperiment instance: The experiment to which this simulation pertains
 		terms: list of VibPerturbedTerm instances: The terms (working expressions) to be evaluated over the spectral
@@ -1102,9 +1102,9 @@ class WilsonSimulation:
 			# See if property specifically mentioned and if so use that
 			if self.eval_by_prop_name is not None:
 
-				if i.triv_name is not None:
-					if i.triv_name in self.eval_by_prop_name:
-						i.addCalcSetup(self.eval_by_prop_name[i.triv_name])
+				if i.trivial_name is not None:
+					if i.trivial_name in self.eval_by_prop_name:
+						i.addCalcSetup(self.eval_by_prop_name[i.trivial_name])
 						dressed=True
 
 				else:
@@ -1262,4 +1262,113 @@ class WilsonSimulation:
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
 
+	def to_dict(self):
+		"""
+		__init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
+				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
+				 eval_uniform: ExternalCalcSetup=None, eval_by_prop_name: dict[str: ExternalCalcSetup]=None,
+				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
+				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
+		
+		redundancies:
 
+		"""
+		attributes = ['exp', 'vib_ana_setup', 'spec_eval_setup', 
+				'system', 'eval_uniform', 'eval_by_prop_name', 'props', 
+				'calc_batches', 
+				'diagn', 'rendering', 'name'] # skipping spec for now
+		
+		# redundancy
+		# calc_batches
+		
+		result = {}
+		for key in attributes:
+			value = getattr(self, key)
+			if is_dataclass(value):
+				try:
+					result[key] = asdict(value)
+				except TypeError:
+					result[key] = value.to_dict()
+			elif hasattr(value, "to_dict"):  # If it's a custom object
+				result[key] = value.to_dict()
+			elif isinstance(value, (list, tuple)):
+				result[key] = [
+					item.to_dict() if hasattr(item, "to_dict") else item for item in value
+				]
+			elif isinstance(value, dict):
+				result[key] = {
+					k: v.to_dict() if hasattr(v, "to_dict") else v for k, v in value.items()
+				}
+			else:
+				result[key] = value
+		from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+		result['terms'] = derived_terms_dict_to_dicts(getattr(self, 'terms'))
+		return result
+
+	
+	@classmethod
+	def from_dict(cls, data):
+		"""
+		__init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
+				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
+				 eval_uniform: ExternalCalcSetup=None, eval_by_prop_name: dict[str: ExternalCalcSetup]=None,
+				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
+				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
+		
+		VibExperiment - dataclass
+		terms - list[VibPerturbedTerm] - handle this or maybe no need?
+		VibAnaSetup - not a dataclass
+
+		SpecEvalSetup - dataclass
+		MolecularSystem - dataclass
+		ExternalCalcSetup - dataclass
+
+		props - list[MolecularProperty] - not a dataclass
+		calc_batches - dict[int: CalculationBatch] - not a dataclass
+		"""
+		return cls(
+            exp=data['exp'].from_dict(),
+            terms=data['terms'],
+            vib_ana_setup=data['vib_ana_setup']
+        )
+	
+	def writeToJsonFile(self, filename: str = "WilsonSimulation.json"):
+		import json
+		with open(filename, "w") as f:
+			json.dump(self.to_dict(), f, indent=4)
+		print(f'saved to file {filename}')
+
+
+# simply copying old sketch for now
+class WilsonSimulations:
+	"""
+	Class to hold collective jobs instructions (i.e. instructions for collections of jobs, not for individual jobs)
+	# FIXME: Not implemented and form not yet settled, skipping further documentation for now
+	"""
+
+	def __init__(self, jobs=None, coll_instructions=None):
+
+		self.jobs = jobs
+		self.coll_instructions = None
+
+	# A job is a WilsonSimulation instance
+	def addJob(self, job):
+	
+		pass
+		
+	# Make calculation batches needed to fulfill tasks
+	def makeCalculationBatches(self):
+	
+		# Walk through simulations and collect into calculation batches for each setup
+		# Implement union of these batches
+	
+		pass
+
+	def evaluate(self):
+
+			#spectra = wilsonpart2.evaluate(self.exp.get_terms(), self.properties, self.eval_setup.visualization_setup)
+			pass
+
+	def render(self):
+
+			pass
