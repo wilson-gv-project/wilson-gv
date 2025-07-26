@@ -1,4 +1,7 @@
 """
+Example of how logging should work.
+Logger is like a singleton, it's one instance of a logger by the name of it.
+
 import logging
 import sys
 
@@ -67,7 +70,6 @@ def setup_logger(name="wilson", level=logging.INFO, use_rich=True, log_to_file=N
     logger.setLevel(level)
 
     if logger.handlers:
-        # Already set up
         return logger
 
     # Formatter for plain output (no color)
