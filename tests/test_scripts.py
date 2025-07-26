@@ -4,7 +4,7 @@ Turning scripts into pytests
 from wilson_utils.paths import SUITE_ROOT
 from wilson_utils.serialization import unpickle_smth_from
 import numpy as np
-
+from wilson_utils.printing import separatorprint
 
 def test_evv_tester_dataclasses():
     """
@@ -163,4 +163,13 @@ def test_logger_evv_tester():
     assert without_timestamp_m1 == "wilson.wilson_utils.serialization - INFO - ✅ JSON-safe"
     without_timestamp_m2 = " - ".join(lines[-2].split(" - ")[1:]).strip()
     assert without_timestamp_m2 == "wilson. - DEBUG - np.max(intensities): 4.2029e+11"
+
+def test_logger_evv_tester_terminal():
+    separatorprint()
+    import logging
+    from wilson_utils.logger import setup_logger
+    setup_logger("wilson", level=logging.DEBUG)
     
+    import evv_tester
+    evv_tester.run()
+
