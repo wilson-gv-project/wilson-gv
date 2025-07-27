@@ -304,18 +304,19 @@ class VibAnaSetup:
     Class for setup for vibrational analysis and storage of the resulting information
 	
 	----
-	vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
+	regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
 	system: MolecularSystem instance: System to which this instance pertains
-	vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
+	regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
 	max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
 	states: List of VibState instances: Specification of each vibrational state in scope
 	nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
 	nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
 	allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
-	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
-	vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
-	"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
-	data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
+	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the vibrational analysis? 
+		Choices: 
+			"all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+			"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic data], 
+			"none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
 	external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
 	exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
 	"""
@@ -531,7 +532,7 @@ class VibAnaSetup:
 			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
 					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
 					'exclude_modes': self.exclude_modes}
-		self.states = anharmonic_analyzer(**context)
+		self.states, self.diagn = anharmonic_analyzer(**context)
 
 
 @dataclass
