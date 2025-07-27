@@ -77,8 +77,11 @@ def test_anharm_analyzer():
     
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
 
-    # FIXME: should be done internally with WilsonSimulation somehow? or when?
-    sim.vib_ana_setup.doAnharmonicAnalysis(sim.props, anharmonic_analyzer=anharm_analyzer_data)
+    try:
+        # FIXME: should be done internally with WilsonSimulation somehow? or when?
+        sim.vib_ana_setup.doAnharmonicAnalysis(sim.props, anharmonic_analyzer=anharm_analyzer_data)
+    except Exception as e:
+        assert False, f"Test failed due to an exception: {e}"
 
 
 def test_anharm_analyzer_vibana():
@@ -109,7 +112,8 @@ def test_anharm_analyzer_vibana():
     props = vibana.tellNeededProps()
 
     # FIXME? WilsonSimulation: def dressPropsWithSetup(self) - can't dressProps without WilsonSimulation - now done with:
-    vibana.dressPropsWithSetup(eval_uniform=True, eval_by_prop_name=None)
+    
+    ws_main.abstractions.dressPropsWithSetup(props, eval_uniform=calc_setup, eval_by_prop_name=None)
     
     calc_batch = ws_main.abstractions.CalculationBatch(system=mol_system, calc_setup=calc_setup, properties=props)    
     # needs dressed props with calc setup
@@ -118,5 +122,8 @@ def test_anharm_analyzer_vibana():
     
     printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
 
-    # FIXME: should be done internally with WilsonSimulation somehow? or when?
-    vibana.doAnharmonicAnalysis(vibana.props, anharmonic_analyzer=anharm_analyzer_data)
+    try:
+        # FIXME: should be done internally with WilsonSimulation somehow? or when?
+        vibana.doAnharmonicAnalysis(props, anharmonic_analyzer=anharm_analyzer_data)
+    except Exception as e:
+        assert False, f"Test failed due to an exception: {e}"
