@@ -28,7 +28,7 @@ def anharm_analyzer_data(system:MolecularSystem = None, props: list[MolecularPro
     
     prop_dict = {i.trivial_name: i.vals for i in props}
     logger.debug(f'prop_dict {prop_dict.keys()}')
-
+    
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
     corrected_levels, fermi_resonances = anharm_corr_energies(nc_sqrt_eigval,
                                                              prop_dict['cff'], prop_dict['qff'], prop_dict['B'], prop_dict['coriolis'],
