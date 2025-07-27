@@ -8,8 +8,9 @@ from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 from wilson_utils.abstractions import VibState
-from typing import Callable, Any
-import numpy as np
+
+import logging
+logger = logging.getLogger("wilson."+__name__)
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 @dataclass
@@ -44,7 +45,7 @@ class MolecularSystem:
 		if (self.geo is not None) and (self.geo_extra is not None):
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
 		if (self.geo is None) and (self.geo_extra is None):
-			print('Note: Molecular system was instantiated without geometry information')
+			logger.info('Note: Molecular system was instantiated without geometry information')
 	
 	def h(self):
 		"""
@@ -498,7 +499,7 @@ class VibAnaSetup:
 		"""
 
 		if self.regime is None:
-			print('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
+			logger.warning('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
@@ -626,7 +627,7 @@ class SpectralGrid:
 					# Underflow possible
 					n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
 					if not(self.end[i] == self.start[i] + self.spacer[i]*(n_pts[i] - 1)):
-						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
+						logger.warning('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
 
 				else:
 
@@ -790,7 +791,7 @@ class CalculationBatch:
 		from CQCParse.relay import DataVault
 		vault = DataVault(source_loc)
 
-		print('system name', self.system.name)
+		logger.info(f'system name: {self.system.name}')
 
 		datadict = vault.make_DatainputDict(self.calc_setup.program, (self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), wilson_root)
 
@@ -803,11 +804,9 @@ class CalculationBatch:
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 
-		# props_to_fill are ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'hess', 'qff', 'B', 'coriolis']
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				if i.triv_name != 'hess':
-					i.addValues(getattr(parser_obj, i.trivial_name))
+				i.addValues(getattr(parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
 
@@ -1108,7 +1107,7 @@ class WilsonSimulation:
 						dressed=True
 
 				else:
-					print('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
+					logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
 
 			# Otherwise, use uniform eval argument
 			if self.eval_uniform is not None:
@@ -1336,7 +1335,7 @@ class WilsonSimulation:
 		import json
 		with open(filename, "w") as f:
 			json.dump(self.to_dict(), f, indent=4)
-		print(f'saved to file {filename}')
+		logger.info(f'WilsonSimulation instance is saved to file {filename}')
 
 
 # simply copying old sketch for now
