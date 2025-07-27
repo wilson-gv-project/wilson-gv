@@ -448,6 +448,36 @@ class VibAnaSetup:
 
 		return needed_props
 
+	def dressPropsWithSetup(self, eval_uniform: bool = True, eval_by_prop_name: Any = None):
+		"""
+		Dress my self.properties with computational setups according to how they are specified in
+		self.eval_uniform or self.eval_by_prop_name
+		"""
+
+		for i in self.props:
+
+			dressed = False
+
+			# See if property specifically mentioned and if so use that
+			if eval_by_prop_name is not None:
+
+				if i.trivial_name is not None:
+					if i.trivial_name in eval_by_prop_name:
+						i.addCalcSetup(eval_by_prop_name[i.trivial_name])
+						dressed=True
+
+				else:
+					logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
+
+			# Otherwise, use uniform eval argument
+			if eval_uniform:
+
+				i.addCalcSetup(self.external_fill_from)
+				dressed = True
+
+			if not dressed:
+				raise AssertionError('Unable to determine calculation setup for property')
+
 	def setStates(self, states: list[VibState]):
 		"""
 		Set vibrational states
