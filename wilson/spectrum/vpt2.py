@@ -3,8 +3,8 @@ Documentation and tests will be added in the future PR, also style imporvements
 """
 import numpy as np
 import copy
-from wilson.utils.debug import debugfunc, infoprint, separator_print
-
+import logging
+logger = logging.getLogger("wilson."+__name__)
 
 def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield,
                          rotational_constant, coriolis_constant, anharmonic_type,
@@ -33,10 +33,10 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
         do_resonance_checks = True
         do_variational_correction = False
     else:
-        separator_print(title='')
-        infoprint('Something strange has happened in anharm_corrected_vibrational_energies')
-        infoprint('Anharmonic is called, but which type isn/t specified')
+        logger.info('Something strange has happened in anharm_corrected_vibrational_energies')
+        logger.info('Anharmonic is called, but which type isn/t specified')
         exit()
+    
     original_len_ene = len(harmonic_energies)
     harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
 
@@ -54,8 +54,7 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
 
 
     if fermi_resonance: # if not an empty list
-        debugfunc(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}',
-                  tag='vpt2.anharm_corr_energies')
+        logger.debug(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}')
 
     funds_corrections = np.zeros((original_len_ene))
     # for i in range(len(harmonic_energies)):
@@ -262,11 +261,8 @@ def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
                 C = 0
 
                 for k in range(len(rotational_constant)):
-                    # print(type(rotational_constant[k]), 'vpt2.py line 260')
-                    # print(rotational_constant[k], float(rotational_constant[k]))
-                    # C += rotational_constant[k]*coriolis_constant[k][i][j]**2*\
-                    #     (harmonic_energies[i]/harmonic_energies[j] +
-                    #      harmonic_energies[j]/harmonic_energies[i])
+                    logger.debug(f'rotational_constant[k]: {rotational_constant[k]}')
+                    logger.debug(f'float(rotational_constant[k]): {float(rotational_constant[k])}')
                     C += float(rotational_constant[k])*coriolis_constant[k][i][j]**2*\
                         (harmonic_energies[i]/harmonic_energies[j] +
                          harmonic_energies[j]/harmonic_energies[i])
@@ -290,19 +286,26 @@ def is_fermi_resonance(delta, cubic_force_ijk, i_is_j):
     if abs(delta) <= fermi_threshold: # in FR should be less than 200 cm-1
         if i_is_j:
             martin_parameter = cubic_force_ijk**4/(256.0*delta**3)
-            # print('martin_parameter', abs(martin_parameter), abs(martin_parameter) >= martin_threshold, martin_threshold)
+
+            logger.debug(f'abs(martin_parameter): {abs(martin_parameter)}; martin_threshold: {martin_threshold}')
+            logger.debug(f'abs(martin_parameter) >= martin_threshold {abs(martin_parameter) >= martin_threshold}')
+
             if abs(martin_parameter) >= martin_threshold: # in FR should be greater than 1 cm-1
                 fermi = True
-                # print(abs(delta), fermi_threshold)
-                # print(abs(martin_parameter), martin_threshold)
+
+                logger.debug(f'abs(delta), fermi_threshold: {abs(delta)}, {fermi_threshold}')
+                logger.debug(f'abs(martin_parameter), martin_threshold: {abs(martin_parameter)}, {martin_threshold}')
+
             else:
                 fermi = False
         else:
             martin_parameter = cubic_force_ijk**4/(64.0*delta**3)
             if abs(martin_parameter) >= martin_threshold:
                 fermi = True
-                # print(abs(delta), fermi_threshold)
-                # print(abs(martin_parameter), martin_threshold)
+
+                logger.debug(f'abs(delta), fermi_threshold: {abs(delta)}, {fermi_threshold}')
+                logger.debug(f'abs(martin_parameter), martin_threshold: {abs(martin_parameter)}, {martin_threshold}')
+
             else:
                 fermi = False
 
