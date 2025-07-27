@@ -742,7 +742,7 @@ class CalculationBatch:
 
 	def getResults(self, props_to_fill: list[MolecularProperty],
 				   vib_ana_setup_to_fill: VibAnaSetup=None, source_type: str='',
-				   source_types: list[str]=[], source_loc: Any=None):
+				   source_types: list[str]=[], source_loc: Any=None, datavault: Any = None):
 		"""
 		Get results (values for properties) from a specified source or sources and fill them into the
 		MolecularProperty instances in props_to_fill for all such instances that match what self can provide. Also
@@ -769,7 +769,7 @@ class CalculationBatch:
 			raise NotImplementedError('Only vault retrieval currently implemented')
 
 		else:
-			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, source_loc)
+			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault)
 
 	def getResultsFromOutputs(self):
 		"""
@@ -778,7 +778,8 @@ class CalculationBatch:
 		raise NotImplementedError('Results from program output file(s) not yet implemented')
 
 	def getResultsFromVault(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,
-							source_loc: Any):
+							datavault: Any):
+							# source_loc: Any):
 		"""
 		Get results from data vault. See get_results declarations for argument explanations.
 		"""
@@ -788,13 +789,18 @@ class CalculationBatch:
 
 		from wilson.utils import get_package_root
 		wilson_root = get_package_root()
+		logger.debug(f'wilson_root {wilson_root}')
 
-		from CQCParse.relay import DataVault
-		vault = DataVault(source_loc)
+		# from CQCParse.relay import DataVault
+		# vault = DataVault(source_loc)
 
 		logger.info(f'system name: {self.system.name}')
 
-		datadict = vault.make_DatainputDict(self.calc_setup.program, (self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), wilson_root)
+		from wilson_utils.paths import SUITE_ROOT
+		datadict = datavault.make_DatainputDict(self.calc_setup.program, 
+										  (self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
+										  SUITE_ROOT+'/wilson_intensities/tests')
+		logger.debug(f'datadict: {datadict}')
 
 		if self.calc_setup.program == 'gaussian':
 			from CQCParse.parsing import GaussianDataParser as progDataParser
@@ -802,6 +808,8 @@ class CalculationBatch:
 		elif self.calc_setup.program == 'cfour':
 			from CQCParse.parsing import CFOURdataParser as progDataParser
 
+		# maybe should just take parser object from outside, and this object can be set up with external functionality 
+		# external to WilsonSimulation
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 
@@ -812,6 +820,7 @@ class CalculationBatch:
 		if vib_ana_setup_to_fill is not None:
 
 			# Take harmonic vibrational analysis results
+			# FIXME? why not also for 'all'?
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
 				vib_ana_setup_to_fill.nc_sqrt_eigval = parser_obj.fundamentals_harmonic_int # todo: tests...
@@ -1141,7 +1150,8 @@ class WilsonSimulation:
 
 		self.calc_batches = calc_batches
 
-	def getResultsFromCalculationBatches(self, source_type: str='', source_types: list[str]=[], source_loc: Any=None):
+	def getResultsFromCalculationBatches(self, source_type: str='', source_types: list[str]=[], source_loc: Any=None,
+									  datavault: Any = None):
 		"""
 		Get results from calculation batches and register in self.properties
 		FIXME: See comments in CalculationBatch.getResults
@@ -1158,10 +1168,10 @@ class WilsonSimulation:
 			if self.vib_ana_setup.external_fill_from is not None:
 				if self.calc_batches[i].calc_setup.h() == self.vib_ana_setup.external_fill_from.h():
 					self.calc_batches[i].getResults(self.props, vib_ana_setup_to_fill=self.vib_ana_setup,
-													source_type=source_type, source_loc=source_loc)
+													source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 			else:
-				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc)
+				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
