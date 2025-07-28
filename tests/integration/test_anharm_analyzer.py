@@ -1,4 +1,4 @@
-from wilson.utils.debug import printtest, separator_print
+from wilson_utils.printing import printtest, separatorprint
 
 def evv_experiment():
     import wilson_experiment as ws_experiment
@@ -30,7 +30,7 @@ def test_anharm_analyzer():
     """
     Anharmonic analyzer (using vpt2.py module) integration test
     """
-    separator_print()
+    separatorprint()
     import logging
     from wilson_utils.logger import setup_logger
     setup_logger("wilson.", level=logging.DEBUG)
@@ -89,7 +89,7 @@ def test_anharm_analyzer_vibana():
     Anharmonic analyzer (using vpt2.py module) integration test 
     without wilson simulation
     """
-    separator_print()
+    separatorprint()
     import logging
     from wilson_utils.logger import setup_logger
     setup_logger("wilson.", level=logging.DEBUG)

@@ -7,7 +7,7 @@ Need to test:
     -[] Reference comparison
 
 """
-from wilson.utils.debug import printtest, separator_print
+from wilson_utils.printing import printtest, separatorprint
 import wilson_main.abstractions as wm_abst
 
 
@@ -18,7 +18,7 @@ def test_anharm_analyzer_vibana():
 
     TODO: not passing now because unfinished
     """
-    separator_print()
+    separatorprint()
     import logging
     from wilson_utils.logger import setup_logger
     setup_logger("wilson", level=logging.DEBUG)
