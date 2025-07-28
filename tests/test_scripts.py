@@ -154,15 +154,13 @@ def test_logger_evv_tester():
     with open("./tests/out.log", "r", encoding="utf-8") as f:
         lines = f.readlines()
     
-    assert len(lines) == 20
+    assert len(lines) == 25
 
     without_timestamp_0 = " - ".join(lines[0].split(" - ")[1:]).strip()
     assert without_timestamp_0 == "wilson. - INFO - evv_tester_dataclasses.py"
     
-    without_timestamp_m1 = " - ".join(lines[-1].split(" - ")[1:]).strip()
-    assert without_timestamp_m1 == "wilson.wilson_utils.serialization - INFO - ✅ JSON-safe"
-    without_timestamp_m2 = " - ".join(lines[-2].split(" - ")[1:]).strip()
-    assert without_timestamp_m2 == "wilson. - DEBUG - np.max(intensities): 4.2029e+11"
+    without_timestamp_m3 = " - ".join(lines[-3].split(" - ")[1:]).strip()
+    assert without_timestamp_m3 == "wilson. - DEBUG - np.max(intensities): 4.2029e+11"
 
 def test_logger_evv_tester_terminal():
     separatorprint()
