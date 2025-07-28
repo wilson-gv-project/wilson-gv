@@ -25,9 +25,14 @@ def test_logger_with_caplog_serialization(caplog):
     assert "WARNING wilson.wilson_utils.serialization:serialization.py:60 🔍 Offending object: {'a': 1, 'b': {(0, 1): 'str'}}" in log_output
 
 def logfunc_mock():
+    """
+    A mock function with an intentionally incorrect usage of logger.info: 
+        argument should be one string or a formatted string:
+            logger.info(''+''+'fg') - is OK
+            logger.debug(f"number is {number}")
+    """
     import logging
     logger = logging.getLogger('testlogger')
-    # Intentionally incorrect usage of logger.info: argument should be one string or a formatted string
     logger.info('', '', 'fg')
 
 

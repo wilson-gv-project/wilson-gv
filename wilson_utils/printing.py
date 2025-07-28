@@ -10,7 +10,16 @@ level = 0
 def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = None) -> None:
     """
     Generalized styled print for internal use. Used in other print functions
-    Is a private function
+    Is a private function.
+
+    https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
+    Colors reference:
+    | Code | Color          | Meaning                           |
+    | ---- | -------------- | --------------------------------- |
+    | `92` | Bright Green   | Used in `debugprint`, `printtest` |
+    | `93` | Bright Yellow  | Used in `infoprint`               |
+    | `95` | Bright Magenta | Used in `debugfunc`               |
+
     """
     target = file or PRINT_TARGET or sys.stdout
     try:
