@@ -26,7 +26,7 @@ logger = logging.getLogger("wilson.")
 
 logger.info('evv_tester_dataclasses.py')
 
-TO_PICKLES = ['VibExperiment', 'ExternalCalcSetup', 'WilsonSimulation']
+TO_PICKLES = []
 PKL_FILES = {}
 
 def run():
