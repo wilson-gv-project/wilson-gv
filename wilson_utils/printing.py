@@ -3,6 +3,8 @@ from typing import TextIO, Optional, Any
 from contextlib import contextmanager
 from rich import print as rich_print
 
+PRINT_TARGET: TextIO = sys.stdout
+
 level = 0
 
 def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = None) -> None:
@@ -11,7 +13,10 @@ def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = N
     Is a private function
     """
     target = file or PRINT_TARGET or sys.stdout
-    is_terminal = hasattr(target, 'isatty') and target.isatty()
+    try:
+        is_terminal = hasattr(target, 'isatty') and target.isatty()
+    except ValueError:
+        is_terminal = False  # closed file
 
     text_parts = [m if isinstance(m, str) else repr(m) for m in msgs]
     text = ' '.join(text_parts)
@@ -40,7 +45,6 @@ def debug_deep(msgs: str, tag: str = "") -> None:
         _styled_print(f"DEBUG DEEP][{tag}", "95", msgs)
 
 
-PRINT_TARGET: TextIO = sys.stdout
 
 @contextmanager
 def use_print_target(temp_target: TextIO):
@@ -66,8 +70,11 @@ def separatorprint(*title: Any, file: Optional[TextIO] = None):
     Print to specified file or global target; if file is None, then PRINT_TARGET.
     Won't print color modifiers if file is not None
     """
-    target = file or PRINT_TARGET
-    is_terminal = hasattr(target, 'isatty') and target.isatty()
+    target = file or PRINT_TARGET or sys.stdout
+    try:
+        is_terminal = hasattr(target, 'isatty') and target.isatty()
+    except ValueError:
+        is_terminal = False  # closed file
 
     if not title:
         text = ''

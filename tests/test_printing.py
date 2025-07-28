@@ -8,6 +8,7 @@ from wilson_utils.printing import (
     debugfunc,
     debug_deep
 )
+import sys
 
 from wilson_utils.paths import UTILS_ROOT
 TESTFILESDIR = UTILS_ROOT + "/tests/"
@@ -16,7 +17,6 @@ def test_debugfunc(capsys):
     """
     capsys - pytest caturing stdout/stderr
     """
-    import sys
     import wilson_utils.printing as wprinting
     wprinting.level = 2
     wprinting.PRINT_TARGET = sys.stdout
@@ -36,7 +36,6 @@ def test_debug_deep(capsys):
     """
     capsys - pytest caturing stdout/stderr
     """
-    import sys
     import wilson_utils.printing as wprinting
     wprinting.level = 2
     wprinting.PRINT_TARGET = sys.stdout
@@ -51,11 +50,16 @@ def test_debug_deep(capsys):
     captured = capsys.readouterr()
     assert "[DEBUG DEEP][yo] hello debug_deep" in captured.out
 
+def test_separatorprint():
+    import wilson_utils.printing as wprint
+    wprint.PRINT_TARGET = sys.stdout # reseting
+    separatorprint()
 
 def test_set_print_target():
-    separatorprint()
     import wilson_utils.printing as wprint
-    import sys
+    # wprint.PRINT_TARGET = sys.stdout # reseting
+    separatorprint()
+
     assert wprint.PRINT_TARGET == sys.stdout
     
     with use_print_target(open(TESTFILESDIR+"logfile0.txt", "w")):
@@ -66,7 +70,10 @@ def test_set_print_target():
     assert lines[0].strip() == '[INFO] hello world'
 
 def test_infoprint():
+    # import wilson_utils.printing as wprint
+    # wprint.PRINT_TARGET = sys.stdout # reseting
     separatorprint()
+    
     with use_print_target(open(TESTFILESDIR+"logfile1.txt", "a")):
         infoprint('hello test_infoprint')
     infoprint('hello test_infoprint again')
