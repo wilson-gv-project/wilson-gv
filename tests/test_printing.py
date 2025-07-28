@@ -50,10 +50,12 @@ def test_debug_deep(capsys):
     captured = capsys.readouterr()
     assert "[DEBUG DEEP][yo] hello debug_deep" in captured.out
 
-def test_separatorprint():
+def test_separatorprint(capsys):
     import wilson_utils.printing as wprint
     wprint.PRINT_TARGET = sys.stdout # reseting
     separatorprint()
+    captured = capsys.readouterr()
+    assert '---------------  ---------------' in captured.out
 
 def test_set_print_target():
     import wilson_utils.printing as wprint
