@@ -384,6 +384,7 @@ class VibAnaSetup:
 			if self.system is None:
 				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
 
+
 	@property
 	def modes_indices(self):
 		"""
@@ -571,9 +572,21 @@ class VibAnaSetup:
 
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+		else:
+			if self.regime not in ['harmonic', "GVPT2", "VPT2"]:
+				raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
+			elif self.regime == 'harmonic':
+				raise ValueError('Are you sure you know what you are doing?')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+
+		from inspect import isfunction
+		if not isfunction(anharmonic_analyzer):
+			raise TypeError('anharmonic_analyzer should be a function')
+		
+		if self.nc_sqrt_eigval is None:
+			raise ValueError('nc_sqrt_eigval is None; need nc_sqrt_eigval for anharmonic_analyzer()')
 
 		context = {'system': self.system, 'props': props, 
 			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
