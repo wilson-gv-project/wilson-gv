@@ -22,7 +22,7 @@ from wilson.utils.spectrum_utils import MolProperty, VibStatesDiff
 from wilson.utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
 from wilson.utils.spectrum_utils import abc_list, greek_list
 from wilson.utils.tagger import tag
-from wilson.utils.debug import debugfunc, debug_deep
+from wilson_utils.printing import debugfunc, debug_deep
 from collections.abc import Callable
 from itertools import product
 
