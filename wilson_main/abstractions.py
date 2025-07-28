@@ -46,7 +46,9 @@ class MolecularSystem:
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
 		if (self.geo is None) and (self.geo_extra is None):
 			logger.info('Note: Molecular system was instantiated without geometry information')
-	
+		if self.natoms is None and self.geo is None:
+			raise ValueError('Incomplete definition: Either the number of atoms (natoms) or the geometry (geo) of the MolecularSystem is required')
+
 	def h(self):
 		"""
 		Hashing function
@@ -277,6 +279,36 @@ class MolecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 
+def dressPropsWithSetup(props, eval_uniform: bool = True, eval_by_prop_name: Any = None):
+	"""
+	Dress my self.properties with computational setups according to how they are specified in
+	self.eval_uniform or self.eval_by_prop_name
+	"""
+
+	for i in props:
+
+		dressed = False
+
+		# See if property specifically mentioned and if so use that
+		if eval_by_prop_name is not None:
+
+			if i.trivial_name is not None:
+				if i.trivial_name in eval_by_prop_name:
+					i.addCalcSetup(eval_by_prop_name[i.trivial_name])
+					dressed=True
+
+			else:
+				logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
+
+		# Otherwise, use uniform eval argument
+		if eval_uniform is not None:
+
+			i.addCalcSetup(eval_uniform)
+			dressed = True
+
+		if not dressed:
+			raise AssertionError('Unable to determine calculation setup for property')
+
 class MolecularPropertyEncoder(json.JSONEncoder):
 	"""
 	Helper for JSON encoding of MolecularProperty
@@ -342,14 +374,29 @@ class VibAnaSetup:
 	external_fill_from: ExternalCalcSetup=None
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-	exclude_modes: list=None
+	exclude_modes: list = None
 
 	def __post_init__(self):
 		if self.exclude_modes is None:
-			self.exclude_modes = []
-		
+			if self.system is not None:
+				self.exclude_modes = []
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+
+	@property
+	def modes_indices(self):
+		"""
+		Automatically set up based on number of modes in the system (3*N-5 or 3*N-6) and exclude_modes list, 
+			which is an empty list by default
+		Returns empty list if no system attribute
+		"""
+		if self.system is None:
+			raise AttributeError('VibAnaSetup().modes_indices attribute cannot be created without having set the VibAnaSetup().system attribute')
+
 		import numpy as np
-		self.modes_indices = [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
+		return [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
 	
 	@property
 	def serial_states(self):
@@ -448,6 +495,7 @@ class VibAnaSetup:
 
 		return needed_props
 
+
 	def setStates(self, states: list[VibState]):
 		"""
 		Set vibrational states
@@ -524,14 +572,29 @@ class VibAnaSetup:
 
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+		else:
+			if self.regime not in ['harmonic', "GVPT2", "VPT2"]:
+				raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
+			elif self.regime == 'harmonic':
+				raise ValueError('Are you sure you know what you are doing?')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
+		from inspect import isfunction
+		if not isfunction(anharmonic_analyzer):
+			raise TypeError('anharmonic_analyzer should be a function')
+		
+		if self.nc_sqrt_eigval is None:
+			raise ValueError('nc_sqrt_eigval is None; need nc_sqrt_eigval for anharmonic_analyzer()')
+		# TODO props should have vals?
 		context = {'system': self.system, 'props': props, 
 			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
 					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
 					'exclude_modes': self.exclude_modes}
+		
+		logger.debug(repr(context))
+
 		self.states, self.diagn = anharmonic_analyzer(**context)
 
 
@@ -628,7 +691,7 @@ class SpectralGrid:
 					# Underflow possible
 					n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
 					if not(self.end[i] == self.start[i] + self.spacer[i]*(n_pts[i] - 1)):
-						logger.warning('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
+						logger.warning(f'NOTE: Axis defined end {self.end[i]} not precisely at spacer increment of start')
 
 				else:
 
