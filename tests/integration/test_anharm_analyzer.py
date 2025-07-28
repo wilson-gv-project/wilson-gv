@@ -51,7 +51,6 @@ def test_anharm_analyzer():
                                               allow_skip_eigvec=True, 
                                               external_fill_from=calc_setup)
     printtest(f'vibana.vibana_prop_need: {vibana.vibana_prop_need}')
-
     experiment_a = evv_experiment()
 
     sim = ws_main.abstractions.WilsonSimulation()
@@ -76,6 +75,7 @@ def test_anharm_analyzer():
                                          source_loc=database_csv)
     
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
+    printtest(sim.props)
 
     try:
         # FIXME: should be done internally with WilsonSimulation somehow? or when?

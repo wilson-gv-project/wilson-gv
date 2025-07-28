@@ -2,23 +2,25 @@
 Anharmonic analyzer for wilson_main.VibAnaSetup.doAnharmonicAnalysis()
 
 """
-from wilson_utils.abstractions import VibState
-from wilson_main.abstractions import MolecularSystem, MolecularProperty
+import wilson_utils.abstractions as wu_abst
+import wilson_main.abstractions as wm_abst
 from wilson.spectrum.vpt2 import anharm_corr_energies
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def anharm_analyzer_data(system:MolecularSystem = None, props: list[MolecularProperty] = None, 
+def anharm_analyzer_data(system:wm_abst.MolecularSystem = None, props: list[wm_abst.MolecularProperty] = None, 
                     nc_sqrt_eigval: dict = None, 
                     regime: str = None, regime_subinfo: dict = None, 
-                    exclude_modes: list = None) -> tuple[list[VibState], dict]:
+                    exclude_modes: list = None) -> tuple[list[wu_abst.VibState], dict]:
     """
     Basically a wrapper for analyser; passes data to anharm_corr_energies where analysis happens...
-        then puts into list[VibState] form
+        then puts into list[VibState] form.
+    This way it is more clean
 
     returns self.states for VibAnaSetup, and states are list[VibState]
     
+    NOTE: Pure function -  will assume that inputs are always valid
     """
     logger.info('Starting anharm_analyzer()')
     
@@ -61,7 +63,7 @@ def anharm_analyzer_data(system:MolecularSystem = None, props: list[MolecularPro
         # if len(st) <= max_state_lvl: # ?
         # TODO: Exclusion based on mode index or freq cutoff
         # FIXME: Change to integer indexing - in s dict?
-        vibstates.append(VibState(s={st: 1.0}, e=all_states_corr[st]))
+        vibstates.append(wu_abst.VibState(s={st: 1.0}, e=all_states_corr[st]))
 
     logger.debug('GVPT2 anharm corrected:')
     logger.debug(f'vibstates: {vibstates}')
