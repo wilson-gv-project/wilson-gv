@@ -33,7 +33,7 @@ def test_anharm_analyzer():
     separator_print()
     import logging
     from wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG)
+    setup_logger("wilson.", level=logging.DEBUG)
     logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
 
     from CQCParse.logger import setup_logger as set_loggerCQCP
@@ -92,7 +92,7 @@ def test_anharm_analyzer_vibana():
     separator_print()
     import logging
     from wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG)
+    setup_logger("wilson.", level=logging.DEBUG)
     logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
 
     from CQCParse.logger import setup_logger as set_loggerCQCP

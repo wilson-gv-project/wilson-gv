@@ -1,9 +1,22 @@
+"""
+anharm_analyzer/anharm_analyzer_data are pure functions
+Need to test:
+    -[] Expected output
+    -[] Edge cases
+    -[] Properties or invariants
+    -[] Reference comparison
+
+"""
 from wilson.utils.debug import printtest, separator_print
+import wilson_main.abstractions as wm_abst
+
 
 def test_anharm_analyzer_vibana():
     """
     Trying to isolate anharm_analyzer_data function
     and test it
+
+    TODO: not passing now because unfinished
     """
     separator_print()
     import logging
@@ -15,42 +28,15 @@ def test_anharm_analyzer_vibana():
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
     from wilson.spectrum.anharmonic_analyzer import anharm_analyzer_data
-    # context = {'system': None, 'props': None, 'nc_sqrt_eigval': None,
-    #            'regime': None, 'regime_subinfo': None, 'exclude_modes': None}
-    context = {'system': None, 'props': None, 'nc_sqrt_eigval': None,
-            'regime': None, 'regime_subinfo': None}
+
+    context = {'system': wm_abst.MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
+               'props': [wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff'), 
+                         wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='qff'), 
+                         wm_abst.MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B'), 
+                         wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis')],
+                         'regime': 'GVPT2', 'regime_subinfo': None,
+                         'nc_sqrt_eigval': {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
+                         'exclude_modes': []}
     
     # how it's used in VibAnaSetup().doAnharmonicAnalysis
     anharm_analyzer_data(**context)
-
-
-    # from wilson_utils.paths import SUITE_ROOT
-    # database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
-
-    # from wilson.spectrum.anharmonic_analyzer import anharm_analyzer_data
-    # import wilson_main as ws_main
-
-    # mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    # calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
-    # vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
-    #                                           vibana_prop_need='anharm', # should this vary? take minimal needed for regime unless specified? 
-    #                                           allow_skip_eigvec=True, external_fill_from=calc_setup)
-    # printtest(f'vibana.vibana_prop_need: {vibana.vibana_prop_need}')
-    # props = vibana.tellNeededProps()
-
-    # # FIXME? WilsonSimulation: def dressPropsWithSetup(self) - can't dressProps without WilsonSimulation - now done with:
-    
-    # ws_main.abstractions.dressPropsWithSetup(props, eval_uniform=calc_setup, eval_by_prop_name=None)
-    
-    # calc_batch = ws_main.abstractions.CalculationBatch(system=mol_system, calc_setup=calc_setup, properties=props)    
-    # # needs dressed props with calc setup
-    # calc_batch.getResultsFromVault(props_to_fill=props, vib_ana_setup_to_fill=vibana,
-    #                                source_loc=database_csv)
-    
-    # printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
-
-    # try:
-    #     # FIXME: should be done internally with WilsonSimulation somehow? or when?
-    #     vibana.doAnharmonicAnalysis(props, anharmonic_analyzer=anharm_analyzer_data)
-    # except Exception as e:
-    #     assert False, f"Test failed due to an exception: {e}"
