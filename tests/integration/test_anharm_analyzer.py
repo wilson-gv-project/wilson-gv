@@ -28,7 +28,7 @@ def evv_experiment():
 
 def test_anharm_analyzer():
     """
-    Anharmonic analyzer (using vpt2.py module) semi-integration test
+    Anharmonic analyzer (using vpt2.py module) integration test
     """
     separator_print()
     import logging
@@ -86,7 +86,8 @@ def test_anharm_analyzer():
 
 def test_anharm_analyzer_vibana():
     """
-    Anharmonic analyzer (using vpt2.py module) semi-integration test
+    Anharmonic analyzer (using vpt2.py module) integration test 
+    without wilson simulation
     """
     separator_print()
     import logging
