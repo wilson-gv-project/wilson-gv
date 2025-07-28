@@ -10,7 +10,7 @@ def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = N
     Generalized styled print for internal use. Used in other print functions
     Is a private function
     """
-    target = file or PRINT_TARGET
+    target = file or PRINT_TARGET or sys.stdout
     is_terminal = hasattr(target, 'isatty') and target.isatty()
 
     text_parts = [m if isinstance(m, str) else repr(m) for m in msgs]
