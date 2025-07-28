@@ -146,12 +146,12 @@ def test_evv_tester_dataclasses_wilsonsim():
 def test_logger_evv_tester_file():
     import logging
     from wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG, log_to_file='./tests/out.log')
+    setup_logger("wilson", level=logging.DEBUG, log_to_file=SUITE_ROOT+'/tests/out.log')
     
     import evv_tester
     evv_tester.run()
 
-    with open("./tests/out.log", "r", encoding="utf-8") as f:
+    with open(SUITE_ROOT+"/tests/out.log", "r", encoding="utf-8") as f:
         lines = f.readlines()
         lines = [i for i in lines if i!='']
     
