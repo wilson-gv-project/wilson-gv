@@ -46,7 +46,9 @@ class MolecularSystem:
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
 		if (self.geo is None) and (self.geo_extra is None):
 			logger.info('Note: Molecular system was instantiated without geometry information')
-	
+		if self.natoms is None and self.geo is None:
+			raise ValueError('Incomplete definition: Either the number of atoms (natoms) or the geometry (geo) of the MolecularSystem is required')
+
 	def h(self):
 		"""
 		Hashing function
@@ -372,14 +374,28 @@ class VibAnaSetup:
 	external_fill_from: ExternalCalcSetup=None
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-	exclude_modes: list=None
+	exclude_modes: list = None
 
 	def __post_init__(self):
 		if self.exclude_modes is None:
-			self.exclude_modes = []
-		
+			if self.system is not None:
+				self.exclude_modes = []
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+	@property
+	def modes_indices(self):
+		"""
+		Automatically set up based on number of modes in the system (3*N-5 or 3*N-6) and exclude_modes list, 
+			which is an empty list by default
+		Returns empty list if no system attribute
+		"""
+		if self.system is None:
+			raise AttributeError('VibAnaSetup().modes_indices attribute cannot be created without having set the VibAnaSetup().system attribute')
+
 		import numpy as np
-		self.modes_indices = [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
+		return [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
 	
 	@property
 	def serial_states(self):
