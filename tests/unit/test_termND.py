@@ -15,7 +15,7 @@ from wilson.spectrum.termND import sum_over_suffixes
 from tests.testing_utils import require_asserts
 
 from wilson.spectrum import debug_mode
-from wilson.utils import debug
+from wilson_utils import printing as debug
 import CQCParse.debug as cqc_debug
 
 debug.level = 0
