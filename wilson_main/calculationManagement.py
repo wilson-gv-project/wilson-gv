@@ -86,7 +86,6 @@ class CalcDataStorage:
 
     def addResult(self, calc_data: CalculatedDataFromOutput):
         system, calc_setup = calc_data.system, calc_data.calc_setup
-        print(system)
         if hash((system, calc_setup)) in self.data:
             logger.warning('Data is already registered for:'+
                            f'\n  system: {system.name}'

@@ -59,7 +59,15 @@ storage.addResult(cd5)
 
 def test_mixed_sources_calc():
     """
-    
+    What should happen:
+
+    - wilsonsim is set up for getting result from mixed data calculations
+
+    - there would be several CalculationBatches
+    - molprops would have different sources (should keep that info with them somehow, point to a system,calcsetup hash?)
+    - vib states would also have another data source/calcsetup
+
+    should be possible to get info about sources of data
     """
 
     pass
