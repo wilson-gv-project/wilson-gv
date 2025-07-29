@@ -98,7 +98,7 @@ def test_VAS_anharm_context_regime_harm():
         vibana.doAnharmonicAnalysis(props=[], anharmonic_analyzer=mock_anhanalyser)
         pytest.fail('Should have raised an error without set attribute VibAnaSetup().regime')
     except ValueError as e:
-        assert 'Are you sure you know what you are doing?' in str(e), \
+        assert 'Anharmonic analysis requested but chosen vibrational regime is harmonic.' in str(e), \
             f"Unexpected error message: {e}"
         
 def test_VAS_anharm_analyzerfunc():
