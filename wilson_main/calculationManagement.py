@@ -13,7 +13,7 @@ eval_by_prop_name - be constructed using eval_uniform setup
 - 
 """
 # NOTE - is itself imported to .abstractions
-from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty
+from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty, VibAnaSetup
 import numpy as np
 from dataclasses import dataclass
 
@@ -28,20 +28,28 @@ class CalculatedDataFromOutput:
     Holds possible molecular properties data and VibAnaSetup data.
 
     Immutable (frozen=True)
+
+    tuple[np.ndarray, str, str] - data, basis, units
+    tuple[np.ndarray, None, str] - data, basis, units
+    tuple[np.ndarray, str] - data, units
+
+	# TODO units dictionary? basis? 
+    # TODO validation of consistent units/bases? should be part of WilsonSimulation pipeline
     """
-    hess: np.ndarray
-    cff: np.ndarray
-    qff: np.ndarray
-    dipgrad: np.ndarray
-    diphess: np.ndarray
-    polgrad: np.ndarray
-    polhess: np.ndarray
-    B: np.ndarray
-    coriolis: np.ndarray
-    nc_sqrt_eigval: np.ndarray
-    nc_eigvec: np.ndarray
-    system: MolecularSystem
-    calc_setup: ExternalCalcSetup
+    hess: tuple[np.ndarray, str, str] = None
+    cff: tuple[np.ndarray, str, str] = None
+    qff: tuple[np.ndarray, str, str] = None
+    dipgrad: tuple[np.ndarray, str, str] = None
+    diphess: tuple[np.ndarray, str, str] = None
+    polgrad: tuple[np.ndarray, str, str] = None
+    polhess: tuple[np.ndarray, str, str] = None
+    B: tuple[np.ndarray, None, str] = None
+    coriolis: tuple[np.ndarray, str, str] = None
+    anharmonic_states: dict = None
+    harmonic_states: dict = None
+    normal_modes: tuple[np.ndarray, str] = None
+    system: MolecularSystem = None
+    calc_setup: ExternalCalcSetup = None
 
     def h(self):
         return hash(self.system, self.calc_setup)
@@ -68,11 +76,11 @@ class CalcDataStorage:
     def getbyCalcSetup(self):
         pass
 
-    def getbySysCalc(self, syscalcTuple: tuple[MolecularSystem, ExternalCalcSetup]):
+    def getbySysCalc(self, system: MolecularSystem, calc_setup: ExternalCalcSetup):
         """
         returns None if key not in data dict
         """
-        return self.data.get(hash(*syscalcTuple))
+        return self.data.get(hash(system, calc_setup))
 
     def addResult(self, calc_data: CalculatedDataFromOutput, 
                   syscalcTuple: tuple[MolecularSystem, ExternalCalcSetup]):
@@ -87,85 +95,70 @@ class CalcDataStorage:
             self.data[hash(system, calc_setup)] = calc_data
 
 
-def getPropVals(system: MolecularSystem, 
+def getPropValsStorage(system: MolecularSystem, 
                 props_to_fill: list[MolecularProperty], 
                 eval_by_prop_name: dict, calcdatasets: CalcDataStorage):
     """
     For all props_to_fill add vals from their respective calc_setup for this system
 
     eval_by_prop_name: dict {trivial name: ExternalCalcSetup}
-    calcdatasets: dict {ExternalCalcSetup.h(): CalculatedDataFromOutput}
+    calcdatasets: dict {ExternalCalcSetup.h(): CalculatedDataFromOutput} - is like a valut?
+
+    maybe could be a pure function? should be?
     """
-    # for i in props_to_fill:
-    #     # if property belongs to this CalculationBatch
-    #     if i.calc_setup.h() == calc_batch.calc_setup.h():
-    #         i.addValues(getattr(calcData, i.trivial_name))
-
-    pass
-
-def getResultsToSimulation(calc_batch, 
-                           props_to_fill,
-                           vib_ana_setup_to_fill,
-                           sources: dict):
-    """
-    Based on CalculationBatch.getResults.
-    Fill in props input and vibanasetup; 
-    uses batch hash to connect property to the batch
-
-def getResults(self, 
-            props_to_fill: list[MolecularProperty],
-            vib_ana_setup_to_fill: VibAnaSetup=None, 
-            source_type: str='',
-            source_types: list[str]=[], 
-            source_loc: Any=None, 
-            datavault: Any = None):
-    
-    Example use:
-self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
-
-    """
-    calcData = sources.get('calcData')
-
-    #! i is an instance of MolecularProperty
     for i in props_to_fill:
-        # if property belongs to this CalculationBatch
-        if i.calc_setup.h() == calc_batch.calc_setup.h():
-            i.addValues(getattr(calcData, i.trivial_name))
+        calc_setup = eval_by_prop_name[i.trivial_name]
+        vals, basis, units = calcdatasets.getbySysCalc(system, calc_setup)
+        i.addValues(values=getattr(vals, i.trivial_name),
+                    in_basis=basis, in_units=units)
 
-    #! vib_ana_setup_to_fill is an instance of VibAnaSetup
-    if vib_ana_setup_to_fill is not None:
 
-        # Take harmonic vibrational analysis results
-        # FIXME? why not also for 'all'?
-        if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
+def getVibAnaValsStorage(system: MolecularSystem, 
+                vib_ana_setup_to_fill: VibAnaSetup, 
+                calcdatasets: CalcDataStorage):
+    """
+    For all props_to_fill add vals from their respective calc_setup for this system
 
-            # vib_ana_setup_to_fill.nc_sqrt_eigval = calcData.fundamentals_harmonic_int # todo: tests...
-            vib_ana_setup_to_fill.nc_sqrt_eigval = calcData.nc_sqrt_eigval # todo: tests...
+    eval_by_prop_name: dict {trivial name: ExternalCalcSetup}
+    calcdatasets: dict {ExternalCalcSetup.h(): CalculatedDataFromOutput} - is like a valut?
 
-            if not vib_ana_setup_to_fill.allow_skip_eigvec:
-                # FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
-                if calcData.normal_modes is None:
-                    raise AssertionError('Normal coordinates (eigenvectors) not found')
-                vib_ana_setup_to_fill.nc_eigvec = calcData.normal_modes
+    maybe could be a pure function? should be?
+    """
+    calc_setup = vib_ana_setup_to_fill.external_fill_from
+    calcData = calcdatasets.getbySysCalc(system, calc_setup)
 
-        # Take states
-        if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
+    # Take harmonic vibrational analysis results
+    # FIXME? why not also for 'all'?
+    if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
-            if vib_ana_setup_to_fill.regime not in ['harmonic']:
-                extracted_states = calcData.anharmonic_states
+        vib_ana_setup_to_fill.nc_sqrt_eigval = {k:v for k,v in calcData.harmonic_states.items() if len(k)==1}
 
-            else:
-                extracted_states = calcData.harmonic_states
+        if not vib_ana_setup_to_fill.allow_skip_eigvec:
+            # FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
+            if calcData.normal_modes is None:
+                raise AssertionError('Normal coordinates (eigenvectors) not found')
+            vib_ana_setup_to_fill.nc_eigvec = calcData.normal_modes
 
-            processed_states = []
+    # Take states
+    # TODO units
+	# FIXME vibana_prop_need? confusing name; need for what/whom? I get from context of VibAnaSetup init that "need" means "need to calculate with Wilson internally"
+    if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
 
-            # For now taking only "single harmonic oscillator state" states when getting from output file
-            # TODO: Add parsing capability for re-resolved states with possible admixtures
-            for i in extracted_states:
-                if len(i) <= vib_ana_setup_to_fill.max_state_lvl:
+        if vib_ana_setup_to_fill.regime not in ['harmonic']:
+            extracted_states = calcData.anharmonic_states
 
-                    # TODO: Exclusion based on mode index or freq cutoff
-                    # FIXME: Change to integer indexing
-                    processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
-            vib_ana_setup_to_fill.states = processed_states
+        else:
+            extracted_states = calcData.harmonic_states
+
+        processed_states = []
+
+        # For now taking only "single harmonic oscillator state" states when getting from output file
+        # TODO: Add parsing capability for re-resolved states with possible admixtures
+        for i in extracted_states:
+            if len(i) <= vib_ana_setup_to_fill.max_state_lvl:
+
+                # TODO: Exclusion based on mode index or freq cutoff - when should this happen? should define places for exclusion
+                # FIXME: Change to integer indexing - what does it mean?
+                processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
+        vib_ana_setup_to_fill.states = processed_states
 

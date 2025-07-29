@@ -373,6 +373,7 @@ class VibAnaSetup:
 	# 'all': Will need properties for both harmonic and anharmonic analysis
 	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
 	# 'none': All results will be provided by external program
+	# FIXME? confusing name, need for what/whom? I get from context here that "need" means "need to calculate with Wilson internally"
 	vibana_prop_need: str='all'
 
 	# externalCalcSetup instance
@@ -391,6 +392,7 @@ class VibAnaSetup:
 			if self.system is None:
 				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
 
+	# TODO units dictionary? basis? validation of consistent units/bases?
 
 	@property
 	def modes_indices(self):
