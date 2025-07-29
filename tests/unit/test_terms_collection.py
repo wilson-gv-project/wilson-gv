@@ -14,7 +14,7 @@ from wilson.utils.spectrum_utils import VibStatesDiff
 from tests.testing_utils import require_asserts
 
 
-from wilson.utils import debug
+from wilson_utils import printing as debug
 import CQCParse.debug as cqc_debug
 debug.level = 0
 cqc_debug.level = 0
