@@ -576,7 +576,7 @@ class VibAnaSetup:
 			if self.regime not in ['harmonic', "GVPT2", "VPT2"]:
 				raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
 			elif self.regime == 'harmonic':
-				raise ValueError('Are you sure you know what you are doing?')
+				raise ValueError('Anharmonic analysis requested but chosen vibrational regime is harmonic.')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
