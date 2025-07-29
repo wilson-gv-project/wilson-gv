@@ -7,7 +7,7 @@ PRINT_TARGET: TextIO = sys.stdout
 
 level = 0
 
-def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = None) -> None:
+def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = PRINT_TARGET) -> None:
     """
     Generalized styled print for internal use. Used in other print functions
     Is a private function.
@@ -37,21 +37,27 @@ def _styled_print(label: str, color: str, *msgs: Any, file: Optional[TextIO] = N
 
 
 def infoprint(*msgs: Any, file: Optional[TextIO] = None):
-    _styled_print("INFO", "93", *msgs, file=file)
+    _styled_print("INFO", "93", *msgs, file=file or PRINT_TARGET)
 
 def debugprint(*msgs: Any, file: Optional[TextIO] = None):
-    _styled_print("DEBUG", "92", *msgs, file=file)
+    _styled_print("DEBUG", "92", *msgs, file=file or PRINT_TARGET)
 
 def printtest(*msgs: Any, file: Optional[TextIO] = None):
-    _styled_print("TESTPRINT", "92", *msgs, file=file)
+    _styled_print("TESTPRINT", "92", *msgs, file=file or PRINT_TARGET)
 
 def debugfunc(msgs: str, tag: str = "") -> None:
+    """
+    always prints to sys.stdout. level >= 1
+    """
     if level >= 1:
-        _styled_print(f"DEBUG][{tag}", "95", msgs)
+        _styled_print(f"DEBUG][{tag}", "95", msgs, file=PRINT_TARGET)
 
 def debug_deep(msgs: str, tag: str = "") -> None:
+    """
+    always prints to sys.stdout. level >= 2
+    """
     if level >= 2:
-        _styled_print(f"DEBUG DEEP][{tag}", "95", msgs)
+        _styled_print(f"DEBUG DEEP][{tag}", "95", msgs, file=PRINT_TARGET)
 
 
 
@@ -64,15 +70,15 @@ def use_print_target(temp_target: TextIO):
     """
     global PRINT_TARGET
     prev_target = PRINT_TARGET
+    PRINT_TARGET = temp_target
     try:
-        PRINT_TARGET = temp_target
         yield
     finally:
         PRINT_TARGET = prev_target
-        temp_target.close()
+        # temp_target.close()
 
 
-def separatorprint(*title: Any, file: Optional[TextIO] = None):
+def separatorprint(*title: Any, file: Optional[TextIO] = PRINT_TARGET):
     """
     Marker of section, function...
     
