@@ -8,8 +8,9 @@ from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 from wilson_utils.abstractions import VibState
-from typing import Callable, Any
-import numpy as np
+
+import logging
+logger = logging.getLogger("wilson."+__name__)
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 @dataclass
@@ -44,8 +45,10 @@ class MolecularSystem:
 		if (self.geo is not None) and (self.geo_extra is not None):
 			raise AssertionError('Ambigious definition: Both default form geometry geo and extended form geometry geo_extra was defined')
 		if (self.geo is None) and (self.geo_extra is None):
-			print('Note: Molecular system was instantiated without geometry information')
-	
+			logger.info('Note: Molecular system was instantiated without geometry information')
+		if self.natoms is None and self.geo is None:
+			raise ValueError('Incomplete definition: Either the number of atoms (natoms) or the geometry (geo) of the MolecularSystem is required')
+
 	def h(self):
 		"""
 		Hashing function
@@ -276,6 +279,36 @@ class MolecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 
+def dressPropsWithSetup(props, eval_uniform: bool = True, eval_by_prop_name: Any = None):
+	"""
+	Dress my self.properties with computational setups according to how they are specified in
+	self.eval_uniform or self.eval_by_prop_name
+	"""
+
+	for i in props:
+
+		dressed = False
+
+		# See if property specifically mentioned and if so use that
+		if eval_by_prop_name is not None:
+
+			if i.trivial_name is not None:
+				if i.trivial_name in eval_by_prop_name:
+					i.addCalcSetup(eval_by_prop_name[i.trivial_name])
+					dressed=True
+
+			else:
+				logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
+
+		# Otherwise, use uniform eval argument
+		if eval_uniform is not None:
+
+			i.addCalcSetup(eval_uniform)
+			dressed = True
+
+		if not dressed:
+			raise AssertionError('Unable to determine calculation setup for property')
+
 class MolecularPropertyEncoder(json.JSONEncoder):
 	"""
 	Helper for JSON encoding of MolecularProperty
@@ -303,18 +336,19 @@ class VibAnaSetup:
     Class for setup for vibrational analysis and storage of the resulting information
 	
 	----
-	vib_regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
+	regime: string: Vibrational analysis regime (e.g. "harmonic", "GVPT2", "VPT2")
 	system: MolecularSystem instance: System to which this instance pertains
-	vib_regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
+	regime_subinfo: dictionary: Extra configuration info for vibrational regime (e.g. skip rotational effects)
 	max_state_lvl: integer: Maximum number of vibrational quanta per harmonic state involved in states
 	states: List of VibState instances: Specification of each vibrational state in scope
 	nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
 	nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
 	allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
-	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the
-	vibrational analysis? Choices: "all": I need properties for both harmonic and (if chosen) anharmonic analysis,
-	"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic
-	data], "none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
+	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the vibrational analysis? 
+		Choices: 
+			"all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+			"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic data], 
+			"none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
 	external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
 	exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
 	"""
@@ -340,14 +374,29 @@ class VibAnaSetup:
 	external_fill_from: ExternalCalcSetup=None
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-	exclude_modes: list=None
+	exclude_modes: list = None
 
 	def __post_init__(self):
 		if self.exclude_modes is None:
-			self.exclude_modes = []
-		
+			if self.system is not None:
+				self.exclude_modes = []
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+
+	@property
+	def modes_indices(self):
+		"""
+		Automatically set up based on number of modes in the system (3*N-5 or 3*N-6) and exclude_modes list, 
+			which is an empty list by default
+		Returns empty list if no system attribute
+		"""
+		if self.system is None:
+			raise AttributeError('VibAnaSetup().modes_indices attribute cannot be created without having set the VibAnaSetup().system attribute')
+
 		import numpy as np
-		self.modes_indices = [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
+		return [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
 	
 	@property
 	def serial_states(self):
@@ -446,6 +495,7 @@ class VibAnaSetup:
 
 		return needed_props
 
+
 	def setStates(self, states: list[VibState]):
 		"""
 		Set vibrational states
@@ -498,7 +548,7 @@ class VibAnaSetup:
 		"""
 
 		if self.regime is None:
-			print('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
+			logger.warning('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
@@ -522,12 +572,30 @@ class VibAnaSetup:
 
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+		else:
+			if self.regime not in ['harmonic', "GVPT2", "VPT2"]:
+				raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
+			elif self.regime == 'harmonic':
+				raise ValueError('Anharmonic analysis requested but chosen vibrational regime is harmonic.')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-		self.states = anharmonic_analyzer(self.system, props, self.regime, self.regime_subinfo,
-										  self.nc_sqrt_eigval, self.nc_eigvec)
+		from inspect import isfunction
+		if not isfunction(anharmonic_analyzer):
+			raise TypeError('anharmonic_analyzer should be a function')
+		
+		if self.nc_sqrt_eigval is None:
+			raise ValueError('nc_sqrt_eigval is None; need nc_sqrt_eigval for anharmonic_analyzer()')
+		# TODO props should have vals?
+		context = {'system': self.system, 'props': props, 
+			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
+					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
+					'exclude_modes': self.exclude_modes}
+		
+		logger.debug(repr(context))
+
+		self.states, self.diagn = anharmonic_analyzer(**context)
 
 
 @dataclass
@@ -623,7 +691,7 @@ class SpectralGrid:
 					# Underflow possible
 					n_pts[i] = int((self.end[i] - self.start[i])/self.spacer[i] + 1)
 					if not(self.end[i] == self.start[i] + self.spacer[i]*(n_pts[i] - 1)):
-						print('NOTE: Axis defined end', self.end[i], 'not precisely at spacer increment of start')
+						logger.warning(f'NOTE: Axis defined end {self.end[i]} not precisely at spacer increment of start')
 
 				else:
 
@@ -787,7 +855,7 @@ class CalculationBatch:
 		from CQCParse.relay import DataVault
 		vault = DataVault(source_loc)
 
-		print('system name', self.system.name)
+		logger.info(f'system name: {self.system.name}')
 
 		datadict = vault.make_DatainputDict(self.calc_setup.program, (self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), wilson_root)
 
@@ -799,9 +867,6 @@ class CalculationBatch:
 
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
-
-		print([i.trivial_name for i in props_to_fill])
-		print(dir(parser_obj))
 
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
@@ -823,7 +888,7 @@ class CalculationBatch:
 			# Take states
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
 
-				if not(vib_ana_setup_to_fill.regime in ['harmonic']):
+				if vib_ana_setup_to_fill.regime not in ['harmonic']:
 					extracted_states = parser_obj.anharmonic_states
 
 				else:
@@ -1106,7 +1171,7 @@ class WilsonSimulation:
 						dressed=True
 
 				else:
-					print('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
+					logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
 
 			# Otherwise, use uniform eval argument
 			if self.eval_uniform is not None:
@@ -1334,7 +1399,7 @@ class WilsonSimulation:
 		import json
 		with open(filename, "w") as f:
 			json.dump(self.to_dict(), f, indent=4)
-		print(f'saved to file {filename}')
+		logger.info(f'WilsonSimulation instance is saved to file {filename}')
 
 
 # simply copying old sketch for now

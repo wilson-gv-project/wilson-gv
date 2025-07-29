@@ -7,12 +7,18 @@ Skipped from abstraction.py: CollEvalSetup, WilsonSimulations, SpectralAxisAdvan
 
 Integration test is in wilson_suitetests/evv_tester_dataclasses.py (different from wilson_suitetests/evv_tester.py only by the import from different abstractions module)
 """
-import wilson_main.abstractions as wm_abst_dataclass
+import wilson_main.abstractions as wm_abst
 import numpy as np
+from wilson_utils.printing import printtest
+from wilson_utils.logger import setup_logger
+import pytest
+
+import logging
+setup_logger("wilson", level=logging.DEBUG)
 
 def test_MolecularSystem():
 
-    mol_system_datacls = wm_abst_dataclass.MolecularSystem(name='Mock_datacls', natoms=3)
+    mol_system_datacls = wm_abst.MolecularSystem(name='Mock_datacls', natoms=3)
     assert mol_system_datacls.geo is None
     mol_system_datacls.geo = np.array([[1., -0.3, 2.2], [-1.3, 0.0, -2.1], [0.0, 0.0, -0.1]])
 
@@ -24,9 +30,10 @@ def test_ExternalCalcSetup():
     pass
 
 def test_MolecularProperty():
+
     from wilson_utils.prop_trivname import prop_trivname
 
-    hess = wm_abst_dataclass.MolecularProperty(
+    hess = wm_abst.MolecularProperty(
 					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
 					trivial_name=prop_trivname(ord_geo=2),
 					target_basis='cart',
@@ -37,7 +44,7 @@ def test_MolecularProperty():
                               'trivial_name': 'hess', 'in_basis': None, 'in_units': None, 
                               'target_basis': 'cart', 'target_units': 'au', 'serial_vals': None}
 
-    rot_const = wm_abst_dataclass.MolecularProperty(
+    rot_const = wm_abst.MolecularProperty(
 						{'ops': tuple(['r']), 'freq': (0.0)},
 						trivial_name=prop_trivname(ord_rot=1),
 						target_basis='nm',
@@ -50,7 +57,7 @@ def test_MolecularProperty():
 
 
     pdict = {'ops': tuple(['g', 'f']), 'freq': tuple([0.0 * k for k in range(len(['g', 'f']))])}
-    dipgrad = wm_abst_dataclass.MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=1, ord_el=1),
+    dipgrad = wm_abst.MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=1, ord_el=1),
 													 target_basis='nm', target_units='au')
     assert dipgrad.serial_vals is None
     assert dipgrad.vals is None
@@ -70,7 +77,7 @@ def test_MolecularProperty():
                                    '(1, 0)': 0.42, '(1, 1)': 0.59, '(1, 2)': 0.98}
 
     # providing vals in init, serial_vals will be made from input vals    
-    dipgrad2 = wm_abst_dataclass.MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=1, ord_el=1),
+    dipgrad2 = wm_abst.MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=1, ord_el=1),
                                                     target_basis='nm', target_units='au', vals=dipgrad_vals)
     assert dipgrad2.serial_vals == {'(0, 0)': 0.67, '(0, 1)': 0.05, '(0, 2)': 0.11, 
                                     '(1, 0)': 0.42, '(1, 1)': 0.59, '(1, 2)': 0.98}
@@ -83,9 +90,6 @@ def test_MolecularPropertyEncoder():
     pass
 
 def test_VibState():
-    pass
-
-def test_VibAnaSetup():
     pass
 
 def test_SpectralAxis():
