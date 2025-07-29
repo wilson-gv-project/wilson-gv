@@ -49,6 +49,9 @@ class MolecularSystem:
 		if self.natoms is None and self.geo is None:
 			raise ValueError('Incomplete definition: Either the number of atoms (natoms) or the geometry (geo) of the MolecularSystem is required')
 
+	def __hash__(self):
+		return hash(self.name)
+
 	def h(self):
 		"""
 		Hashing function
@@ -108,6 +111,10 @@ class ExternalCalcSetup:
 
 			if self.other_setup_identifier is not None:
 				raise AssertionError('No other setup identifier string may be given if no other setup is given')
+
+	def __hash__(self):
+		# FIXME Only using other setup keys in hash for now, need to complete this for full hash consistency
+		return hash((self.program, self.lvl_theory, self.basis, tuple(self.other_setup.keys())))
 
 	def h(self) -> int:
 		"""
@@ -844,7 +851,8 @@ class CalculationBatch:
 							datavault: Any):
 							# source_loc: Any):
 		"""
-		Get results from data vault. See get_results declarations for argument explanations.
+		Get results from data vault. 
+		See get_results declarations for argument explanations.
 		"""
 
 		# FIXME: There might be ways to make this cleaner. Return to this after vault functionality (e.g. trivial names
