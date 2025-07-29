@@ -4,18 +4,20 @@ User cases:
 CalculatedData has all parts that are associated with a setup
 
 Notes:
-- a set of results is identified by hash(self.system, self.calc_setup)
+- a set of results is identified by hash((self.system, self.calc_setup))
 - a CalculationBatch requests data for a given calc_setup - relates to inputs and outputs
 - eval_by_prop_name is a dictionary {trivial name: ExternalCalcSetup}.
 For given property request a specific ExternalCalcSetup
 - eval_uniform - one ExternalCalcSetup for all - [a special case of eval_by_prop_name]
 eval_by_prop_name - be constructed using eval_uniform setup
-- 
+
+Goal:
+- construct a calculation using mixed sources of data
 """
 # NOTE - is itself imported to .abstractions
 from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty, VibAnaSetup
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -52,7 +54,7 @@ class CalculatedDataFromOutput:
     calc_setup: ExternalCalcSetup = None
 
     def h(self):
-        return hash(self.system, self.calc_setup)
+        return hash((self.system, self.calc_setup))
 
 @dataclass
 class CalcDataStorage:
@@ -62,13 +64,13 @@ class CalcDataStorage:
     systems: list [MolecularSystem, ...]
     setups: list [ExternalCalcSetup]
     data: dict {CalculatedDataFromOutput.h(): CalculatedDataFromOutput} ==
-               {hash(self.system, self.calc_setup): CalculatedDataFromOutput}
+               {hash((self.system, self.calc_setup)): CalculatedDataFromOutput}
 
     could also store/generate inputs for QC programs ID-ing this way
     """
-    systems: list
-    setups: list
-    data: dict
+    systems: list = field(default_factory=lambda: list())
+    setups: list = field(default_factory=lambda: list())
+    data: dict = field(default_factory=lambda: dict())
 
     def getbySystem(self):
         pass
@@ -80,19 +82,19 @@ class CalcDataStorage:
         """
         returns None if key not in data dict
         """
-        return self.data.get(hash(system, calc_setup))
+        return self.data.get(hash((system, calc_setup)))
 
-    def addResult(self, calc_data: CalculatedDataFromOutput, 
-                  syscalcTuple: tuple[MolecularSystem, ExternalCalcSetup]):
-        system, calc_setup = syscalcTuple
-        if hash(system, calc_setup) in self.data:
+    def addResult(self, calc_data: CalculatedDataFromOutput):
+        system, calc_setup = calc_data.system, calc_data.calc_setup
+        print(system)
+        if hash((system, calc_setup)) in self.data:
             logger.warning('Data is already registered for:'+
                            f'\n  system: {system.name}'
                            f'\n  level of theory: {calc_setup.lvl_theory}'
                            f'\n  basis set: {calc_setup.basis}'
                            f'\n  program: {calc_setup.program}')
         else:
-            self.data[hash(system, calc_setup)] = calc_data
+            self.data[hash((system, calc_setup))] = calc_data
 
 
 def getPropValsStorage(system: MolecularSystem, 
