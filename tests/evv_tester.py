@@ -20,9 +20,13 @@ import wilson_suite as ws
 from wilson_utils.serialization import pickle_this_to, unpickle_smth_from
 from wilson_utils.paths import SUITE_ROOT
 
-print('\nevv_tester_dataclasses.py')
+import logging
+# wilson. - for hierarchy of loggers
+logger = logging.getLogger("wilson.")
 
-TO_PICKLES = ['VibExperiment', 'ExternalCalcSetup', 'WilsonSimulation']
+logger.info('evv_tester_dataclasses.py')
+
+TO_PICKLES = []
 PKL_FILES = {}
 
 def run():
@@ -90,17 +94,16 @@ def run():
     sim.addSpecEvalSetup(eval_setup)
 
     sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
-    print('\nafter findPropsAndMaxStateLvl', sim.props, '\n')
+    logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
 
     sim.dressPropsWithSetup()
     sim.makeCalculationBatches()
     sim.getResultsFromCalculationBatches(source_type='vault',
                                         source_loc=ws.intensities.utils.get_package_root()
                                                     + '/../tests/test_database/mini_files_database.csv' )
-    print('\nafter getResultsFromCalculationBatches', sim.props, '\n')
+    logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
 
 
-    print('\n===========================================================================')
     import numpy as np
     np.set_printoptions(precision=4)
 
@@ -110,22 +113,21 @@ def run():
         sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/tests/')
         PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
 
-    print('  >>> Going to evaluate now...\n')
+    logger.info('  >>> Going to evaluate now...\n')
     sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator)
     intensities_spec = np.abs(sim.spec)**2
-    print(np.max(np.abs(sim.spec)**2))
+    logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 
-    print('\n===========================================================================')
-    print('\n  >>> And now rendering...\n')
+    logger.debug('\n=====================================================')
+    logger.info('\n  >>> And now rendering...\n')
 
     from wilson_analysis.render import render_spectrum
 
     hist, bin_edges = np.histogram(intensities_spec, bins=10)
-    print("Histogram counts:", hist)
-    print("Bin edges:", bin_edges)
-    print('\n')
+    logger.debug(f"Histogram counts: {hist}")
+    logger.debug(f"Bin edges: {bin_edges}\n")
 
-    print(f'np.max(intensities): {np.max(intensities_spec):.4e}')
+    logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
 
     dict_meshes = spec_grid.make_mesh_numpy()
     render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],

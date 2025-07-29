@@ -4,7 +4,7 @@ Turning scripts into pytests
 from wilson_utils.paths import SUITE_ROOT
 from wilson_utils.serialization import unpickle_smth_from
 import numpy as np
-
+from wilson_utils.printing import separatorprint
 
 def test_evv_tester_dataclasses():
     """
@@ -142,3 +142,31 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     assert vibanasetup_ref.nc_sqrt_eigval == wilsim3.vib_ana_setup.nc_sqrt_eigval
     assert vibanasetup_ref.nc_sqrt_eigval == load_wilsonsim_final.vib_ana_setup.nc_sqrt_eigval
+
+def test_logger_evv_tester_file():
+    import logging
+    from wilson_utils.logger import setup_logger
+    setup_logger("wilson", level=logging.DEBUG, log_to_file=SUITE_ROOT+'/tests/out.log')
+    
+    import evv_tester
+    evv_tester.run()
+
+    with open(SUITE_ROOT+"/tests/out.log", "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        lines = [i for i in lines if i!='']
+    
+    info_line = [line for line in lines if "INFO" in line and "evv_tester_dataclasses.py" in line]
+    assert info_line, "No INFO log line with evv_tester_dataclasses.py found"
+
+    debug_line = [line for line in lines if "DEBUG" in line and "np.max(intensities): 4.2029e+11" in line]
+    assert debug_line is not None, "DEBUG log with np.max(intensities) line not found"
+
+def test_logger_evv_tester_terminal():
+    separatorprint()
+    import logging
+    from wilson_utils.logger import setup_logger
+    setup_logger("wilson", level=logging.DEBUG)
+    
+    import evv_tester
+    evv_tester.run()
+
