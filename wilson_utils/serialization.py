@@ -3,6 +3,9 @@ from dataclasses import is_dataclass, asdict
 import numpy as np
 import pickle
 
+import logging
+logger = logging.getLogger("wilson."+__name__)
+
 def find_non_json_safe(obj, path=""):
     """
     Recursively find non-JSON-serializable elements in an object.
@@ -13,24 +16,24 @@ def find_non_json_safe(obj, path=""):
         for key, value in obj.items():
             key_path = f"{path}[{repr(key)}]"
             if isinstance(key, (tuple, list, set)):  # JSON keys must be str, int, float, bool, or None
-                print(f"❌ Non-JSON-safe key at {key_path}: {key}")
+                logger.warning(f"❌ Non-JSON-safe key at {key_path}: {key}")
             find_non_json_safe(value, key_path)
     elif isinstance(obj, list):
         for index, item in enumerate(obj):
             find_non_json_safe(item, f"{path}[{index}]")
     elif isinstance(obj, tuple):
-        print(f"❌ Non-JSON-safe value (tuple) at {path}: {obj}")
+        logger.warning(f"❌ Non-JSON-safe value (tuple) at {path}: {obj}")
         for index, item in enumerate(obj):
             find_non_json_safe(item, f"{path}[{index}]")
     elif isinstance(obj, set):
-        print(f"❌ Non-JSON-safe value (set) at {path}: {obj}")
+        logger.warning(f"❌ Non-JSON-safe value (set) at {path}: {obj}")
         for item in obj:
             find_non_json_safe(item, f"{path}[set_item]")
     else:
         try:
             json.dumps(obj)  # Attempt to serialize the object
         except TypeError:
-            print(f"❌ Non-JSON-safe value at {path}: {obj}")
+            logger.warning(f"❌ Non-JSON-safe value at {path}: {obj}")
 
 def check_if_jsonsafe(obj):
     """
@@ -51,15 +54,15 @@ def check_if_jsonsafe(obj):
             dict_obj = obj
 
         json.dumps(dict_obj)
-        print("✅ JSON-safe")
+        logger.info("✅ JSON-safe")
         return True
     except TypeError as e:
-        print("🔍 Offending object:", dict_obj)
-        print("❌ Not JSON-safe:", e)
+        logger.warning(f"🔍 Offending object: {dict_obj}")
+        logger.error(f"❌ Not JSON-safe: {e}")
         # for more infor here can do: find_non_json_safe(dict_obj)
         return False
     except Exception as e:
-        print("⚠️ Other error:", e)
+        logger.error(f"⚠️ Other error: {e}")
         return False
 
 

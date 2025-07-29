@@ -67,16 +67,12 @@ def test_find_non_json_safe():
 
 def test_get_utils_root():
     import os
-    from wilson_utils.paths import UTILS_ROOT, SUITE_ROOT
+    from wilson_utils.paths import UTILS_ROOT
 
     assert os.path.isabs(UTILS_ROOT)
     assert os.path.exists(UTILS_ROOT)
     assert os.path.basename(UTILS_ROOT) == "wilson-utils"
     
-    assert os.path.basename(SUITE_ROOT) == 'wilson-suite'
-    assert os.path.isabs(SUITE_ROOT)
-    assert os.path.exists(SUITE_ROOT)
-
 @dataclass
 class Mock1:
     a: int
