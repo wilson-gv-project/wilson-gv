@@ -71,7 +71,7 @@ def test_get_utils_root():
 
     assert os.path.isabs(UTILS_ROOT)
     assert os.path.exists(UTILS_ROOT)
-    assert os.path.basename(UTILS_ROOT) == "wilson_utils"
+    assert os.path.basename(UTILS_ROOT) == "wilson-utils"
     
     assert os.path.basename(SUITE_ROOT) == 'wilson-suite'
     assert os.path.isabs(SUITE_ROOT)
