@@ -9,9 +9,7 @@ Integration test is in wilson_suitetests/evv_tester_dataclasses.py (different fr
 """
 import wilson_main.abstractions as wm_abst
 import numpy as np
-from wilson_utils.printing import printtest
 from wilson_utils.logger import setup_logger
-import pytest
 
 import logging
 setup_logger("wilson", level=logging.DEBUG)
