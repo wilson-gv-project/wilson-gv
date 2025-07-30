@@ -98,9 +98,15 @@ def run():
 
     sim.dressPropsWithSetup()
     sim.makeCalculationBatches()
+    
+    # vault setup outside of wilsonsim
+    from CQCParse.relay import DataVault
+    source_loc=ws.intensities.utils.get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+    vault = DataVault(source_loc)
+
     sim.getResultsFromCalculationBatches(source_type='vault',
-                                        source_loc=ws.intensities.utils.get_package_root()
-                                                    + '/../tests/test_database/mini_files_database.csv' )
+                                         source_loc=source_loc,
+                                         datavault=vault)
     logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
 
 

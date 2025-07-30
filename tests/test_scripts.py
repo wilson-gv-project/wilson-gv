@@ -170,3 +170,16 @@ def test_logger_evv_tester_terminal():
     import evv_tester
     evv_tester.run()
 
+
+def test_logger_evv_mixed_terminal():
+    """
+    A script with mixed calculation data sources. 
+    See evv_test_mixedCalcData.py
+    """
+    separatorprint()
+    import logging
+    from wilson_utils.logger import setup_logger
+    setup_logger("wilson", level=logging.DEBUG)
+    
+    import evv_test_mixedCalcData
+    evv_test_mixedCalcData.run()
