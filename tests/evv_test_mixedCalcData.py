@@ -183,3 +183,6 @@ def run():
 
     logger.debug(needed_props[0].vals)
     logger.debug(needed_props[0].serial_vals)
+
+    # maybe get info/hints of what one can do from this point? or any other point - the workflow is fairly complex
+    # TODO hints for notebook use
