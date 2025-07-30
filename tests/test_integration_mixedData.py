@@ -97,7 +97,7 @@ np5b3 = np.array([[0.29, 0.23, 0.52],
 
 datadict1 = {'system': mol1, 'calc_setup': setup1, 
              'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
-             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3, 'bu', 'cm-1'), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
              'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
              'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
              'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
@@ -109,14 +109,15 @@ datadict2 = {'system': mol2, 'calc_setup': setup2,
              'harmonic_states': {}, 'anharmonic_states': {}}
 
 datadict3 = {'system': mol1, 'calc_setup': setup2, 
-             'B': None, 'coriolis': None,
+             'B': None, 'coriolis': (np3b3, 'bu', 'cm-1'),
              'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
+             'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
+             'polgrad': None, 'polhess': None,
              'harmonic_states': {}, 'anharmonic_states': {}}
 
 datadict4 = {'system': mol1, 'calc_setup': setup3, 
              'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
-             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3, 'bu', 'cm-1'), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
              'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
              'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
              'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
@@ -156,9 +157,6 @@ terms = evv_terms()
 
 needed_props, vibanasetup = manage.findPropsAndMaxStateLvlNeeded(terms, vibanasetup, freqs='static')
 
-# add data to vibanasetup from vibanasetup.external_fill_from fromstorage
-manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
-
 g = manage.groupDataForCalcSetups(vibanasetup=vibanasetup, calc_props_setup=eval_prop_specify, props_needed=needed_props)
 
 logger.debug('grouped calc setups:')
@@ -166,58 +164,29 @@ logger.debug(g)
 
 calcbatches = manage.makeBatchesFromGroups(mol1, g)
 
+# with this empty (no vals) batches can make input files
 logger.debug('calcbatches:')
 logger.debug(calcbatches)
 
 # Get results from calculation batches
 # register vib_ana_setup_to_fill.states
-manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
+manage.getVibAnaValsFromStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
 
 logger.debug('vibanasetup')
 logger.debug(vibanasetup)
 
 # register props_to_fill values
-manage.getPropValsStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
+manage.getPropValsFromStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
 
 logger.debug('needed_props')
 logger.debug(needed_props)
 
-# sim.calc_batches
-# {-7513024324685850344: 
-# [CalculationBatch(system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
-#                   calc_setup=ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={}), 
-#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad', 
-#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess', 
-#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                                                     MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad', 
-#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess', 
-#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff', 
-#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)])}
+logger.debug(needed_props[0].vals)
+logger.debug(needed_props[0].serial_vals)
 
-# calcbatches:
-# [CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
-#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl1', basis='b1', other_setup={}, other_setup_identifier={}), 
-#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, 
-#                                                 trivial_name='cff', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)},
-#                                                 trivial_name='qff', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                               MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), None]), 
-#  CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
-#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl2', basis='b2', other_setup={}, other_setup_identifier={}), 
-#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 
-#                                                 trivial_name='dipgrad', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None),
-#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, 
-#                                                 trivial_name='diphess', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
-#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)]),
-#  CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
-#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl2', basis='b3', other_setup={}, other_setup_identifier={}), 
-#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, 
-#                                                 trivial_name='polgrad', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None),
-#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 
-#                                                 trivial_name='polhess', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)])]
+# batches now have vals in the nested props and vibanasetup
+logger.debug('calcbatches:')
+logger.debug(calcbatches)
 
 
 def test_mixed_sources_calc():
@@ -230,7 +199,7 @@ def test_mixed_sources_calc():
     - molprops would have different sources (should keep that info with them somehow, point to a system,calcsetup hash?)
     - vib states would also have another data source/calcsetup
 
-    should be possible to get info about sources of data
+    should be possible to get info about sources of data - from calc batches, all info is there
     """
 
     pass

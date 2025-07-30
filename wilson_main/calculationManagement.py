@@ -14,7 +14,7 @@ eval_by_prop_name - be constructed using eval_uniform setup
 Goal:
 - construct a calculation using mixed sources of data
 """
-# NOTE - is itself imported to .abstractions
+# NOTE - VibState is itself imported to .abstractions
 from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty, VibAnaSetup, CalculationBatch
 import numpy as np
 from dataclasses import dataclass, field
@@ -128,7 +128,7 @@ class AttributeIndex:
         return self._indexes[attr].get(value)
 
 
-def getPropValsStorage(system: MolecularSystem, 
+def getPropValsFromStorage(system: MolecularSystem, 
                 props_to_fill: list[MolecularProperty], 
                 eval_by_prop_name: dict, calcdatasets: CalcDataStorage):
     """
@@ -147,11 +147,16 @@ def getPropValsStorage(system: MolecularSystem,
         try:
             vals, basis, units = getattr(entry, i.trivial_name)
             i.addValues(values=vals, in_basis=basis, in_units=units)
-        except TypeError as e:
+            
+            # fills in serial_vals attribute; doesn't have to be done here
+            i.make_serial_vals()
+
+        # when entry is None
+        except TypeError:
             logger.info(f' --> Attention! Did not find results for: {i.trivial_name}; with calc_setup: {calc_setup}')
 
 
-def getVibAnaValsStorage(system: MolecularSystem, vib_ana_setup_to_fill: VibAnaSetup, calcdatasets: CalcDataStorage):
+def getVibAnaValsFromStorage(system: MolecularSystem, vib_ana_setup_to_fill: VibAnaSetup, calcdatasets: CalcDataStorage):
     """
     vib_ana_setup_to_fill
 
@@ -237,7 +242,7 @@ def makeBatchesFromGroups(system, grouped_calcs):
     return [CalculationBatch(system=system, calc_setup=calc_setup, properties=grouped_calcs[calc_setup]) for calc_setup in grouped_calcs]
 
 
-def findPropsAndMaxStateLvlNeeded(terms, vib_ana_setup, freqs: str='static'):
+def findPropsAndMaxStateLvlNeeded(terms, vib_ana_setup: VibAnaSetup, freqs: str='static') -> tuple[list[MolecularProperty], VibAnaSetup]:
     """
     copy of WilsonSimulation.findPropsAndMaxStateLvl
 
