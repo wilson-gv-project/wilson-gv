@@ -95,10 +95,9 @@ def run():
                     [0.21, 0.79, 0.21],
                     [0.66, 0.93, 0.71]])
 
-
     datadict1 = {'system': mol1, 'calc_setup': setup1, 
                 'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
-                'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+                'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3, 'bu', 'cm-1'), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
                 'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
                 'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
                 'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
@@ -112,12 +111,13 @@ def run():
     datadict3 = {'system': mol1, 'calc_setup': setup2, 
                 'B': None, 'coriolis': None,
                 'hess': None, 'cff': None, 'qff': None, 
-                'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
+                'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
+                'polgrad': None, 'polhess': None,
                 'harmonic_states': {}, 'anharmonic_states': {}}
 
     datadict4 = {'system': mol1, 'calc_setup': setup3, 
                 'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
-                'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+                'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3, 'bu', 'cm-1'), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
                 'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
                 'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
                 'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
@@ -127,6 +127,7 @@ def run():
                 'hess': None, 'cff': None, 'qff': None, 
                 'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
                 'harmonic_states': {}, 'anharmonic_states': {}}
+
 
     # NOTE manage.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
     # NOTE manage.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
@@ -157,9 +158,6 @@ def run():
 
     needed_props, vibanasetup = manage.findPropsAndMaxStateLvlNeeded(terms, vibanasetup, freqs='static')
 
-    # add data to vibanasetup from vibanasetup.external_fill_from fromstorage
-    manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
-
     g = manage.groupDataForCalcSetups(vibanasetup=vibanasetup, calc_props_setup=eval_prop_specify, props_needed=needed_props)
 
     logger.debug('grouped calc setups:')
@@ -172,13 +170,16 @@ def run():
 
     # Get results from calculation batches
     # register vib_ana_setup_to_fill.states
-    manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
+    manage.getVibAnaValsFromStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
 
     logger.debug('vibanasetup')
     logger.debug(vibanasetup)
 
     # register props_to_fill values
-    manage.getPropValsStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
+    manage.getPropValsFromStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
 
     logger.debug('needed_props')
     logger.debug(needed_props)
+
+    logger.debug(needed_props[0].vals)
+    logger.debug(needed_props[0].serial_vals)
