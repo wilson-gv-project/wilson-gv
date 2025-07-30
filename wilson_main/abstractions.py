@@ -848,11 +848,15 @@ class CalculationBatch:
 		"""
 
 		# Currently only vault retrieval
-		if not source_type == 'vault':
-			raise NotImplementedError('Only vault retrieval currently implemented')
+		if source_type == 'vault':
+			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault)
+		
+		elif source_type == 'outfiles':
+			self.getResultsFromOutputs()
+			raise NotImplementedError('Results from program output file(s) not yet implemented')
 
 		else:
-			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault)
+			raise NotImplementedError(f'Data retrieval for this source_type [{source_type}] is not implemented')
 
 	def getResultsFromOutputs(self):
 		"""
