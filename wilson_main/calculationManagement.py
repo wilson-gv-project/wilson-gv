@@ -15,9 +15,12 @@ Goal:
 - construct a calculation using mixed sources of data
 """
 # NOTE - is itself imported to .abstractions
-from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty, VibAnaSetup
+from .abstractions import VibState, MolecularSystem, ExternalCalcSetup, MolecularProperty, VibAnaSetup, CalculationBatch
 import numpy as np
 from dataclasses import dataclass, field
+import copy
+
+from wilson_utils.prop_trivname import prop_trivname
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -96,6 +99,35 @@ class CalcDataStorage:
             self.data[hash((system, calc_setup))] = calc_data
 
 
+class AttributeIndex:
+    """
+    Sets up a retrieval by attribute from a list of custom class instances
+
+    objects: list of class instances
+
+    Example:
+    index_molecules = AttributeIndex(molecules)
+
+    index_molecules.get_by("name", "Methane")    #  MolecularSystem(...)
+    index_molecules.get_by("natoms", 4)          #  MolecularSystem(...)
+    
+    [here seems unnecessary, but generally allows to retrieve by different attributes]
+    """
+    def __init__(self, objects: list):
+        self.objects = objects
+        self._indexes = {}
+
+    def get_by(self, attr, value):
+        """
+        retrieve an instance by value of an attribute
+
+        attr is an atribute of the class of objects
+        """
+        if attr not in self._indexes:
+            self._indexes[attr] = {getattr(obj, attr): obj for obj in self.objects}
+        return self._indexes[attr].get(value)
+
+
 def getPropValsStorage(system: MolecularSystem, 
                 props_to_fill: list[MolecularProperty], 
                 eval_by_prop_name: dict, calcdatasets: CalcDataStorage):
@@ -109,19 +141,19 @@ def getPropValsStorage(system: MolecularSystem,
     """
     for i in props_to_fill:
         calc_setup = eval_by_prop_name[i.trivial_name]
-        vals, basis, units = calcdatasets.getbySysCalc(system, calc_setup)
-        i.addValues(values=getattr(vals, i.trivial_name),
-                    in_basis=basis, in_units=units)
+        entry = calcdatasets.getbySysCalc(system, calc_setup)
+        if entry is None:
+            raise ValueError(f"No data found for system={system.name}, calc_setup={calc_setup}")
+        try:
+            vals, basis, units = getattr(entry, i.trivial_name)
+            i.addValues(values=vals, in_basis=basis, in_units=units)
+        except TypeError as e:
+            logger.info(f' --> Attention! Did not find results for: {i.trivial_name}; with calc_setup: {calc_setup}')
 
 
-def getVibAnaValsStorage(system: MolecularSystem, 
-                vib_ana_setup_to_fill: VibAnaSetup, 
-                calcdatasets: CalcDataStorage):
+def getVibAnaValsStorage(system: MolecularSystem, vib_ana_setup_to_fill: VibAnaSetup, calcdatasets: CalcDataStorage):
     """
-    For all props_to_fill add vals from their respective calc_setup for this system
-
-    eval_by_prop_name: dict {trivial name: ExternalCalcSetup}
-    calcdatasets: dict {ExternalCalcSetup.h(): CalculatedDataFromOutput} - is like a valut?
+    vib_ana_setup_to_fill
 
     maybe could be a pure function? should be?
     """
@@ -163,3 +195,118 @@ def getVibAnaValsStorage(system: MolecularSystem,
                 processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
         vib_ana_setup_to_fill.states = processed_states
 
+def groupDataForCalcSetups(vibanasetup, calc_props_setup, props_needed: list[MolecularProperty]):
+    """
+    Similar to WilsonSimulation.makeCalculationBatches()
+
+    Collect all comp setups from settings and group into batches.
+    Expected calc setups are in vibanasetup and eval_by_prop_name or eval_uniform (?) 
+    FIXME? [could generalize and do only eval_by_prop_name?]
+    """
+    collected = copy.deepcopy(calc_props_setup)
+    
+    if vibanasetup.external_fill_from is not None:
+        collected['vibana'] = vibanasetup.external_fill_from
+    
+    missing_props = [i.trivial_name for i in props_needed if i.trivial_name not in calc_props_setup]
+    
+    if missing_props:
+        raise ValueError(f"Some properties do not have a calculation setup associated with them: {missing_props}")
+    
+    # index of props_needed = list[MolecularProperty]
+    index_props_needed = AttributeIndex(props_needed)
+    
+    grouped_names = {}
+    for p in collected:
+        if collected[p] not in grouped_names:
+            grouped_names[collected[p]] = []
+        grouped_names[collected[p]].append(p)
+    
+    logger.debug('grouped_names')
+    logger.debug(grouped_names)
+
+    grouped = {}
+    for p in grouped_names:
+        grouped[p] = [index_props_needed.get_by('trivial_name', i) for i in grouped_names[p]]
+
+    return grouped
+
+
+def makeBatchesFromGroups(system, grouped_calcs):
+
+    return [CalculationBatch(system=system, calc_setup=calc_setup, properties=grouped_calcs[calc_setup]) for calc_setup in grouped_calcs]
+
+
+def findPropsAndMaxStateLvlNeeded(terms, vib_ana_setup, freqs: str='static'):
+    """
+    copy of WilsonSimulation.findPropsAndMaxStateLvl
+
+    Make property instances needed to fulfill tasks and set maximum state level in vibrational analysis
+
+    freqs: String: For terms involving properties that may be frequency dependent, use
+    experiment information ('exp') or use the static ('static') properties?
+    """
+
+    props = []
+
+    if terms is None:
+        raise AssertionError('There must be terms present to determine needed properties')
+    if vib_ana_setup is None:
+        raise AssertionError('There must be a vibrational analysis setup present to')
+
+    # FIXME: Consider checking if terms are VibPerturbedTerm instances
+    for i in terms:
+
+        for a in terms[i]:
+            for t in terms[i][a]:
+                for j in t.props:
+
+                    ops = []
+
+                    m = j.dord
+                    for k in range(m):
+                        ops.append('g')
+
+                    n = len(j.ops)
+
+                    for k in range(n):
+                        ops.append('f')
+
+                    if freqs == 'static':
+                        pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
+
+                    else:
+                        raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
+
+                    new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
+                                                    target_basis='nm', target_units='au')
+
+                    if new_prop.h(1) not in [k.h(1) for k in props]:
+                        props.append(copy.deepcopy(new_prop))
+
+                # Currently registering these states without regard to whether harmonic or other regime
+                # TODO: Find out if this should be changed
+
+                max_state_lvl = 0
+
+                for j in t.freqterms:
+
+                    if len(j.sl.q) > max_state_lvl:
+                        max_state_lvl = len(j.sl.q)
+                    if len(j.sr.q) > max_state_lvl:
+                        max_state_lvl = len(j.sr.q)
+
+                for j in t.res:
+
+                    if len(j.diff.sl.q) > max_state_lvl:
+                        max_state_lvl = len(j.diff.sl.q)
+                    if len(j.diff.sr.q) > max_state_lvl:
+                        max_state_lvl = len(j.diff.sr.q)
+
+                vib_ana_setup.max_state_lvl = max_state_lvl
+
+    for i in vib_ana_setup.tellNeededProps():
+        if i.h(1) not in [k.h(1) for k in props]:
+            props.append(copy.deepcopy(i))
+    
+    return props, vib_ana_setup

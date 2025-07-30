@@ -1,15 +1,31 @@
 """
 Goal:
 - construct a calculation using mixed sources of data
+
+[x] making calc batches
+[ ] making inputs
+[ ] putting results to Storage ?
+[ ] getting data for batches
 """
-import wilson_main.abstractions as wm_abst
-from wilson_utils.printing import printtest
+import numpy as np
 from wilson_utils.logger import setup_logger
+import wilson_main.abstractions as wm_abst
 
 import wilson_main.calculationManagement as manage
 
+import sys
+import os
+# to get wilson_fixtures import working
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+from wilson_fixtures.fixtures import evv_terms
+
 import logging
+logger = logging.getLogger("wilson."+__name__)
 setup_logger("wilson", level=logging.DEBUG)
+
+logger.info('wm_abst.namelogger')
+logger.info(wm_abst.namelogger)
+
 
 storage = manage.CalcDataStorage()
 
@@ -21,25 +37,95 @@ setup2 = wm_abst.ExternalCalcSetup('p1', 'lvl2', 'b2')
 setup3 = wm_abst.ExternalCalcSetup('p1', 'lvl2', 'b3')
 setup4 = wm_abst.ExternalCalcSetup('p2', 'lvl3', 'b2')
 
+np3b3 = np.array([[0.48, 0.53, 0.52],
+                  [0.42, 0.81, 0.47],
+                  [0.23, 0.66, 0.8 ]])
+np1b3 = np.array([[0.81, 0.51, 0.3 ]])
+np3b3b3 = np.array([[[0.21, 0.44, 0.16],
+                     [0.96, 0.98, 0.43],
+                     [0.69, 0.5 , 0.05]],
+
+                    [[0.21, 0.68, 0.11],
+                     [0.55, 0.22, 0.61],
+                     [0.34, 0.11, 0.32]],
+                    
+                    [[0.2 , 0.63, 0.52],
+                     [0.95, 0.49, 0.22],
+                     [0.17, 0.84, 0.27]]])
+np3b3b3b3 = np.array([[[[0.93, 0.84, 0.13],
+                        [0.96, 0.52, 0.5 ],
+                        [0.38, 0.71, 0.16]],
+
+                        [[0.38, 0.35, 0.03],
+                        [0.49, 0.54, 0.47],
+                        [0.56, 0.95, 0.25]],
+
+                        [[0.47, 0.81, 0.13],
+                        [0.12, 0.6 , 0.97],
+                        [0.55, 0.15, 0.05]]],
+
+                    [[[0.89, 0.13, 0.08],
+                        [0.48, 0.45, 0.14],
+                        [0.33, 0.15, 0.78]],
+
+                        [[0.38, 0.6 , 0.82],
+                        [0.36, 0.64, 0.58],
+                        [0.83, 0.52, 0.05]],
+
+                        [[0.14, 0.89, 0.69],
+                        [0.88, 0.95, 0.64],
+                        [0.21, 0.14, 0.4 ]]],
+
+                    [[[0.03, 0.59, 0.85],
+                        [0.82, 0.2 , 0.09],
+                        [0.14, 0.37, 0.36]],
+
+                        [[0.23, 0.25, 0.  ],
+                        [0.43, 0.9 , 0.47],
+                        [0.47, 0.37, 0.35]],
+
+                        [[0.3 , 0.8 , 0.54],
+                        [0.18, 0.08, 0.38],
+                        [0.57, 0.22, 0.06]]]])
+
+np5b3 = np.array([[0.29, 0.23, 0.52],
+                  [0.42, 0.15, 0.23],
+                  [0.33, 0.26, 0.04],
+                  [0.21, 0.79, 0.21],
+                  [0.66, 0.93, 0.71]])
+
+
 datadict1 = {'system': mol1, 'calc_setup': setup1, 
-             'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None}
+             'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
+             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+             'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
+             'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
+             'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
 
 datadict2 = {'system': mol2, 'calc_setup': setup2, 
+             'B': None, 'coriolis': None,
              'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None}
+             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
+             'harmonic_states': {}, 'anharmonic_states': {}}
 
-datadict3 = {'system': mol1, 'calc_setup': setup3, 
+datadict3 = {'system': mol1, 'calc_setup': setup2, 
+             'B': None, 'coriolis': None,
              'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None}
+             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
+             'harmonic_states': {}, 'anharmonic_states': {}}
 
-datadict4 = {'system': mol2, 'calc_setup': setup3, 
-             'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None}
+datadict4 = {'system': mol1, 'calc_setup': setup3, 
+             'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
+             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
+             'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
+             'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
+             'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
 
 datadict5 = {'system': mol2, 'calc_setup': setup4, 
+             'B': None, 'coriolis': None,
              'hess': None, 'cff': None, 'qff': None, 
-             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None}
+             'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
+             'harmonic_states': {}, 'anharmonic_states': {}}
 
 # NOTE manage.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
 # NOTE manage.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
@@ -55,6 +141,83 @@ storage.addResult(cd2)
 storage.addResult(cd3)
 storage.addResult(cd4)
 storage.addResult(cd5)
+
+# QC calculations/vibana parameters
+vibanasetup = wm_abst.VibAnaSetup(system=mol1, regime='GVPT2', 
+                                  vibana_prop_need='anharm', # very confusing name for understanding what is going on....
+                                  allow_skip_eigvec=True, external_fill_from=setup1)
+
+eval_prop_specify = {'cff': setup1, 'qff': setup1, 
+                     'dipgrad': setup2, 'diphess': setup2, 
+                     'polgrad': setup3, 'polhess': setup3,
+                     'B': setup1, 'coriolis': setup2}
+
+terms = evv_terms()
+
+needed_props, vibanasetup = manage.findPropsAndMaxStateLvlNeeded(terms, vibanasetup, freqs='static')
+
+# add data to vibanasetup from vibanasetup.external_fill_from fromstorage
+manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
+
+g = manage.groupDataForCalcSetups(vibanasetup=vibanasetup, calc_props_setup=eval_prop_specify, props_needed=needed_props)
+
+logger.debug('grouped calc setups:')
+logger.debug(g)
+
+calcbatches = manage.makeBatchesFromGroups(mol1, g)
+
+logger.debug('calcbatches:')
+logger.debug(calcbatches)
+
+# Get results from calculation batches
+# register vib_ana_setup_to_fill.states
+manage.getVibAnaValsStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
+
+logger.debug('vibanasetup')
+logger.debug(vibanasetup)
+
+# register props_to_fill values
+manage.getPropValsStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
+
+logger.debug('needed_props')
+logger.debug(needed_props)
+
+# sim.calc_batches
+# {-7513024324685850344: 
+# [CalculationBatch(system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
+#                   calc_setup=ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={}), 
+#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad', 
+#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess', 
+#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                                                     MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad', 
+#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess', 
+#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                                                     MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff', 
+#                                                                       in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)])}
+
+# calcbatches:
+# [CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
+#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl1', basis='b1', other_setup={}, other_setup_identifier={}), 
+#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, 
+#                                                 trivial_name='cff', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)},
+#                                                 trivial_name='qff', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                               MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), None]), 
+#  CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
+#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl2', basis='b2', other_setup={}, other_setup_identifier={}), 
+#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, 
+#                                                 trivial_name='dipgrad', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None),
+#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, 
+#                                                 trivial_name='diphess', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None), 
+#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)]),
+#  CalculationBatch(system=MolecularSystem(name='mol1', natoms=3, geo=None, geo_extra=None, linear=False), 
+#                   calc_setup=ExternalCalcSetup(program='p1', lvl_theory='lvl2', basis='b3', other_setup={}, other_setup_identifier={}), 
+#                   properties=[MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, 
+#                                                 trivial_name='polgrad', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None),
+#                               MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, 
+#                                                 trivial_name='polhess', in_basis=None, in_units=None, target_basis='nm', target_units='au', serial_vals=None)])]
 
 
 def test_mixed_sources_calc():

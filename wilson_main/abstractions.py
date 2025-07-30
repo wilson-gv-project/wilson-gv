@@ -11,6 +11,9 @@ from wilson_utils.abstractions import VibState
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
+# wilson.wilson_main.abstractions
+namelogger = f'"wilson."+__name__: {"wilson."+__name__}'
+logger.info(namelogger)
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
 @dataclass
@@ -48,6 +51,9 @@ class MolecularSystem:
 			logger.info('Note: Molecular system was instantiated without geometry information')
 		if self.natoms is None and self.geo is None:
 			raise ValueError('Incomplete definition: Either the number of atoms (natoms) or the geometry (geo) of the MolecularSystem is required')
+		
+		if self.natoms < 3:
+			self.linear = True
 
 	def __hash__(self):
 		return hash(self.name)
@@ -73,8 +79,8 @@ class MolecularSystem:
 
 
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
-# Does not need to reference an actual setup and can also be used for "get from no specific calculation"
-@dataclass
+# Does not need to reference an actual setup and can also be used for "get from no specific calculation" - VL: what does it mean?
+@dataclass(frozen=True)
 class ExternalCalcSetup:
 	"""
 	Class to represent computational setups for properties obtained external to Wilson
@@ -115,6 +121,17 @@ class ExternalCalcSetup:
 	def __hash__(self):
 		# FIXME Only using other setup keys in hash for now, need to complete this for full hash consistency
 		return hash((self.program, self.lvl_theory, self.basis, tuple(self.other_setup.keys())))
+
+	def __eq__(self, other):
+		if not isinstance(other, ExternalCalcSetup):
+			return False
+		
+		return (
+            self.program == other.program and
+            self.lvl_theory == other.lvl_theory and
+            self.basis == other.basis and
+            self.other_setup == other.other_setup # fragile? because dict
+        )
 
 	def h(self) -> int:
 		"""
@@ -772,28 +789,22 @@ class SpecEvalSetup:
 	rnd_info: dict=None
 
 
+@dataclass
 class CalculationBatch:
 	"""
 	Class to collect (external) calculations with one setup, make input and collect results
 	TODO: Add functionality to make input
 	TODO: Extend functinality to collect results
+
+	-----
+	system: MolecularSystem instance: The system for which calclulation is sought/defined
+	calc_setup: ExternalCalcSetup: The calculation setup with respect to which calclulation is sought/defined
+	properties: List of MolecularProperty instances: The properties for which calculation is sought/defined
 	"""
+	system: MolecularSystem
+	calc_setup: ExternalCalcSetup
+	properties: list[MolecularProperty]=field(default_factory=lambda: list())
 
-	def __init__(self, system: MolecularSystem, calc_setup: ExternalCalcSetup, properties: list[MolecularProperty]=None):
-		"""
-		system: MolecularSystem instance: The system for which calclulation is sought/defined
-		calc_setup: ExternalCalcSetup: The calculation setup with respect to which calclulation is sought/defined
-		properties: List of MolecularProperty instances: The properties for which calculation is sought/defined
-		"""
-
-		self.system = system
-		self.calc_setup = calc_setup
-
-		if properties is None:
-			self.properties = []
-
-		else:
-			self.properties = properties
 
 	def addProperty(self, prop):
 		"""
@@ -1205,6 +1216,9 @@ class WilsonSimulation:
 		"""
 		Make calculation batches needed to fulfill tasks, grouping together properties to be obtained under
 		common setups
+
+		So it doesn't take care of vibana vib_ana_setup_to_fill it seems.
+		redunduncy because __eq__ can be implemented for comparisons
 		"""
 
 		calc_batches = {}
@@ -1222,6 +1236,8 @@ class WilsonSimulation:
 				calc_batches[ih] = CalculationBatch(self.system, i.calc_setup, [copy.deepcopy(i)])
 
 		self.calc_batches = calc_batches
+		logger.debug('sim.calc_batches')
+		logger.debug(self.calc_batches)
 
 	def getResultsFromCalculationBatches(self, source_type: str='', source_types: list[str]=[], source_loc: Any=None,
 									  datavault: Any = None):
@@ -1245,6 +1261,12 @@ class WilsonSimulation:
 
 			else:
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
+
+	def getResultsFromCalcBatches(self):
+		"""
+		
+		"""
+		pass
 
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
