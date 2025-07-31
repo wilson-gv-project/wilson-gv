@@ -83,7 +83,7 @@ def run():
     sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     sim.addSystem(mol_system)
-    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
+    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='anharm',
                                                         allow_skip_eigvec=True, external_fill_from=calc_setup))
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 

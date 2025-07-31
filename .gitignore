@@ -2,6 +2,7 @@
 wilson*/
 CQCParse/
 !wilson_fixtures
+!wilson_suite
 
 *.svg
 *.npy
