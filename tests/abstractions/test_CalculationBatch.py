@@ -5,7 +5,6 @@ from wilson_suite import fixtures as fixt
 from wilson_suite import molprops as propsfixt
 from wilson_suite import calcsetups as calcsetupfixt
 from wilson_suite import vibana as vibanafixt
-
 from wilson_suite import parsing as parse_fixt
 
 import pytest
@@ -60,17 +59,8 @@ def test_CalculationBatch_getResults_vault():
                           source_type='vault', datavault=parse_fixt.vault)
 
     prop_vals_check = [i.vals for i in propsfixt.props_evv_anharm_wcalc_novals]
-    p = [elem is not None for elem in prop_vals_check]
-    printtest('p')
-    printtest(p)
 
-    printtest('prop_vals_check')
-    printtest(prop_vals_check)
-
-    printtest('propsfixt.props_evv_anharm_wcalc_novals')
-    printtest(propsfixt.props_evv_anharm_wcalc_novals)
-
-    # assert all(elem is not None for elem in prop_vals_check), 'Some props did not get vals'
+    assert all(elem is not None for elem in prop_vals_check), 'Some props did not get values?'
 
 
 def test_CalculationBatch_getResultsFromOutputs():

@@ -867,7 +867,6 @@ class CalculationBatch:
 
 	def getResultsFromVault(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,
 							datavault: Any):
-							# source_loc: Any):
 		"""
 		Get results from data vault. 
 		See get_results declarations for argument explanations.
@@ -902,13 +901,8 @@ class CalculationBatch:
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
 		
-		logger.debug('props_to_fill')
-		logger.debug(props_to_fill)
-
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				logger.debug('getattr(parser_obj, i.trivial_name)')
-				logger.debug(getattr(parser_obj, i.trivial_name))
 				i.addValues(getattr(parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
