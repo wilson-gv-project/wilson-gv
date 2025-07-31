@@ -11,7 +11,6 @@ import numpy as np
 from wilson_utils.logger import setup_logger
 import wilson_main.abstractions as wm_abst
 
-import wilson_main.calculationManagement as manage
 import wilson_main.externalDataProcessor as dataprc
 
 from wilson_suite.fixtures import evv_terms
@@ -153,41 +152,6 @@ def run():
 
     terms = evv_terms()
 
-    needed_props, vibanasetup = manage.findPropsAndMaxStateLvlNeeded(terms, vibanasetup, freqs='static')
-
-    wm_abst.dressPropsWithSetup(props=needed_props, eval_by_prop_name=eval_prop_specify)
-
-    logger.debug('      needed_props after drssing')
-    logger.debug(needed_props)
-
-    g = manage.groupDataForCalcSetups(vibanasetup=vibanasetup, calc_props_setup=eval_prop_specify, props_needed=needed_props)
-
-    logger.debug('      grouped calc setups:')
-    logger.debug(g)
-
-    calcbatches = manage.makeBatchesFromGroups(mol1, g)
-
-    logger.debug('      calcbatches:')
-    logger.debug(calcbatches)
-
-    # Get results from calculation batches
-    # register vib_ana_setup_to_fill.states
-    manage.getVibAnaValsFromStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
-
-    logger.debug('      vibanasetup')
-    logger.debug(vibanasetup)
-
-    # register props_to_fill values
-    manage.getPropValsFromStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
-
-    logger.debug('      needed_props')
-    logger.debug(needed_props)
-
-    logger.debug(needed_props[0].vals)
-    logger.debug(needed_props[0].serial_vals)
-
-    logger.debug('      calcbatches after getting vals:')
-    logger.debug(calcbatches)
 
     # maybe get info/hints of what one can do from this point? or any other point - the workflow is fairly complex
     # TODO hints for notebook use
