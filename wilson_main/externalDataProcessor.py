@@ -2,7 +2,7 @@
 Functionality for prepping data from files to WilsonSimulation
 
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import numpy as np
 from .abstractions import MolecularSystem, ExternalCalcSetup
 
@@ -53,46 +53,6 @@ class CalculatedDataFromOutput:
             return False
         
         return self.system == other.system and self.calc_setup == self.calc_setup
-    
-
-@dataclass
-class CalcDataStorage:
-    """
-    This looks more like "vault" now.
-    
-    systems: list [MolecularSystem, ...]
-    setups: list [ExternalCalcSetup]
-    data: dict {CalculatedDataFromOutput.h(): CalculatedDataFromOutput} ==
-               {hash((self.system, self.calc_setup)): CalculatedDataFromOutput}
-
-    could also store/generate inputs for QC programs ID-ing this way
-    """
-    systems: list = field(default_factory=lambda: list())
-    setups: list = field(default_factory=lambda: list())
-    data: dict = field(default_factory=lambda: dict())
-
-    def getbySystem(self):
-        pass
-
-    def getbyCalcSetup(self):
-        pass
-
-    def getbySysCalc(self, system: MolecularSystem, calc_setup: ExternalCalcSetup):
-        """
-        returns None if key not in data dict
-        """
-        return self.data.get(hash((system, calc_setup)))
-
-    def addResult(self, calc_data: CalculatedDataFromOutput):
-        system, calc_setup = calc_data.system, calc_data.calc_setup
-        if hash((system, calc_setup)) in self.data:
-            logger.warning('Data is already registered for:'+
-                           f'\n  system: {system.name}'
-                           f'\n  level of theory: {calc_setup.lvl_theory}'
-                           f'\n  basis set: {calc_setup.basis}'
-                           f'\n  program: {calc_setup.program}')
-        else:
-            self.data[hash((system, calc_setup))] = calc_data
 
 
 def _retrieveFromCQCParse(parsed_data: parsing.ParsedData):

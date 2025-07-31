@@ -851,7 +851,7 @@ class CalculationBatch:
 		# Currently only vault retrieval
 		if source_type == 'vault':
 			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault)
-		
+
 		elif source_type == 'outfiles':
 			self.getResultsFromOutputs()
 			raise NotImplementedError('Results from program output file(s) not yet implemented')
@@ -908,7 +908,6 @@ class CalculationBatch:
 		if vib_ana_setup_to_fill is not None:
 
 			# Take harmonic vibrational analysis results
-			# FIXME? why not also for 'all'?
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
 				vib_ana_setup_to_fill.nc_sqrt_eigval = parser_obj.fundamentals_harmonic_int # todo: tests...
@@ -939,6 +938,10 @@ class CalculationBatch:
 						# FIXME: Change to integer indexing
 						processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
 				vib_ana_setup_to_fill.states = processed_states
+
+
+	def makeVibAnaResults(self):
+		pass
 
 	def to_dict(self):
 		"""
@@ -1269,6 +1272,20 @@ class WilsonSimulation:
 			else:
 				# should do vib analysis somewhere down from here?
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
+
+
+	def getVibAnaResults(self, harmonic_analyzer: Callable = None, anharmonic_analyzer: Callable = None):
+		"""
+		Step to be executed after getting data from batches.
+		Getting missing data for self.vib_ana_setup.
+		"""
+		# self.vib_ana_setup.vibana_prop_need - 'all', 'none', 'anharm'
+		
+		if self.vib_ana_setup.vibana_prop_need == 'all':
+			self.vib_ana_setup.doHarmonicAnalysis(props=self.props, harmonic_analyzer=harmonic_analyzer)
+		
+		if self.vib_ana_setup.vibana_prop_need in ['anharm', 'all']:
+			self.vib_ana_setup.doAnharmonicAnalysis(props=self.props, anharmonic_analyzer=anharmonic_analyzer)
 
 
 	def evaluateAsResponseFunction(self,

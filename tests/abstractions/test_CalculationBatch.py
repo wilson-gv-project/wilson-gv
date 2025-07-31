@@ -62,6 +62,11 @@ def test_CalculationBatch_getResults_vault():
 
     assert all(elem is not None for elem in prop_vals_check), 'Some props did not get values?'
 
+    assert vibanafixt.vibanasetup_anharm.vibana_prop_need == 'anharm'
+    assert vibanafixt.vibanasetup_anharm.regime == 'GVPT2'
+    # should not be None?
+    assert vibanafixt.vibanasetup_anharm.states is None
+
 
 def test_CalculationBatch_getResultsFromOutputs():
     pass
