@@ -12,12 +12,9 @@ from wilson_utils.logger import setup_logger
 import wilson_main.abstractions as wm_abst
 
 import wilson_main.calculationManagement as manage
+import wilson_main.externalDataProcessor as prcsCalc
 
-import sys
-import os
-# to get wilson_fixtures import working
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from wilson_fixtures.fixtures import evv_terms
+from wilson_suite.fixtures import evv_terms
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -27,7 +24,7 @@ logger.info('wm_abst.namelogger')
 logger.info(wm_abst.namelogger)
 
 
-storage = manage.CalcDataStorage()
+storage = prcsCalc.CalcDataStorage()
 
 mol1 = wm_abst.MolecularSystem(name='mol1', natoms=3)
 mol2 = wm_abst.MolecularSystem(name='mol2', natoms=5)
@@ -128,14 +125,14 @@ datadict5 = {'system': mol2, 'calc_setup': setup4,
              'dipgrad': None, 'diphess': None, 'polgrad': None, 'polhess': None,
              'harmonic_states': {}, 'anharmonic_states': {}}
 
-# NOTE manage.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
-# NOTE manage.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
+# NOTE prcsCalc.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
+# NOTE prcsCalc.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
 
-cd1 = manage.CalculatedDataFromOutput(**datadict1)
-cd2 = manage.CalculatedDataFromOutput(**datadict2)
-cd3 = manage.CalculatedDataFromOutput(**datadict3)
-cd4 = manage.CalculatedDataFromOutput(**datadict4)
-cd5 = manage.CalculatedDataFromOutput(**datadict5)
+cd1 = prcsCalc.CalculatedDataFromOutput(**datadict1)
+cd2 = prcsCalc.CalculatedDataFromOutput(**datadict2)
+cd3 = prcsCalc.CalculatedDataFromOutput(**datadict3)
+cd4 = prcsCalc.CalculatedDataFromOutput(**datadict4)
+cd5 = prcsCalc.CalculatedDataFromOutput(**datadict5)
 
 storage.addResult(cd1)
 storage.addResult(cd2)

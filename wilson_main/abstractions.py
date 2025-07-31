@@ -901,9 +901,14 @@ class CalculationBatch:
 		# external to WilsonSimulation
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
+		
+		logger.debug('props_to_fill')
+		logger.debug(props_to_fill)
 
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
+				logger.debug('getattr(parser_obj, i.trivial_name)')
+				logger.debug(getattr(parser_obj, i.trivial_name))
 				i.addValues(getattr(parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
@@ -1159,7 +1164,7 @@ class WilsonSimulation:
 						new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
 													 target_basis='nm', target_units='au')
 
-						if not new_prop.h(1) in [k.h(1) for k in self.props]:
+						if new_prop.h(1) not in [k.h(1) for k in self.props]:
 							self.props.append(copy.deepcopy(new_prop))
 
 					# Currently registering these states without regard to whether harmonic or other regime
@@ -1184,7 +1189,7 @@ class WilsonSimulation:
 					self.vib_ana_setup.max_state_lvl = max_state_lvl
 
 		for i in self.vib_ana_setup.tellNeededProps():
-			if not i.h(1) in [k.h(1) for k in self.props]:
+			if i.h(1) not in [k.h(1) for k in self.props]:
 				self.props.append(copy.deepcopy(i))
 
 	def dressPropsWithSetup(self):
@@ -1209,7 +1214,8 @@ class WilsonSimulation:
 					logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
 
 			# Otherwise, use uniform eval argument
-			if self.eval_uniform is not None:
+			# if both are not None, this will overide previous setup if dressed before
+			if self.eval_uniform is not None and not dressed:
 
 				i.addCalcSetup(self.eval_uniform)
 				dressed = True
@@ -1235,6 +1241,8 @@ class WilsonSimulation:
 			# TODO: Consider adding calc setup data strip method to molecularProperty to avoid calc setup info duplication here
 
 			if ih in calc_batches:
+				# why copy? 
+				# this creates new prop objects which will be stored in batches which are also stored in WilsonSimulation?
 				calc_batches[ih].addProperty(copy.deepcopy(i))
 
 			else:
@@ -1265,13 +1273,9 @@ class WilsonSimulation:
 													source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 			else:
+				# should do vib analysis somewhere down from here?
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
 
-	def getResultsFromCalcBatches(self):
-		"""
-		
-		"""
-		pass
 
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
@@ -1366,8 +1370,7 @@ class WilsonSimulation:
 		"""
 
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn,
-											  self.name, self.spec_eval_setup)
+		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
 
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')

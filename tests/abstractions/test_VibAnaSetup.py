@@ -52,6 +52,9 @@ def test_VibAnaSetup_system_exclude_modes():
     assert hasattr(vibana2, 'modes_indices')
 
 def mock_anhanalyser():
+    """
+    dummy anharmonic_analyzer function
+    """
     return
 
 def test_VAS_anharm_context_regime():
