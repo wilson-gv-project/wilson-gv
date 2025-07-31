@@ -304,7 +304,7 @@ class MolecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 
-def dressPropsWithSetup(props, eval_uniform: bool = None, eval_by_prop_name: Any = None):
+def dressPropsWithSetup(props, eval_uniform: Any = None, eval_by_prop_name: Any = None):
 	"""
 	Dress my self.properties with computational setups according to how they are specified in
 	self.eval_uniform or self.eval_by_prop_name
@@ -841,7 +841,7 @@ class CalculationBatch:
 		attempted. Typically involved if the external program can calculate e.g. energy levels directly.
 
 		source_type: string: Type of data source. Could be e.g. "vault" or "file". Intended for use when only one
-		kind of location is relevant.
+		kind of location is relevant. / for Vault - directory with CSV file containing paths to output files files 
 
 		source_types: list of strings: Types of data source (in decreasing order of priority).
 
@@ -850,7 +850,7 @@ class CalculationBatch:
 
 		# Currently only vault retrieval
 		if source_type == 'vault':
-			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault)
+			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault, csvfile_loc=source_loc)
 
 		elif source_type == 'outfiles':
 			self.getResultsFromOutputs()
@@ -866,7 +866,7 @@ class CalculationBatch:
 		raise NotImplementedError('Results from program output file(s) not yet implemented')
 
 	def getResultsFromVault(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,
-							datavault: Any):
+							datavault: Any, csvfile_loc: Any):
 		"""
 		Get results from data vault. 
 		See get_results declarations for argument explanations.
@@ -875,19 +875,11 @@ class CalculationBatch:
 		# FIXME: There might be ways to make this cleaner. Return to this after vault functionality (e.g. trivial names
 		# throughout) is settled more fully.
 
-		from wilson.utils import get_package_root
-		wilson_root = get_package_root()
-		logger.debug(f'wilson_root {wilson_root}')
-
-		# from CQCParse.relay import DataVault
-		# vault = DataVault(source_loc)
-
 		logger.info(f'system name: {self.system.name}')
 
-		from wilson_utils.paths import SUITE_ROOT
-		datadict = datavault.make_DatainputDict(self.calc_setup.program, 
-										  (self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
-										  SUITE_ROOT+'/wilson_intensities/tests')
+		datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
+										  mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
+										  csvfile_dir=csvfile_loc)
 		logger.debug(f'datadict: {datadict}')
 
 		if self.calc_setup.program == 'gaussian':
