@@ -48,34 +48,12 @@ def evv_terms() -> list[VibPerturbedTerm]:
 
 # QC calculations/vibana parameters
 mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)
-calc_setup = abst_main.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
-calc_setup1 = abst_main.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVTZ')
-calc_setup2 = abst_main.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVDZ')
-
-vibanasetup_none = abst_main.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
-                                         allow_skip_eigvec=True, external_fill_from=calc_setup)
-vibanasetup_anharm = abst_main.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='anharm',
-                                           allow_skip_eigvec=True, external_fill_from=calc_setup)
-
-eval_prop_specify = {'cff': calc_setup2, 'qff': calc_setup2, 
-                     'dipgrad': calc_setup1, 'diphess': calc_setup2, 
-                     'polgrad': calc_setup1, 'polhess': calc_setup2}
 
 
-mol_props_evv_none = [abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad'), 
-                      abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess',), 
-                      abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad'), 
-                      abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess'), 
-                      abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff')]
+# eval_prop_specify = {'cff': calc_setup2, 'qff': calc_setup2, 
+#                      'dipgrad': calc_setup1, 'diphess': calc_setup2, 
+#                      'polgrad': calc_setup1, 'polhess': calc_setup2}
 
-mol_props_evv_amharm = [abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='qff'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B'), 
-                        abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis')]
 
 # spectrum eval/render parameters
 

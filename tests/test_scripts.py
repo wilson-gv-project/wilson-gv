@@ -171,7 +171,7 @@ def test_logger_evv_tester_terminal():
     evv_tester.run()
 
 
-def test_logger_evv_mixed_terminal():
+def test_logger_evv_test_mixedCalcData_terminal():
     """
     A script with mixed calculation data sources. 
     See evv_test_mixedCalcData.py

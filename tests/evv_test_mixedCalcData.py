@@ -14,11 +14,7 @@ import wilson_main.abstractions as wm_abst
 import wilson_main.calculationManagement as manage
 import wilson_main.externalDataProcessor as dataprc
 
-import sys
-import os
-# to get wilson_fixtures import working
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from wilson_fixtures.fixtures import evv_terms
+from wilson_suite.fixtures import evv_terms
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
