@@ -12,6 +12,7 @@ from wilson_utils.logger import setup_logger
 import wilson_main.abstractions as wm_abst
 
 import wilson_main.calculationManagement as manage
+import wilson_main.externalDataProcessor as dataprc
 
 import sys
 import os
@@ -28,7 +29,7 @@ def run():
     logger.info(wm_abst.namelogger)
 
 
-    storage = manage.CalcDataStorage()
+    storage = dataprc.CalcDataStorage()
 
     mol1 = wm_abst.MolecularSystem(name='mol1', natoms=3)
     mol2 = wm_abst.MolecularSystem(name='mol2', natoms=5)
@@ -129,14 +130,14 @@ def run():
                 'harmonic_states': {}, 'anharmonic_states': {}}
 
 
-    # NOTE manage.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
-    # NOTE manage.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
+    # NOTE dataprc.CalculatedDataFromOutput(datadict1) - then need keys in dict to be in order
+    # NOTE dataprc.CalculatedDataFromOutput(**datadict1) - doesn't need ordered keys
 
-    cd1 = manage.CalculatedDataFromOutput(**datadict1)
-    cd2 = manage.CalculatedDataFromOutput(**datadict2)
-    cd3 = manage.CalculatedDataFromOutput(**datadict3)
-    cd4 = manage.CalculatedDataFromOutput(**datadict4)
-    cd5 = manage.CalculatedDataFromOutput(**datadict5)
+    cd1 = dataprc.CalculatedDataFromOutput(**datadict1)
+    cd2 = dataprc.CalculatedDataFromOutput(**datadict2)
+    cd3 = dataprc.CalculatedDataFromOutput(**datadict3)
+    cd4 = dataprc.CalculatedDataFromOutput(**datadict4)
+    cd5 = dataprc.CalculatedDataFromOutput(**datadict5)
 
     storage.addResult(cd1)
     storage.addResult(cd2)
@@ -158,31 +159,39 @@ def run():
 
     needed_props, vibanasetup = manage.findPropsAndMaxStateLvlNeeded(terms, vibanasetup, freqs='static')
 
+    wm_abst.dressPropsWithSetup(props=needed_props, eval_by_prop_name=eval_prop_specify)
+
+    logger.debug('      needed_props after drssing')
+    logger.debug(needed_props)
+
     g = manage.groupDataForCalcSetups(vibanasetup=vibanasetup, calc_props_setup=eval_prop_specify, props_needed=needed_props)
 
-    logger.debug('grouped calc setups:')
+    logger.debug('      grouped calc setups:')
     logger.debug(g)
 
     calcbatches = manage.makeBatchesFromGroups(mol1, g)
 
-    logger.debug('calcbatches:')
+    logger.debug('      calcbatches:')
     logger.debug(calcbatches)
 
     # Get results from calculation batches
     # register vib_ana_setup_to_fill.states
     manage.getVibAnaValsFromStorage(system=mol1, vib_ana_setup_to_fill=vibanasetup, calcdatasets=storage)
 
-    logger.debug('vibanasetup')
+    logger.debug('      vibanasetup')
     logger.debug(vibanasetup)
 
     # register props_to_fill values
     manage.getPropValsFromStorage(system=mol1, props_to_fill=needed_props, eval_by_prop_name=eval_prop_specify, calcdatasets=storage)
 
-    logger.debug('needed_props')
+    logger.debug('      needed_props')
     logger.debug(needed_props)
 
     logger.debug(needed_props[0].vals)
     logger.debug(needed_props[0].serial_vals)
+
+    logger.debug('      calcbatches after getting vals:')
+    logger.debug(calcbatches)
 
     # maybe get info/hints of what one can do from this point? or any other point - the workflow is fairly complex
     # TODO hints for notebook use
