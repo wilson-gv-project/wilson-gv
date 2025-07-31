@@ -4,7 +4,7 @@ Goal:
 
 [x] making calc batches
 [ ] making inputs
-[ ] putting results to Storage ?
+[x] putting results to Storage ?
 [ ] getting data for batches
 """
 import numpy as np

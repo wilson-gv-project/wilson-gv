@@ -172,6 +172,7 @@ class MolecularProperty:
 	target_basis: str=None
 	target_units:str=None
 	serial_vals: Any = field(init=False)
+	calc_setup: ExternalCalcSetup = None
 
 	def __post_init__(self, vals):
 		"""
@@ -303,7 +304,7 @@ class MolecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 
-def dressPropsWithSetup(props, eval_uniform: bool = True, eval_by_prop_name: Any = None):
+def dressPropsWithSetup(props, eval_uniform: bool = None, eval_by_prop_name: Any = None):
 	"""
 	Dress my self.properties with computational setups according to how they are specified in
 	self.eval_uniform or self.eval_by_prop_name

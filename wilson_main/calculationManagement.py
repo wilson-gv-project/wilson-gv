@@ -61,6 +61,7 @@ def getPropValsFromStorage(system: MolecularSystem,
     For all props_to_fill add vals from their respective calc_setup for this system
 
     eval_by_prop_name: dict {trivial name: ExternalCalcSetup}
+         - MolecularProperty can have .calc_setup associate with it - with dressPropsWithSetup()
     calcdatasets: dict {ExternalCalcSetup.h(): CalculatedDataFromOutput} - is like a valut?
 
     maybe could be a pure function? should be?
