@@ -39,15 +39,21 @@ def test_CalculatedDataFromOutput():
 
 
 def test_prepareDataFromFiles_g16():
-
-    assert np.allclose(getattr(cd_from_files2, 'B'), [1.1507743, 1.3090557, 9.5174003])
-    assert {k:v for k,v in getattr(cd_from_files2, 'harmonic_states').items() if len(k)==1} == {('0',): 2878.687, ('1',): 1820.416, 
+    """
+[1.14505171 1.30063729 9.57220394]
+[1.1507743, 1.3090557, 9.5174003]
+hmmm
+    """
+    assert np.allclose(getattr(cd_from_files1, 'B'), [1.1507743, 1.3090557, 9.5174003])
+    assert np.allclose(cd_from_files1.B, [1.1507743, 1.3090557, 9.5174003])
+    assert {k:v for k,v in getattr(cd_from_files1, 'harmonic_states').items() if len(k)==1} == {('0',): 2878.687, ('1',): 1820.416, 
                                                                                                ('2',): 1534.549, ('3',): 1203.179, 
                                                                                                ('4',): 2933.526, ('5',): 1268.91}
 
 def test_prepareDataFromFiles_c4():
 
-    assert np.allclose(getattr(cd_from_files1, 'B'), [1.14505171, 1.30063729, 9.57220394])
-    assert {k:v for k,v in getattr(cd_from_files1, 'harmonic_states').items() if len(k)==1} == {('0',): 1195.515081, ('1',): 1278.448678, 
+    assert np.allclose(getattr(cd_from_files2, 'B'), [1.14505171, 1.30063729, 9.57220394])
+    assert np.allclose(cd_from_files2.B, [1.14505171, 1.30063729, 9.57220394])
+    assert {k:v for k,v in getattr(cd_from_files2, 'harmonic_states').items() if len(k)==1} == {('0',): 1195.515081, ('1',): 1278.448678, 
                                                                                                ('2',): 1544.478183, ('3',): 1791.306846, 
                                                                                                ('4',): 2944.822345, ('5',): 3014.592218}

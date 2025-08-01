@@ -7,6 +7,8 @@ from wilson_suite import calcsetups as calcsetupfixt
 from wilson_suite import vibana as vibanafixt
 from wilson_suite import parsing as parse_fixt
 
+from wilson_utils.paths import SUITE_ROOT
+
 import pytest
 from wilson_utils.printing import printtest
 
@@ -56,7 +58,8 @@ def test_CalculationBatch_getResults_vault():
 
     dummyBatch.getResults(props_to_fill=propsfixt.props_evv_anharm_wcalc_novals, 
                           vib_ana_setup_to_fill=vibanafixt.vibanasetup_anharm,
-                          source_type='vault', datavault=parse_fixt.vault)
+                          source_type='vault', datavault=parse_fixt.vault, 
+                          source_loc=SUITE_ROOT+'/wilson_intensities/tests')
 
     prop_vals_check = [i.vals for i in propsfixt.props_evv_anharm_wcalc_novals]
 
