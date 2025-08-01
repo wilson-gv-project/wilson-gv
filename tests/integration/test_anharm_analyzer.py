@@ -69,10 +69,12 @@ def test_anharm_analyzer():
     sim.makeCalculationBatches()
     
     database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
-    
+    from CQCParse.relay import DataVault
+    vault = DataVault(database_csv)
+
     # looks like VibAnaSetup can't get data without WilsonSimulation? CalculationBatches?
-    sim.getResultsFromCalculationBatches(source_type='vault', 
-                                         source_loc=database_csv)
+    sim.getResultsFromCalculationBatches(source_type='vault',
+                                        datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
     
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
     printtest(sim.props)
@@ -112,14 +114,20 @@ def test_anharm_analyzer_vibana():
     printtest(f'vibana.vibana_prop_need: {vibana.vibana_prop_need}')
     props = vibana.tellNeededProps()
 
-    # FIXME? WilsonSimulation: def dressPropsWithSetup(self) - can't dressProps without WilsonSimulation - now done with:
-    
-    ws_main.abstractions.dressPropsWithSetup(props, eval_uniform=calc_setup, eval_by_prop_name=None)
-    
+    for i in props:
+        i.addCalcSetup(calc_setup)
+
     calc_batch = ws_main.abstractions.CalculationBatch(system=mol_system, calc_setup=calc_setup, properties=props)    
+    
+    database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
+    from CQCParse.relay import DataVault
+    vault = DataVault(database_csv)
+
     # needs dressed props with calc setup
-    calc_batch.getResultsFromVault(props_to_fill=props, vib_ana_setup_to_fill=vibana,
-                                   source_loc=database_csv)
+    calc_batch.getResults(props_to_fill=props, vib_ana_setup_to_fill=vibana,
+                          source_type='vault',
+                          datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+
     
     printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
 
