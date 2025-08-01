@@ -613,8 +613,12 @@ class VibAnaSetup:
 			raise TypeError('anharmonic_analyzer should be a function')
 		
 		if self.nc_sqrt_eigval is None:
-			raise ValueError('nc_sqrt_eigval is None; need nc_sqrt_eigval for anharmonic_analyzer()')
-		# TODO props should have vals?
+			raise ValueError('Missing values for nc_sqrt_eigval, cannot proceed with anharmonic analysis')
+
+		for i in props:
+			if i.trivial_name in ['cff', 'qff', 'B', 'coriolis']:
+				assert i.vals is not None, f'Missing values for {i.trivial_name}, cannot proceed with anharmonic analysis'
+
 		context = {'system': self.system, 'props': props, 
 			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
 					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
@@ -641,8 +645,11 @@ class SpectralAxis:
 		axis1 = ws.main.abstractions.spectralAxis({1: 1})        -- w1
 		axis2 = ws.main.abstractions.spectralAxis({2: 1})        -- w2
 	"""
-	# Must be dictionary: {freq label 1 in this axis: coeff, ...}
 	freq_vars: dict
+	
+	def __post_init__(self):
+		if not isinstance(self.freq_vars, dict):
+			raise TypeError('SpectralAxis needs freq_vars to be a dictionary like {freq label 1 in this axis: coeff, ...}')
 
 
 # simply copying old sketch for now
@@ -694,7 +701,11 @@ class SpectralGrid:
 	collective_grid: Any=None
 
 	def __post_init__(self):
-	
+		
+		for i in self.axes:
+			if not isinstance(self.axes[i], SpectralAxis):
+				raise TypeError("Values of axes dict should be SpectralAxis instances")
+
 		if (self.range_style == 'uniform'):
 
 			self.ranges = {}
@@ -733,7 +744,7 @@ class SpectralGrid:
 				self.n_pts = n_pts
 
 		if(self.range_style == 'custom'):
-			pass
+			raise NotImplementedError('Custom range style is not yet supported')
 
 
 	def make_mesh_numpy(self) -> dict:
@@ -789,6 +800,11 @@ class SpecEvalSetup:
 	ev_info: dict=None
 	rnd_info: dict=None
 
+	def __post_init__(self):
+		if self.grid is not None:
+			if not isinstance(self.grid, SpectralGrid):
+				raise TypeError("Values of axes dict should be SpectralAxis instances")
+
 
 @dataclass
 class CalculationBatch:
@@ -806,6 +822,18 @@ class CalculationBatch:
 	calc_setup: ExternalCalcSetup
 	properties: list[MolecularProperty]=field(default_factory=lambda: list())
 
+	def __post_init__(self):
+		"""
+		or should it be a method addParser? yes probably
+		"""
+		if self.calc_setup.program == 'gaussian':
+			from CQCParse.parsing import GaussianDataParser as progDataParser
+
+		elif self.calc_setup.program == 'cfour':
+			from CQCParse.parsing import CFOURdataParser as progDataParser
+		
+		self.parser_obj = progDataParser()
+
 
 	def addProperty(self, prop):
 		"""
@@ -813,6 +841,8 @@ class CalculationBatch:
 
 		prop: MolecularProperty instance: The property to be added
 		"""
+		if not isinstance(prop, MolecularProperty):
+			raise TypeError("Provided prop argument is not a MolecularProperty instance")
 
 		self.properties.append(prop)
 
@@ -848,6 +878,12 @@ class CalculationBatch:
 		source_loc: Format not specified: Location(s) of data source(s).
 		"""
 
+		for i in props_to_fill:
+			if not isinstance(i, MolecularProperty):
+				raise TypeError(f"props_to_fill has an element that is not a MolecularProperty instance: {i}")
+			else:
+				assert i.calc_setup is not None, f'A molecular property without calc_setup is encountered: {i.trivial_name}. Cannot getResults'
+
 		# Currently only vault retrieval
 		if source_type == 'vault':
 			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault, csvfile_loc=source_loc)
@@ -870,6 +906,8 @@ class CalculationBatch:
 		"""
 		Get results from data vault. 
 		See get_results declarations for argument explanations.
+
+		Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
 		"""
 
 		# FIXME: There might be ways to make this cleaner. Return to this after vault functionality (e.g. trivial names
@@ -890,8 +928,16 @@ class CalculationBatch:
 
 		# maybe should just take parser object from outside, and this object can be set up with external functionality 
 		# external to WilsonSimulation
+		
+		# Parser can be reused? just suply a new datadict and run getData? 
+		# 	- this is not supported yet but it looks like it could be; 
+		# 		then parser could be associated with the calculation batch? 
+		# 		calc batch ID is system and calc_batch which has "program" attribute, so parser can be auto constructed
+		#		huh, this actually sounds good
 		parser_obj = progDataParser(datadict)
 		parser_obj.getData()
+		# self.parser_obj.addFilesDict(all_files_dict=datadict)
+		# self.parser_obj.getData()
 		
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
@@ -1080,7 +1126,7 @@ class WilsonSimulation:
 		deriver: A function taking a VibExperiment instance and returning a list of VibPerturbedTerm instances:
 		The function that will carry out the derivation of terms
 		"""
-
+		assert self.exp is not None, "There must be an experiment present to derive terms"
 		self.terms = deriver(self.exp)
 
 	def addVibAnaSetup(self, vib_ana_setup: VibAnaSetup):
@@ -1124,7 +1170,7 @@ class WilsonSimulation:
 		if self.terms is None:
 			raise AssertionError('There must be terms present to determine needed properties')
 		if self.vib_ana_setup is None:
-			raise AssertionError('There must be a vibrational analysis setup present to')
+			raise AssertionError('There must be a vibrational analysis setup present to get properties needed there, if any')
 
 		# FIXME: Consider checking if terms are VibPerturbedTerm instances
 		for i in self.terms:
@@ -1186,7 +1232,9 @@ class WilsonSimulation:
 		Dress my self.properties with computational setups according to how they are specified in
 		self.eval_uniform or self.eval_by_prop_name
 		"""
-
+		if not self.props:
+			logger.warning('There are no properties to be dressed')
+		
 		for i in self.props:
 
 			dressed = False
@@ -1210,7 +1258,7 @@ class WilsonSimulation:
 				dressed = True
 
 			if not dressed:
-				raise AssertionError('Unable to determine calculation setup for property')
+				raise AssertionError(f'Unable to determine calculation setup for property: {i}')
 
 	def makeCalculationBatches(self):
 		"""
@@ -1221,6 +1269,9 @@ class WilsonSimulation:
 		redunduncy because __eq__ can be implemented for comparisons
 		"""
 
+		if not self.props:
+			logger.warning('There are no properties to be calculated')
+		
 		calc_batches = {}
 
 		for i in self.props:
@@ -1250,10 +1301,11 @@ class WilsonSimulation:
 		source_type: string: Type of data source. Could be e.g. "vault" or "file". Intended for use when only one
 		kind of location is relevant.
 
-		source_types: list of strings: Types of data source (in decreasing order of priority).
+		source_types: list of strings: Types of data source (in decreasing order of priority). VL - what is the idea? why plural?
 
 		source_loc: Format not specified: Location(s) of data source(s).
 		"""
+
 
 		for i in self.calc_batches:
 			if self.vib_ana_setup.external_fill_from is not None:
@@ -1262,7 +1314,7 @@ class WilsonSimulation:
 													source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 			else:
-				# should do vib analysis somewhere down from here?
+				# VL - should do vib analysis somewhere down from here?
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 
@@ -1272,6 +1324,10 @@ class WilsonSimulation:
 		Getting missing data for self.vib_ana_setup.
 		"""
 		# self.vib_ana_setup.vibana_prop_need - 'all', 'none', 'anharm'
+		assert self.vib_ana_setup is not None, "There must be a vibrational analysis setup present to do vibrational analysis"
+		if self.vib_ana_setup.vibana_prop_need == 'all':
+			logger.warning('All vibrational analysis properties are requested to be computed internally')
+
 		
 		if self.vib_ana_setup.vibana_prop_need == 'all':
 			self.vib_ana_setup.doHarmonicAnalysis(props=self.props, harmonic_analyzer=harmonic_analyzer)
