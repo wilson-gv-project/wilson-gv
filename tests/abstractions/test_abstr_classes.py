@@ -25,6 +25,7 @@ def test_MolecularSystem():
 
 
 def test_ExternalCalcSetup():
+    """To be implemented"""
     pass
 
 def test_MolecularProperty():
@@ -82,31 +83,29 @@ def test_MolecularProperty():
     
 
 def test_MolecularPropertyEncoder():
-    """
-    Helper class
-    """
+    """To be implemented"""
     pass
 
 def test_VibState():
+    """To be implemented"""
     pass
 
 def test_SpectralAxis():
+    """To be implemented"""
     pass
 
 def test_SpectralGrid():
+    """To be implemented"""
     pass
 
 def test_SpecEvalSetup():
+    """To be implemented"""
     pass
 
 def test_CalculationBatch():
-    """
-    CalculationBatch is not a dataclass
-    """
+    """To be implemented"""
     pass
 
 def test_WilsonSimulation():
-    """
-    WilsonSimulation is not a dataclass
-    """
+    """To be implemented"""
     pass
