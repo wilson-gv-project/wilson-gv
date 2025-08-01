@@ -304,35 +304,6 @@ class MolecularProperty:
 		if self.target_units is not None:
 			self.in_units = self.target_units
 
-def dressPropsWithSetup(props, eval_uniform: Any = None, eval_by_prop_name: Any = None):
-	"""
-	Dress my self.properties with computational setups according to how they are specified in
-	self.eval_uniform or self.eval_by_prop_name
-	"""
-
-	for i in props:
-
-		dressed = False
-
-		# See if property specifically mentioned and if so use that
-		if eval_by_prop_name is not None:
-
-			if i.trivial_name is not None:
-				if i.trivial_name in eval_by_prop_name:
-					i.addCalcSetup(eval_by_prop_name[i.trivial_name])
-					dressed=True
-
-			else:
-				logger.warning('Warning: Property without trivial name encountered but eval_by_prop_name was specified.')
-
-		# Otherwise, use uniform eval argument
-		if eval_uniform is not None:
-
-			i.addCalcSetup(eval_uniform)
-			dressed = True
-
-		if not dressed:
-			raise AssertionError('Unable to determine calculation setup for property')
 
 class MolecularPropertyEncoder(json.JSONEncoder):
 	"""
@@ -965,7 +936,7 @@ class CalculationBatch:
 					if len(i) <= vib_ana_setup_to_fill.max_state_lvl:
 
 						# TODO: Exclusion based on mode index or freq cutoff
-						# FIXME: Change to integer indexing
+						# FIXME: Change to integer indexing - VL: what does it mean?
 						processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
 				vib_ana_setup_to_fill.states = processed_states
 
