@@ -461,8 +461,8 @@ def get_vpt2_corrected_levels(parsed_data, vpt2settings, list2exclude=None, prin
         print(dict(sorted(one.items())))
         print(dict(sorted(two.items())), '\n')
 
-    cff_cm_1 = parsed_data.derivatives.cubic_cm_1
-    qff_cm_1 = parsed_data.derivatives.quartic_cm_1
+    cff_cm_1 = parsed_data.derivatives.cff
+    qff_cm_1 = parsed_data.derivatives.qff
     rot_c = parsed_data.anharm_correction_data.rotational_constants
     cor_c = parsed_data.anharm_correction_data.coriolis_constants
     # list, not associated to normal mode indices
