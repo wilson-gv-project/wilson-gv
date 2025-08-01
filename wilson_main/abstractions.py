@@ -1123,6 +1123,10 @@ class WilsonSimulation:
 		Add a property evaluation setup
 
 		See argument explanation of __init__ method of this class for explanation of these arguments
+
+		VL: What if done after self.props is filled? 
+		then can check if all props have calculation setup specified in parameters here.
+		Also can warn user about the use of eval_uniform for props not mentioned in eval_by_prop_name
 		"""
 
 		self.eval_uniform = eval_uniform
