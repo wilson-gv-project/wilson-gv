@@ -131,5 +131,5 @@ def test_VAS_anharm_nc_sqrt_eigval():
         vibana.doAnharmonicAnalysis(props=[], anharmonic_analyzer=mock_anhanalyser)
         pytest.fail('Should have raised an error without set attribute VibAnaSetup().regime')
     except ValueError as e:
-        assert 'nc_sqrt_eigval is None; need nc_sqrt_eigval for anharmonic_analyzer()' in str(e), \
+        assert 'Missing values for nc_sqrt_eigval, cannot proceed with anharmonic analysis' in str(e), \
             f"Unexpected error message: {e}"

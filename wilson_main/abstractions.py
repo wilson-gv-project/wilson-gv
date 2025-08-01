@@ -824,16 +824,27 @@ class CalculationBatch:
 
 	def __post_init__(self):
 		"""
-		or should it be a method addParser? yes probably
+		CQCParse import can be removed for the use outside? then need to use self.addParser(progDataParser())
 		"""
 		if self.calc_setup.program == 'gaussian':
 			from CQCParse.parsing import GaussianDataParser as progDataParser
 
 		elif self.calc_setup.program == 'cfour':
 			from CQCParse.parsing import CFOURdataParser as progDataParser
+		else:
+			raise ValueError('Implemented parsers are for program = ["cfour", "gaussian"]. ' \
+			'Please, provide an instance of a custom data parser class via addParser(your_parser_class_instance)')
 		
-		self.parser_obj = progDataParser()
+		self.addParser(progDataParser())
 
+	def addParser(self, parser_obj):
+		"""
+		parser_obj is a custom_parser class instance.
+		"""
+		assert hasattr(parser_obj, 'addFilesDict'), 'Parser class needs to have a addFilesDict(files_dict) method to register output files locations'
+		assert hasattr(parser_obj, 'getData'), 'Parser class needs to have a getData() method - to register parsed data in the instance'
+		# a parser class instance is constructed
+		self.parser_obj = parser_obj
 
 	def addProperty(self, prop):
 		"""
@@ -915,7 +926,8 @@ class CalculationBatch:
 
 		logger.info(f'system name: {self.system.name}')
 		
-		# using generated and registered at init self.parser_obj
+		# using generated and registered at init self.parser_obj; 
+		# this is a specific required functionality of the self.parser_obj 
 		self.parser_obj.addFilesDict(all_files_dict=datafilesdict)
 		self.parser_obj.getData()
 
@@ -1332,7 +1344,7 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
 		if not isinstance(self.spec, np.ndarray):
@@ -1347,7 +1359,7 @@ class WilsonSimulation:
 
 		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
 		if not isinstance(self.spec, np.ndarray):
@@ -1366,7 +1378,7 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
 
 		if not isinstance(self.spec, np.ndarray):
@@ -1381,7 +1393,7 @@ class WilsonSimulation:
 
 		evaluator: Callable: As in evaluateFull but must additionally return a dictionary of diagnostics information.
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props,
 										  self.spec_eval_setup, self.vib_ana_setup)
 
@@ -1399,7 +1411,7 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		# Consider extending arguments to provide even more info to renderer
 		self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
 
@@ -1411,7 +1423,7 @@ class WilsonSimulation:
 		renderer: Callable: A function to carry out the rendering. As in render but must additionally return a
 		dictionary of diagnostics information.
 		"""
-
+		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
 		# Consider extending arguments to provide even more info to renderer
 		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
 

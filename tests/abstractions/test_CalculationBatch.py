@@ -10,7 +10,6 @@ from wilson_suite import parsing as parse_fixt
 from wilson_utils.paths import SUITE_ROOT
 
 import pytest
-from wilson_utils.printing import printtest
 
 import logging
 setup_logger("wilson", level=logging.DEBUG)
@@ -30,7 +29,7 @@ def test_CalculationBatch_getResults():
             
     minimum setup to test functionality:
         None
-    but needs to be initialized with system and calc_setup (both not optional)
+    but needs to be initialized with system and calc_setup (both are not optional)
     """
     dummyBatch = wm_abst.CalculationBatch(system=fixt.mol_system, calc_setup=calcsetupfixt.calc_setup)
     
@@ -67,9 +66,13 @@ def test_CalculationBatch_getResults_vault():
 
     assert vibanafixt.vibanasetup_anharm.vibana_prop_need == 'anharm'
     assert vibanafixt.vibanasetup_anharm.regime == 'GVPT2'
-    # should not be None?
+    
+    # should not be None? - if OK then need to get states later; should have a check
     assert vibanafixt.vibanasetup_anharm.states is None
 
 
 def test_CalculationBatch_getResultsFromOutputs():
+    """
+    functionality 
+    """
     pass
