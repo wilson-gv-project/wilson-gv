@@ -50,11 +50,6 @@ def evv_terms() -> list[VibPerturbedTerm]:
 mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)
 
 
-# eval_prop_specify = {'cff': calc_setup2, 'qff': calc_setup2, 
-#                      'dipgrad': calc_setup1, 'diphess': calc_setup2, 
-#                      'polgrad': calc_setup1, 'polhess': calc_setup2}
-
-
 # spectrum eval/render parameters
 
 def spectral_grid():
