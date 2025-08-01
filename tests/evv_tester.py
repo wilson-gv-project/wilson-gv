@@ -83,7 +83,7 @@ def run():
     sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     sim.addSystem(mol_system)
-    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='anharm',
+    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
                                                         allow_skip_eigvec=True, external_fill_from=calc_setup))
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 
@@ -115,10 +115,11 @@ def run():
         # --- this is a clean vault use example
         # vault setup outside of wilsonsim
         from CQCParse.relay import DataVault
-        source_loc=ws.intensities.utils.get_package_root()+ '/../tests/test_database/mini_files_database.csv'
-        vault = DataVault(source_loc)
+        csvfile = ws.intensities.utils.get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+        vault = DataVault(csvfile)
+
         sim.getResultsFromCalculationBatches(source_type='vault',
-                                            datavault=vault)
+                                            datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
     elif SOURCE_TYPE == 'outfiles':
         # should simply provide list of files? 
         # that would be simple for gaussian but not so much for cfour

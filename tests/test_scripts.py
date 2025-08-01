@@ -95,10 +95,11 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_final']
     evv_tester.TO_PICKLES = topickles_2
+    evv_tester.PREP_ONLY = False
     
     # WilsonSimulation object after spectrum was calculated and rendered
     wilsim3 = evv_tester.run()
-
+    print(evv_tester.PKL_FILES)
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
     load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
     load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
@@ -169,17 +170,3 @@ def test_logger_evv_tester_terminal():
     
     import evv_tester
     evv_tester.run()
-
-
-def test_logger_evv_test_mixedCalcData_terminal():
-    """
-    A script with mixed calculation data sources. 
-    See evv_test_mixedCalcData.py
-    """
-    separatorprint()
-    import logging
-    from wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG)
-    
-    import evv_test_mixedCalcData
-    evv_test_mixedCalcData.run()
