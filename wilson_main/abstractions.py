@@ -884,86 +884,66 @@ class CalculationBatch:
 			else:
 				assert i.calc_setup is not None, f'A molecular property without calc_setup is encountered: {i.trivial_name}. Cannot getResults'
 
-		# Currently only vault retrieval
 		if source_type == 'vault':
-			self.getResultsFromVault(props_to_fill, vib_ana_setup_to_fill, datavault=datavault, csvfile_loc=source_loc)
+			"""
+			Get results from data vault. 
+			See get_results declarations for argument explanations.
+
+			Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
+			"""
+			# preparing a file sources dict from vault, CSV file
+			datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
+											mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
+											csvfile_dir=source_loc)
+			logger.debug(f'datadict: {datadict}')
+			self.getResultsFromOutputs(props_to_fill, vib_ana_setup_to_fill, datafilesdict=datadict)
 
 		elif source_type == 'outfiles':
-			self.getResultsFromOutputs()
 			raise NotImplementedError('Results from program output file(s) not yet implemented')
 
 		else:
 			raise NotImplementedError(f'Data retrieval for this source_type [{source_type}] is not implemented')
 
-	def getResultsFromOutputs(self):
+	def getResultsFromOutputs(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,  datafilesdict: dict):
 		"""
-		Get results from program output file(s): Not yet implemented.
-		"""
-		raise NotImplementedError('Results from program output file(s) not yet implemented')
-
-	def getResultsFromVault(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,
-							datavault: Any, csvfile_loc: Any):
-		"""
-		Get results from data vault. 
-		See get_results declarations for argument explanations.
-
+		Get results from program output file(s)
+		
 		Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
-		"""
 
-		# FIXME: There might be ways to make this cleaner. Return to this after vault functionality (e.g. trivial names
-		# throughout) is settled more fully.
+		datafilesdict contains paths to output files and other relevant info
+		"""
 
 		logger.info(f'system name: {self.system.name}')
-
-		datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
-										  mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
-										  csvfile_dir=csvfile_loc)
-		logger.debug(f'datadict: {datadict}')
-
-		if self.calc_setup.program == 'gaussian':
-			from CQCParse.parsing import GaussianDataParser as progDataParser
-
-		elif self.calc_setup.program == 'cfour':
-			from CQCParse.parsing import CFOURdataParser as progDataParser
-
-		# maybe should just take parser object from outside, and this object can be set up with external functionality 
-		# external to WilsonSimulation
 		
-		# Parser can be reused? just suply a new datadict and run getData? 
-		# 	- this is not supported yet but it looks like it could be; 
-		# 		then parser could be associated with the calculation batch? 
-		# 		calc batch ID is system and calc_batch which has "program" attribute, so parser can be auto constructed
-		#		huh, this actually sounds good
-		parser_obj = progDataParser(datadict)
-		parser_obj.getData()
-		# self.parser_obj.addFilesDict(all_files_dict=datadict)
-		# self.parser_obj.getData()
-		
+		# using generated and registered at init self.parser_obj
+		self.parser_obj.addFilesDict(all_files_dict=datafilesdict)
+		self.parser_obj.getData()
+
 		for i in props_to_fill:
 			if i.calc_setup.h() == self.calc_setup.h():
-				i.addValues(getattr(parser_obj, i.trivial_name))
+				i.addValues(getattr(self.parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
 
 			# Take harmonic vibrational analysis results
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
-				vib_ana_setup_to_fill.nc_sqrt_eigval = parser_obj.fundamentals_harmonic_int # todo: tests...
+				vib_ana_setup_to_fill.nc_sqrt_eigval = self.parser_obj.fundamentals_harmonic_int # todo: tests...
 
 				if not vib_ana_setup_to_fill.allow_skip_eigvec:
 					# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
-					if parser_obj.normal_modes is None:
+					if self.parser_obj.normal_modes is None:
 						raise AssertionError('Normal coordinates (eigenvectors) not found')
-					vib_ana_setup_to_fill.nc_eigvec = parser_obj.normal_modes
+					vib_ana_setup_to_fill.nc_eigvec = self.parser_obj.normal_modes
 
 			# Take states
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
 
 				if vib_ana_setup_to_fill.regime not in ['harmonic']:
-					extracted_states = parser_obj.anharmonic_states
+					extracted_states = self.parser_obj.anharmonic_states
 
 				else:
-					extracted_states = parser_obj.harmonic_states
+					extracted_states = self.parser_obj.harmonic_states
 
 				processed_states = []
 
