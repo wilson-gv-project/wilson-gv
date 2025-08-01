@@ -26,3 +26,26 @@ for prop in props_evv_anharm_wcalc_novals:
 eval_prop_specify = {'cff': calc_setup2, 'qff': calc_setup2, 
                      'dipgrad': calc_setup1, 'diphess': calc_setup2, 
                      'polgrad': calc_setup1, 'polhess': calc_setup2}
+
+
+def makeMockProps(request: str = ''):
+    if 'evv' in request:
+        if 'none' in request:
+            props = [abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad'), 
+                                abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess',), 
+                                abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad'), 
+                                abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess'), 
+                                abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff')]
+        elif 'anharm' in request:
+            props = [abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='polhess'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='polgrad'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'f'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='diphess'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='qff'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B'), 
+                                    abst_main.MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis')]
+            if 'wcalc_uni' in request:
+                for p in props:
+                    p.addCalcSetup(calc_setup)
+    return props
