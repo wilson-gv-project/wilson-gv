@@ -12,6 +12,7 @@ def test_evv_tester_dataclasses():
     """
     import evv_tester as evv_tester
     evv_tester.TO_PICKLES = []
+    evv_tester.PREP_ONLY = False
     wilsim = evv_tester.run()
 
     assert hasattr(wilsim, 'spec')
@@ -169,4 +170,5 @@ def test_logger_evv_tester_terminal():
     setup_logger("wilson", level=logging.DEBUG)
     
     import evv_tester
+    evv_tester.PREP_ONLY = False
     evv_tester.run()
