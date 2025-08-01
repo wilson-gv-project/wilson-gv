@@ -940,10 +940,6 @@ class CalculationBatch:
 						processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
 				vib_ana_setup_to_fill.states = processed_states
 
-
-	def makeVibAnaResults(self):
-		pass
-
 	def to_dict(self):
 		"""
 		"""
@@ -1233,7 +1229,7 @@ class WilsonSimulation:
 		common setups
 
 		So it doesn't take care of vibana vib_ana_setup_to_fill it seems.
-		redunduncy because __eq__ can be implemented for comparisons
+		use of hashes is redundant because __eq__ can be implemented for comparisons
 		"""
 
 		if not self.props:
@@ -1248,7 +1244,7 @@ class WilsonSimulation:
 			# TODO: Consider adding calc setup data strip method to molecularProperty to avoid calc setup info duplication here
 
 			if ih in calc_batches:
-				# why copy? 
+				# VL why copy? 
 				# this creates new prop objects which will be stored in batches which are also stored in WilsonSimulation?
 				calc_batches[ih].addProperty(copy.deepcopy(i))
 
@@ -1281,27 +1277,8 @@ class WilsonSimulation:
 													source_type=source_type, source_loc=source_loc, datavault=datavault)
 
 			else:
-				# VL - should do vib analysis somewhere down from here?
+				# VL - should do vib analysis somewhere down from this point in simulation?
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
-
-
-	def getVibAnaResults(self, harmonic_analyzer: Callable = None, anharmonic_analyzer: Callable = None):
-		"""
-		Step to be executed after getting data from batches.
-		Getting missing data for self.vib_ana_setup.
-		"""
-		# self.vib_ana_setup.vibana_prop_need - 'all', 'none', 'anharm'
-		assert self.vib_ana_setup is not None, "There must be a vibrational analysis setup present to do vibrational analysis"
-		if self.vib_ana_setup.vibana_prop_need == 'all':
-			logger.warning('All vibrational analysis properties are requested to be computed internally')
-
-		
-		if self.vib_ana_setup.vibana_prop_need == 'all':
-			self.vib_ana_setup.doHarmonicAnalysis(props=self.props, harmonic_analyzer=harmonic_analyzer)
-		
-		if self.vib_ana_setup.vibana_prop_need in ['anharm', 'all']:
-			self.vib_ana_setup.doAnharmonicAnalysis(props=self.props, anharmonic_analyzer=anharmonic_analyzer)
-
 
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
