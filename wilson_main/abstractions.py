@@ -764,7 +764,7 @@ class RenderingInfo:
 	num_level_ticks: int = 12
 	metadat: dict = field(default_factory=lambda: dict())
 	figsize: tuple = (10, 13)
-	font_dict: dict = {'size': 20}
+	font_dict: dict = field(default_factory=lambda: {'size': 20})
 	to_save: bool = False
 
 # An evaluation setup contains various visualization configuration information
