@@ -83,6 +83,11 @@ def run():
     
     sim.addExperiment(experiment_a)
     sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
+    
+    logger.info(' >>>> sim.terms')
+    logger.info(sim.terms)
+    logger.info(ws.derive.main.present_derived_terms_dict(sim.terms))
+
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     sim.addSystem(mol_system)
     sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
@@ -91,6 +96,10 @@ def run():
 
     # more clear definitions with str keys of dicts
     # so, dicionaries of SpectralAxis instances refer to independent variables, frequencies ranges/lists of vals
+    # this means that there should be independent_vars data in addition to axes - that's where evaluation will be, in those ranges
+    # smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
+    # could follow from derived terms, as pfs from ResonanceCondictions
+
     axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
     axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1}) 
 
