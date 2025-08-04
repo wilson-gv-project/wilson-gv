@@ -88,35 +88,104 @@ def prep_levels(d_max, dynamic_range, num_level_ticks):
     min_dynrange = np.log10(d_max) - dynrange_log
     dt = - (np.log10(d_max) - min_dynrange) / num_level_ticks
 
-    print('min_dynrange', min_dynrange)
-    print('dynrange_log', dynrange_log)
-
     if d_max > 1:
-        print(np.log10(d_max), min_dynrange, -round(dt, 4))
         levels_before_norm = np.arange(np.log10(d_max), min_dynrange, round(dt, 4))
     else:
-        print(np.log10(d_max), min_dynrange, round(dt, 4))
         levels_before_norm = np.arange(np.log10(d_max), min_dynrange, round(dt, 4))
 
-    # levels_before_norm = np.sort(np.arange(np.log10(d_max), min_dynrange, round(dt,4)))
-    print('levels_before_norm with log10', levels_before_norm)
-    # print('np.log10(d_max)', np.log10(d_max))
-    # levels_ticks = np.sort(levels_before_norm/np.log10(d_max))
     levels_ticks = np.sort(levels_before_norm/np.max(levels_before_norm))
-    # levels_ticks = (levels_before_norm - min(levels_before_norm)) / (max(levels_before_norm) - min(levels_before_norm))
     levels_ticks = np.sort(levels_ticks)
-    # print('levels_ticks', np.sort(levels_ticks))
 
     levels_nums = np.sort([float(10**i) for i in levels_before_norm])
-    # print('levels_nums', levels_nums)
-    # levels_nums_str = [f'{tick:.2e}' for tick in levels_nums]
     levels_nums_str = [fmt(tick) for tick in levels_nums]
 
-    # levels = [d_max * 10.0 ** (-1.0 * dynrange_log *
-    #                                      (float(num_color_levels - 1 - i) / (num_color_levels - 1)))
-    #                for i in range(num_color_levels)]
+    return levels_nums, levels_ticks, levels_nums_str
+
+
+def prep_levels_clean(d_max: float, dynamic_range: float, num_level_ticks: int):
+    """
+    Prepares numerical levels and their normalized counterparts for plotting,
+    such as for colorbars in contour plots.
+
+    Parameters:
+    ----------
+    d_max : float
+        Maximum data value to be visualized (e.g., highest density).
+    dynamic_range : float
+        The ratio between the maximum and minimum value shown (e.g., 1e3).
+    num_level_ticks : int
+        Number of ticks/levels to show between d_max and d_max/dynamic_range.
+
+    Returns:
+    -------
+    levels_nums : np.ndarray
+        Actual values for each contour level (linear scale).
+    levels_ticks : np.ndarray
+        Normalized log-scale values between 0 and 1.
+    levels_nums_str : list[str]
+        Formatted string labels (e.g., '1e5') for the levels.
+    """
+
+    # Compute min value (log scale) based on dynamic range
+    log_dmax = np.log10(d_max)
+    log_min = log_dmax - np.log10(dynamic_range)
+
+    # Step size in log space (negative step to go from d_max downward)
+    dt = - (log_dmax - log_min) / num_level_ticks
+
+    # Compute raw log10-levels
+    levels_log = np.arange(log_dmax, log_min, dt)
+
+    # Convert log-levels back to actual values
+    levels_nums = np.power(10, levels_log)
+
+    # Normalize log values to [0, 1] range (used in colormaps)
+    levels_ticks = (levels_log - log_min) / (log_dmax - log_min)
+
+    # Format labels (e.g., '1e5') – you can replace `fmt` with your formatter
+    levels_nums_str = [f"{val:.0e}" for val in levels_nums]
 
     return levels_nums, levels_ticks, levels_nums_str
+
+
+def compute_log_colorbar_levels(d_max: float, dynamic_range: float, num_levels: int):
+    """
+    Generate tick values, formatted labels, and normalized positions for a colorbar with logarithmic scaling.
+
+    Parameters
+    ----------
+    d_max : float
+        Maximum data value for the colorbar.
+    dynamic_range : float
+        Ratio between d_max and minimum value to display. E.g., 1e3 means d_min = d_max / 1e3.
+    num_levels : int
+        Number of levels/ticks to generate between d_min and d_max (inclusive).
+
+    Returns
+    -------
+    tick_values : np.ndarray
+        The actual tick values (e.g., [1e5, 1e6, ..., 1e8]).
+    tick_labels : list of str
+        Tick labels formatted in LaTeX style (e.g., ["1.0x10⁵", ...]).
+    tick_norm_positions : np.ndarray
+        Tick positions normalized to [0, 1] in log10 scale.
+    """
+    # Calculate min value from dynamic range
+    d_min = d_max / dynamic_range
+    log_min = np.log10(d_min)
+    log_max = np.log10(d_max)
+
+    # evenly spaced log10 levels
+    log_ticks = np.linspace(log_min, log_max, num_levels)
+    tick_values = np.power(10, log_ticks)
+
+    # Format labels nicely (LaTeX-style strings)
+    tick_labels = [f"${val:.1e}$".replace('e', r'\times 10^{') + '}$' for val in tick_values]
+
+    # Normalize log-scale values to [0, 1]
+    tick_norm_positions = (log_ticks - log_min) / (log_max - log_min)
+
+    return tick_values, tick_labels, tick_norm_positions
 
 
 def set_xyz(X, Y, intensity_plot, fig, ax, w1mw2, nicetitle,
@@ -126,10 +195,8 @@ def set_xyz(X, Y, intensity_plot, fig, ax, w1mw2, nicetitle,
     if w1mw2:
         y = -(X - Y)
         ax.set_ylabel(r'$(\omega_2-\omega_1)/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
-        # ax.set_ylabel(r'(\\omega_2-\\omega_1)/2\pi c, \\text{cm}^{-1}', fontsize=18)
     else:
         y = Y
-        # ax.set_ylabel(r'$\\omega_2/2\pi c, \\text{cm}^{-1}$', fontsize=18)
         ax.set_ylabel(r'$\omega_2/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
     ax.set_xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', fontsize=25, labelpad=21.)
 
@@ -250,7 +317,8 @@ def render_spectrum(intensities, w1m, w2m, filename, dynamic_range, num_level_ti
     coolprint('4. Prepare XYZ, make contourf and colorbar... '
               'Using previously configured intensity, levels_ticks, levels_nums_str...')
     fig, ax = set_xyz(
-        w1m, w2m, intensity_plot, fig, ax,
+        X=w1m, Y=w2m, intensity_plot=intensity_plot, 
+        fig=fig, ax=ax,
         w1mw2=True, nicetitle=nicetitle,
         levels=levels_ticks, saturation_color='#FF00FF',
         levels_ticks=levels_ticks,
