@@ -57,7 +57,7 @@ def spectral_grid():
     axis2 = abst_main.SpectralAxis({1: 1, 2: -1})
     start = {1: 250, 2: 100}
     end = {1: 3850, 2: 7550}
-    spacer = {1: 3.8, 2: 3.8}
+    spacer = {1: 230.8, 2: 230.8}
     return abst_main.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
                                   start=start, end=end, spacer=spacer)
 
@@ -67,36 +67,16 @@ def spec_eval_setup(spec_grid):
     return abst_main.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 
 
-def makeWilsonSim(experiment, mol_system, vibanasetup, calc_setup, eval_prop_specify: dict, 
+def makeWilsonSimInstance(experiment, mol_system, vibanasetup, calc_setup, eval_prop_specify: dict, 
                   spec_eval_setup: abst_main.SpecEvalSetup = None):
-
-    sim = abst_main.WilsonSimulation()
-
-    # terms for calculation
-    sim.addExperiment(experiment)
-    sim.getTerms(ws_derive.main.get_fully_enhanced_terms)
-
-    # QC data/vibana parameters
-    sim.addSystem(mol_system)
-    sim.addVibAnaSetup(vibanasetup)
-    sim.addPropEvalSetup(eval_uniform=calc_setup, eval_by_prop_name=eval_prop_specify)
-
-    sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
-    logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
-
-    sim.dressPropsWithSetup()
-    sim.makeCalculationBatches()
+    """
+    Should create an instance of a WilsonSimulation 
+    with a certain state based on the needs
     
-    sim.getResultsFromCalculationBatches(source_type='vault',
-                                        source_loc=ws_utils.paths.SUITE_ROOT
-                                                    + '/wilson_intensities/tests/test_database/mini_files_database.csv' )
-    
+    """
+    # sim = abst_main.WilsonSimulation()
 
-    if spec_eval_setup is not None:
-        # spectrum eval/render parameters
-        sim.addSpecEvalSetup(spec_eval_setup)
-    
-    return sim
+    raise NotImplementedError('This fixture-making function is not yet implemented.')
 
 """
 1. Ready for evaluation, WilsonSimulation instance should have:
