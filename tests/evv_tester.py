@@ -29,6 +29,12 @@ logger.info('evv_tester_dataclasses.py')
 TO_PICKLES = []
 PKL_FILES = {}
 
+# CHOICE of source_type
+# source_type = 'outfiles'
+SOURCE_TYPE = 'vault'
+# STOP before evaluation
+PREP_ONLY = True
+
 def run():
 
     pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
@@ -98,9 +104,27 @@ def run():
 
     sim.dressPropsWithSetup()
     sim.makeCalculationBatches()
-    sim.getResultsFromCalculationBatches(source_type='vault',
-                                        source_loc=ws.intensities.utils.get_package_root()
-                                                    + '/../tests/test_database/mini_files_database.csv' )
+    
+    # FIXME do data prep outside of this workflow
+    # data prep:
+    #  - 1. collect paths for output files
+    #  - 2. parse data with CQCParse
+    #  - 3. collect data into CalculatedDataFromOutput - wrapper func for this, to not expose CQCParse to wilson
+    #  - 4. 
+    if SOURCE_TYPE == 'vault':
+        # --- this is a clean vault use example
+        # vault setup outside of wilsonsim
+        from CQCParse.relay import DataVault
+        csvfile = ws.intensities.utils.get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+        vault = DataVault(csvfile)
+
+        sim.getResultsFromCalculationBatches(source_type='vault',
+                                            datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+    elif SOURCE_TYPE == 'outfiles':
+        # should simply provide list of files? 
+        # that would be simple for gaussian but not so much for cfour
+        sim.getResultsFromCalculationBatches(source_type='outfiles')
+        
     logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
 
 
@@ -113,50 +137,52 @@ def run():
         sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/tests/')
         PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
 
-    logger.info('  >>> Going to evaluate now...\n')
-    sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator)
-    intensities_spec = np.abs(sim.spec)**2
-    logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
+    if not PREP_ONLY:
 
-    logger.debug('\n=====================================================')
-    logger.info('\n  >>> And now rendering...\n')
+        logger.info('  >>> Going to evaluate now...\n')
+        sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator)
+        intensities_spec = np.abs(sim.spec)**2
+        logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 
-    from wilson_analysis.render import render_spectrum
+        logger.debug('\n=====================================================')
+        logger.info('\n  >>> And now rendering...\n')
 
-    hist, bin_edges = np.histogram(intensities_spec, bins=10)
-    logger.debug(f"Histogram counts: {hist}")
-    logger.debug(f"Bin edges: {bin_edges}\n")
+        from wilson_analysis.render import render_spectrum
 
-    logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
+        hist, bin_edges = np.histogram(intensities_spec, bins=10)
+        logger.debug(f"Histogram counts: {hist}")
+        logger.debug(f"Bin edges: {bin_edges}\n")
 
-    dict_meshes = spec_grid.make_mesh_numpy()
-    render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
-                    filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
-                    nicetitle='TermsEvaluator')
+        logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
 
-    from wilson_utils.serialization import check_if_jsonsafe
-    check_if_jsonsafe(sim.to_dict())
+        dict_meshes = spec_grid.make_mesh_numpy()
+        render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
+                        filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
+                        nicetitle='TermsEvaluator')
 
-    ws_root = ws.intensities.utils.get_package_root() + '/../../'
+        from wilson_utils.serialization import check_if_jsonsafe
+        check_if_jsonsafe(sim.to_dict())
 
-    # writing JSON file
-    sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+        ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
-    # pickling
-    import pickle
-    with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
-        pickle.dump(sim, f)
+        # writing JSON file
+        sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
 
-    with open(ws_root+"/tests/wilsonsim0.pkl", "rb") as f:
-        loaded_wilsonsim0 = pickle.load(f)
-    
-    if 'WilsonSimulation_final' in TO_PICKLES:
-        pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/tests/')
+        # pickling
+        import pickle
+        with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
+            pickle.dump(sim, f)
 
-        sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/tests/')
-        PKL_FILES['WilsonSimulation_final'] = 'sim_final.pkl'
-    
-    # apparently numpy can't compare complex numbers
-    assert np.allclose(np.abs(sim.spec), np.abs(loaded_wilsonsim0.spec))
+        with open(ws_root+"/tests/wilsonsim0.pkl", "rb") as f:
+            loaded_wilsonsim0 = pickle.load(f)
+        
+        if 'WilsonSimulation_final' in TO_PICKLES:
+            pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/tests/')
+
+            sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/tests/')
+            PKL_FILES['WilsonSimulation_final'] = 'sim_final.pkl'
+        
+        # apparently numpy can't compare complex numbers
+        assert np.allclose(np.abs(sim.spec), np.abs(loaded_wilsonsim0.spec))
 
     return sim

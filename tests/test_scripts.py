@@ -12,6 +12,7 @@ def test_evv_tester_dataclasses():
     """
     import evv_tester as evv_tester
     evv_tester.TO_PICKLES = []
+    evv_tester.PREP_ONLY = False
     wilsim = evv_tester.run()
 
     assert hasattr(wilsim, 'spec')
@@ -95,10 +96,11 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     topickles_2 = ['WilsonSimulation_init', 'WilsonSimulation_final']
     evv_tester.TO_PICKLES = topickles_2
+    evv_tester.PREP_ONLY = False
     
     # WilsonSimulation object after spectrum was calculated and rendered
     wilsim3 = evv_tester.run()
-
+    print(evv_tester.PKL_FILES)
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
     load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
     load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
@@ -168,5 +170,5 @@ def test_logger_evv_tester_terminal():
     setup_logger("wilson", level=logging.DEBUG)
     
     import evv_tester
+    evv_tester.PREP_ONLY = False
     evv_tester.run()
-
