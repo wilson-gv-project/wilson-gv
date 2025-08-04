@@ -57,7 +57,7 @@ def spectral_grid():
     axis2 = abst_main.SpectralAxis({1: 1, 2: -1})
     start = {1: 250, 2: 100}
     end = {1: 3850, 2: 7550}
-    spacer = {1: 3.8, 2: 3.8}
+    spacer = {1: 230.8, 2: 230.8}
     return abst_main.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
                                   start=start, end=end, spacer=spacer)
 

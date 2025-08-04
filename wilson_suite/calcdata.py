@@ -61,15 +61,10 @@ np3b3b3b3 = np.array([[[[0.93, 0.84, 0.13],
                         [0.18, 0.08, 0.38],
                         [0.57, 0.22, 0.06]]]])
 
-np5b3 = np.array([[0.29, 0.23, 0.52],
-                [0.42, 0.15, 0.23],
-                [0.33, 0.26, 0.04],
-                [0.21, 0.79, 0.21],
-                [0.66, 0.93, 0.71]])
 
 datadict1 = {'system': mol1, 'calc_setup': setup1, 
             'B': (np1b3, None, 'cm-1'), 'coriolis': (np3b3, 'bu', 'cm-1'),
             'hess': (np3b3, 'bu', 'cm-1'), 'cff': (np3b3b3, 'bu', 'cm-1'), 'qff': (np3b3b3b3, 'bu', 'cm-1'), 
-            'dipgrad': (np5b3, 'bu', 'cm-1'), 'diphess': (np5b3, 'bu', 'cm-1'), 
-            'polgrad': (np5b3, 'bu', 'cm-1'), 'polhess': (np5b3, 'bu', 'cm-1'),
+            'dipgrad': (np3b3, 'bu', 'cm-1'), 'diphess': (np3b3b3, 'bu', 'cm-1'), 
+            'polgrad': (np3b3b3, 'bu', 'cm-1'), 'polhess': (np3b3b3b3, 'bu', 'cm-1'),
             'harmonic_states': {(3,):4, (5,):2, (6,):46}, 'anharmonic_states': {(3,):14, (5,):32, (6,):96}}
