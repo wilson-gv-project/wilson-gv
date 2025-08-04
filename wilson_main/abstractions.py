@@ -720,7 +720,8 @@ class SpectralGrid:
 
 	def make_mesh_numpy(self) -> dict:
 		"""
-		Make a meshgrid using the axes information
+		Make a meshgrid using the axes information.
+
 		"""
 
 		listofmeshaxes = []
@@ -747,6 +748,25 @@ class SpectralGrid:
 		pass
 
 
+@dataclass
+class EvaluationInfo:
+	freq_variables: dict
+	Gamma: float
+	Gamma_unit: str
+	fixed_variables: dict = field(default_factory=lambda: dict())
+
+
+@dataclass
+class RenderingInfo:
+	projection: str = '2d'
+	maxPeak: float = None
+	dynrange: float = 100
+	num_level_ticks: int = 12
+	metadat: dict = field(default_factory=lambda: dict())
+	figsize: tuple = (10, 13)
+	font_dict: dict = {'size': 20}
+	to_save: bool = False
+
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
 #
@@ -770,6 +790,8 @@ class SpecEvalSetup:
 	grid: SpectralGrid=None
 	ev_info: dict=None
 	rnd_info: dict=None
+	ev_info_class: EvaluationInfo = None
+	rnd_info_class: RenderingInfo = None
 
 	def __post_init__(self):
 		if self.grid is not None:
