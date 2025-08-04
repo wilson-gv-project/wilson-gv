@@ -59,6 +59,8 @@ def run():
     scan_a = ws.experiment.abstractions.SpecScan(scan_obj_a, scan_range_a)
 
     experiment_a = ws.experiment.abstractions.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
+    logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
+    
     if 'VibExperiment' in TO_PICKLES:
         pickle_this_to(obj=experiment_a, filenamepkl='vibexp.pkl', save_to=SUITE_ROOT+'/tests/')
 
@@ -87,13 +89,20 @@ def run():
                                                         allow_skip_eigvec=True, external_fill_from=calc_setup))
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 
-    axis1 = ws.main.abstractions.SpectralAxis({1: 1})
-    axis2 = ws.main.abstractions.SpectralAxis({1: 1, 2: -1})
-    start = {1: 250, 2: 100}
-    end = {1: 3850, 2: 7550}
-    spacer = {1: 3.8, 2: 3.8}
-    spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+    # more clear definitions with str keys of dicts
+    # so, dicionaries of SpectralAxis instances refer to independent variables, frequencies ranges/lists of vals
+    axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
+    axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1}) 
+
+    # SpectralGrid - is also a source of data for the evaluation function
+    # now here, keys are refereing to spectrum plot axes
+    # SpectralGrid.axes dict keys should be the same as start, end, spacer keys
+    start = {'x': 250, 'y': 100}
+    end = {'x': 3850, 'y': 7550}
+    spacer = {'x': 3.8, 'y': 3.8}
+    spec_grid = ws.main.abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
                                                 start=start, end=end, spacer=spacer)
+
     evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
     rndi = {'num_level_ticks': 15}
     eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
