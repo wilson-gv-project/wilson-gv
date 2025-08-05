@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 from matplotlib.figure import Figure
-from wilson_analysis.render.base_template import BaseRenderer  
+from wilson_analysis.render.base_renderer import BaseRenderer  
 
 class MockRenderer(BaseRenderer):
     def prepare_axes_data(self) -> dict:

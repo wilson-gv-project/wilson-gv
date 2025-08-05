@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import matplotlib.ticker as ticker
-from .base_template import BaseRenderer
+from .base_renderer import BaseRenderer
 from wilson_main.abstractions import RenderingInfo, EvaluationInfo, SpectralGrid
 
 import logging

@@ -30,9 +30,9 @@ logger = logging.getLogger("wilson."+__name__)
 
 
 def renderer(spec: np.ndarray, system: wm_abst.MolecularSystem, 
-             exp: we_abst.VibExperiment, terms: list[wd_abst.VibPerturbedTerm],
+             exp: we_abst.VibExperiment,    # terms: list[wd_abst.VibPerturbedTerm], #?
              diagn: dict, name: str, spec_eval_setup: wm_abst.SpecEvalSetup, 
-             rnd_choice: str = 'matplotlib'):
+             rnd_choice: str = 'matplotlib', do_diagn: bool = False):
     """
     spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
                                                     start=start, end=end, spacer=spacer)
@@ -49,12 +49,16 @@ def renderer(spec: np.ndarray, system: wm_abst.MolecularSystem,
 
     if rnd_choice == 'matplotlib':
         from .matplotlib_renderer import MatplotlibRenderer
-        return MatplotlibRenderer(intensities=intensities,
-                                  spec_grid=spec_grid, 
-                                  rnd_info=spec_eval_setup.rnd_info, 
-                                  ev_info=spec_eval_setup.ev_info).render(filename=filename)
+        rnd_result = MatplotlibRenderer(intensities=intensities,
+                                        spec_grid=spec_grid, 
+                                        rnd_info=spec_eval_setup.rnd_info, 
+                                        ev_info=spec_eval_setup.ev_info).render(filename=filename)
     
     else:
         raise NotImplementedError('Other than `matplotlib` renderers are not implemented. Custom renderer is not supported yet')
-    return 
+    
+    if do_diagn:
+        return rnd_result, diagn
+    else:
+        return rnd_result
 
