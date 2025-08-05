@@ -50,21 +50,26 @@ class EvaluationInfo:
 
     """
     def __init__(self, *args, spec_grid: SpectralGrid, 
-                 rnd_info_class = None, ev_info_class = None, **kwargs):
+                 rnd_info = None, ev_info = None, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.spec_grid = spec_grid
 
-        if rnd_info_class is None:
+        if rnd_info is None:
             # default_rnd_info_class
-            rnd_info_class = RenderingInfo()
+            rnd_info = RenderingInfo()
 
-        if ev_info_class is None:
+        if ev_info is None:
             # default_rnd_info_class
-            ev_info_class = EvaluationInfo()
+            ev_info = EvaluationInfo()
 
-        self.rnd_info_class = rnd_info_class
-        self.ev_info_class = ev_info_class
+        self.rnd_info = rnd_info
+        self.ev_info = ev_info
+
+        # self.spec_grid.axes is - 'x': axis1({'w1': 1}), 'y': axis2({'w1': 1, 'w2': -1})
+        assert len(self.spec_grid.axes) == int(self.rnd_info.projection[0]), 'Provided spectral axes do not correspond to the projection choice'
+
+
 
     def create_figure(self):
         """
@@ -78,17 +83,17 @@ class EvaluationInfo:
         Returns:
             tuple: (fig, ax)
         """
-        if self.rnd_info_class.to_save:
+        if self.rnd_info.to_save:
             matplotlib.use('Agg')
 
-        if self.font_dict:
-            matplotlib.rc('font', **self.font_dict)
+        if self.rnd_info.font_dict:
+            matplotlib.rc('font', **self.rnd_info.font_dict)
 
-        subplot_kw = {'projection': self.rnd_info_class.projection} if self.rnd_info_class.projection else {}
-        fig, ax = plt.subplots(figsize=self.rnd_info_class.figsize, subplot_kw=subplot_kw)
+        subplot_kw = {'projection': self.rnd_info.projection} if self.rnd_info.projection else {}
+        fig, ax = plt.subplots(figsize=self.rnd_info.figsize, subplot_kw=subplot_kw)
         return fig, ax
 
-    def prepare_axes_data(self)  -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def prepare_axes_data(self) -> dict:
         """
         variables = {'x1': x1, 'x2': x2, 'x3': x3, 'x4': x4} - dict[str, np.ndarray]
         plot_axes = {
@@ -100,30 +105,36 @@ class EvaluationInfo:
         - need to fix unused variables ('x1', 'x4' here)
         - need to extract appropriate shapes from meshgrids
 
-class EvaluationInfo:
-	freq_variables: dict
-	Gamma: float
-	Gamma_unit: str
-	fixed_variables: dict = field(default_factory=lambda: dict())
-
         """
-        specAxes = self.spec_grid.axes
-        x_vals = sum([self.spec_grid.axes[1].freq_vars.items()])
+        # 'w1': mesh, 'w2': mesh; variables
+        freq_vars = self.ev_info.freq_variables
+        
+        # 'x': meshsum, 'y': meshsum; plot_axes
+        xy_axes = {}
+        for i in self.spec_grid.axes:
+            xy_axes[i] = sum([freq_vars[k]*v for k,v in self.spec_grid.axes[i].freq_vars.items()])
 
-    def prepare_contour_levels(self, Zvals, log10=False):
+        return xy_axes
+
+    def prepare_contour_levels(self):
         """
         For contourf plots
-        """
-        
-        d_max = np.max(Zvals)
-        d_min = d_max / self.dynrange_n
 
-        if log10:
+        set values to:
+            self.tick_values
+            self.tick_labels
+            self.tick_norm_positions
+        """
+
+        d_max = np.max(self.intensities)
+        d_min = d_max / self.rnd_info.dynrange
+
+        if self.rnd_info.log10:
             log_min = np.log10(d_min)
             log_max = np.log10(d_max)
 
             # evenly spaced log10 levels
-            log_ticks = np.linspace(log_min, log_max, self.num_levels)
+            log_ticks = np.linspace(log_min, log_max, self.rnd_info.num_level_ticks)
             self.tick_values = np.power(10, log_ticks)
 
             # Format labels nicely (LaTeX-style strings)
@@ -160,7 +171,7 @@ class EvaluationInfo:
         
         return self.log10
 
-    def do_normalize_data(self, specAxes_dict: dict, normalize: list = None):
+    def do_normalize_data(self, specAxes_dict: dict, normalize: list = None) -> dict:
 
         if normalize is None:
             self.normalize = {}
@@ -171,42 +182,49 @@ class EvaluationInfo:
         
         return self.normalize
 
-    def plot_contours(self, fig, ax, contourAxes: dict):
+    def plot_contours(self, fig: plt.Figure, ax: plt.Axes, axes_dict: dict):
         """
         needs 3 dimensions
         """
-        X, Y = contourAxes['x'], contourAxes['y']
-        y = -(X - Y) # should get this from SpectralAxis objects
+        
+        assert 'x' in axes_dict and 'y' in axes_dict, 'Did not recieve `x` and `y` axes, cannot make a contour plot'
+        assert len(axes_dict) < 3, 'Recieved more than 2 axes for plot. Contour plot needs `x` and `y` axes'
+
+        X, Y = axes_dict['x'], axes_dict['x']
+        Z = self.intensities
 
         cmap = plt.get_cmap('hot_r').copy()
         cmap.set_extremes(over='#FF00FF')
         cont = ax.contourf(
-            X, y, self.intensity_plot,
-            levels=self.level_ticks,
+            X, Y, Z,
+            levels=self.tick_values,
             cmap=cmap,
             extend='max'
         )
 
         ax.set_xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', fontsize=25)
         ax.set_ylabel(r'$(\omega_2 - \omega_1)/2\pi c, \text{cm}^{-1}$', fontsize=25)
-        ax.set_title(self.title)
+        ax.set_title(self.rnd_info.title)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="3%", pad=2.1)
         cbar = fig.colorbar(cont, cax=cax, aspect=65, shrink=0.9,
-                            ticks=self.level_ticks, format=ticker.FuncFormatter(self._fmt_tick))
-        cbar.set_ticklabels([f'{tick:.2f}' for tick in self.level_ticks])
-        for tick, label in zip(self.level_ticks, self.level_labels):
+                            ticks=self.tick_values, format=ticker.FuncFormatter(self._fmt_tick))
+        
+        cbar.set_ticklabels([f'{tick:.2f}' for tick in self.tick_values])
+        for tick, label in zip(self.tick_values, self.tick_labels):
             cbar.ax.text(-2.0, tick, label, ha='left', va='center')
 
-    def finalize(self, fig, ax, filename):
+
+    def finalize(self, ax: plt.Axes, filename):
         ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.set_aspect('equal', adjustable='box')
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.tick_params(axis="x", bottom=True, top=True, labelbottom=True, labeltop=True)
-        if self.to_save:
+        if self.rnd_info.to_save:
             plt.savefig(filename, dpi=250, format='svg')
+
 
     def _format_level(self, val):
         if val >= 1000 or val < 0.01:

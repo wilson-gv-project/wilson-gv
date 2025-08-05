@@ -28,6 +28,7 @@ import logging
 # wilson. - for hierarchy of loggers
 logger = logging.getLogger("wilson."+__name__)
 
+
 def renderer(spec: np.ndarray, system: wm_abst.MolecularSystem, 
              exp: we_abst.VibExperiment, terms: list[wd_abst.VibPerturbedTerm],
              diagn: dict, name: str, spec_eval_setup: wm_abst.SpecEvalSetup, 
@@ -43,25 +44,15 @@ def renderer(spec: np.ndarray, system: wm_abst.MolecularSystem,
     """
     dimensionality = exp.dim # 2 for EVV
     spec_grid = spec_eval_setup.grid
-    
-    # Gamma = spec_eval_setup.ev_info_class.Gamma
-    # assert spec_eval_setup.ev_info_class.Gamma_unit == 'cm-1'
-
-    # dynrange = spec_eval_setup.rnd_info_class.dynrange
-    # maxmax = spec_eval_setup.rnd_info_class.maxPeak
-    # num_level_ticks = spec_eval_setup.rnd_info_class.num_level_ticks
-
-    # indp_vars = spec_eval_setup.ev_info_class.freq_variables
-    # fixed_vars = spec_eval_setup.ev_info_class.fixed_variables
-
-    # # 1 - x, 2 - y figure axes
-    # specAxes = spec_eval_setup.grid.axes
+    filename = f'{system.name}_{name}'
+    intensities = np.abs(spec)**2
 
     if rnd_choice == 'matplotlib':
         from .matplotlib_renderer import MatplotlibRenderer
-        return MatplotlibRenderer(spec_grid=spec_grid, 
-                                  rnd_info_class=spec_eval_setup.rnd_info_class, 
-                                  ev_info_class=spec_eval_setup.ev_info_class).render()
+        return MatplotlibRenderer(intensities=intensities,
+                                  spec_grid=spec_grid, 
+                                  rnd_info=spec_eval_setup.rnd_info, 
+                                  ev_info=spec_eval_setup.ev_info).render(filename=filename)
     
     else:
         raise NotImplementedError('Other than `matplotlib` renderers are not implemented. Custom renderer is not supported yet')

@@ -1,6 +1,4 @@
-import wilson_main.abstractions as wm_abst
 from abc import ABC, abstractmethod
-import numpy as np
 
 class BaseRenderer(ABC):
     """
@@ -23,45 +21,42 @@ class BaseRenderer(ABC):
     rndi = {'num_level_ticks': 15}
     eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
     """
-    def __init__(self, specAxes=None, projection=None, dynrange_n=None):
+    def __init__(self, intensities = None):
         """
+        intensities - final values for Z axis of the figure
+
         dynrange_n: 
             max / dynrange_n ==> min
             1e8 / 1000       ==> 1e5
         """
-        self.specAxes = None
-        self.projection = None
-        self.dynrange_n = None
+        self.intensities = intensities
 
 
-        self.num_levels = None
-        self.title = None
+    def render(self, filename: str):
+        """
+        pipeline of rendering:
+            from data prep to daved figure
 
-        self.tick_values = None
-        self.tick_labels = None
-        self.tick_norm_positions = None
+        after prepare_contour_levels():
+            self.tick_values
+            self.tick_labels
+            self.tick_norm_positions
 
-
-    def render(self, spec_eval_setup: wm_abst.SpecEvalSetup, contourAxes: dict, filename: str):
         
-        self.specAxes = spec_eval_setup.grid.axes        
-        assert self.specAxes is not None, 'Set specAxes value'
-        
-        Zval_axID = contourAxes['z']
-        self.prepare_contour_levels(self.specAxes[Zval_axID])
-        
+        """
+        # pre-processing
+        axes_dict = self.prepare_axes_data()
+        self.prepare_contour_levels()
+        # fig prep
         fig, ax = self.create_figure()
-
-        self.plot_contours(fig, ax)
+        # plotting
+        self.plot_contours(fig, ax, axes_dict)
+        # final styling of figure and saving
         self.finalize(fig, ax, filename)
 
+
     @abstractmethod
-    def prepare_axes_data(self,
-                            variables: dict[str, np.ndarray],
-                            values: np.ndarray, # self.spec from WilsonSim
-                            axes_def: dict[str, str],       # 'x', 'y', 'z' expressions
-                            fixed_axes: dict[str, float] = None,  # x1=0.5, x4=1.0
-                            interpolate: bool = True)  -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def prepare_axes_data(self)  -> dict:
         """
         variables = {'x1': x1, 'x2': x2, 'x3': x3, 'x4': x4} - dict[str, np.ndarray]
         axes_def = {
