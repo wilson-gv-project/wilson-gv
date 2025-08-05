@@ -652,6 +652,11 @@ class SpectralGrid:
 	----
 	axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
 	instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
+		this parameter is misleading if :
+			e.g., axis1 is with {1: 1} and axis2 is with {1: 1, 2: -1} 
+			and `spacer`, `start` and `end` dicts are used as they are now in __post_init__ and `make_mesh_numpy`
+			the grid itself right now would not correspond to axis1 is with {1: 1} and axis2 is with {1: 1, 2: -1}
+
 	range_style: String: What sort of range? Intended options at least "uniform" or "custom"
 	start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
 	end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
@@ -749,20 +754,80 @@ class SpectralGrid:
 
 
 @dataclass
+class EvaluationVariable:
+	"""
+	Like SpectralAxis, but a range for an independent variable of the response function (frequency variable)
+
+	range_style: 'uniform' or 'custom'
+	"""
+	range_style: str
+	start: float = None
+	end: float = None
+	n_pts: int = None
+	spacer: float = None
+	custom_range: list|np.ndarray = None
+
+	def __post_init__(self):
+		"""
+		dealing with one range at the time seems to be more clean
+		"""
+		
+		if self.range_style == 'custom':
+			raise NotImplementedError('Custom range style is not yet supported')
+		
+		elif self.range_style == 'uniform':
+			
+			if (self.n_pts is None) and (self.spacer is None):
+				raise AssertionError('For a uniform setup, either a spacer or a n_pts dictionary must be specified')
+
+			if (self.n_pts is not None) and (self.spacer is not None):
+				raise AssertionError('Only one of the arguments n_pts and spacer may be specified')
+			
+			if self.n_pts is not None:
+				self.spacer = (self.end - self.start)/(self.n_pts + 1)
+				self.range = np.linspace(self.start, self.end, self.n_pts)
+
+			elif self.spacer is not None:
+
+				self.n_pts = int((self.end - self.start)/self.spacer + 1)
+				if self.end != self.start + self.spacer*(self.n_pts - 1):
+					logger.info(f'NOTE: Axis defined end {self.end} not precisely at spacer increment of start')
+				self.range = np.arange(self.start, self.end, self.spacer)
+
+
+@dataclass
 class EvaluationInfo:
+	"""
+	this feels a bit more "official" than a dict
+	and it is warranted because that is a critical info that is needed for the evaluation
+
+	freq_variables - is a dict {variable label: variable data} with a range for each
+	fixed_variables - a dict of values for the non-varied fixed variables 
+		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
+	"""
 	freq_variables: dict
 	Gamma: float
 	Gamma_unit: str
 	fixed_variables: dict = field(default_factory=lambda: dict())
-
+	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 
 @dataclass
 class RenderingInfo:
+	"""
+	this feels a bit more "official" than a dict
+	and it is warranted because that is a critical info that is needed for the rendiring
+
+	projection: '1d', '2d' or '3d'
+	maxPeak: normalizing to this maxPeak value
+
+	"""
 	projection: str = '2d'
 	maxPeak: float = None
 	dynrange: float = 100
 	num_level_ticks: int = 12
-	metadat: dict = field(default_factory=lambda: dict())
+	log10: bool = True
+	title: str = 'plot'
+	metadata: dict = field(default_factory=lambda: dict())
 	figsize: tuple = (10, 13)
 	font_dict: dict = field(default_factory=lambda: {'size': 20})
 	to_save: bool = False
@@ -788,10 +853,8 @@ class SpecEvalSetup:
 	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
 	"""
 	grid: SpectralGrid=None
-	ev_info: dict=None
-	rnd_info: dict=None
-	ev_info_class: EvaluationInfo = None
-	rnd_info_class: RenderingInfo = None
+	ev_info: EvaluationInfo = None
+	rnd_info: RenderingInfo = None
 
 	def __post_init__(self):
 		if self.grid is not None:
