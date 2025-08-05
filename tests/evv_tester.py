@@ -86,7 +86,6 @@ def run():
     
     logger.info(' >>>> sim.terms')
     logger.info(sim.terms)
-    logger.info(ws.derive.main.present_derived_terms_dict(sim.terms))
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     sim.addSystem(mol_system)
@@ -98,7 +97,7 @@ def run():
     # so, dicionaries of SpectralAxis instances refer to independent variables, frequencies ranges/lists of vals
     # this means that there should be independent_vars data in addition to axes - that's where evaluation will be, in those ranges
     # smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
-    # could follow from derived terms, as pfs from ResonanceCondictions
+    # could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
 
     axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
     axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1}) 
@@ -109,12 +108,25 @@ def run():
     start = {'x': 250, 'y': 100}
     end = {'x': 3850, 'y': 7550}
     spacer = {'x': 3.8, 'y': 3.8}
+
     spec_grid = ws.main.abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
                                                 start=start, end=end, spacer=spacer)
 
-    evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
-    rndi = {'num_level_ticks': 15}
+    eval_vars = {'w1': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
+                 'w2': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
+    import numpy as np
+    meshgrids = np.meshgrid(*eval_vars.values(), indexing='ij')
+
+    eval_vars_meshgrids = {}
+    for i, key in enumerate(eval_vars.keys()):
+        eval_vars_meshgrids[key] = meshgrids[i]
+    
+    evi = ws.main.abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+                                                 'Gamma': 4.7, 'Gamma_unit': 'cm-1', 'maxPeak': None})
+    rndi = ws.main.abstractions.RenderingInfo(**{'dynrange': 500, 'num_level_ticks': 15, 
+                                                 'projection': '2d', 'to_save': True})
     eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+
     sim.addSpecEvalSetup(eval_setup)
 
     sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
