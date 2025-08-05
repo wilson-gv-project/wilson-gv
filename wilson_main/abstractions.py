@@ -1444,9 +1444,25 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return
 		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+		assert self.spec is not None, 'No spectrum data, there is nothing to render'
+		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
+		
+		if self.diagn is None:
+			self.diagn = {}
+
+		# TODO also - self.system, self.exp, self.name
+		# generate self.name?
+
+		context = {'spec': self.spec, 'system': self.system, 
+			 		'exp': self.exp, 'diagn': self.diagn, 
+					'name': self.name, 
+					'spec_eval_setup': self.spec_eval_setup,
+					'do_diagn': False}
+		
+		logger.debug(repr(context))
+
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		self.rendering = renderer(**context)
 
 	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
 														dict, str, SpecEvalSetup], tuple[Any, dict]]):
@@ -1456,9 +1472,25 @@ class WilsonSimulation:
 		renderer: Callable: A function to carry out the rendering. As in render but must additionally return a
 		dictionary of diagnostics information.
 		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+		assert self.spec is not None, 'No spectrum data, there is nothing to render'
+		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
+		
+		if self.diagn is None:
+			self.diagn = {}
+
+		# TODO also - self.system, self.exp, self.name
+		# generate self.name?
+
+		context = {'spec': self.spec, 'system': self.system, 
+			 		'exp': self.exp, 'diagn': self.diagn, 
+					'name': self.name, 
+					'spec_eval_setup': self.spec_eval_setup,
+					'do_diagn': True}
+		
+		logger.debug(repr(context))
+
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		self.rendering, self.diagn = renderer(**context)
 
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
