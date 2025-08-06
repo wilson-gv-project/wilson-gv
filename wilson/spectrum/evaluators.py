@@ -3,6 +3,7 @@ Evaluator functions for WilsonSimulation
 """
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+from wilson_main import abstractions as wm_abst
 
 import numpy as np
 
@@ -14,7 +15,7 @@ def eval_spec2D():
 # TermND with TermsEvaluator
 def terms_evaluator(system,
                     derived_terms, props,
-                    spec_eval_setup, vib_ana_setup) -> complex|float|np.ndarray:
+                    spec_eval_setup: wm_abst.SpecEvalSetup, vib_ana_setup) -> complex|float|np.ndarray:
     """
     >> Orchestrating spectrum amplitudes evaluation with TermND setup.
 
@@ -102,6 +103,7 @@ def terms_evaluator(system,
 
     avrg_terms, prefactorAvrg = getPolarizationAveragingExpression("ZZZZ") # "ZZZZ" should come from some setup dataobject
     axes_dict = spec_eval_setup.grid.make_mesh_numpy()
+    axes_dict = spec_eval_setup.ev_info.freq_variables
 
     # format transformation
     states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
@@ -124,7 +126,7 @@ def terms_evaluator(system,
         term.mode_indices = vib_ana_setup.modes_indices
         # context manager - setting debug level
         with debug_mode(0):
-            a_intermediate = term.get_amplitudes(axes_dict[1], axes_dict[2],
+            a_intermediate = term.get_amplitudes(axes_dict['w1'], axes_dict['w2'],
                                                  3.8, 0.0, debugprint=True, collect_all=False)
         amplitudes += a_intermediate
     

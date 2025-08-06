@@ -8,6 +8,8 @@ from wilson.utils.spectrum_utils import greek_list
 from wilson.utils.spectrum_utils import DataForPrecalc
 from wilson.spectrum.termND import TermND
 
+import logging
+logger = logging.getLogger("wilson."+__name__)
 
 class TermsEvaluator:
     """
@@ -228,7 +230,7 @@ class TermsEvaluator:
         requires:
             self.unique_res_conds
 
-        axes_dict - ??? {1: , 2: , 3: ....} pf labels: points array/meshgrid
+        axes_dict - ??? {'w1': , 'w2': , 'w3': ....} pf labels: points array/meshgrid
 
         precalculates pf combinations accorging to given signes - [-1], [-1, 2] ...
         """
@@ -243,10 +245,12 @@ class TermsEvaluator:
         # collect types of pert freqs arrangements
         for pfs in uq_pert_freq_arrays:
             pfs = [int(i) for i in pfs]
+            logger.debug('pfs = \[int(i) for i in pfs]')
+            logger.debug(pfs)
             result_pfs[tuple(pfs)] = 0.
 
             for pf in pfs:
-                result_pfs[tuple(pfs)] += axes_dict[abs(pf)] * np.sign(pf)
+                result_pfs[tuple(pfs)] += axes_dict[f'w{abs(pf)}'] * np.sign(pf)
 
         return result_pfs
 
