@@ -27,6 +27,12 @@ from matplotlib import pyplot as plt
 import matplotlib
 from enum import Enum
 
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo, SpecEvalSetup
+
+
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
@@ -60,13 +66,9 @@ class NormalizationType(Enum):
 @dataclass
 class SpectrumData:
     """Container for spectrum data and metadata"""
-    intensities: np.ndarray
-    w1: np.ndarray  # omega 1 frequencies
-    w2: np.ndarray  # omega 2 frequencies
-    title: str = ""
-    dynamic_range: float = 1e3
-    num_levels: int = 10
-    reference_max: Optional[float] = None  # For normalization reference
+    w1: np.ndarray  #                                       - SpecEvalSetup.grid.axes
+    w2: np.ndarray  #                                       - SpecEvalSetup.grid.axes
+
 
 @dataclass
 class PlotConfig:
@@ -88,7 +90,7 @@ class PlotConfig:
     y_min: Optional[float] = None
     y_max: Optional[float] = None
     colorbar_main_label: str = "Intensity"
-    normalization_type: NormalizationType = NormalizationType.LOG_RATIO  # Add this line
+    colorbar_padding: float = 0.01  # Padding between colorbar and plot
     show_top_ticks: bool = False
     show_right_ticks: bool = False
     x_tick_rotation: float = 45  # Add this line for configurable rotation
@@ -156,18 +158,33 @@ class LevelCalculator:
 class SpectrumRenderer(ABC):
     """Abstract base class for spectrum rendering"""
     
-    def __init__(self, data: SpectrumData, config: PlotConfig):
-        self.data = data
-        self.config = config
+    def __init__(self, 
+                 spec_data: np.ndarray | dict,
+                 spec_grid: "SpectralGrid" = None,
+                 ev_info: "EvaluationInfo" = None,
+                 rnd_info: "RenderingInfo" = None, 
+                 config: PlotConfig = PlotConfig()):
+
+        self.spec_data = spec_data
+        self.rnd_info = rnd_info
+        self.ev_info = ev_info
+        self.spec_grid = spec_grid
+        
+        self.config = self.rnd_info.style_config if rnd_info else config
         self.level_calc = LevelCalculator()
-    
+        self.intensities = None
+
+        self.Xdata = None  # Placeholder for X-axis data
+        self.Ydata = None  # Placeholder for Y-axis data
+
+
     @abstractmethod
     def initialize_plot(self) -> Any:
         """Initialize plotting surface"""
         pass
     
     @abstractmethod
-    def create_contour(self, plot_obj: Any, levels: np.ndarray, normalized_data: np.ndarray) -> Any:
+    def create_contour(self, plot_obj: Any, levels: np.ndarray, data: np.ndarray) -> Any:
         """Create contour plot"""
         pass
     
@@ -177,27 +194,69 @@ class SpectrumRenderer(ABC):
         pass
     
     @abstractmethod
+    def finalize(self, plot_obj) -> None:
+        pass
+
+    @abstractmethod
     def save_plot(self, plot_obj: Any, filename: str) -> None:
         """Save plot to file"""
         pass
+
+    def prep_data(self, spec_data_operations: str) -> np.ndarray:
+        """
+        Prepare data for contour plotting.
+        """
+        if self.intensities is None:
+            if spec_data_operations == 'abs()**2':
+                self.intensities = np.abs(self.spec_data) ** 2
+            elif spec_data_operations == 'abs':
+                self.intensities = np.abs(self.spec_data)
+            elif spec_data_operations == 'real':
+                self.intensities = np.real(self.spec_data)
+            elif spec_data_operations == 'imag':
+                self.intensities = np.imag(self.spec_data)
+            else:
+                raise ValueError(f"Unsupported spec_data_operations: {spec_data_operations}")
+
+        if self.spec_grid is not None:
+            # 'w1': mesh, 'w2': mesh; variables
+            freq_vars = self.ev_info.freq_variables
+
+            # 'x': meshsum, 'y': meshsum; plot_axes
+            xy_axes = {}
+
+            for i in self.spec_grid.axes:
+                xy_axes[i] = sum([freq_vars[k]*v for k,v in self.spec_grid.axes[i].freq_vars.items()])
+
+            self.Xdata = xy_axes.get('x', None)
+            self.Ydata = xy_axes.get('y', None)
+            self.Zdata = xy_axes.get('z', None) # 3D plot with 3 spectral axes
+
     
     def render(self, filename: str) -> None:
         """Main rendering pipeline"""
+
+        # prepare data for contour plotting with spec_data_operations and spec_grid.axes
+        self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+
         # Calculate levels with both original and normalized scales
         levels, labels, norm_positions, norm_labels = self.level_calc.compute_levels(
-            np.max(self.data.intensities),
-            self.data.dynamic_range,
-            self.data.num_levels,
-            ref_max=self.data.reference_max,
+            np.max(self.intensities),
+            self.rnd_info.dynamic_range,
+            self.rnd_info.num_levels,
+            ref_max=self.rnd_info.reference_max,
             colormap_spacing=self.config.colormap_spacing,
             colormap_power=self.config.colormap_power
         )
-        
-        # Create and save plot using original data
+
+        # plot_obj is - tuple of fig, ax
         plot_obj = self.initialize_plot()
-        plot_obj = self.create_contour(plot_obj, levels, self.data.intensities)
-        self.add_colorbar(plot_obj, levels, labels)
-        self.save_plot(plot_obj, filename)
+        # plot_obj is - tuple of fig, ax, contour
+        plot_obj = self.create_contour(plot_obj=plot_obj, levels=levels, data=self.intensities)
+        # plot_obj is - tuple of fig, ax, cbar
+        plot_obj = self.add_colorbar(plot_obj=plot_obj, levels=levels, labels=labels)
+        self.finalize(plot_obj=plot_obj)
+        self.save_plot(plot_obj=plot_obj, filename=filename)
 
 class MatplotlibRenderer(SpectrumRenderer):
     """Matplotlib implementation of spectrum renderer"""
@@ -217,14 +276,22 @@ class MatplotlibRenderer(SpectrumRenderer):
         
         return fig, ax
     
-    def create_contour(self, plot_obj: Tuple[plt.Figure, plt.Axes], 
-                      levels: np.ndarray, 
-                      data: np.ndarray) -> Tuple[plt.Figure, plt.Axes, Any]:
+
+    def create_contour(self, 
+                       plot_obj: Tuple[plt.Figure, plt.Axes], 
+                       levels: np.ndarray, 
+                       data: np.ndarray) -> Tuple[plt.Figure, plt.Axes, Any]:
+        """
+        2D contour plot.
+
+        data parameter here refers to the Z-axis data for contour plotting, the signal magnitude
+        """
+
         fig, ax = plot_obj
         
         # Create masked arrays
         no_data_mask = np.isnan(data)
-        d_min = np.max(data) / self.data.dynamic_range
+        d_min = np.max(data) / self.rnd_info.dynamic_range
         below_range_mask = (~no_data_mask) & (data < d_min)
         
         # Setup base colormap
@@ -232,12 +299,12 @@ class MatplotlibRenderer(SpectrumRenderer):
         cmap.set_over(self.config.saturation_color)
         
         # Fill no-data and below-range regions
-        ax.contourf(self.data.w1, -(self.data.w1 - self.data.w2),
+        ax.contourf(self.Xdata, self.Ydata,
                    no_data_mask,
                    levels=[0, 0.5, 1],
                    colors=[self.config.no_data_color])
         
-        ax.contourf(self.data.w1, -(self.data.w1 - self.data.w2),
+        ax.contourf(self.Xdata, self.Ydata,
                    below_range_mask,
                    levels=[0, 0.5, 1],
                    colors=[self.config.below_range_color])
@@ -246,7 +313,7 @@ class MatplotlibRenderer(SpectrumRenderer):
         norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
         
         # Plot main data with normalized colors
-        contour = ax.contourf(self.data.w1, -(self.data.w1 - self.data.w2), 
+        contour = ax.contourf(self.Xdata, self.Ydata, 
                            data,
                            levels=levels,
                            norm=norm,  # Add normalization
@@ -254,7 +321,7 @@ class MatplotlibRenderer(SpectrumRenderer):
                            extend='max')
         
         # Single clean edge line
-        ax.contour(self.data.w1, -(self.data.w1 - self.data.w2),
+        ax.contour(self.Xdata, self.Ydata,
                   ~no_data_mask,
                   levels=[0.5],
                   colors=[self.config.data_edge_color],
@@ -262,11 +329,17 @@ class MatplotlibRenderer(SpectrumRenderer):
         
         # Set up axes labels
         label_fontsize = self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25
-        ax.set_xlabel(r'$\omega_1/2\pi c, \text{cm}^{-1}$', 
+
+        xlabel_str = spectral_axis_to_label(self.spec_grid.axes.get('x').freq_vars) if self.spec_grid else r'$\omega_1/2\pi c, \text{cm}^{-1}$'
+        ylabel_str = spectral_axis_to_label(self.spec_grid.axes.get('y').freq_vars) if self.spec_grid else r'$(\omega_2-\omega_1)/2\pi c, \text{cm}^{-1}$'
+
+        ax.set_xlabel(xlabel_str, 
                      fontsize=label_fontsize, labelpad=65.) # labelpad - distance from axis to label
-        ax.set_ylabel(r'$(\omega_2-\omega_1)/2\pi c, \text{cm}^{-1}$', 
+        ax.set_ylabel(ylabel_str, 
                      fontsize=label_fontsize, labelpad=65.) # labelpad - distance from axis to label
-        
+        logger.debug(f'self.spec_grid.axes {self.spec_grid.axes}')
+
+
         # Simple aspect ratio setting
         if self.config.equal_aspect:
             ax.set_aspect('equal', adjustable='box')
@@ -293,12 +366,12 @@ class MatplotlibRenderer(SpectrumRenderer):
         
         # Set axis limits
         ax.set_xlim(
-            self.config.x_min if self.config.x_min is not None else np.min(self.data.w1),
-            self.config.x_max if self.config.x_max is not None else np.max(self.data.w1)
+            self.config.x_min if self.config.x_min is not None else np.min(self.Xdata),
+            self.config.x_max if self.config.x_max is not None else np.max(self.Xdata)
         )
         ax.set_ylim(
             self.config.y_min,
-            self.config.y_max if self.config.y_max is not None else np.max(-(self.data.w1 - self.data.w2))
+            self.config.y_max if self.config.y_max is not None else np.max(self.Ydata)
         )
         
         # After setting up the main axes ticks and labels
@@ -317,12 +390,12 @@ class MatplotlibRenderer(SpectrumRenderer):
         
         # Set axis limits
         ax.set_xlim(
-            self.config.x_min if self.config.x_min is not None else np.min(self.data.w1),
-            self.config.x_max if self.config.x_max is not None else np.max(self.data.w1)
+            self.config.x_min if self.config.x_min is not None else np.min(self.Xdata),
+            self.config.x_max if self.config.x_max is not None else np.max(self.Xdata)
         )
         ax.set_ylim(
             self.config.y_min,
-            self.config.y_max if self.config.y_max is not None else np.max(-(self.data.w1 - self.data.w2))
+            self.config.y_max if self.config.y_max is not None else np.max(self.Ydata)
         )
         
         # After setting ticks, rotate x-axis tick labels
@@ -332,34 +405,35 @@ class MatplotlibRenderer(SpectrumRenderer):
         return fig, ax, contour
     
     def add_colorbar(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any], 
-                    levels: np.ndarray, labels: List[str]) -> None:
+                    levels: np.ndarray, labels: List[str]) -> Tuple[plt.Figure, plt.Axes, Any]:
         """
         https://pythonmatplotlibtips.blogspot.com/2019/07/draw-two-axis-to-one-colorbar.html
         """
         fig, ax, contour = plot_obj
-        
-        # Create main colorbar with some padding
-        cbar = fig.colorbar(contour, ax=ax, pad=0.08)
-        
-        # Get colorbar axes and adjust position
-        pos = cbar.ax.get_position()
+
+        # Create colorbar and manually align it to the plot's height
+        cbar = fig.colorbar(contour, ax=ax)
+
         ax1 = cbar.ax
         ax1.set_aspect('auto')
-        
+
+        fig.canvas.draw()  # Ensure layout is updated
+        pos = cbar.ax.get_position()
+
         # Create and set up normalized (left) axis
         ax2 = ax1.twinx()
         ax2.set_position(pos)
         
         # Calculate normalized positions based on selected normalization type
-        if self.config.normalization_type == NormalizationType.LOG_RATIO:
+        if self.rnd_info.intensity_normalization_type == NormalizationType.LOG_RATIO:
             norm_positions = np.log10(levels)/np.log10(levels[-1])
             norm_format = "{x:.3f}"
             norm_label = "Log Ratio"
-        elif self.config.normalization_type == NormalizationType.DECIBEL:
+        elif self.rnd_info.intensity_normalization_type == NormalizationType.DECIBEL:
             norm_positions = 10 * np.log10(levels/levels[-1])
             norm_format = "{x:.1f} dB"
             norm_label = "Intensity (dB)"
-        elif self.config.normalization_type == NormalizationType.PERCENTAGE:
+        elif self.rnd_info.intensity_normalization_type == NormalizationType.PERCENTAGE:
             norm_positions = (levels/levels[-1]) * 100
             norm_format = "{x:.1f}%"
             norm_label = "Relative Intensity (%)"
@@ -368,7 +442,7 @@ class MatplotlibRenderer(SpectrumRenderer):
             norm_format = "{x:.2f}"
             norm_label = "Log-scale Normalized"
         
-        logger.debug(f"Normalized positions ({self.config.normalization_type.value}): {norm_positions}")
+        logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
         
         # Set up normalized axis limits and ticks
         ax2.set_ylim(min(norm_positions), max(norm_positions))
@@ -390,33 +464,53 @@ class MatplotlibRenderer(SpectrumRenderer):
         ax1.set_ylabel(self.config.colorbar_main_label,
                        rotation=90,
                        labelpad=48, # distance from axis to label
-                       fontsize=self.config.font_dict.get('size', 20))
+                       fontsize=self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25)
         
         # Set normalized axis label
         ax2.set_ylabel(norm_label,
                        rotation=90,
                        labelpad=48, # distance from axis to label
-                       fontsize=self.config.font_dict.get('size', 20))
+                       fontsize=self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25)
         
         # Adjust spacing between axes
         cbar.ax.spines['right'].set_position(('outward', 0))
         ax2.spines['left'].set_position(('outward', 0))
+        return fig, ax, cbar
+
+    def finalize(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any]) -> None:
+        """
+        Finalize plot styling.
+        This method can be overridden in subclasses for additional styling.
+        """
         
+        fig, ax, cbar = plot_obj
+        fig.canvas.draw()  # Make sure the figure layout is updated
+
+        # Get the main axis position (where the actual plot is)
+        ax_pos = ax.get_position()
+
+        # Example: shrink or stretch colorbar to match ax height
+        cbar_pos = cbar.ax.get_position()
+        cbar.ax.set_position([
+            cbar_pos.x0+self.config.colorbar_padding,       # x-position (keep same or adjust)
+            ax_pos.y0,         # align bottom of colorbar to ax
+            cbar_pos.width,    # keep same width
+            ax_pos.height      # match ax height
+        ])
 
     def save_plot(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any], filename: str) -> None:
-        fig, ax, contour = plot_obj
+        fig, ax, _ = plot_obj
         
         # No need to set aspect here anymore as it's handled in create_contour
         ax.grid(True, linestyle='--', alpha=0.7)
-        fig.savefig(filename, dpi=self.config.dpi, format='svg')
+        fig.savefig(filename, bbox_inches='tight',
+                    dpi=self.config.dpi, format=filename.split('.')[-1])
         plt.close(fig)
 
 # Example usage:
-def render_spectrum(intensities: np.ndarray, 
-                   w1: np.ndarray,
-                   w2: np.ndarray,
+def render_spectrum(spec_data: np.ndarray, 
                    filename: str,
-                   plort_config: Optional[PlotConfig] = None,
+                   spec_eval_setup: "SpecEvalSetup" = None,
                    renderer_class=MatplotlibRenderer,
                    **kwargs) -> None:
     """
@@ -468,14 +562,55 @@ def render_spectrum(intensities: np.ndarray,
 
     - need to fix unused variables ('x1', 'x4' here)
     - need to extract appropriate shapes from meshgrids
-    
+
     """
-    data = SpectrumData(
-        intensities=intensities,
-        w1=w1,
-        w2=w2,
-        **kwargs
-    )
-    
-    renderer = renderer_class(data, plort_config)
+    # TODO - UPD!
+    """
+    context = {'spec': self.spec, 'system': self.system, 
+                'exp': self.exp, 'diagn': self.diagn, 
+                'name': self.name, 
+                'spec_eval_setup': self.spec_eval_setup,
+                'do_diagn': True}
+    """
+        
+    plort_config = spec_eval_setup.rnd_info.style_config
+
+    renderer = renderer_class(spec_data=spec_data, 
+                              spec_grid=spec_eval_setup.grid,
+                              ev_info=spec_eval_setup.ev_info, 
+                              rnd_info=spec_eval_setup.rnd_info, 
+                              config=plort_config)
     renderer.render(filename)
+
+
+def spectral_axis_to_label(axis_dict: dict, divide_by_2pic: bool = True) -> str:
+    terms = []
+    for key, coeff in sorted(axis_dict.items(), key=lambda x: x[0]):
+        if coeff == 0:
+            continue
+        sign = '+' if coeff > 0 else '-'
+        abs_coeff = abs(coeff)
+
+        if abs_coeff == 1:
+            term = f"{sign} \\omega_{{{key[1:]}}}"  # remove 'w' from 'w1'
+        else:
+            term = f"{sign} {abs_coeff}\\omega_{{{key[1:]}}}"
+        terms.append(term)
+
+    if not terms:
+        expr = "0"
+    else:
+        expr = " ".join(terms)
+        if expr.startswith('+ '):
+            expr = expr[2:]  # remove leading '+ ' for aesthetics
+
+    # Wrap in parentheses if there are multiple terms
+    if len(terms) > 1:
+        expr = f"({expr})"
+
+    if divide_by_2pic:
+        expr = rf"${expr}/2\pi c, \text{{cm}}^{{-1}}$"
+    else:
+        expr = rf"${expr}, \text{{cm}}^{{-1}}$"
+
+    return expr
