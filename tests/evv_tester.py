@@ -30,7 +30,6 @@ TO_PICKLES = []
 PKL_FILES = {}
 
 # CHOICE of source_type
-# source_type = 'outfiles'
 SOURCE_TYPE = 'vault'
 # STOP before evaluation
 PREP_ONLY = True
@@ -100,7 +99,8 @@ def run():
     # could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
 
     axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
-    axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1}) 
+    axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1})
+    # axis2 = ws.main.abstractions.SpectralAxis({'w2': 1})
 
     # SpectralGrid - is also a source of data for the evaluation function
     # now here, keys are refereing to spectrum plot axes
@@ -121,10 +121,43 @@ def run():
     for i, key in enumerate(eval_vars.keys()):
         eval_vars_meshgrids[key] = meshgrids[i]
     
+    from wilson_analysis.render.spectrum_renderer import PlotConfig, MatplotlibRenderer, NormalizationType
+
+    style_config = PlotConfig(
+        figsize=(35, 45),
+        label_fontsize=30,
+        font_dict={'size': 24},
+        colormap='hot_r',  # Better contrast colormap
+        saturation_color='#FF00FF',
+        dpi=350,
+        tick_step=200.0,  # Step size for both axes ticks
+        equal_aspect=True,  # Force equal aspect ratio for axes
+        no_data_color='#E0E0E0',  # Light gray
+        below_range_color='#F8F8F8',  # Very light gray
+        data_edge_color='black',
+        data_edge_width=0.75,
+        y_min=0,
+        y_max=4500,
+        colorbar_main_label="Intensity",
+        colorbar_padding=0.02,
+        show_top_ticks=True,
+        show_right_ticks=True,
+        x_tick_rotation=45,
+        colormap_spacing='log',
+        colormap_power=0.5,
+    )
+
     evi = ws.main.abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
-                                                 'Gamma': 4.7, 'Gamma_unit': 'cm-1', 'maxPeak': None})
-    rndi = ws.main.abstractions.RenderingInfo(**{'dynrange': 500, 'num_level_ticks': 15, 
-                                                 'projection': '2d', 'to_save': True})
+                                                 'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
+    rndi = ws.main.abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
+                                                 'dynamic_range': 500, 
+                                                 'num_levels': 15, 
+                                                 'reference_max': None,
+                                                 'spec_data_operations': 'abs()**2',
+                                                 'projection': '2d', 
+                                                 'to_save': True,
+                                                 'style_config': style_config})
+    
     eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 
     sim.addSpecEvalSetup(eval_setup)
@@ -167,6 +200,9 @@ def run():
         sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/tests/')
         PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
 
+    logger.debug('sim.spec_eval_setup')
+    logger.debug(sim.spec_eval_setup)
+
     if not PREP_ONLY:
 
         logger.info('  >>> Going to evaluate now...\n')
@@ -174,29 +210,34 @@ def run():
         intensities_spec = np.abs(sim.spec)**2
         logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 
-        logger.debug('\n=====================================================')
-        logger.info('\n  >>> And now rendering...\n')
-
-        from wilson_analysis.render import render_spectrum
-
         hist, bin_edges = np.histogram(intensities_spec, bins=10)
         logger.debug(f"Histogram counts: {hist}")
         logger.debug(f"Bin edges: {bin_edges}\n")
-
         logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
 
-        dict_meshes = spec_grid.make_mesh_numpy()
-        render_spectrum(intensities_spec, dict_meshes[1], dict_meshes[2],
-                        filename='yo_terms_derive_ACAC.svg', dynamic_range=100,
-                        nicetitle='TermsEvaluator')
+        logger.debug('\n=====================================================')
+        logger.info('\n  >>> And now rendering...\n')
 
-        from wilson_utils.serialization import check_if_jsonsafe
-        check_if_jsonsafe(sim.to_dict())
+        # sim.render(renderer=ws.analysis.render.renderer.renderer)
+
+        sim.spec_eval_setup.ev_info.spec_result = sim.spec
+
+        from wilson_analysis.render.spectrum_renderer import render_spectrum
+        render_spectrum(spec_data=sim.spec,
+                        filename='spectrum_rendered.svg',
+                        spec_eval_setup=sim.spec_eval_setup,
+                        renderer_class=MatplotlibRenderer)
+
+
+        logger.info('  >>> Saving to files now...\n')
 
         ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
+        # from wilson_utils.serialization import check_if_jsonsafe
+        # check_if_jsonsafe(sim.to_dict())
+
         # writing JSON file
-        sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+        # sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
 
         # pickling
         import pickle
