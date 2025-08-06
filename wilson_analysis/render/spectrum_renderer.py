@@ -1,3 +1,24 @@
+"""
+Use in WilsonSimulation:
+self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+
+Input:
+self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup; 
+
+Steps: 
+1. choice of projection - how to present spectrum data: 2d or 3d or 1d ... (figure dimension setup)
+2. assignment of data to axes
+3. dynamic range settings (for contour - colorbar, for 1d - threshold on y values?)
+. style:
+    a. axes titles
+    b. axes ticks
+    c. axes ticks labels
+    d. axes labels
+    e. title if any
+. finalize figure styling: tight layout, etc...
+. Save figure (where, filename)
+"""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, List, Dict, Any
@@ -56,39 +77,37 @@ class PlotConfig:
     colormap: str = 'magma'  # Better contrast colormap
     saturation_color: str = '#FF00FF'
     dpi: int = 250
-    max_frequency: float = 3000.0
-    min_frequency: Optional[float] = None
     tick_step: float = 200.0  # Step size for both axes ticks
     equal_aspect: bool = True  # Force equal aspect ratio for axes
     no_data_color: str = '#E0E0E0'  # Light gray
     below_range_color: str = '#F8F8F8'  # Very light gray
     data_edge_color: str = 'black'
-    data_edge_style: str = '--'  # Line style for data boundary
     data_edge_width: float = 0.75
     x_min: Optional[float] = None
     x_max: Optional[float] = None
     y_min: Optional[float] = None
     y_max: Optional[float] = None
     colorbar_main_label: str = "Intensity"
-    colorbar_norm_label: str = "Normalized"
     normalization_type: NormalizationType = NormalizationType.LOG_RATIO  # Add this line
     show_top_ticks: bool = False
     show_right_ticks: bool = False
     x_tick_rotation: float = 45  # Add this line for configurable rotation
     colormap_spacing: str = None  # Options: "log", "power", "linear"
-    colormap_power: float = 0.5    # For power-law spacing
+    colormap_power: float = 0.5    # For power-law spacing; Adjust this value to change color distribution
 
 class LevelCalculator:
-    """Handles calculation of contour levels and normalization"""
+    """
+    Handles calculation of contour levels and normalization
     
-    @staticmethod
-    def normalize_intensities(intensities: np.ndarray) -> np.ndarray:
-        """Normalize intensities to [0,1] range"""
-        return intensities / np.max(intensities)
-    
+    organizes the logic for computing levels and labels
+    based on dynamic range, number of levels, and normalization type.
+    """
+
     @staticmethod
     def compute_levels(d_max: float, dynamic_range: float, num_levels: int, 
-                  ref_max: Optional[float] = None, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
+                  ref_max: Optional[float] = None, 
+                  colormap_spacing: str = None, 
+                  colormap_power: float = 0.5) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
         d_min = d_max / dynamic_range
         log_min = np.log10(d_min)
@@ -108,8 +127,7 @@ class LevelCalculator:
     
         elif colormap_spacing == "power":
             # Power-law spacing for more uniform color distribution
-            alpha = 0.5  # Adjust this value to change color distribution
-            power_space = np.power(np.linspace(0, 1, num_levels), alpha)
+            power_space = np.power(np.linspace(0, 1, num_levels), colormap_power)
             log_space = log_min + (log_max - log_min) * power_space
             # back to linear scale
             level_values = np.power(10, log_space)
@@ -171,7 +189,8 @@ class SpectrumRenderer(ABC):
             self.data.dynamic_range,
             self.data.num_levels,
             ref_max=self.data.reference_max,
-            colormap_spacing=self.config.colormap_spacing
+            colormap_spacing=self.config.colormap_spacing,
+            colormap_power=self.config.colormap_power
         )
         
         # Create and save plot using original data
@@ -402,6 +421,54 @@ def render_spectrum(intensities: np.ndarray,
                    **kwargs) -> None:
     """
     High-level function to render spectrum with specified backend
+    
+--------------
+    spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+                                                    start=start, end=end, spacer=spacer)
+
+    evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
+    rndi = {'num_level_ticks': 15}
+    eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+---------------
+
+1. choice of projection - how to present spectrum data: 2d or 3d or 1d ... (figure dimension setup)
+2. assignment of data to axes
+3. dynamic range settings (for contour - colorbar, for 1d - threshold on y values?)
+. style:
+    a. axes titles
+    b. axes ticks
+    c. axes ticks labels
+    d. axes labels
+    e. title if any
+. finalize figure styling: tight layout, etc...
+. Save figure (where, filename)
+
+    spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
+                                                    start=start, end=end, spacer=spacer)
+
+    evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
+    rndi = {'num_level_ticks': 15}
+    eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+
+-------------
+    intensities - final values for Z axis of the figure
+
+    dynrange_n: 
+        max / dynrange_n ==> min
+        1e8 / 1000       ==> 1e5
+
+-------------
+
+    variables = {'x1': x1, 'x2': x2, 'x3': x3, 'x4': x4} - dict[str, np.ndarray]
+    axes_def = {
+        'x': 'x2',
+        'y': 'x3 - x2',
+        'z': 'values'  # or even something like 'np.sin(values)'
+    } - dict[str, str]
+
+    - need to fix unused variables ('x1', 'x4' here)
+    - need to extract appropriate shapes from meshgrids
+    
     """
     data = SpectrumData(
         intensities=intensities,
