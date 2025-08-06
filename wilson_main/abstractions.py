@@ -8,6 +8,7 @@ from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 from wilson_utils.abstractions import VibState
+from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -810,6 +811,7 @@ class EvaluationInfo:
 	Gamma_unit: str
 	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
+	spec_result: np.ndarray | dict = None
 
 @dataclass
 class RenderingInfo:
@@ -822,15 +824,16 @@ class RenderingInfo:
 
 	"""
 	projection: str = '2d'
-	maxPeak: float = None
-	dynrange: float = 100
-	num_level_ticks: int = 12
-	log10: bool = True
+	reference_max: float = None
+	dynamic_range: float = 100
+	num_levels: int = 12
+	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
 	title: str = 'plot'
+	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
 	metadata: dict = field(default_factory=lambda: dict())
-	figsize: tuple = (10, 13)
-	font_dict: dict = field(default_factory=lambda: {'size': 20})
 	to_save: bool = False
+	# style configurations - currently will work/be used for matplotlib renderer
+	style_config: PlotConfig = field(default_factory=lambda: PlotConfig())
 
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
@@ -850,7 +853,7 @@ class SpecEvalSetup:
 	parameters etc.)
 	rnd_info: dict: Setup information which is principally rendering-related (e.g. number of level ticks, other
 	plotting-/visualization-related information)
-	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
+	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info -> RenderingInfom and EvaluationInfo
 	"""
 	grid: SpectralGrid=None
 	ev_info: EvaluationInfo = None
@@ -1443,6 +1446,20 @@ class WilsonSimulation:
 		renderer: Callable: A function to carry out the rendering. Uses attributes described in __init__ of this
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return
+
+
+		what are the options for rendering? 
+		
+		by plot type/projection type
+		1. 1D plot : slice of a 2D spectrum; 1D IR/Raman spectrum (?)
+		2. 2D plot : 2D IR/Raman spectrum; slice of a 3D spectrum : a) contour plot; b) scatter plot
+		3. 3D plot : 2D IR/Raman spectrum : surface plot == contout plot (same info; Z axis is intensity or color is intensity)
+
+		by spectrum dimensionality
+		- 1D spectrum: 1D IR/Raman spectrum - simply 1d plot
+		- 2D spectrum: 2D IR/Raman spectrum - 2D contour/scatter plot or 3D surface plot
+		- 3D spectrum: 3D IR/Raman spectrum - 1) 2D slice of a 3D spectrum - 2D contour/scatter plot or 3D surface plot; 2) 3D surface plot with color as intensity
+		- nD spectrum: nD IR/Raman spectrum - lower D slices as above
 		"""
 		assert self.spec is not None, 'No spectrum data, there is nothing to render'
 		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
