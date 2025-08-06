@@ -15,7 +15,7 @@ def eval_spec2D():
 # TermND with TermsEvaluator
 def terms_evaluator(system,
                     derived_terms, props,
-                    spec_eval_setup: wm_abst.SpecEvalSetup, vib_ana_setup) -> complex|float|np.ndarray:
+                    spec_eval_setup, vib_ana_setup) -> complex|float|np.ndarray:
     """
     >> Orchestrating spectrum amplitudes evaluation with TermND setup.
 
@@ -63,6 +63,8 @@ def terms_evaluator(system,
     result = postprocess_results(amplitudes)
     - Step 6: Generate diagnostics
     diagnostics = generate_diagnostics(precalc_data, amplitudes)
+
+    spec_eval_setup  is a wilson_main.abstractions.specEvalSetup instance
     """
     from wilson.spectrum import TermND, TermsEvaluator
     from wilson.utils.spectrum_utils import DataForPrecalc
