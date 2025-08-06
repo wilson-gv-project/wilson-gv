@@ -44,7 +44,7 @@ def renderer(spec: np.ndarray, system: wm_abst.MolecularSystem,
     """
     dimensionality = exp.dim # 2 for EVV
     spec_grid = spec_eval_setup.grid
-    filename = f'{system.name}_{name}'
+    filename = f'{system.name}_{name}.svg'
     intensities = np.abs(spec)**2
 
     if rnd_choice == 'matplotlib':

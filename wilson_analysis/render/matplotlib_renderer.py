@@ -83,13 +83,25 @@ class EvaluationInfo:
         Returns:
             tuple: (fig, ax)
         """
+        # import matplotlib as mpl
+        # mpl.rcParams['text.usetex'] = True
+        
         if self.rnd_info.to_save:
             matplotlib.use('Agg')
 
         if self.rnd_info.font_dict:
             matplotlib.rc('font', **self.rnd_info.font_dict)
 
-        subplot_kw = {'projection': self.rnd_info.projection} if self.rnd_info.projection else {}
+        if self.rnd_info.projection == '3d':
+            subplot_kw = {'projection': '3d'}
+
+        elif self.rnd_info.projection == '2d':
+            # For 2D, do not specify 'projection' (default is 'rectilinear')
+            subplot_kw = {}
+        else:
+            logger.warning('This is not a valid projection choice; using default value `rectilinear`')
+            subplot_kw = {}
+
         fig, ax = plt.subplots(figsize=self.rnd_info.figsize, subplot_kw=subplot_kw)
         return fig, ax
 
@@ -208,20 +220,24 @@ class EvaluationInfo:
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="3%", pad=2.1)
-        cbar = fig.colorbar(cont, cax=cax, aspect=65, shrink=0.9,
+        self.cbar = fig.colorbar(cont, cax=cax, aspect=65, shrink=0.9,
                             ticks=self.tick_values, format=ticker.FuncFormatter(self._fmt_tick))
         
-        cbar.set_ticklabels([f'{tick:.2f}' for tick in self.tick_values])
+        self.cbar.set_ticklabels([f'{tick:.2f}' for tick in self.tick_values])
         for tick, label in zip(self.tick_values, self.tick_labels):
-            cbar.ax.text(-2.0, tick, label, ha='left', va='center')
+            self.cbar.ax.text(-2.0, tick, label, ha='left', va='center')
+        # self.cbar.ax.yaxis.set_major_formatter(ticker.FuncFormatter(self._fmt_tick))
 
-
-    def finalize(self, ax: plt.Axes, filename):
+    def finalize(self, fig, ax: plt.Axes, filename):
         ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(100))
         ax.set_aspect('equal', adjustable='box')
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.tick_params(axis="x", bottom=True, top=True, labelbottom=True, labeltop=True)
+        
+        # plt.title(r"$1.23 \times 10^3$")
+        self.cbar.ax.yaxis.set_major_formatter(ticker.FuncFormatter(self._fmt_tick))
+
         if self.rnd_info.to_save:
             plt.savefig(filename, dpi=250, format='svg')
 
@@ -234,7 +250,8 @@ class EvaluationInfo:
         else:
             return f"{val:.2f}"
 
-    def _fmt_tick(self, x, pos=''):
+    def _fmt_tick(self, x, pos=None):
         a, b = '{:.2e}'.format(x).split('e')
+        a = float(a)
         b = int(b)
-        return r'${} \times 10^{{{}}}$'.format(a, b)
+        return r"${:.2f} \times 10^{{{}}}$".format(a, b)
