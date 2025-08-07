@@ -218,21 +218,14 @@ def run():
         logger.debug('\n=====================================================')
         logger.info('\n  >>> And now rendering...\n')
 
-        # sim.render(renderer=ws.analysis.render.renderer.renderer)
-
-        sim.spec_eval_setup.ev_info.spec_result = sim.spec
-
-        from wilson_analysis.render.spectrum_renderer import render_spectrum
-        render_spectrum(spec_data=sim.spec,
-                        filename='spectrum_rendered.svg',
-                        spec_eval_setup=sim.spec_eval_setup,
-                        renderer_class=MatplotlibRenderer)
-
+        sim.render(renderer=ws.analysis.render.spectrum_renderer.render_spectrum,
+                   filename='smth.svg')
 
         logger.info('  >>> Saving to files now...\n')
 
         ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
+        # TODO: fix this later; not working now
         # from wilson_utils.serialization import check_if_jsonsafe
         # check_if_jsonsafe(sim.to_dict())
 
