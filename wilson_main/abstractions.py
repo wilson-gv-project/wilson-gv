@@ -750,8 +750,7 @@ class SpectralGrid:
 
 	def make_mesh_numpy(self) -> dict:
 		"""
-		Make a meshgrid using the axes information.
-
+		Make a meshgrid using the axes information
 		"""
 
 		listofmeshaxes = []
