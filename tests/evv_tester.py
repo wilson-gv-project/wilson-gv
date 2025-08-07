@@ -121,7 +121,7 @@ def run():
     for i, key in enumerate(eval_vars.keys()):
         eval_vars_meshgrids[key] = meshgrids[i]
     
-    from wilson_analysis.render.spectrum_renderer import PlotConfig, MatplotlibRenderer, NormalizationType
+    from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
     style_config = PlotConfig(
         figsize=(35, 45),
@@ -218,7 +218,7 @@ def run():
         logger.debug('\n=====================================================')
         logger.info('\n  >>> And now rendering...\n')
 
-        sim.render(renderer=ws.analysis.render.spectrum_renderer.render_spectrum,
+        sim.render(renderer=ws.analysis.render.render_spectrum,
                    filename='smth.svg')
 
         logger.info('  >>> Saving to files now...\n')
