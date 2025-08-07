@@ -30,7 +30,7 @@ from enum import Enum
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo, SpecEvalSetup
+    from wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo, SpecEvalSetup, SimContext
 
 
 import logging
@@ -61,13 +61,6 @@ class NormalizationType(Enum):
     DECIBEL = "db"
     PERCENTAGE = "percent"
     LOG_SCALE = "log_scale"
-
-
-@dataclass
-class SpectrumData:
-    """Container for spectrum data and metadata"""
-    w1: np.ndarray  #                                       - SpecEvalSetup.grid.axes
-    w2: np.ndarray  #                                       - SpecEvalSetup.grid.axes
 
 
 @dataclass
@@ -156,7 +149,12 @@ class LevelCalculator:
 
 
 class SpectrumRenderer(ABC):
-    """Abstract base class for spectrum rendering"""
+    """
+    Abstract base class for spectrum rendering
+    
+    PlotConfig instance would normally be stored in the RenderingInfo instance
+    but can be provided as config parameter
+    """
     
     def __init__(self, 
                  spec_data: np.ndarray | dict,
@@ -174,8 +172,8 @@ class SpectrumRenderer(ABC):
         self.level_calc = LevelCalculator()
         self.intensities = None
 
-        self.Xdata = None  # Placeholder for X-axis data
-        self.Ydata = None  # Placeholder for Y-axis data
+        self.Xdata = None
+        self.Ydata = None
 
 
     @abstractmethod
@@ -189,12 +187,18 @@ class SpectrumRenderer(ABC):
         pass
     
     @abstractmethod
+    def setup_axes(self, plot_obj: Any) -> Any:
+        """Configure axes, ticks and labels"""
+        pass
+
+    @abstractmethod
     def add_colorbar(self, plot_obj: Any, levels: np.ndarray, labels: List[str]) -> None:
         """Add colorbar to plot"""
         pass
     
     @abstractmethod
     def finalize(self, plot_obj) -> None:
+        """some finishing styling touches (positioning and resizing)"""
         pass
 
     @abstractmethod
@@ -249,14 +253,16 @@ class SpectrumRenderer(ABC):
             colormap_power=self.config.colormap_power
         )
 
-        # plot_obj is - tuple of fig, ax
-        plot_obj = self.initialize_plot()
-        # plot_obj is - tuple of fig, ax, contour
-        plot_obj = self.create_contour(plot_obj=plot_obj, levels=levels, data=self.intensities)
-        # plot_obj is - tuple of fig, ax, cbar
-        plot_obj = self.add_colorbar(plot_obj=plot_obj, levels=levels, labels=labels)
-        self.finalize(plot_obj=plot_obj)
-        self.save_plot(plot_obj=plot_obj, filename=filename)
+        fig, ax = self.initialize_plot()
+        fig, ax, contour = self.create_contour(plot_obj=(fig, ax), levels=levels, data=self.intensities)
+        fig, ax = self.setup_axes(plot_obj=(fig, ax))
+        fig, ax, cbar = self.add_colorbar(plot_obj=(fig, ax, contour), levels=levels, labels=labels)
+        
+        self.finalize(plot_obj=(fig, ax, cbar))
+        self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
+
+        return fig, ax, contour, cbar
+
 
 class MatplotlibRenderer(SpectrumRenderer):
     """Matplotlib implementation of spectrum renderer"""
@@ -327,17 +333,21 @@ class MatplotlibRenderer(SpectrumRenderer):
                   colors=[self.config.data_edge_color],
                   linewidths=[self.config.data_edge_width])
         
+        return fig, ax, contour
+
+
+    def setup_axes(self, plot_obj):
+        fig, ax = plot_obj
+
         # Set up axes labels
         label_fontsize = self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25
 
-        xlabel_str = spectral_axis_to_label(self.spec_grid.axes.get('x').freq_vars) if self.spec_grid else r'$\omega_1/2\pi c, \text{cm}^{-1}$'
-        ylabel_str = spectral_axis_to_label(self.spec_grid.axes.get('y').freq_vars) if self.spec_grid else r'$(\omega_2-\omega_1)/2\pi c, \text{cm}^{-1}$'
+        xlabel_str = spectral_axis_to_label(self.spec_grid.axes.get('x').freq_vars) if self.spec_grid else r'$default x /2\pi c, \text{cm}^{-1}$'
+        ylabel_str = spectral_axis_to_label(self.spec_grid.axes.get('y').freq_vars) if self.spec_grid else r'$default y /2\pi c, \text{cm}^{-1}$'
 
-        ax.set_xlabel(xlabel_str, 
-                     fontsize=label_fontsize, labelpad=65.) # labelpad - distance from axis to label
-        ax.set_ylabel(ylabel_str, 
-                     fontsize=label_fontsize, labelpad=65.) # labelpad - distance from axis to label
-        logger.debug(f'self.spec_grid.axes {self.spec_grid.axes}')
+        # labelpad - distance from axis to label
+        ax.set_xlabel(xlabel_str, fontsize=label_fontsize, labelpad=65.) 
+        ax.set_ylabel(ylabel_str, fontsize=label_fontsize, labelpad=65.)
 
 
         # Simple aspect ratio setting
@@ -402,7 +412,7 @@ class MatplotlibRenderer(SpectrumRenderer):
         ax.tick_params(axis='x', rotation=self.config.x_tick_rotation)
         # https://stackoverflow.com/questions/2969867/how-do-i-add-space-between-the-ticklabels-and-the-axes
         
-        return fig, ax, contour
+        return fig, ax
     
     def add_colorbar(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any], 
                     levels: np.ndarray, labels: List[str]) -> Tuple[plt.Figure, plt.Axes, Any]:
@@ -507,83 +517,49 @@ class MatplotlibRenderer(SpectrumRenderer):
                     dpi=self.config.dpi, format=filename.split('.')[-1])
         plt.close(fig)
 
-# Example usage:
-def render_spectrum(spec_data: np.ndarray, 
-                   filename: str,
-                   spec_eval_setup: "SpecEvalSetup" = None,
-                   renderer_class=MatplotlibRenderer,
-                   **kwargs) -> None:
+
+def render_spectrum(context: 'SimContext') -> None:
+    
     """
     High-level function to render spectrum with specified backend
-    
---------------
-    spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
-                                                    start=start, end=end, spacer=spacer)
+ -------------
+    spec_data is not the final Z values of spectrum (intensities)
+        it is amplitudes here, complex values, but they get to be transformed
+        using spec_data_operations attribute of RenderingInfo instance
 
-    evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
-    rndi = {'num_level_ticks': 15}
-    eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
----------------
-
-1. choice of projection - how to present spectrum data: 2d or 3d or 1d ... (figure dimension setup)
-2. assignment of data to axes
-3. dynamic range settings (for contour - colorbar, for 1d - threshold on y values?)
-. style:
-    a. axes titles
-    b. axes ticks
-    c. axes ticks labels
-    d. axes labels
-    e. title if any
-. finalize figure styling: tight layout, etc...
-. Save figure (where, filename)
-
-    spec_grid = ws.main.abstractions.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
-                                                    start=start, end=end, spacer=spacer)
-
-    evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
-    rndi = {'num_level_ticks': 15}
-    eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
-
--------------
-    intensities - final values for Z axis of the figure
-
-    dynrange_n: 
-        max / dynrange_n ==> min
-        1e8 / 1000       ==> 1e5
-
--------------
-
-    variables = {'x1': x1, 'x2': x2, 'x3': x3, 'x4': x4} - dict[str, np.ndarray]
-    axes_def = {
-        'x': 'x2',
-        'y': 'x3 - x2',
-        'z': 'values'  # or even something like 'np.sin(values)'
-    } - dict[str, str]
-
-    - need to fix unused variables ('x1', 'x4' here)
-    - need to extract appropriate shapes from meshgrids
-
-    """
-    # TODO - UPD!
-    """
     context = {'spec': self.spec, 'system': self.system, 
                 'exp': self.exp, 'diagn': self.diagn, 
                 'name': self.name, 
                 'spec_eval_setup': self.spec_eval_setup,
                 'do_diagn': True}
     """
-        
-    plort_config = spec_eval_setup.rnd_info.style_config
+    spec_data = context.spec
+    spec_eval_setup = context.spec_eval_setup
+    filename = context.filename
+    backend = context.backend
+
+    if backend == 'matplotlib':
+        renderer_class=MatplotlibRenderer
+    else:
+        raise NotImplementedError('Only matplotlib backend is currently supported')
+    
+    plot_config = spec_eval_setup.rnd_info.style_config
 
     renderer = renderer_class(spec_data=spec_data, 
                               spec_grid=spec_eval_setup.grid,
                               ev_info=spec_eval_setup.ev_info, 
                               rnd_info=spec_eval_setup.rnd_info, 
-                              config=plort_config)
+                              config=plot_config)
     renderer.render(filename)
 
 
 def spectral_axis_to_label(axis_dict: dict, divide_by_2pic: bool = True) -> str:
+    """
+    Utility function.
+    Making labels for axes using SpectralAxis.freq_vars dict
+    
+    axis_dict = SpectralAxis.freq_vars
+    """
     terms = []
     for key, coeff in sorted(axis_dict.items(), key=lambda x: x[0]):
         if coeff == 0:
