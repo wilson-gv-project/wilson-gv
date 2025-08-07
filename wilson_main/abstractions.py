@@ -745,7 +745,9 @@ class SpectralGrid:
 				self.n_pts = n_pts
 
 		if(self.range_style == 'custom'):
-			raise NotImplementedError('Custom range style is not yet supported')
+			# rm error to enable skipping `spacer, start, end` - they aren't used meaningfully anyway
+			logger.warning('Custom range style is not yet supported')
+			pass
 
 
 	def make_mesh_numpy(self) -> dict:
