@@ -48,16 +48,17 @@ class MatplotlibRenderer(SpectrumRenderer):
         cmap = plt.get_cmap(self.config.colormap).copy()
         cmap.set_over(self.config.saturation_color)
         
-        # Fill no-data and below-range regions
-        ax.contourf(self.Xdata, self.Ydata,
-                   no_data_mask,
-                   levels=[0, 0.5, 1],
-                   colors=[self.config.no_data_color])
-        
-        ax.contourf(self.Xdata, self.Ydata,
-                   below_range_mask,
-                   levels=[0, 0.5, 1],
-                   colors=[self.config.below_range_color])
+        if self.config.other_colors:
+            # Fill no-data and below-range regions
+            ax.contourf(self.Xdata, self.Ydata,
+                    no_data_mask,
+                    levels=[0, 0.5, 1],
+                    colors=[self.config.no_data_color])
+            
+            ax.contourf(self.Xdata, self.Ydata,
+                    below_range_mask,
+                    levels=[0, 0.5, 1],
+                    colors=[self.config.below_range_color])
         
         # Create logarithmic normalization for color mapping
         norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
@@ -70,13 +71,18 @@ class MatplotlibRenderer(SpectrumRenderer):
                            cmap=cmap,
                            extend='max')
         
-        # Single clean edge line
-        ax.contour(self.Xdata, self.Ydata,
-                  ~no_data_mask,
-                  levels=[0.5],
-                  colors=[self.config.data_edge_color],
-                  linewidths=[self.config.data_edge_width])
-        
+        # Hide contour linestroke on pyplot.contourf to get only fills
+        # https://stackoverflow.com/questions/8263769/hide-contour-linestroke-on-pyplot-contourf-to-get-only-fills
+        contour.set_edgecolor("face")
+
+        if self.config.other_colors:   
+            # Single clean edge line
+            ax.contour(self.Xdata, self.Ydata,
+                    ~no_data_mask,
+                    levels=[0.5],
+                    colors=[self.config.data_edge_color],
+                    linewidths=[self.config.data_edge_width])
+
         return fig, ax, contour
 
 

@@ -71,6 +71,7 @@ class PlotConfig:
     dpi: int = 250
     tick_step: float = 200.0  # Step size for both axes ticks
     equal_aspect: bool = True  # Force equal aspect ratio for axes
+    other_colors: bool = True
     no_data_color: str = '#E0E0E0'  # Light gray
     below_range_color: str = '#F8F8F8'  # Very light gray
     data_edge_color: str = 'black'
@@ -220,6 +221,8 @@ class SpectrumRenderer(ABC):
                 self.intensities = np.real(self.spec_data)
             elif spec_data_operations == 'imag':
                 self.intensities = np.imag(self.spec_data)
+            elif spec_data_operations == 'none':
+                self.intensities = self.spec_data
             else:
                 raise ValueError(f"Unsupported spec_data_operations: {spec_data_operations}")
 
