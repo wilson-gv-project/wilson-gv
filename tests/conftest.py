@@ -275,7 +275,8 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
         w2 = np.arange(spectrum_setup[mol].start2,
                        spectrum_setup[mol].end2, spectrum_setup[mol].step2)
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-        axes_dict = {1: w1m, 2: w2m}
+        # axes_dict = {1: w1m, 2: w2m}
+        axes_dict = {'w1': w1m, 'w2': w2m}
 
         from wilson.spectrum import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
@@ -308,7 +309,8 @@ def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> 
         w2 = np.arange(spectrum_setup[mol].start2,
                        spectrum_setup[mol].end2, spectrum_setup[mol].step2)
         w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-        axes_dict = {1: w1m, 2: w2m}
+        # axes_dict = {1: w1m, 2: w2m}
+        axes_dict = {'w1': w1m, 'w2': w2m}
 
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
