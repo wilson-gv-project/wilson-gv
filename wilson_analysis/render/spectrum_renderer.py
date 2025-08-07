@@ -161,12 +161,16 @@ class SpectrumRenderer(ABC):
                  spec_grid: "SpectralGrid" = None,
                  ev_info: "EvaluationInfo" = None,
                  rnd_info: "RenderingInfo" = None, 
+                 do_diagn: bool = False,
                  config: PlotConfig = PlotConfig()):
 
         self.spec_data = spec_data
         self.rnd_info = rnd_info
         self.ev_info = ev_info
         self.spec_grid = spec_grid
+
+        # TODO not used currently
+        self.do_diagn = do_diagn
         
         self.config = self.rnd_info.style_config if rnd_info else config
         self.level_calc = LevelCalculator()
@@ -538,6 +542,10 @@ def render_spectrum(context: 'SimContext') -> None:
     filename = context.filename
     backend = context.backend
 
+    # TODO not used currently
+    do_diagn = context.do_diagn
+    diagn = {}
+
     if backend == 'matplotlib':
         renderer_class=MatplotlibRenderer
     else:
@@ -549,8 +557,13 @@ def render_spectrum(context: 'SimContext') -> None:
                               spec_grid=spec_eval_setup.grid,
                               ev_info=spec_eval_setup.ev_info, 
                               rnd_info=spec_eval_setup.rnd_info, 
-                              config=plot_config)
-    renderer.render(filename)
+                              config=plot_config, do_diagn=do_diagn)
+    fig, ax, contour, cbar = renderer.render(filename)
+    
+    if do_diagn:
+        return tuple([fig, ax, contour, cbar]), diagn
+    else:
+        return tuple([fig, ax, contour, cbar])
 
 
 def spectral_axis_to_label(axis_dict: dict, divide_by_2pic: bool = True) -> str:
