@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, asdict, is_dataclass, InitVar
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 import json
 import numpy as np
 import copy
@@ -77,6 +77,30 @@ class MolecularSystem:
 		# For geo_extra
 
 		pass
+
+
+@dataclass
+class SimContext:
+	"""
+	dataclass that can hold various contexts for the use
+	in the WilsonSimulation pipeline.
+
+	Extend when needed
+	"""
+	spec: Optional[Any] = None
+	system: Optional[Any] = None
+	exp: Optional[Any] = None
+	diagn: Optional[Any] = None
+	name: Optional[Any] = None
+	spec_eval_setup: Optional[Any] = None # rendering
+	do_diagn: Optional[bool] = None
+	props: Optional[Any] = None
+	regime: Optional[Any] = None
+	regime_subinfo: Optional[Any] = None
+	nc_sqrt_eigval: Optional[Any] = None # VibAna
+	exclude_modes: Optional[Any] = None
+	filename: Optional[str] = None # rendering
+	backend: Optional[str] = 'matplotlib' # rendering
 
 
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
@@ -1439,7 +1463,8 @@ class WilsonSimulation:
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
 
-	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
+	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any],
+			filename: str = 'spectrum.svg', backend: str = 'matplotlib'):
 		"""
 		Render the spectral data.
 
@@ -1470,19 +1495,20 @@ class WilsonSimulation:
 		# TODO also - self.system, self.exp, self.name
 		# generate self.name?
 
-		context = {'spec': self.spec, 'system': self.system, 
-			 		'exp': self.exp, 'diagn': self.diagn, 
-					'name': self.name, 
-					'spec_eval_setup': self.spec_eval_setup,
-					'do_diagn': False}
+		context = SimContext(spec=self.spec, system=self.system, exp=self.exp,
+					   diagn=self.diagn, name=self.name, 
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=False,
+					   filename=filename, backend=backend)
 		
-		logger.debug(repr(context))
+		logger.debug('context')
+		logger.debug(context)
 
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering = renderer(**context)
+		self.rendering = renderer(context)
 
 	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
-														dict, str, SpecEvalSetup], tuple[Any, dict]]):
+														dict, str, SpecEvalSetup], tuple[Any, dict]],
+							filename: str = 'spectrum.svg', backend: str = 'matplotlib'):
 		"""
 		Render the spectral data
 
@@ -1497,17 +1523,17 @@ class WilsonSimulation:
 
 		# TODO also - self.system, self.exp, self.name
 		# generate self.name?
-
-		context = {'spec': self.spec, 'system': self.system, 
-			 		'exp': self.exp, 'diagn': self.diagn, 
-					'name': self.name, 
-					'spec_eval_setup': self.spec_eval_setup,
-					'do_diagn': True}
 		
-		logger.debug(repr(context))
+		context = SimContext(spec=self.spec, system=self.system, exp=self.exp,
+					   diagn=self.diagn, name=self.name, 
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=True,
+					   filename=filename, backend=backend)
+		
+		logger.debug('context')
+		logger.debug(context)
 
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering, self.diagn = renderer(**context)
+		self.rendering, self.diagn = renderer(context)
 
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
