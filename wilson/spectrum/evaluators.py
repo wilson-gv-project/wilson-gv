@@ -3,7 +3,6 @@ Evaluator functions for WilsonSimulation
 """
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
-from wilson_main import abstractions as wm_abst
 
 import numpy as np
 
