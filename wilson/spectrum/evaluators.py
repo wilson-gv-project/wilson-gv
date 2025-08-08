@@ -103,7 +103,6 @@ def terms_evaluator(system,
         harmonic_arrays_Eh = {1: harm_states_arr}
 
     avrg_terms, prefactorAvrg = getPolarizationAveragingExpression("ZZZZ") # "ZZZZ" should come from some setup dataobject
-    axes_dict = spec_eval_setup.grid.make_mesh_numpy()
     axes_dict = spec_eval_setup.ev_info.freq_variables
 
     # format transformation
