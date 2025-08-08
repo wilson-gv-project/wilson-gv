@@ -49,7 +49,7 @@ def run():
 # choice for Y axis values
 w1_minus_w2 = False
 
-def test_plt():
+def test_plt_NOw1_minus_w2():
     """
     A qualitative test with figure inspection.
 
@@ -62,10 +62,7 @@ def test_plt():
     eval_vars_meshgrids = {'w1': X1, 'w2': X2}
 
     axis1 = SpectralAxis({'w1': 1})
-    if w1_minus_w2:
-        axis2 = SpectralAxis({'w1': 1, 'w2': -1})
-    else:
-        axis2 = SpectralAxis({'w2': 1})
+    axis2 = SpectralAxis({'w2': 1})
     spec_grid = SpectralGrid({'x': axis1, 'y': axis2}, range_style='custom')
     
     evi = EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
@@ -79,7 +76,35 @@ def test_plt():
     spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
     context = SimContext(spec=z_vals, 
                          spec_eval_setup=spec_eval_setup, do_diagn=False,
-                         filename='filename.svg', backend='matplotlib')
+                         filename='filename1.svg', backend='matplotlib')
     render_spectrum(context)
     import os
-    assert os.path.exists("filename.svg")
+    assert os.path.exists("filename1.svg")
+
+
+def test_plt_w1_minus_w2():
+    from wilson_utils.logger import setup_logger
+    setup_logger(__name__, level=logging.DEBUG)
+
+    z_vals, X1, X2 = run()
+    eval_vars_meshgrids = {'w1': X1, 'w2': X2}
+
+    axis1 = SpectralAxis({'w1': 1})
+    axis2 = SpectralAxis({'w1': 1, 'w2': -1})
+    spec_grid = SpectralGrid({'x': axis1, 'y': axis2}, range_style='custom')
+    
+    evi = EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+                            'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
+    rndi = RenderingInfo(**{'intensity_normalization_type': NormalizationType.DECIBEL, 'dynamic_range': 1e3, 
+                            'num_levels': 20,  'reference_max': None, 'spec_data_operations': 'abs', 
+                            'projection': '2d', 'to_save': True, 
+                            'style_config': PlotConfig(other_colors=False,
+                                                       colormap='magma',
+                                                       tick_step=1)})
+    spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+    context = SimContext(spec=z_vals, 
+                         spec_eval_setup=spec_eval_setup, do_diagn=False,
+                         filename='filename2.svg', backend='matplotlib')
+    render_spectrum(context)
+    import os
+    assert os.path.exists("filename2.svg")
