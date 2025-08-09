@@ -2,9 +2,12 @@ from .matplotlib_renderer import MatplotlibRenderer
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from wilson_main.abstractions import SimContext
+    from wilson_main.abstractions import SpecEvalSetup
 
-def render_spectrum(context: 'SimContext') -> None:
+def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
+                    system, experiment, name, 
+                    diagn, # isn't used yet
+                    do_diagn) -> None:
     
     """
     High-level function to render spectrum with specified backend
@@ -13,8 +16,8 @@ def render_spectrum(context: 'SimContext') -> None:
         it is amplitudes here, complex values, but they get to be transformed
         using spec_data_operations attribute of RenderingInfo instance
 
-    context = {'spec': self.spec, 'system': self.system, 
-                'exp': self.exp, 'diagn': self.diagn, 
+    context = {'spec_data': self.spec, 'system': self.system, 
+                'experiment': self.exp, 'diagn': self.diagn, 
                 'name': self.name, 
                 'spec_eval_setup': self.spec_eval_setup,
                 'do_diagn': True}
@@ -34,14 +37,8 @@ def render_spectrum(context: 'SimContext') -> None:
     - nD spectrum: nD IR/Raman spectrum - lower D slices as above
     
     """
-    spec_data = context.spec
-    spec_eval_setup = context.spec_eval_setup
-    filename = context.filename
-    backend = context.backend
-
-    # TODO not used currently
-    do_diagn = context.do_diagn
-    diagn = {}
+    filename = spec_eval_setup.rnd_info.filename
+    backend = spec_eval_setup.rnd_info.backend
 
     if backend == 'matplotlib':
         renderer_class=MatplotlibRenderer
