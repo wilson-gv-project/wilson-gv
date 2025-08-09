@@ -62,6 +62,8 @@ def terms_evaluator(system,
     result = postprocess_results(amplitudes)
     - Step 6: Generate diagnostics
     diagnostics = generate_diagnostics(precalc_data, amplitudes)
+
+    spec_eval_setup  is a wilson_main.abstractions.specEvalSetup instance
     """
     from wilson.spectrum import TermND, TermsEvaluator
     from wilson.utils.spectrum_utils import DataForPrecalc
@@ -101,7 +103,7 @@ def terms_evaluator(system,
         harmonic_arrays_Eh = {1: harm_states_arr}
 
     avrg_terms, prefactorAvrg = getPolarizationAveragingExpression("ZZZZ") # "ZZZZ" should come from some setup dataobject
-    axes_dict = spec_eval_setup.grid.make_mesh_numpy()
+    axes_dict = spec_eval_setup.ev_info.freq_variables
 
     # format transformation
     states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
@@ -124,7 +126,7 @@ def terms_evaluator(system,
         term.mode_indices = vib_ana_setup.modes_indices
         # context manager - setting debug level
         with debug_mode(0):
-            a_intermediate = term.get_amplitudes(axes_dict[1], axes_dict[2],
+            a_intermediate = term.get_amplitudes(axes_dict['w1'], axes_dict['w2'],
                                                  3.8, 0.0, debugprint=True, collect_all=False)
         amplitudes += a_intermediate
     

@@ -140,7 +140,9 @@ def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict,
     w2 = np.arange(spectrum_setup.start2,
                    spectrum_setup.end2, spectrum_setup.step2)
     w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-    axes_dict = {1: w1m, 2: w2m}
+    # axes_dict = {1: w1m, 2: w2m}
+    axes_dict = {'w1': w1m, 'w2': w2m}
+    
     from wilson.spectrum import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
@@ -197,7 +199,9 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
     w2 = np.arange(spectrum_setup.start2,
                    spectrum_setup.end2, spectrum_setup.step2)
     w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-    axes_dict = {1: w1m, 2: w2m}
+    # axes_dict = {1: w1m, 2: w2m}
+    axes_dict = {'w1': w1m, 'w2': w2m}
+
     from wilson.spectrum import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
@@ -340,7 +344,8 @@ def test_get_resonance_location_general_real(dict_8terms: dict, MOL_setup_parser
     axis1 = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
     axis2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
     x,y = np.meshgrid(axis1, axis2)
-    axes_dict = {1: x, 2: y}
+    # axes_dict = {1: x, 2: y}
+    axes_dict = {'w1': x, 'w2': y}
 
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
@@ -382,7 +387,8 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
         'polhess': t0.properties_data['polhess'],
     }
     avrg_terms = spectrum_setup.gammaCompsAll
-    axes_dict = {1: w1, 2: w2}
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
 
     print()
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
@@ -406,8 +412,9 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
 
     a,b = 0,1 # (4,5), (2,3), (2,5)
     w1,w2 = t0.get_resonance_location_general((a,b))
-    axes_dict = {1: w1, 2: w2}
-
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
+    
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
                              avrg_terms=avrg_terms,
@@ -428,8 +435,9 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
 
     a,b = 2,3 # (4,5), (2,3), (2,5)
     w1,w2 = t0.get_resonance_location_general((a,b))
-    axes_dict = {1: w1, 2: w2}
-
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
+    
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
                              avrg_terms=avrg_terms,
@@ -491,7 +499,8 @@ def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectr
     w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
     w1m, w2m = np.meshgrid(w1, w2)
 
-    axes_dict = {1: w1m, 2: w2m}
+    # axes_dict = {1: w1m, 2: w2m}
+    axes_dict = {'w1': w1m, 'w2': w2m}
 
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
@@ -551,7 +560,8 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
         'polhess': t0.properties_data['polhess'],
     }
     avrg_terms = spectrum_setup.gammaCompsAll
-    axes_dict = {1: w1, 2: w2}
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
 
     print()
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
@@ -575,7 +585,8 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
 
     a,b = 0,1 # (4,5), (2,3), (2,5)
     w1,w2 = t0.get_resonance_location_general((a,b))
-    axes_dict = {1: w1, 2: w2}
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
 
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
@@ -597,7 +608,8 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
 
     a,b = 2,3 # (4,5), (2,3), (2,5)
     w1,w2 = t0.get_resonance_location_general((a,b))
-    axes_dict = {1: w1, 2: w2}
+    # axes_dict = {1: w1, 2: w2}
+    axes_dict = {'w1': w1, 'w2': w2}
 
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,

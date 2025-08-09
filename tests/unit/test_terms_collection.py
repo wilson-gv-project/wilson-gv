@@ -175,7 +175,9 @@ def test_precalc_res_conds(dict_8terms: dict) -> None:
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
-    axes_dict = {1: x, 2: y}
+    # axes_dict = {1: x, 2: y}
+    axes_dict = {'w1': x, 'w2': y}
+
     print('axes_dict\n', axes_dict)
 
     pf_types = tts.precalc_res_conds(axes_dict)
@@ -189,7 +191,9 @@ def test_precalc_res_conds(dict_8terms: dict) -> None:
                                                  [2., 4., 8.],
                                                  [2., 4., 8.]]))
 
-    axes_dict = {1: 80, 2: 800}
+    # axes_dict = {1: 80, 2: 800}
+    axes_dict = {'w1': 80, 'w2': 800}
+
     print('axes_dict\n', axes_dict)
 
     pf_types = tts.precalc_res_conds(axes_dict)
@@ -286,7 +290,9 @@ def test_precalculate(dict_8terms: dict) -> None:
 
     axes_dict_1d = {1: np.array([2., 4., 8.]), 2: np.array([8., 16., 32.])}
     x,y = np.meshgrid(axes_dict_1d[1], axes_dict_1d[2])
-    axes_dict = {1: x, 2: y}
+    # axes_dict = {1: x, 2: y}
+    axes_dict = {'w1': x, 'w2': y}
+
     Nnmodes = 3
     props_data_ready = {
         'dipgrad': np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
