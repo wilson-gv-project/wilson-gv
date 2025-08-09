@@ -155,6 +155,8 @@ def run():
                                                  'reference_max': None,
                                                  'spec_data_operations': 'abs()**2',
                                                  'projection': '2d', 
+                                                 'filename': 'smth.svg',
+                                                 'backend': 'matplotlib',
                                                  'to_save': True,
                                                  'style_config': style_config})
     
@@ -218,8 +220,7 @@ def run():
         logger.debug('\n=====================================================')
         logger.info('\n  >>> And now rendering...\n')
 
-        sim.render(renderer=ws.analysis.render.render_spectrum,
-                   filename='smth.svg')
+        sim.render(renderer=ws.analysis.render.render_spectrum)
 
         logger.info('  >>> Saving to files now...\n')
 
