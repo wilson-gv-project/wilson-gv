@@ -79,30 +79,6 @@ class MolecularSystem:
 		pass
 
 
-@dataclass
-class SimContext:
-	"""
-	dataclass that can hold various contexts for the use
-	in the WilsonSimulation pipeline.
-
-	Extend when needed
-	"""
-	spec: Optional[Any] = None
-	system: Optional[Any] = None
-	exp: Optional[Any] = None
-	diagn: Optional[Any] = None
-	name: Optional[Any] = None
-	spec_eval_setup: Optional[Any] = None # rendering
-	do_diagn: Optional[bool] = None
-	props: Optional[Any] = None
-	regime: Optional[Any] = None
-	regime_subinfo: Optional[Any] = None
-	nc_sqrt_eigval: Optional[Any] = None # VibAna
-	exclude_modes: Optional[Any] = None
-	filename: Optional[str] = None # rendering
-	backend: Optional[str] = 'matplotlib' # rendering
-
-
 # Program, level of theory, basis set, other setup info (environment for QM/MM?)
 # Does not need to reference an actual setup and can also be used for "get from no specific calculation" - VL: what does it mean?
 @dataclass(frozen=True)
@@ -845,7 +821,7 @@ class RenderingInfo:
 	and it is warranted because that is a critical info that is needed for the rendiring
 
 	projection: '1d', '2d' or '3d'
-	maxPeak: normalizing to this maxPeak value
+	reference_max: normalizing to this reference_max value
 
 	"""
 	projection: str = '2d'
@@ -857,6 +833,8 @@ class RenderingInfo:
 	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
 	metadata: dict = field(default_factory=lambda: dict())
 	to_save: bool = False
+	filename: str = 'spectrum.svg'
+	backend: str = 'matplotlib'
 	# style configurations - currently will work/be used for matplotlib renderer
 	style_config: PlotConfig = field(default_factory=lambda: PlotConfig())
 
@@ -1464,8 +1442,7 @@ class WilsonSimulation:
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
 
-	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any],
-			filename: str = 'spectrum.svg', backend: str = 'matplotlib'):
+	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
 		"""
 		Render the spectral data.
 
@@ -1482,20 +1459,18 @@ class WilsonSimulation:
 		# TODO also - self.system, self.exp, self.name
 		# generate self.name?
 
-		context = SimContext(spec=self.spec, system=self.system, exp=self.exp,
+		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
 					   diagn=self.diagn, name=self.name, 
-					   spec_eval_setup=self.spec_eval_setup, do_diagn=False,
-					   filename=filename, backend=backend)
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=False)
 		
 		logger.debug('context')
 		logger.debug(context)
 
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering = renderer(context)
+		self.rendering = renderer(**context)
 
 	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
-														dict, str, SpecEvalSetup], tuple[Any, dict]],
-							filename: str = 'spectrum.svg', backend: str = 'matplotlib'):
+														dict, str, SpecEvalSetup], tuple[Any, dict]]):
 		"""
 		Render the spectral data
 
@@ -1511,10 +1486,9 @@ class WilsonSimulation:
 		# TODO also - self.system, self.exp, self.name
 		# generate self.name?
 		
-		context = SimContext(spec=self.spec, system=self.system, exp=self.exp,
+		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
 					   diagn=self.diagn, name=self.name, 
-					   spec_eval_setup=self.spec_eval_setup, do_diagn=True,
-					   filename=filename, backend=backend)
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=True)
 		
 		logger.debug('context')
 		logger.debug(context)
