@@ -1,4 +1,4 @@
-from .image_utils import make_name, make_texts4fig, text_spec_fig
-from .matplotlib_image import SpectrumFigure
-from .dot_spectrum import DotSpectrum
 from .simple_plot import *
+from .spectrum_renderer import *
+from .matplotlib_renderer import MatplotlibRenderer
+from .render import render_spectrum
