@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, asdict, is_dataclass, InitVar
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 import json
 import numpy as np
 import copy
@@ -8,6 +8,7 @@ from wilson_utils.prop_trivname import prop_trivname
 from wilson_derive.abstractions import VibPerturbedTerm
 from wilson_experiment.abstractions import VibExperiment
 from wilson_utils.abstractions import VibState
+from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -652,6 +653,11 @@ class SpectralGrid:
 	----
 	axes: Dictionary {axis 1 ID: SpectralAxis instance, axis 2 ID: SpectralAxis instance, ...}: One SpectralAxis
 	instance per axis. TODO: Also to support instances being SpectralAxisAdvanced
+		this parameter is misleading if :
+			e.g., axis1 is with {1: 1} and axis2 is with {1: 1, 2: -1} 
+			and `spacer`, `start` and `end` dicts are used as they are now in __post_init__ and `make_mesh_numpy`
+			the grid itself right now would not correspond to axis1 is with {1: 1} and axis2 is with {1: 1, 2: -1}
+
 	range_style: String: What sort of range? Intended options at least "uniform" or "custom"
 	start: Dictionary {axis 1 ID: starting point (float), ...}: Axis starting points
 	end: Dictionary {axis 1 ID: end point (float), ...}: Axis end points
@@ -715,7 +721,9 @@ class SpectralGrid:
 				self.n_pts = n_pts
 
 		if(self.range_style == 'custom'):
-			raise NotImplementedError('Custom range style is not yet supported')
+			# rm error to enable skipping `spacer, start, end` - they aren't used meaningfully anyway
+			logger.warning('Custom range style is not yet supported')
+			pass
 
 
 	def make_mesh_numpy(self) -> dict:
@@ -747,6 +755,89 @@ class SpectralGrid:
 		pass
 
 
+@dataclass
+class EvaluationVariable:
+	"""
+	Like SpectralAxis, but a range for an independent variable of the response function (frequency variable)
+
+	range_style: 'uniform' or 'custom'
+	"""
+	range_style: str
+	start: float = None
+	end: float = None
+	n_pts: int = None
+	spacer: float = None
+	custom_range: list|np.ndarray = None
+
+	def __post_init__(self):
+		"""
+		dealing with one range at the time seems to be more clean
+		"""
+		
+		if self.range_style == 'custom':
+			raise NotImplementedError('Custom range style is not yet supported')
+		
+		elif self.range_style == 'uniform':
+			
+			if (self.n_pts is None) and (self.spacer is None):
+				raise AssertionError('For a uniform setup, either a spacer or a n_pts dictionary must be specified')
+
+			if (self.n_pts is not None) and (self.spacer is not None):
+				raise AssertionError('Only one of the arguments n_pts and spacer may be specified')
+			
+			if self.n_pts is not None:
+				self.spacer = (self.end - self.start)/(self.n_pts + 1)
+				self.range = np.linspace(self.start, self.end, self.n_pts)
+
+			elif self.spacer is not None:
+
+				self.n_pts = int((self.end - self.start)/self.spacer + 1)
+				if self.end != self.start + self.spacer*(self.n_pts - 1):
+					logger.info(f'NOTE: Axis defined end {self.end} not precisely at spacer increment of start')
+				self.range = np.arange(self.start, self.end, self.spacer)
+
+
+@dataclass
+class EvaluationInfo:
+	"""
+	this feels a bit more "official" than a dict
+	and it is warranted because that is a critical info that is needed for the evaluation
+
+	freq_variables - is a dict {variable label: variable data} with a range for each
+	fixed_variables - a dict of values for the non-varied fixed variables 
+		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
+	"""
+	freq_variables: dict
+	Gamma: float
+	Gamma_unit: str
+	fixed_variables: dict = field(default_factory=lambda: dict())
+	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
+	spec_result: np.ndarray | dict = None
+
+@dataclass
+class RenderingInfo:
+	"""
+	this feels a bit more "official" than a dict
+	and it is warranted because that is a critical info that is needed for the rendiring
+
+	projection: '1d', '2d' or '3d'
+	reference_max: normalizing to this reference_max value
+
+	"""
+	projection: str = '2d'
+	reference_max: float = None
+	dynamic_range: float = 100
+	num_levels: int = 12
+	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
+	title: str = 'plot'
+	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
+	metadata: dict = field(default_factory=lambda: dict())
+	to_save: bool = False
+	filename: str = 'spectrum.svg'
+	backend: str = 'matplotlib'
+	# style configurations - currently will work/be used for matplotlib renderer
+	style_config: PlotConfig = field(default_factory=lambda: PlotConfig())
+
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
 #
@@ -765,11 +856,11 @@ class SpecEvalSetup:
 	parameters etc.)
 	rnd_info: dict: Setup information which is principally rendering-related (e.g. number of level ticks, other
 	plotting-/visualization-related information)
-	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info
+	FIXME: Consider formalizing which setup attributes may be passed in ev_info and rnd_info -> RenderingInfom and EvaluationInfo
 	"""
 	grid: SpectralGrid=None
-	ev_info: dict=None
-	rnd_info: dict=None
+	ev_info: EvaluationInfo = None
+	rnd_info: RenderingInfo = None
 
 	def __post_init__(self):
 		if self.grid is not None:
@@ -1359,9 +1450,24 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return
 		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+		assert self.spec is not None, 'No spectrum data, there is nothing to render'
+		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
+		
+		if self.diagn is None:
+			self.diagn = {}
+
+		# TODO also - self.system, self.exp, self.name
+		# generate self.name?
+
+		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
+					   diagn=self.diagn, name=self.name, 
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=False)
+		
+		logger.debug('context')
+		logger.debug(context)
+
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		self.rendering = renderer(**context)
 
 	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
 														dict, str, SpecEvalSetup], tuple[Any, dict]]):
@@ -1371,9 +1477,24 @@ class WilsonSimulation:
 		renderer: Callable: A function to carry out the rendering. As in render but must additionally return a
 		dictionary of diagnostics information.
 		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+		assert self.spec is not None, 'No spectrum data, there is nothing to render'
+		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
+		
+		if self.diagn is None:
+			self.diagn = {}
+
+		# TODO also - self.system, self.exp, self.name
+		# generate self.name?
+		
+		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
+					   diagn=self.diagn, name=self.name, 
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=True)
+		
+		logger.debug('context')
+		logger.debug(context)
+
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering, self.diagn = renderer(self.spec, self.system, self.exp, self.diagn, self.name, self.spec_eval_setup)
+		self.rendering, self.diagn = renderer(context)
 
 		if not isinstance(self.diagn, dict):
 			raise AssertionError('Diagnostics result must be dictionary')
