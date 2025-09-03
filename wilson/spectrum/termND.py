@@ -108,6 +108,7 @@ class TermND:
         """
         self.term_id = term_id
         self.expression = expression
+        self.diagnostics = {}
 
         # expression parts
         self.resonances_expr = expression['resonances']
