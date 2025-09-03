@@ -26,8 +26,10 @@ from wilson_utils.printing import debugfunc, debug_deep
 from collections.abc import Callable
 from itertools import product
 
-from wilson.spectrum import func_evaluation
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from wilson.spectrum import func_evaluation
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -898,10 +900,12 @@ def get_spec_window(freqvars: dict, margins: dict = None):
 
     return bounds
 
-def get_resonances(termnd: TermND, modes_indices, max_state_lvl) -> list[func_evaluation.Resonance]:
+def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
     """
-    
+     -> list[func_evaluation.Resonance]
     """
+    from wilson.spectrum import func_evaluation
+
     evalterm = func_evaluation.EvalTerm(**termnd.expression)
 
     get_state = func_evaluation.make_state_value_func(termnd.vibstates)
