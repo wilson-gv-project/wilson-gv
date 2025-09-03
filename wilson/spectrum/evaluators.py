@@ -3,6 +3,7 @@ Evaluator functions for WilsonSimulation
 """
 from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+from wilson_utils.unit_convertor import convertor
 
 import numpy as np
 
@@ -80,7 +81,6 @@ def terms_evaluator(system,
     # fixme: logging decorator instead?
     diagn = {}
 
-    print('\n\n EVALUATOR \n')
     #! 1.1 transform terms from derive to evaluate form
     dict_terms = derived_terms_dict_to_dicts(derived_terms)
 
@@ -92,6 +92,13 @@ def terms_evaluator(system,
 
     # 4 complete
     te.identify_to_precalculate()
+
+    for p in props:
+        if p.trivial_name == 'cff':
+            if p.in_units != 'au':
+                p.target_units = 'au'
+                p.convertValues(convertor=convertor,
+                                convertor_info={'harm_freqs': list(vib_ana_setup.nc_sqrt_eigval.values())})
 
     # 5.1
     props_data = {prop.trivial_name: prop.vals for prop in props}
@@ -138,6 +145,8 @@ def terms_evaluator(system,
             term.properties_data = cff_data
         term.precalc_data = precalculated_data
         term.mode_indices = vib_ana_setup.modes_indices
+
+        term.vibstates = vib_ana_setup.states
         # context manager - setting debug level
         with debug_mode(0):
             logger.warning(f'now term {id}')
