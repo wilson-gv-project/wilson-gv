@@ -108,6 +108,8 @@ class TermND:
         """
         self.term_id = term_id
         self.expression = expression
+        
+        self.vibstates = None
         self.diagnostics = {}
 
         # expression parts
