@@ -625,7 +625,6 @@ class TermND:
 
             # return np.sum(total0), np.array(total)
 
-
     @tag('general')
     def get_amplitudes(self, w1: float|np.ndarray, w2: float|np.ndarray,
                        Gamma_rc: float, margin: float,
@@ -657,7 +656,7 @@ class TermND:
             w1ab, w2ab = resonance_inst.location
 
             # is a list of axes values of the resonance
-            axes_resonance = self.get_resonance_location_general(ab) #! this line isn't general
+            # axes_resonance = self.get_resonance_location_general(ab) #! this line isn't general
 
             # todo: window_check should be a utility function
             resonance_is_ordered = w2ab > w1ab #! this line isn't general; should get from experiment?
@@ -688,8 +687,12 @@ class TermND:
                     used_combs[ab] = ((w1ab, w2ab), (w1[max_indices], w2[max_indices]))
             else:
                 skipped += 1
+                skipped_combs[ab] = ((w1ab, w2ab), f'resonance_in_window {resonance_in_window}', 
+                                     f'resonance_is_ordered {resonance_is_ordered}')
                 debug_deep(f'skipped later {ab}', 'Term2D.get_intensity')
                 continue
+        self.diagnostics['skipped_combs'] = skipped_combs
+        self.diagnostics['used_combs'] = used_combs
 
         return result
 
