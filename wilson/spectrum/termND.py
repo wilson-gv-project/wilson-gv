@@ -26,6 +26,12 @@ from wilson_utils.printing import debugfunc, debug_deep
 from collections.abc import Callable
 from itertools import product
 
+from wilson.spectrum import func_evaluation
+
+
+import logging
+logger = logging.getLogger("wilson."+__name__)
+
 @tag('used in get_resonance_location_general for NO PRECALC')
 def compute_vibdiff(vibdiff_type: tuple, idx: tuple) -> list:
     """
@@ -313,13 +319,15 @@ class TermND:
             assert len(res_conds_vds) == len(res_conds_ax), 'Each resonance condition must have axes and vib diffs'
 
             RCs = [res_conds_vds[i]+convNu2Ene(res_conds_ax[i]) for i in range(len(res_conds_vds))]
+            # logger.warning(f'RCs {RCs}')
             for i,rc in enumerate(RCs):
                 if np.any(rc-1j*Gamma_Eh == 0):
                     print(i, rc)
                     raise ValueError("Division by zero detected in TermND.get_res_factor! Singularity at resonance")
 
             from functools import reduce
-            RC_prod = reduce(np.multiply, [i-1j*Gamma_Eh for i in RCs])
+            RC_prod = reduce(np.multiply, [i-1.j*Gamma_Eh for i in RCs])
+            # logger.warning(f'RC_prod {RC_prod}')
             if np.any(RC_prod == 0):
                 raise ValueError("Division by zero detected in TermND.get_res_factor! Singularity at resonance")
             r = np.where(condition, 1/RC_prod, 0.)
@@ -389,7 +397,9 @@ class TermND:
         """
         # c is None if not given
         indices_dict = make_abc_dict(abc_comb)
+        
         if self.precalc_data is None:
+            
             components = {}
             total = 0.
             for ABGD in self.gammaCompsAll: #! is this general?
@@ -408,7 +418,9 @@ class TermND:
         else:
             idxs = tuple([i for i in indices_dict.values() if i is not None])
             priv_names_tuple = tuple(sorted([p[0] for p in self.avrg_props_expr]))
-
+            # print(f'priv_names_tuple {priv_names_tuple}')
+            # print(f'idxs {idxs}')
+            # print(self.precalc_data['avrg_tensors'][priv_names_tuple])
             return self.precalc_data['avrg_tensors'][priv_names_tuple][idxs]
 
 
@@ -430,7 +442,7 @@ class TermND:
                                   remaining_length,
                                   self.mode_indices,
                                   self.get_full_factor)
-
+        # logger.warning(f'out of get_factor_summed {total:.3e}')
         if comps:
             return total, components
         else:
@@ -447,10 +459,15 @@ class TermND:
         """
         if debugprint:
             debugfunc('', f'get_full_factor called for {self.term_label} term')
-
+        logger.warning(f'get_full_factor called for {self.term_label} term {self.term_id} for {abc_comb}')
         components = {}
-        avrg_properties = self.get_avrg_properties(abc_comb, comps=comps)
+        self.diagnostics['get_amplitudes_ab prefac0'][abc_comb] = {}
+        logger.warning(f'diagn {self.diagnostics.get('get_amplitudes_ab prefac0', None)}')
 
+        avrg_properties = self.get_avrg_properties(abc_comb, comps=comps)
+        self.diagnostics['get_amplitudes_ab prefac0'][abc_comb]['avrg_properties'] = avrg_properties
+
+        # logger.warning(f'avrg_properties {avrg_properties:.3e}')
         if avrg_properties==0:
             if comps:
                 return 0., components
@@ -458,6 +475,9 @@ class TermND:
                 return 0.
 
         ene_factor = self.get_ene_factor(abc_comb)
+        # logger.warning(f'ene_factor {ene_factor:.3e}')
+        self.diagnostics['get_amplitudes_ab prefac0'][abc_comb]['ene_factor'] = ene_factor
+
         product_all = ene_factor*avrg_properties # [0] if comps == True
 
         if debugprint:
@@ -471,6 +491,7 @@ class TermND:
         if self.viblevelsdiff_expr:
             # fixme: make more general
             self.get_non_averaged_props(abc_comb)
+            self.diagnostics['get_amplitudes_ab prefac0'][abc_comb]['F_vals'] = self.F_vals[abc_comb]
 
             if self.F_vals[abc_comb]==0:
                 if comps:
@@ -479,12 +500,16 @@ class TermND:
                     return 0.
 
             vibdiff = self.get_viblevelsdiff(abc_comb)[0]
+            self.diagnostics['get_amplitudes_ab prefac0'][abc_comb]['vibdiff'] = vibdiff
+
             if vibdiff==0:
                 if comps:
                     return 0., components
                 else:
                     return 0.
-
+            logger.warning(f'vibdiff {vibdiff} {abc_comb}')
+            # logger.warning(f'self.F_vals[abc_comb] {self.F_vals[abc_comb]}')
+            # logger.warning(f'--------------- comb was {abc_comb}')
             product_all *= self.F_vals[abc_comb] * vibdiff
 
             if comps:
@@ -493,6 +518,8 @@ class TermND:
             if debugprint:
                 debugfunc(f'{self.F_vals[abc_comb]:.2e}', 'self.F_vals[(a,b,c)]') #! change names
                 debugfunc(f'{self.get_viblevelsdiff(abc_comb)[0]:.2e}', 'self.get_viblevelsdiff(a, b, c)[0]')
+        
+        logger.warning(f'product_all end from get_full_factor for given ab {abc_comb} {product_all:.3e}')
 
         if comps:
             return product_all, components
@@ -505,7 +532,6 @@ class TermND:
         """
         1/omega_a/omega_b/omega_c
         """
-
         d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
         modes = [i for i in d.values() if i is not None]
 
@@ -530,20 +556,33 @@ class TermND:
         a, b, c=None
         """
         d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
-
+        logger.warning(f'd {d}')
+        logger.warning(f'self.vibstatesdiff_objs {self.vibstatesdiff_objs}')
         if self.precalc_data is not None:
             vds = []
             for vd in self.vibstatesdiff_objs:
                 if not vd.res_cond:
-                    indices = tuple([d[i] for i in vd.diff_str.replace('+', ',').split(',') if i in d])
+                    logger.warning(f'vd in self.vibstatesdiff_objs {vd}')
+                    left,right = vd.diff_str.split(',')
+                    logger.warning(f'vd.diff_type {vd.diff_type}')
+                    logger.warning(f'vd.diff_str original {vd.diff_str}')
+
+                    if tuple(sorted(vd.diff_type)) != vd.diff_type:
+                        diff_str = ','.join(reversed(vd.diff_str.split(',')))
+
+                    indices = tuple([d[i] for i in diff_str.replace('+', ',').split(',') if i in d])
+                    logger.warning(f'diff_str {diff_str}')
+                    logger.warning(f'indices {indices}')
                     vd_n = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][indices]
+                    logger.warning(f'vd_n {vd_n}')
+
                     # opposite sign for reversed vib diff
                     if tuple(sorted(vd.diff_type)) != vd.diff_type:
                         vd_n *= -1
                     vds.append(vd_n)
                     if np.any(np.array(vd_n) == 0):
                         raise ValueError("Division by zero detected in TermND.get_vibenediff!")
-
+            logger.warning(f'vds list {vds}')
             if np.any(np.array(vds) == 0):
                 raise ValueError("Division by zero detected in TermND.get_vibenediff!")
             return np.sum(1./np.array(vds)), np.array(vds)
@@ -597,19 +636,23 @@ class TermND:
             'allstates', 'harmonic_states_Eh',
             'properties_data', 'gammaCompsAll', 'mode_indices'}
         """
-        result = 0.
+        result = np.zeros_like(w1, dtype=complex)
         skipped = 0
+        skipped_combs = {}
+        used_combs = {}
         #! should get number of indices to sum over
         #! ab - are the indices from resonance conditions but ab should have others as None
+        self.diagnostics['get_amplitudes_ab prefac0'] = {}
 
-        for ab in combinations_with_permutations(self.mode_indices, self.collective_n_idx_rescond):
-            if sel_abs is not None:
-                if ab not in sel_abs:
-                    skipped+=1
-                    debug_deep(f'skipped {ab}', 'Term2D.get_intensity')
-                    continue
+        list_resonances = get_resonances(self, modes_indices=self.mode_indices, max_state_lvl=self.collective_n_idx_rescond)
+        self.diagnostics['list_resonances'] = list_resonances
+        # for ab in combinations_with_permutations(self.mode_indices, self.collective_n_idx_rescond):
+        for resonance_inst in list_resonances:
+            ab = resonance_inst.producers[0]['assignment']
 
-            w1ab, w2ab = self.get_resonance_location_general(ab) #! this line isn't general
+            # w1ab, w2ab = self.get_resonance_location_general(ab) #! this line isn't general
+            w1ab, w2ab = resonance_inst.location
+
             # is a list of axes values of the resonance
             axes_resonance = self.get_resonance_location_general(ab) #! this line isn't general
 
@@ -620,9 +663,26 @@ class TermND:
             sufficient_margin_between = (w2ab - margin) > w1ab
             resonance_in_window = within_w1_window and within_w2_window and sufficient_margin_between
 
+            if sel_abs is not None:
+                if ab not in sel_abs:
+                    skipped+=1
+                    debug_deep(f'skipped {ab}', 'Term2D.get_intensity')
+                    skipped_combs[ab] = ((w1ab, w2ab), f'resonance_in_window {resonance_in_window}', 
+                                        f'resonance_is_ordered {resonance_is_ordered}')
+                    continue
+                else:
+                    logger.warning(f'ab comb {ab}')
+
             if resonance_is_ordered and (collect_all or resonance_in_window):
-                result += self.get_amplitudes_ab(ab, w1, w2, Gamma_rc,
-                                                 condition=condition, debugprint=debugprint)[0]
+                q = self.get_amplitudes_ab(ab, w1, w2, Gamma_rc,
+                                           condition=condition, debugprint=debugprint)[0]
+                result += q
+
+                max_indices = np.unravel_index(np.argmax(np.abs(q)), q.shape)
+                if not np.any(q):
+                    used_combs[ab] = ((w1ab, w2ab), ('all zeros'))
+                else:
+                    used_combs[ab] = ((w1ab, w2ab), (w1[max_indices], w2[max_indices]))
             else:
                 skipped += 1
                 debug_deep(f'skipped later {ab}', 'Term2D.get_intensity')
@@ -644,15 +704,18 @@ class TermND:
 
         # ab_comb are indices of res condition
         full_abc = make_abc_tuple(ab_comb, self.collective_n_idx_max)
+        self.diagnostics['get_amplitudes_ab prefac0'][full_abc] = {}
 
         product_all = self.get_factor_summed(full_abc, comps=False,
                                              debugprint=debugprint)  # , components if comps==True
+        logger.warning(f'product_all get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
 
         components = {}
-
+        self.diagnostics['get_amplitudes_ab prefac0'][full_abc]['product_all summed'] = product_all
+        
         if product_all==0.:
-            return 0., components
-
+            return np.zeros_like(w1), components
+        
         # ab_comb are indices of res conditions
         if isinstance(w1, float):
             resonance = self.get_res_factor(w1, w2, ab_comb, Gamma_rc, condition,
@@ -662,12 +725,19 @@ class TermND:
             debugfunc(f'{product_all:.2e}', 'product_all before prefA')
         else:
             resonance = self.get_res_factor(w1, w2, ab_comb, Gamma_rc, condition)
-
+            # logger.warning(f'resonance \n{resonance}\n')
+            logger.warning(f'Gamma_rc {Gamma_rc}')
             debugfunc(f'{np.max(np.abs(resonance)):.2e}', 'resonance')
             debugfunc(f'{product_all:.2e}', 'product_all before prefA')
 
         product_all *= self.prefactorA * self.prefactorB
+        logger.warning(f'product_all with prefs get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
+        
+        self.diagnostics['get_amplitudes_ab prefac0'][full_abc]['resonance'] = resonance
+
         result = product_all * resonance
+        logger.warning(f'result ab {ab_comb} \n{result}\n')
+
         return result, components
 
 
@@ -799,4 +869,49 @@ def sum_over_suffixes(fixed_prefix: tuple, remaining_length: int,
     for suffix in product(mode_indices, repeat=remaining_length):
         full_input = fixed_prefix + suffix
         total += func(full_input)
+        # logger.warning(f'suffix {suffix}')
+        # logger.warning(f'addition in sum_over_suffixes {func(full_input):.3e}')
     return total
+
+def check_if_in_window(res_loc:dict, bounds: dict):
+    """
+    res_loc - resonance location
+    bounds - {'w1': {'left': num1, 'right': num2}, 'w2': {'left': num3, 'right': num4}}
+    """
+    windows = []
+    for freqvar in res_loc:
+        within_window = bounds[freqvar]['left'] <= res_loc[freqvar] <= bounds[freqvar]['right']
+        windows.append(within_window)
+    
+    resonance_in_window = all(windows)
+
+    return resonance_in_window
+
+def get_spec_window(freqvars: dict, margins: dict = None):
+    """
+    creating `bounds` dict for `check_if_in_window()`
+    """
+    bounds = {}
+    for key in freqvars:
+        bounds[key] = {'left': np.min(freqvars[key]) + margins.get(key, 0.), 
+                       'right': np.max(freqvars[key]) + margins.get(key, 0.)}
+
+    return bounds
+
+def get_resonances(termnd: TermND, modes_indices, max_state_lvl) -> list[func_evaluation.Resonance]:
+    """
+    
+    """
+    evalterm = func_evaluation.EvalTerm(**termnd.expression)
+
+    get_state = func_evaluation.make_state_value_func(termnd.vibstates)
+    
+    vibdiffbank = func_evaluation.VibDiffBank(indices=modes_indices, 
+                                              max_quanta=max_state_lvl,
+                                              state_value_func=get_state, mode='ondemand')
+    
+    from wilson_analysis.analysis.pre_eval import DataAnalyzer
+    analyzer = DataAnalyzer()
+    list_res = analyzer.extract_oneTerm_resonances(term=evalterm, vibdiffbank=vibdiffbank)
+    logger.warning(f'list_res {list_res}')
+    return list_res

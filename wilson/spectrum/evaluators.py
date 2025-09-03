@@ -6,6 +6,9 @@ from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2E
 
 import numpy as np
 
+import logging
+logger = logging.getLogger("wilson."+__name__)
+
 def eval_spec2D():
     from wilson.spectrum import wilsonmain_integration
     return wilsonmain_integration.spectrum2D
@@ -14,7 +17,10 @@ def eval_spec2D():
 # TermND with TermsEvaluator
 def terms_evaluator(system,
                     derived_terms, props,
-                    spec_eval_setup, vib_ana_setup) -> complex|float|np.ndarray:
+                    spec_eval_setup, vib_ana_setup,
+                    do_diagn: bool,
+                    selected_combs: list = None,
+                    collect_all: bool = False) -> complex|float|np.ndarray:
     """
     >> Orchestrating spectrum amplitudes evaluation with TermND setup.
 
@@ -90,8 +96,9 @@ def terms_evaluator(system,
     # 5.1
     props_data = {prop.trivial_name: prop.vals for prop in props}
 
-    # format transformation 
-    cff_data = {'cff': props_data['cff']}
+    if 'cff' in [p.trivial_name for p in props]:
+        # format transformation 
+        cff_data = {'cff': props_data['cff']}
 
     # todo: make a func for checking units - cm-1 vs Eh - energy_unit_check in spectrum_utils
     # format transformation
@@ -104,7 +111,7 @@ def terms_evaluator(system,
 
     avrg_terms, prefactorAvrg = getPolarizationAveragingExpression("ZZZZ") # "ZZZZ" should come from some setup dataobject
     axes_dict = spec_eval_setup.ev_info.freq_variables
-
+    Gamma_rc = spec_eval_setup.ev_info.Gamma
     # format transformation
     states_arrays_Eh = mainVibStates2arraydict(vib_ana_setup.states, system.Nnmodes)
 
@@ -114,20 +121,37 @@ def terms_evaluator(system,
                                       axes_dict=axes_dict,
                                       states_arrays_Eh=states_arrays_Eh,
                                       harmonic_arrays_Eh=harmonic_arrays_Eh)
-
+    
     # 5 - complete
     precalculated_data = te.precalculate(data_for_precalc)
+
+    diagn['evaluator diagn'] = {}
+
+    # logger.warning(f'precalculated_data \n{precalculated_data['vibdiffs']}')
+    # logger.warning(f'precalculated_data \n{precalculated_data['avrg_tensors']}')
+    logger.warning(f'precalculated_data \n{precalculated_data['res_conds']}')
 
     # 6
     from wilson.spectrum import debug_mode
     for id, term in te.terms.items():
-        term.properties_data = cff_data
+        if 'cff' in [p.trivial_name for p in props]:
+            term.properties_data = cff_data
         term.precalc_data = precalculated_data
         term.mode_indices = vib_ana_setup.modes_indices
         # context manager - setting debug level
         with debug_mode(0):
-            a_intermediate = term.get_amplitudes(axes_dict['w1'], axes_dict['w2'],
-                                                 3.8, 0.0, debugprint=True, collect_all=False)
+            logger.warning(f'now term {id}')
+
+            a_intermediate = term.get_amplitudes(w1=axes_dict['w1'], w2=axes_dict['w2'],
+                                                 Gamma_rc=Gamma_rc, margin=0.0, 
+                                                 debugprint=True, collect_all=collect_all,
+                                                 sel_abs=selected_combs)
         amplitudes += a_intermediate
-    
-    return amplitudes
+
+        diagn['evaluator diagn'][id] = term.diagnostics
+
+    logger.warning(f'amplitudes \n{amplitudes}')
+    if do_diagn:
+        return amplitudes, diagn
+    else:
+        return amplitudes
