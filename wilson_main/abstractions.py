@@ -821,9 +821,23 @@ class EvaluationInfo:
 	freq_variables: dict
 	Gamma: float
 	Gamma_unit: str
+	freq_condition: str = None
 	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 	spec_result: np.ndarray | dict = None
+	margins: dict = None
+
+	@property
+	def spec_window_bounds(self):
+		"""
+		creating `bounds` dict for `check_if_in_window()`
+		"""
+		bounds = {}
+		for key in self.freq_variables:
+			bounds[key] = {'left': np.min(self.freq_variables[key]) + self.margins.get(key, 0.), 
+						'right': np.max(self.freq_variables[key]) + self.margins.get(key, 0.)}
+
+		return bounds
 
 @dataclass
 class RenderingInfo:
