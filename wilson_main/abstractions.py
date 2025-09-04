@@ -600,6 +600,17 @@ class VibAnaSetup:
 
 		self.states, self.diagn = anharmonic_analyzer(**context)
 
+	def upd_exclude_modes(self, upd_exclude_modes: list = None):
+		if self.exclude_modes is None:
+			if self.system is not None:
+				self.exclude_modes = []
+		elif upd_exclude_modes is not None:
+			self.exclude_modes = upd_exclude_modes
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+
 
 @dataclass
 class SpectralAxis:
