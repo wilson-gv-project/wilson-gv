@@ -140,7 +140,7 @@ def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
     return result_dict
 
 
-def derived_terms_dict_to_dicts(derived_terms):
+def derived_terms_dict_to_dicts(derived_terms, tolistonly: bool=False):
     """
     Example:
     derived_terms = {
@@ -158,7 +158,14 @@ def derived_terms_dict_to_dicts(derived_terms):
     for key_num_anharms in derived_terms:
         for anharms_tuple in derived_terms[key_num_anharms]:
             for term in derived_terms[key_num_anharms][anharms_tuple]:
-                result_list.append(dict_from_term(term))
+                
+                if not tolistonly:
+                    d = dict_from_term(term)
+                    d['lvl_anharm'] = key_num_anharms
+                    d['anharm_tuple'] = anharms_tuple
+                    result_list.append(d)
+                else:
+                    result_list.append(term)
 
     return result_list
 
