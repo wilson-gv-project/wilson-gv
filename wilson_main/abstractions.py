@@ -1409,7 +1409,12 @@ class WilsonSimulation:
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
+				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
+				 do_diagn=False)
+	
+		self.spec = evaluator(**context)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
@@ -1423,8 +1428,13 @@ class WilsonSimulation:
 
 		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
 		"""
+		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
+				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
+				 do_diagn=True)
+	
 		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec, diagn = evaluator(**context)
+		self.updDiagnostics(upd_dict=diagn)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
