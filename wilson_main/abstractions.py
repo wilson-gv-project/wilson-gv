@@ -1236,6 +1236,15 @@ class WilsonSimulation:
 
 		self.spec_eval_setup = spec_eval_setup
 
+	def updDiagnostics(self, upd_dict: dict):
+		"""
+		add info to self.diagn dictionary
+		"""
+		if self.diagn is None:
+			self.diagn = {}
+		
+		self.diagn.update(upd_dict)
+
 	def findPropsAndMaxStateLvl(self, freqs: str='static'):
 		"""
 		Make property instances needed to fulfill tasks and set maximum state level in vibrational analysis
