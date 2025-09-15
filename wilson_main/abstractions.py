@@ -600,6 +600,17 @@ class VibAnaSetup:
 
 		self.states, self.diagn = anharmonic_analyzer(**context)
 
+	def upd_exclude_modes(self, upd_exclude_modes: list = None):
+		if self.exclude_modes is None:
+			if self.system is not None:
+				self.exclude_modes = []
+		elif upd_exclude_modes is not None:
+			self.exclude_modes = upd_exclude_modes
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+
 
 @dataclass
 class SpectralAxis:
@@ -810,9 +821,23 @@ class EvaluationInfo:
 	freq_variables: dict
 	Gamma: float
 	Gamma_unit: str
+	freq_condition: str = None
 	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 	spec_result: np.ndarray | dict = None
+	margins: dict = None
+
+	@property
+	def spec_window_bounds(self):
+		"""
+		creating `bounds` dict for `check_if_in_window()`
+		"""
+		bounds = {}
+		for key in self.freq_variables:
+			bounds[key] = {'left': np.min(self.freq_variables[key]) + self.margins.get(key, 0.), 
+						'right': np.max(self.freq_variables[key]) + self.margins.get(key, 0.)}
+
+		return bounds
 
 @dataclass
 class RenderingInfo:
@@ -1211,6 +1236,15 @@ class WilsonSimulation:
 
 		self.spec_eval_setup = spec_eval_setup
 
+	def updDiagnostics(self, upd_dict: dict):
+		"""
+		add info to self.diagn dictionary
+		"""
+		if self.diagn is None:
+			self.diagn = {}
+		
+		self.diagn.update(upd_dict)
+
 	def findPropsAndMaxStateLvl(self, freqs: str='static'):
 		"""
 		Make property instances needed to fulfill tasks and set maximum state level in vibrational analysis
@@ -1384,7 +1418,12 @@ class WilsonSimulation:
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
+				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
+				 do_diagn=False)
+	
+		self.spec = evaluator(**context)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
@@ -1398,8 +1437,13 @@ class WilsonSimulation:
 
 		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
 		"""
+		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
+				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
+				 do_diagn=True)
+	
 		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec, self.diagn = evaluator(self.system, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+		self.spec, diagn = evaluator(**context)
+		self.updDiagnostics(upd_dict=diagn)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
