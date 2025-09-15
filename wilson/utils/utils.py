@@ -276,6 +276,7 @@ def pairwise_differences(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     for vib levels diffs tensors
 
     # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
+    
     # from 2d array subtract 1d array => from each row subtract this 1d array
     # then it means: quant2[0,1] is quant2[a,b] - quant1[a] = diff2_1[b,a]
 

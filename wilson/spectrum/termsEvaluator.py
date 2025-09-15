@@ -158,12 +158,14 @@ class TermsEvaluator:
         """
         avrg_terms_list, prefactorAvrg = avrg_terms
         storage_tensors = {}
+
         for tID in self.unique_avrg_tensors_tID:
             simple_prop_tuple = self.seq_tuples.vk[self.terms[tID]]
 
             num_dims = self.unique_avrg_tensors_all_expr[simple_prop_tuple]
             shape = (Nnmodes,) * num_dims
-
+            logger.warning(f'self.unique_avrg_tensors_all_expr {self.unique_avrg_tensors_all_expr}')
+            logger.warning(f'shape precalc_avrg_tensors {shape}')
             avrg_tensor = np.zeros(shape)
             abcde_combs = combinations_with_permutations(range(Nnmodes), num_dims)
 
@@ -212,6 +214,7 @@ class TermsEvaluator:
             sort_d = sorted(d.diff_type)
 
             diff = pairwise_differences(qstates_Eh[sort_d[0]], qstates_Eh[sort_d[1]])
+
             res[tuple(sort_d)] = diff
             
         # ApBmA[a, b] = ApB[a, b] - A[b] = A[a] + B[b] - A[b]
