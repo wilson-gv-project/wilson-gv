@@ -1,10 +1,11 @@
-from wilson_experiment.abstractions import VibExperiment
+from ..wilson_experiment.abstractions import VibExperiment
 from . import abstractions as abst
 from . import dbl_pert_expansion
 from . import hermaut
 from . import vib_rsp_sos
 from . import simplify
 import copy
+from ..wilson_utils import common_labels as wu_common
 
 def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=1, el_anharm_limit: int=1,
                              mech_anharm_limit: int=1) -> dict:
@@ -21,7 +22,6 @@ def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=
     mech_anharm_limit: integer: Limitation on mechanical order of anharmonicity (default = 1)
     """
 
-    import wilson_utils.common_labels as wu_common
 
     op_omega = abst.QOperator(wu_common.op_omega_label_int)
     ops_pert = tuple([abst.QOperator(wu_common.op_labels_int[i]) for i in range(experiment.order)])

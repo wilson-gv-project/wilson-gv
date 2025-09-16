@@ -1,4 +1,4 @@
-import wilson_main.abstractions as wm_abst
+from .wilson_main import abstractions as wm_abst
 import numpy as np
 
 

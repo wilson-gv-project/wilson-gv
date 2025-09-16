@@ -1,4 +1,4 @@
-import wilson_main.abstractions as abst_main
+from .wilson_main import abstractions as abst_main
 from .fixtures import mol_system
 from .calcsetups import calc_setup
 

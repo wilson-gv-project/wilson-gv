@@ -1,6 +1,6 @@
 import copy
 
-from wilson_derive.abstractions import VibPerturbedTerm
+from .abstractions import VibPerturbedTerm
 
 def terms_simplify(terms_in: list[VibPerturbedTerm], nm_inds: list):
     """

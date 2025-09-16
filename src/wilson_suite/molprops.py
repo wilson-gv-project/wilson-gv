@@ -1,5 +1,5 @@
 import copy
-import wilson_main.abstractions as abst_main
+from .wilson_main import abstractions as abst_main
 from .calcsetups import calc_setup, calc_setup1, calc_setup2
 
 props_evv_none_nocalc_novals = [abst_main.MolecularProperty(prop_spec={'ops': ('g', 'f'), 'freq': (0.0, 0.0)}, trivial_name='dipgrad'), 

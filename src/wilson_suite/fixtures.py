@@ -1,8 +1,8 @@
-import wilson_main.abstractions as abst_main
-import wilson_derive as ws_derive
-from wilson_derive.abstractions import VibPerturbedTerm
-import wilson_experiment as ws_experiment
-import wilson_utils as ws_utils
+from .wilson_main import abstractions as abst_main
+from . import wilson_derive as ws_derive
+from .wilson_derive.abstractions import VibPerturbedTerm
+from . import wilson_experiment as ws_experiment
+from . import wilson_utils as ws_utils
 
 import logging
 # wilson. - for hierarchy of loggers

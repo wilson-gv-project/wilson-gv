@@ -4,11 +4,11 @@ import json
 import numpy as np
 import copy
 
-from wilson_utils.prop_trivname import prop_trivname
-from wilson_derive.abstractions import VibPerturbedTerm
-from wilson_experiment.abstractions import VibExperiment
-from wilson_utils.abstractions import VibState
-from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_utils.prop_trivname import prop_trivname
+from ..wilson_derive.abstractions import VibPerturbedTerm
+from ..wilson_experiment.abstractions import VibExperiment
+from ..wilson_utils.abstractions import VibState
+from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -180,7 +180,7 @@ class MolecularProperty:
 		Turning ndarray to dict when vals were given during init.
 		Can be skipped alltogether is vals would be in dict?
 		"""
-		from wilson_utils.serialization import ndarray_to_dict
+		from ..wilson_utils.serialization import ndarray_to_dict
 		self.serial_vals = ndarray_to_dict(vals, serial=True) if vals is not None else None
 
 	def make_serial_vals(self):
