@@ -1,10 +1,10 @@
 """
 Turning scripts into pytests
 """
-from wilson_utils.paths import SUITE_ROOT
-from wilson_utils.serialization import unpickle_smth_from
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 import numpy as np
-from wilson_utils.printing import separatorprint
+from wilson_suite.wilson_utils.printing import separatorprint
 
 def test_evv_tester_dataclasses():
     """
@@ -46,7 +46,7 @@ def test_evv_tester_dataclasses_vibexp():
     assert load_vibexp.detector.detection_range == wilsim.exp.detector.detection_range
     assert load_vibexp.epochs == wilsim.exp.epochs
 
-    from wilson_experiment.abstractions import EmPulse, ElectricField
+    from wilson_suite.wilson_experiment.abstractions import EmPulse, ElectricField
     # field_ref comes from print: print(wilsim.exp.field)
     field_ref = ElectricField(pulses=[EmPulse(env='ideal', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1), 
                                       EmPulse(env='impulsive', maxstr=1e-05, tc=100.0, cf=None, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2), 
@@ -73,7 +73,7 @@ def test_evv_tester_dataclasses_calcsetup():
     load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/tests/')
     assert load_calcsetup == wilsim2.eval_uniform
 
-    from wilson_main.abstractions import ExternalCalcSetup
+    from wilson_suite.wilson_main.abstractions import ExternalCalcSetup
     calcsetup_ref = ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={})
 
     assert load_calcsetup == calcsetup_ref
@@ -130,7 +130,7 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     assert np.allclose(np.abs(load_wilsonsim_final.spec), np.abs(wilsim3.spec))
 
-    from wilson_main.abstractions import VibAnaSetup, MolecularSystem, ExternalCalcSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, ExternalCalcSetup
     vibanasetup_ref = VibAnaSetup(regime='GVPT2', system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
                                   regime_subinfo=None, max_state_lvl=3, nc_sqrt_eigval={0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
                                   nc_eigvec=None, allow_skip_eigvec=True, vibana_prop_need='none', 
@@ -147,7 +147,7 @@ def test_evv_tester_dataclasses_wilsonsim():
 
 def test_logger_evv_tester_file():
     import logging
-    from wilson_utils.logger import setup_logger
+    from wilson_suite.wilson_utils.logger import setup_logger
     setup_logger("wilson", level=logging.DEBUG, log_to_file=SUITE_ROOT+'/tests/out.log')
     
     import evv_tester
@@ -166,7 +166,7 @@ def test_logger_evv_tester_file():
 def test_logger_evv_tester_terminal():
     separatorprint()
     import logging
-    from wilson_utils.logger import setup_logger
+    from wilson_suite.wilson_utils.logger import setup_logger
     setup_logger("wilson", level=logging.DEBUG)
     
     import evv_tester

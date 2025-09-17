@@ -17,8 +17,8 @@ evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, s
 
 """
 import wilson_suite as ws
-from wilson_utils.serialization import pickle_this_to, unpickle_smth_from
-from wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.serialization import pickle_this_to, unpickle_smth_from
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 import logging
 # wilson. - for hierarchy of loggers
@@ -121,7 +121,7 @@ def run():
     for i, key in enumerate(eval_vars.keys()):
         eval_vars_meshgrids[key] = meshgrids[i]
     
-    from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+    from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
     style_config = PlotConfig(
         figsize=(35, 45),
