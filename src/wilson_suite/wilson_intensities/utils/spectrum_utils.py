@@ -267,7 +267,7 @@ def debug_mode(level: int):
     """
     Context manager to temporarily set the debug level.
     """
-    import wilson_utils.printing as debug
+    from ...wilson_utils import printing as debug
 
     original_level = debug.level
     debug.level = level

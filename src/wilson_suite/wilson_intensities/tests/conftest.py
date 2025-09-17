@@ -10,22 +10,23 @@ import pytest
 import numpy as np
 import pandas as pd
 from CQCParse.relay import DataVault
-from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.utils import prep_data_load, get_package_root
-from wilson.spectrum.termND import TermND
-from wilson.spectrum import DataForPrecalc
-from wilson.spectrum.termsEvaluator import TermsEvaluator
-from wilson.utils.spectrum_utils import SimulationConfig
-from wilson.spectrum import debug_mode
+from ..spectrum.averaging import get_AlphaBetaGammaDelta_indices
+from ..utils import prep_data_load, get_package_root
+from ..spectrum.termND import TermND
+from ..spectrum import DataForPrecalc
+from ..spectrum.termsEvaluator import TermsEvaluator
+from ..utils.spectrum_utils import SimulationConfig
+from ..spectrum import debug_mode
 
-from wilson.spectrum.spectrum2D import Spectrum2D
+from ..spectrum.spectrum2D import Spectrum2D
 from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
 
-from wilson.utils import Conditions
+from ..utils import Conditions
 
 # list of molucules to set up fixtures for
 list_of_molecules = ["FORM"]
-minidatabase_csv = get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+# minidatabase_csv = get_package_root()+ '/tests/test_database/mini_files_database.csv'
+minidatabase_csv = '/home/vlev/sprint/calculations/calculations.csv'
 terms_json = ''
 directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -135,7 +136,7 @@ def dict_8terms() -> dict:
                      }
     return allterms_str
 @pytest.fixture(scope="module")
-def MOL_setup_parser(conditions: dict) -> dict:
+def MOL_setup_parser(conditions: dict[str,Conditions]) -> dict:
     """
     Fixture to set up the Gaussian parser for MOL/B3LYP/cc_pVQZ.
     Molecule is taken from conditions
@@ -143,15 +144,18 @@ def MOL_setup_parser(conditions: dict) -> dict:
     parsers = {}
 
     for mol,cond in conditions.items():
-        molecule, method, basis = cond.molecule, 'B3LYP', 'cc_pVQZ'
+        molecule, method, basis = cond.molecule, 'B3LYP', 'cc-pVQZ'
         data_vault = DataVault(minidatabase_csv)
-        dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+        # dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+        dataframe_gaussian = data_vault.filter_database("gaussian")
+
         aa = dataframe_gaussian[
-            (dataframe_gaussian['code'] == molecule) &
-            (dataframe_gaussian['method'] == method) &
-            (dataframe_gaussian['basis_set'] == basis)
-        ]['g16_3quanta_full']
-        filename = directory+aa.iloc[0]
+            (dataframe_gaussian['Name'] == molecule) &
+            (dataframe_gaussian['Method'] == method) &
+            (dataframe_gaussian['Basis'] == basis)
+        ]['file_location']
+        # filename = directory+aa.iloc[0]
+        filename = aa.iloc[0]
 
         gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
         parser = GaussianParser(gout)
@@ -173,7 +177,7 @@ def spectrum_setup(avrg_xyz_indices: tuple[list|np.ndarray, float], conditions: 
             gammaCompsAll=avrg_xyz_indices,
             molecule=mol,
             method='B3LYP',
-            basis='cc_pVQZ',
+            basis='cc-pVQZ',
             Gamma=3.8,
             diag_margin=1.0,
             start1=850.0,
@@ -278,7 +282,7 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
         # axes_dict = {1: w1m, 2: w2m}
         axes_dict = {'w1': w1m, 'w2': w2m}
 
-        from wilson.spectrum import DataForPrecalc
+        from ..spectrum import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
                                  avrg_terms=avrg_terms,
@@ -370,7 +374,7 @@ def conditions() -> dict[str: Conditions]:
         program = 'gaussian'
         molecule = mol
         method = 'B3LYP'
-        basis = 'cc_pVQZ'
+        basis = 'cc-pVQZ'
         if mol=='FORM':
             new_idx_dict = None #FORM
         else:
@@ -402,12 +406,12 @@ def conditions() -> dict[str: Conditions]:
 @pytest.fixture
 def dataframe_gaussian() -> pd.DataFrame:
     data_vault = DataVault(minidatabase_csv)
-    dataframe_gaussian = data_vault.getting_files_DB("gaussian")
+    dataframe_gaussian = data_vault.filter_database("gaussian")
     return dataframe_gaussian
 @pytest.fixture
 def dataframe_cfour() -> pd.DataFrame:
     data_vault = DataVault(minidatabase_csv)
-    dataframe_cfour = data_vault.getting_files_DB("cfour")
+    dataframe_cfour = data_vault.filter_database("cfour")
     return dataframe_cfour
 
 @pytest.fixture
@@ -423,19 +427,20 @@ def parsed_data(conditions: dict,
         molecule, method, basis = mol, cond.method, cond.basis
         if program == 'gaussian':
             aa = dataframe_gaussian[
-                (dataframe_gaussian['code'] == molecule) &
-                (dataframe_gaussian['method'] == method) &
-                (dataframe_gaussian['basis_set'] == basis)
-            ]['g16_3quanta_full']
-            filename = directory+aa.iloc[0]
+                (dataframe_gaussian['Name'] == molecule) &
+                (dataframe_gaussian['Method'] == method) &
+                (dataframe_gaussian['Basis'] == basis)
+            ]['file_location']
+            # filename = directory+aa.iloc[0]
+            filename = aa.iloc[0]
 
             gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
             parser = GaussianParser(gout)
         elif program == 'cfour':
             aa = dataframe_cfour[
-                (dataframe_cfour['code'] == molecule) &
-                (dataframe_cfour['method'] == method) &
-                (dataframe_cfour['basis_set'] == basis)
+                (dataframe_cfour['Name'] == molecule) &
+                (dataframe_cfour['Method'] == method) &
+                (dataframe_cfour['Basis'] == basis)
             ]
             gout = CFOUROutput(
                 molecule, method, basis, 'cfour',

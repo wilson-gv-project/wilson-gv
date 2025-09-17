@@ -286,7 +286,7 @@ def render_spectrum(intensities, w1m, w2m, filename, dynamic_range, num_level_ti
     Helper function to render the spectrum figure.
     """
     # from rich import print
-    from wilson.utils import coolprint
+    from ... wilson_intensities.utils.utils import coolprint
 
     coolprint('1. Setting figure...')
     fig, ax = set_figure(figsize=(35, 45), font_dict={'size': 20}, to_save=True)
