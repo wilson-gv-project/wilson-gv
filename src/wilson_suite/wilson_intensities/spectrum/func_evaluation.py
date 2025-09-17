@@ -49,8 +49,6 @@ class VibDiffBank:
         elif self.mode == "dense":
             self._build_dense_bank()
 
-            
-
     def _generate_all_states(self):
         states = []
         for r in range(1, self.max_quanta + 1):
