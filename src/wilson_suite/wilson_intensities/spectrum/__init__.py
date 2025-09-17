@@ -5,8 +5,6 @@ from ..utils.tools import convNu2Ene, match_modes
 from .termsEvaluator import *
 from ..utils.spectrum_utils import *
 
-from .spectrum2D import Spectrum2D
 from .termND import TermND, compute_vibdiff
 
-from .wilsonmain_integration import *
 from .evaluators import *

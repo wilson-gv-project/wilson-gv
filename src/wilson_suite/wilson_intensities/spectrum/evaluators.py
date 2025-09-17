@@ -10,10 +10,6 @@ import numpy as np
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def eval_spec2D():
-    from ..spectrum import wilsonmain_integration
-    return wilsonmain_integration.spectrum2D
-
 
 # TermND with TermsEvaluator
 def terms_evaluator(system,

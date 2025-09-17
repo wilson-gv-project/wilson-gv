@@ -18,7 +18,6 @@ from ..spectrum.termsEvaluator import TermsEvaluator
 from ..utils.spectrum_utils import SimulationConfig
 from ..spectrum import debug_mode
 
-from ..spectrum.spectrum2D import Spectrum2D
 from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
 
 from ..utils import Conditions
@@ -454,49 +453,6 @@ def parsed_data(conditions: dict,
         parser.load()
         parsed_data_dict[mol] = parser.parse(linear_molecule=False)
     return parsed_data_dict
-@pytest.fixture
-def spectrum2d(conditions: dict) -> dict:
-    """
-    Fixture to set up a Spectrum2D object.
-    """
-    spectrum_objects = {}
-
-    for mol,cond in conditions.items():
-        omega1, omega2 = cond.omega1, cond.omega2
-        spectrum_obj = Spectrum2D(omega1, omega2)
-        spectrum_objects[mol] = spectrum_obj
-    return spectrum_objects
-@pytest.fixture
-def spectrum_sequence(spectrum2d: dict, parsed_data: dict, conditions: dict) -> dict:
-    """
-    Fixture to launch the spectrum sequence and return the resulting dictionary.
-    """
-    preps = {}
-
-    for mol,cond in conditions.items():
-        preps[mol] = spectrum2d[mol].launch_sequence1(parsed_data[mol],
-                                                      cond, print_level=0)
-    return preps
-@pytest.fixture
-def intensity_data(spectrum2d: dict, spectrum_sequence: dict) -> dict:
-    """
-    Fixture to calculate intensity for the Spectrum2D object.
-    """
-
-    sec_hypol_data_dict = {}
-
-    for mol,spec_preps in spectrum_sequence.items():
-        mask = None
-        sec_hypol_dataALL_ref = spectrum2d[mol].intensity_both(selectionCond=mask)
-        nan_mask = np.isnan(sec_hypol_dataALL_ref)
-
-        has_nan = np.any(nan_mask)
-        num_nan = np.sum(nan_mask)
-
-        sec_hypol_dataALL_ref[nan_mask] = 0 + 0j
-
-        sec_hypol_data_dict[mol] = sec_hypol_dataALL_ref
-    return sec_hypol_data_dict
 
 @pytest.fixture
 def terms_amplitudes(terms_collection: dict, spectrum_setup: dict) -> dict:
