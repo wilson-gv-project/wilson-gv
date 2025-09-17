@@ -3,10 +3,10 @@ import string
 import numpy as np
 from ..utils.tools import combinations_with_permutations
 from ..utils.spectrum_utils import DoubleDict
-from wilson.utils import pairwise_differences, coolprint
-from wilson.utils.spectrum_utils import greek_list
-from wilson.utils.spectrum_utils import DataForPrecalc
-from wilson.spectrum.termND import TermND
+from ..utils import pairwise_differences, coolprint
+from ..utils.spectrum_utils import greek_list
+from ..utils.spectrum_utils import DataForPrecalc
+from ..spectrum.termND import TermND
 
 import logging
 logger = logging.getLogger("wilson."+__name__)

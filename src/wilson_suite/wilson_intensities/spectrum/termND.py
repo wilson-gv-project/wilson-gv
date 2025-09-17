@@ -17,19 +17,19 @@ Module checklist:
 import numpy as np
 import pandas as pd
 
-from wilson.utils.tools import convNu2Ene, combinations_with_permutations
-from wilson.utils.spectrum_utils import MolProperty, VibStatesDiff
-from wilson.utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
-from wilson.utils.spectrum_utils import abc_list, greek_list
-from wilson.utils.tagger import tag
-from wilson_utils.printing import debugfunc, debug_deep
+from ..utils.tools import convNu2Ene, combinations_with_permutations
+from ..utils.spectrum_utils import MolProperty, VibStatesDiff
+from ..utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
+from ..utils.spectrum_utils import abc_list, greek_list
+from ..utils.tagger import tag
+from ...wilson_utils.printing import debugfunc, debug_deep
 from collections.abc import Callable
 from itertools import product
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from wilson.spectrum import func_evaluation
+    from ..spectrum import func_evaluation
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -910,7 +910,7 @@ def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
     """
      -> list[func_evaluation.Resonance]
     """
-    from wilson.spectrum import func_evaluation
+    from ..spectrum import func_evaluation
 
     evalterm = func_evaluation.EvalTerm(**termnd.expression)
 
@@ -920,7 +920,7 @@ def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
                                               max_quanta=max_state_lvl,
                                               state_value_func=get_state, mode='ondemand')
     
-    from wilson_analysis.analysis.pre_eval import DataAnalyzer
+    from ...wilson_analysis.analysis.pre_eval import DataAnalyzer
     analyzer = DataAnalyzer()
     list_res = analyzer.extract_oneTerm_resonances(term=evalterm, vibdiffbank=vibdiffbank)
     logger.warning(f'list_res {list_res}')

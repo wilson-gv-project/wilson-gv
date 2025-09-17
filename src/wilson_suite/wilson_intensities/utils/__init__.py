@@ -1,2 +1,2 @@
-from wilson.utils.utils import *
-from wilson.utils.tagger import tag, TAG_REGISTRY
+from ..utils.utils import *
+from ..utils.tagger import tag, TAG_REGISTRY

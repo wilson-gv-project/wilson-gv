@@ -188,7 +188,7 @@ class MolecularProperty:
 		An option to make serial vals from self.vals
 		see test_main_dataclasses.py::test_MolecularProperty
 		"""
-		from wilson_utils.serialization import ndarray_to_dict
+		from ..wilson_utils.serialization import ndarray_to_dict
 		self.serial_vals = ndarray_to_dict(self.vals, serial=True) if self.vals is not None else None
 
 	def to_dict(self):
@@ -993,6 +993,7 @@ class CalculationBatch:
 			datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
 											mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
 											csvfile_dir=source_loc)
+
 			logger.debug(f'datadict: {datadict}')
 			self.getResultsFromOutputs(props_to_fill, vib_ana_setup_to_fill, datafilesdict=datadict)
 

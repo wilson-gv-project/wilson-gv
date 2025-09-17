@@ -1,9 +1,9 @@
 """
 Evaluator functions for WilsonSimulation
 """
-from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from wilson.spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
-from wilson_utils.unit_convertor import convertor
+from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+from ..spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+from ...wilson_utils.unit_convertor import convertor
 
 import numpy as np
 
@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger("wilson."+__name__)
 
 def eval_spec2D():
-    from wilson.spectrum import wilsonmain_integration
+    from ..spectrum import wilsonmain_integration
     return wilsonmain_integration.spectrum2D
 
 
