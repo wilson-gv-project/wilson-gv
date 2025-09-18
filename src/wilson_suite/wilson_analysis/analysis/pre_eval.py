@@ -5,14 +5,11 @@ from ...wilson_utils.useful_shortcuts import makeSpecSetup2D
 from ...wilson_main.abstractions import SpectralAxis
 
 from ...wilson_intensities.utils.tools import combinations_with_permutations
+from ...wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
 
 import numpy as np
 from rich.pretty import pprint
 from collections import defaultdict
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from ...wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
 
 class DataAnalyzer:
     """
