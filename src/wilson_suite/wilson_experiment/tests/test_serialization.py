@@ -1,5 +1,5 @@
-import wilson_experiment.abstractions as we_abst
-from wilson_utils.serialization import check_if_jsonsafe
+from ...wilson_experiment import abstractions as we_abst
+from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
 
 def test_dict_EmPulse():
