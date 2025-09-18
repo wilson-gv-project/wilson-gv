@@ -1,17 +1,14 @@
-
-from rich.pretty import pprint
-
 import numpy as np
 import itertools
 from typing import Iterable, Generator, ClassVar, Dict
 from dataclasses import dataclass, field
-
 import re
 
 
 class VibDiffBank:
-    def __init__(self, indices, max_quanta, state_value_func,
-                 dense_threshold=1e5, mode = None):
+    def __init__(self, indices: tuple|list, max_quanta: int, 
+                 state_value_func: callable,
+                 dense_threshold=1e5, mode: str = None):
         """
         indices: list of numeric indices
         max_quanta: max number of quanta per state
@@ -70,14 +67,15 @@ class VibDiffBank:
         self.state_values = {s: self.state_value_func(s) for s in self.states if s != 'zero'}
         self.state_values['zero'] = 0.
 
-    def get_vibdiff_number(self, ind_diff_str, ind_tuple):
+    def get_vibdiff_number(self, ind_diff_str: str, ind_tuple: tuple):
         """
         ind_diff_str: string like 'a+b,a' or 'zero,a'
         ind_tuple: tuple of numeric indices, e.g. (1,2,3,4,5)
         """
         letter_to_pos = {chr(ord('a') + i): i for i in range(len(ind_tuple))}
         
-        def parse_state_ref(ref):
+        def parse_state_ref(ref: str):
+            """Parsing label of a vib state with symbolic indices: a+b; b+c; a; c+a"""
             return tuple(sorted(ind_tuple[letter_to_pos[ch.strip()]] for ch in ref.split('+')))
         
         left_str, right_str = ind_diff_str.split(',')
@@ -192,6 +190,8 @@ def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibD
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
     constants = [5, -3, 2]
     output: [5. 2. 0.]
+
+    returns a dict {f'w{i+1}': solution}
     """
     coeff_matrix = generate_coefficient_matrix(resonance_tuples)
     constants = get_const_vector(resonance_tuples, ind_tuple, vibdiffbank)
@@ -205,51 +205,6 @@ def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibD
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
         return None
-
-def test_VibDiffBank():
-    # Example dummy energy function
-    def dummy_energy(state):
-        """
-        state is a tuple of integers-indices
-        """
-        return sum(i**2 for i in state)
-
-    indices = list(range(1, 3*9-5))
-    max_quanta = 3
-
-    bank = VibDiffBank(indices, max_quanta, dummy_energy)
-    pprint(bank.state_values[(1,)])
-    pprint(bank.state_values[(1,2)])
-
-    pprint(bank.mode)
-    pprint(bank.get_vibdiff_number('a+b,a', (1, 2, 3, 4, 5)))
-    pprint(dummy_energy((1, 2))-dummy_energy((1,)))
-
-    pprint(bank.get_vibdiff_number('a+b,a', (2, 4, 3, 5, 1)))
-    pprint(dummy_energy((2, 4))-dummy_energy((2,)))
-
-    pprint(bank.get_vibdiff_number('a+b,c', (2, 4, 3)))
-    pprint(dummy_energy((2, 4))-dummy_energy((3,)))
-
-
-def test_get_resonance_loc():
-    
-    def dummy_energy(state):
-        """
-        state is a tuple of integers-indices
-        """
-        return sum(i**2 for i in state)
-
-    indices = list(range(1, 3*9-5))
-    max_quanta = 3
-
-    bank = VibDiffBank(indices, max_quanta, dummy_energy)
-    
-    pprint()
-    result = get_resonance_loc(resonances=(('zero,a', (-1,)), ('a+b,a', (-1, 2))),
-                               ind_tuple=(1, 2, 3), vibdiffbank=bank)
-    
-    assert result == {1: np.float64(1.0), -2: np.float64(-5.0)}
 
 
 @dataclass(frozen=True)
@@ -381,12 +336,15 @@ class Resonance:
         term_id=term.short_id - string e.g. T001(1_0)
         term_res_pattern=term.resonances - tuple expression e.g. (('b,a', (-1,2)), ('a+b,a', (-1)))
         assignment=comb - (a,b,c) - numbers-indices
+
+        !conflict with `frozen=True`
         """
+
         self.producers.append({"term": term_id, "pattern": term_res_pattern,
                                "assignment": assignment, "value": value})
 
 
-def compress_terms(terms):
+def compress_terms_strlabel(terms):
     """Compress consecutive terms into ranges, preserving suffixes like (0_1)."""
     # Extract prefix, number, and suffix from each term
     parsed = []
@@ -438,16 +396,9 @@ def resonance_to_str(resonance: Resonance) -> str:
     # build compact string
     return (
         f"Resonance @ ({loc[0]:.2f}, {loc[1]:.2f}); "
-        f"terms={compress_terms(terms)}; "
+        f"terms={compress_terms_strlabel(terms)}; "
         f"pattern={pattern}; "
     )
-
-
-def combinations_with_permutations(iterable: Iterable, k: int) -> Generator:
-    """
-    Making a generator of combinations of k elements of iterable
-    """
-    return (comb for comb in itertools.product(iterable, repeat=k))
 
 def make_state_value_func(vibstates):
     """

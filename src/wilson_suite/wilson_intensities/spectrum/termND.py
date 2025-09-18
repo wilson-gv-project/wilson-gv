@@ -17,12 +17,13 @@ Module checklist:
 import numpy as np
 import pandas as pd
 
-from ..utils.tools import convNu2Ene, combinations_with_permutations
+from ..utils.tools import combinations_with_permutations
 from ..utils.spectrum_utils import MolProperty, VibStatesDiff
 from ..utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
 from ..utils.spectrum_utils import abc_list, greek_list
 from ..utils.tagger import tag
 from ...wilson_utils.printing import debugfunc, debug_deep
+from ...wilson_utils.unit_convertor import convNu2Ene
 from collections.abc import Callable
 from itertools import product
 

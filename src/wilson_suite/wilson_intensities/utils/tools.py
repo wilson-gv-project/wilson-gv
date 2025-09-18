@@ -9,17 +9,6 @@ from typing import Iterable, Generator
 import itertools
 
 
-def convNu2Ene(reciprocal_cm: float | np.ndarray, reverse: bool = False) -> float | np.ndarray:
-    """
-    Convert a wavenumber (cm-1) to energy (Hartree)
-    """
-    hartree2J = constants.physical_constants['hartree-joule relationship'][0]
-    if not reverse:
-        return reciprocal_cm * (100 * constants.h * constants.c / hartree2J)
-    else:
-        return reciprocal_cm / (100 * constants.h * constants.c / hartree2J)
-
-
 def combinations_with_permutations(iterable: Iterable, k: int) -> Generator:
     """
     Making a generator of combinations of k elements of iterable
