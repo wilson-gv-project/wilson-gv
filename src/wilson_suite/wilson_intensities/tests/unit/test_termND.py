@@ -5,17 +5,17 @@ Duplicated intro in test_term_evaluation : UPD - now it's in pytest fixtured in 
 """
 import numpy as np
 
-from wilson.spectrum.termND import TermND
-from wilson.spectrum.termsEvaluator import TermsEvaluator
-from wilson.utils import prep_data_load
-from wilson.spectrum import DataForPrecalc
+from ...spectrum.termND import TermND
+from ...spectrum.termsEvaluator import TermsEvaluator
+from ...utils.utils import prep_data_load
+from ...utils import DataForPrecalc
 
-from wilson.spectrum.termND import sum_over_suffixes
+from ...spectrum.termND import sum_over_suffixes
 
-from tests.testing_utils import require_asserts
+from ..testing_utils import require_asserts
 
-from wilson.spectrum import debug_mode
-from wilson_utils import printing as debug
+from ...utils import debug_mode
+from ....wilson_utils import printing as debug
 import CQCParse.debug as cqc_debug
 
 debug.level = 0
@@ -133,7 +133,7 @@ def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict,
         'polgrad': t0.properties_data['polgrad'],
         'polhess': t0.properties_data['polhess'],
     }
-    from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
+    from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     w1 = np.arange(spectrum_setup.start1,
                    spectrum_setup.end1, spectrum_setup.step1)
@@ -143,7 +143,7 @@ def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict,
     # axes_dict = {1: w1m, 2: w2m}
     axes_dict = {'w1': w1m, 'w2': w2m}
     
-    from wilson.spectrum import DataForPrecalc
+    from ...utils import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
                              avrg_terms=avrg_terms,
@@ -192,7 +192,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
         'polgrad': t0.properties_data['polgrad'],
         'polhess': t0.properties_data['polhess'],
     }
-    from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
+    from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     w1 = np.arange(spectrum_setup.start1,
                    spectrum_setup.end1, spectrum_setup.step1)
@@ -202,7 +202,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
     # axes_dict = {1: w1m, 2: w2m}
     axes_dict = {'w1': w1m, 'w2': w2m}
 
-    from wilson.spectrum import DataForPrecalc
+    from ...utils import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
                              avrg_terms=avrg_terms,
@@ -643,7 +643,7 @@ def test_termevaluator() -> None:
 
 def test_compute_vibdiff() -> None:
     print()
-    from wilson.spectrum import compute_vibdiff
+    from ...spectrum import compute_vibdiff
     assert compute_vibdiff((0,1), (3,)) == [('zero',), ('3',)]
     assert compute_vibdiff((0,1), (6,)) == [('zero',), ('6',)]
     assert compute_vibdiff((1,1), (3,2)) == [('3',), ('2',)]
