@@ -11,16 +11,16 @@ import numpy as np
 import pandas as pd
 from CQCParse.relay import DataVault
 from ..spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from ..utils import prep_data_load, get_package_root
+from ..utils.utils import prep_data_load, get_package_root
 from ..spectrum.termND import TermND
-from ..spectrum import DataForPrecalc
+from ..utils import DataForPrecalc
 from ..spectrum.termsEvaluator import TermsEvaluator
 from ..utils.spectrum_utils import SimulationConfig
-from ..spectrum import debug_mode
+from ..utils import debug_mode
 
 from CQCParse.parsing import GaussianParser, GaussianOutput, CFOURParser, CFOUROutput
 
-from ..utils import Conditions
+from ..utils.utils import Conditions
 
 # list of molucules to set up fixtures for
 list_of_molecules = ["FORM"]
