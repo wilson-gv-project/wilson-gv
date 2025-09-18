@@ -1,8 +1,8 @@
-from wilson_intensities.wilson.spectrum import func_evaluation
-from wilson_derive.abstractions import VibPerturbedTerm
-from wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
-from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from wilson_utils.useful_shortcuts import makeSpecSetup2D
+from ...wilson_intensities.spectrum import func_evaluation
+from ...wilson_derive.abstractions import VibPerturbedTerm
+from ...wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
+from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+from ...wilson_utils.useful_shortcuts import makeSpecSetup2D
 
 import numpy as np
 from rich.pretty import pprint
