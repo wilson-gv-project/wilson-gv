@@ -281,7 +281,7 @@ def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
         # axes_dict = {1: w1m, 2: w2m}
         axes_dict = {'w1': w1m, 'w2': w2m}
 
-        from ..spectrum import DataForPrecalc
+        from ..utils import DataForPrecalc
         alldata = DataForPrecalc(Nnmodes=Nnmodes,
                                  props_data=props_data_ready,
                                  avrg_terms=avrg_terms,

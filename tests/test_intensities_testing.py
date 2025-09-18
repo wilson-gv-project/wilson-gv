@@ -1,17 +1,18 @@
 import numpy as np
-from wilson_utils.unit_convertor import convNu2Ene
-from wilson_intensities.wilson.utils.utils import pairwise_differences
+import wilson_suite
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+from wilson_suite.wilson_intensities.utils.utils import pairwise_differences
 
 import logging
-from wilson_utils.logger import setup_logger
+from wilson_suite.wilson_utils.logger import setup_logger
 setup_logger("wilson", level=logging.WARNING)
 
 
 def test_amplitude_mock_singlepoint_one_elterm():
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -40,7 +41,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
     ggf = np.zeros((3,3,3))
     gff = np.zeros((3,3,3))
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
     assert termsdicts[1] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('diphess', ('a', 'b'), ('G',))), 
                              'non_averaged_props': None, 'termA_pref': 0.25, 'termB_pref': 1.0, 
@@ -70,10 +71,10 @@ def test_amplitude_mock_singlepoint_one_elterm():
     specevalsetup.ev_info.Gamma = 1.
     
     sim.addSpecEvalSetup(specevalsetup)
-    from wilson_utils.unit_convertor import convNu2Ene
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(1.))**2
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
     assert round(reference/sim.spec[0,0], 6) == 1.
@@ -81,9 +82,9 @@ def test_amplitude_mock_singlepoint_one_elterm():
 
 def test_amplitude_mock_singlepoint_one_elterm_Gamma():
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -112,7 +113,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     ggf = np.zeros((3,3,3))
     gff = np.zeros((3,3,3))
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
     assert termsdicts[1] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('diphess', ('a', 'b'), ('G',))), 
                              'non_averaged_props': None, 'termA_pref': 0.25, 'termB_pref': 1.0, 
@@ -144,10 +145,10 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     specevalsetup.ev_info.Gamma = Gamma
     
     sim.addSpecEvalSetup(specevalsetup)
-    from wilson_utils.unit_convertor import convNu2Ene
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(Gamma))**2
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
     assert round(reference/sim.spec[0,0], 6) == 1.
@@ -155,9 +156,9 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
 def test_amplitude_mock_singlepoint_one_mechterm():
     print()
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -167,7 +168,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     del sim.terms[0]
     sim.terms[1][(0,1)] = [sim.terms[1][(0,1)][6], sim.terms[1][(0,1)][11]]
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
 
     assert termsdicts[0] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('dipgrad', ('c',), ('G',))), 
@@ -272,7 +273,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print('>>>>>> reference', reference)
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
     assert round(reference/sim.spec[0,0], 6) == 1.
@@ -281,15 +282,15 @@ def test_amplitude_mock_singlepoint_one_mechterm():
 def test_amplitude_mock_singlepoint_one_mechterm_ba():
     print()
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
     del sim.terms[1][(1,0)]
     del sim.terms[0]
@@ -395,7 +396,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
     
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print(sim.diagn)
@@ -406,9 +407,9 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
 def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print()
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -418,7 +419,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     del sim.terms[0]
     sim.terms[1][(0,1)] = [sim.terms[1][(0,1)][6], sim.terms[1][(0,1)][11]]
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
 
     assert termsdicts[0] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('dipgrad', ('c',), ('G',))), 
@@ -523,7 +524,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print('>>>>>> reference', reference)
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
     assert round(reference/sim.spec[0,0], 6) == 1.
@@ -531,9 +532,9 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
 
 def test_amplitude_mock_offresonance_one_elterm():
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -562,7 +563,7 @@ def test_amplitude_mock_offresonance_one_elterm():
     ggf = np.zeros((3,3,3))
     gff = np.zeros((3,3,3))
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
     assert termsdicts[1] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('diphess', ('a', 'b'), ('G',))), 
                              'non_averaged_props': None, 'termA_pref': 0.25, 'termB_pref': 1.0, 
@@ -594,13 +595,13 @@ def test_amplitude_mock_offresonance_one_elterm():
     specevalsetup.ev_info.Gamma = Gamma
     
     sim.addSpecEvalSetup(specevalsetup)
-    from wilson_utils.unit_convertor import convNu2Ene
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     w1, w1mw2 = 505., -653.
 
     reference = 3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / \
                 (convNu2Ene(-500. + w1) - 1j*convNu2Ene(Gamma)) / (convNu2Ene(1150.-500 + w1mw2) - 1j*convNu2Ene(Gamma))
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     from functools import partial
     # eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
     eval_selected = partial(terms_evaluator, collect_all=True)
@@ -616,9 +617,9 @@ def test_amplitude_mock_offresonance_one_elterm():
 def test_amplitude_mock_offresonance_one_mechterm():
     print()
 
-    from wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
-    from wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
                      'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -628,7 +629,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     del sim.terms[0]
     sim.terms[1][(0,1)] = [sim.terms[1][(0,1)][6], sim.terms[1][(0,1)][11]]
 
-    from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
 
     assert termsdicts[0] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('dipgrad', ('c',), ('G',))), 
@@ -744,7 +745,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.5e}')
 
 
-    from wilson_intensities.wilson.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     from functools import partial
     eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=eval_selected)

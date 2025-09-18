@@ -3,7 +3,7 @@ Integration tests for full procedure with figure rendering using TermND function
 """
 import numpy as np
 from ..testing_utils import require_asserts
-from ...spectrum import debug_mode
+from ...utils import debug_mode
 from ....wilson_analysis.render.simple_plot import render_spectrum
 
 from ....wilson_utils import printing as debug

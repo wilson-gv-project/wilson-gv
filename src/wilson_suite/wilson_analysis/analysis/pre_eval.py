@@ -1,12 +1,18 @@
 from ...wilson_intensities.spectrum import func_evaluation
 from ...wilson_derive.abstractions import VibPerturbedTerm
-from ...wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ...wilson_utils.useful_shortcuts import makeSpecSetup2D
+from ...wilson_main.abstractions import SpectralAxis
+
+from ...wilson_intensities.utils.tools import combinations_with_permutations
 
 import numpy as np
 from rich.pretty import pprint
 from collections import defaultdict
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ...wilson_main.abstractions import WilsonSimulation, SpecEvalSetup, SpectralAxis
 
 class DataAnalyzer:
     """
@@ -146,7 +152,7 @@ class DataAnalyzer:
         for term in eval_terms:
             
             indices = set([k for i in term.resonances for k in i[0].split(',') if k!='zero'])
-            for comb in func_evaluation.combinations_with_permutations(iterable=wilsonsim.vib_ana_setup.modes_indices,
+            for comb in combinations_with_permutations(iterable=wilsonsim.vib_ana_setup.modes_indices,
                                                                         k=len(indices)):
                 res_loc_dict = func_evaluation.solve_linear_system_resonaces(resonance_tuples=term.resonances,
                                                                     ind_tuple=comb,
@@ -175,7 +181,7 @@ class DataAnalyzer:
         """
         list_res = []
         indices = set([k for i in term.resonances for k in i[0].split(',') if k!='zero'])
-        for comb in func_evaluation.combinations_with_permutations(iterable=vibdiffbank.indices,
+        for comb in combinations_with_permutations(iterable=vibdiffbank.indices,
                                                                     k=len(indices)):
             res_loc_dict = func_evaluation.solve_linear_system_resonaces(resonance_tuples=term.resonances,
                                                                 ind_tuple=comb,

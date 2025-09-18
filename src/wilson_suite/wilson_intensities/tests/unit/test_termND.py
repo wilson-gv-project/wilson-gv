@@ -672,7 +672,7 @@ def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions
                 print(df)
 
 
-def test_get_factor_summed(terms_collection: dict) -> None:
+def test_get_factor_summed(terms_collection: dict[str,tuple[TermsEvaluator, dict]]) -> None:
     print()
 
     te, precalc_dict = terms_collection['FORM']

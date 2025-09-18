@@ -130,6 +130,7 @@ def test_anharm_analyzer_vibana():
 
     
     printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
+    print(f'props: {props}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
 
     try:
         # FIXME: should be done internally with WilsonSimulation somehow? or when?
