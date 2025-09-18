@@ -2,7 +2,7 @@
 Evaluator functions for WilsonSimulation
 """
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from ..spectrum import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
 from ...wilson_utils.unit_convertor import convertor
 
 import numpy as np
@@ -68,9 +68,9 @@ def terms_evaluator(system,
 
     spec_eval_setup  is a wilson_main.abstractions.specEvalSetup instance
     """
-    from wilson.spectrum import TermND, TermsEvaluator
-    from wilson.utils.spectrum_utils import DataForPrecalc
-    from wilson.spectrum.averaging import getPolarizationAveragingExpression
+    from ..spectrum import TermND, TermsEvaluator
+    from ..utils.spectrum_utils import DataForPrecalc
+    from ..spectrum.averaging import getPolarizationAveragingExpression
 
     amplitudes = 0. + 0.j
 
@@ -135,7 +135,7 @@ def terms_evaluator(system,
     logger.warning(f'precalculated_data \n{precalculated_data['res_conds']}')
 
     # 6
-    from wilson.spectrum import debug_mode
+    from ..utils import debug_mode
     for id, term in te.terms.items():
         if 'cff' in [p.trivial_name for p in props]:
             term.properties_data = cff_data
