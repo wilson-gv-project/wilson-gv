@@ -40,7 +40,7 @@ def test_anharm_analyzer():
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
     from ....wilson_utils.paths import SUITE_ROOT
-    from ...spectrum.anharmonic_analyzer import anharm_analyzer_data
+    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
     from .... import wilson_main as ws_main
     from .... import wilson_derive as ws_derive
 
@@ -103,7 +103,7 @@ def test_anharm_analyzer_vibana():
     from ....wilson_utils.paths import SUITE_ROOT
     database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
 
-    from ...spectrum.anharmonic_analyzer import anharm_analyzer_data
+    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
     from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)

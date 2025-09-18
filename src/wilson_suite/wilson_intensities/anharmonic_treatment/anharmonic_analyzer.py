@@ -4,7 +4,7 @@ Anharmonic analyzer for wilson_main.VibAnaSetup.doAnharmonicAnalysis()
 """
 from ...wilson_utils import abstractions as wu_abst
 from ...wilson_main import abstractions as wm_abst
-from ..spectrum.vpt2 import anharm_corr_energies
+from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
 import logging
 logger = logging.getLogger("wilson."+__name__)

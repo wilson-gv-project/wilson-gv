@@ -27,7 +27,7 @@ def test_anharm_analyzer_vibana():
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
-    from ...spectrum.anharmonic_analyzer import anharm_analyzer_data
+    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
 
     context = {'system': wm_abst.MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
                'props': [wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff'), 
