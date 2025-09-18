@@ -1583,7 +1583,7 @@ class WilsonSimulation:
 				}
 			else:
 				result[key] = value
-		from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+		from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 		result['terms'] = derived_terms_dict_to_dicts(getattr(self, 'terms'))
 		return result
 

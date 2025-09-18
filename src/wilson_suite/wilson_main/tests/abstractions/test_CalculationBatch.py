@@ -1,5 +1,5 @@
-import wilson_main.abstractions as wm_abst
-from wilson_utils.logger import setup_logger
+from ... import abstractions as wm_abst
+from ....wilson_utils.logger import setup_logger
 
 from wilson_suite import fixtures as fixt
 from wilson_suite import molprops as propsfixt
@@ -7,7 +7,7 @@ from wilson_suite import calcsetups as calcsetupfixt
 from wilson_suite import vibana as vibanafixt
 from wilson_suite import parsing as parse_fixt
 
-from wilson_utils.paths import SUITE_ROOT
+from ....wilson_utils.paths import SUITE_ROOT
 
 import pytest
 
