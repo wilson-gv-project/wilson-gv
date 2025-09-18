@@ -1,7 +1,7 @@
-from wilson_utils.printing import printtest, separatorprint
+from ...wilson_utils.printing import printtest, separatorprint
 
 import logging
-from wilson_utils.serialization import check_if_jsonsafe
+from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import dataclass
 
 @dataclass
@@ -41,7 +41,7 @@ def test_log_messages():
     Trying to show that argument to logger message functions should be one string or a formatted string.
     """
     import pytest
-    from wilson_utils.logger import setup_logger
+    from ...wilson_utils.logger import setup_logger
     setup_logger('testlogger', level=logging.INFO)
     # test logfunc_mock and ensure it raises a specific error if the log message is incorrect
     try:
