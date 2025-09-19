@@ -1,9 +1,9 @@
-from wilson_analysis.render.render import render_spectrum
-from wilson_analysis.render.spectrum_renderer import NormalizationType
-from wilson_main.abstractions import (SimContext, SpecEvalSetup, 
-                                        SpectralAxis, SpectralGrid, 
-                                        RenderingInfo, EvaluationInfo, PlotConfig)
-
+from ..render.render import render_spectrum
+from ..render.spectrum_renderer import NormalizationType
+from ...wilson_main.abstractions import (SpecEvalSetup, SpectralAxis, SpectralGrid, 
+                                        RenderingInfo, EvaluationInfo, PlotConfig,
+                                        MolecularSystem, VibExperiment)
+from ...fixtures import evv_experiment
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def test_plt_NOw1_minus_w2():
 
     no specific asserts
     """
-    from wilson_utils.logger import setup_logger
+    from ...wilson_utils.logger import setup_logger
     setup_logger(__name__, level=logging.DEBUG)
 
     z_vals, X1, X2 = run()
@@ -74,16 +74,20 @@ def test_plt_NOw1_minus_w2():
                                                        colormap='magma',
                                                        tick_step=1)})
     spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
-    context = SimContext(spec=z_vals, 
-                         spec_eval_setup=spec_eval_setup, do_diagn=False,
-                         filename='filename1.svg', backend='matplotlib')
-    render_spectrum(context)
+    
+    system = MolecularSystem(name='mock', natoms=4)
+    experiment = evv_experiment()
+
+    context = dict(spec_data=z_vals, system=system, experiment=experiment,
+                    diagn={}, name='name',
+                    spec_eval_setup=spec_eval_setup, do_diagn=False)
+    render_spectrum(**context)
     import os
     assert os.path.exists("filename1.svg")
 
 
 def test_plt_w1_minus_w2():
-    from wilson_utils.logger import setup_logger
+    from ...wilson_utils.logger import setup_logger
     setup_logger(__name__, level=logging.DEBUG)
 
     z_vals, X1, X2 = run()
@@ -102,9 +106,14 @@ def test_plt_w1_minus_w2():
                                                        colormap='magma',
                                                        tick_step=1)})
     spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
-    context = SimContext(spec=z_vals, 
-                         spec_eval_setup=spec_eval_setup, do_diagn=False,
-                         filename='filename2.svg', backend='matplotlib')
-    render_spectrum(context)
+    
+    system = MolecularSystem(name='mock', natoms=4)
+    experiment = evv_experiment()
+
+    context = dict(spec_data=z_vals, system=system, experiment=experiment,
+                    diagn={}, name='name',
+                    spec_eval_setup=spec_eval_setup, do_diagn=False)
+    render_spectrum(**context)
+    
     import os
     assert os.path.exists("filename2.svg")

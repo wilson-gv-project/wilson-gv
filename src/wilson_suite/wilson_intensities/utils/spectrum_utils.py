@@ -7,7 +7,7 @@ import numpy as np
 from collections import Counter
 from typing import List
 from dataclasses import dataclass, field
-from ..utils.tools import convNu2Ene
+from ...wilson_utils.unit_convertor import convNu2Ene
 import string
 from contextlib import contextmanager
 from typing import Dict, Any, Self

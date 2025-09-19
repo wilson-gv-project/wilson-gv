@@ -1,4 +1,4 @@
-from wilson.utils.spectrum_utils import get_allparts_indices, make_abc_tuple
+from ...utils.spectrum_utils import get_allparts_indices, make_abc_tuple
 
 def test_get_indices() -> None:
     print()
@@ -23,7 +23,7 @@ def test_make_abc_tuple() -> None:
 
 def test_abc_list() -> None:
     print()
-    from wilson.utils.spectrum_utils import make_abc_dict
+    from ...utils.spectrum_utils import make_abc_dict
     abc_comb = (1, 2, 3, 4)
     idx_str = make_abc_dict(abc_comb)
     assert idx_str == {'a': 1, 'b': 2, 'c': 3, 'd': 4}

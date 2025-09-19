@@ -7,9 +7,9 @@ Skipped from abstraction.py: CollEvalSetup, WilsonSimulations, SpectralAxisAdvan
 
 Integration test is in wilson_suitetests/evv_tester_dataclasses.py (different from wilson_suitetests/evv_tester.py only by the import from different abstractions module)
 """
-import wilson_main.abstractions as wm_abst
+from ... import abstractions as wm_abst
 import numpy as np
-from wilson_utils.logger import setup_logger
+from ....wilson_utils.logger import setup_logger
 
 import logging
 setup_logger("wilson", level=logging.DEBUG)
@@ -30,7 +30,7 @@ def test_ExternalCalcSetup():
 
 def test_MolecularProperty():
 
-    from wilson_utils.prop_trivname import prop_trivname
+    from ....wilson_utils.prop_trivname import prop_trivname
 
     hess = wm_abst.MolecularProperty(
 					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},

@@ -28,7 +28,7 @@ from enum import Enum
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo
+    from ...wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo
 
 
 import logging

@@ -1,9 +1,10 @@
-
 *.svg
 *.npy
 *.pkl
 *.json
 *.log
+
+.VSCodeCounter/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

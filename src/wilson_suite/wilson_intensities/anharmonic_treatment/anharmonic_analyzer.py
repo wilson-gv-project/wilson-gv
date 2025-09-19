@@ -2,14 +2,15 @@
 Anharmonic analyzer for wilson_main.VibAnaSetup.doAnharmonicAnalysis()
 
 """
-import wilson_utils.abstractions as wu_abst
-import wilson_main.abstractions as wm_abst
-from wilson.spectrum.vpt2 import anharm_corr_energies
+from ...wilson_utils import abstractions as wu_abst
+from ...wilson_main import abstractions as wm_abst
+from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def anharm_analyzer_data(system:wm_abst.MolecularSystem = None, props: list[wm_abst.MolecularProperty] = None, 
+def anharm_analyzer_data(system:wm_abst.MolecularSystem = None, 
+                         props: list[wm_abst.MolecularProperty] = None, 
                     nc_sqrt_eigval: dict = None, 
                     regime: str = None, regime_subinfo: dict = None, 
                     exclude_modes: list = None) -> tuple[list[wu_abst.VibState], dict]:
@@ -28,13 +29,18 @@ def anharm_analyzer_data(system:wm_abst.MolecularSystem = None, props: list[wm_a
     if exclude_modes is None:
         exclude_modes = []
     
-    prop_dict = {i.trivial_name: i.vals for i in props}
+    prop_dict = {i.trivial_name: i.serial_vals for i in props}
     logger.debug(f'prop_dict {prop_dict.keys()}')
+    logger.debug(prop_dict)
     
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
-    corrected_levels, fermi_resonances = anharm_corr_energies(nc_sqrt_eigval,
-                                                             prop_dict['cff'], prop_dict['qff'], prop_dict['B'], prop_dict['coriolis'],
-                                                             regime, exclude_modes)
+    corrected_levels, fermi_resonances = anharm_corr_energies(harmonic_energies=nc_sqrt_eigval,
+                                                             cubic_forcefield=prop_dict['cff'], 
+                                                             quartic_forcefield=prop_dict['qff'], 
+                                                             rotational_constant=prop_dict['B'], 
+                                                             coriolis_constant=prop_dict['coriolis'],
+                                                             anharmonic_type=regime, 
+                                                             list2exclude=exclude_modes)
     # assembling data for return
     all_states_corr = {}
 

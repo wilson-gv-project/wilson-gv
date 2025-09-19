@@ -1,7 +1,7 @@
-from wilson_utils.printing import printtest, separatorprint
+from ....wilson_utils.printing import printtest, separatorprint
 
 def evv_experiment():
-    import wilson_experiment as ws_experiment
+    from .... import wilson_experiment as ws_experiment
 
     pulse_ir_1 = ws_experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
     pulse_ir_2 = ws_experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
@@ -32,17 +32,17 @@ def test_anharm_analyzer():
     """
     separatorprint()
     import logging
-    from wilson_utils.logger import setup_logger
+    from ....wilson_utils.logger import setup_logger
     setup_logger("wilson.", level=logging.DEBUG)
     logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
 
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
-    from wilson_utils.paths import SUITE_ROOT
-    from wilson.spectrum.anharmonic_analyzer import anharm_analyzer_data
-    import wilson_main as ws_main
-    import wilson_derive as ws_derive
+    from ....wilson_utils.paths import SUITE_ROOT
+    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
+    from .... import wilson_main as ws_main
+    from .... import wilson_derive as ws_derive
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
     calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
@@ -93,18 +93,18 @@ def test_anharm_analyzer_vibana():
     """
     separatorprint()
     import logging
-    from wilson_utils.logger import setup_logger
+    from ....wilson_utils.logger import setup_logger
     setup_logger("wilson.", level=logging.DEBUG)
     logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
 
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
-    from wilson_utils.paths import SUITE_ROOT
+    from ....wilson_utils.paths import SUITE_ROOT
     database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
 
-    from wilson.spectrum.anharmonic_analyzer import anharm_analyzer_data
-    import wilson_main as ws_main
+    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
+    from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
     calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
@@ -130,6 +130,7 @@ def test_anharm_analyzer_vibana():
 
     
     printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
+    print(f'props: {props}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
 
     try:
         # FIXME: should be done internally with WilsonSimulation somehow? or when?

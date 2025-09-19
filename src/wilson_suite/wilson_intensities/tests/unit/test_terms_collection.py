@@ -6,15 +6,15 @@ dict_8terms is a fixture dictionary defined in wilson_intensities/tests/conftest
 It contains 8 terms expressions in dict format.
 """
 import numpy as np
-from wilson.spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from wilson.spectrum.termsEvaluator import TermsEvaluator
-from wilson.spectrum import TermND
-from wilson.utils.spectrum_utils import VibStatesDiff
+from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
+from ...spectrum.termsEvaluator import TermsEvaluator
+from ...spectrum import TermND
+from ...utils.spectrum_utils import VibStatesDiff
 
-from tests.testing_utils import require_asserts
+from ..testing_utils import require_asserts
 
 
-from wilson_utils import printing as debug
+from ....wilson_utils import printing as debug
 import CQCParse.debug as cqc_debug
 debug.level = 0
 cqc_debug.level = 0
@@ -62,7 +62,7 @@ def test_outer_product_einsum() -> None:
     print()
 
     arr = np.array([1., 2., 4.])
-    from wilson.spectrum.termsEvaluator import outer_product_einsum
+    from ...spectrum.termsEvaluator import outer_product_einsum
     expected_2d = np.array([[1., 0.5, 0.25],
                             [0.5, 0.25, 0.125],
                             [0.25, 0.125, 0.0625]])
@@ -302,7 +302,7 @@ def test_precalculate(dict_8terms: dict) -> None:
     }
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
 
-    from wilson.spectrum import DataForPrecalc
+    from ...utils import DataForPrecalc
     alldata = DataForPrecalc(Nnmodes=Nnmodes,
                              props_data=props_data_ready,
                              avrg_terms=avrg_terms,

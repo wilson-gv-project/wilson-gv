@@ -1,4 +1,4 @@
-from wilson_utils.printing import (
+from ...wilson_utils.printing import (
     use_print_target,
     infoprint,
     debugprint,
@@ -12,9 +12,9 @@ import io
 import re
 
 import sys
-import wilson_utils.printing as wprinting
+from ...wilson_utils import printing as wprinting
 
-from wilson_utils.paths import UTILS_ROOT
+from ...wilson_utils.paths import UTILS_ROOT
 TESTFILESDIR = UTILS_ROOT + "/tests/"
 
 def test_debugfunc(capsys):

@@ -5,17 +5,17 @@ import pickle
 import os.path
 from rich.pretty import pprint
 
-import wilson_derive.abstractions as wd_abst
-import wilson_experiment.abstractions as we_abst
+from ..wilson_derive import abstractions as wd_abst
+from ..wilson_experiment import abstractions as we_abst
 
-from wilson_derive.main import get_fully_enhanced_terms
-from wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+from ..wilson_derive.main import get_fully_enhanced_terms
+from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
-from wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from wilson_main.abstractions import (VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpecEvalSetup)
+    from ..wilson_main.abstractions import (VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpecEvalSetup)
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -85,7 +85,7 @@ def evv_terms() -> list[wd_abst.VibPerturbedTerm]:
     """
     Returns EVV terms derived with wilson_derive
     """
-    import wilson_main.abstractions as wm_abst
+    from ..wilson_main import abstractions as wm_abst
 
     sim = wm_abst.WilsonSimulation()
     sim.addExperiment(experiment=evv_experiment())
@@ -104,7 +104,7 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
     vib_ana_setup=ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_prop_need='anharm')
     calc_setup=ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     """
-    import wilson_main.abstractions as wm_abst
+    from ..wilson_main import abstractions as wm_abst
 
     vib_ana_setup = wm_abst.VibAnaSetup(regime=vib_ana_setup.regime, vibana_prop_need=vib_ana_setup.vibana_prop_need)
     # -------------------------
@@ -162,7 +162,7 @@ def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalS
 
     axes={'x': axis1, 'y': axis2}
     """
-    import wilson_main.abstractions as wm_abst
+    from ..wilson_main import abstractions as wm_abst
 
     spec_grid = wm_abst.SpectralGrid(axes=axes, 
                                      range_style='uniform',

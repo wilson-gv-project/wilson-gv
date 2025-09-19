@@ -2,8 +2,8 @@
 check_if_jsonsafe - is it a format that can be written in JSON file with json library. 
 Generally, it would also mean that the object is serialized into a dictionary here.
 """
-import wilson_experiment.abstractions as we_abst_dataclass
-from wilson_utils.serialization import check_if_jsonsafe
+from ...wilson_experiment import abstractions as we_abst_dataclass
+from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
 
 def test_SpecDetector():
@@ -67,7 +67,7 @@ def test_VibExperiment():
     experiment_a_datacls = we_abst_dataclass.VibExperiment(order_d, field_a_d, detector_a_d, [scan_a_d], magn_conditions=[[-1, 2]])
     assert check_if_jsonsafe(asdict(experiment_a_datacls))
 
-    from wilson_intensities.wilson.utils import get_package_root
+    from ...wilson_intensities.utils.utils import get_package_root
     ws_root = get_package_root() + '/../../'
 
     import pickle

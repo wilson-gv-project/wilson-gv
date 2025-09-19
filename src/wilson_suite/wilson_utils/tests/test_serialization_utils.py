@@ -1,4 +1,5 @@
-from wilson_utils.serialization import find_non_json_safe, check_if_jsonsafe, ndarray_to_dict, pickle_this_to, unpickle_smth_from
+from ...wilson_utils.serialization import (find_non_json_safe, check_if_jsonsafe, 
+                                ndarray_to_dict, pickle_this_to, unpickle_smth_from)
 import numpy as np
 from dataclasses import dataclass
 
@@ -67,7 +68,7 @@ def test_find_non_json_safe():
 
 def test_get_utils_root():
     import os
-    from wilson_utils.paths import UTILS_ROOT
+    from ...wilson_utils.paths import UTILS_ROOT
 
     assert os.path.isabs(UTILS_ROOT)
     assert os.path.exists(UTILS_ROOT)
