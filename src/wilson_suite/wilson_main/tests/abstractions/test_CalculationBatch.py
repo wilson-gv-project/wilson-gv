@@ -8,7 +8,7 @@ from wilson_suite import vibana as vibanafixt
 from wilson_suite import parsing as parse_fixt
 
 from ....wilson_utils.paths import SUITE_ROOT
-
+from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
 import pytest
 
 import logging
@@ -96,6 +96,19 @@ def test_CalculationBatch_getResultsFromOutputs():
                 'files': {'mol_code': 'FORM', 'method': 'B3LYP', 'basis': 'cc_pVQZ', 
                           'log': SUITE_ROOT+'/wilson_intensities/tests/test_database/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'}}
     
+    datadict = {'source': 'gaussian', 'type': 'log', 
+            'files': {'mol_name': 'FORM', 'method': 'B3LYP', 'basis': 'cc-pVQZ', 
+            'log': CQCPARSE_ROOT + '/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'}}
+    
+    from CQCParse.parsing import GaussianOutput as OutFiles
+    out = OutFiles(molecule=dummyBatch.system.name, 
+                    conformer=dummyBatch.system.conformer,
+                    method=dummyBatch.calc_setup.lvl_theory, 
+                    basis=dummyBatch.calc_setup.basis, program=dummyBatch.calc_setup.program)
+    out.log_file = datadict['files']['log']
+    
+    dummyBatch.parser_obj.relevant_files = out # shouldn't need this or datadict
+
     dummyBatch.getResultsFromOutputs(props_to_fill=props_mock, 
                                      vib_ana_setup_to_fill=vibanafixt.vibanasetup_anharm,
                                      datafilesdict=datadict)

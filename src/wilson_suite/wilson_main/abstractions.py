@@ -1020,6 +1020,8 @@ class CalculationBatch:
 
 			self.parser_obj.relevant_files = out
 
+			print(datadict)
+
 			logger.debug(f'gout: {out}')
 			self.getResultsFromOutputs(props_to_fill, vib_ana_setup_to_fill, datafilesdict=datadict)
 

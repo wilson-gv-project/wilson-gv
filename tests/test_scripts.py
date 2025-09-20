@@ -38,7 +38,7 @@ def test_evv_tester_dataclasses_vibexp():
     # WilsonSimulation object after spectrum was calculated and rendered
     wilsim = evv_tester.run()
     # loading saved VibExperiment in that calculation from the file (file name was saved in a dict)
-    load_vibexp = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['VibExperiment'], load_from=SUITE_ROOT+'/tests/')
+    load_vibexp = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['VibExperiment'], load_from=SUITE_ROOT+'/../tests/')
     
     # now this is not working: evv_tester_dataclasses.PKL_FILES['VibExperiment'] == wilsim.exp; comparison not implemented but it could be # TODO?
     
@@ -70,11 +70,11 @@ def test_evv_tester_dataclasses_calcsetup():
     wilsim2 = evv_tester.run()
 
     # loading saved ExternalCalcSetup in that calculation from the file (file name was saved in a dict)
-    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/tests/')
+    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/../tests/')
     assert load_calcsetup == wilsim2.eval_uniform
 
     from wilson_suite.wilson_main.abstractions import ExternalCalcSetup
-    calcsetup_ref = ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={})
+    calcsetup_ref = ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={})
 
     assert load_calcsetup == calcsetup_ref
     assert wilsim2.eval_uniform == calcsetup_ref
@@ -102,8 +102,8 @@ def test_evv_tester_dataclasses_wilsonsim():
     wilsim3 = evv_tester.run()
     print(evv_tester.PKL_FILES)
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
-    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/../tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/../tests/')
 
     assert load_wilsonsim_init.spec is None
     assert isinstance(load_wilsonsim_final.spec, np.ndarray)
@@ -118,9 +118,9 @@ def test_evv_tester_dataclasses_wilsonsim():
     wilsim3 = evv_tester.run()
 
     # loading saved WilsonSimulation in that calculation from the file (file name was saved in a dict)
-    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_mid = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_mid'], load_from=SUITE_ROOT+'/tests/')
-    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/tests/')
+    load_wilsonsim_init = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_init'], load_from=SUITE_ROOT+'/../tests/')
+    load_wilsonsim_mid = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_mid'], load_from=SUITE_ROOT+'/../tests/')
+    load_wilsonsim_final = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['WilsonSimulation_final'], load_from=SUITE_ROOT+'/../tests/')
 
     assert load_wilsonsim_init.spec is None
     assert load_wilsonsim_mid.spec is None
@@ -134,7 +134,7 @@ def test_evv_tester_dataclasses_wilsonsim():
     vibanasetup_ref = VibAnaSetup(regime='GVPT2', system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
                                   regime_subinfo=None, max_state_lvl=3, nc_sqrt_eigval={0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
                                   nc_eigvec=None, allow_skip_eigvec=True, vibana_prop_need='none', 
-                                  external_fill_from=ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ', other_setup={}, other_setup_identifier={}), 
+                                  external_fill_from=ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={}), 
                                   exclude_modes=[])
     assert vibanasetup_ref.system == wilsim3.vib_ana_setup.system
     assert vibanasetup_ref.external_fill_from == wilsim3.vib_ana_setup.external_fill_from
@@ -148,12 +148,12 @@ def test_evv_tester_dataclasses_wilsonsim():
 def test_logger_evv_tester_file():
     import logging
     from wilson_suite.wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG, log_to_file=SUITE_ROOT+'/tests/out.log')
+    setup_logger("wilson", level=logging.DEBUG, log_to_file=SUITE_ROOT+'/../tests/out.log')
     
     import evv_tester
     evv_tester.run()
 
-    with open(SUITE_ROOT+"/tests/out.log", "r", encoding="utf-8") as f:
+    with open(SUITE_ROOT+"/../tests/out.log", "r", encoding="utf-8") as f:
         lines = f.readlines()
         lines = [i for i in lines if i!='']
     
