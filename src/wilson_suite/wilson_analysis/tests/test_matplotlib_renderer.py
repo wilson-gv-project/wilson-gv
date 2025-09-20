@@ -75,6 +75,8 @@ def test_plt_NOw1_minus_w2():
                                                        tick_step=1)})
     spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
     
+    spec_eval_setup.rnd_info.filename = 'filename1.svg'
+
     system = MolecularSystem(name='mock', natoms=4)
     experiment = evv_experiment()
 
@@ -84,6 +86,7 @@ def test_plt_NOw1_minus_w2():
     render_spectrum(**context)
     import os
     assert os.path.exists("filename1.svg")
+    os.remove("filename1.svg")
 
 
 def test_plt_w1_minus_w2():
@@ -106,6 +109,7 @@ def test_plt_w1_minus_w2():
                                                        colormap='magma',
                                                        tick_step=1)})
     spec_eval_setup = SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+    spec_eval_setup.rnd_info.filename = 'filename2.svg'
     
     system = MolecularSystem(name='mock', natoms=4)
     experiment = evv_experiment()
@@ -117,3 +121,4 @@ def test_plt_w1_minus_w2():
     
     import os
     assert os.path.exists("filename2.svg")
+    os.remove("filename2.svg")

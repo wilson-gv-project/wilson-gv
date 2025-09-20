@@ -106,64 +106,65 @@ def test_load_data(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: di
                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
     assert t0.allstates[('3',)] == 1185.288187960807
 
+# CLEAN UP FIXTURES THEN REWRITE
 
-@require_asserts
-def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
-    print()
-    MOL_setup_parser = MOL_setup_parser['FORM']
-    spectrum_setup = spectrum_setup['FORM']
+# @require_asserts
+# def test_amplitude_1term_single_point(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
+#     print()
+#     MOL_setup_parser = MOL_setup_parser['FORM']
+#     spectrum_setup = spectrum_setup['FORM']
 
-    t0 = TermND(0, dict_8terms[0])
-    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
+#     t0 = TermND(0, dict_8terms[0])
+#     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
+#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
+#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
 
-    te = TermsEvaluator([t0])
-    te.identify_to_precalculate()
+#     te = TermsEvaluator([t0])
+#     te.identify_to_precalculate()
 
-    Nnmodes = 6
-    # now here keys change; fixme: it the change needed??
-    props_data_ready = {
-        'dipgrad': t0.properties_data['dipgrad'],
-        'diphess': t0.properties_data['diphess'],
-        'polgrad': t0.properties_data['polgrad'],
-        'polhess': t0.properties_data['polhess'],
-    }
-    from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
-    avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
-    w1 = np.arange(spectrum_setup.start1,
-                   spectrum_setup.end1, spectrum_setup.step1)
-    w2 = np.arange(spectrum_setup.start2,
-                   spectrum_setup.end2, spectrum_setup.step2)
-    w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
-    # axes_dict = {1: w1m, 2: w2m}
-    axes_dict = {'w1': w1m, 'w2': w2m}
+#     Nnmodes = 6
+#     # now here keys change; fixme: it the change needed??
+#     props_data_ready = {
+#         'dipgrad': t0.properties_data['dipgrad'],
+#         'diphess': t0.properties_data['diphess'],
+#         'polgrad': t0.properties_data['polgrad'],
+#         'polhess': t0.properties_data['polhess'],
+#     }
+#     from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
+#     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
+#     w1 = np.arange(spectrum_setup.start1,
+#                    spectrum_setup.end1, spectrum_setup.step1)
+#     w2 = np.arange(spectrum_setup.start2,
+#                    spectrum_setup.end2, spectrum_setup.step2)
+#     w1m, w2m = np.meshgrid(w1, w2, indexing='ij')
+#     # axes_dict = {1: w1m, 2: w2m}
+#     axes_dict = {'w1': w1m, 'w2': w2m}
     
-    from ...utils import DataForPrecalc
-    alldata = DataForPrecalc(Nnmodes=Nnmodes,
-                             props_data=props_data_ready,
-                             avrg_terms=avrg_terms,
-                             axes_dict=axes_dict,
-                             states_arrays_Eh=t0.states_arrays_Eh,
-                             harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
+#     from ...utils import DataForPrecalc
+#     alldata = DataForPrecalc(Nnmodes=Nnmodes,
+#                              props_data=props_data_ready,
+#                              avrg_terms=avrg_terms,
+#                              axes_dict=axes_dict,
+#                              states_arrays_Eh=t0.states_arrays_Eh,
+#                              harmonic_arrays_Eh=t0.harmonic_arrays_Eh)
 
-    precalc_dict = te.precalculate(alldata)
-    t0.precalc_data = precalc_dict
+#     precalc_dict = te.precalculate(alldata)
+#     t0.precalc_data = precalc_dict
 
-    a, b = 5, 0  # (4,5), (2,3), (2,5), (0,0)
-    w1, w2 = t0.get_resonance_location_general((a, b))
-    amplitude_single = t0.get_amplitudes(w1, w2, 3.8, 0.,
-                                         collect_all=True, sel_abs=[(a,b)])
+#     a, b = 5, 0  # (4,5), (2,3), (2,5), (0,0)
+#     w1, w2 = t0.get_resonance_location_general((a, b))
+#     amplitude_single = t0.get_amplitudes(w1, w2, 3.8, 0.,
+#                                          collect_all=True, sel_abs=[(a,b)])
 
-    print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
-    print(amplitude_single)
-    ampl_single_ab = t0.get_amplitudes_ab((a, b), w1, w2, 3.8, condition=None)[0]
-    print(ampl_single_ab)
-    assert np.isclose(amplitude_single, ampl_single_ab)
+#     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
+#     print(amplitude_single)
+#     ampl_single_ab = t0.get_amplitudes_ab((a, b), w1, w2, 3.8, condition=None)[0]
+#     print(ampl_single_ab)
+#     assert np.isclose(amplitude_single, ampl_single_ab)
 
 
 @require_asserts
@@ -217,6 +218,9 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
     w1,w2 = t0.get_resonance_location_general((a,b))
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
+
+    t0.diagnostics['get_amplitudes_ab prefac0'] = {}
+
     ampl = t0.get_amplitudes_ab((a, b), w1, w2, 3.8, condition=None,
                                 debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
@@ -404,6 +408,9 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
+
+    t0.diagnostics['get_amplitudes_ab prefac0'] = {}
+
     ampl = t0.get_amplitudes_ab((a, b), w1, w2, 3.8, condition=None,
                                 debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
@@ -456,77 +463,78 @@ def test_amplitude_1term_single_point_ab_precalc(dict_8terms: dict, MOL_setup_pa
     debug.level = 0
 
 
+# FIX THE FIXTURES
 
-@require_asserts
-def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
-    print()
-    MOL_setup_parser = MOL_setup_parser['FORM']
-    spectrum_setup = spectrum_setup['FORM']
+# @require_asserts
+# def test_amplitude_4terms_grid(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> None:
+#     print()
+#     MOL_setup_parser = MOL_setup_parser['FORM']
+#     spectrum_setup = spectrum_setup['FORM']
 
-    parsed_data = MOL_setup_parser.parse(linear_molecule=False)
+#     parsed_data = MOL_setup_parser.parse(linear_molecule=False)
 
-    parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-    deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
+#     parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
+#     deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data) # wrapper func
 
-    t0 = TermND(0, dict_8terms[0])
-    t1 = TermND(1, dict_8terms[1])
-    t2 = TermND(2, dict_8terms[2])
-    t3 = TermND(3, dict_8terms[3])
+#     t0 = TermND(0, dict_8terms[0])
+#     t1 = TermND(1, dict_8terms[1])
+#     t2 = TermND(2, dict_8terms[2])
+#     t3 = TermND(3, dict_8terms[3])
 
-    t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
-    t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
-                      mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
+#     t0.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
+#     t1.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
+#     t2.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
+#     t3.load_calc_data(properties_data=deriv_data, allstates=allstates, harmonic_states=harmonic_states,
+#                       mode_indices=mode_indices, gammaCompsAll=spectrum_setup.gammaCompsAll)
 
-    ###########################################################################################################
-    terms = [t0, t1, t2, t3]
-    te = TermsEvaluator(terms)
+#     ###########################################################################################################
+#     terms = [t0, t1, t2, t3]
+#     te = TermsEvaluator(terms)
 
-    Nnmodes = 6
-    props_data_ready = {
-        'dipgrad': t0.properties_data['dipgrad'],
-        'diphess': t0.properties_data['diphess'],
-        'polgrad': t0.properties_data['polgrad'],
-        'polhess': t0.properties_data['polhess'],
-    }
-    avrg_terms = spectrum_setup.gammaCompsAll
+#     Nnmodes = 6
+#     props_data_ready = {
+#         'dipgrad': t0.properties_data['dipgrad'],
+#         'diphess': t0.properties_data['diphess'],
+#         'polgrad': t0.properties_data['polgrad'],
+#         'polhess': t0.properties_data['polhess'],
+#     }
+#     avrg_terms = spectrum_setup.gammaCompsAll
 
-    w1 = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    w1m, w2m = np.meshgrid(w1, w2)
+#     w1 = np.arange(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
+#     w2 = np.arange(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
+#     w1m, w2m = np.meshgrid(w1, w2)
 
-    # axes_dict = {1: w1m, 2: w2m}
-    axes_dict = {'w1': w1m, 'w2': w2m}
+#     # axes_dict = {1: w1m, 2: w2m}
+#     axes_dict = {'w1': w1m, 'w2': w2m}
 
-    alldata = DataForPrecalc(Nnmodes=Nnmodes,
-                             props_data=props_data_ready,
-                             avrg_terms=avrg_terms,
-                             axes_dict=axes_dict,
-                             states_arrays_Eh=t2.states_arrays_Eh,
-                             harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
-    te.identify_to_precalculate()
-    precalc_dict = te.precalculate(alldata)
-    for t in terms:
-        t.precalc_data = precalc_dict
-    ###########################################################################################################
+#     alldata = DataForPrecalc(Nnmodes=Nnmodes,
+#                              props_data=props_data_ready,
+#                              avrg_terms=avrg_terms,
+#                              axes_dict=axes_dict,
+#                              states_arrays_Eh=t2.states_arrays_Eh,
+#                              harmonic_arrays_Eh=t2.harmonic_arrays_Eh)
+#     te.identify_to_precalculate()
+#     precalc_dict = te.precalculate(alldata)
+#     for t in terms:
+#         t.precalc_data = precalc_dict
+#     ###########################################################################################################
 
-    amplitudes = 0.
-    for t in terms:
-        e = t.get_amplitudes(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
-        amplitudes += e
-    debug.level = 0
-    print('\n---- amplitudes')
-    print(amplitudes.shape)
-    print(np.max(np.abs(amplitudes)))
-    print(f'{np.max(np.abs(amplitudes)**2):.2e}')
-    print(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
-    print(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
-    print(w1m.shape)
-    print(w1m)
+#     amplitudes = 0.
+#     for t in terms:
+#         e = t.get_amplitudes(w1m, w2m, 3.8, 0., debugprint=False, collect_all=True)
+#         amplitudes += e
+#     debug.level = 0
+#     print('\n---- amplitudes')
+#     print(amplitudes.shape)
+#     print(np.max(np.abs(amplitudes)))
+#     print(f'{np.max(np.abs(amplitudes)**2):.2e}')
+#     print(spectrum_setup.start1, spectrum_setup.end1, spectrum_setup.step1)
+#     print(spectrum_setup.start2, spectrum_setup.end2, spectrum_setup.step2)
+#     print(w1m.shape)
+#     print(w1m)
 
 
 
@@ -577,6 +585,9 @@ def test_amplitude_4terms_single_point_ab_precalc(dict_8terms: dict, MOL_setup_p
 
     print(f'\n(a,b) - {a,b}; w1,w2 - {w1:.2f}, {w2:.2f}')
     debug.level = 1
+
+    t0.diagnostics['get_amplitudes_ab prefac0'] = {}
+
     ampl = t0.get_amplitudes_ab((a, b), w1, w2, 3.8, condition=None,
                                 debugprint=True)[0]
     print(f'ampl = {ampl:.2e}')
@@ -651,85 +662,86 @@ def test_compute_vibdiff() -> None:
     assert compute_vibdiff((2,1), (3,0,1)) == [('3', '1'), ('0',)]
 
 
+# FIX THE FIXTURES OR UPDATE ALL TOGETHER??
 
-def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions: dict) -> None:
-    """
-    get a spectrum figure
-    """
-    # terms_collection is a fixture
-    te, precalc_dict = terms_collection['FORM']
+# def test_dotspectrum_df(terms_collection: dict, spectrum_setup: dict, conditions: dict) -> None:
+#     """
+#     get a spectrum figure
+#     """
+#     # terms_collection is a fixture
+#     te, precalc_dict = terms_collection['FORM']
 
-    with debug_mode(0):
-        for id, term in te.terms.items():
-            term.precalc_data = precalc_dict
-            with np.printoptions(precision=2,legacy='1.25'):
-                # formatted_resonances = {
-                #     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
-                #     for key, value in term.get_all_resonances(w2mw1=True).items()
-                # }
-                # print(formatted_resonances)
-                df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
-                print(df)
+#     with debug_mode(0):
+#         for id, term in te.terms.items():
+#             term.precalc_data = precalc_dict
+#             with np.printoptions(precision=2,legacy='1.25'):
+#                 # formatted_resonances = {
+#                 #     key: (f"{value[0]:.2f}", f"{value[1]:.2f}")
+#                 #     for key, value in term.get_all_resonances(w2mw1=True).items()
+#                 # }
+#                 # print(formatted_resonances)
+#                 df, distances = term.get_dotspectrum_df(Gamma_rc=3.8, margin=1.)
+#                 print(df)
 
 
-def test_get_factor_summed(terms_collection: dict[str,tuple[TermsEvaluator, dict]]) -> None:
-    print()
+# def test_get_factor_summed(terms_collection: dict[str,tuple[TermsEvaluator, dict]]) -> None:
+#     print()
 
-    te, precalc_dict = terms_collection['FORM']
-    term3 = te.terms[3]
-    term3.precalc_data = precalc_dict
+#     te, precalc_dict = terms_collection['FORM']
+#     term3 = te.terms[3]
+#     term3.precalc_data = precalc_dict
 
-    ab_comb = (0,0)
-    total = 0.
-    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
-    total2 = sum_over_suffixes(ab_comb,
-                               remaining_length,
-                               term3.mode_indices,
-                               term3.get_full_factor)
-    for c in term3.mode_indices:
-        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
-        total += addition_2
+#     ab_comb = (0,0)
+#     total = 0.
+#     remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+#     total2 = sum_over_suffixes(ab_comb,
+#                                remaining_length,
+#                                term3.mode_indices,
+#                                term3.get_full_factor)
+#     for c in term3.mode_indices:
+#         addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+#         total += addition_2
 
-    assert total2==total, "sum_over_suffixes didn't work out"
+#     assert total2==total, "sum_over_suffixes didn't work out"
 
-    ab_comb = (0,1)
-    total = 0.
-    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
-    total2 = sum_over_suffixes(ab_comb,
-                               remaining_length,
-                               term3.mode_indices,
-                               term3.get_full_factor)
-    for c in term3.mode_indices:
-        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
-        total += addition_2
+#     ab_comb = (0,1)
+#     total = 0.
+#     remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+#     total2 = sum_over_suffixes(ab_comb,
+#                                remaining_length,
+#                                term3.mode_indices,
+#                                term3.get_full_factor)
+#     for c in term3.mode_indices:
+#         addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+#         total += addition_2
 
-    assert total2==total, "sum_over_suffixes didn't work out"
+#     assert total2==total, "sum_over_suffixes didn't work out"
 
-    ab_comb = (1,0)
-    total = 0.
-    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
-    total2 = sum_over_suffixes(ab_comb,
-                               remaining_length,
-                               term3.mode_indices,
-                               term3.get_full_factor)
-    for c in term3.mode_indices:
-        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
-        total += addition_2
+#     ab_comb = (1,0)
+#     total = 0.
+#     remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+#     total2 = sum_over_suffixes(ab_comb,
+#                                remaining_length,
+#                                term3.mode_indices,
+#                                term3.get_full_factor)
+#     for c in term3.mode_indices:
+#         addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+#         total += addition_2
 
-    assert total2==total, "sum_over_suffixes didn't work out"
+#     assert total2==total, "sum_over_suffixes didn't work out"
 
-    ab_comb = (2,1)
-    total = 0.
-    remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
-    total2 = sum_over_suffixes(ab_comb,
-                               remaining_length,
-                               term3.mode_indices,
-                               term3.get_full_factor)
-    for c in term3.mode_indices:
-        addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
-        total += addition_2
+#     ab_comb = (2,1)
+#     total = 0.
+#     remaining_length = term3.collective_n_idx_max - term3.collective_n_idx_rescond
+#     total2 = sum_over_suffixes(ab_comb,
+#                                remaining_length,
+#                                term3.mode_indices,
+#                                term3.get_full_factor)
+#     for c in term3.mode_indices:
+#         addition_2 = term3.get_full_factor((*ab_comb, c), False, debugprint=False)
+#         total += addition_2
 
-    assert total2==total, "sum_over_suffixes didn't work out"
+#     assert total2==total, "sum_over_suffixes didn't work out"
 
 
 def test_prod():

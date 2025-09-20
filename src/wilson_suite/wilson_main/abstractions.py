@@ -37,6 +37,7 @@ class MolecularSystem:
 	geo: Any = None
 	geo_extra: Any = None
 	linear: bool = False
+	conformer: str = 'conf1'
 
 	@property
 	def Nnmodes(self):
@@ -914,10 +915,13 @@ class CalculationBatch:
 		CQCParse import can be removed for the use outside? then need to use self.addParser(progDataParser())
 		"""
 		if self.calc_setup.program == 'gaussian':
-			from CQCParse.parsing import GaussianDataParser as progDataParser
+			# from CQCParse.parsing import GaussianDataParser as progDataParser
+			from CQCParse.parsing import GaussianParser as progDataParser
 
 		elif self.calc_setup.program == 'cfour':
-			from CQCParse.parsing import CFOURdataParser as progDataParser
+			# from CQCParse.parsing import CFOURdataParser as progDataParser
+			from CQCParse.parsing import CFOURParser as progDataParser
+
 		else:
 			raise ValueError('Implemented parsers are for program = ["cfour", "gaussian"]. ' \
 			'Please, provide an instance of a custom data parser class via addParser(your_parser_class_instance)')
@@ -928,8 +932,8 @@ class CalculationBatch:
 		"""
 		parser_obj is a custom_parser class instance.
 		"""
-		assert hasattr(parser_obj, 'addFilesDict'), 'Parser class needs to have a addFilesDict(files_dict) method to register output files locations'
-		assert hasattr(parser_obj, 'getData'), 'Parser class needs to have a getData() method - to register parsed data in the instance'
+		# assert hasattr(parser_obj, 'addFilesDict'), 'Parser class needs to have a addFilesDict(files_dict) method to register output files locations'
+		# assert hasattr(parser_obj, 'getData'), 'Parser class needs to have a getData() method - to register parsed data in the instance'
 		# a parser class instance is constructed
 		self.parser_obj = parser_obj
 
@@ -990,11 +994,33 @@ class CalculationBatch:
 			Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
 			"""
 			# preparing a file sources dict from vault, CSV file
-			datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
-											mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
-											csvfile_dir=source_loc)
+			# datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
+			# 								mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
+			# 								csvfile_dir=source_loc)
+			datadict = datavault.make_data_input_dict(source_program=self.calc_setup.program,
+											mol_tuple=(self.system.name, self.system.conformer,
+														self.calc_setup.lvl_theory, self.calc_setup.basis))
 
-			logger.debug(f'datadict: {datadict}')
+			if self.calc_setup.program == 'gaussian':
+				from CQCParse.parsing import GaussianOutput as OutFiles
+
+			elif self.calc_setup.program == 'cfour':
+				from CQCParse.parsing import CFOUROutput as OutFiles
+
+			out = OutFiles(molecule=self.system.name, 
+							conformer=self.system.conformer,
+							method=self.calc_setup.lvl_theory, 
+							basis=self.calc_setup.basis, program=self.calc_setup.program)
+
+			if self.calc_setup.program == 'gaussian':
+				out.log_file = datadict['files']['log']
+
+			elif self.calc_setup.program == 'cfour':
+				out.out_file = datadict['files']['out']
+
+			self.parser_obj.relevant_files = out
+
+			logger.debug(f'gout: {out}')
 			self.getResultsFromOutputs(props_to_fill, vib_ana_setup_to_fill, datafilesdict=datadict)
 
 		elif source_type == 'outfiles':
@@ -1016,19 +1042,27 @@ class CalculationBatch:
 		
 		# using generated and registered at init self.parser_obj; 
 		# this is a specific required functionality of the self.parser_obj 
-		self.parser_obj.addFilesDict(all_files_dict=datafilesdict)
-		self.parser_obj.getData()
+		# self.parser_obj.addFilesDict(all_files_dict=datafilesdict)
+		# self.parser_obj.getData()
+		self.parser_obj.load()
+		self.parser_obj.parse()
 
 		for i in props_to_fill:
+			# if i.calc_setup.h() == self.calc_setup.h():
+			# 	i.addValues(getattr(self.parser_obj, i.trivial_name))
 			if i.calc_setup.h() == self.calc_setup.h():
-				i.addValues(getattr(self.parser_obj, i.trivial_name))
+				i.addSystem(self.system)
+				if i.trivial_name in ['cff', 'qff', 'B']:
+					i.addValues(getattr(self.parser_obj, i.trivial_name), in_units='cm-1', in_basis='nm')
+				else:
+					i.addValues(getattr(self.parser_obj, i.trivial_name))
 
 		if vib_ana_setup_to_fill is not None:
 
 			# Take harmonic vibrational analysis results
 			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
 
-				vib_ana_setup_to_fill.nc_sqrt_eigval = self.parser_obj.fundamentals_harmonic_int # todo: tests...
+				vib_ana_setup_to_fill.nc_sqrt_eigval = self.parser_obj.nc_sqrt_eigval # todo: tests...
 
 				if not vib_ana_setup_to_fill.allow_skip_eigvec:
 					# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)

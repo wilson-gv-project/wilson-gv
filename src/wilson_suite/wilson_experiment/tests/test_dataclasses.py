@@ -5,6 +5,7 @@ Generally, it would also mean that the object is serialized into a dictionary he
 from ...wilson_experiment import abstractions as we_abst_dataclass
 from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
+import os 
 
 def test_SpecDetector():
 
@@ -68,8 +69,8 @@ def test_VibExperiment():
     assert check_if_jsonsafe(asdict(experiment_a_datacls))
 
     from ...wilson_intensities.utils.utils import get_package_root
-    ws_root = get_package_root() + '/../../'
-
+    ws_root = get_package_root() + '/../'
+    print(ws_root)
     import pickle
     with open(ws_root+"/wilson_experiment/tests/experiment_a_datacls.pkl", "wb") as f:
         pickle.dump(experiment_a_datacls, f)
@@ -86,3 +87,4 @@ def test_VibExperiment():
 
     assert hasattr(loaded_experiment_a_datacls, 'tellDimensions')
     assert hasattr(loaded_experiment_a_datacls, 'findInteractionSequences')
+    os.remove(ws_root+"/wilson_experiment/tests/experiment_a_datacls.pkl")

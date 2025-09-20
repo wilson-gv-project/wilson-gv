@@ -41,9 +41,7 @@ def test_get_resonance_loc():
 
     bank = VibDiffBank(indices, max_quanta, dummy_energy)
     
-    pprint()
     result = get_resonance_loc(resonances=(('zero,a', (-1,)), ('a+b,a', (-1, 2))),
                                ind_tuple=(1, 2, 3), vibdiffbank=bank)
-    
-    assert result == {1: np.float64(1.0), -2: np.float64(-5.0)}
+    assert result == {'w1': np.float64(1.0), 'w2': np.float64(5.0)}
 

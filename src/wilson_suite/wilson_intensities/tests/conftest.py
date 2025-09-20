@@ -25,7 +25,7 @@ from ..utils.utils import Conditions
 # list of molucules to set up fixtures for
 list_of_molecules = ["FORM"]
 # minidatabase_csv = get_package_root()+ '/tests/test_database/mini_files_database.csv'
-minidatabase_csv = '/home/vlev/sprint/calculations/calculations.csv'
+minidatabase_csv = '/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/calculations.csv'
 terms_json = ''
 directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -60,6 +60,8 @@ def dict_8terms() -> dict:
                                              ('diphess', ('a', 'b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (1,0),
                           'termB_pref': 1.,
                           'termA_pref': 1/4},
                      1:
@@ -70,6 +72,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': None,
                           'vibene_denom': ('a','b',),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (1,0),
                           'termB_pref': 1.,
                           'termA_pref': 1/4},
                      2:
@@ -80,6 +84,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('c',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'b', 'c',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': 1.,
                           'termA_pref': -1/8.},
                      3:
@@ -90,6 +96,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'b',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': 1.,
                           'termA_pref': -1/8.},
                      4:
@@ -100,6 +108,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('a',), ('G',))),
                           'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': 0.5,
                           'termA_pref': -1/8.},
                      5:
@@ -110,6 +120,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': 0.5,
                           'termA_pref': -1/8.},
                      6:
@@ -120,6 +132,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('b', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': -0.5,
                           'termA_pref': -1/8.},
                      7:
@@ -130,6 +144,8 @@ def dict_8terms() -> dict:
                                              ('dipgrad', ('b',), ('G',))),
                           'non_averaged_props': (('F', ('a', 'c', 'c',)),),
                           'vibene_denom': ('a','b','c'),
+                          'lvl_anharm': 1,
+                          'anharm_tuple': (0,1),
                           'termB_pref': -0.5,
                           'termA_pref': -1/8.}
                      }
@@ -143,20 +159,24 @@ def MOL_setup_parser(conditions: dict[str,Conditions]) -> dict:
     parsers = {}
 
     for mol,cond in conditions.items():
-        molecule, method, basis = cond.molecule, 'B3LYP', 'cc-pVQZ'
+        molecule, method, basis, conformer = cond.molecule, 'B3LYP', 'cc-pVQZ', 'conf1'
         data_vault = DataVault(minidatabase_csv)
         # dataframe_gaussian = data_vault.getting_files_DB("gaussian")
-        dataframe_gaussian = data_vault.filter_database("gaussian")
+        # dataframe_gaussian = data_vault.filter_database("gaussian")
+        files_dict = data_vault.make_data_input_dict(source_program='gaussian', 
+                                        mol_tuple=(molecule, conformer, method, basis))
 
-        aa = dataframe_gaussian[
-            (dataframe_gaussian['Name'] == molecule) &
-            (dataframe_gaussian['Method'] == method) &
-            (dataframe_gaussian['Basis'] == basis)
-        ]['file_location']
-        # filename = directory+aa.iloc[0]
-        filename = aa.iloc[0]
+        # aa = dataframe_gaussian[
+        #     (dataframe_gaussian['Name'] == molecule) &
+        #     (dataframe_gaussian['Method'] == method) &
+        #     (dataframe_gaussian['Basis'] == basis)
+        # ]['file_location']
+        # # filename = directory+aa.iloc[0]
+        # pref_dir = ''
+        # filename = aa.iloc[0]
+        print(files_dict)
 
-        gout = GaussianOutput(molecule, method, basis, 'gaussian', filename)
+        gout = GaussianOutput(molecule, conformer, method, basis, 'gaussian', files_dict['files']['log'])
         parser = GaussianParser(gout)
         parser.load()
         parsers[molecule] = parser
@@ -221,6 +241,8 @@ def setup_term(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) 
                 mode_indices=mode_indices,
                 gammaCompsAll=spectrum_setup[mol].gammaCompsAll
             )
+            term.vibstates = vib_ana_setup.states
+
             return term
         term_funcs[mol] = create_term
     return term_funcs
