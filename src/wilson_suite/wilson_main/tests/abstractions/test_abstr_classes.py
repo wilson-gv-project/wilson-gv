@@ -24,7 +24,7 @@ def test_MolecularSystem():
     assert mol_system_datacls.Nnmodes == 3*3-6
 
 
-def test_ExternalCalcSetup():
+def test_DataOriginInfo():
     """To be implemented"""
     pass
 

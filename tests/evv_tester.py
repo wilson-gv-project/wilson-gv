@@ -66,12 +66,12 @@ def run():
         experiment_a = unpickle_smth_from(filenamepkl='vibexp.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['VibExperiment'] = 'vibexp.pkl'
     
-    calc_setup = ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
-    if 'ExternalCalcSetup' in TO_PICKLES:
+    calc_setup = ws.main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+    if 'DataOriginInfo' in TO_PICKLES:
         pickle_this_to(obj=calc_setup, filenamepkl='calcsetup.pkl', save_to=SUITE_ROOT+'/../tests/')
 
         calc_setup = unpickle_smth_from(filenamepkl='calcsetup.pkl', load_from=SUITE_ROOT+'/../tests/')
-        PKL_FILES['ExternalCalcSetup'] = 'calcsetup.pkl'
+        PKL_FILES['DataOriginInfo'] = 'calcsetup.pkl'
 
     sim = ws.main.abstractions.WilsonSimulation()
     if 'WilsonSimulation_init' in TO_PICKLES:
@@ -88,8 +88,8 @@ def run():
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     sim.addSystem(mol_system)
-    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_prop_need='none',
-                                                        allow_skip_eigvec=True, external_fill_from=calc_setup))
+    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none',
+                                                        external_fill_from=calc_setup))
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 
     # more clear definitions with str keys of dicts

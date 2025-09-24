@@ -57,24 +57,24 @@ def test_evv_tester_dataclasses_vibexp():
 
 def test_evv_tester_dataclasses_calcsetup():
     """
-    pickle and unpickle ExternalCalcSetup after initialization in the integration script.
-    pickled ExternalCalcSetup is then unpickled in the script and calculation continues.
-    Now comparing loaded from file ExternalCalcSetup to the one saved in WilsonSimulation instance (after all calculation is done).
+    pickle and unpickle DataOriginInfo after initialization in the integration script.
+    pickled DataOriginInfo is then unpickled in the script and calculation continues.
+    Now comparing loaded from file DataOriginInfo to the one saved in WilsonSimulation instance (after all calculation is done).
     """
     import evv_tester as evv_tester
 
-    topickles_2 = ['ExternalCalcSetup']
+    topickles_2 = ['DataOriginInfo']
     evv_tester.TO_PICKLES = topickles_2
     
     # WilsonSimulation object after spectrum was calculated and rendered
     wilsim2 = evv_tester.run()
 
-    # loading saved ExternalCalcSetup in that calculation from the file (file name was saved in a dict)
-    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['ExternalCalcSetup'], load_from=SUITE_ROOT+'/../tests/')
+    # loading saved DataOriginInfo in that calculation from the file (file name was saved in a dict)
+    load_calcsetup = unpickle_smth_from(filenamepkl=evv_tester.PKL_FILES['DataOriginInfo'], load_from=SUITE_ROOT+'/../tests/')
     assert load_calcsetup == wilsim2.eval_uniform
 
-    from wilson_suite.wilson_main.abstractions import ExternalCalcSetup
-    calcsetup_ref = ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={})
+    from wilson_suite.wilson_main.abstractions import DataOriginInfo
+    calcsetup_ref = DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={})
 
     assert load_calcsetup == calcsetup_ref
     assert wilsim2.eval_uniform == calcsetup_ref
@@ -130,11 +130,11 @@ def test_evv_tester_dataclasses_wilsonsim():
 
     assert np.allclose(np.abs(load_wilsonsim_final.spec), np.abs(wilsim3.spec))
 
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, ExternalCalcSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, DataOriginInfo
     vibanasetup_ref = VibAnaSetup(regime='GVPT2', system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
                                   regime_subinfo=None, max_state_lvl=3, nc_sqrt_eigval={0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
-                                  nc_eigvec=None, allow_skip_eigvec=True, vibana_prop_need='none', 
-                                  external_fill_from=ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={}), 
+                                  nc_eigvec=None, vibana_own_analysis='none', 
+                                  external_fill_from=DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={}), 
                                   exclude_modes=[])
     assert vibanasetup_ref.system == wilsim3.vib_ana_setup.system
     assert vibanasetup_ref.external_fill_from == wilsim3.vib_ana_setup.external_fill_from

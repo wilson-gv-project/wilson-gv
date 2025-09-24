@@ -15,7 +15,7 @@ from ..wilson_analysis.render.spectrum_renderer import PlotConfig, Normalization
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..wilson_main.abstractions import (VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpecEvalSetup)
+    from ..wilson_main.abstractions import (VibAnaSetup, DataOriginInfo, MolecularSystem, SpecEvalSetup)
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -94,19 +94,19 @@ def evv_terms() -> list[wd_abst.VibPerturbedTerm]:
 
 
 def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup", 
-                            eval_uniform:"ExternalCalcSetup", 
+                            eval_uniform:"DataOriginInfo", 
                             system:"MolecularSystem",
                             project_directory:str='.',
                             silent=False):
     """
     EVV experiment with internally computed GVPT2 vibrational states
 
-    vib_ana_setup=ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_prop_need='anharm')
-    calc_setup=ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+    vib_ana_setup=ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm')
+    calc_setup=ws.main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     """
     from ..wilson_main import abstractions as wm_abst
 
-    vib_ana_setup = wm_abst.VibAnaSetup(regime=vib_ana_setup.regime, vibana_prop_need=vib_ana_setup.vibana_prop_need)
+    vib_ana_setup = wm_abst.VibAnaSetup(regime=vib_ana_setup.regime, vibana_own_analysis=vib_ana_setup.vibana_own_analysis)
     # -------------------------
     sim = wm_abst.WilsonSimulation()
     # adding EVV experiment
@@ -126,7 +126,6 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
     # -------------------------
     sim.addSystem(system=system) # maybe should enforce this same system for all other things
     # -------------------------
-    vib_ana_setup.external_fill_from = eval_uniform
     vib_ana_setup.system = system
     vib_ana_setup.upd_exclude_modes()
 

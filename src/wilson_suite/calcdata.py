@@ -5,10 +5,10 @@ import numpy as np
 mol1 = wm_abst.MolecularSystem(name='mol1', natoms=3)
 mol2 = wm_abst.MolecularSystem(name='mol2', natoms=5)
 
-setup1 = wm_abst.ExternalCalcSetup('p1', 'lvl1', 'b1')
-setup2 = wm_abst.ExternalCalcSetup('p1', 'lvl2', 'b2')
-setup3 = wm_abst.ExternalCalcSetup('p1', 'lvl2', 'b3')
-setup4 = wm_abst.ExternalCalcSetup('p2', 'lvl3', 'b2')
+setup1 = wm_abst.DataOriginInfo('p1', 'lvl1', 'b1')
+setup2 = wm_abst.DataOriginInfo('p1', 'lvl2', 'b2')
+setup3 = wm_abst.DataOriginInfo('p1', 'lvl2', 'b3')
+setup4 = wm_abst.DataOriginInfo('p2', 'lvl3', 'b2')
 
 np3b3 = np.array([[0.48, 0.53, 0.52],
                 [0.42, 0.81, 0.47],
