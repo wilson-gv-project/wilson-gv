@@ -58,26 +58,9 @@ class MolecularSystem:
 			self.linear = True
 
 	def __hash__(self):
+		# FIXME: Influence hash with other attributes as well
 		return hash(self.name)
 
-	def h(self):
-		"""
-		Hashing function
-		"""
-
-		# For now only returning by name
-		return hash(self.name)
-	
-	def asXyz(self):
-		"""
-		Convert geometry to e.g. xyz file - unwritten but keep shell here for now
-		"""
-
-		# For default geo
-
-		# For geo_extra
-
-		pass
 
 
 @dataclass(frozen=True)
@@ -133,6 +116,7 @@ class MolecularProperty:
 
 	see more in test_main_dataclasses.py::test_MolecularProperty
 	"""
+	# FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
 	prop_spec: dict
 	trivial_name: str=None
 	vals: InitVar[Any] = field(default=None, repr=False)
@@ -144,6 +128,7 @@ class MolecularProperty:
 			"trivial_name": self.trivial_name,
 		}
 
+	# FIXME: Complete/update this
 	def h(self, htype: int) -> int:
 		"""
 		Hashing function with four hash types
@@ -200,34 +185,17 @@ class MolecularProperty:
 		self.calc_setup = calc_setup
 	
 	# Add values (usually scalars or a numPy array)
-	def addValues(self, values: Any, in_basis: str=None, in_units: str=None):
+	def addValues(self, values: Any):
 		"""
 		Associate values to this property
 
 		values: Undetermined form: The values to be added
-		in_basis: string: In which basis are these values?
-		in_units: string: In which units are these values?
 		"""
 
 		self.vals = values
 
 
-class MolecularPropertyEncoder(json.JSONEncoder):
-	"""
-	Helper for JSON encoding of MolecularProperty
-	"""
-	def default(self, o):
-		if isinstance(o, MolecularProperty):
-			# Convert the MolecularProperty object to a dictionary
-			return {
-				"prop_spec": o.prop_spec,
-				"trivial_name": o.trivial_name,
-			}
-		# Let the base class handle other types
-		return super().default(o)
-
-
-
+# FIXMEs: Improved handling of mode exclusion; possibly methods changes
 @dataclass
 class VibAnaSetup:
 	"""
@@ -264,9 +232,8 @@ class VibAnaSetup:
 	vibana_own_analysis: str='full'
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-	exclude_modes: list	 = None
+	exclude_modes: list = None
 	diagn: dict = None
-
 
 	def __post_init__(self):
 		if self.exclude_modes is None:
@@ -275,8 +242,6 @@ class VibAnaSetup:
 		else:
 			if self.system is None:
 				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
-
-	# TODO units dictionary? basis? validation of consistent units/bases?
 
 	@property
 	def modes_indices(self):
@@ -291,79 +256,21 @@ class VibAnaSetup:
 		import numpy as np
 		return [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
 	
+	# FIXME: Possibly return to this later
 	@property
 	def serial_states(self):
 		return [{'s': vibst.serial_s, 
 		   'e': vibst.e, 'd': vibst.d} for vibst in getattr(self, 'states')]
 
-	def tellNeededProps(self) -> list:
+	@property
+	def isAllSet(self):
 		"""
-		Tell which MolecularProperty instances are required for a specific vibrational analysis
-
-		Returns a list of MolecularProperty instances detailing which properties are required for curent state of instance
+		Checking status of VibAna data.
 		"""
-
-		needed_props = []
-
-		if self.vibana_own_analysis == 'none':
-			if self.isAllSet():
-				return needed_props
-			else:
-				needed_props.append({'nc_sqrt_eigvec': None})
-				needed_props.append({'states': None})
-		
-		if (self.vibana_own_analysis == 'full'):
-			# should have share the same setting of origin as nc_sqrt_eigval and nc_eigvec
-			# in harmonic analysis procedure it will go from "hess" Property to nc_sqrt_eigval and nc_eigvec
-
-			# FIXME: Not sure about target units
-			needed_props.append(MolecularProperty(
-				{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
-				trivial_name=prop_trivname(ord_geo=2),
-				target_basis='cart',
-				target_units='au')
-			)
-
-		# For now, don't use regime subinfo
-		if 'PT2' in self.regime:
-
-			if (self.vibana_own_analysis == 'anharm') or (self.vibana_own_analysis == 'full'):
-
-				needed_props.append(MolecularProperty(
-					{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
-					trivial_name=prop_trivname(ord_geo=3),
-					target_basis='nm',
-					target_units='au')
-				)
-
-				# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
-				needed_props.append(MolecularProperty(
-					{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
-					trivial_name=prop_trivname(ord_geo=4),
-					target_basis='nm',
-					target_units='au')
-				)
-
-				needed_props.append(MolecularProperty(
-					{'ops': tuple(['r']), 'freq': (0.0)},
-					trivial_name=prop_trivname(ord_rot=1),
-					target_basis='nm',
-					target_units='au')
-				)
-
-				needed_props.append(MolecularProperty(
-					{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
-					trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
-					target_basis='nm',
-					target_units='au')
-				)
-			
-			if self.vibana_own_analysis == 'anharm':
-				needed_props.append({'nc_sqrt_eigvec': None})
-
-		return needed_props
-
-
+		if self.nc_sqrt_eigval is not None and self.states is not None:
+			return True
+		return False
+	
 	def setStates(self, states: list[VibState]):
 		"""
 		Set vibrational states
@@ -373,9 +280,89 @@ class VibAnaSetup:
 
 		self.states = states
 
-	def doFullAnalysis(self, props: list[MolecularProperty],
+	def upd_exclude_modes(self, upd_exclude_modes: list = None):
+		if self.exclude_modes is None:
+			if self.system is not None:
+				self.exclude_modes = []
+		elif upd_exclude_modes is not None:
+			self.exclude_modes = upd_exclude_modes
+		else:
+			if self.system is None:
+				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
+
+
+def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
+	
+	"""
+	Tell which MolecularProperty instances are required for a specific vibrational analysis
+
+	Returns a list of MolecularProperty instances detailing which properties are required for curent state of instance
+	"""
+
+	needed_props = []
+
+	if vib_ana.vibana_own_analysis == 'none':
+		if vib_ana.isAllSet():
+			return needed_props
+		else:
+			needed_props.append({'nc_sqrt_eigvec': None})
+			needed_props.append({'states': None})
+	
+	if (vib_ana.vibana_own_analysis == 'full'):
+		# should have share the same setting of origin as nc_sqrt_eigval and nc_eigvec
+		# in harmonic analysis procedure it will go from "hess" Property to nc_sqrt_eigval and nc_eigvec
+
+		# FIXME: Not sure about target units
+		needed_props.append(MolecularProperty(
+			{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
+			trivial_name=prop_trivname(ord_geo=2),
+			target_basis='cart',
+			target_units='au')
+		)
+
+	# For now, don't use regime subinfo
+	if 'PT2' in vib_ana.regime:
+
+		if (vib_ana.vibana_own_analysis == 'anharm') or (vib_ana.vibana_own_analysis == 'full'):
+
+			needed_props.append(MolecularProperty(
+				{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
+				trivial_name=prop_trivname(ord_geo=3),
+				target_basis='nm',
+				target_units='au')
+			)
+
+			# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
+			needed_props.append(MolecularProperty(
+				{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
+				trivial_name=prop_trivname(ord_geo=4),
+				target_basis='nm',
+				target_units='au')
+			)
+
+			needed_props.append(MolecularProperty(
+				{'ops': tuple(['r']), 'freq': (0.0)},
+				trivial_name=prop_trivname(ord_rot=1),
+				target_basis='nm',
+				target_units='au')
+			)
+
+			needed_props.append(MolecularProperty(
+				{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
+				trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
+				target_basis='nm',
+				target_units='au')
+			)
+		
+		if vib_ana.vibana_own_analysis == 'anharm':
+			needed_props.append({'nc_sqrt_eigvec': None})
+
+	return needed_props
+
+
+def do_full_vib_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
-				   tuple[list[VibState], dict, dict]]):
+				   tuple[dict, dict, list[VibState], dict]]):
 		"""
 		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
 		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
@@ -389,86 +376,67 @@ class VibAnaSetup:
 		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
 		with self as self.system
 		"""
-		if self.nc_sqrt_eigval is not None or self.states is not None or self.nc_eigvec is not None:
+		if vib_ana.nc_sqrt_eigval is not None or vib_ana.states is not None or vib_ana.nc_eigvec is not None:
 			raise AssertionError('Full analysis requested but some of the results are already present')
 
-		if self.regime is None:
+		if vib_ana.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if self.system is None:
+		if vib_ana.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 		
-		context = {'system': self.system, 'props': props, 
-			 	   'regime': self.regime, 'regime_subinfo': self.regime_subinfo}
+		context = {'system': vib_ana.system, 'props': props, 
+			 	   'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo}
 		
-		self.nc_sqrt_eigval, self.nc_eigvec, self.states, self.diagn = analyzer(**context)
+		# To return: nc_sqrt_eigval, nc_eigvec, states, diagn
+		return analyzer(**context)
+	
+def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty], anharmonic_analyzer:
+						Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
+						tuple[list[VibState], dict]]):
+	"""
+	Carry out anharmonic vibrational analysis as set up
 
+	props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+	analyzer: Callable: A reference to an anharmonic analyzer function. See function definition and attribute 
+	explanation in __init__ for detailed argument specification: Must take as input a system, a set of properties,
+	a choice of regime (and subinfo as relevant), harmonic fundamental energy levels and associated eigenvectors,
+	and return the anharmonically corrected vibrational states as VibState instances.
+	system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+	with self as self.system
+	"""
 
-	def doAnharmonicAnalysis(self, props: list[MolecularProperty], anharmonic_analyzer:
-							Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
-							tuple[list[VibState], dict, dict]]):
-		"""
-		Carry out anharmonic vibrational analysis as set up
+	if vib_ana.regime is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+	else:
+		if vib_ana.regime not in ['harmonic', "GVPT2", "VPT2"]:
+			raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
+		elif vib_ana.regime == 'harmonic':
+			raise ValueError('Anharmonic analysis requested but chosen vibrational regime is harmonic.')
 
-		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		analyzer: Callable: A reference to an anharmonic analyzer function. See function definition and attribute 
-		explanation in __init__ for detailed argument specification: Must take as input a system, a set of properties,
-		a choice of regime (and subinfo as relevant), harmonic fundamental energy levels and associated eigenvectors,
-		and return the anharmonically corrected vibrational states as VibState instances.
-		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
-		with self as self.system
-		"""
+	if vib_ana.system is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
 
-		if self.regime is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
-		else:
-			if self.regime not in ['harmonic', "GVPT2", "VPT2"]:
-				raise NotImplementedError('Implemented regime choices are: "GVPT2", "VPT2"')
-			elif self.regime == 'harmonic':
-				raise ValueError('Anharmonic analysis requested but chosen vibrational regime is harmonic.')
+	from inspect import isfunction
+	if not isfunction(anharmonic_analyzer):
+		raise TypeError('anharmonic_analyzer should be a function')
+	
+	if vib_ana.nc_sqrt_eigval is None:
+		raise ValueError('Missing values for nc_sqrt_eigval, cannot proceed with anharmonic analysis')
 
-		if self.system is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+	for i in props:
+		if i.trivial_name in ['cff', 'qff', 'B', 'coriolis']:
+			assert i.vals is not None, f'Missing values for {i.trivial_name}, cannot proceed with anharmonic analysis'
 
-		from inspect import isfunction
-		if not isfunction(anharmonic_analyzer):
-			raise TypeError('anharmonic_analyzer should be a function')
-		
-		if self.nc_sqrt_eigval is None:
-			raise ValueError('Missing values for nc_sqrt_eigval, cannot proceed with anharmonic analysis')
+	context = {'system': vib_ana.system, 'props': props, 
+				'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo, 
+				'nc_sqrt_eigval': vib_ana.nc_sqrt_eigval, 
+				'exclude_modes': vib_ana.exclude_modes}
+	
+	logger.debug(repr(context))
 
-		for i in props:
-			if i.trivial_name in ['cff', 'qff', 'B', 'coriolis']:
-				assert i.vals is not None, f'Missing values for {i.trivial_name}, cannot proceed with anharmonic analysis'
-
-		context = {'system': self.system, 'props': props, 
-			 		'regime': self.regime, 'regime_subinfo': self.regime_subinfo, 
-					'nc_sqrt_eigval': self.nc_sqrt_eigval, 
-					'exclude_modes': self.exclude_modes}
-		
-		logger.debug(repr(context))
-
-		self.states, self.diagn = anharmonic_analyzer(**context)
-
-	def isAllSet(self):
-		"""
-		Checking status of VibAna data.
-		"""
-		if self.nc_sqrt_eigval is not None and self.states is not None:
-			return True
-		return False
-
-
-	def upd_exclude_modes(self, upd_exclude_modes: list = None):
-		if self.exclude_modes is None:
-			if self.system is not None:
-				self.exclude_modes = []
-		elif upd_exclude_modes is not None:
-			self.exclude_modes = upd_exclude_modes
-		else:
-			if self.system is None:
-				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
-
+	# To return: states, diagn
+	return anharmonic_analyzer(**context)
 
 
 @dataclass
@@ -752,245 +720,6 @@ class SpecEvalSetup:
 				raise TypeError("Values of axes dict should be SpectralAxis instances")
 
 
-@dataclass
-class CalculationBatch:
-	"""
-	Class to collect (external) calculations with one setup, make input and collect results
-	TODO: Add functionality to make input
-	TODO: Extend functinality to collect results
-
-	-----
-	system: MolecularSystem instance: The system for which calclulation is sought/defined
-	calc_setup: DataOriginInfo: The calculation setup with respect to which calclulation is sought/defined
-	properties: List of MolecularProperty instances: The properties for which calculation is sought/defined
-	"""
-	system: MolecularSystem
-	calc_setup: DataOriginInfo
-	properties: list[MolecularProperty]=field(default_factory=lambda: list())
-
-	def __post_init__(self):
-		"""
-		CQCParse import can be removed for the use outside? then need to use self.addParser(progDataParser())
-		"""
-		if self.calc_setup.program == 'gaussian':
-			# from CQCParse.parsing import GaussianDataParser as progDataParser
-			from CQCParse.parsing import GaussianParser as progDataParser
-
-		elif self.calc_setup.program == 'cfour':
-			# from CQCParse.parsing import CFOURdataParser as progDataParser
-			from CQCParse.parsing import CFOURParser as progDataParser
-
-		else:
-			raise ValueError('Implemented parsers are for program = ["cfour", "gaussian"]. ' \
-			'Please, provide an instance of a custom data parser class via addParser(your_parser_class_instance)')
-		
-		self.addParser(progDataParser())
-
-	def addParser(self, parser_obj):
-		"""
-		parser_obj is a custom_parser class instance.
-		"""
-		# assert hasattr(parser_obj, 'addFilesDict'), 'Parser class needs to have a addFilesDict(files_dict) method to register output files locations'
-		# assert hasattr(parser_obj, 'getData'), 'Parser class needs to have a getData() method - to register parsed data in the instance'
-		# a parser class instance is constructed
-		self.parser_obj = parser_obj
-
-	def addProperty(self, prop):
-		"""
-		Add a property to the list of requested properties
-
-		prop: MolecularProperty instance: The property to be added
-		"""
-		if not isinstance(prop, MolecularProperty):
-			raise TypeError("Provided prop argument is not a MolecularProperty instance")
-
-		self.properties.append(prop)
-
-	def makeInputs(self):
-		"""
-		Make input(s) for calculation(s)
-		TODO: Implement
-		"""
-
-		pass
-
-	def getResults(self, props_to_fill: list[MolecularProperty],
-				   vib_ana_setup_to_fill: VibAnaSetup=None, source_type: str='',
-				   source_types: list[str]=[], source_loc: Any=None, datavault: Any = None):
-		"""
-		Get results (values for properties) from a specified source or sources and fill them into the
-		MolecularProperty instances in props_to_fill for all such instances that match what self can provide. Also
-		optionally fill data when applicable into a provided vibrational analysis setup.
-
-		FIXME: This functionality could do with some cleaning up. Maybe it's better to fill the vibrational analysis
-		data in a separate method? Also source type/types and source loc are a bit messy: Maybe use just plural and let
-		source_loc be a list of lists of strings.
-
-		props_to_fill: list of MolecularProperty instances: Properties for which filling is to be attempted
-		vib_ana_setup_to_fill: VibAnaSetup instance: Vibrational analysis setup for which filling is to be
-		attempted. Typically involved if the external program can calculate e.g. energy levels directly.
-
-		source_type: string: Type of data source. Could be e.g. "vault" or "file". Intended for use when only one
-		kind of location is relevant. / for Vault - directory with CSV file containing paths to output files files 
-
-		source_types: list of strings: Types of data source (in decreasing order of priority).
-
-		source_loc: Format not specified: Location(s) of data source(s).
-		"""
-
-		for i in props_to_fill:
-			if not isinstance(i, MolecularProperty):
-				raise TypeError(f"props_to_fill has an element that is not a MolecularProperty instance: {i}")
-			else:
-				assert i.calc_setup is not None, f'A molecular property without calc_setup is encountered: {i.trivial_name}. Cannot getResults'
-
-		if source_type == 'vault':
-			"""
-			Get results from data vault. 
-			See get_results declarations for argument explanations.
-
-			Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
-			"""
-			# preparing a file sources dict from vault, CSV file
-			# datadict = datavault.make_DatainputDict(sourceProgram=self.calc_setup.program, 
-			# 								mol_tuple=(self.system.name, self.calc_setup.lvl_theory, self.calc_setup.basis), 
-			# 								csvfile_dir=source_loc)
-			datadict = datavault.make_data_input_dict(source_program=self.calc_setup.program,
-											mol_tuple=(self.system.name, self.system.conformer,
-														self.calc_setup.lvl_theory, self.calc_setup.basis))
-
-			if self.calc_setup.program == 'gaussian':
-				from CQCParse.parsing import GaussianOutput as OutFiles
-
-			elif self.calc_setup.program == 'cfour':
-				from CQCParse.parsing import CFOUROutput as OutFiles
-
-			out = OutFiles(molecule=self.system.name, 
-							conformer=self.system.conformer,
-							method=self.calc_setup.lvl_theory, 
-							basis=self.calc_setup.basis, program=self.calc_setup.program)
-
-			if self.calc_setup.program == 'gaussian':
-				out.log_file = datadict['files']['log']
-
-			elif self.calc_setup.program == 'cfour':
-				out.out_file = datadict['files']['out']
-
-			self.parser_obj.relevant_files = out
-
-			print(datadict)
-
-			logger.debug(f'gout: {out}')
-			self.getResultsFromOutputs(props_to_fill, vib_ana_setup_to_fill, datafilesdict=datadict)
-
-		elif source_type == 'outfiles':
-			raise NotImplementedError('Results from program output file(s) not yet implemented')
-
-		else:
-			raise NotImplementedError(f'Data retrieval for this source_type [{source_type}] is not implemented')
-
-	def getResultsFromOutputs(self, props_to_fill: list[MolecularProperty], vib_ana_setup_to_fill: VibAnaSetup,  datafilesdict: dict):
-		"""
-		Get results from program output file(s)
-		
-		Uses GaussianDataParser and CFOURdataParser classes which hold parsed data
-
-		datafilesdict contains paths to output files and other relevant info
-		"""
-
-		logger.info(f'system name: {self.system.name}')
-		
-		# using generated and registered at init self.parser_obj; 
-		# this is a specific required functionality of the self.parser_obj 
-		# self.parser_obj.addFilesDict(all_files_dict=datafilesdict)
-		# self.parser_obj.getData()
-		self.parser_obj.load()
-		self.parser_obj.parse()
-
-		for i in props_to_fill:
-			# if i.calc_setup.h() == self.calc_setup.h():
-			# 	i.addValues(getattr(self.parser_obj, i.trivial_name))
-			if i.calc_setup.h() == self.calc_setup.h():
-				i.addSystem(self.system)
-				if i.trivial_name in ['cff', 'qff', 'B']:
-					i.addValues(getattr(self.parser_obj, i.trivial_name), in_units='cm-1', in_basis='nm')
-				else:
-					i.addValues(getattr(self.parser_obj, i.trivial_name))
-
-		if vib_ana_setup_to_fill is not None:
-
-			# Take harmonic vibrational analysis results
-			if vib_ana_setup_to_fill.vibana_own_analysis in ['none', 'anharm']:
-
-				vib_ana_setup_to_fill.nc_sqrt_eigval = self.parser_obj.nc_sqrt_eigval # todo: tests...
-
-				# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
-				if self.parser_obj.normal_modes is None:
-					raise AssertionError('Normal coordinates (eigenvectors) not found')
-
-				vib_ana_setup_to_fill.nc_eigvec = self.parser_obj.normal_modes
-
-			# Take states
-			if vib_ana_setup_to_fill.vibana_own_analysis in ['none']:
-
-				if vib_ana_setup_to_fill.regime not in ['harmonic']:
-					extracted_states = self.parser_obj.anharmonic_states
-
-				else:
-					extracted_states = self.parser_obj.harmonic_states
-
-				processed_states = []
-
-				# For now taking only "single harmonic oscillator state" states when getting from output file
-				# TODO: Add parsing capability for re-resolved states with possible admixtures
-				for i in extracted_states:
-					if len(i) <= vib_ana_setup_to_fill.max_state_lvl:
-
-						# TODO: Exclusion based on mode index or freq cutoff
-						# FIXME: Change to integer indexing - VL: what does it mean?
-						processed_states.append(VibState(s={i: 1.0}, e=extracted_states[i]))
-				vib_ana_setup_to_fill.states = processed_states
-
-	def to_dict(self):
-		"""
-		"""
-		attributes = ['system', 'calc_setup', 'properties']
-		result = {}
-		for key in attributes:
-			value = getattr(self, key)
-			if is_dataclass(value):
-				result[key] = asdict(value)
-			elif hasattr(value, "to_dict"):  # if a custom object
-				result[key] = value.to_dict()
-			elif isinstance(value, (list, tuple)):
-				result[key] = [
-					item.to_dict() if hasattr(item, "to_dict") else item for item in value
-				]
-			elif isinstance(value, dict):
-				result[key] = {
-					k: v.to_dict() if hasattr(v, "to_dict") else v for k, v in value.items()
-				}
-			else:
-				result[key] = value
-
-		return result
-
-
-# simply copying old sketch for now
-class CollEvalSetup:
-	"""
-	Class to hold information about how to process several jobs together. Not yet implemented.
-
-	FIXME: Consider merging with WilsonSimulations
-
-	Examples of relevant information here:
-	Render spectra from each job as a tiled image or as an animation?
-	Norm all spectra w.r.t. a collective max?
-	"""
-
-	def __init__(self):
-		pass
-
 
 class WilsonSimulation:
 	"""
@@ -1001,7 +730,6 @@ class WilsonSimulation:
 	def __init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
 				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
 				 props: list[MolecularProperty]=None, residual_vib_info: list=None,
-				 calc_batches: dict[int: CalculationBatch]=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		"""
 		FIXME: terms: list[VibPerturbedTerm]=[] - that's not true
@@ -1019,7 +747,6 @@ class WilsonSimulation:
 		way will instead be assumed to be requested under the setup specified in eval_uniform. If no properties
 		are missing specification in eval_by_prop_name, then eval_uniform can be excluded.
 		props: List of MolecularProperty instances: Properties needed for evaluation
-		calc_batches: Dictionary {hash: CalculationBatch}: Batches of external calculation information
 		spec: Type for now unspecified (likely numpy ndarray): Spectral evaluation results in tensor form
 		diagn: Dictionary {string (attribute name): value}: Diagnostics information accumulated during evaluation
 		and/or rendering
@@ -1040,7 +767,6 @@ class WilsonSimulation:
 			self.props = props
 			self.residual_vib_info = residual_vib_info
 
-			self.calc_batches = calc_batches
 			self.spec = spec
 			self.diagn = diagn
 			self.rendering = rendering
@@ -1086,18 +812,6 @@ class WilsonSimulation:
 		else:
 			self.terms.extend(terms)
 
-
-
-	def getTerms(self, deriver: Callable[[VibExperiment], list[VibPerturbedTerm]]):
-		"""
-		Get terms based on experiment
-
-		deriver: A function taking a VibExperiment instance and returning a list of VibPerturbedTerm instances:
-		The function that will carry out the derivation of terms
-		"""
-		assert self.exp is not None, "There must be an experiment present to derive terms"
-		self.terms = deriver(self.exp)
-
 	def addVibAnaSetup(self, vib_ana_setup: VibAnaSetup):
 		"""
 		Add a vibrational analysis setup
@@ -1139,83 +853,22 @@ class WilsonSimulation:
 		
 		self.diagn.update(upd_dict)
 
-	def findPropsAndMaxStateLvl(self, freqs: str='static'):
+	def setPropsAndMaxStateLvl(self, freqs: str='static'):
 		"""
-		Make property instances needed to fulfill tasks and set maximum state level in vibrational analysis
-
 		freqs: String: For terms involving properties that may be frequency dependent, use
 		experiment information ('exp') or use the static ('static') properties?
 		"""
 
-		self.props = []
-		self.residual_vib_info = {}
-		
 		if self.terms is None:
 			raise AssertionError('There must be terms present to determine needed properties')
 		if self.vib_ana_setup is None:
 			raise AssertionError('There must be a vibrational analysis setup present to get properties needed there, if any')
 
-		# FIXME: Consider checking if terms are VibPerturbedTerm instances
-		for i in self.terms:
+		self.props, self.residual_vib_info, self.vib_ana_setup.max_state_lvl = \
+			find_props_and_max_state_lvl(self.terms, self.vib_ana_setup, freqs)
 
-			for a in self.terms[i]:
-				for t in self.terms[i][a]:
-					for j in t.props:
 
-						ops = []
-
-						m = j.dord
-						for k in range(m):
-							ops.append('g')
-
-						n = len(j.ops)
-
-						for k in range(n):
-							ops.append('f')
-
-						if freqs == 'static':
-							pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
-
-						else:
-							raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
-
-						new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
-													 target_basis='nm', target_units='au')
-
-						if new_prop.h(1) not in [k.h(1) for k in self.props]:
-							self.props.append(copy.deepcopy(new_prop))
-
-					# Currently registering these states without regard to whether harmonic or other regime
-					# TODO: Find out if this should be changed
-
-					max_state_lvl = 0
-
-					for j in t.freqterms:
-
-						if len(j.sl.q) > max_state_lvl:
-							max_state_lvl = len(j.sl.q)
-						if len(j.sr.q) > max_state_lvl:
-							max_state_lvl = len(j.sr.q)
-
-					for j in t.res:
-
-						if len(j.diff.sl.q) > max_state_lvl:
-							max_state_lvl = len(j.diff.sl.q)
-						if len(j.diff.sr.q) > max_state_lvl:
-							max_state_lvl = len(j.diff.sr.q)
-
-					self.vib_ana_setup.max_state_lvl = max_state_lvl
-
-		for i in self.vib_ana_setup.tellNeededProps():
-			if isinstance(i, MolecularProperty):
-				if i.h(1) not in [k.h(1) for k in self.props]: # 
-					self.props.append(copy.deepcopy(i))
-			else:
-				self.residual_vib_info[i] = None
-			
-
-	def dressPropsWithSetup(self, eval_uniform: DataOriginInfo=None, eval_by_prop_name: dict[str: DataOriginInfo]=None,
-):
+	def dressPropsWithSetup(self):
 		"""
 		Dress my self.properties with computational setups according to how they are specified in
 		self.eval_uniform or self.eval_by_prop_name
@@ -1268,63 +921,6 @@ class WilsonSimulation:
 				dressed = True
 
 
-	def makeCalculationBatches(self):
-		"""
-		Make calculation batches needed to fulfill tasks, grouping together properties to be obtained under
-		common setups
-
-		So it doesn't take care of vibana vib_ana_setup_to_fill it seems.
-		use of hashes is redundant because __eq__ can be implemented for comparisons
-		"""
-
-		if not self.props:
-			logger.warning('There are no properties to be calculated')
-		
-		calc_batches = {}
-
-		for i in self.props:
-
-			ih = i.calc_setup.h()
-
-			# TODO: Consider adding calc setup data strip method to molecularProperty to avoid calc setup info duplication here
-
-			if ih in calc_batches:
-				# VL why copy? 
-				# this creates new prop objects which will be stored in batches which are also stored in WilsonSimulation?
-				calc_batches[ih].addProperty(copy.deepcopy(i))
-
-			else:
-				calc_batches[ih] = CalculationBatch(self.system, i.calc_setup, [copy.deepcopy(i)])
-
-		self.calc_batches = calc_batches
-		logger.debug('sim.calc_batches')
-		logger.debug(self.calc_batches)
-
-	def getResultsFromCalculationBatches(self, source_type: str='', source_types: list[str]=[], source_loc: Any=None,
-									  datavault: Any = None):
-		"""
-		Get results from calculation batches and register in self.properties
-		FIXME: See comments in CalculationBatch.getResults
-
-		source_type: string: Type of data source. Could be e.g. "vault" or "file". Intended for use when only one
-		kind of location is relevant.
-
-		source_types: list of strings: Types of data source (in decreasing order of priority). VL - what is the idea? why plural?
-
-		source_loc: Format not specified: Location(s) of data source(s).
-		"""
-
-
-		for i in self.calc_batches:
-			if self.vib_ana_setup.external_fill_from is not None:
-				if self.calc_batches[i].calc_setup.h() == self.vib_ana_setup.external_fill_from.h():
-					self.calc_batches[i].getResults(self.props, vib_ana_setup_to_fill=self.vib_ana_setup,
-													source_type=source_type, source_loc=source_loc, datavault=datavault)
-
-			else:
-				# VL - should do vib analysis somewhere down from this point in simulation?
-				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
-
 	def fillResults(self, data_dict: dict):
 		"""
 		loading data into self.props (and optionally to self.vib_ana_setup)
@@ -1364,7 +960,8 @@ class WilsonSimulation:
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
 								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
+								   SpecEvalSetup, VibAnaSetup, bool], tuple[np.ndarray, dict]],
+								   do_diagn: bool=False):
 		"""
 		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
 		experiment pulse strength information and without regard to further experiment information except terms)
@@ -1373,43 +970,29 @@ class WilsonSimulation:
 		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
 
 		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
-				 do_diagn=False)
+				 do_diagn=do_diagn)
 	
-		self.spec = evaluator(**context)
+		if do_diagn:
+			self.spec, diagn = evaluator(**context)
+			self.updDiagnostics(upd_dict=diagn)
+			
+			if not isinstance(self.diagn, dict):
+				raise AssertionError('Diagnostics result must be dictionary')
+		else:
+			self.spec, _ = evaluator(**context)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
-	def evaluateAsResponseFunctionWithDiagnostics(self, evaluator: Callable[[
-								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
-		"""
-		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
-		experiment pulse strength information and without regard to further experiment information except terms)
-
-		evaluator: As in evaluateAsResponseFunction but must additionally return a dictionary of diagnostics information.
-		"""
-		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
-				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
-				 do_diagn=True)
-	
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec, diagn = evaluator(**context)
-		self.updDiagnostics(upd_dict=diagn)
-
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
-
-		if not isinstance(self.diagn, dict):
-			raise AssertionError('Diagnostics result must be dictionary')
 
 	def evaluateFull(self, evaluator: Callable[[
 								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], np.ndarray]):
+								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]],
+								   do_diagn: bool=False):
 		"""
 		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
 
@@ -1418,59 +1001,29 @@ class WilsonSimulation:
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec = evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, self.vib_ana_setup)
+
+		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
+				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
+				 do_diagn=do_diagn)
+		
+		self.spec = evaluator(**context)
+
+		if do_diagn:
+			self.spec, diagn = evaluator(**context)
+			self.updDiagnostics(upd_dict=diagn)
+			
+			if not isinstance(self.diagn, dict):
+				raise AssertionError('Diagnostics result must be dictionary')
+		else:
+			self.spec, _ = evaluator(**context)
 
 		if not isinstance(self.spec, np.ndarray):
 			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
 
-	def evaluateFullWithDiagnostics(self, evaluator: Callable[[
-								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]]):
-		"""
-		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
-
-		evaluator: Callable: As in evaluateFull but must additionally return a dictionary of diagnostics information.
-		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-		self.spec, self.diagn = evaluator(self.system, self.exp, self.terms, self.props,
-										  self.spec_eval_setup, self.vib_ana_setup)
-
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
-
-		if not isinstance(self.diagn, dict):
-			raise AssertionError('Diagnostics result must be dictionary')
-
-	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment, dict, str, SpecEvalSetup], Any]):
-		"""
-		Render the spectral data.
-
-		renderer: Callable: A function to carry out the rendering. Uses attributes described in __init__ of this
-		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
-		vibrational analysis setup and return
-		"""
-		assert self.spec is not None, 'No spectrum data, there is nothing to render'
-		assert self.spec_eval_setup is not None, 'Setup information for evaluation and rendering is not provided'
-		
-		if self.diagn is None:
-			self.diagn = {}
-
-		# TODO also - self.system, self.exp, self.name
-		# generate self.name?
-
-		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
-					   diagn=self.diagn, name=self.name, 
-					   spec_eval_setup=self.spec_eval_setup, do_diagn=False)
-		
-		logger.debug('context')
-		logger.debug(context)
-
-		# Consider extending arguments to provide even more info to renderer
-		self.rendering = renderer(**context)
-
-	def renderWithDiagnostics(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
-														dict, str, SpecEvalSetup], tuple[Any, dict]]):
+	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
+														dict, str, SpecEvalSetup], tuple[Any, dict]],
+														do_diagn: bool=False):
 		"""
 		Render the spectral data
 
@@ -1488,16 +1041,21 @@ class WilsonSimulation:
 		
 		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
 					   diagn=self.diagn, name=self.name, 
-					   spec_eval_setup=self.spec_eval_setup, do_diagn=True)
+					   spec_eval_setup=self.spec_eval_setup, do_diagn=do_diagn)
 		
 		logger.debug('context')
 		logger.debug(context)
 
 		# Consider extending arguments to provide even more info to renderer
-		self.rendering, self.diagn = renderer(context)
+		if do_diagn:
+			self.rendering, diagn = renderer(**context)
+			self.updDiagnostics(upd_dict=diagn)
+			
+			if not isinstance(self.diagn, dict):
+				raise AssertionError('Diagnostics result must be dictionary')
+		else:
+			self.rendering, _ = renderer(**context)
 
-		if not isinstance(self.diagn, dict):
-			raise AssertionError('Diagnostics result must be dictionary')
 
 	def to_dict(self):
 		"""
@@ -1575,6 +1133,95 @@ class WilsonSimulation:
 			json.dump(self.to_dict(), f, indent=4)
 		logger.info(f'WilsonSimulation instance is saved to file {filename}')
 
+	# TODO: status_report() method
+
+def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[MolecularProperty]:
+
+	props = []
+	
+	if terms is None:
+		raise AssertionError('There must be terms present to determine needed properties')
+
+	# FIXME: Consider checking if terms are VibPerturbedTerm instances
+	for i in terms:
+
+		for a in terms[i]:
+			for t in terms[i][a]:
+				for j in t.props:
+
+					ops = []
+
+					m = j.dord
+					for k in range(m):
+						ops.append('g')
+
+					n = len(j.ops)
+
+					for k in range(n):
+						ops.append('f')
+
+					if freqs == 'static':
+						pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
+
+					else:
+						raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
+
+					new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
+													target_basis='nm', target_units='au')
+
+					if new_prop.h(1) not in [k.h(1) for k in props]:
+						props.append(copy.deepcopy(new_prop))
+
+	return props
+
+def find_max_state_lvl(terms: list[VibPerturbedTerm]) -> int:
+
+	for i in terms:
+
+		for a in terms[i]:
+			for t in terms[i][a]:
+
+				max_state_lvl = 0
+
+				for j in t.freqterms:
+
+					if len(j.sl.q) > max_state_lvl:
+						max_state_lvl = len(j.sl.q)
+					if len(j.sr.q) > max_state_lvl:
+						max_state_lvl = len(j.sr.q)
+
+				for j in t.res:
+
+					if len(j.diff.sl.q) > max_state_lvl:
+						max_state_lvl = len(j.diff.sl.q)
+					if len(j.diff.sr.q) > max_state_lvl:
+						max_state_lvl = len(j.diff.sr.q)
+
+	return max_state_lvl
+
+def find_residual_vib_info(vib_ana: VibAnaSetup) -> tuple[list[MolecularProperty], dict]:
+
+	props = []
+	residual_vib_info = {}
+
+	for i in tell_needed_props_for_vib_analysis(vib_ana):
+		if isinstance(i, MolecularProperty):
+			if i.h(1) not in [k.h(1) for k in props]: # 
+				props.append(copy.deepcopy(i))
+		else:
+			residual_vib_info[i] = None
+
+	return props, residual_vib_info
+
+
+def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm], 
+								 vib_ana: VibAnaSetup, freqs: str='static') -> tuple[list[MolecularProperty], dict, int]:
+
+	props = find_props(terms, freqs)
+	props_ext, residual_vib_info = find_residual_vib_info(vib_ana)
+	props.extend(props_ext)
+
+	return props, residual_vib_info, find_max_state_lvl(terms)
 
 # simply copying old sketch for now
 class WilsonSimulations:
