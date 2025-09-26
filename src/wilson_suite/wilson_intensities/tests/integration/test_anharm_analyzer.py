@@ -33,8 +33,8 @@ def test_anharm_analyzer():
     separatorprint()
     import logging
     from ....wilson_utils.logger import setup_logger
-    setup_logger("wilson.", level=logging.DEBUG)
-    logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
+    setup_logger("wilson_suite.", level=logging.DEBUG)
+    logging.getLogger('wilson_suite.').setLevel(logging.DEBUG)
 
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
@@ -45,7 +45,7 @@ def test_anharm_analyzer():
     from .... import wilson_derive as ws_derive
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
+    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
                                               vibana_prop_need='anharm', # should this vary? take minimal needed for regime unless specified? 
                                               allow_skip_eigvec=True, 
@@ -68,16 +68,19 @@ def test_anharm_analyzer():
     sim.dressPropsWithSetup()
     sim.makeCalculationBatches()
     
-    database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
+    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     from CQCParse.relay import DataVault
+    database_csv = CQCPARSE_ROOT+'/CQCParse/files_examples/calculations.csv'
     vault = DataVault(database_csv)
 
     # looks like VibAnaSetup can't get data without WilsonSimulation? CalculationBatches?
-    sim.getResultsFromCalculationBatches(source_type='vault',
-                                        datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+    sim.getResultsFromCalculationBatches(source_type='vault', datavault=vault, source_loc=CQCPARSE_ROOT)
     
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
     printtest(sim.props)
+    for p in sim.props:
+        if p.trivial_name == 'cff':
+            printtest(p.vals)
 
     try:
         # FIXME: should be done internally with WilsonSimulation somehow? or when?
@@ -100,14 +103,16 @@ def test_anharm_analyzer_vibana():
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
-    from ....wilson_utils.paths import SUITE_ROOT
-    database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
+    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
+    from CQCParse.relay import DataVault
+    database_csv = CQCPARSE_ROOT+'/CQCParse/files_examples/calculations.csv'
+    vault = DataVault(database_csv)
 
     from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
     from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
+    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
                                               vibana_prop_need='anharm', # should this vary? take minimal needed for regime unless specified? 
                                               allow_skip_eigvec=True, external_fill_from=calc_setup)
@@ -119,14 +124,11 @@ def test_anharm_analyzer_vibana():
 
     calc_batch = ws_main.abstractions.CalculationBatch(system=mol_system, calc_setup=calc_setup, properties=props)    
     
-    database_csv = SUITE_ROOT+'/wilson_intensities/tests/test_database/mini_files_database.csv'
-    from CQCParse.relay import DataVault
-    vault = DataVault(database_csv)
 
     # needs dressed props with calc setup
     calc_batch.getResults(props_to_fill=props, vib_ana_setup_to_fill=vibana,
                           source_type='vault',
-                          datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+                          datavault=vault, source_loc=CQCPARSE_ROOT)
 
     
     printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None

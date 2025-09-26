@@ -61,23 +61,23 @@ def run():
     logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
     
     if 'VibExperiment' in TO_PICKLES:
-        pickle_this_to(obj=experiment_a, filenamepkl='vibexp.pkl', save_to=SUITE_ROOT+'/tests/')
+        pickle_this_to(obj=experiment_a, filenamepkl='vibexp.pkl', save_to=SUITE_ROOT+'/../tests/')
 
-        experiment_a = unpickle_smth_from(filenamepkl='vibexp.pkl', load_from=SUITE_ROOT+'/tests/')
+        experiment_a = unpickle_smth_from(filenamepkl='vibexp.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['VibExperiment'] = 'vibexp.pkl'
     
-    calc_setup = ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc_pVQZ')
+    calc_setup = ws.main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     if 'ExternalCalcSetup' in TO_PICKLES:
-        pickle_this_to(obj=calc_setup, filenamepkl='calcsetup.pkl', save_to=SUITE_ROOT+'/tests/')
+        pickle_this_to(obj=calc_setup, filenamepkl='calcsetup.pkl', save_to=SUITE_ROOT+'/../tests/')
 
-        calc_setup = unpickle_smth_from(filenamepkl='calcsetup.pkl', load_from=SUITE_ROOT+'/tests/')
+        calc_setup = unpickle_smth_from(filenamepkl='calcsetup.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['ExternalCalcSetup'] = 'calcsetup.pkl'
 
     sim = ws.main.abstractions.WilsonSimulation()
     if 'WilsonSimulation_init' in TO_PICKLES:
-        pickle_this_to(obj=sim, filenamepkl='sim_init.pkl', save_to=SUITE_ROOT+'/tests/')
+        pickle_this_to(obj=sim, filenamepkl='sim_init.pkl', save_to=SUITE_ROOT+'/../tests/')
 
-        sim = unpickle_smth_from(filenamepkl='sim_init.pkl', load_from=SUITE_ROOT+'/tests/')
+        sim = unpickle_smth_from(filenamepkl='sim_init.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['WilsonSimulation_init'] = 'sim_init.pkl'
     
     sim.addExperiment(experiment_a)
@@ -180,7 +180,8 @@ def run():
         # --- this is a clean vault use example
         # vault setup outside of wilsonsim
         from CQCParse.relay import DataVault
-        csvfile = ws.intensities.utils.get_package_root()+ '/../tests/test_database/mini_files_database.csv'
+        from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
+        csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
         vault = DataVault(csvfile)
 
         sim.getResultsFromCalculationBatches(source_type='vault',
@@ -197,18 +198,18 @@ def run():
     np.set_printoptions(precision=4)
 
     if 'WilsonSimulation_mid' in TO_PICKLES:
-        pickle_this_to(obj=sim, filenamepkl='sim_mid.pkl', save_to=SUITE_ROOT+'/tests/')
+        pickle_this_to(obj=sim, filenamepkl='sim_mid.pkl', save_to=SUITE_ROOT+'/../tests/')
 
-        sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/tests/')
+        sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
 
     logger.debug('sim.spec_eval_setup')
     logger.debug(sim.spec_eval_setup)
 
     if not PREP_ONLY:
-
+        from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
         logger.info('  >>> Going to evaluate now...\n')
-        sim.evaluateAsResponseFunction(evaluator=ws.intensities.spectrum.evaluators.terms_evaluator)
+        sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
         intensities_spec = np.abs(sim.spec)**2
         logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 
@@ -224,7 +225,6 @@ def run():
 
         logger.info('  >>> Saving to files now...\n')
 
-        ws_root = ws.intensities.utils.get_package_root() + '/../../'
 
         # TODO: fix this later; not working now
         # from wilson_utils.serialization import check_if_jsonsafe
@@ -235,16 +235,16 @@ def run():
 
         # pickling
         import pickle
-        with open(ws_root+"/tests/wilsonsim0.pkl", "wb") as f:
+        with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "wb") as f:
             pickle.dump(sim, f)
 
-        with open(ws_root+"/tests/wilsonsim0.pkl", "rb") as f:
+        with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "rb") as f:
             loaded_wilsonsim0 = pickle.load(f)
         
         if 'WilsonSimulation_final' in TO_PICKLES:
-            pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/tests/')
+            pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/../tests/')
 
-            sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/tests/')
+            sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/../tests/')
             PKL_FILES['WilsonSimulation_final'] = 'sim_final.pkl'
         
         # apparently numpy can't compare complex numbers

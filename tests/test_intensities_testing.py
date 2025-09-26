@@ -76,8 +76,8 @@ def test_amplitude_mock_singlepoint_one_elterm():
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
-
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 
 def test_amplitude_mock_singlepoint_one_elterm_Gamma():
@@ -151,7 +151,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 def test_amplitude_mock_singlepoint_one_mechterm():
     print()
@@ -276,7 +276,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 
 def test_amplitude_mock_singlepoint_one_mechterm_ba():
@@ -400,7 +400,9 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print(sim.diagn)
-    assert round(reference/sim.spec[0,0], 12) == 1.
+    print('ratio', reference/sim.spec[0,0])
+
+    assert np.round(reference/sim.spec[0,0], 12) == 1.
 
 
 
@@ -527,7 +529,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
 
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 
 def test_amplitude_mock_offresonance_one_elterm():
@@ -610,8 +612,9 @@ def test_amplitude_mock_offresonance_one_elterm():
     print(sim.diagn)
     print(f'reference {reference:.5e}')
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
+    print('ratio', reference/sim.spec[0,0])
 
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 
 def test_amplitude_mock_offresonance_one_mechterm():
@@ -751,8 +754,9 @@ def test_amplitude_mock_offresonance_one_mechterm():
     sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=eval_selected)
 
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
+    print('ratio', reference/sim.spec[0,0])
 
-    assert round(reference/sim.spec[0,0], 6) == 1.
+    assert np.round(reference/sim.spec[0,0], 6) == 1.
 
 
 

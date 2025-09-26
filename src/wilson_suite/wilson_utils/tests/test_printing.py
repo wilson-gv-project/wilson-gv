@@ -10,7 +10,7 @@ from ...wilson_utils.printing import (
 )
 import io
 import re
-
+import os
 import sys
 from ...wilson_utils import printing as wprinting
 
@@ -59,17 +59,19 @@ def test_coolprint():
     coolprint("This is a cool print test", colorinfo='blue')
     
     # using `with` to not deal with opening and closing files
-    with open(TESTFILESDIR + "coolprint_test.txt", "w") as f:
+    with open("coolprint_test.txt", "w") as f:
         coolprint("This is a cool print test", file=f)
-    with open(TESTFILESDIR+"coolprint_test.txt", "r") as f:
+    with open("coolprint_test.txt", "r") as f:
         lines = f.readlines()
     assert lines[0].strip() == 'This is a cool print test'
 
-    with open(TESTFILESDIR + "coolprint_test_red.txt", "w") as f:
+    with open("coolprint_test_red.txt", "w") as f:
         coolprint("This is a cool print test", colorinfo='red', file=f)
-    with open(TESTFILESDIR+"coolprint_test_red.txt", "r") as f:
+    with open("coolprint_test_red.txt", "r") as f:
         lines = f.readlines()
     assert lines[0].strip() == 'This is a cool print test'
+    os.remove("coolprint_test_red.txt")
+    os.remove("coolprint_test.txt")
 
 
 # =========================================================================

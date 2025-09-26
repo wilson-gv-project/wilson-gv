@@ -7,7 +7,7 @@ from ...wilson_main import abstractions as wm_abst
 from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
 import logging
-logger = logging.getLogger("wilson."+__name__)
+logger = logging.getLogger("wilson_suite."+__name__)
 
 def anharm_analyzer_data(system:wm_abst.MolecularSystem = None, 
                          props: list[wm_abst.MolecularProperty] = None, 
@@ -29,7 +29,8 @@ def anharm_analyzer_data(system:wm_abst.MolecularSystem = None,
     if exclude_modes is None:
         exclude_modes = []
     
-    prop_dict = {i.trivial_name: i.serial_vals for i in props}
+    # prop_dict = {i.trivial_name: i.serial_vals for i in props}
+    prop_dict = {i.trivial_name: i.vals for i in props}
     logger.debug(f'prop_dict {prop_dict.keys()}')
     logger.debug(prop_dict)
     
