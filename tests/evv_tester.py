@@ -18,11 +18,13 @@ evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, s
 """
 import wilson_suite as ws
 from wilson_suite.wilson_utils.serialization import pickle_this_to, unpickle_smth_from
+from wilson_suite.wilson_main.main_functions import do_anharmonic_analysis
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
 
 import logging
 # wilson. - for hierarchy of loggers
-logger = logging.getLogger("wilson.")
+logger = logging.getLogger("wilson")
 
 logger.info('evv_tester_dataclasses.py')
 
@@ -35,8 +37,9 @@ SOURCE_TYPE = 'vault'
 PREP_ONLY = True
 
 def run():
-
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
+    # ================================================
+    # ---- EXPERIMENT
+    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='ideal', maxstr=1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
     pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
     pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
 
@@ -47,17 +50,21 @@ def run():
 
     field_a.findEpochs()
 
-    detector_a = ws.experiment.abstractions.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
-                                                        detection_polarization=[0.0, 0.0, 1.0],
-                                                        detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                                        wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
+    detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq', 
+                                                         detector_location=[0.0, 0.0, 1.0],
+                                                         detection_polarization=[0.0, 0.0, 1.0],
+                                                         detection_range=[0.003 + 0.0001*i for i in range(101)],
+                                                         wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
 
     # Push one carrier freq
     scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
     scan_range_a = [0.0001*i for i in range(101)]
-    scan_a = ws.experiment.abstractions.SpecScan(scan_obj_a, scan_range_a)
+    scan_a = ws.experiment.abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
 
-    experiment_a = ws.experiment.abstractions.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
+    experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field_a, 
+                                                            detector=detector_a, 
+                                                            scans=[scan_a], 
+                                                            magn_conditions=[[-1, 2]])
     logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
     
     if 'VibExperiment' in TO_PICKLES:
@@ -65,15 +72,28 @@ def run():
 
         experiment_a = unpickle_smth_from(filenamepkl='vibexp.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['VibExperiment'] = 'vibexp.pkl'
-    
-    calc_setup = ws.main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+
+    # ================================================
+    # ---- TERMS (derived)
+    terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+
+    # ================================================
+    # ---- DataOriginInfo setup
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
+                                                     lvl_theory='B3LYP', 
+                                                     basis_set='cc-pVQZ', 
+                                                     base_file_loc=CQCPARSE_ROOT+'/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
+
     if 'DataOriginInfo' in TO_PICKLES:
         pickle_this_to(obj=calc_setup, filenamepkl='calcsetup.pkl', save_to=SUITE_ROOT+'/../tests/')
 
         calc_setup = unpickle_smth_from(filenamepkl='calcsetup.pkl', load_from=SUITE_ROOT+'/../tests/')
         PKL_FILES['DataOriginInfo'] = 'calcsetup.pkl'
 
-    sim = ws.main.abstractions.WilsonSimulation()
+    # ================================================
+    # ---- WilsonSimulation setup
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
+    
     if 'WilsonSimulation_init' in TO_PICKLES:
         pickle_this_to(obj=sim, filenamepkl='sim_init.pkl', save_to=SUITE_ROOT+'/../tests/')
 
@@ -81,15 +101,23 @@ def run():
         PKL_FILES['WilsonSimulation_init'] = 'sim_init.pkl'
     
     sim.addExperiment(experiment_a)
-    sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
+    sim.addTerms(terms=terms)
     
     logger.info(' >>>> sim.terms')
     logger.info(sim.terms)
-
+    
+    # ================================================
+    # ---- MolecularSystem setup
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
+    
+    # ================================================
+    # ---- VibAnaSetup setup    
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
+    # from
+    # do_anharmonic_analysis(vib_ana=vib_ana, props=sim.props, anharmonic_analyzer=)
+    
     sim.addSystem(mol_system)
-    sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none',
-                                                        external_fill_from=calc_setup))
+    sim.addVibAnaSetup(vib_ana)
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 
     # more clear definitions with str keys of dicts
@@ -98,8 +126,8 @@ def run():
     # smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
     # could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
 
-    axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
-    axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1})
+    axis1 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1})
+    axis2 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1, 'w2': -1})
     # axis2 = ws.main.abstractions.SpectralAxis({'w2': 1})
 
     # SpectralGrid - is also a source of data for the evaluation function
@@ -109,11 +137,11 @@ def run():
     end = {'x': 3850, 'y': 7550}
     spacer = {'x': 3.8, 'y': 3.8}
 
-    spec_grid = ws.main.abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
+    spec_grid = ws.main.spectrum_abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
                                                 start=start, end=end, spacer=spacer)
 
-    eval_vars = {'w1': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
-                 'w2': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
+    eval_vars = {'w1': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
+                 'w2': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
     import numpy as np
     meshgrids = np.meshgrid(*eval_vars.values(), indexing='ij')
 
@@ -147,9 +175,9 @@ def run():
         colormap_power=0.5,
     )
 
-    evi = ws.main.abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                  'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
-    rndi = ws.main.abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
+    rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
                                                  'dynamic_range': 500, 
                                                  'num_levels': 15, 
                                                  'reference_max': None,
@@ -160,15 +188,14 @@ def run():
                                                  'to_save': True,
                                                  'style_config': style_config})
     
-    eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 
     sim.addSpecEvalSetup(eval_setup)
 
-    sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
+    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
 
     sim.dressPropsWithSetup()
-    sim.makeCalculationBatches()
     
     # FIXME do data prep outside of this workflow
     # data prep:
@@ -179,17 +206,23 @@ def run():
     if SOURCE_TYPE == 'vault':
         # --- this is a clean vault use example
         # vault setup outside of wilsonsim
-        from CQCParse.relay import DataVault
-        from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
-        csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
-        vault = DataVault(csvfile)
+        # from CQCParse.relay import DataVault
+        # csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
+        # vault = DataVault(csvfile)
 
-        sim.getResultsFromCalculationBatches(source_type='vault',
-                                            datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+        from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+        # sim.getResults(source_type='vault', datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+        sim.getResults(obtainer=wilson_data_obtainer)
+        print('\n ----', sim.vib_ana_setup)
+        print(sim.vib_ana_setup.isAllSet)
+
     elif SOURCE_TYPE == 'outfiles':
         # should simply provide list of files? 
         # that would be simple for gaussian but not so much for cfour
-        sim.getResultsFromCalculationBatches(source_type='outfiles')
+        sim.getResults(source_type='outfiles')
+        # sim.getResultsFromCalculationBatches(source_type='outfiles')
+    
+    print('\nsim.vib_ana_setup.states\n', sim.vib_ana_setup.states)
         
     logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
 

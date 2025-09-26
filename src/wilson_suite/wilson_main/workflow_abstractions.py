@@ -3,8 +3,12 @@ from dataclasses import dataclass, field, asdict, is_dataclass
 
 from .spectrum_abstractions import SpecEvalSetup
 from .main_functions import find_props_and_max_state_lvl
-from .abstractions import (VibAnaSetup, MolecularProperty, VibPerturbedTerm,
-                        MolecularSystem, VibExperiment, DataOriginInfo)
+from .abstractions import (VibAnaSetup, MolecularProperty,
+						   MolecularSystem, DataOriginInfo)
+from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_experiment.abstractions import VibExperiment
+from wilson_suite.wilson_utils.abstractions import VibState
+
 import numpy as np
 
 import logging
@@ -217,12 +221,30 @@ class WilsonSimulation:
 		data_dict: dict - {data_name: values}
 
 		"""
+		print('\nin fillResults')
+		print(data_dict)
+		print('self.residual_vib_info start fill', self.residual_vib_info.keys())
+
 		for p in self.props:
 			p.addValues(data_dict.get(p.trivial_name))
 
 		for k in self.residual_vib_info:
-			self.residual_vib_info[k] = data_dict.get(k)
+			if k in ['anharmonic_states', 'harmonic_states']:
+				states_list = []
+				states_dict: dict = data_dict.get(k)
 
+				for state, energy in states_dict.items():
+					states_list.append(VibState(s={state: 1.0}, e=energy))
+
+				self.vib_ana_setup.setStates(states=states_list)
+				self.residual_vib_info[k] = data_dict.get(k)
+
+			else:
+				self.residual_vib_info[k] = data_dict.get(k)
+				setattr(self.vib_ana_setup, k, data_dict.get(k))
+
+		print('self.residual_vib_info', self.residual_vib_info)
+		print('self.vib_ana_setup', self.vib_ana_setup)
 
 	def requestData(self) -> dict:
 		"""
@@ -232,8 +254,14 @@ class WilsonSimulation:
 		for p in self.props:
 			data_dict[p.trivial_name] = p.calc_setup
 		
+		print('\nin request: self.residual_vib_info', self.residual_vib_info.keys())
+
 		for k, v in self.residual_vib_info.items():
 			data_dict[k] = v
+		
+		print('\nin requestData')
+		print(data_dict)
+		print(data_dict.keys())
 		
 		return data_dict
 	
@@ -260,6 +288,8 @@ class WilsonSimulation:
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
+		if not self.vib_ana_setup.isAllSet:
+			raise AssertionError('VibAnaSetup is not ready for evaluateAsResponseFunction()')
 
 		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 

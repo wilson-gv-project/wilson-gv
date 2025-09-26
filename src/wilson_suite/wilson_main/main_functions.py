@@ -1,5 +1,8 @@
-from .abstractions import (VibAnaSetup, MolecularProperty, VibPerturbedTerm,
-                        MolecularSystem, prop_trivname, VibState)
+from .abstractions import (VibAnaSetup, MolecularProperty,
+						   MolecularSystem, VibState)
+
+from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname
 from typing import Callable
 import copy
 
@@ -19,11 +22,14 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 	needed_props = []
 
 	if vib_ana.vibana_own_analysis == 'none':
-		if vib_ana.isAllSet():
+		if vib_ana.isAllSet:
 			return needed_props
 		else:
-			needed_props.append({'nc_sqrt_eigvec': None})
-			needed_props.append({'states': None})
+			needed_props.append({'nc_sqrt_eigval': None})
+			if vib_ana.regime == 'harmonic':
+				needed_props.append({'harmonic_states': None})
+			elif 'PT2' in vib_ana.regime:
+				needed_props.append({'anharmonic_states': None})
 	
 	if (vib_ana.vibana_own_analysis == 'full'):
 		# should have share the same setting of origin as nc_sqrt_eigval and nc_eigvec
@@ -32,9 +38,7 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 		# FIXME: Not sure about target units
 		needed_props.append(MolecularProperty(
 			{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
-			trivial_name=prop_trivname(ord_geo=2),
-			target_basis='cart',
-			target_units='au')
+			trivial_name=prop_trivname(ord_geo=2))
 		)
 
 	# For now, don't use regime subinfo
@@ -44,36 +48,28 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 
 			needed_props.append(MolecularProperty(
 				{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
-				trivial_name=prop_trivname(ord_geo=3),
-				target_basis='nm',
-				target_units='au')
+				trivial_name=prop_trivname(ord_geo=3))
 			)
 
 			# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
 			needed_props.append(MolecularProperty(
 				{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
-				trivial_name=prop_trivname(ord_geo=4),
-				target_basis='nm',
-				target_units='au')
+				trivial_name=prop_trivname(ord_geo=4))
 			)
 
 			needed_props.append(MolecularProperty(
 				{'ops': tuple(['r']), 'freq': (0.0)},
-				trivial_name=prop_trivname(ord_rot=1),
-				target_basis='nm',
-				target_units='au')
+				trivial_name=prop_trivname(ord_rot=1))
 			)
 
 			needed_props.append(MolecularProperty(
 				{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
-				trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
-				target_basis='nm',
-				target_units='au')
+				trivial_name=prop_trivname(ord_geo=2, ord_rot=1))
 			)
 		
 		if vib_ana.vibana_own_analysis == 'anharm':
-			needed_props.append({'nc_sqrt_eigvec': None})
-
+			needed_props.append({'nc_sqrt_eigval': None})
+		
 	return needed_props
 
 
@@ -189,8 +185,7 @@ def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[Molec
 					else:
 						raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
 
-					new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n),
-													target_basis='nm', target_units='au')
+					new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n))
 
 					if new_prop.h(1) not in [k.h(1) for k in props]:
 						props.append(copy.deepcopy(new_prop))
@@ -230,11 +225,12 @@ def find_residual_vib_info(vib_ana: VibAnaSetup) -> tuple[list[MolecularProperty
 	residual_vib_info = {}
 
 	for i in tell_needed_props_for_vib_analysis(vib_ana):
+		
 		if isinstance(i, MolecularProperty):
 			if i.h(1) not in [k.h(1) for k in props]: # 
 				props.append(copy.deepcopy(i))
 		else:
-			residual_vib_info[i] = None
+			residual_vib_info.update(i)
 
 	return props, residual_vib_info
 

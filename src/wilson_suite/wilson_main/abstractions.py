@@ -209,17 +209,18 @@ class VibAnaSetup:
 	regime: str=None
 	system: MolecularSystem=None
 	regime_subinfo: dict=None
+
+	# 'full': Will need properties for harmonic (and, if requested, anharmonic) analysis
+	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided from external source)
+	# 'none': All results will be provided by external source
+	vibana_own_analysis: str='full'
+
 	max_state_lvl: int=None
 	states: list[VibState]=field(default=None, repr=False)
 
 	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
-
-	# 'full': Will need properties for harmonic (and, if requested, anharmonic) analysis
-	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided from external source)
-	# 'none': All results will be provided by external source
-	vibana_own_analysis: str='full'
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
 	exclude_modes: list = None

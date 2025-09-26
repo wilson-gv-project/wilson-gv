@@ -57,5 +57,5 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     if do_diagn:
         return tuple([fig, ax, contour, cbar]), diagn
     else:
-        return tuple([fig, ax, contour, cbar])
+        return tuple([fig, ax, contour, cbar]), {}
 

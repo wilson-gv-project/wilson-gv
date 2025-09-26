@@ -82,19 +82,20 @@ def terms_evaluator(system,
 
     # 1 complete
     terms_to_eval = [TermND(i, dict_terms[i]) for i in range(len(dict_terms))]
-
+    for t in terms_to_eval:
+        t.vibstates = vib_ana_setup.states
     # 3 complete
     te = TermsEvaluator(terms_to_eval)
 
     # 4 complete
     te.identify_to_precalculate()
 
-    for p in props:
-        if p.trivial_name == 'cff':
-            if p.in_units != 'au':
-                p.target_units = 'au'
-                p.convertValues(convertor=convertor,
-                                convertor_info={'harm_freqs': list(vib_ana_setup.nc_sqrt_eigval.values())})
+    # for p in props:
+    #     if p.trivial_name == 'cff':
+    #         if p.in_units != 'au':
+    #             p.target_units = 'au'
+    #             p.convertValues(convertor=convertor,
+    #                             convertor_info={'harm_freqs': list(vib_ana_setup.nc_sqrt_eigval.values())})
 
     # 5.1
     props_data = {prop.trivial_name: prop.vals for prop in props}
@@ -159,4 +160,4 @@ def terms_evaluator(system,
     if do_diagn:
         return amplitudes, diagn
     else:
-        return amplitudes
+        return amplitudes, {}

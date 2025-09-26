@@ -167,7 +167,7 @@ def test_logger_evv_tester_terminal():
     separatorprint()
     import logging
     from wilson_suite.wilson_utils.logger import setup_logger
-    setup_logger("wilson", level=logging.DEBUG)
+    setup_logger("wilson", level=logging.ERROR)
     
     import evv_tester
     evv_tester.PREP_ONLY = False
