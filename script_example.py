@@ -5,6 +5,8 @@ logger = logging.getLogger("wilson")
 """
 
 """
+SOURCE_TYPE = 'vault'
+
 
 pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
 pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
@@ -31,12 +33,12 @@ experiment_a = ws.experiment.abstractions.VibExperiment(order, field_a, detector
 logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
 
 
-calc_setup = ws.main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ')
 
 """
 
 """
-sim = ws.main.abstractions.WilsonSimulation()
+sim = ws.main.workflow_abstractions.WilsonSimulation()
 
 sim.addExperiment(experiment_a)
 sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
@@ -46,8 +48,7 @@ logger.info(sim.terms)
 
 mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
 sim.addSystem(mol_system)
-sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none',
-                                                    external_fill_from=calc_setup))
+sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'))
 sim.addPropEvalSetup(eval_uniform=calc_setup)
 
 # more clear definitions with str keys of dicts
@@ -56,8 +57,8 @@ sim.addPropEvalSetup(eval_uniform=calc_setup)
 # smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
 # could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
 
-axis1 = ws.main.abstractions.SpectralAxis({'w1': 1})
-axis2 = ws.main.abstractions.SpectralAxis({'w1': 1, 'w2': -1})
+axis1 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1})
+axis2 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1, 'w2': -1})
 # axis2 = ws.main.abstractions.SpectralAxis({'w2': 1})
 
 # SpectralGrid - is also a source of data for the evaluation function
@@ -67,11 +68,11 @@ start = {'x': 250, 'y': 100}
 end = {'x': 3850, 'y': 7550}
 spacer = {'x': 3.8, 'y': 3.8}
 
-spec_grid = ws.main.abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
+spec_grid = ws.main.spectrum_abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
                                             start=start, end=end, spacer=spacer)
 
-eval_vars = {'w1': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
-                'w2': ws.main.abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
+eval_vars = {'w1': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
+                'w2': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
 import numpy as np
 meshgrids = np.meshgrid(*eval_vars.values(), indexing='ij')
 
@@ -105,9 +106,9 @@ style_config = PlotConfig(
     colormap_power=0.5,
 )
 
-evi = ws.main.abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                 'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
-rndi = ws.main.abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
+rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
                                                 'dynamic_range': 500, 
                                                 'num_levels': 15, 
                                                 'reference_max': None,
@@ -118,15 +119,14 @@ rndi = ws.main.abstractions.RenderingInfo(**{'intensity_normalization_type': Nor
                                                 'to_save': True,
                                                 'style_config': style_config})
 
-eval_setup = ws.main.abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
 
 sim.addSpecEvalSetup(eval_setup)
 
-sim.findPropsAndMaxStateLvl() # setting up self.props/sim.props
+sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
 logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
 
 sim.dressPropsWithSetup()
-sim.makeCalculationBatches()
 
 # FIXME do data prep outside of this workflow
 # data prep:
@@ -142,8 +142,9 @@ if SOURCE_TYPE == 'vault':
     csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
     vault = DataVault(csvfile)
 
-    sim.getResultsFromCalculationBatches(source_type='vault',
-                                        datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
+    from CQCParse.parsing.parse_wilson_obtainer import parse_from_source
+    sim.getResults(obtainer)
+    
 elif SOURCE_TYPE == 'outfiles':
     # should simply provide list of files? 
     # that would be simple for gaussian but not so much for cfour
