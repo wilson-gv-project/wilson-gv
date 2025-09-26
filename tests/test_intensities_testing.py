@@ -11,10 +11,10 @@ setup_logger("wilson", level=logging.WARNING)
 def test_amplitude_mock_singlepoint_one_elterm():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -83,10 +83,10 @@ def test_amplitude_mock_singlepoint_one_elterm():
 def test_amplitude_mock_singlepoint_one_elterm_Gamma():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -157,10 +157,10 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -283,10 +283,10 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -410,10 +410,10 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -535,10 +535,10 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
 def test_amplitude_mock_offresonance_one_elterm():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
@@ -621,10 +621,10 @@ def test_amplitude_mock_offresonance_one_mechterm():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, ExternalCalcSetup, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_utils.abstractions import VibState
-    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_prop_need='none'), 
-                     'eval_uniform': ExternalCalcSetup('cfour', 'lvl1', 'basis1'), 
+    sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
+                     'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
     sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)

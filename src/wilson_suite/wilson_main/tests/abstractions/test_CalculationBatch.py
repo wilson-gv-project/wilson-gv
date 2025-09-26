@@ -70,7 +70,7 @@ def test_CalculationBatch_getResults_vault():
     prop_vals_notNone = [i.trivial_name for i in props_mock if i.vals is not None]
     assert prop_vals_notNone, 'Some props did not get values?'
 
-    assert vibanafixt.vibanasetup_anharm.vibana_prop_need == 'anharm'
+    assert vibanafixt.vibanasetup_anharm.vibana_own_analysis == 'anharm'
     assert vibanafixt.vibanasetup_anharm.regime == 'GVPT2'
     
     # TODO in WilsonSim? should not be None? - if OK then need to get states later; 
@@ -116,7 +116,7 @@ def test_CalculationBatch_getResultsFromOutputs():
     prop_vals_notNone = [i.trivial_name for i in props_mock if i.vals is not None]
     assert prop_vals_notNone, 'Some props did not get values?'
 
-    assert vibanafixt.vibanasetup_anharm.vibana_prop_need == 'anharm'
+    assert vibanafixt.vibanasetup_anharm.vibana_own_analysis == 'anharm'
     assert vibanafixt.vibanasetup_anharm.regime == 'GVPT2'
     
     # TODO in WilsonSim? should not be None? - if OK then need to get states later; 

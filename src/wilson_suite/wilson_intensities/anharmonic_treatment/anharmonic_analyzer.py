@@ -33,6 +33,8 @@ def anharm_analyzer_data(system:wm_abst.MolecularSystem = None,
     prop_dict = {i.trivial_name: i.vals for i in props}
     logger.debug(f'prop_dict {prop_dict.keys()}')
     logger.debug(prop_dict)
+
+    # FIXME: Convertors from au to rec cm of cff, qff, (MR: B, coriolis)
     
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
     corrected_levels, fermi_resonances = anharm_corr_energies(harmonic_energies=nc_sqrt_eigval,

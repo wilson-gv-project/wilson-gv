@@ -80,68 +80,42 @@ class MolecularSystem:
 		pass
 
 
-# Program, level of theory, basis set, other setup info (environment for QM/MM?)
-# Does not need to reference an actual setup and can also be used for "get from no specific calculation" - VL: what does it mean?
 @dataclass(frozen=True)
-class ExternalCalcSetup:
+class DataOriginInfo:
 	"""
 	Class to represent computational setups for properties obtained external to Wilson
 	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
 	"get from file"
 
 	----
-	program: String: Program name if relevant (alt. names like 'from_file' are also fine)
-	# FIXME: Consider other name "source" instead of "program"
+	source_type: String: Options: gaussian, cfour, wilson
 	lvl_theory: String: Level of theory
-	basis: String: Basis set
-
-	NOTE: Other setup parameters currently not used/handled
-	other_setup: Dictionary {attribute: value, ...}
-	other_setup_identifier: Dictionary {attribute: name (not required to be hashable), ...}
-	# FIXME: Not sure how I want this to work, return to it if needed
+	basis_set: String: Basis set
+	base_file_loc: String: path to the base file
 	"""
 	# Strings
-	program: str = ''
-	lvl_theory: str = ''
-	basis: str = ''
+	source_type: str = ''
 	
-	# Arbitrary data structure (user-managed)
-	other_setup: dict = field(default_factory=lambda: dict())
-	other_setup_identifier: dict = field(default_factory=lambda: dict())
+	lvl_theory: str = ''
+	basis_set: str = ''
 
-	def __post_init__(self):
-		if self.other_setup is not None:
+	base_file_loc: str = ''
 
-			if self.other_setup_identifier is None:
-				raise AssertionError('Other setup identifier string must accompany other setup for hashing purposes')
-
-		else:
-
-			if self.other_setup_identifier is not None:
-				raise AssertionError('No other setup identifier string may be given if no other setup is given')
 
 	def __hash__(self):
-		# FIXME Only using other setup keys in hash for now, need to complete this for full hash consistency
-		return hash((self.program, self.lvl_theory, self.basis, tuple(self.other_setup.keys())))
+		return hash((self.source_type, self.lvl_theory, self.basis_set, self.base_file_loc))
 
 	def __eq__(self, other):
-		if not isinstance(other, ExternalCalcSetup):
+		if not isinstance(other, DataOriginInfo):
 			return False
 		
 		return (
-            self.program == other.program and
+            self.source_type == other.source_type and
             self.lvl_theory == other.lvl_theory and
-            self.basis == other.basis and
-            self.other_setup == other.other_setup # fragile? because dict
-        )
+            self.basis_set == other.basis_set and
+			self.base_file_loc == other.base_file_loc
+		)
 
-	def h(self) -> int:
-		"""
-		Hashing function
-		"""
-
-		# FIXME: Only using other setup keys in hash for now, need to complete this for full hash consistency
-		return hash((self.program, self.lvl_theory, self.basis, tuple(self.other_setup.keys())))
 
 @dataclass
 class MolecularProperty:
@@ -154,53 +128,20 @@ class MolecularProperty:
 	prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
 	triv_name: String: Trivial name For simplified reference
 	vals: Form not specified: Values of properties - could be array or dictionary
-	in_basis: String: In which basis (e.g. "Cartesian" or "normal modes")?
-	in_units: String: In which units?
 	system: MolecularSystem instance: For which system?
-	calc_setup: ExternalCalcSetup instance: For which calculation setup?
-	target_basis: String: In which basis should this property be specified (if not matching in_basis, it means that
-	it should be transformed)
-	target_units: String: In which units should this property be specified (if not matching in_units, it means that
-	it should be converted)
+	calc_setup: DataOriginInfo instance: For which calculation setup?
 
-	serial_vals: Any = field(init=False) - serializable dict of vals
 	see more in test_main_dataclasses.py::test_MolecularProperty
 	"""
 	prop_spec: dict
 	trivial_name: str=None
 	vals: InitVar[Any] = field(default=None, repr=False)
-	in_basis: str=None
-	in_units: str=None
-	target_basis: str=None
-	target_units:str=None
-	serial_vals: Any = field(init=False)
-	calc_setup: ExternalCalcSetup = None
-
-	def __post_init__(self, vals):
-		"""
-		Turning ndarray to dict when vals were given during init.
-		Can be skipped alltogether is vals would be in dict?
-		"""
-		from ..wilson_utils.serialization import ndarray_to_dict
-		self.serial_vals = ndarray_to_dict(vals, serial=True) if vals is not None else None
-
-	def make_serial_vals(self):
-		"""
-		An option to make serial vals from self.vals
-		see test_main_dataclasses.py::test_MolecularProperty
-		"""
-		from ..wilson_utils.serialization import ndarray_to_dict
-		self.serial_vals = ndarray_to_dict(self.vals, serial=True) if self.vals is not None else None
+	calc_setup: DataOriginInfo = None
 
 	def to_dict(self):
 		return {
 			"prop_spec": self.prop_spec,
 			"trivial_name": self.trivial_name,
-			"in_basis": self.in_basis,
-			"in_units": self.in_units,
-			"target_basis": self.target_basis,
-			"target_units": self.target_units,
-			"serial_vals": self.serial_vals,
 		}
 
 	def h(self, htype: int) -> int:
@@ -232,20 +173,11 @@ class MolecularProperty:
 				hlist.append(i)
 				hlist.append(self.prop_spec[i])
 
-		if htype >= 2:
-
-			hlist.append(self.target_basis)
-			hlist.append(self.target_units)
-
 		if htype >= 3:
 
 			hlist.append(self.system.h())
 			hlist.append(self.calc_setup.h())
 
-		if htype >= 4:
-
-			hlist.append(self.in_basis)
-			hlist.append(self.in_units)
 
 		return hash(tuple(hlist))
 
@@ -260,9 +192,9 @@ class MolecularProperty:
 
 	def addCalcSetup(self, calc_setup):
 		"""
-		Associate an ExternalCalcSetup instance
+		Associate an DataOriginInfo instance
 
-		calc_setup: ExternalCalcSetup instance: The setup to be attached
+		calc_setup: DataOriginInfo instance: The setup to be attached
 		"""
 
 		self.calc_setup = calc_setup
@@ -279,33 +211,6 @@ class MolecularProperty:
 
 		self.vals = values
 
-		self.in_basis = in_basis
-		self.in_units = in_units
-	
-	# convertor is a function reference (must take system, basis, units and convertor_info)
-	# convertor_info is further information for the convertor
-	def convertValues(self, convertor: Callable[[MolecularSystem, dict, Any, str, str, str, str, dict], Any],
-					  convertor_info: dict={}):
-		"""
-		Convert values from the current basis and units to the target basis and units
-
-		convertor: A function reference of the form specified in the declaration: Will be assumed to be able to
-		convert to target basis and units and must fail if unable
-		convertor_info: dictionary {attribute: value(s)}: Further information for the convertor if needed
-		"""
-
-		# Call convertor
-		# Will be assumed to be able to convert to target basis and units and must fail if unable
-		self.vals = convertor(self.system, self.prop_spec, self.vals, self.in_basis, self.target_basis,
-								self.in_units, self.target_units, convertor_info)
-
-		# Update basis and units as changed
-		if self.target_basis is not None:
-			self.in_basis = self.target_basis
-			
-		if self.target_units is not None:
-			self.in_units = self.target_units
-
 
 class MolecularPropertyEncoder(json.JSONEncoder):
 	"""
@@ -317,11 +222,6 @@ class MolecularPropertyEncoder(json.JSONEncoder):
 			return {
 				"prop_spec": o.prop_spec,
 				"trivial_name": o.trivial_name,
-				"in_basis": o.in_basis,
-				"in_units": o.in_units,
-				"target_basis": o.target_basis,
-				"target_units": o.target_units,
-				"serial_vals": o.serial_vals,
 			}
 		# Let the base class handle other types
 		return super().default(o)
@@ -341,13 +241,11 @@ class VibAnaSetup:
 	states: List of VibState instances: Specification of each vibrational state in scope
 	nc_sqrt_eigval: dictionary {mode index: value}: Harmonic vibrational energy levels
 	nc_eigvec: dictionary {mode index: [values]}: Normal mode displacements (canonically in Cartesian basis)
-	allow_skip_eigvec: Boolean: Is it OK to skip the obtainment of normal mode displacements?
-	vibana_prop_need: String: Which kinds of properties will I need to actually carry out the vibrational analysis? 
+	vibana_own_analysis: String: Which kinds of properties will I need to actually carry out the vibrational analysis? 
 		Choices: 
-			"all": I need properties for both harmonic and (if chosen) anharmonic analysis,
+			"full": I need properties for both harmonic and (if chosen) anharmonic analysis,
 			"anharm": I only need properties to carry out an anharmonic analysis [I will or have already gotten the harmonic data], 
 			"none": I don't need any properties [I will or have already gotten both harmonic and anharmonic data]
-	external_fill_from: ExternalCalcSetup instance: Specifies requested setup (e.g. lvl of theory etc.) for results
 	exclude_modes: list: Tells which modes (if any) to exclude in this vibrational analysis
 	"""
 	regime: str=None
@@ -359,21 +257,16 @@ class VibAnaSetup:
 	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
-	allow_skip_eigvec: bool=False
 
-	# 'all': Will need properties for both harmonic and anharmonic analysis
-	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided by external program)
-	# 'none': All results will be provided by external program
-	# FIXME? confusing name, need for what/whom? I get from context here that "need" means "need to calculate with Wilson internally"
-	vibana_prop_need: str='all'
-
-	# externalCalcSetup instance
-	# NOTE: Refers only to vibrational properties that will be directly filled from analysis and not to
-	# properties that will be used in own doAnalysis invocation (they may have their own specification)
-	external_fill_from: ExternalCalcSetup=None
+	# 'full': Will need properties for harmonic (and, if requested, anharmonic) analysis
+	# 'anharm': Will only need props. for anharmonic analysis (harmonic results will be provided from external source)
+	# 'none': All results will be provided by external source
+	vibana_own_analysis: str='full'
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
-	exclude_modes: list = None
+	exclude_modes: list	 = None
+	diagn: dict = None
+
 
 	def __post_init__(self):
 		if self.exclude_modes is None:
@@ -403,95 +296,70 @@ class VibAnaSetup:
 		return [{'s': vibst.serial_s, 
 		   'e': vibst.e, 'd': vibst.d} for vibst in getattr(self, 'states')]
 
-	def tellNeededProps(self) -> list[MolecularProperty]:
+	def tellNeededProps(self) -> list:
 		"""
-		Tell which molecularProperty instances are required for a specific vibrational analysis
+		Tell which MolecularProperty instances are required for a specific vibrational analysis
 
-		Returns a list of MolecularProperty instances detailing which properties are required
+		Returns a list of MolecularProperty instances detailing which properties are required for curent state of instance
 		"""
 
 		needed_props = []
 
-		if self.vibana_prop_need == 'none':
-			return needed_props
+		if self.vibana_own_analysis == 'none':
+			if self.isAllSet():
+				return needed_props
+			else:
+				needed_props.append({'nc_sqrt_eigvec': None})
+				needed_props.append({'states': None})
+		
+		if (self.vibana_own_analysis == 'full'):
+			# should have share the same setting of origin as nc_sqrt_eigval and nc_eigvec
+			# in harmonic analysis procedure it will go from "hess" Property to nc_sqrt_eigval and nc_eigvec
 
-		# Check which information is already present
-		reg_hess = False
+			# FIXME: Not sure about target units
+			needed_props.append(MolecularProperty(
+				{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
+				trivial_name=prop_trivname(ord_geo=2),
+				target_basis='cart',
+				target_units='au')
+			)
 
-		if self.nc_sqrt_eigval is None:
+		# For now, don't use regime subinfo
+		if 'PT2' in self.regime:
 
-			if (self.vibana_prop_need == 'all'):
+			if (self.vibana_own_analysis == 'anharm') or (self.vibana_own_analysis == 'full'):
 
-				# FIXME: Not sure about target units
 				needed_props.append(MolecularProperty(
-					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
-					trivial_name=prop_trivname(ord_geo=2),
-					target_basis='cart',
+					{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
+					trivial_name=prop_trivname(ord_geo=3),
+					target_basis='nm',
 					target_units='au')
 				)
-				reg_hess = True
 
-		if self.nc_eigvec is None and (not(self.allow_skip_eigvec) and not(reg_hess)):
-
-			if (self.vibana_prop_need  == 'all'):
-
-				# FIXME: Not sure about target units
+				# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
 				needed_props.append(MolecularProperty(
-					{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
-					trivial_name=prop_trivname(ord_geo=2),
-					target_basis='cart',
+					{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
+					trivial_name=prop_trivname(ord_geo=4),
+					target_basis='nm',
 					target_units='au')
 				)
-				reg_hess = True
 
-		if self.states is None:
+				needed_props.append(MolecularProperty(
+					{'ops': tuple(['r']), 'freq': (0.0)},
+					trivial_name=prop_trivname(ord_rot=1),
+					target_basis='nm',
+					target_units='au')
+				)
 
-			if (self.vibana_prop_need == 'all'):
-
-				if not reg_hess:
-
-					# FIXME: Not sure about target units
-					needed_props.append(MolecularProperty(
-						{'ops': tuple(['g', 'g']), 'freq': (0.0, 0.0)},
-						trivial_name=prop_trivname(ord_geo=2),
-						target_basis='cart',
-						target_units='au')
-					)
-					reg_hess = True
-
-			# For now, don't use regime subinfo
-			if 'PT2' in self.regime:
-
-				if (self.vibana_prop_need == 'anharm') or (self.vibana_prop_need == 'all'):
-
-					needed_props.append(MolecularProperty(
-						{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
-						trivial_name=prop_trivname(ord_geo=3),
-						target_basis='nm',
-						target_units='au')
-					)
-
-					# FIXME: Consider implementing extra flag for only semidiagonal force constants needed
-					needed_props.append(MolecularProperty(
-						{'ops': tuple(['g', 'g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0, 0.0)},
-						trivial_name=prop_trivname(ord_geo=4),
-						target_basis='nm',
-						target_units='au')
-					)
-
-					needed_props.append(MolecularProperty(
-						{'ops': tuple(['r']), 'freq': (0.0)},
-						trivial_name=prop_trivname(ord_rot=1),
-						target_basis='nm',
-						target_units='au')
-					)
-
-					needed_props.append(MolecularProperty(
-						{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
-						trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
-						target_basis='nm',
-						target_units='au')
-					)
+				needed_props.append(MolecularProperty(
+					{'ops': tuple(['g', 'g', 'r']), 'freq': (0.0, 0.0, 0.0)},
+					trivial_name=prop_trivname(ord_geo=2, ord_rot=1),
+					target_basis='nm',
+					target_units='au')
+				)
+			
+			if self.vibana_own_analysis == 'anharm':
+				needed_props.append({'nc_sqrt_eigvec': None})
 
 		return needed_props
 
@@ -505,7 +373,7 @@ class VibAnaSetup:
 
 		self.states = states
 
-	def doAnalysis(self, props: list[MolecularProperty],
+	def doFullAnalysis(self, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
 				   tuple[list[VibState], dict, dict]]):
 		"""
@@ -521,39 +389,20 @@ class VibAnaSetup:
 		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
 		with self as self.system
 		"""
+		if self.nc_sqrt_eigval is not None or self.states is not None or self.nc_eigvec is not None:
+			raise AssertionError('Full analysis requested but some of the results are already present')
 
 		if self.regime is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
 		if self.system is None:
 			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
-		self.nc_sqrt_eigval, self.nc_eigvec, self.states = analyzer(self.system, props,
-																	self.regime, self.regime_subinfo)
+		
+		context = {'system': self.system, 'props': props, 
+			 	   'regime': self.regime, 'regime_subinfo': self.regime_subinfo}
+		
+		self.nc_sqrt_eigval, self.nc_eigvec, self.states, self.diagn = analyzer(**context)
 
-
-	def doHarmonicAnalysis(self, props: list[MolecularProperty],
-						   harmonic_analyzer: Callable[[MolecularSystem, list[MolecularProperty]], tuple[dict, dict]]):
-		"""
-		Carry out a harmonic vibrational analysis (regardless of chosen regime) and keep only
-		the (harmonic) fundamental vibrational energy levels (stored in self.nc_sqrt_eigval) and
-		associated eigenvectors (stored in self.nc_eigvec), but not vibrational state VibState instances.
-
-		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		harmonic_analyzer: Callable: A reference to a harmonic analyzer function. See function definition and
-		attribute explanation in __init__ for detailed argument specification: Must take as input a system,
-		a set of properties, a choice of regime (and subinfo as relevant) and return
-		fundamental harmonic energy levels and associated eigenvectors.
-		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
-		with self as self.system
-		"""
-
-		if self.regime is None:
-			logger.warning('WARNING: doHarmonicAnalysis was called but no VibAnaSetup regime was specified')
-
-		if self.system is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
-
-		self.nc_sqrt_eigval, self.nc_eigvec = harmonic_analyzer(self.system, props)
 
 	def doAnharmonicAnalysis(self, props: list[MolecularProperty], anharmonic_analyzer:
 							Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
@@ -600,6 +449,15 @@ class VibAnaSetup:
 		logger.debug(repr(context))
 
 		self.states, self.diagn = anharmonic_analyzer(**context)
+
+	def isAllSet(self):
+		"""
+		Checking status of VibAna data.
+		"""
+		if self.nc_sqrt_eigval is not None and self.states is not None:
+			return True
+		return False
+
 
 	def upd_exclude_modes(self, upd_exclude_modes: list = None):
 		if self.exclude_modes is None:
@@ -903,11 +761,11 @@ class CalculationBatch:
 
 	-----
 	system: MolecularSystem instance: The system for which calclulation is sought/defined
-	calc_setup: ExternalCalcSetup: The calculation setup with respect to which calclulation is sought/defined
+	calc_setup: DataOriginInfo: The calculation setup with respect to which calclulation is sought/defined
 	properties: List of MolecularProperty instances: The properties for which calculation is sought/defined
 	"""
 	system: MolecularSystem
-	calc_setup: ExternalCalcSetup
+	calc_setup: DataOriginInfo
 	properties: list[MolecularProperty]=field(default_factory=lambda: list())
 
 	def __post_init__(self):
@@ -1062,18 +920,18 @@ class CalculationBatch:
 		if vib_ana_setup_to_fill is not None:
 
 			# Take harmonic vibrational analysis results
-			if vib_ana_setup_to_fill.vibana_prop_need in ['none', 'anharm']:
+			if vib_ana_setup_to_fill.vibana_own_analysis in ['none', 'anharm']:
 
 				vib_ana_setup_to_fill.nc_sqrt_eigval = self.parser_obj.nc_sqrt_eigval # todo: tests...
 
-				if not vib_ana_setup_to_fill.allow_skip_eigvec:
-					# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
-					if self.parser_obj.normal_modes is None:
-						raise AssertionError('Normal coordinates (eigenvectors) not found')
-					vib_ana_setup_to_fill.nc_eigvec = self.parser_obj.normal_modes
+				# FIXME: Find out if these are proper coordinates (and precision) for the intended use (transformation)
+				if self.parser_obj.normal_modes is None:
+					raise AssertionError('Normal coordinates (eigenvectors) not found')
+
+				vib_ana_setup_to_fill.nc_eigvec = self.parser_obj.normal_modes
 
 			# Take states
-			if vib_ana_setup_to_fill.vibana_prop_need in ['none']:
+			if vib_ana_setup_to_fill.vibana_own_analysis in ['none']:
 
 				if vib_ana_setup_to_fill.regime not in ['harmonic']:
 					extracted_states = self.parser_obj.anharmonic_states
@@ -1142,8 +1000,8 @@ class WilsonSimulation:
 
 	def __init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
 				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
-				 eval_uniform: ExternalCalcSetup=None, eval_by_prop_name: dict[str: ExternalCalcSetup]=None,
-				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
+				 props: list[MolecularProperty]=None, residual_vib_info: list=None,
+				 calc_batches: dict[int: CalculationBatch]=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		"""
 		FIXME: terms: list[VibPerturbedTerm]=[] - that's not true
@@ -1154,9 +1012,9 @@ class WilsonSimulation:
 		vib_ana_setup: VibAnaSetup instance: Setup and storage of results concerning the vibrational states
 		spec_eval_setup: SpecEvalSetup instance: Setup information for evaluation and rendering
 		system: MolecularSystem instance: The system under consideration in this simulation
-		eval_uniform: ExternalCalcSetup instance: If all properties are (to be) evaluated under the same external
-		setup, then providing an ExternalCalcSetup as this argument signifies that
-		eval_by_prop_name: dictionary {trivial name: ExternalCalcSetup}: If specific properties are (to be) evaluated
+		eval_uniform: DataOriginInfo instance: If all properties are (to be) evaluated under the same external
+		setup, then providing an DataOriginInfo as this argument signifies that
+		eval_by_prop_name: dictionary {trivial name: DataOriginInfo}: If specific properties are (to be) evaluated
 		under specific setups, then signify that with this argument. All properties needed but not referred to in this
 		way will instead be assumed to be requested under the setup specified in eval_uniform. If no properties
 		are missing specification in eval_by_prop_name, then eval_uniform can be excluded.
@@ -1179,10 +1037,9 @@ class WilsonSimulation:
 			self.spec_eval_setup = spec_eval_setup
 			self.system = system
 
-			self.eval_uniform = eval_uniform
-			self.eval_by_prop_name = eval_by_prop_name
-
 			self.props = props
+			self.residual_vib_info = residual_vib_info
+
 			self.calc_batches = calc_batches
 			self.spec = spec
 			self.diagn = diagn
@@ -1249,8 +1106,8 @@ class WilsonSimulation:
 		"""
 		self.vib_ana_setup = vib_ana_setup
 
-	def addPropEvalSetup(self, eval_uniform: ExternalCalcSetup=None,
-						 eval_by_prop_name: dict[str: ExternalCalcSetup]=None,):
+	def addPropEvalSetup(self, eval_uniform: DataOriginInfo=None,
+						 eval_by_prop_name: dict[str: DataOriginInfo]=None,):
 		"""
 		Add a property evaluation setup
 
@@ -1291,7 +1148,8 @@ class WilsonSimulation:
 		"""
 
 		self.props = []
-
+		self.residual_vib_info = {}
+		
 		if self.terms is None:
 			raise AssertionError('There must be terms present to determine needed properties')
 		if self.vib_ana_setup is None:
@@ -1349,17 +1207,22 @@ class WilsonSimulation:
 					self.vib_ana_setup.max_state_lvl = max_state_lvl
 
 		for i in self.vib_ana_setup.tellNeededProps():
-			if i.h(1) not in [k.h(1) for k in self.props]:
-				self.props.append(copy.deepcopy(i))
+			if isinstance(i, MolecularProperty):
+				if i.h(1) not in [k.h(1) for k in self.props]: # 
+					self.props.append(copy.deepcopy(i))
+			else:
+				self.residual_vib_info[i] = None
+			
 
-	def dressPropsWithSetup(self):
+	def dressPropsWithSetup(self, eval_uniform: DataOriginInfo=None, eval_by_prop_name: dict[str: DataOriginInfo]=None,
+):
 		"""
 		Dress my self.properties with computational setups according to how they are specified in
 		self.eval_uniform or self.eval_by_prop_name
 		"""
 		if not self.props:
 			logger.warning('There are no properties to be dressed')
-		
+
 		for i in self.props:
 
 			dressed = False
@@ -1384,6 +1247,26 @@ class WilsonSimulation:
 
 			if not dressed:
 				raise AssertionError(f'Unable to determine calculation setup for property: {i}')
+
+		for i in self.residual_vib_info:
+			
+			dressed = False
+			
+			if self.eval_by_prop_name is not None:
+
+				if self.eval_by_prop_name.get(i, None) is not None:
+					self.residual_vib_info[i] = self.eval_by_prop_name[i]
+					dressed=True
+
+				else:
+					logger.warning('Warning: _ encountered but eval_by_prop_name was specified.')
+
+			# Otherwise, use uniform eval argument
+			# if both are not None, this will overide previous setup if dressed before
+			if self.eval_uniform is not None and not dressed:
+				self.residual_vib_info[i] = self.eval_uniform
+				dressed = True
+
 
 	def makeCalculationBatches(self):
 		"""
@@ -1441,6 +1324,42 @@ class WilsonSimulation:
 			else:
 				# VL - should do vib analysis somewhere down from this point in simulation?
 				self.calc_batches[i].getResults(self.props, source_type=source_type, source_loc=source_loc, datavault=datavault)
+
+	def fillResults(self, data_dict: dict):
+		"""
+		loading data into self.props (and optionally to self.vib_ana_setup)
+		
+		data_dict: dict - {data_name: values}
+
+		"""
+		for p in self.props:
+			p.addValues(data_dict.get(p.trivial_name))
+
+		for k in self.residual_vib_info:
+			self.residual_vib_info[k] = data_dict.get(k)
+
+
+	def requestData(self) -> dict:
+		"""
+		data_dict: dict - {data_name: DataOriginInfo}
+		"""
+		data_dict = {}
+		for p in self.props:
+			data_dict[p.trivial_name] = p.calc_setup
+		
+		for k, v in self.residual_vib_info.items():
+			data_dict[k] = v
+		
+		return data_dict
+	
+	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
+		"""
+		obtainer must return : a dictionary:
+		 	keys: trivial_name for properties or residual_vib_info keys
+			values: values
+		"""
+		self.fillResults(data_dict=obtainer(self.requestData()))
+
 
 	def evaluateAsResponseFunction(self,
 								   evaluator: Callable[[
@@ -1584,7 +1503,7 @@ class WilsonSimulation:
 		"""
 		__init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
 				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
-				 eval_uniform: ExternalCalcSetup=None, eval_by_prop_name: dict[str: ExternalCalcSetup]=None,
+				 eval_uniform: DataOriginInfo=None, eval_by_prop_name: dict[str: DataOriginInfo]=None,
 				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		
@@ -1629,7 +1548,7 @@ class WilsonSimulation:
 		"""
 		__init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
 				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
-				 eval_uniform: ExternalCalcSetup=None, eval_by_prop_name: dict[str: ExternalCalcSetup]=None,
+				 eval_uniform: DataOriginInfo=None, eval_by_prop_name: dict[str: DataOriginInfo]=None,
 				 props: list[MolecularProperty]=None, calc_batches: dict[int: CalculationBatch]=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		
@@ -1639,7 +1558,7 @@ class WilsonSimulation:
 
 		SpecEvalSetup - dataclass
 		MolecularSystem - dataclass
-		ExternalCalcSetup - dataclass
+		DataOriginInfo - dataclass
 
 		props - list[MolecularProperty] - not a dataclass
 		calc_batches - dict[int: CalculationBatch] - not a dataclass

@@ -45,12 +45,11 @@ def test_anharm_analyzer():
     from .... import wilson_derive as ws_derive
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+    calc_setup = ws_main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
-                                              vibana_prop_need='anharm', # should this vary? take minimal needed for regime unless specified? 
-                                              allow_skip_eigvec=True, 
-                                              external_fill_from=calc_setup)
-    printtest(f'vibana.vibana_prop_need: {vibana.vibana_prop_need}')
+                                              vibana_own_analysis='anharm', # should this vary? take minimal needed for regime unless specified? 
+                                              )
+    printtest(f'vibana.vibana_own_analysis: {vibana.vibana_own_analysis}')
     experiment_a = evv_experiment()
 
     sim = ws_main.abstractions.WilsonSimulation()
@@ -76,7 +75,7 @@ def test_anharm_analyzer():
     # looks like VibAnaSetup can't get data without WilsonSimulation? CalculationBatches?
     sim.getResultsFromCalculationBatches(source_type='vault', datavault=vault, source_loc=CQCPARSE_ROOT)
     
-    printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
+    printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
     printtest(sim.props)
     for p in sim.props:
         if p.trivial_name == 'cff':
@@ -112,11 +111,11 @@ def test_anharm_analyzer_vibana():
     from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    calc_setup = ws_main.abstractions.ExternalCalcSetup(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
+    calc_setup = ws_main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
-                                              vibana_prop_need='anharm', # should this vary? take minimal needed for regime unless specified? 
-                                              allow_skip_eigvec=True, external_fill_from=calc_setup)
-    printtest(f'vibana.vibana_prop_need: {vibana.vibana_prop_need}')
+                                              vibana_own_analysis='anharm', # should this vary? take minimal needed for regime unless specified? 
+                                              )
+    printtest(f'vibana.vibana_own_analysis: {vibana.vibana_own_analysis}')
     props = vibana.tellNeededProps()
 
     for i in props:
@@ -131,8 +130,8 @@ def test_anharm_analyzer_vibana():
                           datavault=vault, source_loc=CQCPARSE_ROOT)
 
     
-    printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
-    print(f'props: {props}') # vibana_prop_need='all' -> nc_sqrt_eigval is None
+    printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
+    print(f'props: {props}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
 
     try:
         # FIXME: should be done internally with WilsonSimulation somehow? or when?
