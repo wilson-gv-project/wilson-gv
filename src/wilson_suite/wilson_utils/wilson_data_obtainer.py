@@ -8,18 +8,6 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
     print('requested_data_dict _______________', requested_data_dict.keys())
-# {'dipgrad': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                            base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 
-#  'polhess': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                            base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 
-#  'polgrad': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                            base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 
-#  'diphess': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                            base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 
-#  'cff': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                        base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 
-#  'nc_sqrt_eigvec': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out'), 'states': DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ', 
-#                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')}
 
     requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'], 
                                 'normal_modes': requested_data_dict['nc_sqrt_eigval']})
