@@ -133,7 +133,7 @@ def terms_evaluator(system,
 
     # logger.warning(f'precalculated_data \n{precalculated_data['vibdiffs']}')
     # logger.warning(f'precalculated_data \n{precalculated_data['avrg_tensors']}')
-    logger.warning(f'precalculated_data \n{precalculated_data['res_conds']}')
+    # logger.warning(f'precalculated_data \n{precalculated_data['res_conds']}')
 
     # 6
     from ..utils import debug_mode
@@ -156,7 +156,7 @@ def terms_evaluator(system,
 
         diagn['evaluator diagn'][id] = term.diagnostics
 
-    logger.warning(f'amplitudes \n{amplitudes}')
+    # logger.warning(f'amplitudes \n{amplitudes}')
     if do_diagn:
         return amplitudes, diagn
     else:

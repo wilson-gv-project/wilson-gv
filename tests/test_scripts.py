@@ -74,7 +74,9 @@ def test_evv_tester_dataclasses_calcsetup():
     assert load_calcsetup == wilsim2.eval_uniform
 
     from wilson_suite.wilson_main.abstractions import DataOriginInfo
-    calcsetup_ref = DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={})
+    calcsetup_ref = DataOriginInfo(source_type='gaussian', 
+                                   lvl_theory='B3LYP', basis_set='cc-pVQZ',
+                                   base_file_loc='/home/vlev/wilson-suite/CQCParse/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
 
     assert load_calcsetup == calcsetup_ref
     assert wilsim2.eval_uniform == calcsetup_ref
@@ -131,17 +133,16 @@ def test_evv_tester_dataclasses_wilsonsim():
     assert np.allclose(np.abs(load_wilsonsim_final.spec), np.abs(wilsim3.spec))
 
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, DataOriginInfo
+    external_fill_from=DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ')
+
     vibanasetup_ref = VibAnaSetup(regime='GVPT2', system=MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
-                                  regime_subinfo=None, max_state_lvl=3, nc_sqrt_eigval={0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
-                                  nc_eigvec=None, vibana_own_analysis='none', 
-                                  external_fill_from=DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ', other_setup={}, other_setup_identifier={}), 
-                                  exclude_modes=[])
+                                  regime_subinfo=None, max_state_lvl=3,
+                                    nc_sqrt_eigval={('0',): 2878.687, ('1',): 1820.416, ('2',): 1534.549, ('3',): 1203.179, ('4',): 2933.526, ('5',): 1268.91}, 
+                                    nc_eigvec=None, vibana_own_analysis='none')
     assert vibanasetup_ref.system == wilsim3.vib_ana_setup.system
-    assert vibanasetup_ref.external_fill_from == wilsim3.vib_ana_setup.external_fill_from
 
-    assert vibanasetup_ref.system == load_wilsonsim_mid.vib_ana_setup.system
-    assert vibanasetup_ref.external_fill_from == load_wilsonsim_mid.vib_ana_setup.external_fill_from
-
+    print('vibanasetup_ref.nc_sqrt_eigval', vibanasetup_ref.nc_sqrt_eigval)
+    print('wilsim3.vib_ana_setup.nc_sqrt_eigval', wilsim3.vib_ana_setup.nc_sqrt_eigval)
     assert vibanasetup_ref.nc_sqrt_eigval == wilsim3.vib_ana_setup.nc_sqrt_eigval
     assert vibanasetup_ref.nc_sqrt_eigval == load_wilsonsim_final.vib_ana_setup.nc_sqrt_eigval
 

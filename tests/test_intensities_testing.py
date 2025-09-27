@@ -11,12 +11,14 @@ setup_logger("wilson", level=logging.WARNING)
 def test_amplitude_mock_singlepoint_one_elterm():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(0,1)]
     del sim.terms[0]
@@ -34,7 +36,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     ggff = np.zeros((3,3,3,3))
     gf = np.zeros((3,3))
@@ -75,7 +77,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(1.))**2
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
     
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -83,12 +85,14 @@ def test_amplitude_mock_singlepoint_one_elterm():
 def test_amplitude_mock_singlepoint_one_elterm_Gamma():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(0,1)]
     del sim.terms[0]
@@ -106,7 +110,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     ggff = np.zeros((3,3,3,3))
     gf = np.zeros((3,3))
@@ -149,7 +153,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(Gamma))**2
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -157,12 +161,14 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(1,0)]
     del sim.terms[0]
@@ -209,7 +215,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     gf = np.zeros((3,3))
     gff = np.zeros((3,3,3))
@@ -226,9 +232,9 @@ def test_amplitude_mock_singlepoint_one_mechterm():
 
     props_dict = {sim.props[i].trivial_name: i for i in range(len(sim.props))}
 
-    sim.props[props_dict['dipgrad']].addValues(gf, in_basis='nm')
-    sim.props[props_dict['polgrad']].addValues(gff, in_basis='nm')
-    sim.props[props_dict['cff']].addValues(ggg, in_basis='nm', in_units='au')
+    sim.props[props_dict['dipgrad']].addValues(gf)
+    sim.props[props_dict['polgrad']].addValues(gff)
+    sim.props[props_dict['cff']].addValues(ggg)
     
     start = {'x': 500., 'y': 1150.}
     end = {'x': 513., 'y': 1163.}
@@ -274,7 +280,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -283,12 +289,14 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
@@ -326,7 +334,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     gf = np.zeros((3,3))
     gff = np.zeros((3,3,3))
@@ -345,9 +353,9 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
 
     print(f'props_dict \n{props_dict}')
 
-    sim.props[props_dict['dipgrad']].addValues(gf, in_basis='nm')
-    sim.props[props_dict['polgrad']].addValues(gff, in_basis='nm')
-    sim.props[props_dict['cff']].addValues(ggg, in_basis='nm', in_units='au')
+    sim.props[props_dict['dipgrad']].addValues(gf)
+    sim.props[props_dict['polgrad']].addValues(gff)
+    sim.props[props_dict['cff']].addValues(ggg)
     
     start = {'x': 500., 'y': 700.}
     end = {'x': 513., 'y': 713.}
@@ -397,7 +405,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator, do_diagn=True)
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print(sim.diagn)
     print('ratio', reference/sim.spec[0,0])
@@ -410,12 +418,14 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(1,0)]
     del sim.terms[0]
@@ -462,7 +472,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     gf = np.zeros((3,3))
     gff = np.zeros((3,3,3))
@@ -479,9 +489,9 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
 
     props_dict = {sim.props[i].trivial_name: i for i in range(len(sim.props))}
 
-    sim.props[props_dict['dipgrad']].addValues(gf, in_basis='nm')
-    sim.props[props_dict['polgrad']].addValues(gff, in_basis='nm')
-    sim.props[props_dict['cff']].addValues(ggg, in_basis='nm', in_units='au')
+    sim.props[props_dict['dipgrad']].addValues(gf)
+    sim.props[props_dict['polgrad']].addValues(gff)
+    sim.props[props_dict['cff']].addValues(ggg)
     
     start = {'x': 500., 'y': 1150.}
     end = {'x': 513., 'y': 1163.}
@@ -527,7 +537,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -535,12 +545,14 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
 def test_amplitude_mock_offresonance_one_elterm():
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation    
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(0,1)]
     del sim.terms[0]
@@ -558,7 +570,7 @@ def test_amplitude_mock_offresonance_one_elterm():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     ggff = np.zeros((3,3,3,3))
     gf = np.zeros((3,3))
@@ -607,7 +619,7 @@ def test_amplitude_mock_offresonance_one_elterm():
     from functools import partial
     # eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
     eval_selected = partial(terms_evaluator, collect_all=True)
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=eval_selected)
+    sim.evaluateAsResponseFunction(evaluator=eval_selected)
     # sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
     print(sim.diagn)
     print(f'reference {reference:.5e}')
@@ -621,12 +633,14 @@ def test_amplitude_mock_offresonance_one_mechterm():
     print()
 
     from wilson_suite.wilson_utils.useful_shortcuts import bare_wsim_for_EVVpGVPT2, makeSpecSetup2D
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem, SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
+    from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation    
     from wilson_suite.wilson_utils.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
-    sim = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
+    sim: WilsonSimulation = bare_wsim_for_EVVpGVPT2(**sim_conf_dict, 
                                     silent=True)
     del sim.terms[1][(1,0)]
     del sim.terms[0]
@@ -673,7 +687,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     gf = np.zeros((3,3))
     gff = np.zeros((3,3,3))
@@ -690,9 +704,9 @@ def test_amplitude_mock_offresonance_one_mechterm():
 
     props_dict = {sim.props[i].trivial_name: i for i in range(len(sim.props))}
 
-    sim.props[props_dict['dipgrad']].addValues(gf, in_basis='nm')
-    sim.props[props_dict['polgrad']].addValues(gff, in_basis='nm')
-    sim.props[props_dict['cff']].addValues(ggg, in_basis='nm', in_units='au')
+    sim.props[props_dict['dipgrad']].addValues(gf)
+    sim.props[props_dict['polgrad']].addValues(gff)
+    sim.props[props_dict['cff']].addValues(ggg)
     
     start = {'x': 505., 'y': 1158.}
     end = {'x': 513., 'y': 1163.}
@@ -751,7 +765,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
     from functools import partial
     eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
-    sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=eval_selected)
+    sim.evaluateAsResponseFunction(evaluator=eval_selected)
 
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print('ratio', reference/sim.spec[0,0])
