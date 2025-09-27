@@ -6,7 +6,11 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     """
     dict_with_data = {}
 
-    origin_to_req_data = {}
+    origin_to_req_data: dict[DataOriginInfo, list] = {}
+    print('requested_data_dict _______________', requested_data_dict.keys())
+
+    requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'], 
+                                'normal_modes': requested_data_dict['nc_sqrt_eigval']})
 
     for k, v in requested_data_dict.items():
         
@@ -21,10 +25,12 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
 
         if o.source_type in ['cfour', 'gaussian']:
 
-            from CQCParse import parse_from_source
+            from CQCParse.parsing import parse_from_source
             from dataclasses import asdict
-            these_results_dict = parse_from_source(origin_to_req_data[o], **asdict(o))
 
+            these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], **asdict(o))
+
+            
             dict_with_data.update(these_results_dict)
 
         elif o.source_type in ['wilson']:
@@ -41,17 +47,7 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
             raise AssertionError('Unsupported source type for data obtainer')
     
     return dict_with_data
-        
 
-
-
-
-
-
-
-            
-
-    return dict_with_data
 
 def test_do():
     dict_with_data = {'cff': DataOriginInfo(lvl_theory='B3LYP'), 

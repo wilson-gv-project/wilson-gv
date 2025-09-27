@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from ..spectrum import func_evaluation
 
 import logging
-logger = logging.getLogger("wilson."+__name__)
+logger = logging.getLogger("intensities")
 
 @tag('used in get_resonance_location_general for NO PRECALC')
 def compute_vibdiff(vibdiff_type: tuple, idx: tuple) -> list:
@@ -465,10 +465,10 @@ class TermND:
         """
         if debugprint:
             debugfunc('', f'get_full_factor called for {self.term_label} term')
-        logger.warning(f'get_full_factor called for {self.term_label} term {self.term_id} for {abc_comb}')
+        # logger.warning(f'get_full_factor called for {self.term_label} term {self.term_id} for {abc_comb}')
         components = {}
         self.diagnostics['get_amplitudes_ab prefac0'][abc_comb] = {}
-        logger.warning(f'diagn {self.diagnostics.get('get_amplitudes_ab prefac0', None)}')
+        # logger.warning(f'diagn {self.diagnostics.get('get_amplitudes_ab prefac0', None)}')
 
         avrg_properties = self.get_avrg_properties(abc_comb, comps=comps)
         self.diagnostics['get_amplitudes_ab prefac0'][abc_comb]['avrg_properties'] = avrg_properties
@@ -513,7 +513,7 @@ class TermND:
                     return 0., components
                 else:
                     return 0.
-            logger.warning(f'vibdiff {vibdiff} {abc_comb}')
+            # logger.warning(f'vibdiff {vibdiff} {abc_comb}')
             # logger.warning(f'self.F_vals[abc_comb] {self.F_vals[abc_comb]}')
             # logger.warning(f'--------------- comb was {abc_comb}')
             product_all *= self.F_vals[abc_comb] * vibdiff
@@ -525,7 +525,7 @@ class TermND:
                 debugfunc(f'{self.F_vals[abc_comb]:.2e}', 'self.F_vals[(a,b,c)]') #! change names
                 debugfunc(f'{self.get_viblevelsdiff(abc_comb)[0]:.2e}', 'self.get_viblevelsdiff(a, b, c)[0]')
         
-        logger.warning(f'product_all end from get_full_factor for given ab {abc_comb} {product_all:.3e}')
+        # logger.warning(f'product_all end from get_full_factor for given ab {abc_comb} {product_all:.3e}')
 
         if comps:
             return product_all, components
@@ -562,25 +562,25 @@ class TermND:
         a, b, c=None
         """
         d = {L: n for L,n in zip( abc_list[:len(abc_comb)], abc_comb)}
-        logger.warning(f'd {d}')
-        logger.warning(f'self.vibstatesdiff_objs {self.vibstatesdiff_objs}')
+        # logger.warning(f'd {d}')
+        # logger.warning(f'self.vibstatesdiff_objs {self.vibstatesdiff_objs}')
         if self.precalc_data is not None:
             vds = []
             for vd in self.vibstatesdiff_objs:
                 if not vd.res_cond:
-                    logger.warning(f'vd in self.vibstatesdiff_objs {vd}')
+                    # logger.warning(f'vd in self.vibstatesdiff_objs {vd}')
                     left,right = vd.diff_str.split(',')
-                    logger.warning(f'vd.diff_type {vd.diff_type}')
-                    logger.warning(f'vd.diff_str original {vd.diff_str}')
+                    # logger.warning(f'vd.diff_type {vd.diff_type}')
+                    # logger.warning(f'vd.diff_str original {vd.diff_str}')
 
                     if tuple(sorted(vd.diff_type)) != vd.diff_type:
                         diff_str = ','.join(reversed(vd.diff_str.split(',')))
 
                     indices = tuple([d[i] for i in diff_str.replace('+', ',').split(',') if i in d])
-                    logger.warning(f'diff_str {diff_str}')
-                    logger.warning(f'indices {indices}')
+                    # logger.warning(f'diff_str {diff_str}')
+                    # logger.warning(f'indices {indices}')
                     vd_n = self.precalc_data['vibdiffs'][tuple(sorted(vd.diff_type))][indices]
-                    logger.warning(f'vd_n {vd_n}')
+                    # logger.warning(f'vd_n {vd_n}')
 
                     # opposite sign for reversed vib diff
                     if tuple(sorted(vd.diff_type)) != vd.diff_type:
@@ -588,7 +588,7 @@ class TermND:
                     vds.append(vd_n)
                     if np.any(np.array(vd_n) == 0):
                         raise ValueError("Division by zero detected in TermND.get_vibenediff!")
-            logger.warning(f'vds list {vds}')
+            # logger.warning(f'vds list {vds}')
             if np.any(np.array(vds) == 0):
                 raise ValueError("Division by zero detected in TermND.get_vibenediff!")
             return np.sum(1./np.array(vds)), np.array(vds)
@@ -717,7 +717,7 @@ class TermND:
 
         product_all = self.get_factor_summed(full_abc, comps=False,
                                              debugprint=debugprint)  # , components if comps==True
-        logger.warning(f'product_all get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
+        # logger.warning(f'product_all get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
 
         components = {}
         self.diagnostics['get_amplitudes_ab prefac0'][full_abc]['product_all summed'] = product_all
@@ -735,17 +735,17 @@ class TermND:
         else:
             resonance = self.get_res_factor(w1, w2, ab_comb, Gamma_rc, condition)
             # logger.warning(f'resonance \n{resonance}\n')
-            logger.warning(f'Gamma_rc {Gamma_rc}')
+            # logger.warning(f'Gamma_rc {Gamma_rc}')
             debugfunc(f'{np.max(np.abs(resonance)):.2e}', 'resonance')
             debugfunc(f'{product_all:.2e}', 'product_all before prefA')
 
         product_all *= self.prefactorA * self.prefactorB
-        logger.warning(f'product_all with prefs get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
+        # logger.warning(f'product_all with prefs get_amplitudes_ab {ab_comb} \n{product_all:.4e}')
         
         self.diagnostics['get_amplitudes_ab prefac0'][full_abc]['resonance'] = resonance
 
         result = product_all * resonance
-        logger.warning(f'result ab {ab_comb} \n{result}\n')
+        # logger.warning(f'result ab {ab_comb} \n{result}\n')
 
         return result, components
 
@@ -924,5 +924,5 @@ def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
     from ...wilson_analysis.analysis.pre_eval import DataAnalyzer
     analyzer = DataAnalyzer()
     list_res = analyzer.extract_oneTerm_resonances(term=evalterm, vibdiffbank=vibdiffbank)
-    logger.warning(f'list_res {list_res}')
+    # logger.warning(f'list_res {list_res}')
     return list_res

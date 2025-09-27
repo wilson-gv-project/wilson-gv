@@ -15,7 +15,8 @@ from ..wilson_analysis.render.spectrum_renderer import PlotConfig, Normalization
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..wilson_main.abstractions import (VibAnaSetup, DataOriginInfo, MolecularSystem, SpecEvalSetup)
+    from ..wilson_main.abstractions import (VibAnaSetup, DataOriginInfo, MolecularSystem)
+    from ..wilson_main.spectrum_abstractions import SpecEvalSetup
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -85,9 +86,8 @@ def evv_terms() -> list[wd_abst.VibPerturbedTerm]:
     """
     Returns EVV terms derived with wilson_derive
     """
-    from ..wilson_main import abstractions as wm_abst
-
-    sim = wm_abst.WilsonSimulation()
+    from ..wilson_main import workflow_abstractions as wf_abst
+    sim = wf_abst.WilsonSimulation()
     sim.addExperiment(experiment=evv_experiment())
     sim.getTerms(deriver=get_fully_enhanced_terms)
     return sim.terms
@@ -105,10 +105,11 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
     calc_setup=ws.main.abstractions.DataOriginInfo(program='gaussian', lvl_theory='B3LYP', basis='cc-pVQZ')
     """
     from ..wilson_main import abstractions as wm_abst
+    from ..wilson_main import workflow_abstractions as wf_abst
 
     vib_ana_setup = wm_abst.VibAnaSetup(regime=vib_ana_setup.regime, vibana_own_analysis=vib_ana_setup.vibana_own_analysis)
     # -------------------------
-    sim = wm_abst.WilsonSimulation()
+    sim = wf_abst.WilsonSimulation()
     # adding EVV experiment
     sim.addExperiment(experiment=evv_experiment())
 
@@ -135,7 +136,7 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
     assert vib_ana_setup.system==system
     assert vib_ana_setup.system==sim.system
     # -------------------------
-    sim.findPropsAndMaxStateLvl()
+    sim.setPropsAndMaxStateLvl()
 
     needed_props = {i.trivial_name: None for i in sim.props}
 
@@ -150,8 +151,6 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
     
     sim.addPropEvalSetup(eval_uniform=eval_uniform)
     sim.dressPropsWithSetup()
-    sim.makeCalculationBatches()
-    assert len(sim.calc_batches) == 1, 'For some reason, there is more than 1 calculation batch'
     return sim
 
 def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalSetup":
@@ -161,17 +160,17 @@ def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalS
 
     axes={'x': axis1, 'y': axis2}
     """
-    from ..wilson_main import abstractions as wm_abst
+    from ..wilson_main import spectrum_abstractions as spc_abst
 
-    spec_grid = wm_abst.SpectralGrid(axes=axes, 
+    spec_grid = spc_abst.SpectralGrid(axes=axes, 
                                      range_style='uniform',
                                      start=start, end=end, spacer=spacer)
 
-    w1var = wm_abst.EvaluationVariable(range_style='uniform', 
+    w1var = spc_abst.EvaluationVariable(range_style='uniform', 
                                        start=start['x'], 
                                        end=end['x'], 
                                        spacer=spacer['x'])
-    w2var = wm_abst.EvaluationVariable(range_style='uniform', 
+    w2var = spc_abst.EvaluationVariable(range_style='uniform', 
                                        start=start['y'], 
                                        end=end['y'], 
                                        spacer=spacer['y'])
@@ -190,10 +189,10 @@ def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalS
 
     style_config = make_plot_config()
 
-    evi = wm_abst.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+    evi = spc_abst.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                  'Gamma': 4.7, 'Gamma_unit': 'cm-1',
                                                  'margins': {'w1': 10., 'w2': 10.}})
-    rndi = wm_abst.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_SCALE,
+    rndi = spc_abst.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_SCALE,
                                                  'dynamic_range': configs.get('dynamic_range', None),
                                                  'num_levels': 15, 
                                                  'reference_max': None,
@@ -204,7 +203,7 @@ def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalS
                                                  'to_save': True,
                                                  'style_config': style_config})
     
-    eval_setup = wm_abst.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+    eval_setup = spc_abst.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
     
     return eval_setup
 

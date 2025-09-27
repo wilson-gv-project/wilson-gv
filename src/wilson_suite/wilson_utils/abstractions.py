@@ -21,7 +21,7 @@ class VibState:
 	InitVar - is an init-only variable
 	This seems to be okay for now, but should mind this feature
 	"""
-	s: InitVar[dict] = field(repr=False)
+	s: InitVar[dict] = field(repr=False) # 
 	e: float = 0.0
 	d: Any = None
 	serial_s: dict = field(init=False)

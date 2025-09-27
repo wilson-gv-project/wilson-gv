@@ -1,0 +1,210 @@
+import wilson_suite as ws
+import logging
+logger = logging.getLogger("wilson")
+
+"""
+
+"""
+SOURCE_TYPE = 'vault'
+
+
+pulse_ir_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
+pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
+pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
+
+pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
+
+field_a = ws.experiment.abstractions.ElectricField(pulses)
+order = len(pulses)
+
+field_a.findEpochs()
+
+detector_a = ws.experiment.abstractions.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
+                                                    detection_polarization=[0.0, 0.0, 1.0],
+                                                    detection_range=[0.003 + 0.0001*i for i in range(101)],
+                                                    wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
+
+# Push one carrier freq
+scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
+scan_range_a = [0.0001*i for i in range(101)]
+scan_a = ws.experiment.abstractions.SpecScan(scan_obj_a, scan_range_a)
+
+experiment_a = ws.experiment.abstractions.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
+logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
+
+
+calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ')
+
+"""
+
+"""
+sim = ws.main.workflow_abstractions.WilsonSimulation()
+
+sim.addExperiment(experiment_a)
+sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
+
+logger.info(' >>>> sim.terms')
+logger.info(sim.terms)
+
+mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
+sim.addSystem(mol_system)
+sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'))
+sim.addPropEvalSetup(eval_uniform=calc_setup)
+
+# more clear definitions with str keys of dicts
+# so, dicionaries of SpectralAxis instances refer to independent variables, frequencies ranges/lists of vals
+# this means that there should be independent_vars data in addition to axes - that's where evaluation will be, in those ranges
+# smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
+# could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
+
+axis1 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1})
+axis2 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1, 'w2': -1})
+# axis2 = ws.main.abstractions.SpectralAxis({'w2': 1})
+
+# SpectralGrid - is also a source of data for the evaluation function
+# now here, keys are refereing to spectrum plot axes
+# SpectralGrid.axes dict keys should be the same as start, end, spacer keys
+start = {'x': 250, 'y': 100}
+end = {'x': 3850, 'y': 7550}
+spacer = {'x': 3.8, 'y': 3.8}
+
+spec_grid = ws.main.spectrum_abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
+                                            start=start, end=end, spacer=spacer)
+
+eval_vars = {'w1': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
+                'w2': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
+import numpy as np
+meshgrids = np.meshgrid(*eval_vars.values(), indexing='ij')
+
+eval_vars_meshgrids = {}
+for i, key in enumerate(eval_vars.keys()):
+    eval_vars_meshgrids[key] = meshgrids[i]
+
+from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+
+style_config = PlotConfig(
+    figsize=(35, 45),
+    label_fontsize=30,
+    font_dict={'size': 24},
+    colormap='hot_r',  # Better contrast colormap
+    saturation_color='#FF00FF',
+    dpi=350,
+    tick_step=200.0,  # Step size for both axes ticks
+    equal_aspect=True,  # Force equal aspect ratio for axes
+    no_data_color='#E0E0E0',  # Light gray
+    below_range_color='#F8F8F8',  # Very light gray
+    data_edge_color='black',
+    data_edge_width=0.75,
+    y_min=0,
+    y_max=4500,
+    colorbar_main_label="Intensity",
+    colorbar_padding=0.02,
+    show_top_ticks=True,
+    show_right_ticks=True,
+    x_tick_rotation=45,
+    colormap_spacing='log',
+    colormap_power=0.5,
+)
+
+evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
+                                                'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
+rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
+                                                'dynamic_range': 500, 
+                                                'num_levels': 15, 
+                                                'reference_max': None,
+                                                'spec_data_operations': 'abs()**2',
+                                                'projection': '2d', 
+                                                'filename': 'smth.svg',
+                                                'backend': 'matplotlib',
+                                                'to_save': True,
+                                                'style_config': style_config})
+
+eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
+
+sim.addSpecEvalSetup(eval_setup)
+
+sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
+logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
+
+sim.dressPropsWithSetup()
+
+# FIXME do data prep outside of this workflow
+# data prep:
+#  - 1. collect paths for output files
+#  - 2. parse data with CQCParse
+#  - 3. collect data into CalculatedDataFromOutput - wrapper func for this, to not expose CQCParse to wilson
+#  - 4. 
+if SOURCE_TYPE == 'vault':
+    # --- this is a clean vault use example
+    # vault setup outside of wilsonsim
+    from CQCParse.relay import DataVault
+    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
+    csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
+    vault = DataVault(csvfile)
+
+    from CQCParse.parsing.parse_wilson_obtainer import parse_from_source
+    sim.getResults(obtainer)
+    
+elif SOURCE_TYPE == 'outfiles':
+    # should simply provide list of files? 
+    # that would be simple for gaussian but not so much for cfour
+    sim.getResultsFromCalculationBatches(source_type='outfiles')
+    
+logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
+
+
+import numpy as np
+np.set_printoptions(precision=4)
+
+if 'WilsonSimulation_mid' in TO_PICKLES:
+    pickle_this_to(obj=sim, filenamepkl='sim_mid.pkl', save_to=SUITE_ROOT+'/../tests/')
+
+    sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/../tests/')
+    PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
+
+logger.debug('sim.spec_eval_setup')
+logger.debug(sim.spec_eval_setup)
+
+if not PREP_ONLY:
+    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
+    logger.info('  >>> Going to evaluate now...\n')
+    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    intensities_spec = np.abs(sim.spec)**2
+    logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
+
+    hist, bin_edges = np.histogram(intensities_spec, bins=10)
+    logger.debug(f"Histogram counts: {hist}")
+    logger.debug(f"Bin edges: {bin_edges}\n")
+    logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
+
+    logger.debug('\n=====================================================')
+    logger.info('\n  >>> And now rendering...\n')
+
+    sim.render(renderer=ws.analysis.render.render_spectrum)
+
+    logger.info('  >>> Saving to files now...\n')
+
+
+    # TODO: fix this later; not working now
+    # from wilson_utils.serialization import check_if_jsonsafe
+    # check_if_jsonsafe(sim.to_dict())
+
+    # writing JSON file
+    # sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+
+    # pickling
+    import pickle
+    with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "wb") as f:
+        pickle.dump(sim, f)
+
+    with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "rb") as f:
+        loaded_wilsonsim0 = pickle.load(f)
+    
+    if 'WilsonSimulation_final' in TO_PICKLES:
+        pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/../tests/')
+
+        sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/../tests/')
+        PKL_FILES['WilsonSimulation_final'] = 'sim_final.pkl'
+    
+    # apparently numpy can't compare complex numbers
+    assert np.allclose(np.abs(sim.spec), np.abs(loaded_wilsonsim0.spec))
