@@ -1,0 +1,5 @@
+# _config.yml
+title: "Wilson Docs"
+author: "Your Name"
+execute:
+  execute_notebooks: "off"   # or "auto" if you want to run notebooks during build

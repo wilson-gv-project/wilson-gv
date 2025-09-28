@@ -1,0 +1,31 @@
+version: 1
+project:
+  title: Wilson Docs
+  authors:
+    - name: Your Name
+  toc:
+    - file: index.md
+    - title: Getting Started
+      file: getting-started-tutorials/index.md
+      children:
+        - file: getting-started-tutorials/install.md
+        - file: getting-started-tutorials/quickstart.md
+
+    - title: How-to Guides
+      children:
+        - file: how-to/index.md
+    - title: Explanations
+      children:
+        - file: explanations/index.md
+    - title: API Reference
+      children:
+        - file: reference/index.md
+    - title: Development
+      children:
+        - file: development/index.md
+site:
+  title: Wilson Docs
+  options:
+    logo_text: 🤖 😼 Wilson - Coherent Multidimensional Spectroscopy Python Package
+    folders: false
+  template: book-theme

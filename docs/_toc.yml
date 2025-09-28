@@ -1,0 +1,11 @@
+format: jb-article
+root: index
+sections:
+- file: getting-started-tutorials/index
+  sections:
+  - file: getting-started-tutorials/installation
+  - file: getting-started-tutorials/quickstart
+- file: how-to/index
+- file: explanations/index
+- file: reference/index
+- file: development/index
