@@ -93,8 +93,10 @@ class EmPulse:
     maxstr: Float: Pulse amplitude at maximum of envelope
     tc: Float: Point in time at which pulse envelope is at maximum
     cf: float: (Infrared-range) Carrier frequency
-    cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation)
-    For pulses where cf_uv != 0.0, then cf must be 0.0
+    cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation).
+        - cf_uv should be specified as a nonnegative value: Any cancellation should follow from the phase-matching
+        wavevector--frequency combination in the experiment
+        - For pulses where cf_uv != 0.0, then cf must be 0.0
     dev: float: Deviation parameter (e.g. broadness of Gaussian pulse)
     wv: float: Wavevector travel direction
     pol: float: Polarization (only linearly polarized light currently countenanced)
@@ -190,49 +192,113 @@ class ElectricField:
     # FIXME: Consider: Pulses as dictionary with IDs?
     pulses: List[EmPulse]
 
-    def findEpochs(self, tol: float=0.0) -> list:
-        """
-        Divide field into epochs either with zero or finite tolerance
-        Currently only supported for a field consisting of ideal or impulsive pulses
 
-        tol: Float: Tolerance for non-temporal coincidence (currently not supported)
-        # TODO: Add support for tolerance
+def get_carrier_freqs_uv(pulses) -> dict:
+    """
+    Get dictionary of UV/VIS-range part of carrier frequencies
 
-        Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
-        """
+    Returns: Dictionary {pulse 1: UV/VIS carrier freq., ...}
+    """
+    cfuv_dict = {}
+    for i in pulses:
+        cfuv_dict[i.id] = i.cf_uv
 
-        for i in self.pulses:
-            if i.env not in ['ideal', 'impulsive']:
-                raise AssertionError('Can currently only determine epochs for fields consisting of only ideal or impulsive pulses')
-            if i.id is None:
-                raise AssertionError('All pulses must have IDs for valid epoch determination')
+    return cfuv_dict
 
-        times_ids = sorted([(i.tc, i.id) for i in self.pulses], key=itemgetter(0))
-        epochs = [[]]
-        epoch = 0
-        curr_time = times_ids[0][0]
+def find_epochs(field, tol: float=0.0) -> list:
+    """
+    Divide field into epochs with either zero or finite tolerance
+    Currently only supported for a field consisting of ideal or impulsive pulses
 
-        for i in times_ids:
-            if not(i[0] == curr_time):
-                epochs.append([])
-                epoch += 1
-                curr_time = i[0]
-            epochs[epoch].append(i[1])
+    tol: Float: Tolerance for non-temporal coincidence (currently not supported)
+    # TODO: Add support for tolerance
 
-        return epochs
-    
-    def getCarrierFreqsUV(self) -> dict:
-        """
-        Get dictionary of UV/VIS-range part of carrier frequencies
+    Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
+    """
 
-        Returns: Dictionary {pulse 1: UV/VIS carrier freq., ...}
-        """
-        cfuv_dict = {}
-        for i in self.pulses:
-            cfuv_dict[i.id] = i.cf_uv
+    for i in field.pulses:
+        if i.env not in ['ideal', 'impulsive']:
+            raise AssertionError('Can currently only determine epochs for fields consisting of only ideal or impulsive pulses')
+        if i.id is None:
+            raise AssertionError('All pulses must have IDs for valid epoch determination')
 
-        return cfuv_dict
+    times_ids = sorted([(i.tc, i.id) for i in self.pulses], key=itemgetter(0))
+    epochs = [[]]
+    epoch = 0
+    curr_time = times_ids[0][0]
 
+    for i in times_ids:
+        if not(i[0] == curr_time):
+            epochs.append([])
+            epoch += 1
+            curr_time = i[0]
+        epochs[epoch].append(i[1])
+
+    return epochs
+
+def uv_cancels_for_coll(coll: list, wv_signs: dict, cfs_uv: dict, tol: float=0.0) -> bool:
+    """
+    Do the UV/VIS parts of this p/m combination of pulse carrier frequencies cancel?
+
+    coll: Collection of pulse IDs to be considered
+    wv_sgns: Signs of wavevector
+    tol: tolerance (default: 0.0)
+    NOTE: Consequences if tolerance != 0.0 used are not yet supported/investigated
+    """
+
+    acc = 0.0
+
+    for i in coll:
+        acc += wv_signs[i] * cfs_uv[i]
+
+    sgnacc = (acc > 0) - (acc < 0)
+
+    return ((sgnacc * acc) <= tol)
+
+# Take an independent variables
+def indep_var_recursion(ind_vars_p, ind_var_cfgs_p, history):
+
+    # Tail recursive into ind_var_cfgs_p
+    #
+    pass
+
+# FIXME: Update when working to use attributes and not field instance
+def find_indep_exp_variables(field, phasematch):
+
+    all_ind_var_cfgs_p = []
+
+    for p in phasematch:
+        # For each phase-matching condition
+        ind_vars_p = []
+
+        for i in epochs:
+            print('new epoch', i)
+
+            ind_vars_p_epoch = []
+
+            # For this epoch:
+                # Determine which pulses have nonzero UV/VIS components
+                # For the UV/VIS nonzero pulses: Determine all sets of combinations that sum to zero with
+                # the present phase-matching condition - the resulting combinations are valid independent
+                # variables: Register those combinations as list of lists per epoch
+                # Each zero UV/VIS pulse is a valid independent variable
+                # Form a list of all combinations/singleton pulses that are valid (new) indep vars at this epoch
+            ind_vars_p.append(ind_vars_p_epoch)
+
+        # After all epochs, recurse over the independent variable collections to determine all valid cfgs
+        seed_hist = []
+        ind_var_cfgs_p = []
+        indep_var_recursion(ind_vars_p, ind_var_cfgs_p, seed_hist)
+
+        all_ind_var_cfgs_p.append(copy.deepcopy(ind_var_cfgs_p))
+
+    # Possible internal sorting of ind var cfgs
+
+    # Finally, for several PM directions, take intersection of cfgs shared between all PM directions and
+    # assign this to final_valid_ind_vars
+    final_valid_ind_vars = []
+
+    return final_valid_ind_vars
 
 
 @dataclass
