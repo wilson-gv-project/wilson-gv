@@ -255,48 +255,81 @@ def uv_cancels_for_coll(coll: list, wv_signs: dict, cfs_uv: dict, tol: float=0.0
 
     return ((sgnacc * acc) <= tol)
 
-# Take an independent variables
-def indep_var_recursion(ind_vars_p, ind_var_cfgs_p, history):
 
-    # Tail recursive into ind_var_cfgs_p
-    #
-    pass
+
+def find_indep_vars_for_one_phasematch(field, phasematch_dir):
+
+    # For each phase-matching condition
+    ind_vars_p = []
+
+    for i in epochs:
+        print('new epoch', i)
+
+        ind_vars_p_epoch = []
+
+        # For this epoch:
+        # Determine which pulses have nonzero UV/VIS components
+        # For the UV/VIS nonzero pulses: Determine all sets of combinations that sum to zero with
+        # the present phase-matching condition - the resulting combinations are valid independent
+        # variables: Register those combinations as list of lists per epoch
+        # Each zero UV/VIS pulse is a valid independent variable
+        # Form a list of all combinations/singleton pulses that are valid (new) indep vars at this epoch
+        ind_vars_p.append(ind_vars_p_epoch)
+
+    return ind_vars_p
 
 # FIXME: Update when working to use attributes and not field instance
-def find_indep_exp_variables(field, phasematch):
+def find_indep_exp_variables(field, phasematch_dirs):
 
     all_ind_var_cfgs_p = []
 
     for p in phasematch:
-        # For each phase-matching condition
-        ind_vars_p = []
 
-        for i in epochs:
-            print('new epoch', i)
+        all_ind_var_cfgs_p.append(copy.deepcopy(find_indep_vars_for_one_phasematch(field, p)))
 
-            ind_vars_p_epoch = []
+    return all_ind_var_cfgs_p
 
-            # For this epoch:
-                # Determine which pulses have nonzero UV/VIS components
-                # For the UV/VIS nonzero pulses: Determine all sets of combinations that sum to zero with
-                # the present phase-matching condition - the resulting combinations are valid independent
-                # variables: Register those combinations as list of lists per epoch
-                # Each zero UV/VIS pulse is a valid independent variable
-                # Form a list of all combinations/singleton pulses that are valid (new) indep vars at this epoch
-            ind_vars_p.append(ind_vars_p_epoch)
+def find_canonical_axes(ind_vars_cfg_p):
 
-        # After all epochs, recurse over the independent variable collections to determine all valid cfgs
-        seed_hist = []
-        ind_var_cfgs_p = []
-        indep_var_recursion(ind_vars_p, ind_var_cfgs_p, seed_hist)
+    canonical_axis_cfg = []
 
-        all_ind_var_cfgs_p.append(copy.deepcopy(ind_var_cfgs_p))
+    return canonical_axis_cfg
 
-    # Possible internal sorting of ind var cfgs
+def find_axes_recursion(ind_vars_cfg_p, valid_axes_p, history):
 
-    # Finally, for several PM directions, take intersection of cfgs shared between all PM directions and
-    # assign this to final_valid_ind_vars
+    # Tail recursive into ind_var_cfgs_p
+    pass
+
+def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
+
+    # Recurse over the independent variable collections to determine all valid axis cfgs
+    seed_hist = []
+    valid_ax_cfgs = []
+    find_axes_recursion(ind_vars_p, valid_axes, seed_hist)
+
+    # Valid ax cfg format:
+    # [[signed pulse id(s) for one axis], [signed pulse id(s) for other axis], ...]
+
+    return valid_ax_cfgs
+
+def find_valid_axes(all_ind_var_cfgs_p):
+
+    # Find valid axes for each phase-matching direction
+    valid_axes_p = []
+
+    for i in all_ind_var_cfgs_p:
+
+        valid_axes_p.append(find_valid_axes_cfgs_for_one_phasematch(i))
+
     final_valid_ind_vars = []
+
+    for i in valid_axes_p:
+
+        # for several PM directions, take intersection of cfgs shared between all PM directions and
+        # assign this to final_valid_ind_vars
+        pass
+
+    # Format of final_valid_ind_vars: [valid axis cfg 1, ..]
 
     return final_valid_ind_vars
 
