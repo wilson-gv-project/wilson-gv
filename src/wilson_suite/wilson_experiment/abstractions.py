@@ -222,7 +222,7 @@ def find_epochs(field, tol: float=0.0) -> list:
         if i.id is None:
             raise AssertionError('All pulses must have IDs for valid epoch determination')
 
-    times_ids = sorted([(i.tc, i.id) for i in self.pulses], key=itemgetter(0))
+    times_ids = sorted([(i.tc, i.id) for i in field.pulses], key=itemgetter(0))
     epochs = [[]]
     epoch = 0
     curr_time = times_ids[0][0]
@@ -236,56 +236,102 @@ def find_epochs(field, tol: float=0.0) -> list:
 
     return epochs
 
-def uv_cancels_for_coll(coll: list, wv_signs: dict, cfs_uv: dict, tol: float=0.0) -> bool:
-    """
-    Do the UV/VIS parts of this p/m combination of pulse carrier frequencies cancel?
-
-    coll: Collection of pulse IDs to be considered
-    wv_sgns: Signs of wavevector
-    tol: tolerance (default: 0.0)
-    NOTE: Consequences if tolerance != 0.0 used are not yet supported/investigated
-    """
+def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=0.0) -> bool:
 
     acc = 0.0
 
     for i in coll:
-        acc += wv_signs[i] * cfs_uv[i]
+        acc += cfs_uv[i]
 
     sgnacc = (acc > 0) - (acc < 0)
 
     return ((sgnacc * acc) <= tol)
 
 
+def find_subsets_making_orig(subsets, acc, orig, res):
 
-def find_indep_vars_for_one_phasematch(field, phasematch_dir):
+    def collapse(s):
+        c = []
+        for i in s:
+            c.extend(list(i))
+        return c
+
+    if len(collapse(acc)) > len(orig):
+        return
+
+    if (collapse(sorted(acc)) == orig) and (len(orig) > 0):
+        res.append(acc)
+
+    if len(subsets) > 0:
+
+        for i in range(len(subsets)):
+
+            new_acc = copy.deepcopy(acc)
+            new_acc.append(subsets[i])
+
+            if i - 1 < len(subsets):
+                find_subsets_making_orig(subsets[i + 1:], new_acc, orig, res)
+
+            else:
+                find_subsets_making_orig([], new_acc, orig, res)
+
+
+def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
 
     # For each phase-matching condition
     ind_vars_p = []
 
-    for i in epochs:
-        print('new epoch', i)
+    cfuv = get_carrier_freqs_uv(field.pulses)
+
+    for i in range(len(epochs)):
 
         ind_vars_p_epoch = []
+        cfuv_this_pm = {}
+        uv_this = []
+        ir_this = []
 
-        # For this epoch:
-        # Determine which pulses have nonzero UV/VIS components
-        # For the UV/VIS nonzero pulses: Determine all sets of combinations that sum to zero with
-        # the present phase-matching condition - the resulting combinations are valid independent
-        # variables: Register those combinations as list of lists per epoch
-        # Each zero UV/VIS pulse is a valid independent variable
-        # Form a list of all combinations/singleton pulses that are valid (new) indep vars at this epoch
-        ind_vars_p.append(ind_vars_p_epoch)
+        for k in epochs[i]:
+            if not(cfuv[k] == 0.0):
+                cfuv_this_pm[k] = cfuv[k] * pm_dir[k][0]
+                uv_this.append(k)
+            else:
+                ir_this.append(k)
+
+        from itertools import chain, combinations
+
+        uv_superset = set(list(chain.from_iterable(combinations(uv_this, r) for r in range(len(uv_this) + 1)))[1:])
+        uv_superset_cancel = []
+
+        for j in uv_superset:
+
+            if uv_cancels(j, cfuv_this_pm):
+                uv_superset_cancel.append(j)
+
+        acc = []
+        uv_subs_res = []
+        find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
+
+        for j in ir_this:
+            ind_vars_p_epoch.append(j)
+
+        for j in uv_subs_res:
+            ind_vars_p_epoch.append(j)
+
+        if (len(ind_vars_p_epoch) > 0):
+            ind_vars_p.append(copy.deepcopy(ind_vars_p_epoch))
+
+    print('ind vars p', ind_vars_p)
 
     return ind_vars_p
 
 # FIXME: Update when working to use attributes and not field instance
-def find_indep_exp_variables(field, phasematch_dirs):
+def find_indep_exp_variables(field, epochs, phasematch_dirs):
 
     all_ind_var_cfgs_p = []
 
-    for p in phasematch:
+    for p in phasematch_dirs:
 
-        all_ind_var_cfgs_p.append(copy.deepcopy(find_indep_vars_for_one_phasematch(field, p)))
+        all_ind_var_cfgs_p.append(copy.deepcopy(find_indep_vars_for_one_phasematch(field, epochs, p)))
 
     return all_ind_var_cfgs_p
 
@@ -294,6 +340,8 @@ def find_canonical_axes(ind_vars_cfg_p):
     canonical_axis_cfg = []
 
     return canonical_axis_cfg
+# FIXME: THE NEW ROUTINES HERE MUST HAVE TESTS TO ESTABLISH THEIR FUNCTIONING
+# AND VERIFY CHOICES OF CONVENTION
 
 def find_axes_recursion(ind_vars_cfg_p, valid_axes_p, history):
 
@@ -364,9 +412,9 @@ class VibExperiment:
     def __post_init__(self):
 
         self.dim = self.findDimensionality()
-        self.epochs = self.field.findEpochs()
+        self.epochs = find_epochs(self.field)
         self.int_sequences = self.findInteractionSequences()
-        self.cfuv = self.field.getCarrierFreqsUV()
+        self.cfuv = get_carrier_freqs_uv(self.field.pulses)
 
     def findDimensionality(self) -> int:
         """
@@ -461,6 +509,6 @@ class VibExperiment:
 
         for i in self.detector.wv_filter:
 
-            interactionRecurse(int_sequences, int_seed, i, 0, self.field.findEpochs())
+            interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
 
         return int_sequences

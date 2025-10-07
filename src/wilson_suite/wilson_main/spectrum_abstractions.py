@@ -40,6 +40,7 @@ class SpectralAxisAdvanced:
 
 		pass
 
+# Fixme: Have this be just SpectralGrid to replace
 @dataclass
 class SpectralGridMultires:
 
@@ -64,7 +65,7 @@ def is_axis_cfg_valid(axis_cfg, valid_cfgs):
 
     return True
 
-
+# FIXME: RM for now
 # Holds an axis definer and a grid
 # Comment "Frame" suggests 2D but not actually limited to that
 # FIXME: Settle organization of axis check, (default) use of canonical axes, (default?) grid choices
