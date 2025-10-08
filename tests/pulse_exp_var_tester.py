@@ -150,12 +150,19 @@ ind_vars = ws.experiment.abstractions.find_indep_exp_variables(experiment_a.fiel
 
 valid_axis_combs, canonical_axes = ws.experiment.abstractions.find_valid_axes(ind_vars)
 
-
-
-# Get terms based on canonical axes
-# Later: Translate to chosen axes
-# Need: Translator, variable equivalence finder in terms of chosen axes
-# Also need: Function to tell which values need to be specified with chosen axes (that is, indep vars not chosen as axes)
+# TODO: Include ind vars and axes in experiment class as post-init calculated attribute
+# TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms)
+# TODO: Translate to chosen axes
+# FOR THAT NEED: Translator, variable equivalence finder in terms of chosen axes
+# TODO: Finish new spectral grid class in wilson-main
+# TODO: Bring new axis functionality into wilson-main
+# ALSO NEED: Function to tell which values need to be specified with chosen axes (that is, indep vars not chosen as axes)
+# TODO: Docstrings for all new fns
+# TODO: Unit tests for all new fns
+# TODO (possibly not on this branch): Full functional consistency in wilson-experiment
+# TODO (possibly not on this branch): Make Docstrings for by this new fns, update existing ones wrt. ditto changes
+# TODO (possibly not on this branch): Unit tests for all fns thus separated out
+# TODO (possibly not on this branch): Full functional consistency in wilson-experiment
 
 quit()
 
