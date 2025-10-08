@@ -3,6 +3,7 @@ from typing import List, Optional, Iterable
 from operator import itemgetter
 import copy
 
+
 # TODO: SpecDetector and SpecScan as dataclasses?
 # TODO: Expand functionality according to below TODOs
 
@@ -364,21 +365,14 @@ def find_indep_exp_variables(field, epochs, phasematch_dirs):
     all_ind_var_cfgs_p = []
 
     for p in phasematch_dirs:
-
         all_ind_var_cfgs_p.append(copy.deepcopy(find_indep_vars_for_one_phasematch(field, epochs, p)))
 
     return all_ind_var_cfgs_p
 
-def find_canonical_axes(ind_vars_cfg_p):
-
-    canonical_axis_cfg = []
-
-    return canonical_axis_cfg
-
 def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
     if pos == len(ind_vars):
-        valid_axes.append(curr_ax_list)
+        valid_axes.append(sorted(curr_ax_list))
 
     else:
 
@@ -399,29 +393,43 @@ def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
             find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
 
-
-
 def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
     valid_axes = {}
     seed_ax_list = []
 
-    # Recurse over the independent variable collections to determine all valid axis cfgs
+    max_len_ind = 0
+
     for i in ind_vars:
+
+        if len(i) == max_len_ind:
+            max_len_entries.append(copy.deepcopy(sorted(i)))
+
+        elif len(i) > max_len_ind:
+            max_len_ind = len(i)
+            max_len_entries = [copy.deepcopy(sorted(i))]
+
+
         curr_valid_axes = []
         find_axes_recursion(i, curr_valid_axes, seed_ax_list, 0)
 
-        valid_axes[tuple(i)] = copy.deepcopy(curr_valid_axes)
+        valid_axes[tuple(sorted(i))] = sorted(copy.deepcopy(curr_valid_axes))
+
+    print('tuple', tuple(sorted(max_len_entries)))
+
+    canonical_axes = valid_axes[tuple(sorted(max_len_entries)[0])][0]
 
     for i in valid_axes:
         print('\nInd vars comb', i, '\n')
         for j in valid_axes[i]:
             print('Axis combination', j)
 
+    print('\nCanonical axes:', canonical_axes)
+
     # Valid ax cfg format:
     # [[signed pulse id(s) for one axis], [signed pulse id(s) for other axis], ...]
 
-    return set(valid_axes)
+    return set(valid_axes), canonical_axes
 
 def find_valid_axes(all_ind_var_cfgs_p):
 

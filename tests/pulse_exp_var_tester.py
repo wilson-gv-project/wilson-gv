@@ -79,7 +79,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
 
 '''
 
-'''
+
 
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
@@ -130,6 +130,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
                                                          {1: [-1], 2: [1], 3: [1]}])
+'''
 
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
@@ -147,8 +148,7 @@ epochs = ws.experiment.abstractions.find_epochs(field_a)
 
 ind_vars = ws.experiment.abstractions.find_indep_exp_variables(experiment_a.field, epochs, experiment_a.detector.wv_filter)
 
-valid_axis_combs = ws.experiment.abstractions.find_valid_axes(ind_vars)
-canonical_axes = ws.experiment.abstractions.find_canonical_axes(ind_vars)
+valid_axis_combs, canonical_axes = ws.experiment.abstractions.find_valid_axes(ind_vars)
 
 
 
