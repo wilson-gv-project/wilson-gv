@@ -16,11 +16,17 @@ pulse_5 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=
                                                 pol=[0.0, 0.0, 1.0], id=5)
 pulse_6 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=100.0, cf=0.0, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=6)
+pulse_7 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=120.0, cf=0.0, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=7)
 
-pulse_7 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=120.0, cf=0.0, cf_uv=0.072,
-                                                   wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=7)
+pulse_8 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=120.0, cf=0.0, cf_uv=0.072,
+                                                   wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=8)
+pulse_9 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=120.0, cf=0.0, cf_uv=0.072,
+                                                   wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=9)
+pulse_10 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=120.0, cf=0.0, cf_uv=0.072,
+                                                   wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=10)
 
-pulses = [pulse_1, pulse_2, pulse_3, pulse_4, pulse_5, pulse_6, pulse_7]
+pulses = [pulse_1, pulse_2, pulse_3, pulse_4, pulse_5, pulse_6, pulse_7, pulse_8, pulse_9, pulse_10]
 
 field_a = ws.experiment.abstractions.ElectricField(pulses)
 order = len(pulses)
@@ -30,7 +36,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1], 7: [1]}])  # , {1: [-1], 2: [1], 3: [1]}
+                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1], 7: [1], 8: [1], 9: [-1], 10: [1]}])
 
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]

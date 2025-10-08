@@ -309,13 +309,19 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
 
         acc = []
         uv_subs_res = []
-        find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
+
+        if i < (len(epochs) - 1):
+            find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
+        else:
+            for j in uv_superset:
+                acc = []
+                find_subsets_making_orig(uv_superset_cancel, acc, list(j), uv_subs_res)
 
         for j in ir_this:
             ind_vars_p_epoch.append(j)
 
-        for j in uv_subs_res:
-            ind_vars_p_epoch.append(j)
+        if not(uv_subs_res == []):
+            ind_vars_p_epoch.append(uv_subs_res)
 
         if (len(ind_vars_p_epoch) > 0):
             ind_vars_p.append(copy.deepcopy(ind_vars_p_epoch))
