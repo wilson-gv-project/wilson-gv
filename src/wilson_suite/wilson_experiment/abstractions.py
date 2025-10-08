@@ -259,7 +259,7 @@ def find_subsets_making_orig(subsets, acc, orig, res):
     if len(collapse(acc)) > len(orig):
         return
 
-    if (collapse(sorted(acc)) == orig) and (len(orig) > 0):
+    if (sorted(collapse(sorted(acc))) == sorted(orig)) and (len(orig) > 0):
         res.append(acc)
 
     if len(subsets) > 0:
@@ -275,17 +275,42 @@ def find_subsets_making_orig(subsets, acc, orig, res):
             else:
                 find_subsets_making_orig([], new_acc, orig, res)
 
+def find_branching_indep_var_combs(combs, orig_vars, curr_comb, curr_epoch):
+
+    if curr_epoch == len(orig_vars):
+        combs.append(copy.deepcopy(curr_comb))
+
+    else:
+        new_comb_ir = copy.deepcopy(curr_comb)
+
+        uv_start = 0
+        for i in orig_vars[curr_epoch]:
+            if not isinstance(i, list):
+                uv_start += 1
+                new_comb_ir.append(i)
+
+        if not(uv_start == (len(orig_vars[curr_epoch]))):
+
+            for i in orig_vars[curr_epoch][uv_start]:
+
+                new_comb_ir_uv = copy.deepcopy(new_comb_ir)
+                new_comb_ir_uv.extend(i)
+
+                find_branching_indep_var_combs(combs, orig_vars, new_comb_ir_uv, curr_epoch + 1)
+
+        else:
+
+            find_branching_indep_var_combs(combs, orig_vars, new_comb_ir, curr_epoch + 1)
+
 
 def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
 
-    # For each phase-matching condition
-    ind_vars_p = []
-
+    raw_ind_vars_p = []
     cfuv = get_carrier_freqs_uv(field.pulses)
 
     for i in range(len(epochs)):
 
-        ind_vars_p_epoch = []
+        raw_ind_vars_p_epoch = []
         cfuv_this_pm = {}
         uv_this = []
         ir_this = []
@@ -318,15 +343,18 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
                 find_subsets_making_orig(uv_superset_cancel, acc, list(j), uv_subs_res)
 
         for j in ir_this:
-            ind_vars_p_epoch.append(j)
+            raw_ind_vars_p_epoch.append(tuple([j]))
 
         if not(uv_subs_res == []):
-            ind_vars_p_epoch.append(uv_subs_res)
+            raw_ind_vars_p_epoch.append(uv_subs_res)
 
-        if (len(ind_vars_p_epoch) > 0):
-            ind_vars_p.append(copy.deepcopy(ind_vars_p_epoch))
+        if (len(raw_ind_vars_p_epoch) > 0):
+            raw_ind_vars_p.append(copy.deepcopy(raw_ind_vars_p_epoch))
 
-    print('ind vars p', ind_vars_p)
+    ind_vars_p = []
+    seed_comb = []
+
+    find_branching_indep_var_combs(ind_vars_p, raw_ind_vars_p, seed_comb, 0)
 
     return ind_vars_p
 
@@ -346,25 +374,54 @@ def find_canonical_axes(ind_vars_cfg_p):
     canonical_axis_cfg = []
 
     return canonical_axis_cfg
-# FIXME: THE NEW ROUTINES HERE MUST HAVE TESTS TO ESTABLISH THEIR FUNCTIONING
-# AND VERIFY CHOICES OF CONVENTION
 
-def find_axes_recursion(ind_vars_cfg_p, valid_axes_p, history):
+def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
-    # Tail recursive into ind_var_cfgs_p
-    pass
+    if pos == len(ind_vars):
+        valid_axes.append(curr_ax_list)
+
+    else:
+
+        from itertools import chain, combinations
+
+        prev_var_superset = set(list(chain.from_iterable(combinations(ind_vars[:pos], r) for r in range(len(ind_vars[:pos]) + 1)))[1:])
+
+        tmp_ax_list = copy.deepcopy(curr_ax_list)
+        tmp_ax_list.append([ind_vars[pos]])
+        new_ax_list = copy.deepcopy(tmp_ax_list)
+
+        find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
+
+        for i in prev_var_superset:
+
+            new_ax_list = copy.deepcopy(tmp_ax_list)
+            new_ax_list[len(new_ax_list) - 1].extend(i)
+
+            find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
+
+
 
 def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
+    valid_axes = {}
+    seed_ax_list = []
+
     # Recurse over the independent variable collections to determine all valid axis cfgs
-    seed_hist = []
-    valid_ax_cfgs = []
-    find_axes_recursion(ind_vars_p, valid_axes, seed_hist)
+    for i in ind_vars:
+        curr_valid_axes = []
+        find_axes_recursion(i, curr_valid_axes, seed_ax_list, 0)
+
+        valid_axes[tuple(i)] = copy.deepcopy(curr_valid_axes)
+
+    for i in valid_axes:
+        print('\nInd vars comb', i, '\n')
+        for j in valid_axes[i]:
+            print('Axis combination', j)
 
     # Valid ax cfg format:
     # [[signed pulse id(s) for one axis], [signed pulse id(s) for other axis], ...]
 
-    return valid_ax_cfgs
+    return set(valid_axes)
 
 def find_valid_axes(all_ind_var_cfgs_p):
 
@@ -375,15 +432,13 @@ def find_valid_axes(all_ind_var_cfgs_p):
 
         valid_axes_p.append(find_valid_axes_cfgs_for_one_phasematch(i))
 
-    final_valid_ind_vars = []
+    # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
+    final_valid_ind_vars = valid_axes_p[0]
 
-    for i in valid_axes_p:
-
-        # for several PM directions, take intersection of cfgs shared between all PM directions and
-        # assign this to final_valid_ind_vars
-        pass
-
-    # Format of final_valid_ind_vars: [valid axis cfg 1, ..]
+    # For several PM directions, take intersection of cfgs shared between all PM directions
+    if len(valid_axes_p) > 1:
+        for i in valid_axes_p[1:]:
+            final_valid_ind_vars = final_valid_ind_vars.intersection(i)
 
     return final_valid_ind_vars
 
