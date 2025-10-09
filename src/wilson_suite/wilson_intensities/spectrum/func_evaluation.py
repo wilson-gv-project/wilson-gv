@@ -1,8 +1,9 @@
 import numpy as np
 import itertools
-from typing import Iterable, Generator, ClassVar, Dict
+from typing import Iterable, Generator, ClassVar, Dict, Any, Self
 from dataclasses import dataclass, field
 import re
+from collections import Counter
 
 
 class VibDiffBank:
@@ -95,7 +96,7 @@ class VibDiffBank:
             return self.state_values[s1] - self.state_values[s2]
 
 
-
+# to rm
 def get_resonance_loc(*, resonances, ind_tuple, vibdiffbank: VibDiffBank) -> dict:
     """
     resonace is when:
@@ -138,39 +139,66 @@ def get_resonance_loc(*, resonances, ind_tuple, vibdiffbank: VibDiffBank) -> dic
 
 def generate_coefficient_matrix(resonance_tuples):
     """
+    w_mn[-1] = 0  -> w_mn + w1 = 0      -> w1 = -w_mn       coeffs: [1,  0,  0]
+    w_mn[-12] = 0 -> w_mn + w1 - w2 = 0 -> w1 - w2 = -w_mn  coeffs: [1, -1,  0]
+    w_mn[-23] = 0 -> w_mn + w2 - w3 = 0 -> w2 - w3 = -w_mn  coeffs: [0,  1, -1]
+
     making a coefficient matrix from a list of tuples
-    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-    output: [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
+        resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+        output: [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
 
     chatuit
     """
-    # Helper function to determine the sign of a number
-    def sign(x):
-        if x > 0:
-            return 1
-        elif x < 0:
-            return -1
-        else:
-            return 0
-    
-    # Find the maximum variable index across all tuples
+    # maximum variable index across all tuples
     max_var_index = 0
     for _, coeffs in resonance_tuples:
         for coeff in coeffs:
             max_var_index = max(max_var_index, abs(coeff))
     
-    # Initialize the coefficient matrix with zeros
-    coeff_matrix = []
+    coeff_matrix = np.zeros((max_var_index, max_var_index))
     
     for _, coeffs in resonance_tuples:
         # Create a row with zeros for all variables
         row = [0] * max_var_index
         for coeff in coeffs:
             # Reverse the sign and place it in the correct position
-            row[abs(coeff) - 1] = -1 * sign(coeff)
-        coeff_matrix.append(row)
+            row[abs(coeff) - 1] = -1 * np.sign(coeff)
+        # coeff_matrix.append(row)
     
     return coeff_matrix
+
+from .func_abstractions import VibDiffSymbolic, ParameterSet, VibStatesData
+def generate_LHS(resonances: tuple[VibDiffSymbolic, ...]):
+    """
+    w_mn[-1] = 0  -> w_mn + w1 = 0      -> w1 = -w_mn       coeffs: [1,  0,  0]
+    w_mn[-12] = 0 -> w_mn + w1 - w2 = 0 -> w1 - w2 = -w_mn  coeffs: [1, -1,  0]
+    w_mn[-23] = 0 -> w_mn + w2 - w3 = 0 -> w2 - w3 = -w_mn  coeffs: [0,  1, -1]
+
+    making a coefficient matrix from a list of tuples
+        resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+        output: [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
+
+    chatuit --> rewritten for VibDiffSymbolic
+    """
+    # maximum variable index across all tuples
+    max_var_index = 0
+    
+    # to identify coeff matrix shape
+    for vd_res in resonances:
+        coeffs = vd_res.wavematching # [-1, 2] is {'1': -1, '2': 1} - is this better?
+        max_var_index = max(max_var_index, len(coeffs))
+
+    coeff_matrix = np.zeros((max_var_index, max_var_index))
+
+    for i, vd_res in enumerate(resonances):
+        coeffs = vd_res.wavematching # [-1, 2] is {'1': -1, '2': 1} - is this better?
+
+        for key, coeff in coeffs.items():
+            # Reverse the sign and place it in the correct position
+            coeff_matrix[i, int(key) - 1] = -1 * np.sign(coeff)
+    
+    return coeff_matrix
+
 
 def get_const_vector(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
     """
@@ -182,6 +210,19 @@ def get_const_vector(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
     output: [5, -3, 2]
     """
     constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
+    return constants
+
+def get_RHS(resonances: tuple[VibDiffSymbolic, ...], parameters: ParameterSet, vibdata: VibStatesData):
+    """
+    making a constants vector from a list of tuples
+    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+    ind_tuple = (1, 2, 3) --- 
+    vibdiffbank: VibDiffBank instance
+
+    output: [5, -3, 2]
+    """
+    # constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
+    constants = [(-1)*vibdata.get_vibdiff(parameters[i.left], parameters[i.right]) for i in resonances]
     return constants
 
 def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
@@ -206,109 +247,27 @@ def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibD
         print("Error solving linear system:", e)
         return None
 
-
-@dataclass(frozen=True)
-class EvalTerm:
+def solve_LSE_resonaces(resonances:tuple[VibDiffSymbolic, ...], parameters: ParameterSet, vibdata: VibStatesData):
     """
-    EvalTerm with global registry to avoid duplicates.
-    
-    Example usage:
-        {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
-        'vibenediff': ('b,a+b', 'a,zero'),
-        'averaged_props': (('dipgrad', ('a',), ('B',)),
-                            ('polgrad', ('b',), ('A', 'D')),
-                            ('dipgrad', ('b',), ('G',))),
-        'non_averaged_props': (('F', ('a', 'c', 'c',)),),
-        'vibene_denom': ('a','b','c'),
-        'termB_pref': 0.5,
-        'termA_pref': -1/8.,
-        'lvl_anharm': 2,
-        'anharm_tuple': (1, 0)}
-    """
-    resonances: tuple
-    vibenediff: tuple
-    averaged_props: tuple
-    non_averaged_props: tuple
-    vibene_denom: tuple
-    termB_pref: float
-    termA_pref: float
-    lvl_anharm: int
-    anharm_tuple: tuple
-    
-    # Class variables for global registry
-    _global_counter: ClassVar[int] = 0
-    _registry: ClassVar[Dict[tuple, 'EvalTerm']] = {}
-    
-    def __new__(cls, *args, **kwargs):
-        # Create a temporary instance to get the hash key
-        if args:
-            # Handle positional arguments
-            field_names = ['resonances', 'vibenediff', 'averaged_props', 
-                          'non_averaged_props', 'vibene_denom', 'termB_pref', 
-                          'termA_pref', 'lvl_anharm', 'anharm_tuple']
-            kwargs.update(dict(zip(field_names, args)))
-        
-        # Create a key for the registry based on all field values
-        key = cls._make_registry_key(kwargs)
-        
-        # Check if this exact term already exists
-        if key in cls._registry:
-            return cls._registry[key]
-        
-        # Create new instance using normal dataclass constructor
-        instance = super().__new__(cls)
-        return instance
-    
-    def __post_init__(self):
-        # Create registry key and check if we need to register this instance
-        key = self._make_registry_key(self.__dict__)
-        
-        if key not in EvalTerm._registry:
-            EvalTerm._global_counter += 1
-            object.__setattr__(self, '_seq_num', EvalTerm._global_counter)
-            EvalTerm._registry[key] = self
-        else:
-            # This shouldn't happen due to __new__, but just in case
-            existing = EvalTerm._registry[key]
-            object.__setattr__(self, '_seq_num', existing._seq_num)
-    
-    @staticmethod
-    def _make_registry_key(field_dict):
-        """Create a hashable key from the field values."""
-        # Convert dict to sorted tuple of (key, value) pairs
-        # Handle nested structures by converting to strings for hashing
-        def make_hashable(obj):
-            if isinstance(obj, (list, tuple)):
-                return tuple(make_hashable(item) for item in obj)
-            elif isinstance(obj, dict):
-                return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
-            else:
-                return obj
-        
-        relevant_fields = {k: v for k, v in field_dict.items() 
-                          if not k.startswith('_')}
-        return tuple(sorted((k, make_hashable(v)) for k, v in relevant_fields.items()))
-    
-    @property
-    def short_id(self) -> str:
-        anharm_tuple_str = '_'.join([str(i) for i in self.anharm_tuple])
-        return f"T{self._seq_num:03d}({anharm_tuple_str})"
-    
-    @classmethod
-    def get_registry_stats(cls):
-        """Get statistics about the global registry."""
-        return {
-            'total_unique_terms': len(cls._registry),
-            'global_counter': cls._global_counter,
-            'terms': {term.short_id: term for term in cls._registry.values()}
-        }
-    
-    @classmethod
-    def clear_registry(cls):
-        """Clear the global registry (useful for testing)."""
-        cls._registry.clear()
-        cls._global_counter = 0
+    solving a linear system of equations
+    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
+    constants = [5, -3, 2]
+    output: [5. 2. 0.]
 
+    returns a dict {f'w{i+1}': solution}
+    """
+    coeff_matrix = generate_LHS(resonances)
+    constants = get_RHS(resonances, parameters, vibdata)
+
+    A = np.array(coeff_matrix)
+    b = np.array(constants)
+    
+    try:
+        solution = np.linalg.solve(A, b)
+        return {f'w{i+1}': val for i, val in enumerate(solution)}
+    except np.linalg.LinAlgError as e:
+        print("Error solving linear system:", e)
+        return None
 
 @dataclass(frozen=True)
 class Resonance:
@@ -436,3 +395,106 @@ def make_state_value_func(vibstates):
         return state_map.get(strtuple, None)
 
     return state_value_func
+
+
+@dataclass(frozen=True)
+class EvalTerm:
+    """
+    EvalTerm with global registry to avoid duplicates.
+    
+    Example usage:
+        {'resonances': (('b,a', (-1, 2)), ('zero,a', (-1,))),
+        'vibenediff': ('b,a+b', 'a,zero'),
+        'averaged_props': (('dipgrad', ('a',), ('B',)),
+                            ('polgrad', ('b',), ('A', 'D')),
+                            ('dipgrad', ('b',), ('G',))),
+        'non_averaged_props': (('F', ('a', 'c', 'c',)),),
+        'vibene_denom': ('a','b','c'),
+        'termB_pref': 0.5,
+        'termA_pref': -1/8.,
+        'lvl_anharm': 2,
+        'anharm_tuple': (1, 0)}
+    """
+    resonances: tuple
+    vibenediff: tuple
+    averaged_props: tuple
+    non_averaged_props: tuple
+    vibene_denom: tuple
+    termB_pref: float
+    termA_pref: float
+    lvl_anharm: int
+    anharm_tuple: tuple
+    
+    # Class variables for global registry
+    _global_counter: ClassVar[int] = 0
+    _registry: ClassVar[Dict[tuple, 'EvalTerm']] = {}
+    
+    def __new__(cls, *args, **kwargs):
+        # Create a temporary instance to get the hash key
+        if args:
+            field_names = ['resonances', 'vibenediff', 'averaged_props', 
+                          'non_averaged_props', 'vibene_denom', 'termB_pref', 
+                          'termA_pref', 'lvl_anharm', 'anharm_tuple']
+            kwargs.update(dict(zip(field_names, args)))
+        
+        # Create a key for the registry based on all field values
+        key = cls._make_registry_key(kwargs)
+        
+        # Check if this exact term already exists
+        if key in cls._registry:
+            return cls._registry[key]
+        
+        # Create new instance using normal dataclass constructor
+        instance = super().__new__(cls)
+        return instance
+    
+    def __post_init__(self):
+        # Create registry key and check if we need to register this instance
+        key = self._make_registry_key(self.__dict__)
+        
+        if key not in EvalTerm._registry:
+            EvalTerm._global_counter += 1
+            object.__setattr__(self, '_seq_num', EvalTerm._global_counter)
+            EvalTerm._registry[key] = self
+        else:
+            # This shouldn't happen due to __new__, but just in case ---???
+            existing = EvalTerm._registry[key]
+            object.__setattr__(self, '_seq_num', existing._seq_num)
+    
+    @staticmethod
+    def _make_registry_key(field_dict):
+        """Create a hashable key from the field values."""
+        # Convert dict to sorted tuple of (key, value) pairs
+        # Handle nested structures by converting to strings for hashing
+        def make_hashable(obj):
+            if isinstance(obj, (list, tuple)):
+                return tuple(make_hashable(item) for item in obj)
+            elif isinstance(obj, dict):
+                return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
+            else:
+                return obj
+        
+        relevant_fields = {k: v for k, v in field_dict.items() 
+                          if not k.startswith('_')}
+        return tuple(sorted((k, make_hashable(v)) for k, v in relevant_fields.items()))
+    
+    @property
+    def short_id(self) -> str:
+        anharm_tuple_str = '_'.join([str(i) for i in self.anharm_tuple])
+        return f"T{self._seq_num:03d}({anharm_tuple_str})"
+    
+    @classmethod
+    def get_registry_stats(cls):
+        """Get statistics about the global registry."""
+        return {
+            'total_unique_terms': len(cls._registry),
+            'global_counter': cls._global_counter,
+            'terms': {term.short_id: term for term in cls._registry.values()}
+        }
+    
+    @classmethod
+    def clear_registry(cls):
+        """Clear the global registry (useful for testing)."""
+        cls._registry.clear()
+        cls._global_counter = 0
+
