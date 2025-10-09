@@ -150,7 +150,7 @@ ind_vars = ws.experiment.abstractions.find_indep_exp_variables(experiment_a.fiel
 
 valid_axis_combs, canonical_axes = ws.experiment.abstractions.find_valid_axes(ind_vars)
 
-# TODO: Include ind vars and axes in experiment class as post-init calculated attribute
+# TODO: Include ind vars and axes in experiment class as post-init calculated attribute DONE
 # TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms)
 # TODO: Translate to chosen axes
 # FOR THAT NEED: Translator, variable equivalence finder in terms of chosen axes

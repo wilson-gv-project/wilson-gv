@@ -484,6 +484,9 @@ class VibExperiment:
         self.epochs = find_epochs(self.field)
         self.int_sequences = self.findInteractionSequences()
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
+        self.indep_vars = find_indep_exp_variables(self.field, self.epochs, self.detector.wv_filter)
+        self.valid_axis_combs, self.canonical_axes = find_valid_axes(self.indep_vars)
+
 
     def findDimensionality(self) -> int:
         """
