@@ -242,7 +242,8 @@ def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=0.0) -> bool:
     acc = 0.0
 
     for i in coll:
-        acc += cfs_uv[i]
+        sgn = (i > 0) - (i < 0)
+        acc += cfs_uv[sgn*i]
 
     sgnacc = (acc > 0) - (acc < 0)
 
@@ -319,9 +320,12 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
         for k in epochs[i]:
             if not(cfuv[k] == 0.0):
                 cfuv_this_pm[k] = cfuv[k] * pm_dir[k][0]
-                uv_this.append(k)
+                uv_this.append(k * pm_dir[k][0])
             else:
-                ir_this.append(k)
+                ir_this.append(k * pm_dir[k][0])
+
+        uv_this = sorted(uv_this)
+        ir_this = sorted(ir_this)
 
         from itertools import chain, combinations
 
@@ -395,6 +399,8 @@ def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
 def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
+    from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+
     valid_axes = {}
     seed_ax_list = []
 
@@ -413,9 +419,19 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
         curr_valid_axes = []
         find_axes_recursion(i, curr_valid_axes, seed_ax_list, 0)
 
-        valid_axes[tuple(sorted(i))] = sorted(copy.deepcopy(curr_valid_axes))
+        curr_valid_axes = sorted(copy.deepcopy(curr_valid_axes))
 
-    print('tuple', tuple(sorted(max_len_entries)))
+        dressed_valid_axes = []
+
+        for j in curr_valid_axes:
+
+            new_dress_v_a = {}
+            for k in range(len(j)):
+                new_dress_v_a[cap_alpha_labels[k]] = j[k]
+
+            dressed_valid_axes.append(copy.deepcopy(new_dress_v_a))
+
+        valid_axes[tuple(sorted(i))] = copy.deepcopy(dressed_valid_axes)
 
     canonical_axes = valid_axes[tuple(sorted(max_len_entries)[0])][0]
 
@@ -441,14 +457,14 @@ def find_valid_axes(all_ind_var_cfgs_p):
         valid_axes_p.append(find_valid_axes_cfgs_for_one_phasematch(i))
 
     # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
-    final_valid_ind_vars = valid_axes_p[0]
+    final_valid_axes = valid_axes_p[0]
 
     # For several PM directions, take intersection of cfgs shared between all PM directions
     if len(valid_axes_p) > 1:
         for i in valid_axes_p[1:]:
-            final_valid_ind_vars = final_valid_ind_vars.intersection(i)
+            final_valid_axes = final_valid_axes.intersection(i)
 
-    return final_valid_ind_vars
+    return final_valid_axes
 
 
 @dataclass

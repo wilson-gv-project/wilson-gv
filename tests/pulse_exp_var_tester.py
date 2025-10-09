@@ -80,7 +80,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
 '''
 
 
-
+'''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
 pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -107,6 +107,32 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
                                                          {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1]}])
+
+'''
+
+
+pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=1)
+pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=2)
+pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=3)
+pulse_4 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=4)
+pulse_5 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=80.0, cf=0.0, cf_uv=0.02, wv=[0.0, 0.0, 1.0],
+                                                pol=[0.0, 0.0, 1.0], id=5)
+
+pulses = [pulse_1, pulse_2, pulse_3, pulse_4, pulse_5]
+
+field_a = ws.experiment.abstractions.ElectricField(pulses)
+order = len(pulses)
+
+detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
+                                                     detector_location=[0.0, 0.0, 1.0],
+                                                     detection_polarization=[0.0, 0.0, 1.0],
+                                                     detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                                     wv_filter=[
+                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1]}])
 
 '''
 
@@ -146,13 +172,9 @@ experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field
 
 epochs = ws.experiment.abstractions.find_epochs(field_a)
 
-ind_vars = ws.experiment.abstractions.find_indep_exp_variables(experiment_a.field, epochs, experiment_a.detector.wv_filter)
-
-valid_axis_combs, canonical_axes = ws.experiment.abstractions.find_valid_axes(ind_vars)
-
 # TODO: Include ind vars and axes in experiment class as post-init calculated attribute DONE
-# TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms)
-# TODO: Translate to chosen axes
+# TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms) UPD: DO NOT DO; KEEP CURR FORM
+# TODO: Translate to chosen axes (DO THIS IN main or as utility in derive? Decision: In derive)
 # FOR THAT NEED: Translator, variable equivalence finder in terms of chosen axes
 # TODO: Finish new spectral grid class in wilson-main
 # TODO: Bring new axis functionality into wilson-main
@@ -164,10 +186,12 @@ valid_axis_combs, canonical_axes = ws.experiment.abstractions.find_valid_axes(in
 # TODO (possibly not on this branch): Unit tests for all fns thus separated out
 # TODO (possibly not on this branch): Full functional consistency in wilson-experiment
 
-quit()
-
 
 terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+
+ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.canonical_axes)
+
+quit()
 
 calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                  lvl_theory='B3LYP',
