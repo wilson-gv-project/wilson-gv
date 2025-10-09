@@ -172,6 +172,8 @@ experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field
 
 epochs = ws.experiment.abstractions.find_epochs(field_a)
 
+print('Valid axis combinations', experiment_a.valid_axis_combs)
+
 # TODO: Include ind vars and axes in experiment class as post-init calculated attribute DONE
 # TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms) UPD: DO NOT DO; KEEP CURR FORM
 # TODO: Translate to chosen axes (DO THIS IN main or as utility in derive? Decision: In derive)
@@ -189,7 +191,7 @@ epochs = ws.experiment.abstractions.find_epochs(field_a)
 
 terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
 
-ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.canonical_axes)
+translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-4, 3), (-2, 1))][1])
 
 quit()
 

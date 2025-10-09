@@ -442,10 +442,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
     print('\nCanonical axes:', canonical_axes)
 
-    # Valid ax cfg format:
-    # [[signed pulse id(s) for one axis], [signed pulse id(s) for other axis], ...]
-
-    return set(valid_axes), canonical_axes
+    return valid_axes, canonical_axes
 
 def find_valid_axes(all_ind_var_cfgs_p):
 
