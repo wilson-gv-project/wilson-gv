@@ -167,7 +167,46 @@ def generate_coefficient_matrix(resonance_tuples):
     
     return coeff_matrix
 
+
+def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
+    """
+    solving a linear system of equations
+    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
+    constants = [5, -3, 2]
+    output: [5. 2. 0.]
+
+    returns a dict {f'w{i+1}': solution}
+    """
+    coeff_matrix = generate_coefficient_matrix(resonance_tuples)
+    constants = get_const_vector(resonance_tuples, ind_tuple, vibdiffbank)
+
+    A = np.array(coeff_matrix)
+    b = np.array(constants)
+    
+    try:
+        solution = np.linalg.solve(A, b)
+        return {f'w{i+1}': val for i, val in enumerate(solution)}
+    except np.linalg.LinAlgError as e:
+        print("Error solving linear system:", e)
+        return None
+
+
+def get_const_vector(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
+    """
+    making a constants vector from a list of tuples
+    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+    ind_tuple = (1, 2, 3)
+    vibdiffbank: VibDiffBank instance
+
+    output: [5, -3, 2]
+    """
+    constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
+    return constants
+
+
 from .func_abstractions import VibDiffSymbolic, ParameterSet, VibStatesData
+
+# works with .func_abstractions
 def generate_LHS(resonances: tuple[VibDiffSymbolic, ...]):
     """
     w_mn[-1] = 0  -> w_mn + w1 = 0      -> w1 = -w_mn       coeffs: [1,  0,  0]
@@ -200,19 +239,10 @@ def generate_LHS(resonances: tuple[VibDiffSymbolic, ...]):
     return coeff_matrix
 
 
-def get_const_vector(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
-    """
-    making a constants vector from a list of tuples
-    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-    ind_tuple = (1, 2, 3)
-    vibdiffbank: VibDiffBank instance
-
-    output: [5, -3, 2]
-    """
-    constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
-    return constants
-
-def get_RHS(resonances: tuple[VibDiffSymbolic, ...], parameters: ParameterSet, vibdata: VibStatesData):
+# works with .func_abstractions
+def get_RHS(resonances: tuple[VibDiffSymbolic, ...], 
+            parameters: ParameterSet, vibdata: VibStatesData, 
+            eval_mode: str = 'on-the-fly'):
     """
     making a constants vector from a list of tuples
     resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
@@ -221,33 +251,18 @@ def get_RHS(resonances: tuple[VibDiffSymbolic, ...], parameters: ParameterSet, v
 
     output: [5, -3, 2]
     """
-    # constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
-    constants = [(-1)*vibdata.get_vibdiff(parameters[i.left], parameters[i.right]) for i in resonances]
+    if eval_mode == 'on-the-fly':
+        constants = [(-1)*get_vibdiff(vibdiffsymb=i, parameters=parameters,
+                                      allstates_map=vibdata.allstates_map) for i in resonances]
+    else:
+        raise NotImplementedError('RHS can be only "on-the-fly" now')
     return constants
 
-def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
-    """
-    solving a linear system of equations
-    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
-    constants = [5, -3, 2]
-    output: [5. 2. 0.]
 
-    returns a dict {f'w{i+1}': solution}
-    """
-    coeff_matrix = generate_coefficient_matrix(resonance_tuples)
-    constants = get_const_vector(resonance_tuples, ind_tuple, vibdiffbank)
-
-    A = np.array(coeff_matrix)
-    b = np.array(constants)
-    
-    try:
-        solution = np.linalg.solve(A, b)
-        return {f'w{i+1}': val for i, val in enumerate(solution)}
-    except np.linalg.LinAlgError as e:
-        print("Error solving linear system:", e)
-        return None
-
-def solve_LSE_resonaces(resonances:tuple[VibDiffSymbolic, ...], parameters: ParameterSet, vibdata: VibStatesData):
+# works with .func_abstractions
+def solve_LSE_resonace(resonances:tuple[VibDiffSymbolic, ...], 
+                       parameters: ParameterSet, vibdata: VibStatesData,
+                       eval_mode: str = 'on-the-fly'):
     """
     solving a linear system of equations
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
@@ -257,7 +272,7 @@ def solve_LSE_resonaces(resonances:tuple[VibDiffSymbolic, ...], parameters: Para
     returns a dict {f'w{i+1}': solution}
     """
     coeff_matrix = generate_LHS(resonances)
-    constants = get_RHS(resonances, parameters, vibdata)
+    constants = get_RHS(resonances, parameters, vibdata, eval_mode)
 
     A = np.array(coeff_matrix)
     b = np.array(constants)
@@ -268,6 +283,26 @@ def solve_LSE_resonaces(resonances:tuple[VibDiffSymbolic, ...], parameters: Para
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
         return None
+
+
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+# works with .func_abstractions
+def get_vibdiff(vibdiffsymb: VibDiffSymbolic, 
+                parameters: ParameterSet,
+                allstates_map: dict, unit='Eh') -> float:
+    """
+    left, right - vibrational states labels for left and right state
+    eval_mode - 'full-stored' or 'on-the-fly'
+    """
+    left_num = parameters[vibdiffsymb.left]
+    right_num = parameters[vibdiffsymb.right]
+    if unit=='Eh':
+        return convNu2Ene(allstates_map[left_num] - allstates_map[right_num])
+    elif unit=='cm-1':
+        return allstates_map[left_num] - allstates_map[right_num]
+    else:
+        raise NotImplementedError('This unit of energy is not supported')
+
 
 @dataclass(frozen=True)
 class Resonance:

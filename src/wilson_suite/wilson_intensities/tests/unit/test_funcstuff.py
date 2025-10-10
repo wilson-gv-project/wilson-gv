@@ -1,3 +1,12 @@
+"""
+- [x] resonance location function 
+- [x] vibenedif calculation
+- [ ] vibenediff denominator
+- [ ] averaged_props
+- [ ] non_averaged_props
+- [ ] vibene_denom
+- [ ] resonance part
+"""
 from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst
 import json
 import numpy as np
@@ -46,11 +55,13 @@ def test_EvaluationTerm():
 
     avrgGroup = f_abst.GroupPropsSymbolic(props=(p1,p2,p3))
     nonavrgGroup = f_abst.GroupPropsSymbolic(props=(p4,))
+    # grouped properties part
     allprops = f_abst.PropertiesGrouped(averaged=avrgGroup, non_averaged=nonavrgGroup)
 
     coeffs = f_abst.TermCoefficients(term_a=0.5, term_b=-1./8)
     anharmonicity = f_abst.AnharmonicLevelInfo(level=2, el_mech=(1,0))
 
+    # grouped part involving vibrational states energies
     vibene1 = f_abst.VibEneSymbolic(resonances=(r1, r2), 
                                     energy_differences=(vd1, vd2),
                                     denominators=('a', 'b', 'c'))
@@ -59,7 +70,21 @@ def test_EvaluationTerm():
                                properties=allprops, 
                                coefficients=coeffs,
                                anharmonicity=anharmonicity)
-    print(et)
+    assert et.short_id == 'T001(1_0)'
+
+    params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
+    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
+                                              f_abst.VibState(s={}, state_label='3', e=3644.),
+                                              f_abst.VibState(s={}, state_label='zero', e=0.)))
+    
+    res = f_eval.solve_LSE_resonace(resonances=(r1, r2), parameters=params, vibdata=vibdata)
+
+    res_point = f_abst.ResonancePoint(location=(res['w1'], res['w2']), 
+                                      term_id=et.short_id, 
+                                      parameters=params,
+                                      factor_value=None,
+                                      Gamma=3.14)
+    print(res_point)
 
 from wilson_suite.wilson_intensities.spectrum import func_evaluation as f_eval
 
@@ -91,7 +116,7 @@ def test_get_RHS():
     
     assert np.all(RHS==np.array([2410.0, 3644.0]))
 
-def test_solve_LSE_resonaces():
+def test_solve_LSE_resonace():
     print()
     rr1 = f_abst.ResonanceWaveMatch({'1': -1, '2': 1})
     rr2 = f_abst.ResonanceWaveMatch({'1': -1})
@@ -104,6 +129,6 @@ def test_solve_LSE_resonaces():
                                               f_abst.VibState(s={}, state_label='3', e=3644.),
                                               f_abst.VibState(s={}, state_label='zero', e=0.)))
 
-    res = f_eval.solve_LSE_resonaces(resonances=(r1, r2), parameters=params, vibdata=vibdata)
+    res = f_eval.solve_LSE_resonace(resonances=(r1, r2), parameters=params, vibdata=vibdata)
 
     assert res == {'w1': np.float64(1234.0), 'w2': np.float64(3644.0)}

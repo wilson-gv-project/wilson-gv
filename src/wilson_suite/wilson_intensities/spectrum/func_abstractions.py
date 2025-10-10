@@ -19,6 +19,8 @@ from collections.abc import Mapping
 class ParameterSet(Mapping):
     """
     Dict-like holder of "parameter label -> index value" mapping
+
+    index value should be in VibState label space, so it's a string likely
     """
     def __init__(self, parameters):
 
@@ -62,19 +64,24 @@ class ParameterSet(Mapping):
         return cls(parameters)
 
 from wilson_suite.wilson_utils.abstractions import VibState
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 @dataclass
 class VibStatesData:
-    allstates: tuple[VibState]
+    """
+    Holds vib states data and can compute vib states energy differences
+    """
+    allstates: tuple[VibState]    
 
     def __post_init__(self):
         self.allstates_map = {i.state_label: i.e for i in self.allstates}
+        self._storage = dict()
 
-    def get_vibdiff(self, left, right) -> float:
-        """
-        left, right - vibrational states labels for left and right state
-        """
-        return self.allstates_map[left] - self.allstates_map[right]
+    def _fill_storage(self):
+        for vlabel_a, energy_a in self.allstates_map:
+            for vlabel_b, energy_b in self.allstates_map:
+                self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
+
 
 @dataclass
 class EvalualtionLayer:
@@ -94,7 +101,7 @@ class ResonancePoint:
     """
     location: tuple
     term_id: str # term_res_pattern: str -- will be implied? should pass whole term?
-    vibstates_label: ParameterSet # {'a': 1, 'b': 0, 'c': 3, ...}
+    parameters: ParameterSet # {'a': 1, 'b': 0, 'c': 3, ...}
     factor_value: float
     Gamma: tuple
 
@@ -137,6 +144,19 @@ class VibDiffSymbolic:
     left: str
     right: str
     wavematching: ResonanceWaveMatch = None # [-1, 2] is {'1': -1, '2': 1} - is this better?
+
+    def resolve_states(self, parameters: ParameterSet):
+        """Get the actual vibrational states from parameters."""
+        return parameters[self.left], parameters[self.right]
+
+    def evaluate(self, parameters: ParameterSet, vibdata: VibStatesData,
+                 eval_mode: str = 'on-the-fly'):
+        if not self.wavematching is not None:
+            raise ValueError('Cannot compute expression with frequency variables')
+        
+        left_state, right_state = self.resolve_states(parameters)
+        return vibdata.get_vibdiff(left_state, right_state, eval_mode)
+
 
 
 @dataclass(frozen=True)
@@ -312,7 +332,7 @@ class EvaluationTerm:
     
     @property
     def short_id(self) -> str:
-        anharm_tuple_str = '_'.join([str(i) for i in self.anharmonic.el_mech])
+        anharm_tuple_str = '_'.join([str(i) for i in self.anharmonicity.el_mech])
         return f"T{self._seq_num:03d}({anharm_tuple_str})"
     
     @classmethod
