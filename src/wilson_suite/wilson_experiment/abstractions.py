@@ -237,7 +237,7 @@ def find_epochs(field, tol: float=0.0) -> list:
 
     return epochs
 
-def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=0.0) -> bool:
+def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=1e-10) -> bool:
 
     acc = 0.0
 
@@ -318,9 +318,11 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
         ir_this = []
 
         for k in epochs[i]:
+
             if not(cfuv[k] == 0.0):
                 cfuv_this_pm[k] = cfuv[k] * pm_dir[k][0]
                 uv_this.append(k * pm_dir[k][0])
+
             else:
                 ir_this.append(k * pm_dir[k][0])
 
@@ -433,14 +435,11 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
         valid_axes[tuple(sorted(i))] = copy.deepcopy(dressed_valid_axes)
 
+    # FIXME: Also do permutations of ind vars to get all poss axes, chk for uniqueness
+    # TODO: Have option to let user fix one or more axes and recurse starting from that instead
+
+    # Chg this to just be ind vars, then chg return struct for this fn
     canonical_axes = valid_axes[tuple(sorted(max_len_entries)[0])][0]
-
-    for i in valid_axes:
-        print('\nInd vars comb', i, '\n')
-        for j in valid_axes[i]:
-            print('Axis combination', j)
-
-    print('\nCanonical axes:', canonical_axes)
 
     return valid_axes, canonical_axes
 
@@ -489,7 +488,6 @@ class VibExperiment:
     detector: SpecDetector
     scans: list[SpecScan] = None
     magn_conditions: list = dc_field(default_factory=lambda: list)
-
 
     def __post_init__(self):
 

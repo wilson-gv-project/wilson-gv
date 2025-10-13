@@ -42,7 +42,6 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      wv_filter=[
                                                          {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [-1], 7: [1], 8: [1], 9: [1], 10: [1], 11: [-1], 12: [1]}])
 '''
-
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
@@ -76,10 +75,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
                                                          {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1], 7: [1], 8: [1], 9: [-1], 10: [1]}])
-
 '''
-
-
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
@@ -109,8 +105,6 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                          {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1]}])
 
 '''
-
-
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
 pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -133,9 +127,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
                                                          {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1]}])
-
 '''
-
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
 pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
@@ -172,12 +164,12 @@ experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field
 
 epochs = ws.experiment.abstractions.find_epochs(field_a)
 
-print('Valid axis combinations', experiment_a.valid_axis_combs)
+#print('Valid axis combinations', experiment_a.valid_axis_combs)
 
 # TODO: Include ind vars and axes in experiment class as post-init calculated attribute DONE
 # TODO: Get terms based on canonical axes (send c.a. as argument to get_fully_enhanced_terms) UPD: DO NOT DO; KEEP CURR FORM
-# TODO: Translate to chosen axes (DO THIS IN main or as utility in derive? Decision: In derive)
-# FOR THAT NEED: Translator, variable equivalence finder in terms of chosen axes
+# TODO: Translate to chosen axes (DO THIS IN main or as utility in derive? Decision: In derive) OK
+# FOR THAT NEED: Translator, variable equivalence finder in terms of chosen axes DONE
 # TODO: Finish new spectral grid class in wilson-main
 # TODO: Bring new axis functionality into wilson-main
 # ALSO NEED: Function to tell which values need to be specified with chosen axes (that is, indep vars not chosen as axes)
@@ -189,9 +181,11 @@ print('Valid axis combinations', experiment_a.valid_axis_combs)
 # TODO (possibly not on this branch): Full functional consistency in wilson-experiment
 
 
+
 terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
 
 translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-4, 3), (-2, 1))][1])
+
 
 quit()
 

@@ -8,9 +8,6 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
 
     id_tuple_in_axis_vars = {}
 
-    print('Target:', id_tuple)
-    print('Axes:', axes)
-
     # Crude search: Try all combinations -1, 0, 1 * the axis variables; stop when found
     for i in iter_prod([-1, 0, 1], repeat=len(axes)):
 
@@ -25,7 +22,6 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
                 for p in curr_ax:
 
                     for k in p:
-
 
                         if i[j] == -1:
 
@@ -59,7 +55,6 @@ def translate_one_term_to_axis_variables(term, id_tuples_in_axis_vars):
 
     for i in range(len(return_term.res)):
 
-        print('res cond PF was', return_term.res[i].pf)
         idt_dict = id_tuples_in_axis_vars[tuple(sorted(return_term.res[i].pf))]
 
         new_pf = []
@@ -72,8 +67,6 @@ def translate_one_term_to_axis_variables(term, id_tuples_in_axis_vars):
 
         return_term.res[i].pf = copy.deepcopy(new_pf)
 
-        print('res cond PF now', return_term.res[i].pf)
-
     return return_term
 
 # FIXME: Currently translating only for resonance conditions: If later using non-static pol props, then may
@@ -82,8 +75,6 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
 
     # Walk through all terms and identify all pulse ID tuples used
     pulse_id_tuples = []
-
-    print(terms)
 
     # NOTE: Assumes that resonance conditions have been canonically sorted according to number of perturbing freqs
     for i in terms:
@@ -98,8 +89,6 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
 
     for i in pulse_id_tuples:
         id_tuples_in_axis_vars[i] = find_pulse_id_tuples_as_axis_vars(i, chosen_axes)
-
-    print('Pulse ID tuples expressed in axis variables:', id_tuples_in_axis_vars)
 
     # Go through each term and translate; make structure of same shape as original to return
 
