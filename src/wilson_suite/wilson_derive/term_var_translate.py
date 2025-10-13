@@ -47,7 +47,7 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
 
     # I think that if the input data was properly assembled, then this condition will never be met; nevertheless
     # included just in case
-    raise AssertionError('Error: Pulse ID tuple was not expressable in terms of chosen axes')
+    raise AssertionError('Error: Pulse ID tuple', id_tuple, 'was not expressable in terms of chosen axes', axes)
 
 def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_axis_vars):
 

@@ -26,7 +26,7 @@ class SpecDetector:
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
 
-    wv_filter: List of dictionaries {pulse label: [sign], ...}:  Detect only light along this/these particular
+    wv_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
     phase-matching direction(s)
     # FIXME: Putting sign in a list seems unnecessary, consider rm and rework. Or maybe OK if considering multiple
     directions for same puls at once?
@@ -368,10 +368,10 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
 # FIXME: Update when working to use attributes and not field instance
 def find_indep_exp_variables(field, epochs, phasematch_dirs):
 
-    all_ind_var_cfgs_p = []
+    all_ind_var_cfgs_p = {}
 
     for p in phasematch_dirs:
-        all_ind_var_cfgs_p.append(copy.deepcopy(find_indep_vars_for_one_phasematch(field, epochs, p)))
+        all_ind_var_cfgs_p[p] = copy.deepcopy(find_indep_vars_for_one_phasematch(field, epochs, phasematch_dirs[p]))
 
     return all_ind_var_cfgs_p
 
@@ -406,16 +406,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
     valid_axes = {}
     seed_ax_list = []
 
-    max_len_ind = 0
-
     for i in ind_vars:
-
-        if len(i) == max_len_ind:
-            max_len_entries.append(copy.deepcopy(sorted(i)))
-
-        elif len(i) > max_len_ind:
-            max_len_ind = len(i)
-            max_len_entries = [copy.deepcopy(sorted(i))]
 
 
         curr_valid_axes = []
@@ -439,38 +430,75 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
     # TODO: Have option to let user fix one or more axes and recurse starting from that instead
 
     # Chg this to just be ind vars, then chg return struct for this fn
-    canonical_axes = valid_axes[tuple(sorted(max_len_entries)[0])][0]
+
 
     return valid_axes
+
+def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p):
+
+    from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+    from itertools import permutations
+
+    max_len_ind = 0
+
+    canonical_axes = {}
+
+    for i in ind_var_cfgs_p:
+        if len(i) == max_len_ind:
+            max_len_entries.append(copy.deepcopy(sorted(i)))
+
+        elif len(i) > max_len_ind:
+            max_len_ind = len(i)
+            max_len_entries = [copy.deepcopy(sorted(i))]
+
+    max_len_entries = sorted(max_len_entries)
+
+    # Since max len entries is sorted, I can make a canonical choice with the first entry
+    for i in range(len(max_len_entries[0])):
+        canonical_axes[cap_alpha_labels[i]] = max_len_entries[0][i]
+
+    print('my canonical axes', canonical_axes)
+
+    return canonical_axes
 
 def find_canonical_axes(all_ind_var_cfgs_p):
 
     from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
     from itertools import permutations
 
-    for i in all_ind_var_cfgs_p:
-        print('ind var cfgs i', i)
-        print('these ind vars', all_ind_var_cfgs_p[i])
+    max_len_ind = 0
 
+    canonical_axes_p = {}
+
+
+    for i in all_ind_var_cfgs_p:
+
+        canonical_axes_p[i] = find_canonical_axes_for_one_phasematch(all_ind_var_cfgs_p[i])
+
+    return canonical_axes_p
 
 
 
 def find_valid_axes(all_ind_var_cfgs_p):
 
     # Find valid axes for each phase-matching direction
-    valid_axes_p = []
+    valid_axes_p = {}
+
 
     for i in all_ind_var_cfgs_p:
 
-        valid_axes_p.append(find_valid_axes_cfgs_for_one_phasematch(i))
+        valid_axes_p[i] = find_valid_axes_cfgs_for_one_phasematch(all_ind_var_cfgs_p[i])
 
     # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
     final_valid_axes = valid_axes_p[0]
 
     # For several PM directions, take intersection of cfgs shared between all PM directions
     if len(valid_axes_p) > 1:
+        raise NotImplementedError('Support for axis determination over more than one phasematching direction not implemented')
         for i in valid_axes_p[1:]:
             final_valid_axes = final_valid_axes.intersection(i)
+
+    print('final valid axes', final_valid_axes)
 
     return final_valid_axes
 
@@ -503,11 +531,37 @@ class VibExperiment:
 
     def __post_init__(self):
 
+        relevant_phasematch = {}
+
+        # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
+        if self.detector.wv_filter is None:
+
+            from itertools import product as iter_prod
+
+            k = 0
+
+            for i in iter_prod([1, -1], repeat=len(self.field.pulses)):
+
+                new_phasematch = {}
+                for j in range(len(self.field.pulses)):
+                    new_phasematch[self.field.pulses[j].id] = i[j]
+
+                relevant_phasematch[k] = copy.deepcopy(new_phasematch)
+                k += 1
+
+        else:
+
+            for i in range(len(self.detector.wv_filter)):
+
+                relevant_phasematch[i] = self.detector.wv_filter[i]
+
+        self.relevant_phasematch= relevant_phasematch
+
         self.dim = self.findDimensionality()
         self.epochs = find_epochs(self.field)
         self.int_sequences = self.findInteractionSequences()
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
-        self.indep_vars = find_indep_exp_variables(self.field, self.epochs, self.detector.wv_filter)
+        self.indep_vars = find_indep_exp_variables(self.field, self.epochs, self.relevant_phasematch)
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
 
