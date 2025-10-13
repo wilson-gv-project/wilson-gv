@@ -109,9 +109,9 @@ pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=
                                                 pol=[0.0, 0.0, 1.0], id=1)
 pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=2)
-pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
+pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=3)
-pulse_4 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
+pulse_4 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=4)
 pulse_5 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=80.0, cf=0.0, cf_uv=0.02, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=5)

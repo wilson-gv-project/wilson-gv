@@ -17,8 +17,6 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
 
             if not i[j] == 0:
 
-                print('axes', axes)
-
                 curr_ax = axes[cap_alpha_labels[j]]
 
                 for p in curr_ax:
@@ -47,9 +45,12 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
 
             return id_tuple_in_axis_vars
 
-    # I think that if the input data was properly assembled, then this condition will never be met; nevertheless
-    # included just in case
-    raise AssertionError('Error: Pulse ID tuple', id_tuple, 'was not expressable in terms of chosen axes', axes)
+
+    err_str = 'Error: Pulse ID tuple ' + str(id_tuple) + ' was not expressable in terms of chosen axes ' + str(axes)
+    err_str += ('. The occurrence of this error may be due to an ambiguity inherent to the present UV/VIS-range pulse' +
+                ' interaction handling arising when more than one partitioning of the same such pulses could result in' +
+                ' an IR-range sum frequency.')
+    raise AssertionError(err_str)
 
 def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_axis_vars):
 
