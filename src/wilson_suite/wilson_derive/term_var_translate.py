@@ -49,7 +49,7 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
     # included just in case
     raise AssertionError('Error: Pulse ID tuple was not expressable in terms of chosen axes')
 
-def translate_one_term_to_axis_variables(term, id_tuples_in_axis_vars):
+def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_axis_vars):
 
     return_term = copy.deepcopy(term)
 

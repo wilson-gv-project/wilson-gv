@@ -320,11 +320,11 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
         for k in epochs[i]:
 
             if not(cfuv[k] == 0.0):
-                cfuv_this_pm[k] = cfuv[k] * pm_dir[k][0]
-                uv_this.append(k * pm_dir[k][0])
+                cfuv_this_pm[k] = cfuv[k] * pm_dir[k]
+                uv_this.append(k * pm_dir[k])
 
             else:
-                ir_this.append(k * pm_dir[k][0])
+                ir_this.append(k * pm_dir[k])
 
         uv_this = sorted(uv_this)
         ir_this = sorted(ir_this)
@@ -441,7 +441,19 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
     # Chg this to just be ind vars, then chg return struct for this fn
     canonical_axes = valid_axes[tuple(sorted(max_len_entries)[0])][0]
 
-    return valid_axes, canonical_axes
+    return valid_axes
+
+def find_canonical_axes(all_ind_var_cfgs_p):
+
+    from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+    from itertools import permutations
+
+    for i in all_ind_var_cfgs_p:
+        print('ind var cfgs i', i)
+        print('these ind vars', all_ind_var_cfgs_p[i])
+
+
+
 
 def find_valid_axes(all_ind_var_cfgs_p):
 
@@ -496,7 +508,8 @@ class VibExperiment:
         self.int_sequences = self.findInteractionSequences()
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
         self.indep_vars = find_indep_exp_variables(self.field, self.epochs, self.detector.wv_filter)
-        self.valid_axis_combs, self.canonical_axes = find_valid_axes(self.indep_vars)
+        self.valid_axis_combs = find_valid_axes(self.indep_vars)
+        self.canonical_axes = find_canonical_axes(self.indep_vars)
 
 
     def findDimensionality(self) -> int:
@@ -573,16 +586,14 @@ class VibExperiment:
                     for i in rem_wv:
 
                         if i in epochs[t]:
-                            for j in range(len(rem_wv[i])):
-                                new_rem_wv = copy.deepcopy(rem_wv)
-                                new_int = copy.deepcopy(curr_int)
-                                new_int.append({i: new_rem_wv[i][j]})
 
-                                del new_rem_wv[i][j]
-                                if new_rem_wv[i] == []:
-                                    del new_rem_wv[i]
+                            new_rem_wv = copy.deepcopy(rem_wv)
+                            new_int = copy.deepcopy(curr_int)
+                            new_int.append({i: new_rem_wv[i]})
 
-                                interactionRecurse(res, new_int, new_rem_wv, t, epochs)
+                            del new_rem_wv[i]
+
+                            interactionRecurse(res, new_int, new_rem_wv, t, epochs)
 
         if self.detector.wv_filter is None:
             raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')

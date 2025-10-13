@@ -40,7 +40,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [-1], 7: [1], 8: [1], 9: [1], 10: [1], 11: [-1], 12: [1]}])
+                                                         {1: 1, 2: -1, 3: 1, 4: -1, 5: 1, 6: -1, 7: 1, 8: 1, 9: 1, 10: 1, 11: -1, 12: 1}])
 '''
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -74,7 +74,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1], 7: [1], 8: [1], 9: [-1], 10: [1]}])
+                                                         {1: 1, 2: -1, 3: 1, 4: -1, 5: 1, 6: 1, 7: 1, 8: 1, 9: -1, 10: 1}])
 '''
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -102,7 +102,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1], 6: [1]}])
+                                                         {1: 1, 2: -1, 3: 1, 4: -1, 5: 1, 6: 1}])
 
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -126,7 +126,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [1], 2: [-1], 3: [1], 4: [-1], 5: [1]}])
+                                                         {1: 1, 2: -1, 3: 1, 4: -1, 5: 1}])
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
@@ -147,7 +147,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
-                                                         {1: [-1], 2: [1], 3: [1]}])
+                                                         {1: -1, 2: 1, 3: 1}])
 '''
 
 # Push one carrier freq
