@@ -378,7 +378,8 @@ def find_indep_exp_variables(field, epochs, phasematch_dirs):
 def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
     if pos == len(ind_vars):
-        valid_axes.append(sorted(curr_ax_list))
+        if not [sorted(i) for i in curr_ax_list] in valid_axes:
+            valid_axes.append([sorted(i) for i in curr_ax_list])
 
     else:
 
@@ -402,15 +403,17 @@ def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
 
     from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+    from itertools import permutations
 
     valid_axes = {}
     seed_ax_list = []
 
     for i in ind_vars:
 
-
         curr_valid_axes = []
-        find_axes_recursion(i, curr_valid_axes, seed_ax_list, 0)
+
+        for j in permutations(i):
+            find_axes_recursion(j, curr_valid_axes, seed_ax_list, 0)
 
         curr_valid_axes = sorted(copy.deepcopy(curr_valid_axes))
 
@@ -429,8 +432,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
     # FIXME: Also do permutations of ind vars to get all poss axes, chk for uniqueness
     # TODO: Have option to let user fix one or more axes and recurse starting from that instead
 
-    # Chg this to just be ind vars, then chg return struct for this fn
-
+    print('valid axes', valid_axes)
 
     return valid_axes
 
@@ -455,9 +457,7 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p):
 
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
-        canonical_axes[cap_alpha_labels[i]] = max_len_entries[0][i]
-
-    print('my canonical axes', canonical_axes)
+        canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
 
     return canonical_axes
 
@@ -470,12 +470,20 @@ def find_canonical_axes(all_ind_var_cfgs_p):
 
     canonical_axes_p = {}
 
-
     for i in all_ind_var_cfgs_p:
 
         canonical_axes_p[i] = find_canonical_axes_for_one_phasematch(all_ind_var_cfgs_p[i])
 
-    return canonical_axes_p
+    # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
+    final_canonical_axes = canonical_axes_p[0]
+
+    # For several PM directions, take intersection of cfgs shared between all PM directions
+    if len(canonical_axes_p) > 1:
+        raise NotImplementedError('Support for axis determination over more than one phasematching direction not implemented')
+        for i in valid_axes_p[1:]:
+            final_canonical_axes = final_canonical_axes.intersection(i)
+
+    return final_canonical_axes
 
 
 
@@ -497,8 +505,6 @@ def find_valid_axes(all_ind_var_cfgs_p):
         raise NotImplementedError('Support for axis determination over more than one phasematching direction not implemented')
         for i in valid_axes_p[1:]:
             final_valid_axes = final_valid_axes.intersection(i)
-
-    print('final valid axes', final_valid_axes)
 
     return final_valid_axes
 

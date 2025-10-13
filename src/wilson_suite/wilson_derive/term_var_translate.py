@@ -17,6 +17,8 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
 
             if not i[j] == 0:
 
+                print('axes', axes)
+
                 curr_ax = axes[cap_alpha_labels[j]]
 
                 for p in curr_ax:

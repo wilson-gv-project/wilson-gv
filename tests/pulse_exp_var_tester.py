@@ -184,7 +184,8 @@ epochs = ws.experiment.abstractions.find_epochs(field_a)
 
 terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
 
-translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-4, 3), (-2, 1))][1])
+
+translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.canonical_axes)
 
 
 quit()
