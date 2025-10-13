@@ -1,7 +1,18 @@
 import copy
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
-def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
+def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
+    """
+    Attempt to express a linear combination of pulse IDs in terms of the given axes
+
+    id_tuple: A tuple expressing a  +/- 1 linear combination of pulse IDs
+    axes: A dictionary expressing axes as {axis dummy label: independent variable(s) in axis} pairs
+
+    returns (on success): id_tuple_in_axis_vars: {axis label 1: coeff, ...}}: A description
+    of which linear combination of the axis variables make up the combination id_tuple
+
+    On fail, throws AssertionError (see end).
+    """
 
     from itertools import product as iter_prod
     from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
@@ -14,15 +25,12 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
         running_vars = []
 
         for j in range(len(i)):
-
             if not i[j] == 0:
 
                 curr_ax = axes[cap_alpha_labels[j]]
 
                 for p in curr_ax:
-
                     for k in p:
-
                         if i[j] == -1:
 
                             if k in running_vars:
@@ -37,6 +45,7 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
                             else:
                                 running_vars.append(k)
 
+        # If success, assemble result and return
         if tuple(sorted(running_vars)) == id_tuple:
 
             # Assemble ID tuple in axis variables
@@ -52,10 +61,22 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple, axes):
                 ' an IR-range sum frequency.')
     raise AssertionError(err_str)
 
-def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_axis_vars):
+def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_axis_vars: dict) -> VibPerturbedTerm:
+    """
+    Translate a term represented in terms of pulse IDs to be represented in terms of chosen axes
+
+    term: VibPerturbedTerm to be translated
+
+    id_tuples_in_axis_vars: Dictionary {pulse linear combination: {axis label 1: coeff, ...}}: That is, a description
+    of which linear combination of the axis variables make up a given oulse linear combination
+
+    returns: return_term: The translated term
+    """
+
 
     return_term = copy.deepcopy(term)
 
+    # Walk through the resonance conditions and translate according to id_tuples_in_axis_vars
     for i in range(len(return_term.res)):
 
         idt_dict = id_tuples_in_axis_vars[tuple(sorted(return_term.res[i].pf))]
@@ -74,7 +95,16 @@ def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_ax
 
 # FIXME: Currently translating only for resonance conditions: If later using non-static pol props, then may
 # need extra handling for UV parts of that? Not sure
-def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes: dict):
+def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes: dict) -> list[VibPerturbedTerm]:
+    """
+    Translate terms represented in terms of pulse IDs to be represented in terms of chosen axes
+
+    terms: list of VibPerturbedTerm instances: The terms to be translated
+    chosen_axes: dictionary of {axis dummy label: list of independent variables in axis} pairs
+
+    Returns: translated_terms: list of VibPerturbedTerm instances: The terms thus translated
+
+    """
 
     # Walk through all terms and identify all pulse ID tuples used
     pulse_id_tuples = []
@@ -93,8 +123,9 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
     for i in pulse_id_tuples:
         id_tuples_in_axis_vars[i] = find_pulse_id_tuples_as_axis_vars(i, chosen_axes)
 
-    # Go through each term and translate; make structure of same shape as original to return
+    print('idt', id_tuples_in_axis_vars)
 
+    # Go through each term and translate; make structure of same shape as original to return
     translated_terms = {}
     for i in terms:
         translated_terms[i] = {}

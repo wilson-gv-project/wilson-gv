@@ -250,20 +250,32 @@ def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=1e-10) -> bool:
     return ((sgnacc * acc) <= tol)
 
 
-def find_subsets_making_orig(subsets, acc, orig, res):
+def find_subsets_making_orig(subsets: list, acc: list, orig: list, res: list):
+    """
+    Identify which collections of subsets are valid full partitions of original set orig; tail-recursive.
 
+    subsets: A list of subsets to be checked by this function
+    acc: list: In-recursion accumulator (candidate)
+    orig: list: The original set w.r.t. which to compare
+    res: Accumulated results
+    """
+
+    # Helper function: Collapse list of iterables into one-fold list
     def collapse(s):
         c = []
         for i in s:
             c.extend(list(i))
         return c
 
+    # Pruning criterion: No use in recursion if candidate list is already longer than orig
     if len(collapse(acc)) > len(orig):
         return
 
+    # Check at recursion end: Does acc correspond to a original list which is non-empty?
     if (sorted(collapse(sorted(acc))) == sorted(orig)) and (len(orig) > 0):
         res.append(acc)
 
+    # Recursion
     if len(subsets) > 0:
 
         for i in range(len(subsets)):
@@ -271,13 +283,22 @@ def find_subsets_making_orig(subsets, acc, orig, res):
             new_acc = copy.deepcopy(acc)
             new_acc.append(subsets[i])
 
+            # Pass remaining subsets to further recursion
             if i - 1 < len(subsets):
                 find_subsets_making_orig(subsets[i + 1:], new_acc, orig, res)
 
             else:
                 find_subsets_making_orig([], new_acc, orig, res)
 
-def find_branching_indep_var_combs(combs, orig_vars, curr_comb, curr_epoch):
+def find_branching_indep_var_combs(combs: list, orig_vars: list, curr_comb: list, curr_epoch: int):
+    """
+    Make branching choices of different valid UV/VIS partitioning choices (tail-recursive)
+
+    combs: list: Accumulated combinations (tail-recursion result)
+    orig_vars: list: Original variables (with branches as multi-entry lists)
+    curr_comb: list: Branching choice in-recursion accumulator
+    curr_epoch: int: Current epoch counter
+    """
 
     if curr_epoch == len(orig_vars):
         combs.append(copy.deepcopy(curr_comb))
@@ -305,11 +326,24 @@ def find_branching_indep_var_combs(combs, orig_vars, curr_comb, curr_epoch):
             find_branching_indep_var_combs(combs, orig_vars, new_comb_ir, curr_epoch + 1)
 
 
-def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
+def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_dir: dict) -> list:
+    """
+    Determine possible (non-ordered) configurations of (IR-range) independent variables for a set of IR or UV/VIS-range pulses
+    for a given phase-matching condition.
+
+    pulses: List of EmPulse instances
+    epochs: List of epochs where the pulses (referred to by their IDs) are grouped in time
+    pm_dir: Dictionary of (pulse ID: phase-matching condition sign) pairs
+
+    Returns: ind_vars_p: The collection of identified independent variables for that phase-matching condition, formatted as a
+                        list of lists, where the outer list represents one full collection of independent
+                        variables, and the inner list represents the specific independent variables for that entry.
+    """
 
     raw_ind_vars_p = []
-    cfuv = get_carrier_freqs_uv(field.pulses)
+    cfuv = get_carrier_freqs_uv(pulses)
 
+    # Loop over epochs
     for i in range(len(epochs)):
 
         raw_ind_vars_p_epoch = []
@@ -317,8 +351,10 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
         uv_this = []
         ir_this = []
 
+        # Pulses in epoch
         for k in epochs[i]:
 
+            # Dress UV/VIS-range pulses with phase-matching sign
             if not(cfuv[k] == 0.0):
                 cfuv_this_pm[k] = cfuv[k] * pm_dir[k]
                 uv_this.append(k * pm_dir[k])
@@ -331,9 +367,11 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
 
         from itertools import chain, combinations
 
+        # Find the superset (less empty entry) of all UV/VIS pulses in this epoch
         uv_superset = set(list(chain.from_iterable(combinations(uv_this, r) for r in range(len(uv_this) + 1)))[1:])
         uv_superset_cancel = []
 
+        # Which subsets have UV/VIS components that cancel?
         for j in uv_superset:
 
             if uv_cancels(j, cfuv_this_pm):
@@ -342,41 +380,75 @@ def find_indep_vars_for_one_phasematch(field, epochs, pm_dir):
         acc = []
         uv_subs_res = []
 
+        # Which collections of UV/VIS pulses that cancel do together add up to the full set of UV/VIS pulses in this epoch?
         if i < (len(epochs) - 1):
             find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
         else:
+            # In last epoch they do not need to cancel since the resulting signal is presumed to go to the detector
             for j in uv_superset:
                 acc = []
                 find_subsets_making_orig(uv_superset_cancel, acc, list(j), uv_subs_res)
 
+        # IR-range pulses become independent variables directly
         for j in ir_this:
             raw_ind_vars_p_epoch.append(tuple([j]))
 
+        # Different UV/VIS partitions of all the UV/VIS pulses in this epoch become branching options
         if not(uv_subs_res == []):
             raw_ind_vars_p_epoch.append(uv_subs_res)
 
+        # No need to add if no independent variables found
+        # In this case, there could be a "missing" set of frequencies if no UV/VIS collections were found to
+        # be valid in this epoch, but in that case, there should in all likelihood also be no surviving wilson-derive terms
         if (len(raw_ind_vars_p_epoch) > 0):
             raw_ind_vars_p.append(copy.deepcopy(raw_ind_vars_p_epoch))
 
     ind_vars_p = []
     seed_comb = []
 
+    # Do the branching combinatorics over any UV/VIS partitions with more than one option
     find_branching_indep_var_combs(ind_vars_p, raw_ind_vars_p, seed_comb, 0)
 
     return ind_vars_p
 
-# FIXME: Update when working to use attributes and not field instance
-def find_indep_exp_variables(field, epochs, phasematch_dirs):
+def find_indep_exp_variables(pulses: list[EmPulse], epochs: list, phasematch_dirs: dict) -> dict:
+    """
+    Outer loop over phase-matching conditions for use with find_indep_vars_for_one_phasematch.
+
+    pulses: List of EmPulse instances
+    epochs: List of epochs where the pulses (referred to by their IDs) are grouped in time
+    phasematch_dirs: Dictionary: Each entry (key: phase-matching condition ID)
+                    corresponds to a phase-matching condition/direction. Each direction is
+                    itself a dictionary with pulse ID: sign pairs for entries.
+
+    Returns: all_ind_var_cfgs_p: A dictionary over the phase-matching condition IDs. Each entry is the set of
+                                 found independent variables for that phase-matching condition, formatted as a
+                                 list of lists, where the outer list represents one full collection of independent
+                                 variables, and the inner list represents the specific independent variables for that
+                                 entry.
+    """
 
     all_ind_var_cfgs_p = {}
 
     for p in phasematch_dirs:
-        all_ind_var_cfgs_p[p] = copy.deepcopy(find_indep_vars_for_one_phasematch(field, epochs, phasematch_dirs[p]))
+        all_ind_var_cfgs_p[p] = copy.deepcopy(find_indep_vars_for_one_phasematch(pulses, epochs, phasematch_dirs[p]))
 
     return all_ind_var_cfgs_p
 
-def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
+def find_axes_recursion(ind_vars: tuple, valid_axes: list, curr_ax_list: list, pos: int):
+    """
+    Find valid axes for one independent variables choice (tail-recursive)
 
+    ind_vars: tuple of tuples: One independent variables choice.
+    valid_axes: list: Accumulated sets of valid axes
+    curr_ax_list: intra-recursion accumulator
+    pos: recursion depth counter: Which indep. var. position is considered here?
+
+    Valid axis choices either use the independent variable by itself or together with any nonempty subset of the
+    preceding independent variables
+    """
+
+    # Recursion termination
     if pos == len(ind_vars):
         if not [sorted(i) for i in curr_ax_list] in valid_axes:
             valid_axes.append([sorted(i) for i in curr_ax_list])
@@ -385,12 +457,14 @@ def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
 
         from itertools import chain, combinations
 
+        # Make superset and recurse over it
         prev_var_superset = set(list(chain.from_iterable(combinations(ind_vars[:pos], r) for r in range(len(ind_vars[:pos]) + 1)))[1:])
 
         tmp_ax_list = copy.deepcopy(curr_ax_list)
         tmp_ax_list.append([ind_vars[pos]])
         new_ax_list = copy.deepcopy(tmp_ax_list)
 
+        # Recursion without contribution from superset ("independent variable by itself")
         find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
 
         for i in prev_var_superset:
@@ -398,9 +472,21 @@ def find_axes_recursion(ind_vars, valid_axes, curr_ax_list, pos):
             new_ax_list = copy.deepcopy(tmp_ax_list)
             new_ax_list[len(new_ax_list) - 1].extend(i)
 
+            # New recursion with entry from superset
             find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
 
-def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
+def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict:
+    """
+    Find valid axes choices for one phase-matching direction.
+
+    ind_var: List of lists of tuples: independent variables for one phase-matching condition.
+                    See return structure of find_indep_exp_variables.
+
+    Returns: dict: valid_axes: For each set of independent variable choices (keys), return a list of
+    valid axis choices. Each such list entry is a dictionary {dummy axis label: list of independent variables
+    comprising axis}
+    """
+
 
     from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
     from itertools import permutations
@@ -408,35 +494,52 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars):
     valid_axes = {}
     seed_ax_list = []
 
+    # Loop over independent variable collection choices
     for i in ind_vars:
 
         curr_valid_axes = []
 
+        # Permute each independent variable collection for full combinatorics; accumulate new entries (inside recursion)
         for j in permutations(i):
             find_axes_recursion(j, curr_valid_axes, seed_ax_list, 0)
 
         curr_valid_axes = sorted(copy.deepcopy(curr_valid_axes))
 
+        # Dress the found axis entries with dummy labels
         dressed_valid_axes = []
 
         for j in curr_valid_axes:
 
             new_dress_v_a = {}
+
             for k in range(len(j)):
                 new_dress_v_a[cap_alpha_labels[k]] = j[k]
 
             dressed_valid_axes.append(copy.deepcopy(new_dress_v_a))
 
+        # Enter in dictionary by sorted independent variable tuples
         valid_axes[tuple(sorted(i))] = copy.deepcopy(dressed_valid_axes)
-
-    # FIXME: Also do permutations of ind vars to get all poss axes, chk for uniqueness
-    # TODO: Have option to let user fix one or more axes and recurse starting from that instead
-
-    print('valid axes', valid_axes)
 
     return valid_axes
 
-def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p):
+def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict:
+    """
+    Find canonical axes for one phase-matching direction.
+
+    ind_var_cfgs_p: List of lists: independent variables for one phase-matching condition.
+                    See return structure of find_indep_exp_variables.
+
+    Returns: dict: canonical_axes: For the canonical independent variable choice,
+                   return a dictionary {axis dummy label: independent variable}
+
+    The canonical independent variable choice is taken to be that which gives the greatest number of
+    independent variables. If more than one such entry, then the canonical choice is the minimum
+    such choice after numerically sorting
+
+    The canonical axis choice is the choice of axes that uses each of the canonical independent variables
+    exactly once for each axis, with dummy axis labels affixed in the same order as the ordering for the
+    canonical independent variables
+    """
 
     from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
     from itertools import permutations
@@ -445,6 +548,7 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p):
 
     canonical_axes = {}
 
+    # Find entry/-ies with the most independent variables
     for i in ind_var_cfgs_p:
         if len(i) == max_len_ind:
             max_len_entries.append(copy.deepcopy(sorted(i)))
@@ -457,24 +561,29 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p):
 
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
+        # Dress canonical indepentent variables with axis labels
         canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
 
     return canonical_axes
 
+# TODO: Have option to let user fix one or more axes and recurse starting from that instead
 def find_canonical_axes(all_ind_var_cfgs_p):
+    """
+    Find canonical axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
 
-    from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+    all_ind_var_cfgs_p: Dictionary of independent variables. See return structure of find_indep_exp_variables.
+
+    Returns: dict: final_canonical_axes: For the canonical independent variable choice
+    (see find_canonical_axes_for_one_phasematch), return a dictionary {axis dummy label: independent variable}
+    """
+
     from itertools import permutations
-
-    max_len_ind = 0
 
     canonical_axes_p = {}
 
     for i in all_ind_var_cfgs_p:
-
         canonical_axes_p[i] = find_canonical_axes_for_one_phasematch(all_ind_var_cfgs_p[i])
 
-    # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
     final_canonical_axes = canonical_axes_p[0]
 
     # For several PM directions, take intersection of cfgs shared between all PM directions
@@ -485,9 +594,17 @@ def find_canonical_axes(all_ind_var_cfgs_p):
 
     return final_canonical_axes
 
+# TODO: Have option to let user fix one or more axes and recurse starting from that instead
+def find_valid_axes(all_ind_var_cfgs_p: dict) -> dict:
+    """
+    Find valid axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
 
+    all_ind_var_cfgs_p: Dictionary of independent variables. See return structure of find_indep_exp_variables.
 
-def find_valid_axes(all_ind_var_cfgs_p):
+    Returns: dict: final_valid_axes: For each set of independent variable choices (keys), return a list of
+    valid axis choices. Each such list entry is a dictionary {dummy axis label: list of independent variables
+    comprising axis}
+    """
 
     # Find valid axes for each phase-matching direction
     valid_axes_p = {}
@@ -561,13 +678,13 @@ class VibExperiment:
 
                 relevant_phasematch[i] = self.detector.wv_filter[i]
 
-        self.relevant_phasematch= relevant_phasematch
+        self.relevant_phasematch = relevant_phasematch
 
         self.dim = self.findDimensionality()
         self.epochs = find_epochs(self.field)
         self.int_sequences = self.findInteractionSequences()
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
-        self.indep_vars = find_indep_exp_variables(self.field, self.epochs, self.relevant_phasematch)
+        self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
 
