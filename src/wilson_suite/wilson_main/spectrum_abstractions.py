@@ -40,6 +40,54 @@ class SpectralAxisAdvanced:
 
 		pass
 
+# Fixme: Have this be just SpectralGrid to replace
+# HACKATHON TASK: Settle all details related to this as to be used in intensities after refresher look at intensities
+@dataclass
+class SpectralGridMultires:
+
+    base_resolution: float
+    base_axis_npoints: list
+    axis_starts: list
+    increased_res_regions: list # One entry per region,
+    # region def: [[axis starts], [n points wrt base resolution], detail level (integer or power or 2)]
+
+    # Return all grid points as tuples
+    def yield_all_grid_points(self):
+
+        pass
+
+    # Other yield methods? Discuss needs
+
+def is_axis_cfg_valid(axis_cfg, valid_cfgs):
+
+    # TODO: Make canonical sorting before checking if in
+    if not axis_cfg in valid_cfgs:
+        return False
+
+    return True
+
+# FIXME: RM for now
+# Holds an axis definer and a grid
+# Comment: "Frame" suggests 2D but not actually limited to that
+# FIXME: Settle organization of axis check, (default) use of canonical axes, (default?) grid choices
+@dataclass
+class SpectralFrame:
+
+    axes: dict # dict of SpectralAxis instances
+    grid: SpectralGridMultires
+
+    def __post_init__(self, valid_axes):
+
+        for i in self.axes:
+            if not isinstance(self.axes[i], SpectralAxis):
+                raise TypeError("Values of axes dict should be SpectralAxis instances")
+
+        if not is_axis_cfg_valid(self.axes, valid_axes):
+            raise AssertionError("Axis choice does not correspond to valid set")
+
+
+
+
 @dataclass
 class SpectralGrid:
 	"""

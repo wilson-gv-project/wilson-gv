@@ -20,3 +20,6 @@ op_labels_greek = ['B', 'G', 'D', 'E', 'Z', 'H', 'T', 'I']
 
 # "Omega" special operator label
 op_omega_label_greek = 'A'
+
+# Capital alphabetical labels (primary use: Axis aliases)
+cap_alpha_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']

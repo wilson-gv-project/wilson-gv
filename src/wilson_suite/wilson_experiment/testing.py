@@ -8,7 +8,7 @@ pulse_uvvis_2 = abst.emPulse('ideal', 1.0e-5, tc = 220.0, cf=0.0, cf_uv=0.072, w
 
 field_a = abst.electricField([pulse_ir_1, pulse_ir_2, pulse_uvvis_1])
 
-epochs = field_a.findEpochs()
+epochs = field_a.find_epochs()
 
 print(epochs)
 
