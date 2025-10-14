@@ -25,6 +25,7 @@ class VibState:
 	e: float = 0.0
 	d: Any = None
 	serial_s: dict = field(init=False)
+	state_label: str = None
 
 	def __post_init__(self, s):
 		self.serial_s = {",".join(k): v for k, v in s.items()}
