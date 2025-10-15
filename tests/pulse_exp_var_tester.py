@@ -105,6 +105,7 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                          {1: 1, 2: -1, 3: 1, 4: -1, 5: 1, 6: 1}])
 
 '''
+'''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
 pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.04, wv=[0.0, 0.0, 1.0],
@@ -130,9 +131,9 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
 '''
 pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=1)
-pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
+pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=58.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=2)
-pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
+pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=110.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
                                                 pol=[0.0, 0.0, 1.0], id=3)
 
 pulses = [pulse_1, pulse_2, pulse_3]
@@ -148,7 +149,6 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                      wv_filter=[
                                                          {1: -1, 2: 1, 3: 1}])
-'''
 
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
@@ -184,11 +184,11 @@ epochs = ws.experiment.abstractions.find_epochs(field_a)
 
 terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
 
+print(experiment_a.valid_axis_combs)
 
-translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.canonical_axes)
 
+translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
 
-quit()
 
 calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                  lvl_theory='B3LYP',
@@ -198,7 +198,16 @@ calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
 sim = ws.main.workflow_abstractions.WilsonSimulation()
 
 sim.addExperiment(experiment_a)
-sim.addTerms(terms=terms)
+sim.addTerms(terms=translated_terms)
+
+# ! 1.1 transform terms from derive to evaluate form
+dict_terms = ws.wilson_utils.termdict_from_symb_term.derived_terms_dict_to_dicts(translated_terms)
+
+for i in dict_terms:
+    print('\n\n')
+    print(i)
+
+quit()
 
 mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
 vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')

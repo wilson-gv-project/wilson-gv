@@ -225,7 +225,7 @@ class VibDiffTerm:
     def __init__(self, sl=None, sr=None, is_pert_wf_diff=False):
         """
         sl: VibStateSymbolic or HarmOscStateSymbolic instance: Bra ("left-hand") state
-        sl: VibStateSymbolic or HarmOscStateSymbolic instance: Ket ("right-hand") state
+        sr: VibStateSymbolic or HarmOscStateSymbolic instance: Ket ("right-hand") state
         is_pert_wf_diff: Boolean: Flag: Does this term come from an expression for
         a perturbed (vibrational) wavefunction? (Alternative: from Hermite integration)
         """
@@ -265,6 +265,7 @@ class VibDiffTerm:
         return hash( ( self.sl.h(), self.sr.h() ) )
 
 
+
 class ResonanceCondition:
     """
     Resonance condition class
@@ -285,10 +286,6 @@ class ResonanceCondition:
             raise TypeError('The energy difference must be a VibDiffTerm instance')
 
         self.diff = diff
-
-        # Perturbing frequencies
-        if not all(isinstance(i, int) for i in pf):
-            raise TypeError('All perturbing frequencies must be represented by an integer index')
 
         self.pf = pf
         self.id = id
@@ -655,6 +652,42 @@ class VibPerturbedTerm:
 
         # Hash (currently indeterminate)
         self.hsh = None
+
+
+    def tellNonSummSummIndices(self):
+
+        summation_indices = []
+        non_summation_indices = []
+
+        for i in self.res:
+
+            for j in i.diff.sl.q:
+                if not j in non_summation_indices:
+                    non_summation_indices.append(j)
+
+            for j in i.diff.sr.q:
+                if not j in non_summation_indices:
+                    non_summation_indices.append(j)
+
+        candidate_summation_indices = []
+
+        for i in self.freqterms:
+
+            for j in i.sl.q:
+                if not j in candidate_summation_indices:
+                    candidate_summation_indices.append(j)
+
+            for j in i.sr.q:
+                if not j in candidate_summation_indices:
+                    candidate_summation_indices.append(j)
+
+        for i in candidate_summation_indices:
+
+            if not i in non_summation_indices:
+                summation_indices.append(i)
+
+
+        return non_summation_indices, summation_indices
 
 
     def nmRenameAndInternalResort(self, mask: dict):

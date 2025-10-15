@@ -1,5 +1,8 @@
 import copy
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_intensities.spectrum.pre_eval_treatment import identify_unique_resmotifs, \
+    terms_for_motif
+
 
 def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
     """
@@ -123,8 +126,6 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
     for i in pulse_id_tuples:
         id_tuples_in_axis_vars[i] = find_pulse_id_tuples_as_axis_vars(i, chosen_axes)
 
-    print('idt', id_tuples_in_axis_vars)
-
     # Go through each term and translate; make structure of same shape as original to return
     translated_terms = {}
     for i in terms:
@@ -133,5 +134,30 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
             translated_terms[i][j] = []
             for k in terms[i][j]:
                 translated_terms[i][j].append(translate_one_term_to_axis_variables(k, id_tuples_in_axis_vars))
+
+    for i in translated_terms:
+        for j in translated_terms[i]:
+
+            print('i, j ', i, j)
+
+
+
+            for k in range(len(translated_terms[i][j])):
+
+                print('\n\n')
+                print('My axes', chosen_axes)
+                print('My pulse combinations as axes', id_tuples_in_axis_vars)
+
+                #print('\n\n')
+                #terms[i][j][k].present()
+                #translated_terms[i][j][k].present()
+                #print('non-sum, sum indices')
+                #print(translated_terms[i][j][k].tellNonSummSummIndices())
+                #print('')
+
+            print('res motifs', identify_unique_resmotifs(terms[i][j]))
+            print('which_terms_motifs', terms_for_motif(terms[i][j]))
+
+
 
     return translated_terms

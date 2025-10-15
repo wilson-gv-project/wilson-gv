@@ -1,6 +1,7 @@
 """
 Evaluator functions for WilsonSimulation
 """
+from ...wilson_utils.printing import printtest
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
 from ...wilson_utils.unit_convertor import convertor
@@ -10,6 +11,75 @@ import numpy as np
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
+
+# TermND with TermsEvaluator
+def terms_evaluator_general(system,
+                    derived_terms, props,
+                    spec_eval_setup, vib_ana_setup,
+                    do_diagn: bool,
+                    selected_combs: list = None,
+                    collect_all: bool = False) -> dict:
+    '''
+
+    res_motifs = {}
+
+    # make keys with empty lists
+    res_motifs = find_all_unique_resonance_motifs(terms) OK
+
+    which_terms_have_this_res_motif = find_which_terms_have_res_motif(res_motifs, terms) OK
+
+    for i in res_motifs:
+        res_motifs[i] = find_inside_window_resonance_locations_wrt_index_choices(i, states, spec_window)
+
+
+    # Results: Each resonance motif entry i gets a dictionary ((index tuple), (resonance location tuple))
+
+    motif_res_loc = {motif 1: {(500., 1200.): [(1, 2), (1, 3)],
+               (500., 1400.): [(1, 4)], ...}}
+
+    for i in terms:
+        # Direct invocation in features_to_draw assembler also possible
+        term_coeffs_per_index[i] = evaluate_term_coeffs(i, motif_res_loc[make_resonance_motif((term.res))].values())
+
+    features_to_draw = {}
+
+    for i in res_motifs:
+
+        features_to_draw[i] = {}
+
+        for nm_inds in res_motifs[i]:
+
+            # Two-fold grouping: Motif, then location per criterion
+            features_to_draw[i][(state_tuple), (location_tuple)] = sum([term_coeffs_per_index[k][nm_inds]
+            for k in which_terms_have_this_res_motif[i]])
+
+    domains_with_features = determine_domains_and_features(features_to_draw)
+    domain_grids = get_domain_grids(domains_with_features)
+
+    for d in domains_with_features:
+        domain_grid_values = get_numerical_grids(domain_grids[d])
+        for f in domains_with_features[d]:
+            domain_grid_values += evaluate_feature_on_grid(domains_with_features[d][f], domain_grids[d], opt: lineshape
+            fns)
+
+            Option
+            A: Add up domain
+            grid
+            values
+            into
+            total
+            evaluation
+            result
+            Option
+            B: Return
+            only
+            domain
+            info and domain
+            grid
+            values
+
+    '''
+    pass
 
 # TermND with TermsEvaluator
 def terms_evaluator(system,
