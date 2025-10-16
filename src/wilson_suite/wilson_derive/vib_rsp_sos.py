@@ -243,7 +243,7 @@ def make_op_sel_set(all_ops, taken) -> list:
     return sel_set
 
 
-def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator, ...], maxord: int, states: list[VibStateSymbolic], noncomb: bool=False):
+def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator, ...], maxord: int, states: list[VibStateSymbolic], noncomb: bool=False) -> list[VibContribTerm]:
     """
     Get vibrational SOS expressions at order 'maxord' for omega operator 'op_omega' and perturbing operators 'ops'"
     with vibrational states 'states'

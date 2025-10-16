@@ -29,7 +29,7 @@ def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=
     symbolic_vib_states = [abst.VibStateSymbolic(wu_common.ground_state_label, is_ground=True)]
     symbolic_vib_states.extend([abst.VibStateSymbolic(wu_common.state_labels[i]) for i in range(experiment.order)])
 
-    R_sos = vib_rsp_sos.get_vib_sos(op_omega, ops_pert, experiment.order, symbolic_vib_states, noncomb=True)
+    R_sos: list[abst.VibContribTerm] = vib_rsp_sos.get_vib_sos(op_omega, ops_pert, experiment.order, symbolic_vib_states, noncomb=True)
 
     R_sos_int = []
 

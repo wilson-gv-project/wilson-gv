@@ -28,6 +28,9 @@ class QOperator:
         self.op_type = op_type
         self.ax = ax
 
+    def __repr__(self):
+        return f'QOperator(o = {self.o}, op_type = {self.op_type}, ax = {self.ax})'
+
     def setOperatorType(self, op_type: str, ax: tuple):
         """
         Set the operator type with associated axis argument. See __init__ for argument explanation
@@ -66,6 +69,9 @@ class HarmOscStateSymbolic:
 
         # Sort
         self.q = sorted(q)
+
+    def __repr__(self):
+        return f'harmState(q = {self.q})'
 
     def h(self):
         """
@@ -240,6 +246,9 @@ class VibDiffTerm:
 
         self.is_pert_wf_diff = is_pert_wf_diff
 
+    def __repr__(self):
+        return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
+
     def present(self):
         """
         Formatted printing of own attributes
@@ -289,6 +298,9 @@ class ResonanceCondition:
 
         self.pf = pf
         self.id = id
+
+    def __repr__(self):
+        return f'ResonanceCondition(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
 
     def present(self):
         """
@@ -653,6 +665,8 @@ class VibPerturbedTerm:
         # Hash (currently indeterminate)
         self.hsh = None
 
+    def __repr__(self):
+        return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
     def tellNonSummSummIndices(self):
 
@@ -912,13 +926,13 @@ class VibPerturbedTerm:
         print(' >> VibPerturbedTerm presents:')
 
         print('Coefficient:', self.coeff)
-
+        print('Properties:')
         for i in self.props:
             i.present()
-
+        print('Freqterms:')
         for i in self.freqterms:
             i.present()
-
+        print('Resonances:')
         for i in self.res:
             i.present()
 
@@ -926,6 +940,26 @@ class VibPerturbedTerm:
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
               '\nPresenting also elements of: self.props, self.freqterms, self.res')
 
+    def present_better(self):
+        """
+        Formatted printing of own attributes
+        """
+        print(' >> VibPerturbedTerm presents:')
+
+        print('Coefficient:', self.coeff)
+        print('Properties:')
+        for i in self.props:
+            print('    ', i)
+        print('Freqterms:')
+        for i in self.freqterms:
+            print('    ', i)
+        print('Resonances:')
+        for i in self.res:
+            print('    ', i)
+
+        print('\nHas attributes: coeff, freqterms, res, was_sorted, props, hsh'
+              '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
+              '\nPresenting also elements of: self.props, self.freqterms, self.res')
 
 
 class TransitionIntegral:
