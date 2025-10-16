@@ -23,3 +23,6 @@ op_omega_label_greek = 'A'
 
 # Capital alphabetical labels (primary use: Axis aliases)
 cap_alpha_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+
+# numerical index of ordering for Capital alphabetical labels -- alpha label to index mapping
+num_cap_alpha_labels = dict(zip(cap_alpha_labels, range(len(cap_alpha_labels))))

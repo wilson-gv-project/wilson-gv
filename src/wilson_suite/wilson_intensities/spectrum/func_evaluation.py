@@ -285,6 +285,80 @@ def solve_LSE_resonace(resonances:tuple[VibDiffSymbolic, ...],
         return None
 
 
+def generate_LHS_motif(motif: tuple[tuple,...]):
+    """
+    motif is a tuple/collection of res_conditions
+        res_conditions is a tuple of (vib_difference, axes)
+            vib_difference is a tuple of states indices
+    
+    (
+     ((('a', 'b'), ('a',)), ('A',)), # res_condition
+     
+     (
+      (('b',), ('a',)),              # vib_difference tupleID
+      ('B',)                         # axis tupleID
+      )
+    
+    )
+
+    (
+     (
+      (
+        ('',), 
+        ('a',)
+      ), 
+      ('B',)
+      ),
+
+     ((('',), 
+       ('a',)), 
+       
+      ('A', '-B')))
+    """
+    from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
+    # maximum variable index across all tuples
+    max_var_index = max([len(rc[1]) for rc in motif])
+    
+    if len(motif)==1:
+        print('1D motif', motif)
+    
+    if max_var_index == 1:
+        max_var_index = len(motif)
+    
+    # to identify coeff matrix shape
+    coeff_matrix = np.zeros((max_var_index, max_var_index))
+
+    for i, r_condition in enumerate(motif):
+        axis_tupleID: tuple[str] = r_condition[1]
+
+        # axis_tupleID = ('A', '-B') --> {'A': 1, 'B': -1} better?
+        # coeffs {'A': 1, 'B': -1}
+        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
+
+        for alpha_label, coefficient in coeffs.items():
+             # Reverse the sign and place it in the correct position
+             coeff_matrix[i, num_cap_alpha_labels[alpha_label]] = -1 * np.sign(coefficient)
+    
+    return coeff_matrix
+
+def get_RHS_motif(resonances: tuple[VibDiffSymbolic, ...], 
+            parameters: ParameterSet, vibdata: VibStatesData, 
+            eval_mode: str = 'on-the-fly'):
+    """
+    making a constants vector from a list of tuples
+    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+    ind_tuple = (1, 2, 3) --- 
+    vibdiffbank: VibDiffBank instance
+
+    output: [5, -3, 2]
+    """
+    if eval_mode == 'on-the-fly':
+        constants = [(-1)*get_vibdiff(vibdiffsymb=i, parameters=parameters,
+                                      allstates_map=vibdata.allstates_map) for i in resonances]
+    else:
+        raise NotImplementedError('RHS can be only "on-the-fly" now')
+    return constants
+
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 # works with .func_abstractions
 def get_vibdiff(vibdiffsymb: VibDiffSymbolic, 

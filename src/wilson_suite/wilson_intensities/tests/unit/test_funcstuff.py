@@ -132,3 +132,33 @@ def test_solve_LSE_resonace():
     res = f_eval.solve_LSE_resonace(resonances=(r1, r2), parameters=params, vibdata=vibdata)
 
     assert res == {'w1': np.float64(1234.0), 'w2': np.float64(3644.0)}
+
+def test_generate_LHS_motif():
+    print()
+    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+    
+    motif3 = (
+               (
+                (('',), ('a',)), 
+                ('B',)
+               ), 
+
+              ((('',), ('a',)), 
+               ('A', '-B'))
+             )
+    
+    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    
+    from ...spectrum.func_evaluation import generate_LHS_motif
+    
+    r1 = generate_LHS_motif(motif=motif1)
+    assert np.allclose(r1, np.array([[-1.,  0.], [ 0., -1.]]))
+    
+    r2 = generate_LHS_motif(motif=motif2)
+    assert np.allclose(r2, np.array([[-1.]])) # ???
+
+    r3 = generate_LHS_motif(motif=motif3)
+    assert np.allclose(r3, np.array([[ 0., -1.], [ -1.,  1.]]))
+
+    r4 = generate_LHS_motif(motif=motif4)

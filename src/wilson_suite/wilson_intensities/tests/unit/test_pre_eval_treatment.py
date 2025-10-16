@@ -44,7 +44,15 @@ def generate_only_res_cond_evv_term_selection():
     return [term_a, term_b, term_c, term_d, term_e]
 
 def test_terms_for_motif():
+    """
+    HMM...
+unique_motifs:
+(((('a', 'b'), ('a',)), ('A',)),)  ------> ????
+(((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+(((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',))) ------> ????
+(((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
 
+    """
     candidate_terms = generate_only_res_cond_evv_term_selection()
 
     unique_motifs = pet.identify_unique_resmotifs(candidate_terms)
@@ -57,3 +65,36 @@ def test_terms_for_motif():
 
     assert sorted(unique_motifs) == sorted(list(terms_for_motif.keys()))
 
+
+def test_find_resonance_locations_wrt_index_choices():
+    print()
+    candidate_terms = generate_only_res_cond_evv_term_selection()
+
+    unique_motifs = pet.identify_unique_resmotifs(candidate_terms)
+    for i in unique_motifs:
+        print(i)
+    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+    
+    motif3 = (
+               (
+                (('',), ('a',)), 
+                ('B',)
+               ), 
+
+              ((('',), ('a',)), 
+               ('A', '-B'))
+             )
+    
+    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+
+    states = []
+
+    d = pet.find_resonance_locations_wrt_index_choices(motif=motif1, states=states)
+    print(d)
+
+def test_motifs_control():
+    print()
+    candidate_terms = generate_only_res_cond_evv_term_selection()
+    
+    pet.motifs_control(candidate_terms)
