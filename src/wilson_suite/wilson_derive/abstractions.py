@@ -31,6 +31,9 @@ class QOperator:
     def __repr__(self):
         return f'QOperator(o = {self.o}, op_type = {self.op_type}, ax = {self.ax})'
 
+    def to_latex(self):
+        return
+    
     def setOperatorType(self, op_type: str, ax: tuple):
         """
         Set the operator type with associated axis argument. See __init__ for argument explanation
@@ -222,6 +225,23 @@ class PolProp:
 
         print('----')
 
+    def __repr__(self):
+        return f'PolProp(ops = {self.ops}, dord = {self.dord})'
+    
+    def to_latex(self):
+        from ..wilson_utils import common_labels
+        numalpha = {common_labels.op_omega_label_int: common_labels.op_omega_label_greek}
+        for i in range(min(len(common_labels.op_labels_int), len(common_labels.op_labels_greek))):
+            numalpha[common_labels.op_labels_int[i]] = common_labels.op_labels_greek[i]
+
+        from ..wilson_utils.prop_trivname import prop_trivname
+        from ..wilson_utils.latex_rendering import prop_trivialname_latex
+        
+        curr_ops = tuple([numalpha[j.o] for j in self.ops])
+        curr_diff_inds = tuple(self.inds)
+        num_denom = prop_trivialname_latex(geo=curr_diff_inds, el=curr_ops)
+
+        return rf'\frac{{{num_denom[0]}}}{{{num_denom[1]}}}'
 
 class VibDiffTerm:
     """
@@ -248,6 +268,17 @@ class VibDiffTerm:
 
     def __repr__(self):
         return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
+
+    def to_latex(self):
+        if isinstance(self.sl, VibStateSymbolic):
+            bra = self.sl.s
+            ket = self.sr.s
+
+        elif isinstance(self.sl, HarmOscStateSymbolic):
+            bra = self.sl.q
+            ket = self.sr.q
+
+        return ','.join([f"{'+'.join(bra)}",f"{'+'.join(ket)}"])
 
     def present(self):
         """
@@ -312,6 +343,10 @@ class ResonanceCondition:
         self.diff.present()
         print('Resonance condition pert freqs', str(self.pf))
         print('----')
+
+    def to_latex(self):
+        upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in self.pf]
+        return rf'(\omega_{{{self.diff.to_latex()}}} {''.join(upd_pf_sign)})'
 
     def permute(self, mask: dict):
         """
@@ -944,7 +979,7 @@ class VibPerturbedTerm:
         """
         Formatted printing of own attributes
         """
-        print(' >> VibPerturbedTerm presents:')
+        print('\n >> VibPerturbedTerm presents:')
 
         print('Coefficient:', self.coeff)
         print('Properties:')
@@ -960,6 +995,29 @@ class VibPerturbedTerm:
         print('\nHas attributes: coeff, freqterms, res, was_sorted, props, hsh'
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
               '\nPresenting also elements of: self.props, self.freqterms, self.res')
+
+    def to_latex(self, part=None):
+        """
+        """
+        res_conditions_denom = ''.join([rc.to_latex() for rc in self.res])
+        res_conditions_str = rf'\frac{{1}}{{{res_conditions_denom}}}'
+
+        coefficients_str = rf'\frac{{{self.coeff.numerator}}}{{{self.coeff.denominator}}}'
+        properties_str = ''.join([p.to_latex() for p in self.props])
+        freqterms_denom = ''.join([rf'\omega_{{{vd.to_latex()}}}' for vd in self.freqterms])
+        freqterms_str = rf'\frac{{{1}}}{{{freqterms_denom}}}'
+
+        if part is not None:
+            if part=='res':
+                return res_conditions_str
+            elif part=='coeff':
+                return coefficients_str
+            elif part=='props':
+                return properties_str
+            elif part=='freqterms':
+                return freqterms_str
+        else:
+            return coefficients_str + freqterms_str + properties_str + res_conditions_str
 
 
 class TransitionIntegral:

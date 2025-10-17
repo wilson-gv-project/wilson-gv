@@ -21,6 +21,11 @@ op_labels_greek = ['B', 'G', 'D', 'E', 'Z', 'H', 'T', 'I']
 # "Omega" special operator label
 op_omega_label_greek = 'A'
 
+# latinized Greek letters in latex
+op_labels_greek_latex = {'A': r'\alpha', 'B': r'\beta', 'G': r'\gamma', 
+                         'D': r'\delta', 'E': r'\epsilon', 'Z': r'\zeta', 
+                         'H': r'\eta', 'T': r'\theta', 'I': r'\iota'}
+
 # Capital alphabetical labels (primary use: Axis aliases)
 cap_alpha_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 
