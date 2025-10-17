@@ -14,3 +14,21 @@ def test_plt_latex():
     get_plt_latex(expr4)
     get_plt_latex(expr5)
     get_plt_latex(expr6)
+
+def test_saved():
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+
+    latex_strs = [t.to_latex() for t in terms_fuller_list]
+    for n, t_latex in enumerate(latex_strs):
+        get_plt_latex(t_latex, savename=f'term{n}.svg')
+
+def test_terms_custom_saved():
+    from ...wilson_intensities.tests.unit.test_pre_eval_treatment import generate_only_res_cond_evv_term_selection
+    terms = generate_only_res_cond_evv_term_selection()
+    latex_strs = [t.to_latex() for t in terms]
+
+    for n, t_latex in enumerate(latex_strs):
+        get_plt_latex(t_latex, savename=f'term_custom{n}.svg')

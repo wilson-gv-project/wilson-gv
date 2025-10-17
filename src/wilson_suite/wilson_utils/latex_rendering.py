@@ -4,7 +4,7 @@ def get_plt_latex(expr, savename: str=None, color: str='black'):
     """
     color: blue, green, red, black, yellow ...
     """
-    _, ax = plt.subplots(figsize=(2, 2))
+    _, ax = plt.subplots(figsize=(22, 2))
     ax.axis("off")  # hide axes
 
     ax.text(

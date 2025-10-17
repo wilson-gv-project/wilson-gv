@@ -1000,12 +1000,19 @@ class VibPerturbedTerm:
         """
         """
         res_conditions_denom = ''.join([rc.to_latex() for rc in self.res])
-        res_conditions_str = rf'\frac{{1}}{{{res_conditions_denom}}}'
+        if res_conditions_denom == '':
+            res_conditions_str = ''
+        else:
+            res_conditions_str = rf'\frac{{1}}{{{res_conditions_denom}}}'
 
         coefficients_str = rf'\frac{{{self.coeff.numerator}}}{{{self.coeff.denominator}}}'
         properties_str = ''.join([p.to_latex() for p in self.props])
+        
         freqterms_denom = ''.join([rf'\omega_{{{vd.to_latex()}}}' for vd in self.freqterms])
-        freqterms_str = rf'\frac{{{1}}}{{{freqterms_denom}}}'
+        if freqterms_denom == '':
+            freqterms_str = ''
+        else:
+            freqterms_str = rf'\frac{{{1}}}{{{freqterms_denom}}}'
 
         if part is not None:
             if part=='res':
