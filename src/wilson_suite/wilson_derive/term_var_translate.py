@@ -142,21 +142,21 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes
 
 
 
-            for k in range(len(translated_terms[i][j])):
+            # for k in range(len(translated_terms[i][j])):
 
-                print('\n\n')
-                print('My axes', chosen_axes)
-                print('My pulse combinations as axes', id_tuples_in_axis_vars)
+            #     print('\n\n')
+            #     print('My axes', chosen_axes)
+            #     print('My pulse combinations as axes', id_tuples_in_axis_vars)
 
-                #print('\n\n')
-                #terms[i][j][k].present()
-                #translated_terms[i][j][k].present()
-                #print('non-sum, sum indices')
-                #print(translated_terms[i][j][k].tellNonSummSummIndices())
-                #print('')
+            #     #print('\n\n')
+            #     #terms[i][j][k].present()
+            #     #translated_terms[i][j][k].present()
+            #     #print('non-sum, sum indices')
+            #     #print(translated_terms[i][j][k].tellNonSummSummIndices())
+            #     #print('')
 
-            print('res motifs', identify_unique_resmotifs(terms[i][j]))
-            print('which_terms_motifs', terms_for_motif(terms[i][j]))
+            # print('res motifs', identify_unique_resmotifs(terms[i][j]))
+            # print('which_terms_motifs', terms_for_motif(terms[i][j]))
 
 
 

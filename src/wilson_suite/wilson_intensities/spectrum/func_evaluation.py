@@ -290,30 +290,6 @@ def generate_LHS_motif(motif: tuple[tuple,...]):
     motif is a tuple/collection of res_conditions
         res_conditions is a tuple of (vib_difference, axes)
             vib_difference is a tuple of states indices
-    
-    (
-     ((('a', 'b'), ('a',)), ('A',)), # res_condition
-     
-     (
-      (('b',), ('a',)),              # vib_difference tupleID
-      ('B',)                         # axis tupleID
-      )
-    
-    )
-
-    (
-     (
-      (
-        ('',), 
-        ('a',)
-      ), 
-      ('B',)
-      ),
-
-     ((('',), 
-       ('a',)), 
-       
-      ('A', '-B')))
     """
     from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
     # maximum variable index across all tuples

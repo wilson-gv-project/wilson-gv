@@ -41,9 +41,7 @@ def generate_only_res_cond_evv_term_selection():
 
     return [term_a, term_b, term_c, term_d, term_e]
 
-
-def test_ResonanceCondition():
-
+def generate_res_cond_objs():
     ab_state = wa.HarmOscStateSymbolic(['a', 'b'])
     a_state = wa.HarmOscStateSymbolic(['a'])
     b_state = wa.HarmOscStateSymbolic(['b'])
@@ -57,16 +55,43 @@ def test_ResonanceCondition():
     rc_b_a_w_B = wa.ResonanceCondition(diff=vd_b_a, pf=['B'])
     rc_0_a_w_B = wa.ResonanceCondition(diff=vd_0_a, pf=['B'])
     rc_0_a_w_AmB = wa.ResonanceCondition(diff=vd_0_a, pf=['A', '-B'])
+    
+    return [rc_ab_a_w_A, rc_b_a_w_B, rc_0_a_w_B, rc_0_a_w_AmB]
 
-    pass
 
 def test_VibPerturbedTerm_repr():
     
     print()
     terms = generate_only_res_cond_evv_term_selection()
-    # print(terms[0])
 
-    print()
-    # print(terms[1])
+    for i, t in enumerate(terms):
+        print('\n ---', i)
+        for res in t.res:
+            print(res)
+
+def test_RC_latex():
+    res_conds = generate_res_cond_objs()
+    latex_resconds = [rc.to_latex() for rc in res_conds]
+    assert latex_resconds == ['(\\omega_{a+b,a} -A)', 
+                              '(\\omega_{b,a} -B)', 
+                              '(\\omega_{,a} -B)', 
+                              '(\\omega_{,a} -A+B)']
+
+def test_VibPerturbedTerm_latex():
+    terms = generate_only_res_cond_evv_term_selection()
+    latex_strs = [t.to_latex() for t in terms]
+
+    assert latex_strs == ['\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)}', 
+                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{,a} -B)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{,a} -B)(\\omega_{,a} -A+B)}']
     
-    terms[0].present_better()
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+
+    latex_strs = [t.to_latex() for t in terms_fuller_list]
+    assert latex_strs[0] == '\\frac{-1}{4}\\frac{1}{\\omega_{a,}\\omega_{b,}}\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{b}}\\frac{\\partial^{2}\\alpha_{\\alpha\\delta}}{\\partial Q_{a}\\partial Q_{b}}\\frac{1}{(\\omega_{,a} +A-B)(\\omega_{b,a} -B)}'
+    assert latex_strs[-1] == '\\frac{1}{8}\\frac{1}{\\omega_{a,}\\omega_{a+b+c,}\\omega_{b,}\\omega_{c,}}\\frac{\\partial\\alpha_{\\alpha\\delta}}{\\partial Q_{b}}\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{c}}\\frac{\\partial^{3}E_{}}{\\partial Q_{a}\\partial Q_{b}\\partial Q_{c}}\\frac{1}{(\\omega_{,a} +A-B)(\\omega_{a+b,a} -B)}'

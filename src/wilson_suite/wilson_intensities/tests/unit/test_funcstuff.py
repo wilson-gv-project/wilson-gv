@@ -162,3 +162,4 @@ def test_generate_LHS_motif():
     assert np.allclose(r3, np.array([[ 0., -1.], [ -1.,  1.]]))
 
     r4 = generate_LHS_motif(motif=motif4)
+    print(r4)

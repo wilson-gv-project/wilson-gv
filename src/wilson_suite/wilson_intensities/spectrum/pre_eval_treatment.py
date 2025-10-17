@@ -1,6 +1,10 @@
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
 import copy
-
+"""
+Extra info on top of VibPerturbedTerm and its components:
+ - [+] resonances motif - per list[ResonanceCondition]
+ - [] list of axes (vars of eval function)
+"""
 def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
     """
     """
@@ -15,12 +19,21 @@ def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
 
     return tuple(conditions)
 
-def identify_unique_resmotifs(list_of_terms: list[VibPerturbedTerm]) -> set:
+def get_num_axes_in_motif(motif: tuple):
+    """
+    """
+    
+    return
+
+def identify_unique_resmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[tuple]:
     """
     """
     return set(make_resonance_motif(term.res) for term in list_of_terms)
 
 def motifs_control(list_of_terms: list[VibPerturbedTerm]):
+    """
+    check validity(?), what axes are in the motifs and give info and suggestions
+    """
     unique = identify_unique_resmotifs(list_of_terms)
     axes_per_motif = {m: [rc[1] for rc in m] for m in unique}
     print('axes_per_motif')

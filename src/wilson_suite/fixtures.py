@@ -77,8 +77,11 @@ def SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH():
                                                             detector=detector_a,
                                                             scans=[scan_a],
                                                             magn_conditions=[[-1, 2]])
+    
+    terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+    translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
 
-    return ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+    return translated_terms
 
 
 
