@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from collections import Counter
 
 from collections.abc import Mapping
+import copy
 
 class ParameterSet(Mapping):
     """
@@ -26,7 +27,10 @@ class ParameterSet(Mapping):
 
         if not isinstance(parameters, dict):
             raise TypeError("ParameterSet must be initialized with a dictionary.")
-
+        parameters = copy.deepcopy(parameters)
+        
+        if 'zero' not in parameters:
+            parameters['zero'] = 'zero'
         self._parameters = dict(parameters)
         self._hash = hash(frozenset(self._parameters.items()))
 
@@ -37,6 +41,8 @@ class ParameterSet(Mapping):
         return list(self._parameters.values())
 
     def __getitem__(self, key):
+        if key=='':
+            key = 'zero'
         return self._parameters[key]
 
     def __iter__(self):
