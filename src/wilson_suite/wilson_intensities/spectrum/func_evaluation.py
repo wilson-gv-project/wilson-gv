@@ -96,79 +96,13 @@ class VibDiffBank:
             return self.state_values[s1] - self.state_values[s2]
 
 
-# to rm
-def get_resonance_loc(*, resonances, ind_tuple, vibdiffbank: VibDiffBank) -> dict:
-    """
-    resonace is when:
-        vib_diff + (resonace_pfs) = 0
-    
-    # resonances = (('zero,a', (-1,)), ('a+b,a', (-1, 2)))
-    # resonances = (('zero,a', (-1,)), ('b,a', (-1, 2)))
+from .func_abstractions import ParameterSet, VibStatesData
 
-    # resonances_with_numbers = ((vibdiff_number1, (-1,)), (vibdiff_number2, (-1, 2)))
-    # resonances_with_numbers = ((vibdiff_number1, (-1,)), (vibdiff_number2, (-1, 2))) 
-
-    # vibdiff + pf = 0
-    # pf = -vibdiff
-
-    """
-    resonances_with_numbers = [(vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple), i[1]) for i in resonances]
-    res_dict = {len(i[1]): i for i in resonances_with_numbers}
-    sorted_res_dict = dict(sorted(res_dict.items()))
-
-    pfs_id = {}
-
-    for i in sorted_res_dict:
-        vibdiff, pfs = sorted_res_dict[i]
-        pfs_implicit_minus = np.array(pfs)*(-1)
-
-        if i == 1:
-            # vibdiff + pf = 0
-            pfs_id[int(pfs_implicit_minus[0])] = -vibdiff * np.sign(pfs_implicit_minus[0])
-        else:
-            # vibdiff + pf_known + pf_new = 0
-            pfs_upd = [i for i in pfs_implicit_minus if i not in pfs_id] 
-            for i in pfs_implicit_minus:
-                if i in pfs_id:
-                    vibdiff += np.sign(i)*pfs_id[i]
-            pfs_id[int(pfs_upd[0])] = -vibdiff * np.sign(pfs_implicit_minus[0])
-    
-    pfs_id = {f'w{int(k*np.sign(k))}':v*np.sign(k) for k,v in pfs_id.items()}
-    return pfs_id
-
-
-def generate_coefficient_matrix(resonance_tuples):
-    """
-    w_mn[-1] = 0  -> w_mn + w1 = 0      -> w1 = -w_mn       coeffs: [1,  0,  0]
-    w_mn[-12] = 0 -> w_mn + w1 - w2 = 0 -> w1 - w2 = -w_mn  coeffs: [1, -1,  0]
-    w_mn[-23] = 0 -> w_mn + w2 - w3 = 0 -> w2 - w3 = -w_mn  coeffs: [0,  1, -1]
-
-    making a coefficient matrix from a list of tuples
-        resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-        output: [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
-
-    chatuit
-    """
-    # maximum variable index across all tuples
-    max_var_index = 0
-    for _, coeffs in resonance_tuples:
-        for coeff in coeffs:
-            max_var_index = max(max_var_index, abs(coeff))
-    
-    coeff_matrix = np.zeros((max_var_index, max_var_index))
-    
-    for _, coeffs in resonance_tuples:
-        # Create a row with zeros for all variables
-        row = [0] * max_var_index
-        for coeff in coeffs:
-            # Reverse the sign and place it in the correct position
-            row[abs(coeff) - 1] = -1 * np.sign(coeff)
-        # coeff_matrix.append(row)
-    
-    return coeff_matrix
-
-
-def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
+# works with .func_abstractions
+def solve_LSE_motif(motif: tuple[tuple,...], 
+                    parameters: ParameterSet, vibdata: VibStatesData,
+                    unit: str='Eh',
+                    eval_mode: str = 'on-the-fly'):
     """
     solving a linear system of equations
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
@@ -177,113 +111,20 @@ def solve_linear_system_resonaces(resonance_tuples, ind_tuple, vibdiffbank: VibD
 
     returns a dict {f'w{i+1}': solution}
     """
-    coeff_matrix = generate_coefficient_matrix(resonance_tuples)
-    constants = get_const_vector(resonance_tuples, ind_tuple, vibdiffbank)
+    coeff_matrix = generate_LHS_motif(motif)
+    constants = get_RHS_motif(motif, parameters, vibdata, unit, eval_mode)
 
     A = np.array(coeff_matrix)
     b = np.array(constants)
     
     try:
         solution = np.linalg.solve(A, b)
-        return {f'w{i+1}': val for i, val in enumerate(solution)}
+        from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
+        num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
+
+        return {num_to_ax[i]: val for i, val in enumerate(solution)}
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
-        return None
-
-
-def get_const_vector(resonance_tuples, ind_tuple, vibdiffbank: VibDiffBank):
-    """
-    making a constants vector from a list of tuples
-    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-    ind_tuple = (1, 2, 3)
-    vibdiffbank: VibDiffBank instance
-
-    output: [5, -3, 2]
-    """
-    constants = [(-1)*vibdiffbank.get_vibdiff_number(ind_diff_str=i[0], ind_tuple=ind_tuple) for i in resonance_tuples]
-    return constants
-
-
-from .func_abstractions import VibDiffSymbolic, ParameterSet, VibStatesData
-
-# works with .func_abstractions
-def generate_LHS(resonances: tuple[VibDiffSymbolic, ...]):
-    """
-    w_mn[-1] = 0  -> w_mn + w1 = 0      -> w1 = -w_mn       coeffs: [1,  0,  0]
-    w_mn[-12] = 0 -> w_mn + w1 - w2 = 0 -> w1 - w2 = -w_mn  coeffs: [1, -1,  0]
-    w_mn[-23] = 0 -> w_mn + w2 - w3 = 0 -> w2 - w3 = -w_mn  coeffs: [0,  1, -1]
-
-    making a coefficient matrix from a list of tuples
-        resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-        output: [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
-
-    chatuit --> rewritten for VibDiffSymbolic
-    """
-    # maximum variable index across all tuples
-    max_var_index = 0
-    
-    # to identify coeff matrix shape
-    for vd_res in resonances:
-        coeffs = vd_res.wavematching # [-1, 2] is {'1': -1, '2': 1} - is this better?
-        max_var_index = max(max_var_index, len(coeffs))
-
-    coeff_matrix = np.zeros((max_var_index, max_var_index))
-
-    for i, vd_res in enumerate(resonances):
-        coeffs = vd_res.wavematching # [-1, 2] is {'1': -1, '2': 1} - is this better?
-
-        for key, coeff in coeffs.items():
-            # Reverse the sign and place it in the correct position
-            coeff_matrix[i, int(key) - 1] = -1 * np.sign(coeff)
-    
-    return coeff_matrix
-
-
-# works with .func_abstractions
-def get_RHS(resonances: tuple[VibDiffSymbolic, ...], 
-            parameters: ParameterSet, vibdata: VibStatesData, 
-            eval_mode: str = 'on-the-fly'):
-    """
-    making a constants vector from a list of tuples
-    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-    ind_tuple = (1, 2, 3) --- 
-    vibdiffbank: VibDiffBank instance
-
-    output: [5, -3, 2]
-    """
-    if eval_mode == 'on-the-fly':
-        constants = [(-1)*get_vibdiff(vibdiffsymb=i, parameters=parameters,
-                                      allstates_map=vibdata.allstates_map) for i in resonances]
-    else:
-        raise NotImplementedError('RHS can be only "on-the-fly" now')
-    return constants
-
-
-# works with .func_abstractions
-def solve_LSE_resonace(resonances:tuple[VibDiffSymbolic, ...], 
-                       parameters: ParameterSet, vibdata: VibStatesData,
-                       eval_mode: str = 'on-the-fly'):
-    """
-    solving a linear system of equations
-    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
-    constants = [5, -3, 2]
-    output: [5. 2. 0.]
-
-    returns a dict {f'w{i+1}': solution}
-    """
-    coeff_matrix = generate_LHS(resonances)
-    constants = get_RHS(resonances, parameters, vibdata, eval_mode)
-
-    A = np.array(coeff_matrix)
-    b = np.array(constants)
-    
-    try:
-        solution = np.linalg.solve(A, b)
-        return {f'w{i+1}': val for i, val in enumerate(solution)}
-    except np.linalg.LinAlgError as e:
-        print("Error solving linear system:", e)
-        return None
-
 
 def generate_LHS_motif(motif: tuple[tuple,...]):
     """
@@ -294,9 +135,6 @@ def generate_LHS_motif(motif: tuple[tuple,...]):
     from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
     # maximum variable index across all tuples
     max_var_index = max([len(rc[1]) for rc in motif])
-    
-    if len(motif)==1:
-        print('1D motif', motif)
     
     if max_var_index == 1:
         max_var_index = len(motif)
@@ -317,8 +155,9 @@ def generate_LHS_motif(motif: tuple[tuple,...]):
     
     return coeff_matrix
 
-def get_RHS_motif(resonances: tuple[VibDiffSymbolic, ...], 
-            parameters: ParameterSet, vibdata: VibStatesData, 
+def get_RHS_motif(motif: tuple[tuple,...], 
+            parameters: ParameterSet, vibdata: VibStatesData,
+            unit: str='Eh',
             eval_mode: str = 'on-the-fly'):
     """
     making a constants vector from a list of tuples
@@ -329,30 +168,33 @@ def get_RHS_motif(resonances: tuple[VibDiffSymbolic, ...],
     output: [5, -3, 2]
     """
     if eval_mode == 'on-the-fly':
-        constants = [(-1)*get_vibdiff(vibdiffsymb=i, parameters=parameters,
-                                      allstates_map=vibdata.allstates_map) for i in resonances]
+        constants = [(-1)*get_vibdiff_motif(vibdiff_symb=rc[0], parameters=parameters,
+                                            allstates_map=vibdata.allstates_map, unit=unit) for rc in motif]
     else:
         raise NotImplementedError('RHS can be only "on-the-fly" now')
     return constants
 
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-# works with .func_abstractions
-def get_vibdiff(vibdiffsymb: VibDiffSymbolic, 
-                parameters: ParameterSet,
-                allstates_map: dict, unit='Eh') -> float:
+
+def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
+                      parameters: ParameterSet,
+                      allstates_map: dict, unit='Eh') -> float:
     """
     left, right - vibrational states labels for left and right state
     eval_mode - 'full-stored' or 'on-the-fly'
     """
-    left_num = parameters[vibdiffsymb.left]
-    right_num = parameters[vibdiffsymb.right]
+    leftToNum = [parameters[alpha_ind] for alpha_ind in vibdiff_symb[0]]
+    rightToNum = [parameters[alpha_ind] for alpha_ind in vibdiff_symb[1]]
+
+    left_num = '+'.join(sorted(leftToNum))
+    right_num = '+'.join(sorted(rightToNum))
+
     if unit=='Eh':
         return convNu2Ene(allstates_map[left_num] - allstates_map[right_num])
     elif unit=='cm-1':
         return allstates_map[left_num] - allstates_map[right_num]
     else:
         raise NotImplementedError('This unit of energy is not supported')
-
 
 @dataclass(frozen=True)
 class Resonance:
