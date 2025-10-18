@@ -75,26 +75,41 @@ def test_find_resonance_locations_wrt_index_choices():
         print(i)
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    
-    motif3 = (
-               (
-                (('',), ('a',)), 
-                ('B',)
-               ), 
-
-              ((('',), ('a',)), 
-               ('A', '-B'))
-             )
-    
+    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
-    states = []
-
-    d = pet.find_resonance_locations_wrt_index_choices(motif=motif1, states=states)
+    from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst
+    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
+                                              f_abst.VibState(s={}, state_label='1+1', e=2514.),
+                                              f_abst.VibState(s={}, state_label='3', e=3644.),
+                                              f_abst.VibState(s={}, state_label='3+3', e=7344.),
+                                              f_abst.VibState(s={}, state_label='1+3', e=4364.),
+                                              f_abst.VibState(s={}, state_label='zero', e=0.)))
+    
+    d = pet.find_resonance_locations_wrt_index_choices(motif=motif1, vibstates_data=vibdata)
     print(d)
 
 def test_motifs_control():
     print()
     candidate_terms = generate_only_res_cond_evv_term_selection()
     
-    pet.motifs_control(candidate_terms)
+    r = pet.motifs_control(candidate_terms)
+    print(r)
+
+def test_identify_maximum_axes():
+    print()
+    candidate_terms = generate_only_res_cond_evv_term_selection()
+
+    pet.identify_maximum_axes(candidate_terms)
+
+def test_single_motif_control():
+    print()
+    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+
+    pet.single_motif_control(motif1, 2)
+    pet.single_motif_control(motif2, 2)
+    pet.single_motif_control(motif3, 2)
+    pet.single_motif_control(motif4, 2)

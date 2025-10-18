@@ -4,6 +4,12 @@ import copy
 Extra info on top of VibPerturbedTerm and its components:
  - [+] resonances motif - per list[ResonanceCondition]
  - [] list of axes (vars of eval function)
+
+ for a collection of VibPerturbedTerms: 
+    - identify valid choices of axes
+    - axes choice
+    - use the chosen axes in terms
+    - find resonance motifs
 """
 def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
     """
@@ -19,30 +25,34 @@ def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
 
     return tuple(conditions)
 
-def get_num_axes_in_motif(motif: tuple):
+def get_axes_in_motif(motif: tuple):
     """
     """
+    return set([ax.strip('-') for rc in motif for ax in rc[1]])
     
-    return
-
 def identify_unique_resmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[tuple]:
     """
     """
     return set(make_resonance_motif(term.res) for term in list_of_terms)
 
-def motifs_control(list_of_terms: list[VibPerturbedTerm]):
+def identify_maximum_axes(list_of_terms: list[VibPerturbedTerm]):
     """
-    check validity(?), what axes are in the motifs and give info and suggestions
     """
     unique = identify_unique_resmotifs(list_of_terms)
-    axes_per_motif = {m: [rc[1] for rc in m] for m in unique}
-    print('axes_per_motif')
-    for k,v in axes_per_motif.items():
-        print(k, '-----------', v)
+    axes: list[tuple[str]] = [cond[1] for motif in list(unique) for cond in motif]
 
-    ndims_per_motif = {}
+    axes_in_these_terms = set([ax_tuple[0].strip('-') for ax_tuple in axes])
+    return len(axes_in_these_terms)
 
-    return
+def motifs_control(list_of_terms: list[VibPerturbedTerm]):
+    """
+    what axes are in the motifs and give info and suggestions
+    """
+    total_num_axes = identify_maximum_axes(list_of_terms)
+    unique = identify_unique_resmotifs(list_of_terms)
+    axes_per_motif = {m: get_axes_in_motif(motif=m) for m in unique}
+
+    return axes_per_motif, total_num_axes
 
 def terms_for_motif(terms: list[VibPerturbedTerm]) -> dict[tuple, list]:
     """
@@ -59,8 +69,10 @@ def terms_for_motif(terms: list[VibPerturbedTerm]) -> dict[tuple, list]:
 
     return terms_for_motif
 
-def find_resonance_locations_wrt_index_choices(motif, states, spec_window=None) -> dict:
-    from ..spectrum.func_evaluation import solve_LSE_resonace
+def find_resonance_locations_wrt_index_choices(motif, vibstates_data, spec_window=None) -> dict:
+    from ..spectrum.func_evaluation import solve_LSE_motif, ParameterSet
+    axes_in_motif = get_axes_in_motif(motif)
+    res_loc_dict = {ax: None for ax in axes_in_motif}
 
     # Use or adapt solve_LSE_resonance with information from motif to get resonance locations
 
@@ -69,12 +81,22 @@ def find_resonance_locations_wrt_index_choices(motif, states, spec_window=None) 
     # {motif 1: {(500., 1200.): [(1, 2), (1, 3)],
     #           (500., 1400.): [(1, 4)], ...}}
 
-    results = {}
+    results: dict[dict,list] = {}
 
-    index_choices = []
-    # for idxs in index_choices:
-    #     solve_LSE_resonace(resonances=)
-    #     results[]
+    labels = ['1', '3'] # should be input (?) with vibstates_data(?)
+    indices = ['a', 'b'] # should get from motif
+    
+    import itertools
+    index_choices = [dict(zip(indices, combo)) for combo in itertools.product(labels, repeat=len(indices))]
+    print(index_choices)
+
+    for idxs in index_choices:
+        parameters = ParameterSet(idxs)
+        location_d = solve_LSE_motif(motif, parameters, vibstates_data, unit='cm-1')
+        if tuple(location_d.items()) not in results:
+            results[tuple(location_d.items())] = [idxs]
+        else:
+            results[tuple(location_d.items())].append(idxs)
 
     return results
 
