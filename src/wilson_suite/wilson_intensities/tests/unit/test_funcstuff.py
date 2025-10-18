@@ -137,17 +137,7 @@ def test_generate_LHS_motif():
     print()
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    
-    motif3 = (
-               (
-                (('',), ('a',)), 
-                ('B',)
-               ), 
-
-              ((('',), ('a',)), 
-               ('A', '-B'))
-             )
-    
+    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
     
     from ...spectrum.func_evaluation import generate_LHS_motif
@@ -163,3 +153,63 @@ def test_generate_LHS_motif():
 
     r4 = generate_LHS_motif(motif=motif4)
     print(r4)
+
+def test_generate_RHS_motif():
+    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+    
+    # (res_cond1, res_cond2, res_cond3, ...)
+    # (res_cond1, (wibdiff_mn, axes), ...)
+    # (res_cond1, ((m_inds, n_inds), (ax1, ax2, ax3, ...)), ...)
+    # (res_cond1, (((m1, m2, ...), (n1, n2, ...)), (ax1, ax2, ax3, ...)), ...)
+
+    # vibdiff: (m_inds, n_inds) <=== ((m1, m2, ...), (n1, n2, ...))
+    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    
+    from ...spectrum.func_evaluation import get_RHS_motif
+    params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
+    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
+                                              f_abst.VibState(s={}, state_label='3', e=3644.),
+                                              f_abst.VibState(s={}, state_label='1+3', e=4164.),
+                                              f_abst.VibState(s={}, state_label='zero', e=0.)))
+    
+    r1 = get_RHS_motif(motif=motif1, parameters=params, vibdata=vibdata, unit='cm-1')
+    print(r1, motif1, params)
+    assert np.all(r1==np.array([-2930.0, -2410.0]))
+    
+    r2 = get_RHS_motif(motif=motif2, parameters=params, vibdata=vibdata, unit='cm-1')
+    assert np.all(r2==np.array([-2930.0]))
+
+    r3 = get_RHS_motif(motif=motif3, parameters=params, vibdata=vibdata, unit='cm-1')
+    assert np.all(r3==np.array([1234.0, 1234.0]))
+
+    r4 = get_RHS_motif(motif=motif4, parameters=params, vibdata=vibdata, unit='cm-1')
+    assert np.all(r4==np.array([1234.0, -2410.0]))
+
+
+def test_solve_LSE_motif():
+    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+
+    from ...spectrum.func_evaluation import solve_LSE_motif
+    params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
+    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
+                                              f_abst.VibState(s={}, state_label='3', e=3644.),
+                                              f_abst.VibState(s={}, state_label='1+3', e=4164.),
+                                              f_abst.VibState(s={}, state_label='zero', e=0.)))
+    print()
+    r1 = solve_LSE_motif(motif=motif1, parameters=params, vibdata=vibdata, unit='cm-1')
+    print(r1, motif1, params)
+
+    r2 = solve_LSE_motif(motif=motif2, parameters=params, vibdata=vibdata, unit='cm-1')
+    print(r2, motif2, params)
+
+    r3 = solve_LSE_motif(motif=motif3, parameters=params, vibdata=vibdata, unit='cm-1')
+    print(r3, motif3, params)
+
+    r4 = solve_LSE_motif(motif=motif4, parameters=params, vibdata=vibdata, unit='cm-1')
+    print(r4, motif4, params)
+
