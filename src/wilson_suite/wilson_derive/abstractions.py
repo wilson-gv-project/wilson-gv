@@ -152,6 +152,11 @@ class PolProp:
 
         # To be used as list of characters symbolizing indices of differentiation
         self.inds = None
+    
+    def __eq__(self, other):
+        if isinstance(other, PolProp):
+            return
+        return False
 
     def setDerivOrder(self, dord):
         """
@@ -226,7 +231,7 @@ class PolProp:
         print('----')
 
     def __repr__(self):
-        return f'PolProp(ops = {self.ops}, dord = {self.dord})'
+        return f'PolProp(ops = {self.ops}, dord = {self.dord}, (inds = {self.inds}))'
     
     def to_latex(self):
         from ..wilson_utils import common_labels
@@ -234,7 +239,6 @@ class PolProp:
         for i in range(min(len(common_labels.op_labels_int), len(common_labels.op_labels_greek))):
             numalpha[common_labels.op_labels_int[i]] = common_labels.op_labels_greek[i]
 
-        from ..wilson_utils.prop_trivname import prop_trivname
         from ..wilson_utils.latex_rendering import prop_trivialname_latex
         
         curr_ops = tuple([numalpha[j.o] for j in self.ops])
