@@ -77,9 +77,14 @@ class VibStatesData:
     """
     Holds vib states data and can compute vib states energy differences
     """
-    allstates: tuple[VibState]    
+    allstates: tuple[VibState]
+    harmonic_osc_states_labels: tuple
 
     def __post_init__(self):
+        tmp_allstates = list(self.allstates)
+        tmp_allstates.append(VibState(s={}, state_label='zero', e=0.))
+        self.allstates = tuple(tmp_allstates)
+        
         self.allstates_map = {i.state_label: i.e for i in self.allstates}
         self._storage = dict()
 
