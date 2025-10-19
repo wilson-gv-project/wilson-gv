@@ -68,26 +68,28 @@ unique_motifs:
 
 def test_find_resonance_locations_wrt_index_choices():
     print()
-    candidate_terms = generate_only_res_cond_evv_term_selection()
 
-    unique_motifs = pet.identify_unique_resmotifs(candidate_terms)
-    for i in unique_motifs:
-        print(i)
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
     motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst
-    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
-                                              f_abst.VibState(s={}, state_label='1+1', e=2514.),
-                                              f_abst.VibState(s={}, state_label='3', e=3644.),
-                                              f_abst.VibState(s={}, state_label='3+3', e=7344.),
-                                              f_abst.VibState(s={}, state_label='1+3', e=4364.),
-                                              f_abst.VibState(s={}, state_label='zero', e=0.)))
+    allstates = (f_abst.VibState(s={}, state_label='1', e=1234.),
+                 f_abst.VibState(s={}, state_label='3', e=3644.),
+                 f_abst.VibState(s={}, state_label='4', e=1621.),
+                 f_abst.VibState(s={}, state_label='1+1', e=2514.),
+                 f_abst.VibState(s={}, state_label='1+4', e=1904.),
+                 f_abst.VibState(s={}, state_label='3+4', e=4129.),
+                 f_abst.VibState(s={}, state_label='4+4', e=3022.),
+                 f_abst.VibState(s={}, state_label='3+3', e=7344.),
+                 f_abst.VibState(s={}, state_label='1+3', e=4364.))
+    harm_labels = ('1', '3', '4')
+    vibdata = f_abst.VibStatesData(allstates=allstates, harmonic_osc_states_labels=harm_labels)
     
     d = pet.find_resonance_locations_wrt_index_choices(motif=motif1, vibstates_data=vibdata)
     print(d)
+
 
 def test_motifs_control():
     print()
@@ -96,20 +98,86 @@ def test_motifs_control():
     r = pet.motifs_control(candidate_terms)
     print(r)
 
-def test_identify_maximum_axes():
+def test_identify_maximum_axes_in_terms():
     print()
     candidate_terms = generate_only_res_cond_evv_term_selection()
 
-    pet.identify_maximum_axes(candidate_terms)
+    pet.identify_maximum_axes_in_terms(candidate_terms)
 
-def test_single_motif_control():
+def test_is_location_in_window():
+    loc1 = {'A': 12., 'B': 33.}
+    window1 = {'A': (9., 14.), 'B': (22., 54.)}
+    window2 = {'A': (12., 14.), 'B': (30., 54.)}
+    window3 = {'A': (9., 14.), 'B': (41., 44.)}
+    window4 = {'A': (11., 21.), 'B': (41., 44.)}
+
     print()
-    motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
-    motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    r1 = pet.is_location_in_window(location=loc1, window=window1)
+    assert r1
 
-    pet.single_motif_control(motif1, 2)
-    pet.single_motif_control(motif2, 2)
-    pet.single_motif_control(motif3, 2)
-    pet.single_motif_control(motif4, 2)
+    r2 = pet.is_location_in_window(location=loc1, window=window2, margins={'A': (-2., 2.)})
+    assert r2
+
+    r3 = pet.is_location_in_window(location=loc1, window=window3)
+    assert not r3
+
+    r4 = pet.is_location_in_window(location=loc1, window=window4, margins={'B':(-10., 2.)})
+    assert r4
+
+
+def test_find_domain_groups_by_distance():
+    print()
+
+    points = [[1., 3.], [5., 11.], [4., 2.], [12., 6.], [8., 2.], [11., 4.]]
+    print(points, len(points))
+
+    groups = pet.find_domain_groups_by_distance(points, distance_threshold=10.)
+    assert len(groups) == 3
+    print(groups)
+
+    groups = pet.find_domain_groups_by_distance(points, distance_threshold=12.)
+    assert len(groups) == 2
+    print(groups)
+
+    groups = pet.find_domain_groups_by_distance(points, distance_threshold=4.)
+    assert len(groups) == 4
+    print(groups)
+
+def test_find_domain_distance_threshold():
+    print()
+    pet.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
+
+
+def test_make_avrg_props_motif():
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    
+    collect_simple = []
+    t_inds = [0, -2]
+    for tID in t_inds:
+        term = terms_fuller_flat[tID]
+        
+        # get only avrg props
+        # props_with_cart_axes = [prop.to_latex() for prop in term.props if prop.ops]
+        props_with_cax_simple = [pet.simple_prop_ID(prop) for prop in term.props if prop.ops]
+
+        collect_simple.append(set(tuple(props_with_cax_simple)))
+        pp = pet.make_avrg_props_motif(term.props)
+        print(props_with_cax_simple)
+        print(pp)
+    
+def test_identify_unique_avrgmotifs():
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    
+    t_inds = [0, 1, 2, -3, -2, -1]
+    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+
+    unique = pet.identify_unique_avrgmotifs(terms_select)
+    print(unique, len(unique))
+
+    assert len(unique) == 3

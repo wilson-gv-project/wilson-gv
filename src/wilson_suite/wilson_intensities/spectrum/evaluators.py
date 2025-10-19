@@ -50,8 +50,7 @@ def terms_evaluator_general(system,
         for nm_inds in res_motifs[i]:
 
             # Two-fold grouping: Motif, then location per criterion
-            features_to_draw[i][(state_tuple), (location_tuple)] = sum([term_coeffs_per_index[k][nm_inds]
-            for k in which_terms_have_this_res_motif[i]])
+            features_to_draw[i][(state_tuple), (location_tuple)] = sum([term_coeffs_per_index[k][nm_inds] for k in which_terms_have_this_res_motif[i]])
 
     domains_with_features = determine_domains_and_features(features_to_draw)
     domain_grids = get_domain_grids(domains_with_features)
@@ -62,21 +61,8 @@ def terms_evaluator_general(system,
             domain_grid_values += evaluate_feature_on_grid(domains_with_features[d][f], domain_grids[d], opt: lineshape
             fns)
 
-            Option
-            A: Add up domain
-            grid
-            values
-            into
-            total
-            evaluation
-            result
-            Option
-            B: Return
-            only
-            domain
-            info and domain
-            grid
-            values
+            Option A: Add up domain grid values into evaluation result 
+            Option B: Return only domain info and domain grid values
 
     '''
     pass
