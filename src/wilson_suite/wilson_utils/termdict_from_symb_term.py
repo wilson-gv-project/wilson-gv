@@ -62,14 +62,14 @@ def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
 
 
             averaged_props.append((
-                prop_trivname(len(curr_diff_inds), len(curr_ops)),
+                prop_trivname(ord_geo=len(curr_diff_inds), ord_el=len(curr_ops)),
                 curr_diff_inds,
                 curr_ops))
 
         else:
 
             non_averaged_props.append((
-                prop_trivname(len(curr_diff_inds), len(curr_ops)),
+                prop_trivname(ord_geo=len(curr_diff_inds), ord_el=len(curr_ops)),
                 curr_diff_inds))
 
     result_dict['averaged_props'] = tuple(averaged_props)
