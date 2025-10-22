@@ -31,6 +31,13 @@ class QOperator:
     def __repr__(self):
         return f'QOperator(o = {self.o}, op_type = {self.op_type}, ax = {self.ax})'
 
+    def __hash__(self):
+        return hash( ( self.o, self.op_type, self.ax ) )
+    def __eq__(self, other):
+        if isinstance(other, QOperator):
+            return self.o == other.o and self.ax == other.ax and self.op_type == other.op_type
+        return False
+    
     def to_latex(self):
         return
     
@@ -133,6 +140,7 @@ class PolProp:
     """
     Polarization property differentiated zero or more times w.r.t. geometrical displacement
     Also used more generally as energy derivative
+    TODO: refactor names of attributes so they are understandable and clear
     """
 
     def __init__(self, ops: list[QOperator], dord: int=0):
@@ -155,8 +163,11 @@ class PolProp:
     
     def __eq__(self, other):
         if isinstance(other, PolProp):
-            return
+            return set(self.ops) == set(other.ops) and self.dord == other.dord
         return False
+
+    def __hash__(self):
+        return hash(( tuple([i.h() for i in self.ops]), self.dord, tuple(self.inds) ) )
 
     def setDerivOrder(self, dord):
         """
