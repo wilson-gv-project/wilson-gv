@@ -68,6 +68,25 @@ def test_VibPerturbedTerm_repr():
         print('\n ---', i)
         for res in t.res:
             print(res)
+        
+        for frt in t.freqterms:
+            print(frt)
+
+def test_VibPerturbedTerm_full_repr():
+    
+    print()
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+
+    for i, t in enumerate(terms_fuller_list):
+        print('\n ---', i)
+        for res in t.res:
+            print('in res cond', res.diff)
+        
+        for frt in t.freqterms:
+            print(frt)
 
 def test_RC_latex():
     res_conds = generate_res_cond_objs()
