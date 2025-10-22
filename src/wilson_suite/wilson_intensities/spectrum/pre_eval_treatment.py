@@ -1,7 +1,12 @@
-from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
-from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
+    from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst 
+
 import copy
 import numpy as np
+from ..spectrum.term_parts import PropsCollection
+
 """
 Extra info on top of VibPerturbedTerm and its components:
  - [+] resonances motif - per list[ResonanceCondition]
@@ -13,39 +18,41 @@ Extra info on top of VibPerturbedTerm and its components:
     - use the chosen axes in terms
     - find resonance motifs
 """
-from dataclasses import dataclass
-# @dataclass
-# class PropsCollection:
-#     props: list[PolProp]
 
-#     def __eq__(self, other):
-#         if isinstance(other, PropsCollection):
-#             return all([p in other.props for p in self.props])
-#         return False
-# @dataclass
-# class ResonanceMotif:
-#     resonance_conditions: list[ResonanceCondition]
-
-def make_vibdiff_motif(freqterms: list[VibDiffTerm]):
-    """
-    """
-    return
-
+"""
+PROPERTIES in VibPerturbedTerm
+"""
 def simple_prop_ID(property: PolProp) -> tuple[tuple, int]:
     """
+    USING TUPLES OF TUPLES
     """
     operators = tuple([op.o for op in property.ops])
     return (operators, property.dord)
 
 def make_avrg_props_motif(props: list[PolProp]) -> set[tuple]:
     """
+    USING TUPLES OF TUPLES
+
     indices below are concrete, after | but could be others, main part of ID is in the numerator
     {((0, 3), 1),  ---- \\frac{\\partial\\alpha_{\\alpha\\delta}} | e.g. {\\partial Q_{b}}
      ((2,), 1),    ---- \\frac{\\partial\\mu_{\\gamma}} | e.g. {\\partial Q_{b}}
      ((1,), 1)}    ---- \\frac{\\partial\\mu_{\\beta}} | e.g. {\\partial Q_{a}}
     """
-    return tuple(simple_prop_ID(prop) for prop in props if prop.ops)
+    num_unique_inds = len(set([ind for prop in props for ind in prop.inds if prop.ops]))
+    return tuple(simple_prop_ID(prop) for prop in props if prop.ops) + (num_unique_inds,)
 
+def identify_unique_avrgmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[PropsCollection]:
+    """
+    motif contains props and total number of unique indices in them together
+    """
+    propcolls = [PropsCollection(term.props).get_avegaded_props() for term in list_of_terms]
+    for collection in propcolls:
+        collection._set_attr_for_all_props('inds', None)
+    return set(propcolls)
+
+"""
+RESONANCES in VibPerturbedTerm
+"""
 def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
     """
     """
@@ -77,11 +84,6 @@ def identify_unique_resmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[tupl
     """
     """
     return set(make_resonance_motif(term.res) for term in list_of_terms)
-
-def identify_unique_avrgmotifs(list_of_terms: list[VibPerturbedTerm]):
-    """
-    """
-    return set(make_avrg_props_motif(term.props) for term in list_of_terms)
 
 def identify_maximum_axes_in_terms(list_of_terms: list[VibPerturbedTerm]):
     """
@@ -117,6 +119,25 @@ def terms_for_motif(terms: list[VibPerturbedTerm]) -> dict[tuple, list]:
 
     return terms_for_motif
 
+
+"""
+VIB DIFFERENCES in VibPerturbedTerm
+"""
+def identify_unique_vibdiff_motifs(list_of_terms: list[VibPerturbedTerm]):
+    all_vibdiffs = []
+
+    for term in list_of_terms:
+        for res in term.res:
+            all_vibdiffs.append(sorted([len(set(res.diff.sl.q)), len(set(res.diff.sr.q))]))
+            # all_vibdiffs.append(tuple([tuple(res.diff.sl.q), tuple(res.diff.sr.q)]))            
+        
+        for frt in term.freqterms:
+            all_vibdiffs.append(sorted([len(set(frt.sl.q)), len(set(frt.sr.q))]))
+            # all_vibdiffs.append(tuple([tuple(frt.sl.q), tuple(frt.sr.q)]))
+
+    return set(tuple(vd) for vd in all_vibdiffs)
+
+
 def initialize_resonance_dict(motif):
     """
     Initialize a dictionary with axes in the motif as keys.
@@ -134,6 +155,9 @@ def generate_index_choices(motif, vibstates_data: f_abst.VibStatesData):
     return [dict(zip(indlabels_in_motif, combo)) for combo in itertools.product(labels, repeat=len(indlabels_in_motif))]
 
 
+"""
+RESONANCE LOCATIONS for VibPerturbedTerm
+"""
 def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...], 
                                                vibstates_data: f_abst.VibStatesData, 
                                                spec_window=None) -> dict:
@@ -163,7 +187,6 @@ def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
             results.setdefault(location_key, []).append(idxs)
 
     return results
-
 
 def crop_resonances_to_window(resonances: tuple[dict], spec_window: dict, margins) -> list[dict]:
     """
@@ -199,6 +222,10 @@ def is_location_in_window(location: dict, window: dict, margins: dict=None):
             return False
     return True
 
+
+"""
+FULL TERM COEFFICIENT for VibPerturbedTerm
+"""
 def calculate_term_coeffs_for_indices(terms, motif_res_loc):
 
     # Suggestion sketch for overall steps
@@ -219,8 +246,7 @@ def calculate_term_coeffs_for_indices(terms, motif_res_loc):
 
     pass
 
-
-def identify_precalc_unique_terms_parts(terms: list[VibPerturbedTerm]):
+def identify_precalc_unique_coeff_parts(terms: list[VibPerturbedTerm]):
     """
     Identify all unique parts that can be precalculated for 
             a sensible partitioning of the term parts
@@ -229,8 +255,9 @@ def identify_precalc_unique_terms_parts(terms: list[VibPerturbedTerm]):
     2. non-orient. avrg. props. - skip further if zero
     2. vibdiffs_bank - ?
     """
+    return {'avrg_motifs': identify_unique_avrgmotifs(terms), 
+            'vibdiff_motifs': identify_unique_vibdiff_motifs(terms)}
 
-    return
 
 '''
 def evaluate_term_coeffs(term, relevant_indices):
@@ -242,6 +269,10 @@ def evaluate_term_coeffs(term, relevant_indices):
     pass
 '''
 
+
+"""
+DOMAINS of RESONANCE LOCATIONS
+"""
 def find_domain_groups_by_distance(res_locations, distance_threshold):
     """
     using scikit-learn to cluster points with distance threshold
