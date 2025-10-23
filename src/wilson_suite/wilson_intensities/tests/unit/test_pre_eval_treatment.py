@@ -1,5 +1,5 @@
 import wilson_suite.wilson_intensities.spectrum.pre_eval_treatment as pet
-
+import wilson_suite.wilson_intensities.spectrum.term_parts  as tparts
 
 def generate_only_res_cond_evv_term_selection():
 
@@ -174,11 +174,12 @@ def test_identify_unique_avrgmotifs():
     terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
     terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
     
-    t_inds = [0, 1,-1]
+    t_inds = [0, 1,-1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
     terms_select = terms_fuller_flat
 
     unique = pet.identify_unique_avrgmotifs(terms_select)
+    print('\n\n')
     for i in unique:
         print(i)
     print(len(unique))
@@ -209,16 +210,33 @@ def test_PropsCollection_get_avegaded_props():
     t_inds = [0, 1, -2, -1]
     # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+    
+    motifs_coll = []
 
     for t in terms_select:
         t_props = pet.PropsCollection(props=t.props)
-        print('----')
-        print('all t_props', t_props)
-        avrg_props = t_props.get_avegaded_props()
-        print(avrg_props)
-        print('avrg_props.get_mode_indices()', avrg_props.get_mode_indices())
-        print('avrg_props.get_cart_axes()', avrg_props.get_cart_axes())
-        print('avrg_props.get_total_difforder()', avrg_props.get_total_difforder())
+        
+        # print('----')
+        # motifs_coll.append(t_props.get_avegaded_props())
+
+        # print('all t_props')
+        # for tp in t_props:
+        #     print(tp)
+        # avrg_props = t_props.get_avegaded_props()
+        # print(avrg_props)
+        # print('avrg_props.get_mode_indices()', avrg_props.get_mode_indices())
+        # print('avrg_props.get_cart_axes()', avrg_props.get_cart_axes())
+        # print('avrg_props.get_total_difforder()', avrg_props.get_total_difforder())
+        # print('avrg_props.identify_avrg_motif()', avrg_props.identify_avrg_motif())
+
+        motifs_coll.append(t_props.identify_avrg_motif())
+    for m in motifs_coll:
+        print(m)
+    # print(motifs_coll)
+    print(motifs_coll[2] == motifs_coll[3])
+    print(motifs_coll[0] == motifs_coll[2])
+    print(motifs_coll[0] == motifs_coll[1])
+    print(set(motifs_coll))
 
 """
 
@@ -239,7 +257,7 @@ def test_ResonanceMotif():
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
 
     for t in terms_select:
-        t_resmotif = pet.ResonanceMotif(t.res)
+        t_resmotif = tparts.ResonanceMotif(t.res)
         print('----')
         print(t_resmotif)
         print(t_resmotif.get_vibdiffs())

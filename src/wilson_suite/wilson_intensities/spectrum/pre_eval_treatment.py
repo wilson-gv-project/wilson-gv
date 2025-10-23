@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
-    from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst 
+    from wilson_suite.wilson_intensities.spectrum.func_abstractions import VibStatesData
 
 import copy
 import numpy as np
@@ -22,18 +22,18 @@ Extra info on top of VibPerturbedTerm and its components:
 """
 PROPERTIES in VibPerturbedTerm
 """
-def simple_prop_ID(property: PolProp) -> tuple[tuple, int]:
+def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
     """
     USING TUPLES OF TUPLES
     """
     operators = tuple([op.o for op in property.ops])
     return (operators, property.dord)
 
-def make_avrg_props_motif(props: list[PolProp]) -> set[tuple]:
+def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
     """
     USING TUPLES OF TUPLES
 
-    indices below are concrete, after | but could be others, main part of ID is in the numerator
+    indices below are concrete, after '|' but could be others, main part of ID is in the numerator
     {((0, 3), 1),  ---- \\frac{\\partial\\alpha_{\\alpha\\delta}} | e.g. {\\partial Q_{b}}
      ((2,), 1),    ---- \\frac{\\partial\\mu_{\\gamma}} | e.g. {\\partial Q_{b}}
      ((1,), 1)}    ---- \\frac{\\partial\\mu_{\\beta}} | e.g. {\\partial Q_{a}}
@@ -41,19 +41,19 @@ def make_avrg_props_motif(props: list[PolProp]) -> set[tuple]:
     num_unique_inds = len(set([ind for prop in props for ind in prop.inds if prop.ops]))
     return tuple(simple_prop_ID(prop) for prop in props if prop.ops) + (num_unique_inds,)
 
-def identify_unique_avrgmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[PropsCollection]:
+def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[PropsCollection]:
     """
     motif contains props and total number of unique indices in them together
     """
-    propcolls = [PropsCollection(term.props).get_avegaded_props() for term in list_of_terms]
-    for collection in propcolls:
-        collection._set_attr_for_all_props('inds', None)
-    return set(propcolls)
+    lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
+    for l in lst:
+        print(l)
+    return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 """
 RESONANCES in VibPerturbedTerm
 """
-def make_resonance_motif(res_conds: list[ResonanceCondition]) -> tuple:
+def make_resonance_motif(res_conds: list['ResonanceCondition']) -> tuple:
     """
     """
     conditions = []
@@ -80,12 +80,12 @@ def get_indlabels_in_resmotif(motif: tuple):
     indlabels_list = set([indlabels for rcond in motif for indlabels in rcond[0]])
     return set(label for labels in indlabels_list for label in labels)
 
-def identify_unique_resmotifs(list_of_terms: list[VibPerturbedTerm]) -> set[tuple]:
+def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
     """
     """
     return set(make_resonance_motif(term.res) for term in list_of_terms)
 
-def identify_maximum_axes_in_terms(list_of_terms: list[VibPerturbedTerm]):
+def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):
     """
     """
     unique = identify_unique_resmotifs(list_of_terms)
@@ -94,7 +94,7 @@ def identify_maximum_axes_in_terms(list_of_terms: list[VibPerturbedTerm]):
     axes_in_these_terms = set([ax_tuple[0].strip('-') for ax_tuple in axes])
     return len(axes_in_these_terms)
 
-def motifs_control(list_of_terms: list[VibPerturbedTerm]):
+def motifs_control(list_of_terms: list['VibPerturbedTerm']):
     """
     what axes are in the motifs and give info and suggestions
     """
@@ -104,7 +104,7 @@ def motifs_control(list_of_terms: list[VibPerturbedTerm]):
 
     return axes_per_motif, total_num_axes
 
-def terms_for_motif(terms: list[VibPerturbedTerm]) -> dict[tuple, list]:
+def terms_for_motif(terms: list['VibPerturbedTerm']) -> dict[tuple, list]:
     """
     """
     terms_for_motif: dict[tuple, list] = {}
@@ -123,7 +123,7 @@ def terms_for_motif(terms: list[VibPerturbedTerm]) -> dict[tuple, list]:
 """
 VIB DIFFERENCES in VibPerturbedTerm
 """
-def identify_unique_vibdiff_motifs(list_of_terms: list[VibPerturbedTerm]):
+def identify_unique_vibdiff_motifs(list_of_terms: list['VibPerturbedTerm']):
     all_vibdiffs = []
 
     for term in list_of_terms:
@@ -145,7 +145,7 @@ def initialize_resonance_dict(motif):
     axes_in_motif = sorted(get_axes_in_resmotif(motif))
     return {ax: None for ax in axes_in_motif}
 
-def generate_index_choices(motif, vibstates_data: f_abst.VibStatesData):
+def generate_index_choices(motif, vibstates_data: 'VibStatesData'):
     """
     Generate all possible index combinations for the given motif.
     """
@@ -154,12 +154,20 @@ def generate_index_choices(motif, vibstates_data: f_abst.VibStatesData):
     import itertools
     return [dict(zip(indlabels_in_motif, combo)) for combo in itertools.product(labels, repeat=len(indlabels_in_motif))]
 
+def generate_index_choices_general(indlabels_in_motif, labels):
+    """
+    indlabels_in_motif - collection of symbolic label indices
+    labels - collection of numerical or string values
+    """
+    import itertools
+    return [dict(zip(indlabels_in_motif, combo)) for combo in itertools.product(labels, repeat=len(indlabels_in_motif))]
+
 
 """
 RESONANCE LOCATIONS for VibPerturbedTerm
 """
 def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...], 
-                                               vibstates_data: f_abst.VibStatesData, 
+                                               vibstates_data: 'VibStatesData', 
                                                spec_window=None) -> dict:
     """
     """
@@ -246,7 +254,7 @@ def calculate_term_coeffs_for_indices(terms, motif_res_loc):
 
     pass
 
-def identify_precalc_unique_coeff_parts(terms: list[VibPerturbedTerm]):
+def identify_precalc_unique_coeff_parts(terms: list['VibPerturbedTerm']):
     """
     Identify all unique parts that can be precalculated for 
             a sensible partitioning of the term parts
