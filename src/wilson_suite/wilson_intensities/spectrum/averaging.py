@@ -382,12 +382,14 @@ def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
     return array_of_4greekIndices
 
 
-def getPolarizationAveragingExpression(num_f: int, polarization: str):
+def getPolarizationAveragingExpression(num_pulses: int, polarization: str):
     """
     Get the arrays of indices to be summed and a prefactor of the averaging expression
 
     """
-    if num_f==4:
+    if len(polarization) != num_pulses:
+        raise ValueError("Polarization choice string should have the length of 'num_pulses'")
+    if num_pulses==4:
         if polarization=="ZZZZ":
-            return get_AlphaBetaGammaDelta_indices(num_f=num_f), 1./15
+            return get_AlphaBetaGammaDelta_indices(num_f=num_pulses), 1./15
 
