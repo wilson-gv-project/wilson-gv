@@ -169,7 +169,7 @@ def terms_evaluator(system,
     else:
         harmonic_arrays_Eh = {1: harm_states_arr}
 
-    avrg_terms, prefactorAvrg = getPolarizationAveragingExpression(num_f=4, polarization="ZZZZ") # "ZZZZ" should come from some setup dataobject
+    avrg_terms, prefactorAvrg = getPolarizationAveragingExpression(num_pulses=4, polarization="ZZZZ") # "ZZZZ" should come from some setup dataobject
     axes_dict = spec_eval_setup.ev_info.freq_variables
     Gamma_rc = spec_eval_setup.ev_info.Gamma
     # format transformation
