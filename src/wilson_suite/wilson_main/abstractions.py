@@ -184,6 +184,12 @@ class MolecularProperty:
 
 		self.vals = values
 
+@dataclass
+class MolPropsCollection:
+    properties: list[MolecularProperty]
+
+    def get(self, trivial_name: str):
+        return {prop.trivial_name: prop for prop in self.properties}.get(trivial_name)
 
 # FIXMEs: Improved handling of mode exclusion; possibly methods changes
 @dataclass
