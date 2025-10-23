@@ -1,117 +1,62 @@
 import numpy as np
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from .term_parts import PropsCollection
+    from ...wilson_main.abstractions import MolPropsCollection
 
 def precalc_unique_coeff_parts(data_to_precalc: dict):
     return
 
-def precalc_avrg_tensors(needed_data: dict, 
-                         avrg_terms_calc: tuple[list, float],
-                         terms: list[VibPerturbedTerm],
-                         avrg_motifs: tuple[tuple]) -> dict[tuple: np.ndarray]:
+
+def make_func_to_compute_avrg(*,
+                     avrg_expression: 'PropsCollection', 
+                     polarization: str = 'ZZZZ') -> Callable:
     """
-    3 motifs:
-    {(((0, 3), 1), ((1,), 1), ((2,), 1)), 
-     (((1,), 1), ((2,), 1), ((0, 3), 2)), 
-     (((0, 3), 1), ((1,), 1), ((2,), 2))}
+    for an expression with properties data values, 
+    compute average with given polarization setup for a choice of normal mode indices
+    """
+    num_pulses = len(avrg_expression.get_cart_axes()) # should this be a set?
+    from .averaging import getPolarizationAveragingExpression
     
-    avrg tensor coding:
-    ((1, 1), (2, 1), (1, 2)) - mu_Q, alpha_Q, mu_QQ
-    ((1, 1), (2, 2), (1, 1)) - mu_Q, alpha_QQ, mu_Q
-    ((1, 1), (2, 1), (1, 1)) - mu_Q, alpha_Q, mu_Q
+    # polarization='ZZZZ' - only this one is possible now
+    polarization_avrg_terms, prefactor = getPolarizationAveragingExpression(num_pulses=num_pulses, polarization=polarization)
 
-    (0, 3), 1) - alpha_Q
-    ((1,), 1)  - mu_Q
+    def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection'):
+        from ..utils.spectrum_utils import greek_list, num_Greek
+        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+        
+        total = 0.
 
+        for cart_axes in polarization_avrg_terms:
+            greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
+            product = 1.
 
-    requires:
-        self.unique_avrg_tensors_tID; self.seq_tuples; self.unique_avrg_tensors_all_expr;
-        self.terms[tID] so it's a dict;
+            for prop in avrg_expression:
+                el_operators = prop.ops
+                differentiation_order = prop.dord
 
-    HOW TO SET UP FORMULA FOR ORIENATIONAL AVERAGING???? - avrg_terms_calc
-    should be based on pulses (experiment info)
-    """
-    import string
-    from ..utils.tools import combinations_with_permutations
-    from ..utils.spectrum_utils import greek_list
-
-    # Nnmodes: int, data: dict
-    avrg_sum_terms, prefactorAvrg = avrg_terms_calc
-    storage_tensors = {}
-
-    # for tID in self.unique_avrg_tensors_tID:
-    for motif in avrg_motifs:
-        print('avrg_motifs', motif)
-        # simple_prop_tuple = self.seq_tuples.vk[terms[tID]]
-        number_of_indices = motif[1]
-        shape = (needed_data['Nnmodes'],) * number_of_indices
-        # logger.warning(f'self.unique_avrg_tensors_all_expr {self.unique_avrg_tensors_all_expr}')
-        # logger.warning(f'shape precalc_avrg_tensors {shape}')
-        avrg_tensor_to_fill = np.zeros(shape)
-        indices_combs = combinations_with_permutations(range(needed_data['Nnmodes']), number_of_indices)
-
-        for indices_choice in indices_combs:
-            total = 0.
-
-            names = list(string.ascii_lowercase)
-            indices_names = names[:len(indices_choice)]
-            ind_mapping = {var: val for var, val in zip(indices_names, indices_choice)}
-
-            for cart_axes in avrg_sum_terms:
+                prop_tuple_key = prop_trivname(ord_el=len(el_operators), ord_geo=differentiation_order)
                 
-                greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
+                nm_inds = tuple([index_choices[i] for i in prop.inds])
+                cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
+                # print(prop_tuple_key, "nm_inds", nm_inds, "cart_inds", cart_inds, 'cart_axes', cart_axes)
+                
+                all_inds = (*nm_inds, *cart_inds)
 
-                product = 1.
+                # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
+                product *= props_data.get(prop_tuple_key)[all_inds]
+            # print('...')
+            total += product
+        
+        return total * prefactor
+    return compute_for_idx_choice
 
-                for prop_tuple in motif:
-                    el_operators, differentiation_order = prop_tuple
-                    prop_tuple_key = (len(el_operators), differentiation_order)
-                    nm_inds = prop_tuple[0]
-                    cart_inds = prop_tuple[0]
-                    all_inds = (nm_inds, cart_inds)
 
-                # for i, input_tuple in enumerate(terms[tID].avrg_props_expr):
-                    # prop_key, idxs_key = get_data_keys(input_tuple, ind_mapping, greek_dict)
-                    # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                    product *= needed_data[prop_tuple_key][all_inds]
-
-                total += product
-
-            if abs(total)<1e-28:
-                total = 0.
-            else:
-                total *= prefactorAvrg
-            avrg_tensor_to_fill[indices_choice] = total
-
-        storage_tensors[motif] = avrg_tensor_to_fill
-
-    return storage_tensors
-
-def get_data_keys(input_tuple: tuple, variables: dict, greek_dict: dict) -> tuple[str, tuple]:
+def precalculate_avrg_tensor(avrg_expression: 'PropsCollection',
+                             polarization: str, 
+                             props_data: 'MolPropsCollection'):
     """
-    tuple_input = ((1, 1), ('B',), ('a',))
-
-    input_tuples = [
-        ((1, 1), ('B',), ('a',)),
-        ((2, 1), ('A', 'D'), ('a',)),
-        ((2, 2), ('A', 'D'), ('a', 'b'))
-    ]
-    in term:
-    (('mu_Q', ('a',), ('B',)),
-     ('alpha_Q', ('b',), ('A', 'D')),
-     ('mu_Q', ('c',), ('G',)))
-
-    prop_der_key is a trivial name string
-    second_part contains normal mode indices
-    third part contains cartesian axes Greek indices
+    Precalculating the full tensor for given avrg_expression
     """
-
-    prop_der_key, second_part, third_part = input_tuple
-
-    second_part = tuple([variables[v] for v in second_part])
-    third_part = tuple([greek_dict[L] for L in third_part])
-    # combine third_part and second_part to make the second-level index
-    idxs_key = tuple(second_part) + tuple(third_part)
-
-    return prop_der_key, idxs_key
+    return
