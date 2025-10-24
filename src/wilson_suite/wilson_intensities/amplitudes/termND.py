@@ -17,6 +17,8 @@ Module checklist:
 import numpy as np
 import pandas as pd
 
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences
+
 from ..utils.tools import combinations_with_permutations
 from ..utils.spectrum_utils import MolProperty, VibStatesDiff
 from ..utils.spectrum_utils import get_allparts_indices, make_abc_dict, make_abc_tuple
@@ -917,7 +919,7 @@ def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
 
     get_state = func_evaluation.make_state_value_func(termnd.vibstates)
     
-    vibdiffbank = func_evaluation.VibDiffBank(indices=modes_indices, 
+    vibdiffbank = wilson_suite.wilson_intensities.amplitudes.vibene_differences.VibDiffBank(indices=modes_indices, 
                                               max_quanta=max_state_lvl,
                                               state_value_func=get_state, mode='ondemand')
     

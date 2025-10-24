@@ -1,17 +1,48 @@
-import numpy as np
-from typing import TYPE_CHECKING, Callable
-if TYPE_CHECKING:
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-    from .term_parts import PropsCollection
-    from ...wilson_main.abstractions import MolPropsCollection
-from .pre_eval_treatment import generate_index_choices_general
+"""
+PROPERTIES in VibPerturbedTerm ---- #TODO still
+"""
+from typing import Callable
 
-def precalc_unique_coeff_parts(data_to_precalc: dict):
-    return
+import numpy as np
+from wilson_suite.wilson_derive.abstractions import PolProp
+from wilson_suite.wilson_intensities.amplitudes.term_parts import PropsCollection, VibPerturbedTerm
+from wilson_suite.wilson_intensities.amplitudes.utils import generate_index_choices_general
+from wilson_suite.wilson_main.abstractions import MolPropsCollection
+
+
+def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
+    """
+    USING TUPLES OF TUPLES
+    """
+    operators = tuple([op.o for op in property.ops])
+    return (operators, property.dord)
+
+
+def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
+    """
+    USING TUPLES OF TUPLES
+
+    indices below are concrete, after '|' but could be others, main part of ID is in the numerator
+    {((0, 3), 1),  ---- \\frac{\\partial\\alpha_{\\alpha\\delta}} | e.g. {\\partial Q_{b}}
+     ((2,), 1),    ---- \\frac{\\partial\\mu_{\\gamma}} | e.g. {\\partial Q_{b}}
+     ((1,), 1)}    ---- \\frac{\\partial\\mu_{\\beta}} | e.g. {\\partial Q_{a}}
+    """
+    num_unique_inds = len(set([ind for prop in props for ind in prop.inds if prop.ops]))
+    return tuple(simple_prop_ID(prop) for prop in props if prop.ops) + (num_unique_inds,)
+
+
+def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[PropsCollection]:
+    """
+    motif contains props and total number of unique indices in them together
+    """
+    lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
+    for l in lst:
+        print(l)
+    return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 
 def make_func_to_compute_avrg(*,
-                     avrg_expression: 'PropsCollection', 
+                     avrg_expression: 'PropsCollection',
                      polarization: str = 'ZZZZ') -> Callable[[dict, 'MolPropsCollection'], float]:
     """
     for an expression with properties data values, 
@@ -19,14 +50,14 @@ def make_func_to_compute_avrg(*,
     """
     num_pulses = len(avrg_expression.get_cart_axes()) # should this be a set?
     from .averaging import getPolarizationAveragingExpression
-    
+
     # polarization='ZZZZ' - only this one is possible now
     polarization_avrg_terms, prefactor = getPolarizationAveragingExpression(num_pulses=num_pulses, polarization=polarization)
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
         from ..utils.spectrum_utils import greek_list, num_Greek
         from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-        
+
         total = 0.
 
         for cart_axes in polarization_avrg_terms:
@@ -38,18 +69,18 @@ def make_func_to_compute_avrg(*,
                 differentiation_order = prop.dord
 
                 prop_tuple_key = prop_trivname(ord_el=len(el_operators), ord_geo=differentiation_order)
-                
+
                 nm_inds = tuple([index_choices[i] for i in prop.inds])
                 cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
                 # print(prop_tuple_key, "nm_inds", nm_inds, "cart_inds", cart_inds, 'cart_axes', cart_axes)
-                
+
                 all_inds = (*nm_inds, *cart_inds)
 
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
                 product *= props_data.get(prop_tuple_key)[all_inds]
             # print('...')
             total += product
-        
+
         return total * prefactor
     return compute_for_idx_choice
 
@@ -70,9 +101,9 @@ def precalculate_avrg_tensor(avrg_expression: 'PropsCollection',
     print(ind_choices)
 
     for idx in ind_choices:
-        full_tensor[tuple(idx.values())] = func(idx, props_data)
+        full_tensor[tuple(dict(sorted(idx.items())).values())] = func(idx, props_data)
 
     return full_tensor
 
-def precalculate_vibenedenom():
+def precalc_averages_for_terms():
     return

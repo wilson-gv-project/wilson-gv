@@ -1,5 +1,8 @@
-import wilson_suite.wilson_intensities.amplitudes.pre_eval_treatment as pet
+import wilson_suite.wilson_intensities.amplitudes.averaged_props
+import wilson_suite.wilson_intensities.amplitudes.domains
+import wilson_suite.wilson_intensities.amplitudes.resonances
 import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences
 
 def generate_only_res_cond_evv_term_selection():
 
@@ -55,9 +58,9 @@ unique_motifs:
     """
     candidate_terms = generate_only_res_cond_evv_term_selection()
 
-    unique_motifs = pet.identify_unique_resmotifs(candidate_terms)
+    unique_motifs = wilson_suite.wilson_intensities.amplitudes.resonances.identify_unique_resmotifs(candidate_terms)
 
-    terms_for_motif = pet.terms_for_motif(candidate_terms)
+    terms_for_motif = wilson_suite.wilson_intensities.amplitudes.resonances.terms_for_motif(candidate_terms)
 
     assert  len(terms_for_motif[(((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))]) == 2
     assert  len(terms_for_motif[(((('a', 'b'), ('a',)), ('A',)),)]) == 1
@@ -87,7 +90,7 @@ def test_find_resonance_locations_wrt_index_choices():
     harm_labels = ('1', '3', '4')
     vibdata = f_abst.VibStatesData(allstates=allstates, harmonic_osc_states_labels=harm_labels)
     
-    d = pet.find_resonance_locations_wrt_index_choices(motif=motif1, vibstates_data=vibdata)
+    d = wilson_suite.wilson_intensities.amplitudes.resonances.find_resonance_locations_wrt_index_choices(motif=motif1, vibstates_data=vibdata)
     print(d)
 
 
@@ -95,14 +98,14 @@ def test_motifs_control():
     print()
     candidate_terms = generate_only_res_cond_evv_term_selection()
     
-    r = pet.motifs_control(candidate_terms)
+    r = wilson_suite.wilson_intensities.amplitudes.resonances.motifs_control(candidate_terms)
     print(r)
 
 def test_identify_maximum_axes_in_terms():
     print()
     candidate_terms = generate_only_res_cond_evv_term_selection()
 
-    pet.identify_maximum_axes_in_terms(candidate_terms)
+    wilson_suite.wilson_intensities.amplitudes.resonances.identify_maximum_axes_in_terms(candidate_terms)
 
 def test_is_location_in_window():
     loc1 = {'A': 12., 'B': 33.}
@@ -112,16 +115,16 @@ def test_is_location_in_window():
     window4 = {'A': (11., 21.), 'B': (41., 44.)}
 
     print()
-    r1 = pet.is_location_in_window(location=loc1, window=window1)
+    r1 = wilson_suite.wilson_intensities.amplitudes.resonances.is_location_in_window(location=loc1, window=window1)
     assert r1
 
-    r2 = pet.is_location_in_window(location=loc1, window=window2, margins={'A': (-2., 2.)})
+    r2 = wilson_suite.wilson_intensities.amplitudes.resonances.is_location_in_window(location=loc1, window=window2, margins={'A': (2., 2.)})
     assert r2
 
-    r3 = pet.is_location_in_window(location=loc1, window=window3)
+    r3 = wilson_suite.wilson_intensities.amplitudes.resonances.is_location_in_window(location=loc1, window=window3)
     assert not r3
 
-    r4 = pet.is_location_in_window(location=loc1, window=window4, margins={'B':(-10., 2.)})
+    r4 = wilson_suite.wilson_intensities.amplitudes.resonances.is_location_in_window(location=loc1, window=window4, margins={'B':(10., 2.)})
     assert r4
 
 
@@ -131,21 +134,21 @@ def test_find_domain_groups_by_distance():
     points = [[1., 3.], [5., 11.], [4., 2.], [12., 6.], [8., 2.], [11., 4.]]
     print(points, len(points))
 
-    groups = pet.find_domain_groups_by_distance(points, distance_threshold=10.)
+    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=10.)
     assert len(groups) == 3
     print(groups)
 
-    groups = pet.find_domain_groups_by_distance(points, distance_threshold=12.)
+    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=12.)
     assert len(groups) == 2
     print(groups)
 
-    groups = pet.find_domain_groups_by_distance(points, distance_threshold=4.)
+    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=4.)
     assert len(groups) == 4
     print(groups)
 
 def test_find_domain_distance_threshold():
     print()
-    pet.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
+    wilson_suite.wilson_intensities.amplitudes.domains.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
 
 
 def test_make_avrg_props_motif():
@@ -161,10 +164,10 @@ def test_make_avrg_props_motif():
         
         # get only avrg props
         # props_with_cart_axes = [prop.to_latex() for prop in term.props if prop.ops]
-        props_with_cax_simple = [pet.simple_prop_ID(prop) for prop in term.props if prop.ops]
+        props_with_cax_simple = [wilson_suite.wilson_intensities.amplitudes.averaged_props.simple_prop_ID(prop) for prop in term.props if prop.ops]
 
         collect_simple.append(set(tuple(props_with_cax_simple)))
-        pp = pet.make_avrg_props_motif(term.props)
+        pp = wilson_suite.wilson_intensities.amplitudes.averaged_props.make_avrg_props_motif(term.props)
         print(props_with_cax_simple)
         print(pp)
     
@@ -178,7 +181,7 @@ def test_identify_unique_avrgmotifs():
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
     terms_select = terms_fuller_flat
 
-    unique = pet.identify_unique_avrgmotifs(terms_select)
+    unique = wilson_suite.wilson_intensities.amplitudes.averaged_props.identify_unique_avrgmotifs(terms_select)
     print('\n\n')
     for i in unique:
         print(i)
@@ -197,7 +200,7 @@ def test_identify_unique_vibdiff_motifs():
     t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
 
-    res = pet.identify_unique_vibdiff_motifs(terms_select)
+    res = wilson_suite.wilson_intensities.amplitudes.vibene_differences.identify_unique_vibdiff_motifs(terms_select)
     for i in res:
         print(i)
 
@@ -214,7 +217,7 @@ def test_PropsCollection_get_avegaded_props():
     motifs_coll = []
 
     for t in terms_select:
-        t_props = pet.PropsCollection(props=t.props)
+        t_props = tparts.PropsCollection(props=t.props)
         
         # print('----')
         # motifs_coll.append(t_props.get_avegaded_props())

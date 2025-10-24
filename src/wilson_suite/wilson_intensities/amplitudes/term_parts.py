@@ -4,6 +4,7 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ...wilson_main.abstractions import MolecularProperty
+
 @dataclass
 class PropsCollection:
     """
@@ -62,7 +63,8 @@ class PropsCollection:
             averaged._set_attr_for_all_props('inds', None)
             return averaged
     def __repr__(self):
-        full_string = [f'{prop_trivname(ord_geo=len(p.inds), ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}' for p in self.props]
+        inds_all = [len(p.inds) if p.inds else 0 for p in self.props]
+        full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}' for i, p in enumerate(self.props)]
         return ' * '.join(full_string)
 
 
@@ -123,3 +125,83 @@ class EvalTermCollection:
     """
     """
     terms: list[EvalVibPerturbedTerm]
+
+from collections.abc import Mapping
+import copy
+
+class ParameterSet(Mapping):
+    """
+    Dict-like holder of "parameter label -> index value" mapping
+
+    index value should be in VibState label space, so it's a string likely
+    """
+    def __init__(self, parameters):
+
+        if not isinstance(parameters, dict):
+            raise TypeError("ParameterSet must be initialized with a dictionary.")
+        parameters = copy.deepcopy(parameters)
+        
+        if 'zero' not in parameters:
+            parameters['zero'] = 'zero'
+        self._parameters = dict(parameters)
+        self._hash = hash(frozenset(self._parameters.items()))
+
+    def parameter_labels(self):
+        return list(self._parameters.keys())
+    
+    def indices(self):
+        return list(self._parameters.values())
+
+    def __getitem__(self, key):
+        if key=='':
+            key = 'zero'
+        return self._parameters[key]
+
+    def __iter__(self):
+        return iter(self._parameters)
+
+    def __len__(self):
+        return len(self._parameters)
+
+    def __hash__(self):
+        return self._hash
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._parameters})"
+
+    def __eq__(self, other):
+        if isinstance(other, ParameterSet):
+            return self._parameters == other._parameters
+        return False
+    
+    def to_dict(self):
+        return self._parameters
+
+    @classmethod
+    def from_dict(cls, parameters):
+        return cls(parameters)
+
+from wilson_suite.wilson_utils.abstractions import VibState
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
+@dataclass
+class VibStatesData:
+    """
+    Holds vib states data and can compute vib states energy differences
+    """
+    allstates: tuple[VibState]
+    harmonic_osc_states_labels: tuple
+
+    def __post_init__(self):
+        tmp_allstates = list(self.allstates)
+        tmp_allstates.append(VibState(s={}, state_label='zero', e=0.))
+        self.allstates = tuple(tmp_allstates)
+        
+        self.allstates_map = {i.state_label: i.e for i in self.allstates}
+        self._storage = dict()
+
+    def _fill_storage(self):
+        for vlabel_a, energy_a in self.allstates_map:
+            for vlabel_b, energy_b in self.allstates_map:
+                self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
+

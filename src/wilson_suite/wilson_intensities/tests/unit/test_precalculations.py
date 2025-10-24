@@ -1,6 +1,7 @@
-from ...amplitudes import precalculations as prec
-import wilson_suite.wilson_intensities.amplitudes.pre_eval_treatment as pet
+import wilson_suite.wilson_intensities.amplitudes.averaged_props as avrgprops
+# import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as pet
 import wilson_suite.wilson_derive.abstractions as wd_abst
+import wilson_suite.wilson_intensities.amplitudes.term_parts as term_abst
 import numpy as np
 
 
@@ -82,7 +83,7 @@ def test_make_func_to_compute_avrg():
     motifs_coll = []
 
     for t in terms_select:
-        motifs_coll.append(pet.PropsCollection(props=t.props).get_averaged_props())
+        motifs_coll.append(term_abst.PropsCollection(props=t.props).get_averaged_props())
     
     for i in motifs_coll:
         print(i)
@@ -91,7 +92,7 @@ def test_make_func_to_compute_avrg():
     for i in motifs_coll[:2]:
         # print(i)
         # index_choices={'a': 1, 'b': 2}
-        f01 = prec.make_func_to_compute_avrg(avrg_expression=i, 
+        f01 = avrgprops.make_func_to_compute_avrg(avrg_expression=i, 
                                              polarization='ZZZZ')
         # print('f01 res1', f01(index_choices={'a': 1, 'b': 2}, props_data=props_data))
         # print('f01 res2', f01(index_choices={'a': 1, 'b': 0}, props_data=props_data))
@@ -101,7 +102,7 @@ def test_make_func_to_compute_avrg():
     for i in motifs_coll[2:]:
         # print(i)
         # index_choices={'a': 1, 'b': 0, 'c': 1}
-        f02 = prec.make_func_to_compute_avrg(avrg_expression=i,
+        f02 = avrgprops.make_func_to_compute_avrg(avrg_expression=i,
                                              polarization='ZZZZ')
         funcs3dtensors.append(f02)
 
@@ -138,9 +139,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
     dipgrad2.inds = ['b']
 
-    avrg_expr = pet.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
+    avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
 
-    t = prec.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    t = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
     print(t)
 
     # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
@@ -151,6 +152,6 @@ def test_precalculate_avrg_tensor():
     dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
     dipgrad2.inds = ['c']
 
-    avrg_expr = pet.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
-    t = prec.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
+    t = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
     print(t)

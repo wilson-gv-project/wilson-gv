@@ -1,6 +1,8 @@
 from rich.pretty import pprint
 import numpy as np
-from ...amplitudes.func_evaluation import VibDiffBank, get_resonance_loc
+
+from ...amplitudes.vibene_differences import VibDiffBank
+from ...amplitudes.func_evaluation import get_resonance_loc
 
 def test_VibDiffBank():
     # Example dummy energy function

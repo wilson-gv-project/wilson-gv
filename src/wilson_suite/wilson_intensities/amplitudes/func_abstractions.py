@@ -35,10 +35,14 @@ class ParameterSet(Mapping):
         self._hash = hash(frozenset(self._parameters.items()))
 
     def parameter_labels(self):
-        return list(self._parameters.keys())
+        labels = list(self._parameters.keys())
+        labels.remove("zero")
+        return labels
     
     def indices(self):
-        return list(self._parameters.values())
+        inds_all = list(self._parameters.values())
+        inds_all.remove("zero")
+        return inds_all
 
     def __getitem__(self, key):
         if key=='':

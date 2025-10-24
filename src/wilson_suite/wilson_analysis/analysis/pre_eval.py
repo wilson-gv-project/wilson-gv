@@ -1,3 +1,4 @@
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences
 from ...wilson_intensities.amplitudes import func_evaluation
 from ...wilson_derive.abstractions import VibPerturbedTerm
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
@@ -129,7 +130,7 @@ class DataAnalyzer:
         """
         get_state = func_evaluation.make_state_value_func(wilsonsim.vib_ana_setup.states)
         
-        self.vibdiffbank = func_evaluation.VibDiffBank(indices=wilsonsim.vib_ana_setup.modes_indices, 
+        self.vibdiffbank = wilson_suite.wilson_intensities.amplitudes.vibene_differences.VibDiffBank(indices=wilsonsim.vib_ana_setup.modes_indices, 
                                                        max_quanta=wilsonsim.vib_ana_setup.max_state_lvl,
                                                        state_value_func=get_state, mode=vibdiffbank_mode)
         return self.vibdiffbank
@@ -171,7 +172,7 @@ class DataAnalyzer:
         return resonance_registry
     
     @staticmethod
-    def extract_oneTerm_resonances(term: func_evaluation.EvalTerm, vibdiffbank: func_evaluation.VibDiffBank):
+    def extract_oneTerm_resonances(term: func_evaluation.EvalTerm, vibdiffbank: wilson_suite.wilson_intensities.amplitudes.vibene_differences.VibDiffBank):
         """
         Returns a lis of func_evaluation.Resonance instances based on 
             one EvalTerm instance and mode_indices
