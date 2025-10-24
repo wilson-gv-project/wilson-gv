@@ -30,7 +30,7 @@ from itertools import product
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..spectrum import func_evaluation
+    from ..amplitudes import func_evaluation
 
 import logging
 logger = logging.getLogger("intensities")
@@ -911,7 +911,7 @@ def get_resonances(termnd: TermND, modes_indices, max_state_lvl):
     """
      -> list[func_evaluation.Resonance]
     """
-    from ..spectrum import func_evaluation
+    from ..amplitudes import func_evaluation
 
     evalterm = func_evaluation.EvalTerm(**termnd.expression)
 

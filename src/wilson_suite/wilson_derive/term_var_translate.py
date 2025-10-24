@@ -1,6 +1,6 @@
 import copy
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_intensities.spectrum.pre_eval_treatment import identify_unique_resmotifs, \
+from wilson_suite.wilson_intensities.amplitudes.pre_eval_treatment import identify_unique_resmotifs, \
     terms_for_motif
 
 

@@ -10,11 +10,11 @@ import pytest
 import numpy as np
 import pandas as pd
 from CQCParse.relay import DataVault
-from ..spectrum.averaging import get_AlphaBetaGammaDelta_indices
+from ..amplitudes.averaging import get_AlphaBetaGammaDelta_indices
 from ..utils.utils import prep_data_load, get_package_root
-from ..spectrum.termND import TermND
+from ..amplitudes.termND import TermND
 from ..utils import DataForPrecalc
-from ..spectrum.termsEvaluator import TermsEvaluator
+from ..amplitudes.termsEvaluator import TermsEvaluator
 from ..utils.spectrum_utils import SimulationConfig
 from ..utils import debug_mode
 

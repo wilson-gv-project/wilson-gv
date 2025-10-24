@@ -1,4 +1,4 @@
-from ...wilson_intensities.spectrum import func_evaluation
+from ...wilson_intensities.amplitudes import func_evaluation
 from ...wilson_derive.abstractions import VibPerturbedTerm
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ...wilson_utils.useful_shortcuts import makeSpecSetup2D

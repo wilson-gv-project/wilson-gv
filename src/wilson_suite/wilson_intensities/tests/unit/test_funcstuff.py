@@ -7,7 +7,7 @@
 - [ ] vibene_denom
 - [ ] resonance part
 """
-from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst
+from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
 import json
 import numpy as np
 
@@ -86,7 +86,7 @@ def test_EvaluationTerm():
                                       Gamma=3.14)
     print(res_point)
 
-from wilson_suite.wilson_intensities.spectrum import func_evaluation as f_eval
+from wilson_suite.wilson_intensities.amplitudes import func_evaluation as f_eval
 
 def test_generate_LHS():
     rr1 = f_abst.ResonanceWaveMatch({'1': -1, '2': 1})
@@ -140,7 +140,7 @@ def test_generate_LHS_motif():
     motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
     
-    from ...spectrum.func_evaluation import generate_LHS_motif
+    from ...amplitudes.func_evaluation import generate_LHS_motif
     
     r1 = generate_LHS_motif(motif=motif1)
     assert np.allclose(r1, np.array([[-1.,  0.], [ 0., -1.]]))
@@ -167,7 +167,7 @@ def test_generate_RHS_motif():
     # vibdiff: (m_inds, n_inds) <=== ((m1, m2, ...), (n1, n2, ...))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
     
-    from ...spectrum.func_evaluation import get_RHS_motif
+    from ...amplitudes.func_evaluation import get_RHS_motif
     params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
     vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
                                               f_abst.VibState(s={}, state_label='3', e=3644.),
@@ -194,7 +194,7 @@ def test_solve_LSE_motif():
     motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
-    from ...spectrum.func_evaluation import solve_LSE_motif
+    from ...amplitudes.func_evaluation import solve_LSE_motif
     params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
     vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
                                               f_abst.VibState(s={}, state_label='3', e=3644.),

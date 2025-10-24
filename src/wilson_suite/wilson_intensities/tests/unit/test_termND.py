@@ -5,12 +5,12 @@ Duplicated intro in test_term_evaluation : UPD - now it's in pytest fixtured in 
 """
 import numpy as np
 
-from ...spectrum.termND import TermND
-from ...spectrum.termsEvaluator import TermsEvaluator
+from ...amplitudes.termND import TermND
+from ...amplitudes.termsEvaluator import TermsEvaluator
 from ...utils.utils import prep_data_load
 from ...utils import DataForPrecalc
 
-from ...spectrum.termND import sum_over_suffixes
+from ...amplitudes.termND import sum_over_suffixes
 
 from ..testing_utils import require_asserts
 
@@ -193,7 +193,7 @@ def test_amplitude_1term_single_point_ab(dict_8terms: dict, MOL_setup_parser: di
         'polgrad': t0.properties_data['polgrad'],
         'polhess': t0.properties_data['polhess'],
     }
-    from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
+    from ...amplitudes.averaging import get_AlphaBetaGammaDelta_indices
     avrg_terms = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     w1 = np.arange(spectrum_setup.start1,
                    spectrum_setup.end1, spectrum_setup.step1)
@@ -654,7 +654,7 @@ def test_termevaluator() -> None:
 
 def test_compute_vibdiff() -> None:
     print()
-    from ...spectrum import compute_vibdiff
+    from ...amplitudes import compute_vibdiff
     assert compute_vibdiff((0,1), (3,)) == [('zero',), ('3',)]
     assert compute_vibdiff((0,1), (6,)) == [('zero',), ('6',)]
     assert compute_vibdiff((1,1), (3,2)) == [('3',), ('2',)]

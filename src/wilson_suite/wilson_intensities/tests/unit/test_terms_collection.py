@@ -6,9 +6,9 @@ dict_8terms is a fixture dictionary defined in wilson_intensities/tests/conftest
 It contains 8 terms expressions in dict format.
 """
 import numpy as np
-from ...spectrum.averaging import get_AlphaBetaGammaDelta_indices
-from ...spectrum.termsEvaluator import TermsEvaluator
-from ...spectrum import TermND
+from ...amplitudes.averaging import get_AlphaBetaGammaDelta_indices
+from ...amplitudes.termsEvaluator import TermsEvaluator
+from ...amplitudes import TermND
 from ...utils.spectrum_utils import VibStatesDiff
 
 from ..testing_utils import require_asserts
@@ -62,7 +62,7 @@ def test_outer_product_einsum() -> None:
     print()
 
     arr = np.array([1., 2., 4.])
-    from ...spectrum.termsEvaluator import outer_product_einsum
+    from ...amplitudes.termsEvaluator import outer_product_einsum
     expected_2d = np.array([[1., 0.5, 0.25],
                             [0.5, 0.25, 0.125],
                             [0.25, 0.125, 0.0625]])

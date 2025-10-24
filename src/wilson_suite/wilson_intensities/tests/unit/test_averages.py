@@ -1,4 +1,4 @@
-import wilson_suite.wilson_intensities.spectrum.term_parts  as tparts
+import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
 
 def get_expressions():
     from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
@@ -19,7 +19,7 @@ def test_expr1():
         print(prop)
     nm_indices_symb = sorted(set(expression.get_mode_indices()))
     
-    from ...spectrum.pre_eval_treatment import generate_index_choices_general
+    from ...amplitudes.pre_eval_treatment import generate_index_choices_general
     idxs = generate_index_choices_general(indlabels_in_motif=nm_indices_symb, labels=['1', '2', '3'])
     print()
     for i in idxs:

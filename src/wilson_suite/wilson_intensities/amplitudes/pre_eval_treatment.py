@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
-    from wilson_suite.wilson_intensities.spectrum.func_abstractions import VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes.func_abstractions import VibStatesData
 
 import copy
 import numpy as np
-from ..spectrum.term_parts import PropsCollection
+from ..amplitudes.term_parts import PropsCollection
 
 """
 Extra info on top of VibPerturbedTerm and its components:
@@ -171,7 +171,7 @@ def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
                                                spec_window=None) -> dict:
     """
     """
-    from ..spectrum.func_evaluation import solve_LSE_motif, ParameterSet
+    from ..amplitudes.func_evaluation import solve_LSE_motif, ParameterSet
     res_loc_dict = initialize_resonance_dict(motif)
     print('res_loc_dict', res_loc_dict)
 

@@ -1,5 +1,5 @@
-import wilson_suite.wilson_intensities.spectrum.pre_eval_treatment as pet
-import wilson_suite.wilson_intensities.spectrum.term_parts  as tparts
+import wilson_suite.wilson_intensities.amplitudes.pre_eval_treatment as pet
+import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
 
 def generate_only_res_cond_evv_term_selection():
 
@@ -74,7 +74,7 @@ def test_find_resonance_locations_wrt_index_choices():
     motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
-    from wilson_suite.wilson_intensities.spectrum import func_abstractions as f_abst
+    from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
     allstates = (f_abst.VibState(s={}, state_label='1', e=1234.),
                  f_abst.VibState(s={}, state_label='3', e=3644.),
                  f_abst.VibState(s={}, state_label='4', e=1621.),

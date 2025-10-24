@@ -290,7 +290,7 @@ sim.getResults(obtainer=wilson_data_obtainer)
 import numpy as np
 np.set_printoptions(precision=4)
 
-from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
+from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
 sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
 intensities_spec = np.abs(sim.spec) ** 2
 

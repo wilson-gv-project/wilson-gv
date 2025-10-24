@@ -6,7 +6,7 @@ from ..utils.spectrum_utils import DoubleDict
 from ..utils.utils import pairwise_differences, coolprint
 from ..utils.spectrum_utils import greek_list
 from ..utils.spectrum_utils import DataForPrecalc
-from ..spectrum.termND import TermND
+from ..amplitudes.termND import TermND
 
 import logging
 logger = logging.getLogger("wilson."+__name__)

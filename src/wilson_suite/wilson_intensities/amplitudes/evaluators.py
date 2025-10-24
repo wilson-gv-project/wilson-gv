@@ -124,9 +124,9 @@ def terms_evaluator(system,
 
     spec_eval_setup  is a wilson_main.abstractions.specEvalSetup instance
     """
-    from ..spectrum import TermND, TermsEvaluator
+    from ..amplitudes import TermND, TermsEvaluator
     from ..utils.spectrum_utils import DataForPrecalc
-    from ..spectrum.averaging import getPolarizationAveragingExpression
+    from ..amplitudes.averaging import getPolarizationAveragingExpression
 
     amplitudes = 0. + 0.j
 

@@ -240,7 +240,7 @@ def run():
     logger.debug(sim.spec_eval_setup)
 
     if not PREP_ONLY:
-        from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
+        from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
         logger.info('  >>> Going to evaluate now...\n')
         sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
         intensities_spec = np.abs(sim.spec)**2
