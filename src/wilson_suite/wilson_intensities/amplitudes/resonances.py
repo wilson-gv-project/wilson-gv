@@ -119,14 +119,14 @@ def solve_LSE_motif(motif: tuple[tuple,...],
         print("Error solving linear system:", e)
 
 
-def generate_index_choices(motif, vibstates_data: 'VibStatesData'):
+def _generate_index_choices(motif, vibstates_data: 'VibStatesData'):
     """
     Generate all possible index combinations for the given motif.
     """
+    from ..amplitudes.utils import generate_index_choices_general
     indlabels_in_motif = sorted(list(get_indlabels_in_resmotif(motif)))
     labels = vibstates_data.harmonic_osc_states_labels
-    import itertools
-    return [dict(zip(indlabels_in_motif, combo)) for combo in itertools.product(labels, repeat=len(indlabels_in_motif))]
+    return generate_index_choices_general(indlabels_in_motif=indlabels_in_motif, labels=labels)
 
 
 def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
@@ -147,7 +147,7 @@ def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
 
     results: dict[dict,list] = {}
 
-    index_choices = generate_index_choices(motif, vibstates_data)
+    index_choices = _generate_index_choices(motif, vibstates_data)
 
     for idxs in index_choices:
         parameters = ParameterSet(idxs)

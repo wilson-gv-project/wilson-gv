@@ -34,10 +34,11 @@ def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
 def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[PropsCollection]:
     """
     motif contains props and total number of unique indices in them together
+    ???
     """
     lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
-    for l in lst:
-        print(l)
+    for term_props in lst:
+        print(term_props)
     return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 

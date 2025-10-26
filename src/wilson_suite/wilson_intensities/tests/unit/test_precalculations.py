@@ -141,8 +141,21 @@ def test_precalculate_avrg_tensor():
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
 
-    t = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
-    print(t)
+    # t1 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    # print(t1)
+
+    # polgrad['b'][0, 3] * dipgrad['b'][1] * dipgrad['a'][2]
+    polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
+    polhess.inds = ['a', 'b']
+    dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    dipgrad1.inds = ['b']
+    dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    dipgrad2.inds = ['a']
+
+    avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
+
+    # t2 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    # print(t2)
 
     # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
@@ -153,5 +166,56 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['c']
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
-    t = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
-    print(t)
+    t3 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    print(t3)
+
+    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
+    polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
+    polhess.inds = ['a', 'b']
+    dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    dipgrad1.inds = ['c']
+    dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    dipgrad2.inds = ['a']
+
+    avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
+    t4 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    print(t4)
+    print(np.allclose(t3, t4))
+
+    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
+    polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
+    polgrad.inds = ['b']
+    dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    dipgrad1.inds = ['c']
+    dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    dipgrad2.inds = ['a']
+
+    avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
+    t5 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    print(t5)
+
+    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
+    polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
+    polgrad.inds = ['c']
+    dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    dipgrad1.inds = ['b']
+    dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    dipgrad2.inds = ['a']
+
+    avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
+    t6 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    print(t6)
+
+    print(np.allclose(t5, t6))
+
+    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
+    polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
+    polgrad.inds = ['b']
+    dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    dipgrad1.inds = ['a']
+    dipgrad2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    dipgrad2.inds = ['a']
+
+    avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
+    t7 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
+    print(t7)

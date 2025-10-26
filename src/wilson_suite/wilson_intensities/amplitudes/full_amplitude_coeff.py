@@ -23,7 +23,7 @@ Extra info on top of VibPerturbedTerm and its components:
 """
 FULL TERM COEFFICIENT for VibPerturbedTerm
 """
-def calculate_term_coeffs_for_indices(terms, motif_res_loc):
+def calculate_term_coeffs_for_indices(terms: list['VibPerturbedTerm'], motif_res_loc):
 
     # Suggestion sketch for overall steps
 

@@ -26,7 +26,7 @@ def test_saved():
         get_plt_latex(t_latex, savename=f'term{n}.svg')
 
 def test_terms_custom_saved():
-    from ...wilson_intensities.tests.unit.test_pre_eval_treatment import generate_only_res_cond_evv_term_selection
+    from ...wilson_intensities.tests.unit.test_resonances import generate_only_res_cond_evv_term_selection
     terms = generate_only_res_cond_evv_term_selection()
     latex_strs = [t.to_latex() for t in terms]
 
