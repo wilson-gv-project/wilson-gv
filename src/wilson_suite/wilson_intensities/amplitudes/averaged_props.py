@@ -9,6 +9,8 @@ from wilson_suite.wilson_intensities.amplitudes.term_parts import PropsCollectio
 from wilson_suite.wilson_intensities.amplitudes.utils import generate_index_choices_general
 from wilson_suite.wilson_main.abstractions import MolPropsCollection
 
+import logging
+logger = logging.getLogger("wilson")
 
 def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
     """
@@ -80,6 +82,9 @@ def make_func_to_compute_avrg(*,
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
                 product *= props_data.get(prop_tuple_key)[all_inds]
             # print('...')
+            if product != 0.:
+                logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes}: {product}")
+                
             total += product
 
         return total * prefactor
@@ -98,8 +103,8 @@ def precalculate_avrg_tensor(avrg_expression: 'PropsCollection',
     func = make_func_to_compute_avrg(avrg_expression=avrg_expression, polarization=polarization)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
-    print('full_tensor.shape', full_tensor.shape)
-    print(ind_choices)
+    # print('full_tensor.shape', full_tensor.shape)
+    # print(ind_choices)
 
     for idx in ind_choices:
         full_tensor[tuple(dict(sorted(idx.items())).values())] = func(idx, props_data)

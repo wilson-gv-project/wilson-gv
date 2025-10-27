@@ -34,7 +34,7 @@ def find_distance_threshold(dynamic_range, Gamma_axes: dict):
     base_intensity = 1./gamma_prod
     min_to_show = base_intensity/dynamic_range
 
-    raise NotImplementedError
+    raise NotImplementedError('find_distance_threshold not finished yet')
 
 
 def determine_domains_and_features(features_to_draw):
