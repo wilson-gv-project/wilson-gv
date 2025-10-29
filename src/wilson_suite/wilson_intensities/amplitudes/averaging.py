@@ -1,10 +1,54 @@
-"""
-Documentation and tests will be added in the future PR, also style imporvements
-"""
-# Author: Magnus Ringholm
 
 import numpy as np
 import copy
+
+
+def isotropic_average_for_props_and_field(term, experiment):
+    """
+    Take a collection of properties and an experiment and determine the appropriate orientational average
+    """
+
+    # Outline of routine:
+
+    # The average is formed as the contraction A * f * M * g * P (see JCP 67, 5026)
+    # A is a tensor describing a laboratory-frame quantity: Here it represents the polarization of the incident/detected radiation
+    # P is a tensor describing a molecule-frame quantity: Here it represents some relevant part of a response property (e.g.,
+    # for four-wave mixing 2D-IR, this is one term's collection of polarization properties
+    # f and g are collections resulting from evaluating strings of Kronecker deltas and Levi-Civita symbols according to the
+    # JCP 67, 5026 procedure. The result is a collection of references to tensor components of A (f) or P (g) that fulfill the conditions as
+    # dictated by each Kronecker/Levi-Civita string (one string leads to a given number of tensor components, and the collection is over all strings)
+    # The f and g collections are created from tabulated strings. They have a "positive" and "negative" part. The positive part signifies that the
+    # components specified inside are to be added. The negative part (only relevant if there was a Levi-Civita symbol during the evaluation (which happens at
+    # odd orders) signifies that the components are to be subtracted
+    # M is a matrix collecting coefficients associated with the orientational averaging (it is here tabulated for orders up to 6 but can in principle
+    # be calculated).
+
+    # 1: Fails:
+    # a) Fail if the order is > 6
+    # b) Fail if not all of the polarization properties are electric dipole polarization properties
+
+    # 2: Get f, M, g
+    # When properties are all electric dipole properties (not sure what happens if not), then f and g are the same thing
+    # (except that f applies to A and g applies to P)
+
+    # The exact organization of 3, 4, 5 may be adjusted
+
+    # 3. Form K = M * g * p
+
+    # 4. Form L = f * K
+
+    # 5. Form the result A * L
+
+    # Need to find out:
+    # - How does A represent general polarization setups?
+    # - Could einsum be a smart thing to use here?
+    # - How to best bring in polarization information from the experiment?
+    # - How to make sure that the ranks of the microscopic and macroscopic tensors (and their combination on averaging)
+    # are properly kept track of/aligned?
+
+
+
+    pass
 
 # Calculate transposed 'laser polarization term' (the term (A * f) in (A * f * M * g * P) in JCP 141, 204103)
 # The argument pol is a list of vectors
@@ -70,6 +114,7 @@ def make_iso_f(n, kron, lc):
 
     # Are there only Kronecker deltas to take care of? If so, then no subtraction
     if len(lc) == 0:
+        print('iso f', iso_f)
         return [iso_f[0], []]
 
     # If not, proceed to do Levi-Civita handling
@@ -85,39 +130,9 @@ def make_iso_f(n, kron, lc):
 
         iso_f[sum(bperm[i]) % 2] = meso_iso_f(this_lc, iso_f[sum(bperm[i]) % 2])
 
-    #for i in range(len(iso_f)):
-        #iso_f[0][i] = tuple(iso_f)
-        #iso_f[1][i] = tuple(iso_f)
+    print('iso f', iso_f)
 
     return iso_f
-
-
-def binary_perm(n, combs):
-
-    if n > 1:
-
-        for i in range(len(combs)):
-
-            nc1 = copy.deepcopy(combs[i])
-            nc1.append(0)
-
-            nc2 = copy.deepcopy(combs[i])
-            nc2.append(1)
-
-            #a = binary_perm(n-1, nc1)
-            #a = binary_perm(n-1, nc2)
-
-            combs = copy.deepcopy(nc1)
-            combs.extend(copy.deepcopy(nc2))
-
-            return 1
-
-        print ('should not happen')
-        return 0
-    else:
-
-        return 1
-
 
 def meso_iso_f(dicts, iso_f):
 
@@ -144,66 +159,61 @@ def meso_iso_f(dicts, iso_f):
 
             return iso_f
 
+
 # Currently only 3D
 # Maybe necessary to rewrite for higher dimensions for e.g. quadrupole effects
 def get_iso_f(n):
 
     if n == 2:
 
-        return [[
-            [(0, 0),
-             (1, 1),
-             (2, 2)],
-            []]]
+        return [
+            make_iso_f(2, [mdk(0, 1)], []),
+        ]
+
 
     elif n == 3:
 
-        return [[
-            [(0, 1, 2),
-             (1, 2, 0),
-             (2, 0, 1),
-             (2, 1, 0),
-             (1, 0, 2),
-             (0, 2, 1)],
-            []]]
+        return [
+            make_iso_f(3, [], [mdl(0, 1, 2)]),
+        ]
 
     elif n == 4:
 
         return [
-            make_iso_f(4, [mdk(1, 2), mdk(3, 4)], []),
-            make_iso_f(4, [mdk(1, 3), mdk(2, 4)], []),
-            make_iso_f(4, [mdk(1, 4), mdk(2, 3)], [])
+            make_iso_f(4, [mdk(0, 1), mdk(2, 3)], []),
+            make_iso_f(4, [mdk(0, 2), mdk(1, 3)], []),
+            make_iso_f(4, [mdk(0, 3), mdk(1, 2)], [])
         ]
 
     elif n == 5:
 
         return [
-            make_iso_f(5, [mdk(4, 5)], [mdl(1, 2, 3)]),
-            make_iso_f(5, [mdk(3, 5)], [mdl(1, 2, 4)]),
-            make_iso_f(5, [mdk(3, 4)], [mdl(1, 2, 5)]),
-            make_iso_f(5, [mdk(2, 5)], [mdl(1, 3, 4)]),
-            make_iso_f(5, [mdk(2, 4)], [mdl(1, 3, 5)]),
-            make_iso_f(5, [mdk(2, 3)], [mdl(1, 4, 5)])
+            make_iso_f(5, [mdk(3, 4)], [mdl(0, 1, 2)]),
+            make_iso_f(5, [mdk(2, 4)], [mdl(0, 1, 3)]),
+            make_iso_f(5, [mdk(2, 3)], [mdl(0, 1, 4)]),
+            make_iso_f(5, [mdk(1, 4)], [mdl(0, 2, 3)]),
+            make_iso_f(5, [mdk(1, 3)], [mdl(0, 2, 4)]),
+            make_iso_f(5, [mdk(1, 2)], [mdl(0, 3, 4)])
         ]
 
     elif n == 6:
 
         return [
-            make_iso_f(6, [mdk(1, 2), mdk(3, 4), mdk(5, 6)], []),
-            make_iso_f(6, [mdk(1, 2), mdk(3, 5), mdk(4, 6)], []),
-            make_iso_f(6, [mdk(1, 2), mdk(3, 6), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(1, 3), mdk(2, 4), mdk(5, 6)], []),
-            make_iso_f(6, [mdk(1, 3), mdk(2, 5), mdk(4, 6)], []),
-            make_iso_f(6, [mdk(1, 3), mdk(2, 6), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(1, 4), mdk(2, 3), mdk(5, 6)], []),
-            make_iso_f(6, [mdk(1, 4), mdk(2, 5), mdk(3, 6)], []),
-            make_iso_f(6, [mdk(1, 4), mdk(2, 6), mdk(3, 5)], []),
-            make_iso_f(6, [mdk(1, 5), mdk(2, 3), mdk(4, 6)], []),
-            make_iso_f(6, [mdk(1, 5), mdk(2, 4), mdk(3, 6)], []),
-            make_iso_f(6, [mdk(1, 5), mdk(2, 6), mdk(3, 4)], []),
-            make_iso_f(6, [mdk(1, 6), mdk(2, 3), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(1, 6), mdk(2, 4), mdk(3, 5)], []),
-            make_iso_f(6, [mdk(1, 6), mdk(2, 5), mdk(3, 4)], [])
+            make_iso_f(6, [mdk(0, 1), mdk(2, 3), mdk(4, 5)], []),
+            make_iso_f(6, [mdk(0, 1), mdk(2, 4), mdk(3, 5)], []),
+            make_iso_f(6, [mdk(0, 1), mdk(2, 5), mdk(3, 4)], []),
+            make_iso_f(6, [mdk(0, 2), mdk(1, 3), mdk(4, 5)], []),
+            make_iso_f(6, [mdk(0, 2), mdk(1, 4), mdk(3, 5)], []),
+            make_iso_f(6, [mdk(0, 2), mdk(1, 5), mdk(3, 4)], []),
+            make_iso_f(6, [mdk(0, 3), mdk(1, 2), mdk(4, 5)], []),
+            make_iso_f(6, [mdk(0, 3), mdk(1, 4), mdk(2, 5)], []),
+            make_iso_f(6, [mdk(0, 3), mdk(1, 5), mdk(2, 4)], []),
+            make_iso_f(6, [mdk(0, 4), mdk(1, 2), mdk(3, 5)], []),
+            make_iso_f(6, [mdk(0, 4), mdk(1, 3), mdk(2, 5)], []),
+            make_iso_f(6, [mdk(0, 4), mdk(1, 5), mdk(2, 3)], []),
+            make_iso_f(6, [mdk(0, 5), mdk(1, 2), mdk(3, 4)], []),
+            make_iso_f(6, [mdk(0, 5), mdk(1, 3), mdk(2, 4)], []),
+            make_iso_f(6, [mdk(0, 5), mdk(1, 4), mdk(2, 3)], [])
         ]
 
     else:
@@ -214,12 +224,15 @@ def get_iso_f(n):
 def get_iso_mat(n):
 
     if n == 2:
+        #FIXME: Factor 1/3? NOW UPD
 
-        return 1.0
+        return 1.0/3.0
 
     elif n == 3:
 
-        return 1.0
+        # FIXME: Factor 1/6? NOW UPD
+
+        return 1.0/6.0
 
     elif n == 4:
 

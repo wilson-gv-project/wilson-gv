@@ -248,8 +248,8 @@ class TermsEvaluator:
         # collect types of pert freqs arrangements
         for pfs in uq_pert_freq_arrays:
             pfs = [int(i) for i in pfs]
-            logger.debug('pfs = \[int(i) for i in pfs]')
-            logger.debug(pfs)
+            #logger.debug('pfs = \[int(i) for i in pfs]')
+            #logger.debug(pfs)
             result_pfs[tuple(pfs)] = 0.
 
             for pf in pfs:
