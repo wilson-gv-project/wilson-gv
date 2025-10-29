@@ -21,17 +21,18 @@ class VibState:
 	InitVar - is an init-only variable
 	This seems to be okay for now, but should mind this feature
 	"""
-	s: InitVar[dict] = field(repr=False) # 
+	# s: InitVar[dict] = field(repr=False) # 
+	s: dict
 	e: float = 0.0
 	d: Any = None
 	serial_s: dict = field(init=False)
 	state_label: str = None
 
-	def __post_init__(self, s):
-		self.serial_s = {",".join(k): v for k, v in s.items()}
+	# def __post_init__(self, s):
+	# 	self.serial_s = {",".join(k): v for k, v in s.items()}
 
-	# def __post_init__(self):
-		# self.serial_s = {",".join(k): v for k, v in self.s.items()}
+	def __post_init__(self):
+		self.serial_s = {",".join(k): v for k, v in self.s.items()}
 
 	def deserialize_state_dict(self) -> dict:
 		return {tuple(k.split(",")): v for k, v in self.serial_s.items()}

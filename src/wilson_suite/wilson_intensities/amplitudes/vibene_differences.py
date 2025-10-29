@@ -4,7 +4,7 @@ VIB DIFFERENCES in VibPerturbedTerm
 import numpy as np
 import itertools
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.func_abstractions import ParameterSet
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 
@@ -133,6 +133,36 @@ def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
     else:
         raise NotImplementedError('This unit of energy is not supported')
 
+def calculate_vibenedenom_tensor(vibenedenom_inds: set, 
+                                 vibstates_data: VibStatesData):
+    """
+    should be using harmonic uncorrected vib ene levels!!!
+    """
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    
+    vector = convNu2Ene(np.array(list(vibstates_data.get_harmonic_osc_states().values())))
+    
+    # 'i,j,k->ijk'
+    letters = ['i', 'j', 'k', 'l', 'n', 'n', 'o', 'p']
+    einsum_str = ','.join(letters[:len(vibenedenom_inds)])+'->'+''.join(letters[:len(vibenedenom_inds)])
 
-def precalculate_vibenedenom():
-    return
+    return 1. / np.einsum(einsum_str, *(vector,) * len(vibenedenom_inds))
+
+
+def calculate_vibenedenoms(unique_vibenedenoms: list[set], 
+                           vibstates_data: VibStatesData):
+    """
+    can be done as vector multiplication
+    """
+    results = {}
+    
+    for u_vediff in unique_vibenedenoms:
+        results[tuple(sorted(u_vediff))] = calculate_vibenedenom_tensor(u_vediff, vibstates_data)
+    
+    return results
+
+from wilson_suite.wilson_intensities.amplitudes.term_parts import FreqTermsCollection
+def identify_vibenedenoms(terms: list['VibPerturbedTerm']):
+    """
+    """
+    return set([FreqTermsCollection(freqterms=t.freqterms).get_num_indices_vibenedenom() for t in terms])

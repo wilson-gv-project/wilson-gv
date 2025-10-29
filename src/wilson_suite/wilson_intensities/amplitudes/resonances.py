@@ -5,7 +5,7 @@ RESONANCES in VibPerturbedTerm
 import numpy as np
 from wilson_suite.wilson_analysis.render.render import get_axes_in_resmotif
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.func_abstractions import ParameterSet, VibStatesData
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import get_vibdiff_motif
 import copy
 
@@ -134,7 +134,7 @@ def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
                                                spec_window=None) -> dict:
     """
     """
-    from ..amplitudes.func_abstractions import ParameterSet
+    from ..amplitudes.term_parts import ParameterSet
     res_loc_dict = initialize_resonance_dict(motif)
     # print('res_loc_dict', res_loc_dict)
 

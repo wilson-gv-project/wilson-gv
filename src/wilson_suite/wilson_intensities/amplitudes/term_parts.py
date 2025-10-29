@@ -25,7 +25,8 @@ class PropsCollection:
             yield prop
 
     def __hash__(self):
-        return hash(tuple([tuple(self.get_cart_axes()), self.get_total_difforder()]))
+        # return hash(tuple([tuple(self.get_cart_axes()), self.get_total_difforder()]))
+        return hash(tuple([tuple(self.get_cart_axes()), tuple(self.get_mode_indices())]))
     
     def __eq__(self, other):
         """
@@ -45,7 +46,15 @@ class PropsCollection:
     def get_cart_axes(self):
         return [op.o for p in self.props for op in p.ops]
     def get_mode_indices(self):
-        return [idx for p in self.props for idx in p.inds]
+        groups = [p.inds if p.inds is not None else [] for p in self.props]
+        return [idx for p_inds in groups for idx in p_inds]
+    
+    def get_mode_indices_grouped(self):
+        return [p.inds if p.inds is not None else [] for p in self.props]
+    
+    def get_mode_indices_group_template(self):
+        return [len(p.inds) if p.inds is not None else [] for p in self.props]
+    
     def get_total_difforder(self):
         return sum([p.dord for p in self.props])
     
@@ -58,15 +67,58 @@ class PropsCollection:
         Averaged properties motif/ID - inds will be set to None.
         Indices will be added later, when several terms with with avrg motifs are concidered
         """
-        averaged = self.get_averaged_props()
+        averaged = copy.deepcopy(self.get_averaged_props())
         if averaged.props:
             averaged._set_attr_for_all_props('inds', None)
             return averaged
+    
+    def sort(self):
+        """
+        
+        """
+        self.props = sorted(self.props, key=lambda j: j.ops[0].o)
+        return self 
+
     def __repr__(self):
         inds_all = [len(p.inds) if p.inds else 0 for p in self.props]
-        full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}' for i, p in enumerate(self.props)]
+        full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}_d{p.dord}' for i, p in enumerate(self.props)]
         return ' * '.join(full_string)
 
+@dataclass
+class FreqTermsCollection:
+    freqterms: list[VibDiffTerm]
+    
+    def __post_init__(self):
+        self.freqterms = tuple(self.freqterms)
+
+    def __iter__(self):
+        for freqt in self.freqterms:
+            yield freqt
+
+    def __hash__(self):
+        return hash(self.freqterms)
+    
+    def __eq__(self, other):
+        """
+        Now depends on comparison of PolProp instances.
+        Now PolProp instances are considered equal if the have the same lists of operators (ops)
+            (further, equality of QOperator instances) and same differentiation order (dord)
+        """
+        if isinstance(other, FreqTermsCollection):
+            return all([ft in other.freqterms for ft in self.freqterms])
+        return False
+
+    def get_vibenedenom(self):
+        return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if not ft.is_pert_wf_diff])
+    
+    def get_pert_wf_diff(self):
+        return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if ft.is_pert_wf_diff])
+    
+    def get_num_indices_vibenedenom(self):
+        """
+        """
+        # these vibdiffterms have only sl, sr is zero
+        return tuple(sorted(set(i for vd in self.get_vibenedenom() for i in vd.sl.q)))
 
 @dataclass
 class ResonanceMotif:
@@ -205,3 +257,11 @@ class VibStatesData:
             for vlabel_b, energy_b in self.allstates_map:
                 self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
 
+
+    def get_harmonic_osc_states(self):
+        """
+        i.state_label - TODO: make a convention, rules how to describe vibstates
+        now i.state_label is str
+        """
+        harm_states = {int(i.state_label): i.e for i in self.allstates if len(i.s)==1}
+        return dict(sorted(harm_states.items()))
