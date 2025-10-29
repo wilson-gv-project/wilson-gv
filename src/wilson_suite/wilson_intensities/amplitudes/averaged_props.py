@@ -2,6 +2,7 @@
 PROPERTIES in VibPerturbedTerm ---- #TODO still
 """
 from typing import Callable
+import copy
 
 import numpy as np
 from wilson_suite.wilson_derive.abstractions import PolProp
@@ -14,7 +15,7 @@ logger = logging.getLogger("wilson")
 
 def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
     """
-    USING TUPLES OF TUPLES
+    !USING TUPLES OF TUPLES
     """
     operators = tuple([op.o for op in property.ops])
     return (operators, property.dord)
@@ -22,7 +23,7 @@ def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
 
 def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
     """
-    USING TUPLES OF TUPLES
+    !USING TUPLES OF TUPLES
 
     indices below are concrete, after '|' but could be others, main part of ID is in the numerator
     {((0, 3), 1),  ---- \\frac{\\partial\\alpha_{\\alpha\\delta}} | e.g. {\\partial Q_{b}}
@@ -36,18 +37,29 @@ def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
 def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[PropsCollection]:
     """
     motif contains props and total number of unique indices in them together
-    ???
+    ??? --- not usefull now?
     """
     lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
     for term_props in lst:
         print(term_props)
     return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
+def group_PropsColls_by_numerator(list_props_collections: list['PropsCollection']) -> dict[PropsCollection, list[PropsCollection]]:
+    """
+    [x] DONE
+    returns groups of avrg props motifs by numerator
+    """
+    groups_here: dict['PropsCollection', list] = {}
+    for props_collection in list_props_collections:
+        # props_collection.identify_avrg_motif() returns props stripped from nm indices
+        groups_here.setdefault(props_collection.identify_avrg_motif(), []).append(props_collection)
+    return groups_here
 
 def make_func_to_compute_avrg(*,
                      avrg_expression: 'PropsCollection',
                      polarization: str = 'ZZZZ') -> Callable[[dict, 'MolPropsCollection'], float]:
     """
+    [x] DONE
     for an expression with properties data values, 
     compute average with given polarization setup for a choice of normal mode indices
     """
@@ -91,10 +103,12 @@ def make_func_to_compute_avrg(*,
     return compute_for_idx_choice
 
 
-def precalculate_avrg_tensor(avrg_expression: 'PropsCollection',
-                             polarization: str, number_of_nmodes: int,
-                             props_data: 'MolPropsCollection'):
+def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
+                          polarization: str, number_of_nmodes: int,
+                          props_data: 'MolPropsCollection'):
     """
+    [x] DONE
+
     Precalculating the full tensor for given avrg_expression
     """
     mode_inds = set(avrg_expression.get_mode_indices())
@@ -111,5 +125,132 @@ def precalculate_avrg_tensor(avrg_expression: 'PropsCollection',
 
     return full_tensor
 
-def precalc_averages_for_terms():
-    return
+
+def group_PropsColls_by_repetition_pattern(avrg_expressions: list[PropsCollection]):
+    """
+    [x] DONE
+    For a list of averaged properties expressions already grouped by numerator motifs
+
+    """
+    max_nm_inds = 0
+    all_encoded: dict[PropsCollection, list[PropsCollection]] = {}
+
+    for prop_coll in avrg_expressions:
+        # number of max of uniques nm indices is equal to number of boxes for derivatives 
+        #           - all indices are different and all props are 1st order ders
+        nm_indx = prop_coll.get_mode_indices()
+        num_unique_nm_idx = len(set(nm_indx))
+        if num_unique_nm_idx == len(nm_indx):
+            # all_encoded.setdefault(nm_indices_repetition_encoding(nm_indx), []).append(prop_coll)
+            all_encoded.setdefault(nm_indices_repetition_reduce_deriv_symmetry(prop_coll), []).append(prop_coll)
+            continue
+        
+        max_nm_inds = max(num_unique_nm_idx, max_nm_inds)
+        # all_encoded.setdefault(nm_indices_repetition_encoding(nm_indx), []).append(prop_coll)
+        all_encoded.setdefault(nm_indices_repetition_reduce_deriv_symmetry(prop_coll), []).append(prop_coll)
+    
+    return all_encoded
+
+
+
+def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
+    """
+
+    """
+    numerator_groups = group_PropsColls_by_numerator(avrg_expressions)
+    numer_upd = {k:group_PropsColls_by_repetition_pattern(v) for k,v in numerator_groups.items()}
+
+    flat_dict = {}
+    for num_group in numer_upd:
+        for pattern in numer_upd[num_group]:
+            new_inds = nm_indices_repetition_decoding(pattern)
+            model_expr = reconstruct_unique_avrg_expression(numerator_group=num_group, nm_indices=new_inds)
+            for expression in numer_upd[num_group][pattern]:
+                flat_dict[expression] = model_expr
+    return flat_dict
+
+def nm_indices_repetition_encoding(nm_indices: list[str]):
+    """
+    [a, b, c, d, b] - (0, 2, 0, 0, 2)
+    [a, a, b, c, d] - (1, 1, 0, 0, 0)
+    [a, b, c, d, d] - (0, 0, 0, 4, 4)
+    """
+    counts_dict = {i:nm_indices.count(i) for i in nm_indices}
+    repeated = {k:i+1 for i,k in enumerate(counts_dict.keys()) if counts_dict[k]>1}
+
+    encoded = [0] * len(nm_indices)
+    for i, ind in enumerate(nm_indices):
+        encoded[i] = repeated.get(ind, 0)
+    return tuple(encoded)
+
+def nm_indices_repetition_decoding(encoded_idx: tuple[int]):
+    """
+    (0, 2, 0, 0, 2) - [a, b, c, d, b]
+    (1, 1, 0, 0, 0) - [a, a, b, c, d]
+    (0, 0, 0, 4, 4) - [a, b, c, d, d]
+    """
+    lat_letters_for_zeros = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k']
+    lat_letters_for_ones = copy.deepcopy(lat_letters_for_zeros)
+    
+    result = []
+
+    for coded in encoded_idx:
+        curr_letter = 0
+        if coded == 0:
+            result.append(lat_letters_for_zeros.pop(curr_letter))
+
+        else:
+            result.append(lat_letters_for_ones[coded-1])
+            if lat_letters_for_ones[coded-1] in lat_letters_for_zeros:
+                lat_letters_for_zeros.remove(lat_letters_for_ones[coded-1])
+    return result
+
+def nm_indices_repetition_reduce_deriv_symmetry(props: PropsCollection) -> tuple[int]:
+    """
+    returns a sorted encoding, unlike nm_indices_repetition_encoding
+    """
+    nm_group_template = props.get_mode_indices_group_template()
+    nm_indices_encoded = nm_indices_repetition_encoding(props.get_mode_indices())
+    grouped_coded = group_nm_indices(nm_indices_encoded, nm_group_template)
+
+    for g in grouped_coded:
+        g.sort()
+    return tuple([el for group in grouped_coded for el in group])
+
+def group_nm_indices(nm_indices, grouping_template) -> list[list]:
+    """
+    nm_indices - coded or not list of nm indices
+    
+    ['d', 'd', 'a', 'c', 'b'], [2, 1, 1, 1] --> [['d', 'd'], ['a'], ['c'], ['b']]
+    """
+    result = []
+    curr = 0
+    
+    for gr in grouping_template:
+        result.append(list(nm_indices[curr: curr+gr]))
+        curr += gr
+    return result
+
+def reconstruct_unique_avrg_expression(numerator_group: 'PropsCollection',
+                                       nm_indices: list[str]) -> 'PropsCollection':
+    """
+    dipNone[0] * dipNone[1] * dipNone[2] * dipNone[3] * dipNone[4]
+    hypNone[0, 2, 4] * dipNone[1] * dipNone[3] * dipNone[5]
+
+    """
+    upd_props = []
+    index_tracker = 0
+    
+    for prop in numerator_group:
+        prop = copy.deepcopy(prop)
+        prop.inds = nm_indices[index_tracker: index_tracker + prop.dord]
+        index_tracker += prop.dord
+        upd_props.append(prop)
+    return PropsCollection(props=upd_props)
+
+def identify_unique_avrg_tensors(avrg_expressions: list[PropsCollection]) -> list[PropsCollection]:
+    """
+        
+    """
+    return set(make_unique_avrg_tensors_mapping(avrg_expressions).values())
+
