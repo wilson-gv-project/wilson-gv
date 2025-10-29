@@ -7,15 +7,16 @@
 - [ ] vibene_denom
 - [ ] resonance part
 """
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
 from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
 from wilson_suite.wilson_intensities.amplitudes.resonances import solve_LSE_motif
 import json
 
 def test_ParameterSet():
     print()
-    o1 = f_abst.ParameterSet(dict(a=3, b=4, c=4))
-    o2 = f_abst.ParameterSet(dict(a=3, b=4, c=4))
-    o3 = f_abst.ParameterSet(dict(a=1, b=4, c=4))
+    o1 = ParameterSet(dict(a=3, b=4, c=4))
+    o2 = ParameterSet(dict(a=3, b=4, c=4))
+    o3 = ParameterSet(dict(a=1, b=4, c=4))
     print(o1.indices())
     print(o1.parameter_labels())
     assert o1.indices() == [3, 4, 4]
@@ -73,10 +74,10 @@ def test_EvaluationTerm():
                                anharmonicity=anharmonicity)
     assert et.short_id == 'T001(1_0)'
 
-    params = f_abst.ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
-    vibdata = f_abst.VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
-                                              f_abst.VibState(s={}, state_label='3', e=3644.),
-                                              f_abst.VibState(s={}, state_label='zero', e=0.)),
+    params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
+    vibdata = VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
+                                       f_abst.VibState(s={}, state_label='3', e=3644.),
+                                       f_abst.VibState(s={}, state_label='zero', e=0.)),
                                    harmonic_osc_states_labels=(1, 3))
     
     # res = solve_LSE_motif(resonances=(r1, r2), parameters=params, vibdata=vibdata)
