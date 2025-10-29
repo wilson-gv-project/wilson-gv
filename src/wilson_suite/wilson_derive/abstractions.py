@@ -163,7 +163,7 @@ class PolProp:
     
     def __eq__(self, other):
         if isinstance(other, PolProp):
-            return set(self.ops) == set(other.ops) and self.dord == other.dord
+            return set(self.ops) == set(other.ops) and self.dord == other.dord and self.inds == other.inds
         return False
 
     def __hash__(self):
@@ -283,6 +283,9 @@ class VibDiffTerm:
 
     def __repr__(self):
         return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
+
+    def __hash__(self):
+        return hash( ( self.sl.h(), self.sr.h() ) )
 
     def to_latex(self):
         if isinstance(self.sl, VibStateSymbolic):
