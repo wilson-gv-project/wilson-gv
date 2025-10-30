@@ -91,27 +91,21 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, settings: dict):
 
 
 def evaluate_term_coeffs(term: 'VibPerturbedTerm', relevant_indices: list[dict], pre_eval_data):
-
+    """
+    safety function to check relevant_indices?
+    """
     # Evaluate the coefficient part of the term 'term' for all of the indices in 'relevant_index_tuples'
 
     # Return data or associate with term instance question not settled yet
     results = {}
 
     avrg_expr = avrgprops.PropsCollection(props=term.props).get_averaged_props()
-
-    # print('avrg_expr', avrg_expr)
-    # for i in pre_eval_data['avrg_expr_tensor_mapping']:
-    #     print('key', i, '||', pre_eval_data['avrg_expr_tensor_mapping'][i])
-    # print('\n')
-
-    # for k in pre_eval_data['avrg_tensors']:
-    #     print('tensor k', k)
+    non_avrg_expr = avrgprops.PropsCollection(props=term.props).get_non_averaged_props()
+    print('non_avrg_expr', non_avrg_expr)
 
     avrg_tensor_expr = pre_eval_data['avrg_expr_tensor_mapping'][avrg_expr]
     avrg_tensor = pre_eval_data['avrg_tensors'][avrg_tensor_expr]
     
-    print('avrg_tensor.shape', avrg_tensor.shape)
-
     freqterms = vediff.FreqTermsCollection(freqterms=term.freqterms)
     extra_freqterms = freqterms.get_pert_wf_diff()
 
@@ -119,19 +113,34 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm', relevant_indices: list[dict],
 
     vibenedenoms_tensor = pre_eval_data['vibenedenoms_tensors'][freqterms.get_num_indices_vibenedenom()]
 
-    print('vibenedenoms_tensor.shape', vibenedenoms_tensor.shape)
+    # print('vibenedenoms_tensor.shape', vibenedenoms_tensor.shape)
 
-    print('avrg_expr', avrg_expr)
-    print('avrg_tensor_expr', avrg_tensor_expr)
+    # print('avrg_expr', avrg_expr)
+    # print('avrg_tensor_expr', avrg_tensor_expr)
+
+    idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
+    term_idx_all = sorted(idx_summ + idx_nonsumm)
+
+    # print('\nterm.tellNonSummSummIndices()', idx_summ, idx_nonsumm)
+    # print('term_idx_all', term_idx_all, '\n')
 
     for index_dict in relevant_indices:
+        if not all([index in index_dict for index in term_idx_all]):
+            raise ValueError('index_dict is missing values for some indices')
+
+        for non_avrg_prop in non_avrg_expr:
+            print('non_avrg_prop', non_avrg_prop)
         sorted_index_dict = dict(sorted(index_dict.items()))
-        index_tuple = tuple([v for v in sorted_index_dict.values()]) # ???
         
-        # print('avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple]')
-        # print(avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple], float(term.coeff))
-        # print(avrg_tensor)
+        # works if all unique indices are in index_dict
+        index_tuple = tuple([v for v in sorted_index_dict.values()]) # ???
 
-        results[ParameterSet(index_dict)] = float(term.coeff) * avrg_tensor[index_tuple] * vibenedenoms_tensor[index_tuple]
+        avrg_index_tuple = avrgprops.get_ind_tuple_from_base(expr=avrg_expr, base_expr=avrg_tensor_expr, index_dict=index_dict)
+        
+        AVRG = avrg_tensor[avrg_index_tuple]
+        # print('avrg_index_tuple', avrg_index_tuple)
+        # print('index_tuple', index_tuple)
+
+        # should be a single float result?
+        results[ParameterSet(index_dict)] = float(term.coeff) * avrg_tensor[avrg_index_tuple] * vibenedenoms_tensor[index_tuple]
     return results
-

@@ -162,10 +162,10 @@ def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
 
     """
     numerator_groups = group_PropsColls_by_numerator(avrg_expressions)
-    print('numerator_groups', numerator_groups)
+    # print('numerator_groups', numerator_groups)
 
     numer_upd = {k:group_PropsColls_by_repetition_pattern(v) for k,v in numerator_groups.items()}
-    print('numer_upd', numer_upd)
+    # print('numer_upd', numer_upd)
 
 
     flat_dict = {}
@@ -263,3 +263,32 @@ def identify_unique_avrg_tensors(avrg_expressions: list[PropsCollection]) -> lis
     """
     return set(make_unique_avrg_tensors_mapping(avrg_expressions).values())
 
+
+def get_avrg_motif_relation(avrg_expr_main: PropsCollection, avrg_expr_sub: PropsCollection, index_dict: dict):
+    sub_encoded = nm_indices_repetition_reduce_deriv_symmetry(avrg_expr_sub)
+    main_encoded = nm_indices_repetition_reduce_deriv_symmetry(avrg_expr_main)
+    
+    fill_list = [0] * len(main_encoded)
+    for i, actual_ind in enumerate(tuple(avrg_expr_sub.get_mode_indices())):
+        fill_list[i] = index_dict[actual_ind]
+    print('fill_list', fill_list)
+    print('sub_encoded', sub_encoded, tuple(avrg_expr_sub.get_mode_indices()))
+    print('main_encoded', main_encoded, tuple(avrg_expr_main.get_mode_indices()))
+    
+    return fill_list
+
+def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
+    """Map expr to indices according to base expression's unique symbols."""
+    base_unique = sorted(list(set(base_expr.get_mode_indices())))
+    print('base_unique', base_unique)
+    expr_inds = expr.get_mode_indices()
+
+    if len(base_unique) < len(expr_inds):
+        # walk through only base_unique ind labels
+        return tuple(index_dict[sym] for sym in base_unique)
+    elif len(base_unique) == len(expr_inds):
+        # walk through all expr_inds labels, there are repeated labels
+        return tuple(index_dict[sym] for sym in expr_inds)
+    else:
+        # this generally should not be possible
+        raise ValueError('This base_expr cannot be a base expression for this expr')

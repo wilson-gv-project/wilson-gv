@@ -875,3 +875,56 @@ def test_nm_indices_repetition_reduce_deriv_symmetry():
     
     print(ae2.get_mode_indices())
     print(avrgprops.nm_indices_repetition_reduce_deriv_symmetry(ae2))
+
+def test_get_avrg_motif_relation():
+    print()
+
+    ae11 = make_avrg_expr([((0,2), ('c','b')),
+                          ((1,), ('c',)),
+                          ((3,5), ('d','d',)),
+                          ((4,), ('b',)),])
+    
+    ae22 = make_avrg_expr([((0,2), ('d','b')),
+                          ((1,), ('c',)),
+                          ((3,5), ('d','a',)),
+                          ((4,), ('b',)),])
+
+    ae1 = make_avrg_expr([((0,), ('a',)),
+                          ((1,), ('b',)),
+                          ((2,), ('c',)),
+                          ((3,), ('d',)),])
+    
+    ae2 = make_avrg_expr([((0,), ('a',)),
+                          ((1,), ('b',)),
+                          ((2,), ('c',)),
+                          ((3,), ('b',)),])
+
+    ae3 = make_avrg_expr([((0,), ('a',)),
+                          ((1,), ('b',)),
+                          ((2,), ('a',)),
+                          ((3,), ('c',)),])
+    
+    ae211 = make_avrg_expr([((0,2), ('a','b')),
+                          ((1,), ('a',)),
+                          ((3,), ('b',)),])
+    ae311 = make_avrg_expr([((0,2), ('a','a')),
+                          ((1,), ('b',)),
+                          ((3,), ('b',)),])
+    
+    # r = avrgprops.get_avrg_motif_relation(avrg_expr_main=ae1, avrg_expr_sub=ae2, index_dict={'a': 0, 'b': 1, 'c': 2, 'd': 3})
+    # print(r)
+
+    g = avrgprops.get_ind_tuple_from_base(expr=ae2, base_expr=ae1, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
+    print(g, '---------\n')
+    
+    g = avrgprops.get_ind_tuple_from_base(expr=ae3, base_expr=ae1, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
+    print(g, '---------\n')
+
+    g = avrgprops.get_ind_tuple_from_base(expr=ae1, base_expr=ae1, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
+    print(g, '---------\n')
+
+    g = avrgprops.get_ind_tuple_from_base(expr=ae211, base_expr=ae211, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
+    print(g, '---------\n')
+
+    g = avrgprops.get_ind_tuple_from_base(expr=ae311, base_expr=ae311, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
+    print(g, '---------\n')

@@ -1,6 +1,7 @@
 import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, VibState, PropsCollection
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+import pytest
 
 def test_identify_precalc_unique_coeff_parts():
     print()
@@ -133,19 +134,24 @@ def test_evaluate_term_coeffs():
     print(terms_select[-1].to_latex())
     print('-----------')
 
-    # term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
-    #                                        relevant_indices=[{'a': 0, 'b': 0}], 
-    #                                        pre_eval_data=results)
-    # print('\nterm0_coeff', term0_coeff)
-    
-    
-    # print(terms_select[-1], '\n')
-    # term1_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
-    #                                        relevant_indices=[{'a': 0, 'b': 0}], 
-    #                                        pre_eval_data=results)
-    # print('\nterm1_coeff', term1_coeff)
+    # print('terms_select[0].props', terms_select[0].props)
 
-    term1_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
+    term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
+                                           relevant_indices=[{'a': 0, 'b': 0}], 
+                                           pre_eval_data=results)
+    print('\nterm0_coeff', term0_coeff, '\n')
+    print('======================')
+    
+    # print('terms_select[-1].props', terms_select[-1].props)
+    # print(terms_select[-1], '\n')
+
+    # indices are not fully defined : missing 'c' value here
+    with pytest.raises(ValueError, match="index_dict is missing values for some indices"):
+        fac.evaluate_term_coeffs(term=terms_select[-1], relevant_indices=[{'a': 0, 'b': 0}], pre_eval_data=results)
+    
+    
+    term12_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
                                            relevant_indices=[{'a': 0, 'b': 0, 'c': 1}], 
                                            pre_eval_data=results)
-    print('\nterm1_coeff', term1_coeff)
+    print('\nterm12_coeff', term12_coeff, '\n')
+    print('======================')
