@@ -99,23 +99,27 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm', relevant_indices: list[dict],
 
     avrg_expr = avrgprops.PropsCollection(props=term.props).get_averaged_props()
 
-    print('avrg_expr', avrg_expr)
-    for i in pre_eval_data['avrg_expr_tensor_mapping']:
-        print('key', i, '||', pre_eval_data['avrg_expr_tensor_mapping'][i])
-    print('\n')
+    # print('avrg_expr', avrg_expr)
+    # for i in pre_eval_data['avrg_expr_tensor_mapping']:
+    #     print('key', i, '||', pre_eval_data['avrg_expr_tensor_mapping'][i])
+    # print('\n')
 
-    for k in pre_eval_data['avrg_tensors']:
-        print('tensor k', k)
+    # for k in pre_eval_data['avrg_tensors']:
+    #     print('tensor k', k)
 
     avrg_tensor_expr = pre_eval_data['avrg_expr_tensor_mapping'][avrg_expr]
     avrg_tensor = pre_eval_data['avrg_tensors'][avrg_tensor_expr]
     
+    print('avrg_tensor.shape', avrg_tensor.shape)
+
     freqterms = vediff.FreqTermsCollection(freqterms=term.freqterms)
     extra_freqterms = freqterms.get_pert_wf_diff()
-    print('extra_freqterms', extra_freqterms)
+
+    # print('extra_freqterms', extra_freqterms)
 
     vibenedenoms_tensor = pre_eval_data['vibenedenoms_tensors'][freqterms.get_num_indices_vibenedenom()]
 
+    print('vibenedenoms_tensor.shape', vibenedenoms_tensor.shape)
 
     print('avrg_expr', avrg_expr)
     print('avrg_tensor_expr', avrg_tensor_expr)
@@ -124,8 +128,9 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm', relevant_indices: list[dict],
         sorted_index_dict = dict(sorted(index_dict.items()))
         index_tuple = tuple([v for v in sorted_index_dict.values()]) # ???
         
-        print('avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple]')
-        print(avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple], float(term.coeff))
+        # print('avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple]')
+        # print(avrg_tensor[index_tuple] , vibenedenoms_tensor[index_tuple], float(term.coeff))
+        # print(avrg_tensor)
 
         results[ParameterSet(index_dict)] = float(term.coeff) * avrg_tensor[index_tuple] * vibenedenoms_tensor[index_tuple]
     return results

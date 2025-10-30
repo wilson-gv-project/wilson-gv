@@ -74,10 +74,10 @@ class PropsCollection:
     
     def sort(self):
         """
-        
+        non-averaged props will be in the end of the tuple
         """
-        self.props = sorted(self.props, key=lambda j: j.ops[0].o)
-        return self 
+        self.props = sorted(self.props, key=lambda j: j.ops[0].o if j.ops else float('inf'))
+        return self
 
     def __repr__(self):
         inds_all = [len(p.inds) if p.inds else 0 for p in self.props]

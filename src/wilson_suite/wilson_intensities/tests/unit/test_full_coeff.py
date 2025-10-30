@@ -1,5 +1,6 @@
 import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, VibState
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, VibState, PropsCollection
+from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
 def test_identify_precalc_unique_coeff_parts():
     print()
@@ -91,7 +92,7 @@ def test_evaluate_term_coeffs():
     terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
     
     t_inds = [0, 1,-1, -2, -3]
-    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+    terms_select: list[VibPerturbedTerm] = [terms_fuller_flat[tID] for tID in t_inds]
     
     props_data = generate_props_data4modes()
     # cart axes (0, 1, 1, 0) - 0 1 2 3
@@ -106,6 +107,7 @@ def test_evaluate_term_coeffs():
                                    harmonic_osc_states_labels=(0, 1, 2))
 
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
+    print("need_to_precalc['avrg_tensors']\n", need_to_precalc['avrg_tensors'])
     settings = {'polarization': 'ZZZZ', 
                 'number_of_nmodes': 4, 
                 'props_data': props_data, 
@@ -113,14 +115,37 @@ def test_evaluate_term_coeffs():
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   settings=settings)
-    print(terms_select[0], '\n')
-    term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
-                                           relevant_indices=[{'a': 0, 'b': 0}], 
-                                           pre_eval_data=results)
-    print('\n', term0_coeff)
+    # print('>>> results.keys():\n')
+    print(">>> results['avrg_tensors']:")
+    for k in results['avrg_tensors'].keys():
+        print(k)
+    print('\n')
+    # print(">>> results['avrg_tensors']:", results['avrg_tensors'].keys(), '\n')
+
+    # print('>>> terms_select[0].props:', PropsCollection(terms_select[0].props), '\n')
+    # print('>>> terms_select[0]:', terms_select[0], '\n')
+
+    terms_select[0].props = PropsCollection(terms_select[0].props).sort().props
+    terms_select[-1].props = PropsCollection(terms_select[-1].props).sort().props
+
+    print('-----------')
+    print(terms_select[0].to_latex())
+    print(terms_select[-1].to_latex())
+    print('-----------')
+
+    # term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
+    #                                        relevant_indices=[{'a': 0, 'b': 0}], 
+    #                                        pre_eval_data=results)
+    # print('\nterm0_coeff', term0_coeff)
     
-    print(terms_select[-1], '\n')
+    
+    # print(terms_select[-1], '\n')
+    # term1_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
+    #                                        relevant_indices=[{'a': 0, 'b': 0}], 
+    #                                        pre_eval_data=results)
+    # print('\nterm1_coeff', term1_coeff)
+
     term1_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
-                                           relevant_indices=[{'a': 0, 'b': 0}], 
+                                           relevant_indices=[{'a': 0, 'b': 0, 'c': 1}], 
                                            pre_eval_data=results)
-    print('\n', term1_coeff)
+    print('\nterm1_coeff', term1_coeff)

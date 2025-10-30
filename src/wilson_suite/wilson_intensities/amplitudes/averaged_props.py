@@ -40,8 +40,8 @@ def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[P
     ??? --- not usefull now?
     """
     lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
-    for term_props in lst:
-        print(term_props)
+    # for term_props in lst:
+    #     print(term_props)
     return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 def group_PropsColls_by_numerator(list_props_collections: list['PropsCollection']) -> dict[PropsCollection, list[PropsCollection]]:
@@ -140,10 +140,14 @@ def group_PropsColls_by_repetition_pattern(avrg_expressions: list[PropsCollectio
         #           - all indices are different and all props are 1st order ders
         nm_indx = prop_coll.get_mode_indices()
         num_unique_nm_idx = len(set(nm_indx))
+
+        # if max number of unique indices is found then 
+        # that would be the model expression for the whole group with this numerator motif
         if num_unique_nm_idx == len(nm_indx):
-            # all_encoded.setdefault(nm_indices_repetition_encoding(nm_indx), []).append(prop_coll)
-            all_encoded.setdefault(nm_indices_repetition_reduce_deriv_symmetry(prop_coll), []).append(prop_coll)
-            continue
+            all_encoded[nm_indices_repetition_reduce_deriv_symmetry(prop_coll)] = []
+            for pr_coll in avrg_expressions:
+                all_encoded[nm_indices_repetition_reduce_deriv_symmetry(prop_coll)].append(pr_coll)
+            return all_encoded
         
         max_nm_inds = max(num_unique_nm_idx, max_nm_inds)
         # all_encoded.setdefault(nm_indices_repetition_encoding(nm_indx), []).append(prop_coll)
@@ -158,7 +162,11 @@ def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
 
     """
     numerator_groups = group_PropsColls_by_numerator(avrg_expressions)
+    print('numerator_groups', numerator_groups)
+
     numer_upd = {k:group_PropsColls_by_repetition_pattern(v) for k,v in numerator_groups.items()}
+    print('numer_upd', numer_upd)
+
 
     flat_dict = {}
     for num_group in numer_upd:
@@ -167,6 +175,7 @@ def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
             model_expr = reconstruct_unique_avrg_expression(numerator_group=num_group, nm_indices=new_inds)
             for expression in numer_upd[num_group][pattern]:
                 flat_dict[expression] = model_expr
+    # print('flat_dict', flat_dict)
     return flat_dict
 
 def nm_indices_repetition_encoding(nm_indices: list[str]):
