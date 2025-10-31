@@ -41,8 +41,13 @@ def isotropic_average_for_props_and_field(term, experiment):
 
     # Need to find out:
     # - How does A represent general polarization setups?
+    #   - I think I have a decent idea now: For e.g. a beam in the z direction, use the x and y components to define the polarization
+    #   - Should be able to consider both linear and circularly polarized light
+    #   - For beams whose wavevector is not purely in a Cartesian direction, will need to be some extra angle stuff but should be manageable
     # - Could einsum be a smart thing to use here?
     # - How to best bring in polarization information from the experiment?
+    #   - I think take the entire experiment including the detector. I suppose the detector will also need to be extended to involve a polarization filter
+    #   - Not sure how to handle "mixed" polarization setups (i.e. beaming/detecting light with several polarizations), but leave that for now
     # - How to make sure that the ranks of the microscopic and macroscopic tensors (and their combination on averaging)
     # are properly kept track of/aligned?
 
