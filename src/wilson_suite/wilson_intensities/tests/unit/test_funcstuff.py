@@ -12,6 +12,8 @@ from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_ab
 from wilson_suite.wilson_intensities.amplitudes.resonances import solve_LSE_motif
 import json
 
+import wilson_suite.wilson_main.abstractions
+
 def test_ParameterSet():
     print()
     o1 = ParameterSet(dict(a=3, b=4, c=4))
@@ -75,9 +77,9 @@ def test_EvaluationTerm():
     assert et.short_id == 'T001(1_0)'
 
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
-    vibdata = VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
-                                       f_abst.VibState(s={}, state_label='3', e=3644.),
-                                       f_abst.VibState(s={}, state_label='zero', e=0.)),
+    vibdata = VibStatesData(allstates=(wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1', energy=1234.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3', energy=3644.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.)),
                                    harmonic_osc_states_labels=(1, 3))
     
     # res = solve_LSE_motif(resonances=(r1, r2), parameters=params, vibdata=vibdata)

@@ -1,7 +1,9 @@
 import numpy as np
 from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
-import wilson_suite.wilson_intensities.amplitudes.resonances
+import wilson_suite.wilson_intensities.amplitudes.resonances as res_funcs
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+import wilson_suite.wilson_main.abstractions
 
 
 def test_solve_LSE_motif():
@@ -12,10 +14,10 @@ def test_solve_LSE_motif():
 
     from ...amplitudes.resonances import solve_LSE_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
-    vibdata = VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
-                                       f_abst.VibState(s={}, state_label='3', e=3644.),
-                                       f_abst.VibState(s={}, state_label='1+3', e=4164.),
-                                       f_abst.VibState(s={}, state_label='zero', e=0.)),
+    vibdata = VibStatesData(allstates=(wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1', energy=1234.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3', energy=3644.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1+3', energy=4164.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.)),
                                    harmonic_osc_states_labels=('1', '3'))
     print()
     r1 = solve_LSE_motif(motif=motif1, parameters=params, vibdata=vibdata, unit='cm-1')
@@ -46,10 +48,10 @@ def test_generate_RHS_motif():
 
     from ...amplitudes.resonances import get_RHS_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
-    vibdata = VibStatesData(allstates=(f_abst.VibState(s={}, state_label='1', e=1234.),
-                                       f_abst.VibState(s={}, state_label='3', e=3644.),
-                                       f_abst.VibState(s={}, state_label='1+3', e=4164.),
-                                       f_abst.VibState(s={}, state_label='zero', e=0.)),
+    vibdata = VibStatesData(allstates=(wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1', energy=1234.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3', energy=3644.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1+3', energy=4164.),
+                                       wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.)),
                                    harmonic_osc_states_labels=('1', '3'))
 
     r1 = get_RHS_motif(motif=motif1, parameters=params, vibdata=vibdata, unit='cm-1')
@@ -167,7 +169,7 @@ def test_motifs_control():
     print(r)
 
 
-def test_find_resonance_locations_wrt_index_choices():
+def test_find_resonance_locations_wrt_index_choices_tuples():
     print()
 
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
@@ -176,20 +178,62 @@ def test_find_resonance_locations_wrt_index_choices():
     motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
-    allstates = (f_abst.VibState(s={}, state_label='1', e=1234.),
-                 f_abst.VibState(s={}, state_label='3', e=3644.),
-                 f_abst.VibState(s={}, state_label='4', e=1621.),
-                 f_abst.VibState(s={}, state_label='1+1', e=2514.),
-                 f_abst.VibState(s={}, state_label='1+4', e=1904.),
-                 f_abst.VibState(s={}, state_label='3+4', e=4129.),
-                 f_abst.VibState(s={}, state_label='4+4', e=3022.),
-                 f_abst.VibState(s={}, state_label='3+3', e=7344.),
-                 f_abst.VibState(s={}, state_label='1+3', e=4364.))
+    allstates = (wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1', energy=1234.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3', energy=3644.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='4', energy=1621.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1+1', energy=2514.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1+4', energy=1904.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3+4', energy=4129.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='4+4', energy=3022.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3+3', energy=7344.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1+3', energy=4364.))
     harm_labels = ('1', '3', '4')
     vibdata = VibStatesData(allstates=allstates, harmonic_osc_states_labels=harm_labels)
 
     d = wilson_suite.wilson_intensities.amplitudes.resonances.find_resonance_locations_wrt_index_choices(motif=motif1, vibstates_data=vibdata)
     print(d)
+
+
+def test_find_resonance_locations_wrt_index_choices_classes():
+    print()
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    t_inds = [0, 1, -2, -1]
+    # t_inds = range(len(terms_fuller_flat))
+    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+
+    res_motifs_terms_select = []
+
+    for t in terms_select:
+        t_resmotif = tparts.ResonanceMotif(t.res)
+        res_motifs_terms_select.append(t_resmotif)
+        # print('----')
+        # print(t_resmotif)
+
+    from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
+    allstates = (wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1', energy=1234.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3', energy=3644.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='4', energy=1621.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1,1', energy=2514.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1,4', energy=1904.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3,4', energy=4129.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='4,4', energy=3022.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='3,3', energy=7344.),
+                 wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='1,3', energy=4364.))
+    harm_labels = ('1', '3', '4')
+    vibdata = VibStatesData(allstates=allstates, harmonic_osc_states_labels=harm_labels)
+    vibdiff_cache = VibDiffCache()
+
+    for motif in res_motifs_terms_select:
+        print('----')
+        print(motif, len(motif))
+        d = res_funcs.find_resonance_locations_wrt_index_choices(motif=motif, 
+                                                                 vibstates_data=vibdata,
+                                                                 vibdiff_cache=vibdiff_cache)
+    
+        print(d)
 
 
 def test_terms_for_motif():
@@ -213,3 +257,23 @@ unique_motifs:
     assert not(len(terms_for_motif[(((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))]) == 4)
 
     assert sorted(unique_motifs) == sorted(list(terms_for_motif.keys()))
+
+import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
+
+def test_ResonanceMotif():
+    print()
+    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
+    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
+    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    t_inds = [0, 1, -2, -1]
+    # t_inds = range(len(terms_fuller_flat))
+    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+
+    for t in terms_select:
+        t_resmotif = tparts.ResonanceMotif(t.res)
+        print('----')
+        print(t_resmotif)
+        print('get_vibdiffs', t_resmotif.get_vibdiffs())
+        print('get_freq_axes', t_resmotif.get_freq_axes())
+        print('get_nm_indices', t_resmotif.get_nm_indices())

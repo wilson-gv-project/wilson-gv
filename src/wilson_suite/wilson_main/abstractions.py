@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field, asdict, is_dataclass, InitVar
 from typing import Callable, Any, Optional
 
-from ..wilson_utils.abstractions import VibState
 
 import logging
+
+import numpy as np
 logger = logging.getLogger("wilson")
 
 # A system is here only the system name, molecular geometry and atoms (masses for isotopes?)
@@ -186,11 +187,73 @@ class MolecularProperty:
 
 @dataclass
 class MolPropsCollection:
-    properties: list[MolecularProperty]
+	properties: list[MolecularProperty]
 
-    def get(self, trivial_name: str):
-        return {prop.trivial_name: prop for prop in self.properties}.get(trivial_name)
+	def get(self, trivial_name: str):
+		# d = {prop.trivial_name: prop for prop in self.properties}
+		d = {prop.trivial_name: prop for prop in self.properties}
+		if trivial_name not in d:
+			raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
+		return d.get(trivial_name)
 
+
+@dataclass
+class VibState:
+	"""
+	Class to represent a vibrational state.
+	This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
+
+	----
+	s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+	e: float: State energy level
+	d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
+
+	UPD:
+	dictionary self.s is not JSON-serializable (tuples can't be keys), but self.serial_s is.
+	self.serial_s is set up in post_init; deserialize_state_dict will return original self.s based on self.serial_s.
+
+	Notes:
+	s: InitVar[dict] = field(repr=False) - means that this atribute will not be in repr() of the class instance
+	InitVar - is an init-only variable
+	This seems to be okay for now, but should mind this feature
+	"""
+	# s: InitVar[dict] = field(repr=False) # 
+	harm_quanta_coeffs: dict[tuple[int, ...], float]
+	energy: float = 0.0
+	displacement: Any = None
+	serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
+	state_label: str = None
+	harmonic_WF: bool = None
+	# def __post_init__(self, s):
+	# 	self.serial_s = {",".join(k): v for k, v in s.items()}
+
+	# def __post_init__(self):
+	# 	self.serial_s = {",".join(k): v for k, v in self.s.items()}
+
+	def __post_init__(self) -> None:
+		"""Convert tuple keys to comma-separated strings for JSON serialization."""
+		self.serial_harm_quanta_coeffs = {
+			",".join(map(str, k)): v
+			for k, v in self.harm_quanta_coeffs.items()
+		}
+
+	def deserialize_state_dict(self) -> dict[tuple[int, ...], float]:
+		"""Convert serialized dictionary back to original format with tuple keys."""
+		return {
+			tuple(int(x) for x in k.split(",")): v
+			for k, v in self.serial_harm_quanta_coeffs.items()
+		}
+
+	def __eq__(self, other: 'VibState') -> bool:
+		if not isinstance(other, VibState):
+			return NotImplemented
+		return self.state_label == other.state_label and np.isclose(self.energy, other.energy)
+
+	def __lt__(self, other: 'VibState') -> bool:
+		if not isinstance(other, VibState):
+			return NotImplemented
+		return self.state_label < other.state_label
+	
 # FIXMEs: Improved handling of mode exclusion; possibly methods changes
 @dataclass
 class VibAnaSetup:

@@ -3,8 +3,9 @@ VIB DIFFERENCES in VibPerturbedTerm
 """
 import numpy as np
 import itertools
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm, VibDiffTerm
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
+from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 
@@ -166,3 +167,245 @@ def identify_vibenedenoms(terms: list['VibPerturbedTerm']):
     """
     """
     return set([FreqTermsCollection(freqterms=t.freqterms).get_num_indices_vibenedenom() for t in terms])
+
+
+def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, str]:
+    """
+    Non-sorted key for VibDiffBank_cache
+
+    returns keys for vibdiff bank for vib states expression and choice of indices
+    """
+    left_state_symb = vibdiff_term.sl.q
+    right_state_symb = vibdiff_term.sr.q
+
+    # print('>> left', [str(index_dict[i]) for i in left_state_symb])
+    # print('>> right', [str(index_dict[i]) for i in right_state_symb])
+
+    left_state_label = ','.join(sorted([str(index_dict[i]) for i in left_state_symb]))
+    right_state_label = ','.join(sorted([str(index_dict[i]) for i in right_state_symb]))
+    
+    if left_state_label == '':
+        left_state_label = 'zero'
+    if right_state_label == '':
+        right_state_label = 'zero'
+    
+    return (left_state_label, right_state_label)
+
+from dataclasses import dataclass, field
+
+@dataclass
+class VibDiff:
+    """
+    Represents difference between two vibrational states.
+    Numerical representation that holds values, as opposed to VibDiffTerm which is symbolic.
+    Handles special case of zero states (ground state) in comparisons.
+    """
+    left: VibState
+    right: VibState
+    
+    # def __repr__(self):
+        # return f'[{self.left.state_label}, {self.right.state_label}]'
+
+    def is_zero_state(self, state: VibState) -> bool:
+        """
+        Check if state is a zero (ground) state.
+
+        #TODO more criteria?
+        """
+        return state.state_label == 'zero'
+    
+    def normalized(self) -> 'VibDiff':
+        """
+        Return normalized form where left <= right.
+        Zero states are considered smaller than any other state.
+        """
+        left_is_zero = self.is_zero_state(self.left)
+        right_is_zero = self.is_zero_state(self.right)
+        
+        # If both are zero states or neither is zero, use standard comparison
+        if left_is_zero == right_is_zero:
+            if self.left < self.right:
+                return VibDiff(self.left, self.right)
+            return VibDiff(self.right, self.left)
+            
+        # Zero state should always be on the left
+        if left_is_zero:
+            return VibDiff(self.left, self.right)
+        return VibDiff(self.right, self.left)
+    
+    def energy_difference(self, *, au=False) -> float:
+        """
+        Calculate energy difference between states.
+        For zero states, energy is considered to be 0.0
+        """
+        left_energy = 0.0 if self.is_zero_state(self.left) else self.left.energy
+        right_energy = 0.0 if self.is_zero_state(self.right) else self.right.energy
+        if au:
+            return convNu2Ene(left_energy - right_energy)
+        else:
+            return left_energy - right_energy
+
+    @classmethod
+    def from_symbolic(cls, 
+                    vibdiff_term_symb: VibDiffTerm,
+                    index_dict: dict,
+                    vibstates_data: VibStatesData) -> 'VibDiff':
+        """Construct VibDiff from symbolic representation."""
+        # Get state labels from symbolic term
+        left_label, right_label = make_vibdiff_key(vibdiff_term_symb, index_dict)
+        # Look up states in vibstates_data
+        left_state = (
+            VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
+            if left_label == 'zero'
+            else vibstates_data.get_state_by_label(left_label)
+        )
+        
+        right_state = (
+            VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
+            if right_label == 'zero'
+            else vibstates_data.get_state_by_label(right_label)
+        )
+
+        return cls(left=left_state, right=right_state)
+
+    def cache_it(self, vibdiff_cache: 'VibDiffCache'):
+        """Ensure this VibDiff's energy is cached."""
+        if vibdiff_cache.get(self) is None:
+            energy = self.energy_difference()
+            vibdiff_cache.add(self, energy)
+
+@dataclass
+class VibDiffCache:
+    """
+    bank keys
+    ('0', '2')   -> sorted version is the key --- ('0', '2')
+    ('0,2', '2') -> sorted version is the key --- ('2', '0,2')
+    ('1,2', '3') -> sorted version is the key --- ('3', '1,2')
+    ('1,2,4', '3,1') -> sorted version is the key --- ('1,3', '1,2,4')
+    ('4,1,2', '3,1') -> sorted version is the key --- ('1,3', '1,2,4')
+
+    """
+    def __init__(self):
+        self._cache: dict[tuple[str, str], float] = {}
+    
+    def __repr__(self):
+        return str(self._cache)
+    
+    def get(self, vib_diff: VibDiff) -> float | None:
+        """Get cached energy difference"""
+        key = (vib_diff.left.state_label, vib_diff.right.state_label)
+        norm_diff = vib_diff.normalized()
+        norm_key = (norm_diff.left.state_label, norm_diff.right.state_label)
+        
+        if key in self._cache:
+            return self._cache[key]
+        if norm_key in self._cache:
+            return -self._cache[norm_key] if key != norm_key else self._cache[norm_key]
+        return None
+        
+    def add(self, vib_diff: VibDiff, energy: float):
+        """Cache energy difference"""
+        norm_diff = vib_diff.normalized()
+        self._cache[(norm_diff.left.state_label, norm_diff.right.state_label)] = energy
+
+
+def normalize_state_key(state_str: str) -> tuple[int, ...]:
+    """Convert state string to normalized form for comparison while preserving multiplicity
+    
+    Args:
+        state_str: String representation of state like '5,7' or '5,5,7' or 'zero'
+    
+    Returns:
+        Tuple of sorted integers representing the state, or empty tuple for 'zero'
+        
+    Examples:
+        '5,7'    -> (5,7)
+        '7,5'    -> (5,7)      # Same as above - normalized order
+        '5,5,7'  -> (5,5,7)    # Preserves multiplicity
+        'zero'   -> ()         # Empty tuple for ground state
+
+    Claude Sonnet 3.5
+    """
+    if state_str == 'zero' or state_str == '':
+        return tuple()
+    return tuple(sorted(int(x) for x in state_str.split(',')))
+
+def compare_vibdiff_states(left: str, right: str) -> int:
+    """Compare two vibrational states and return ordering value
+    
+    Args:
+        left: First state string ('5,7' or 'zero' etc)
+        right: Second state string
+        
+    Returns:
+        -1 if left < right
+         0 if left == right 
+         1 if left > right
+    """
+    left_tuple = normalize_state_key(left)
+    right_tuple = normalize_state_key(right)
+    
+    # Compare by length first
+    if len(left_tuple) != len(right_tuple):
+        return -1 if len(left_tuple) < len(right_tuple) else 1
+        
+    # Empty tuples (zero states) are equal
+    if not left_tuple and not right_tuple:
+        return 0
+        
+    # Compare by minimum element
+    if left_tuple and right_tuple:
+        left_min = min(left_tuple)
+        right_min = min(right_tuple)
+        if left_min != right_min:
+            return -1 if left_min < right_min else 1
+    
+    # Compare full tuples lexicographically
+    if left_tuple < right_tuple:
+        return -1
+    elif left_tuple > right_tuple:
+        return 1
+    return 0
+
+def is_vibdiff_sorted(left: str, right: str) -> bool:
+    """
+    Check if vibration difference key is in canonical order
+        -1 if left < right  - no need to reorder
+         0 if left == right - no need to reorder
+         1 if left > right  - need to reorder
+    """
+    return compare_vibdiff_states(left, right) <= 0
+
+def make_sorted_vibdiff_key(left: str, right: str) -> tuple[str, str]:
+    """Create canonical sorted form of vibdiff key tuple"""
+    if is_vibdiff_sorted(left, right):
+        return (left, right)
+    return (right, left)
+
+
+def compute_vibdiff_w_bank(vibdiff_term: VibDiffTerm, index_dict: dict, 
+                           vibdiff_bank: VibDiffCache, 
+                           vibstates_data: VibStatesData):
+    """
+    vibdiff_term   - symbolic expression
+    index_dict     - values for symbols => index tuple or index key label
+    vibstates_data - vib states data 
+
+    vibdiff_bank   - compute and register if not there; if there - retrieve
+    """
+    # diff_tuple_label = make_sorted_vibdiff_key(*make_vibdiff_key(vibdiff_term, index_dict))
+    diff_tuple_label = make_vibdiff_key(vibdiff_term, index_dict)
+    print('diff_tuple_label', diff_tuple_label)
+    if not vibdiff_bank.get(diff_tuple_label):
+
+        e_value = compute_vibdiff(diff_tuple_label, vibstates_data)
+        vibdiff_bank.register(diff_tuple_label, e_value=e_value)
+    print('vibdiff_bank', vibdiff_bank)
+    return vibdiff_bank.get(diff_tuple_label)
+
+def compute_vibdiff(diff_tuple_label: tuple[str, str], vibstates_data: VibStatesData):
+    """
+    
+    """
+    left, right = diff_tuple_label
+    return vibstates_data.allenergies_map[left] - vibstates_data.allenergies_map[right]

@@ -7,7 +7,7 @@ from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 from wilson_suite.wilson_experiment.abstractions import VibExperiment
-from wilson_suite.wilson_utils.abstractions import VibState
+from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
 
@@ -234,7 +234,7 @@ class WilsonSimulation:
 				states_dict: dict = data_dict.get(k)
 
 				for state, energy in states_dict.items():
-					states_list.append(VibState(s={state: 1.0}, e=energy))
+					states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy))
 
 				self.vib_ana_setup.setStates(states=states_list)
 				self.residual_vib_info[k] = data_dict.get(k)

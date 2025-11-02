@@ -73,7 +73,7 @@ class ParameterSet(Mapping):
     def from_dict(cls, parameters):
         return cls(parameters)
 
-from wilson_suite.wilson_utils.abstractions import VibState
+from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 @dataclass
@@ -86,10 +86,10 @@ class VibStatesData:
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
-        tmp_allstates.append(VibState(s={}, state_label='zero', e=0.))
+        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.))
         self.allstates = tuple(tmp_allstates)
         
-        self.allstates_map = {i.state_label: i.e for i in self.allstates}
+        self.allstates_map = {i.state_label: i.energy for i in self.allstates}
         self._storage = dict()
 
     def _fill_storage(self):

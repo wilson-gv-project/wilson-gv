@@ -1,5 +1,6 @@
+from .abstractions import VibState
 from .abstractions import (VibAnaSetup, MolecularProperty,
-						   MolecularSystem, VibState)
+						   MolecularSystem)
 
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname

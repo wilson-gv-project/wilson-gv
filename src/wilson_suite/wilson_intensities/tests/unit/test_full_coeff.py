@@ -1,7 +1,10 @@
 import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, VibState, PropsCollection
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, PropsCollection
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 import pytest
+import numpy as np
+
+from wilson_suite.wilson_main.abstractions import VibState
 
 def test_identify_precalc_unique_coeff_parts():
     print()
@@ -26,11 +29,13 @@ def test_identify_precalc_unique_coeff_parts():
 
 
 def generate_props_data4modes():
-    import numpy as np
     return {'dipgrad': np.zeros((4, 3)), 
             'diphess': np.zeros((4, 4, 3)),
             'polgrad': np.zeros((4, 3, 3)), 
-            'polhess': np.zeros((4, 4, 3, 3))}
+            'polhess': np.zeros((4, 4, 3, 3)),
+            'cff':     np.zeros((4, 4, 4)),
+            'qff':     np.zeros((4, 4, 4, 4)),
+            }
 
 def test_precalculate_unique_coeff_parts():
     print()
@@ -49,9 +54,9 @@ def test_precalculate_unique_coeff_parts():
     props_data['polhess'][0, 0, 0, 0] = 0.15
     props_data['diphess'][0, 0, 1] = 0.15
 
-    vibdata = VibStatesData(allstates=(VibState(s={'0':1.}, state_label='0', e=964.),
-                                       VibState(s={'1':1.}, state_label='1', e=1234.),
-                                       VibState(s={'2':1.}, state_label='2', e=3644.)),
+    vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={'0':1.}, state_label='0', energy=964.),
+                                       VibState(harm_quanta_coeffs={'1':1.}, state_label='1', energy=1234.),
+                                       VibState(harm_quanta_coeffs={'2':1.}, state_label='2', energy=3644.)),
                                    harmonic_osc_states_labels=(0, 1, 2))
     
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
@@ -61,29 +66,14 @@ def test_precalculate_unique_coeff_parts():
                 'vibstates_data': vibdata}
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
-                                                  settings=settings)
+                                                  data_and_configs=settings)
     # print('\n', results['avrg_expr_tensor_mapping'], len(results['avrg_expr_tensor_mapping']), '\n')
     # print(need_to_precalc['avrg_expr_tensor_mapping'])
     
     for k in results:
         print(k)
-        if k=='avrg_expr_tensor_mapping':
-            print(results[k])
-        for i in results[k]:
-            print(i)
-            print(results[k][i])
 
-# [dipgrad['a'][1] * dipgrad['b'][2] * polhess['a', 'b'][0, 3], 
-#  polgrad['b'][0, 3] * dipgrad['a'][1] * diphess['a', 'b'][2], 
-#  polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2], 
-#  polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['b'][2], 
-#  polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['a'][2]]
 
-# dipgrad['a'][1]_d1 * dipgrad['b'][2]_d1 * polhess['a', 'b'][0, 3]_d2: dipgrad['a'][1]_d1 * dipgrad['b'][2]_d1 * polhess['a', 'b'][0, 3]_d2, 
-# polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * diphess['a', 'b'][2]_d2: polgrad['a'][0, 3]_d1 * dipgrad['b'][1]_d1 * diphess['b', 'a'][2]_d2, 
-# polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['c'][2]_d1:      polgrad['a'][0, 3]_d1 * dipgrad['b'][1]_d1 * dipgrad['c'][2]_d1, 
-# polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['b'][2]_d1:      polgrad['a'][0, 3]_d1 * dipgrad['b'][1]_d1 * dipgrad['a'][2]_d1, 
-# polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['a'][2]_d1:      polgrad['a'][0, 3]_d1 * dipgrad['b'][1]_d1 * dipgrad['b'][2]_d1
 
 def test_evaluate_term_coeffs():
     print()
@@ -98,29 +88,38 @@ def test_evaluate_term_coeffs():
     props_data = generate_props_data4modes()
     # cart axes (0, 1, 1, 0) - 0 1 2 3
     props_data['dipgrad'][0, 1] = 0.45
+    props_data['dipgrad'][1, 0] = 0.45
     props_data['polgrad'][0, 0, 0] = 0.3
+    props_data['polgrad'][1, 1, 0] = 0.3
+    props_data['polgrad'][0, 1, 0] = 0.3
     props_data['polhess'][0, 0, 0, 0] = 0.15
     props_data['diphess'][0, 0, 1] = 0.15
-
-    vibdata = VibStatesData(allstates=(VibState(s={'0':1.}, state_label='0', e=964.),
-                                       VibState(s={'1':1.}, state_label='1', e=1234.),
-                                       VibState(s={'2':1.}, state_label='2', e=3644.)),
+    
+    props_data['cff'][0, 1, 1] = 0.7
+    
+    vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(0, 1, 1):1.}, state_label='0,1,1', energy=3318., harmonic_WF=False),
+                                       ),
                                    harmonic_osc_states_labels=(0, 1, 2))
 
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
-    print("need_to_precalc['avrg_tensors']\n", need_to_precalc['avrg_tensors'])
+    # print("need_to_precalc['avrg_tensors']\n", need_to_precalc['avrg_tensors'])
     settings = {'polarization': 'ZZZZ', 
                 'number_of_nmodes': 4, 
                 'props_data': props_data, 
                 'vibstates_data': vibdata}
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
-                                                  settings=settings)
-    # print('>>> results.keys():\n')
-    print(">>> results['avrg_tensors']:")
-    for k in results['avrg_tensors'].keys():
-        print(k)
-    print('\n')
+                                                  data_and_configs=settings)
+    results['vibstates_data'] = vibdata
+
+    # print('>>> results.keys():\n', results.keys(), '\n')
+    # print(">>> results['avrg_tensors']:")
+    # for k in results['avrg_tensors'].keys():
+    #     print(k)
+    # print('\n')
     # print(">>> results['avrg_tensors']:", results['avrg_tensors'].keys(), '\n')
 
     # print('>>> terms_select[0].props:', PropsCollection(terms_select[0].props), '\n')
@@ -128,6 +127,8 @@ def test_evaluate_term_coeffs():
 
     terms_select[0].props = PropsCollection(terms_select[0].props).sort().props
     terms_select[-1].props = PropsCollection(terms_select[-1].props).sort().props
+    terms_select[-2].props = PropsCollection(terms_select[-2].props).sort().props
+    terms_select[-3].props = PropsCollection(terms_select[-3].props).sort().props
 
     print('-----------')
     print(terms_select[0].to_latex())
@@ -138,7 +139,7 @@ def test_evaluate_term_coeffs():
 
     term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
                                            relevant_indices=[{'a': 0, 'b': 0}], 
-                                           pre_eval_data=results)
+                                           necessary_data=results)
     print('\nterm0_coeff', term0_coeff, '\n')
     print('======================')
     
@@ -146,12 +147,18 @@ def test_evaluate_term_coeffs():
     # print(terms_select[-1], '\n')
 
     # indices are not fully defined : missing 'c' value here
-    with pytest.raises(ValueError, match="index_dict is missing values for some indices"):
-        fac.evaluate_term_coeffs(term=terms_select[-1], relevant_indices=[{'a': 0, 'b': 0}], pre_eval_data=results)
+    with pytest.raises(ValueError, match="index_dict - {'a': 0, 'b': 0} - is missing values for some indices"):
+        fac.evaluate_term_coeffs(term=terms_select[-1], relevant_indices=[{'a': 0, 'b': 0}], necessary_data=results)
     
     
     term12_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
                                            relevant_indices=[{'a': 0, 'b': 0, 'c': 1}], 
-                                           pre_eval_data=results)
+                                           necessary_data=results)
     print('\nterm12_coeff', term12_coeff, '\n')
+    print('======================')
+
+    term13_coeff = fac.evaluate_term_coeffs(term=terms_select[-3], 
+                                           relevant_indices=[{'a': 0, 'b': 1, 'c': 1}], 
+                                           necessary_data=results)
+    print('\nterm13_coeff', term13_coeff, '\n')
     print('======================')
