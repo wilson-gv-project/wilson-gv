@@ -81,7 +81,7 @@ class HarmOscStateSymbolic:
         self.q = sorted(q)
 
     def __repr__(self):
-        return f'harmState(q = {self.q})'
+        return f'omega_{self.q}'
 
     def h(self):
         """
@@ -282,10 +282,16 @@ class VibDiffTerm:
         self.is_pert_wf_diff = is_pert_wf_diff
 
     def __repr__(self):
-        return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
+        # return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
+        return f'[sl={self.sl}, sr={self.sr}], pert_wf={str(self.is_pert_wf_diff)[0]}'
 
     def __hash__(self):
         return hash( ( self.sl.h(), self.sr.h() ) )
+    
+    def __iter__(self):
+        """Make the class iterable over sl and sr"""
+        yield self.sl
+        yield self.sr
 
     def to_latex(self):
         if isinstance(self.sl, VibStateSymbolic):
@@ -349,7 +355,7 @@ class ResonanceCondition:
         self.id = id
 
     def __repr__(self):
-        return f'ResonanceCondition(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
+        return f'ResCond(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
 
     def present(self):
         """
