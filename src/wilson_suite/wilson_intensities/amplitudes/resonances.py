@@ -48,13 +48,16 @@ def generate_LHS_motif(motif: ResonanceMotif):
     """
     from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
     # maximum different normal mode index across all tuples
-    max_different_nm_index = len(motif.get_nm_indices())
+    # max_different_nm_index = len(motif.get_nm_indices())
+    max_different_freq_axes = motif.get_max_different_freq_axes()
+    num_axes = len(max_different_freq_axes)
+    print('max_different_freq_axes', max_different_freq_axes)
 
-    if max_different_nm_index == 1:
-        max_different_nm_index = len(motif)
+    if num_axes == 1:
+        num_axes = len(motif)
 
     # to identify coeff matrix shape
-    coeff_matrix = np.zeros((max_different_nm_index, max_different_nm_index))
+    coeff_matrix = np.zeros((num_axes,num_axes))
 
     for i, r_condition in enumerate(motif):
         axis_tupleID: tuple[str] = tuple(r_condition.pf)
@@ -90,13 +93,15 @@ def get_RHS_motif(motif: ResonanceMotif,
                                                     parameters, 
                                                     vibdata)
         vib_diff_w_value.cache_it(vibdiff_cache=vibdiff_cache)
+        print('vib_diff_w_value', vib_diff_w_value.energy_difference(au=(unit=='Eh')))
         constants.append((-1)*vib_diff_w_value.energy_difference(au=(unit=='Eh')))
 
+    print('constants', constants)
     return constants
 
 
 # works with .func_abstractions
-def solve_LSE_motif(motif: tuple[tuple,...],
+def solve_LSE_motif(motif: ResonanceMotif,
                     parameters: ParameterSet, vibdata: VibStatesData,
                     vibdiff_cache: VibDiffCache,
                     unit: str='Eh'):
@@ -108,7 +113,11 @@ def solve_LSE_motif(motif: tuple[tuple,...],
 
     returns a dict {f'w{i+1}': solution}
     """
+    print('motif', motif)
+
     coeff_matrix = generate_LHS_motif(motif)
+    print('coeff_matrix\n', coeff_matrix)
+
     constants = get_RHS_motif(motif, parameters, vibdata, vibdiff_cache, unit)
 
     A = np.array(coeff_matrix)
