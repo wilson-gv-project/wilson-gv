@@ -67,6 +67,9 @@ def make_func_to_compute_avrg(*,
     polarization_avrg_terms, prefactor = getPolarizationAveragingExpression(num_pulses=num_pulses, polarization=polarization)
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
+        """
+        index_choices: dict, props_data: 'MolPropsCollection'
+        """
         from ..utils.spectrum_utils import greek_list, num_Greek
         from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 

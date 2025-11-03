@@ -337,7 +337,7 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list[str]=[], id=None):
         """
         diff: VibDiffTerm instance: State energy level difference
         pf: Perturbing field frequency labels (their sum to be subtracted when evaluating)
