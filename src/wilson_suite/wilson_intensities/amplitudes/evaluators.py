@@ -1,10 +1,20 @@
 """
 Evaluator functions for WilsonSimulation
 """
-from ...wilson_utils.printing import printtest
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
-from ...wilson_utils.unit_convertor import convertor
+from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
+from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices
+
+from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+from wilson_suite.wilson_intensities.amplitudes.term_parts import VibPerturbedTerm, ResonanceMotif, VibStatesData, EvaluationDataAndConfigs
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
+    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
 import numpy as np
 
@@ -13,10 +23,12 @@ logger = logging.getLogger("wilson."+__name__)
 
 
 # TermND with TermsEvaluator
-def terms_evaluator_general(system,
-                    derived_terms, props,
-                    spec_eval_setup, vib_ana_setup,
-                    do_diagn: bool,
+def terms_evaluator_general(system: 'MolecularSystem' = None,
+                    derived_terms: list['VibPerturbedTerm'] = None,
+                    props: list['MolecularProperty'] = None,
+                    spec_eval_setup = None, 
+                    vib_ana_setup: 'VibAnaSetup' = None,
+                    do_diagn: bool = None,
                     selected_combs: list = None,
                     collect_all: bool = False) -> dict:
     '''
@@ -65,7 +77,40 @@ def terms_evaluator_general(system,
             Option B: Return only domain info and domain grid values
 
     '''
-    pass
+
+    term_coeffs_per_index = {}
+
+    # Results: Each resonance motif entry i gets a dictionary ((index tuple), (resonance location tuple))
+    # motif_res_loc = {'motif 1': {(500., 1200.): [(1, 2), (1, 3)],(500., 1400.): [(1, 4)]}}
+    motif_res_loc = {}
+    
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=())
+    vibdiff_cache = VibDiffCache()
+    # props = {p.trivial_name: p for p in props}
+    props = MolPropsCollection(properties=props)
+
+    data_and_configs = EvaluationDataAndConfigs(props_data=props,
+                                                vibstates_data=vibstates_data,
+                                                polarization='ZZZZ', #!
+                                                number_of_nmodes=system.Nnmodes)
+
+    to_precalculate = identify_precalc_unique_coeff_parts(terms=derived_terms)
+    precalculated = precalculate_unique_coeff_parts(need_to_precalc=to_precalculate, 
+                                                    data_and_configs=data_and_configs)
+
+    for vibterm in derived_terms:
+        res_motif = ResonanceMotif(vibterm.res)
+
+        motif_res_loc[res_motif] = find_resonance_locations_wrt_index_choices(motif=res_motif,
+                                                                              vibstates_data=vibstates_data,
+                                                                              vibdiff_cache=vibdiff_cache,
+                                                                              spec_window=None)
+
+        # Direct invocation in features_to_draw assembler also possible
+        term_coeffs_per_index[vibterm] = evaluate_term_coeffs(term=vibterm, 
+                                                              relevant_indices=motif_res_loc[res_motif].values(),
+                                                              necessary_data=precalculated)
+
 
 # TermND with TermsEvaluator
 def terms_evaluator(system,
