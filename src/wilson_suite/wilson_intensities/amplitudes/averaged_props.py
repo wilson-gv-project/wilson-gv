@@ -39,9 +39,6 @@ def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[P
     motif contains props and total number of unique indices in them together
     ??? --- not usefull now?
     """
-    lst = [PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms]
-    # for term_props in lst:
-    #     print(term_props)
     return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 def group_PropsColls_by_numerator(list_props_collections: list['PropsCollection']) -> dict[PropsCollection, list[PropsCollection]]:
@@ -87,13 +84,10 @@ def make_func_to_compute_avrg(*,
 
                 nm_inds = tuple([index_choices[i] for i in prop.inds])
                 cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
-                # print(prop_tuple_key, "nm_inds", nm_inds, "cart_inds", cart_inds, 'cart_axes', cart_axes)
-
                 all_inds = (*nm_inds, *cart_inds)
-
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                product *= props_data.get(prop_tuple_key)[all_inds]
-            # print('...')
+                product *= props_data.get(prop_tuple_key).vals[all_inds]
+
             if product != 0.:
                 logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes}: {product}")
                 
@@ -113,12 +107,9 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     """
     mode_inds = set(avrg_expression.get_mode_indices())
     ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
-
     func = make_func_to_compute_avrg(avrg_expression=avrg_expression, polarization=polarization)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
-    # print('full_tensor.shape', full_tensor.shape)
-    # print(ind_choices)
 
     for idx in ind_choices:
         full_tensor[tuple(dict(sorted(idx.items())).values())] = func(idx, props_data)
@@ -150,7 +141,6 @@ def group_PropsColls_by_repetition_pattern(avrg_expressions: list[PropsCollectio
             return all_encoded
         
         max_nm_inds = max(num_unique_nm_idx, max_nm_inds)
-        # all_encoded.setdefault(nm_indices_repetition_encoding(nm_indx), []).append(prop_coll)
         all_encoded.setdefault(nm_indices_repetition_reduce_deriv_symmetry(prop_coll), []).append(prop_coll)
     
     return all_encoded
@@ -162,11 +152,8 @@ def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
 
     """
     numerator_groups = group_PropsColls_by_numerator(avrg_expressions)
-    # print('numerator_groups', numerator_groups)
 
     numer_upd = {k:group_PropsColls_by_repetition_pattern(v) for k,v in numerator_groups.items()}
-    # print('numer_upd', numer_upd)
-
 
     flat_dict = {}
     for num_group in numer_upd:
@@ -175,7 +162,7 @@ def make_unique_avrg_tensors_mapping(avrg_expressions: list[PropsCollection]):
             model_expr = reconstruct_unique_avrg_expression(numerator_group=num_group, nm_indices=new_inds)
             for expression in numer_upd[num_group][pattern]:
                 flat_dict[expression] = model_expr
-    # print('flat_dict', flat_dict)
+                
     return flat_dict
 
 def nm_indices_repetition_encoding(nm_indices: list[str]):
@@ -271,16 +258,12 @@ def get_avrg_motif_relation(avrg_expr_main: PropsCollection, avrg_expr_sub: Prop
     fill_list = [0] * len(main_encoded)
     for i, actual_ind in enumerate(tuple(avrg_expr_sub.get_mode_indices())):
         fill_list[i] = index_dict[actual_ind]
-    print('fill_list', fill_list)
-    print('sub_encoded', sub_encoded, tuple(avrg_expr_sub.get_mode_indices()))
-    print('main_encoded', main_encoded, tuple(avrg_expr_main.get_mode_indices()))
     
     return fill_list
 
 def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
     """Map expr to indices according to base expression's unique symbols."""
     base_unique = sorted(list(set(base_expr.get_mode_indices())))
-    print('base_unique', base_unique)
     expr_inds = expr.get_mode_indices()
 
     if len(base_unique) < len(expr_inds):
