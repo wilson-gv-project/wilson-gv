@@ -1,6 +1,7 @@
 import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, PropsCollection
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, PropsCollection, EvaluationDataAndConfigs
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_main.abstractions import MolPropsCollection, MolecularProperty
 import pytest
 import numpy as np
 
@@ -18,8 +19,6 @@ def test_identify_precalc_unique_coeff_parts():
     
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
     
-    # for i in need_to_precalc['avrg_tensors']:
-    #     print(i)
     print(need_to_precalc)
     print('\n')
     for piece in need_to_precalc:
@@ -54,24 +53,27 @@ def test_precalculate_unique_coeff_parts():
     props_data['polhess'][0, 0, 0, 0] = 0.15
     props_data['diphess'][0, 0, 1] = 0.15
 
+    props = []
+    for trname in props_data:
+        p = MolecularProperty(prop_spec={}, trivial_name=trname, vals=props_data[trname])
+        p.addValues(values=props_data[trname])
+        props.append(p)
+
     vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={'0':1.}, state_label='0', energy=964.),
                                        VibState(harm_quanta_coeffs={'1':1.}, state_label='1', energy=1234.),
                                        VibState(harm_quanta_coeffs={'2':1.}, state_label='2', energy=3644.)),
                                    harmonic_osc_states_labels=(0, 1, 2))
     
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
-    settings = {'polarization': 'ZZZZ', 
-                'number_of_nmodes': 4, 
-                'props_data': props_data,
-                'vibstates_data': vibdata}
-
+    
+    settings = EvaluationDataAndConfigs(props_data=MolPropsCollection(props),
+                                        vibstates_data=vibdata,
+                                        polarization='ZZZZ',
+                                        number_of_nmodes=4)
+    
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
-    # print('\n', results['avrg_expr_tensor_mapping'], len(results['avrg_expr_tensor_mapping']), '\n')
-    # print(need_to_precalc['avrg_expr_tensor_mapping'])
-    
-    for k in results:
-        print(k)
+    print(results)
 
 
 
@@ -96,7 +98,13 @@ def test_evaluate_term_coeffs():
     props_data['diphess'][0, 0, 1] = 0.15
     
     props_data['cff'][0, 1, 1] = 0.7
-    
+
+    props = []
+    for trname in props_data:
+        p = MolecularProperty(prop_spec={}, trivial_name=trname, vals=props_data[trname])
+        p.addValues(values=props_data[trname])
+        props.append(p)
+
     vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
                                        VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
                                        VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True),
@@ -105,25 +113,14 @@ def test_evaluate_term_coeffs():
                                    harmonic_osc_states_labels=(0, 1, 2))
 
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
-    # print("need_to_precalc['avrg_tensors']\n", need_to_precalc['avrg_tensors'])
-    settings = {'polarization': 'ZZZZ', 
-                'number_of_nmodes': 4, 
-                'props_data': props_data, 
-                'vibstates_data': vibdata}
+
+    settings = EvaluationDataAndConfigs(props_data=MolPropsCollection(props),
+                                        vibstates_data=vibdata,
+                                        polarization='ZZZZ',
+                                        number_of_nmodes=4)
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
-    results['vibstates_data'] = vibdata
-
-    # print('>>> results.keys():\n', results.keys(), '\n')
-    # print(">>> results['avrg_tensors']:")
-    # for k in results['avrg_tensors'].keys():
-    #     print(k)
-    # print('\n')
-    # print(">>> results['avrg_tensors']:", results['avrg_tensors'].keys(), '\n')
-
-    # print('>>> terms_select[0].props:', PropsCollection(terms_select[0].props), '\n')
-    # print('>>> terms_select[0]:', terms_select[0], '\n')
 
     terms_select[0].props = PropsCollection(terms_select[0].props).sort().props
     terms_select[-1].props = PropsCollection(terms_select[-1].props).sort().props
@@ -135,7 +132,6 @@ def test_evaluate_term_coeffs():
     print(terms_select[-1].to_latex())
     print('-----------')
 
-    # print('terms_select[0].props', terms_select[0].props)
 
     term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
                                            relevant_indices=[{'a': 0, 'b': 0}], 
@@ -143,8 +139,6 @@ def test_evaluate_term_coeffs():
     print('\nterm0_coeff', term0_coeff, '\n')
     print('======================')
     
-    # print('terms_select[-1].props', terms_select[-1].props)
-    # print(terms_select[-1], '\n')
 
     # indices are not fully defined : missing 'c' value here
     with pytest.raises(ValueError, match="index_dict - {'a': 0, 'b': 0} - is missing values for some indices"):
