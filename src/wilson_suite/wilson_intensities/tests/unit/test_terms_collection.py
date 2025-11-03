@@ -120,6 +120,8 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     gammaCompsAll = get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
     Nnmodes = 2
 
+    print(gammaCompsAll)
+
     data = {
         'dipgrad': np.arange(Nnmodes * 3).reshape((Nnmodes, 3)),
         'diphess': np.arange(Nnmodes * Nnmodes * 3).reshape((Nnmodes, Nnmodes, 3)),
@@ -128,6 +130,8 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     }
 
     stored = tts.precalc_avrg_tensors(Nnmodes, data, (gammaCompsAll[0][:3], gammaCompsAll[1]))
+    print(stored)
+    print(tuple(sorted(['dipgrad', 'polgrad', 'diphess'])))
 
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,1] == 60.4 # term 0
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'diphess']))][1,0] == 4.6 # term 0
@@ -139,6 +143,8 @@ def test_precalc_avrg_tensors(dict_8terms: dict) -> None:
     tts = TermsEvaluator([t0, t1, t2, t3])
     tts.identify_to_precalculate()
     stored = tts.precalc_avrg_tensors(Nnmodes, data, gammaCompsAll)
+
+    print(stored)
 
     assert stored[tuple(sorted(['dipgrad', 'polgrad', 'dipgrad']))][1,1,1] == 392.4
     assert stored[tuple(sorted(['dipgrad', 'polhess', 'dipgrad']))][0,0] == 12.
