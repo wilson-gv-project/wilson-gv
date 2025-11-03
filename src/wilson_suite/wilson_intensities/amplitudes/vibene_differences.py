@@ -134,7 +134,7 @@ def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
     else:
         raise NotImplementedError('This unit of energy is not supported')
 
-def calculate_vibenedenom_tensor(vibenedenom_inds: set, 
+def calculate_vibenedenom_tensor(vibenedenom_inds: tuple, 
                                  vibstates_data: VibStatesData):
     """
     should be using harmonic uncorrected vib ene levels!!!

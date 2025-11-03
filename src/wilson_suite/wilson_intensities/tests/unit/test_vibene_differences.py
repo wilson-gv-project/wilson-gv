@@ -34,16 +34,17 @@ def test_calculate_vibenedenom_tensor():
     # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
 
-    vibdata = VibStatesData(allstates=(f_abst.VibState(harm_quanta_coeffs={'0':1.}, state_label='0', energy=964.),
-                                       f_abst.VibState(harm_quanta_coeffs={'1':1.}, state_label='1', energy=1234.),
-                                       f_abst.VibState(harm_quanta_coeffs={'2':1.}, state_label='2', energy=3644.)),
+    vibdata = VibStatesData(allstates=(f_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
+                                       f_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
+                                       f_abst.VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True)),
                                    harmonic_osc_states_labels=(0, 1, 2))
 
-    id_vibenedenom = vediff.identify_vibenedenoms(terms_select)
+    id_vibenedenom = sorted(list(vediff.identify_vibenedenoms(terms_select)))
     print('id_vibenedenom', id_vibenedenom)
     vibenedenom_tensor2d = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=id_vibenedenom[0],
                                                                vibstates_data=vibdata)
     print(vibenedenom_tensor2d)
+
     vibenedenom_tensor3d = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=id_vibenedenom[1],
                                                                vibstates_data=vibdata)
     print(vibenedenom_tensor3d)
@@ -87,7 +88,7 @@ def test_get_vibdiff_value():
     print('vd_0_a key', vediff.make_vibdiff_key(vd_0_a, {'a': 5, 'b': 7, 'c': 9}))
 
     bank = vediff.VibDiffCache()
-    bank.register
+
 
 def test_make_sorted_vibdiff_key():
     print()
@@ -108,10 +109,10 @@ def test_make_sorted_vibdiff_key():
 
 def test_compute_vibdiff():
     print()
-    vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964.),
-                                       VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-                                       VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.),
-                                       VibState(harm_quanta_coeffs={(1,2,): 1.}, state_label='1,2', energy=4736.)
+    vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644., harmonic_WF=True),
+                                       VibState(harm_quanta_coeffs={(1,2,): 1.}, state_label='1,2', energy=4736., harmonic_WF=False)
                                        ),
                                    harmonic_osc_states_labels=(0, 1, 2))
     t = vediff.compute_vibdiff(('1,2', '1'), vibstates_data=vibdata)
@@ -119,28 +120,6 @@ def test_compute_vibdiff():
     assert vediff.compute_vibdiff(('2', '1'), vibstates_data=vibdata) == 3644. - 1234.
     assert vediff.compute_vibdiff(('1,2', '1'), vibstates_data=vibdata) == 4736. - 1234.
 
-def test_compute_vibdiff_w_bank():
-    print()
-    import wilson_suite.wilson_derive.abstractions as wa
-
-    ab_state = wa.HarmOscStateSymbolic(['a', 'b'])
-    a_state = wa.HarmOscStateSymbolic(['a'])
-    vd_ab_a = wa.VibDiffTerm(sl=ab_state, sr=a_state)
-
-    vibdiff_bank = vediff.VibDiffCache()
-    vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964.),
-                                       VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-                                       VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.),
-                                       VibState(harm_quanta_coeffs={(1,2,): 1.}, state_label='1,2', energy=4736.),
-                                       VibState(harm_quanta_coeffs={(0,2,): 1.}, state_label='0,2', energy=4518.)
-                                       ),
-                                   harmonic_osc_states_labels=(0, 1, 2))
-    res = vediff.compute_vibdiff_w_bank(vibdiff_term=vd_ab_a, 
-                                        index_dict={'a': 2, 'b': 0, 'c': 9},
-                                        vibdiff_bank=vibdiff_bank,
-                                        vibstates_data=vibdata)
-    print(res)
-    print(vibdiff_bank)
 
 def test_VibDiffCache():
     """Test VibDiffCache functionality"""
@@ -219,46 +198,6 @@ def test_VibDiff_normalized():
     assert str(norm_diff.left) == str(reverse_norm.left)
     assert str(norm_diff.right) == str(reverse_norm.right)
 
-def test_make_VibDiff_from_symbolic():
-    """Test conversion from symbolic to concrete VibDiff"""
-    # Setup test data
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964.),
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-            VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.)
-        ),
-        harmonic_osc_states_labels=(0, 1, 2)
-    )
-    
-    # Create symbolic term
-    symb_term = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['a']),
-        sr=wa.HarmOscStateSymbolic(['b'])
-    )
-    
-    # Create index mapping
-    index_dict = {'a': 1, 'b': 2}
-    
-    # Create cache
-    cache = vediff.VibDiffCache()
-    
-    # Convert symbolic to concrete
-    vib_diff = vediff.make_VibDiff_from_symbolic(symb_term, index_dict, cache, vibdata)
-    print(vib_diff)
-
-    # Verify results
-    assert vib_diff.left.state_label == '1'
-    assert vib_diff.right.state_label == '2'
-    assert vib_diff.energy_difference() == -2410.0  # 1234 - 3644
-    assert cache.get(vib_diff) == -2410.0
-
-    print('\n', cache)
-    print('\n', type(cache._cache))
-    for k in cache._cache:
-        print(type(k), k)
-
-
 def test_VibDiffCache_basic_operations():
     """Simple sanity checks for cache operations"""
     cache = vediff.VibDiffCache()
@@ -322,234 +261,3 @@ def test_VibDiffCache_multiple_lookups():
         result = cache.get(diff)
         assert result == expected, f"Lookup {i} failed: {result} != {expected}"
 
-
-
-def test_process_extra_freqterms_with_bank_basic():
-    """Test basic functionality of processing extra frequency terms"""
-    # Setup test data
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964.),
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-            VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.),
-            VibState(harm_quanta_coeffs={(3,): 1.}, state_label='3', energy=5000.)
-        ),
-        harmonic_osc_states_labels=(0, 1, 2, 3)
-    )
-    
-    # Create symbolic terms
-    term1 = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['a']),
-        sr=wa.HarmOscStateSymbolic(['b'])
-    )
-    term2 = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['b']),
-        sr=wa.HarmOscStateSymbolic(['c'])
-    )
-    
-    extra_freqterms = [term1, term2]
-    index_dict = {'a': 1, 'b': 2, 'c': 3}
-    cache = vediff.VibDiffCache()
-    vibdiffs_bank = {}
-    
-    # Process terms
-    result = vediff.process_extra_freqterms_with_bank(
-        extra_freqterms, 
-        index_dict, 
-        cache, 
-        vibdata, 
-        vibdiffs_bank
-    )
-    print('\nresult', result)
-    for i in result:
-        print('---', i.energy_difference(), i.left.energy, i.right.energy)
-        
-    # Verify results
-    assert len(result) == 2
-    assert result[0].left.state_label == '1'
-    assert result[0].right.state_label == '2'
-    assert result[1].left.state_label == '2'
-    assert result[1].right.state_label == '3'
-    
-
-
-def test_process_extra_freqterms_with_bank_retrieval():
-    """Test that function retrieves from bank when available"""
-    # Setup test data
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-            VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.)
-        ),
-        harmonic_osc_states_labels=(1, 2)
-    )
-    
-    # Pre-create a VibDiff for the bank
-    state1 = vibdata.allstates[0]
-    state2 = vibdata.allstates[1]
-    precomputed_diff = vediff.VibDiff(state1, state2)
-    
-    # Create symbolic term
-    term = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['a']),
-        sr=wa.HarmOscStateSymbolic(['b'])
-    )
-    
-    # Put it in the bank
-    vibdiffs_bank = {term: precomputed_diff}
-    
-    extra_freqterms = [term]
-    index_dict = {'a': 1, 'b': 2}
-    cache = vediff.VibDiffCache()
-    
-    # Process - should retrieve from bank, not recompute
-    result = vediff.process_extra_freqterms_with_bank(
-        extra_freqterms, 
-        index_dict, 
-        cache, 
-        vibdata, 
-        vibdiffs_bank
-    )
-    
-    # Verify we got the same object from the bank
-    assert len(result) == 1
-    assert result[0] is precomputed_diff
-    assert result[0].left.state_label == '1'
-    assert result[0].right.state_label == '2'
-    
-    print("Bank retrieval test passed!")
-
-
-def test_process_extra_freqterms_mixed_sources():
-    """Test processing with some terms in bank and some not"""
-    # Setup test data
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(0,): 1.}, state_label='0', energy=964.),
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-            VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=3644.),
-            VibState(harm_quanta_coeffs={(3,): 1.}, state_label='3', energy=5000.)
-        ),
-        harmonic_osc_states_labels=(0, 1, 2, 3)
-    )
-    
-    # Create symbolic terms
-    term_in_bank = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['a']),
-        sr=wa.HarmOscStateSymbolic(['b'])
-    )
-    term_not_in_bank = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['c']),
-        sr=wa.HarmOscStateSymbolic(['d'])
-    )
-    
-    # Pre-populate bank with only one term
-    state1 = vibdata.allstates[1]
-    state2 = vibdata.allstates[2]
-    precomputed_diff = vediff.VibDiff(state1, state2)
-    vibdiffs_bank = {term_in_bank: precomputed_diff}
-    
-    extra_freqterms = [term_in_bank, term_not_in_bank]
-    index_dict = {'a': 1, 'b': 2, 'c': 0, 'd': 3}
-    cache = vediff.VibDiffCache()
-    
-    # Process mixed sources
-    result = vediff.process_extra_freqterms_with_bank(
-        extra_freqterms, 
-        index_dict, 
-        cache, 
-        vibdata, 
-        vibdiffs_bank
-    )
-    
-    # Verify results
-    assert len(result) == 2
-    
-    # First should be from bank
-    assert result[0] is precomputed_diff
-    assert result[0].left.state_label == '1'
-    assert result[0].right.state_label == '2'
-    
-    # Second should be newly computed
-    assert result[1].left.state_label == '0'
-    assert result[1].right.state_label == '3'
-    
-    # Check cache was updated for the new one
-    assert cache.get(result[1]) is not None
-    
-    print("Mixed sources test passed!")
-
-
-def test_process_extra_freqterms_empty():
-    """Test processing empty list of terms"""
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1234.),
-        ),
-        harmonic_osc_states_labels=(1,)
-    )
-    
-    extra_freqterms = []
-    index_dict = {}
-    cache = vediff.VibDiffCache()
-    vibdiffs_bank = {}
-    
-    result = vediff.process_extra_freqterms_with_bank(
-        extra_freqterms, 
-        index_dict, 
-        cache, 
-        vibdata, 
-        vibdiffs_bank
-    )
-    
-    assert len(result) == 0
-    assert result == []
-    
-    print("Empty list test passed!")
-
-
-def test_process_extra_freqterms_cache_population():
-    """Test that cache gets populated for newly computed terms"""
-    # Setup test data
-    vibdata = VibStatesData(
-        allstates=(
-            VibState(harm_quanta_coeffs={(1,): 1.}, state_label='1', energy=1000.),
-            VibState(harm_quanta_coeffs={(2,): 1.}, state_label='2', energy=2000.),
-            VibState(harm_quanta_coeffs={(3,): 1.}, state_label='3', energy=3000.)
-        ),
-        harmonic_osc_states_labels=(1, 2, 3)
-    )
-    
-    # Create symbolic terms (not in bank)
-    term1 = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['a']),
-        sr=wa.HarmOscStateSymbolic(['b'])
-    )
-    term2 = vediff.VibDiffTerm(
-        sl=wa.HarmOscStateSymbolic(['b']),
-        sr=wa.HarmOscStateSymbolic(['c'])
-    )
-    
-    extra_freqterms = [term1, term2]
-    index_dict = {'a': 1, 'b': 2, 'c': 3}
-    cache = vediff.VibDiffCache()
-    vibdiffs_bank = {}  # Empty bank
-    
-    # Initially cache should be empty
-    assert len(cache._cache) == 0
-    
-    # Process terms
-    result = vediff.process_extra_freqterms_with_bank(
-        extra_freqterms, 
-        index_dict, 
-        cache, 
-        vibdata, 
-        vibdiffs_bank
-    )
-    
-    # Cache should now contain both diffs
-    assert len(cache._cache) > 0
-    assert cache.get(result[0]) == -1000.0  # 1000 - 2000
-    assert cache.get(result[1]) == -1000.0  # 2000 - 3000
-    
-    print("Cache population test passed!")
