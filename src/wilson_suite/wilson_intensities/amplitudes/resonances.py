@@ -5,8 +5,8 @@ RESONANCES in VibPerturbedTerm
 import numpy as np
 from wilson_suite.wilson_analysis.render.render import get_axes_in_resmotif
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
-from wilson_suite.wilson_intensities.amplitudes.vibene_differences import get_vibdiff_motif
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import get_vibdiff_motif, VibDiff, VibDiffCache
 import copy
 
 from wilson_suite.wilson_intensities.amplitudes.utils import initialize_resonance_dict
@@ -40,24 +40,24 @@ def is_location_in_window(location: dict, window: dict, margins: dict=None):
     return True
 
 
-def generate_LHS_motif(motif: tuple[tuple,...]):
+def generate_LHS_motif(motif: ResonanceMotif):
     """
     motif is a tuple/collection of res_conditions
         res_conditions is a tuple of (vib_difference, axes)
             vib_difference is a tuple of states indices
     """
     from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
-    # maximum variable index across all tuples
-    max_var_index = max([len(rc[1]) for rc in motif])
+    # maximum different normal mode index across all tuples
+    max_different_nm_index = len(motif.get_nm_indices())
 
-    if max_var_index == 1:
-        max_var_index = len(motif)
+    if max_different_nm_index == 1:
+        max_different_nm_index = len(motif)
 
     # to identify coeff matrix shape
-    coeff_matrix = np.zeros((max_var_index, max_var_index))
+    coeff_matrix = np.zeros((max_different_nm_index, max_different_nm_index))
 
     for i, r_condition in enumerate(motif):
-        axis_tupleID: tuple[str] = r_condition[1]
+        axis_tupleID: tuple[str] = tuple(r_condition.pf)
 
         # axis_tupleID = ('A', '-B') --> {'A': 1, 'B': -1} better?
         # coeffs {'A': 1, 'B': -1}
@@ -70,10 +70,11 @@ def generate_LHS_motif(motif: tuple[tuple,...]):
     return coeff_matrix
 
 
-def get_RHS_motif(motif: tuple[tuple,...],
+# def get_RHS_motif(motif: tuple[tuple,...],
+def get_RHS_motif(motif: ResonanceMotif,
             parameters: ParameterSet, vibdata: VibStatesData,
-            unit: str='Eh',
-            eval_mode: str = 'on-the-fly'):
+            vibdiff_cache: VibDiffCache,
+            unit: str='Eh'):
     """
     making a constants vector from a list of tuples
     resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
@@ -82,19 +83,23 @@ def get_RHS_motif(motif: tuple[tuple,...],
 
     output: [5, -3, 2]
     """
-    if eval_mode == 'on-the-fly':
-        constants = [(-1)*get_vibdiff_motif(vibdiff_symb=rc[0], parameters=parameters,
-                                            allstates_map=vibdata.allstates_map, unit=unit) for rc in motif]
-    else:
-        raise NotImplementedError('RHS can be only "on-the-fly" now')
+    constants = []
+
+    for res_cond in motif:
+        vib_diff_w_value = VibDiff.from_symbolic(res_cond.diff, 
+                                                    parameters, 
+                                                    vibdata)
+        vib_diff_w_value.cache_it(vibdiff_cache=vibdiff_cache)
+        constants.append((-1)*vib_diff_w_value.energy_difference(au=(unit=='Eh')))
+
     return constants
 
 
 # works with .func_abstractions
 def solve_LSE_motif(motif: tuple[tuple,...],
                     parameters: ParameterSet, vibdata: VibStatesData,
-                    unit: str='Eh',
-                    eval_mode: str = 'on-the-fly'):
+                    vibdiff_cache: VibDiffCache,
+                    unit: str='Eh'):
     """
     solving a linear system of equations
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
@@ -104,7 +109,7 @@ def solve_LSE_motif(motif: tuple[tuple,...],
     returns a dict {f'w{i+1}': solution}
     """
     coeff_matrix = generate_LHS_motif(motif)
-    constants = get_RHS_motif(motif, parameters, vibdata, unit, eval_mode)
+    constants = get_RHS_motif(motif, parameters, vibdata, vibdiff_cache, unit)
 
     A = np.array(coeff_matrix)
     b = np.array(constants)
@@ -119,24 +124,24 @@ def solve_LSE_motif(motif: tuple[tuple,...],
         print("Error solving linear system:", e)
 
 
-def _generate_index_choices(motif, vibstates_data: 'VibStatesData'):
+def _generate_index_choices(motif: ResonanceMotif, vibstates_data: 'VibStatesData'):
     """
     Generate all possible index combinations for the given motif.
     """
     from ..amplitudes.utils import generate_index_choices_general
-    indlabels_in_motif = sorted(list(get_indlabels_in_resmotif(motif)))
+    indlabels_in_motif = sorted(list(motif.get_nm_indices()))
     labels = vibstates_data.harmonic_osc_states_labels
     return generate_index_choices_general(indlabels_in_motif=indlabels_in_motif, labels=labels)
 
 
-def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
+# def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
+def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
                                                vibstates_data: 'VibStatesData',
+                                               vibdiff_cache: 'VibDiffCache',
                                                spec_window=None) -> dict:
     """
     """
     from ..amplitudes.term_parts import ParameterSet
-    res_loc_dict = initialize_resonance_dict(motif)
-    # print('res_loc_dict', res_loc_dict)
 
     # Use or adapt solve_LSE_resonance with information from motif to get resonance locations
 
@@ -151,7 +156,7 @@ def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
 
     for idxs in index_choices:
         parameters = ParameterSet(idxs)
-        location_d = solve_LSE_motif(motif, parameters, vibstates_data, unit='cm-1')
+        location_d = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
         location_key = tuple(location_d.items())
 
         if spec_window is None or is_location_in_window(location_d, window=spec_window, margin={}):

@@ -1,9 +1,10 @@
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
 from dataclasses import dataclass
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...wilson_main.abstractions import MolecularProperty
+    from ..amplitudes.vibene_differences import VibDiffCache
 
 @dataclass
 class PropsCollection:
@@ -137,7 +138,8 @@ class ResonanceMotif:
         if isinstance(other, ResonanceMotif):
             return self._tuplify() == other._tuplify()
         return False
-    
+    def __hash__(self):
+        return hash(self._tuplify())
     def _tuplify(self):
         conditions = []
         for cond in self.resonance_conditions:
@@ -147,21 +149,29 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    def __repr__(self):
+        return f'{self.resonance_conditions}'
+    
+    def __len__(self):
+        """
+        Returns the number of elements in the container.
+        """
+        return len(self.resonance_conditions)
+    
     @property
     def resonance_location_class(self, total_num_axes):
         return total_num_axes - len(self.resonance_conditions)
     
     def get_vibdiffs(self):
-        return {i: tuple([tuple(cond.diff.sl.q), tuple(cond.diff.sr.q)]) for i, cond in enumerate(self.resonance_conditions)}
+        # return {i: tuple([tuple(cond.diff.sl.q), tuple(cond.diff.sr.q)]) for i, cond in enumerate(self.resonance_conditions)}
+        return {i: cond.diff for i, cond in enumerate(self.resonance_conditions)}
     def get_freq_axes(self):
         return {i: tuple(cond.pf) for i, cond in enumerate(self.resonance_conditions)}
+    
+    def get_nm_indices(self):
+        return set([label for cond in self.resonance_conditions for i in cond.diff for label in i.q])
 
-@dataclass
-class VibDiffMotif:
-    """
-    """
-    left_len: str
-    right_len: str
+# class ResonanceCondValue:
 
 @dataclass(frozen=True)
 class EvalVibPerturbedTerm:
@@ -233,7 +243,7 @@ class ParameterSet(Mapping):
     def from_dict(cls, parameters):
         return cls(parameters)
 
-from wilson_suite.wilson_utils.abstractions import VibState
+from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 @dataclass
@@ -246,15 +256,16 @@ class VibStatesData:
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
-        tmp_allstates.append(VibState(s={}, state_label='zero', e=0.))
+        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.))
         self.allstates = tuple(tmp_allstates)
         
-        self.allstates_map = {i.state_label: i.e for i in self.allstates}
+        self.allenergies_map = {i.state_label: i.energy for i in self.allstates}
+        self.allstates_map = {i.state_label: i for i in self.allstates}
         self._storage = dict()
 
     def _fill_storage(self):
-        for vlabel_a, energy_a in self.allstates_map:
-            for vlabel_b, energy_b in self.allstates_map:
+        for vlabel_a, energy_a in self.allenergies_map:
+            for vlabel_b, energy_b in self.allenergies_map:
                 self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
 
 
@@ -263,5 +274,29 @@ class VibStatesData:
         i.state_label - TODO: make a convention, rules how to describe vibstates
         now i.state_label is str
         """
-        harm_states = {int(i.state_label): i.e for i in self.allstates if len(i.s)==1}
+        harm_states = {int(i.state_label): i.energy for i in self.allstates if i.harmonic_WF}
         return dict(sorted(harm_states.items()))
+    
+    def get_state_by_label(self, state_label):
+        if state_label in self.allstates_map:
+            return self.allstates_map.get(state_label)
+        else:
+            raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
+    
+    def get_energy_by_label(self, state_label):
+        if state_label in self.allstates_map:
+            return self.allenergies_map.get(state_label)
+        else:
+            raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
+
+@dataclass()
+class EvaluationDataAndConfigs:
+    # props_data: list['MolecularProperty']
+    props_data: MolPropsCollection
+    vibstates_data: 'VibStatesData'
+    polarization: str
+    number_of_nmodes: int
+    vibdiff_cache: 'VibDiffCache' = None
+    avrg_tensors: dict = None
+    avrg_expr_tensor_mapping: dict = None
+    vibenedenoms_tensors: dict = None
