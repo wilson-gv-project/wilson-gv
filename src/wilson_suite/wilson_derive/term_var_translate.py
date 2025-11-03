@@ -1,7 +1,5 @@
 import copy
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.resonances import terms_for_motif
-from wilson_suite.wilson_intensities.amplitudes.resonances import identify_unique_resmotifs
 
 
 def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
