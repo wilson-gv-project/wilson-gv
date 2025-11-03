@@ -1,4 +1,4 @@
-from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm, PolProp, VibDiffTerm
+from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscStateSymbolic, PolProp, VibDiffTerm
 from dataclasses import dataclass
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
@@ -140,6 +140,7 @@ class ResonanceMotif:
         return False
     def __hash__(self):
         return hash(self._tuplify())
+    
     def _tuplify(self):
         conditions = []
         for cond in self.resonance_conditions:
@@ -149,6 +150,15 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    @classmethod
+    def from_tuples(cls, tupleOfTuples):
+        r_conditions = []
+        for rc_tuple in tupleOfTuples:
+            rc = ResonanceCondition(diff=VibDiffTerm(sl=HarmOscStateSymbolic(q=rc_tuple[0][0]),
+                                                     sr=HarmOscStateSymbolic(q=rc_tuple[0][1])), pf=rc_tuple[1])
+            r_conditions.append(rc)
+        return cls(r_conditions)
+
     def __repr__(self):
         return f'{self.resonance_conditions}'
     
@@ -167,6 +177,9 @@ class ResonanceMotif:
         return {i: cond.diff for i, cond in enumerate(self.resonance_conditions)}
     def get_freq_axes(self):
         return {i: tuple(cond.pf) for i, cond in enumerate(self.resonance_conditions)}
+    
+    def get_max_different_freq_axes(self):
+       return set([i.strip('-') for cond in self.resonance_conditions for i in cond.pf])
     
     def get_nm_indices(self):
         return set([label for cond in self.resonance_conditions for i in cond.diff for label in i.q])
@@ -209,10 +222,10 @@ class ParameterSet(Mapping):
         self._hash = hash(frozenset(self._parameters.items()))
 
     def parameter_labels(self):
-        return list(self._parameters.keys())
+        return [i for i in list(self._parameters.keys()) if i!='zero']
     
     def indices(self):
-        return list(self._parameters.values())
+        return [i for i in list(self._parameters.values()) if i!='zero']
 
     def __getitem__(self, key):
         if key=='':
