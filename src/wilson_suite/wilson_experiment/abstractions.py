@@ -131,7 +131,7 @@ class EmPulse:
     cf_uv: float = 0.0
     dev: float = None
     wv: List[float] = None
-    pol: List[float] = [1.0, 0.0, 0.0]
+    pol: List[float] = dc_field(default_factory=lambda: [1.0, 0.0, 0.0])
     overall_phase: complex = 1.0 + 0.0j
     id: int = None
 
