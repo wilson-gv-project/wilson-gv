@@ -148,11 +148,47 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
 
     idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
     term_idx_all = sorted(idx_summ + idx_nonsumm)
+    # print('term_idx_all', term_idx_all)
+    print('\nrelevant_indices', relevant_indices, '\n')
+    # print('idx_summ, idx_nonsumm', idx_summ, idx_nonsumm)
 
     for index_dict in relevant_indices:
+        print('[index in index_dict for index in term_idx_all]', [index in index_dict for index in term_idx_all])
+        # print('index_dict', type(index_dict))
+        print('index_dict', index_dict)
+        # print('term_idx_all', term_idx_all)
 
         if not all([index in index_dict for index in term_idx_all]):
-            raise ValueError(f'index_dict - {index_dict} - is missing values for some indices')
+            # index_dict {'a': 0, 'b': 0}
+            to_summ_over = [index for index in term_idx_all if index not in index_dict]
+            # print('to_summ', to_summ_over)
+            # to_summ ['c']
+            n_modes = necessary_data.number_of_nmodes
+            nm_idxs = list(range(n_modes))
+            
+            # Create new index dictionaries for all combinations
+            inds_w_summ_over = []
+            import itertools
+            
+            # Generate all possible combinations for missing indices
+            value_combinations = itertools.product(nm_idxs, repeat=len(to_summ_over))
+            # print('value_combinations', list(value_combinations))
+
+            for values in value_combinations:
+                new_dict = index_dict.copy()  # Create a copy of original dict
+                for idx, summ_index in enumerate(to_summ_over):
+                    new_dict[summ_index] = values[idx]
+                inds_w_summ_over.append(new_dict)
+            # print('inds_w_summ_over', inds_w_summ_over)
+            computed = evaluate_term_coeffs(term=term, 
+                                    relevant_indices=inds_w_summ_over, 
+                                    necessary_data=necessary_data)
+            # print('computed', computed)
+            result = sum(list(computed.values()))
+            # print(result)
+            results[ParameterSet(index_dict)] = result
+            continue
+            # raise ValueError(f'index_dict - {index_dict} - is missing values for some indices')
         
         product = 1.
         
@@ -164,7 +200,8 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
             NON_AVRG = necessary_data.props_data.get(triv_name).vals[na_prop_inds]
 
             if np.isclose(NON_AVRG, zero_tol):
-                return 0.
+                results[ParameterSet(index_dict)] =  0.
+                continue
             else:
                 product *= NON_AVRG
 
@@ -172,7 +209,8 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
         AVRG = avrg_tensor[avrg_index_tuple]
         
         if np.isclose(AVRG, zero_tol):
-            return 0.
+            results[ParameterSet(index_dict)] =  0.
+            continue
         else:
             product *= AVRG
 
@@ -190,6 +228,6 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
         product *= vibenedenoms_tensor[vibeneden_index_tuple]
 
         # should be a single float result always?
-        results[ParameterSet(index_dict)] = float(term.coeff) * product
-
+        results[ParameterSet(index_dict)] = float(term.coeff) * float(product)
+        print('product', float(product))
     return results

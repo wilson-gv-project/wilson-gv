@@ -2,6 +2,7 @@ from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscS
 from dataclasses import dataclass
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
+from ...wilson_derive.abstractions import VibPerturbedTerm
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..amplitudes.vibene_differences import VibDiffCache
@@ -242,7 +243,8 @@ class ParameterSet(Mapping):
         return self._hash
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self._parameters})"
+        repr_d = {k:v for k,v in self._parameters.items() if k!='zero'}
+        return f"{self.__class__.__name__}({repr_d})"
 
     def __eq__(self, other):
         if isinstance(other, ParameterSet):
@@ -313,3 +315,43 @@ class EvaluationDataAndConfigs:
     avrg_tensors: dict = None
     avrg_expr_tensor_mapping: dict = None
     vibenedenoms_tensors: dict = None
+
+
+@dataclass(frozen=True)
+class TermParametersChoice:
+    """
+    term_key - hash(VibPerturbedTerm)
+    now those terms would have the same res_motif
+    """
+    term_keys: tuple[int]
+    states_parameters: tuple[ParameterSet]
+
+    def __hash__(self) -> int:
+        return hash((self.term_keys, self.states_parameters))
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, TermParametersChoice):
+            return False
+        return (self.term_keys == other.term_keys and 
+                self.states_parameters == other.states_parameters)
+
+@dataclass(frozen=True)
+class SpectralFeature:
+    location: tuple[float, ...]
+    term_contributions: list[TermParametersChoice] # grouped by res_motif
+
+    def __hash__(self) -> int:
+        return hash((self.location, self.term_contributions))
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, SpectralFeature):
+            return False
+        return (self.location == other.location and 
+                self.term_contributions == other.term_contributions)
+
+    def union(self, other: 'SpectralFeature'):
+        if self.location == other.location:
+            return SpectralFeature(location=self.location, 
+                                   term_contributions=self.term_contributions+other.term_contributions)
+        else:
+            raise ValueError('Cannot make a union of SpectralFeatures is location is not the same')

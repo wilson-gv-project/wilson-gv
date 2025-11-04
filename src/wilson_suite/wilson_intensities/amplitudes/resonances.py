@@ -51,7 +51,7 @@ def generate_LHS_motif(motif: ResonanceMotif):
     # max_different_nm_index = len(motif.get_nm_indices())
     max_different_freq_axes = motif.get_max_different_freq_axes()
     num_axes = len(max_different_freq_axes)
-    print('max_different_freq_axes', max_different_freq_axes)
+    # print('max_different_freq_axes', max_different_freq_axes)
 
     if num_axes == 1:
         num_axes = len(motif)
@@ -93,10 +93,10 @@ def get_RHS_motif(motif: ResonanceMotif,
                                                     parameters, 
                                                     vibdata)
         vib_diff_w_value.cache_it(vibdiff_cache=vibdiff_cache)
-        print('vib_diff_w_value', vib_diff_w_value.energy_difference(au=(unit=='Eh')))
+        # print('vib_diff_w_value', vib_diff_w_value.energy_difference(au=(unit=='Eh')))
         constants.append((-1)*vib_diff_w_value.energy_difference(au=(unit=='Eh')))
 
-    print('constants', constants)
+    # print('constants', constants)
     return constants
 
 
@@ -113,10 +113,8 @@ def solve_LSE_motif(motif: ResonanceMotif,
 
     returns a dict {f'w{i+1}': solution}
     """
-    print('motif', motif)
 
     coeff_matrix = generate_LHS_motif(motif)
-    print('coeff_matrix\n', coeff_matrix)
 
     constants = get_RHS_motif(motif, parameters, vibdata, vibdiff_cache, unit)
 
@@ -128,7 +126,7 @@ def solve_LSE_motif(motif: ResonanceMotif,
         from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
         num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
 
-        return {num_to_ax[i]: val for i, val in enumerate(solution)}
+        return {num_to_ax[i]: float(val) for i, val in enumerate(solution)}
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
 
@@ -143,7 +141,6 @@ def _generate_index_choices(motif: ResonanceMotif, vibstates_data: 'VibStatesDat
     return generate_index_choices_general(indlabels_in_motif=indlabels_in_motif, labels=labels)
 
 
-# def find_resonance_locations_wrt_index_choices(motif: tuple[tuple,...],
 def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
                                                vibstates_data: 'VibStatesData',
                                                vibdiff_cache: 'VibDiffCache',
@@ -159,18 +156,20 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     # {motif 1: {(500., 1200.): [(1, 2), (1, 3)],
     #           (500., 1400.): [(1, 4)], ...}}
 
-    results: dict[dict,list] = {}
+    results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
+    # print('index_choices', index_choices)
 
     for idxs in index_choices:
+        # print('idxs', idxs)
         parameters = ParameterSet(idxs)
         location_d = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
         location_key = tuple(location_d.items())
 
         if spec_window is None or is_location_in_window(location_d, window=spec_window, margin={}):
-            results.setdefault(location_key, []).append(idxs)
-
+            results[motif].setdefault(location_key, []).append(idxs)
+    # print('\n---------- find_resonance_locations_wrt_index_choices', results)
     return results
 
 
@@ -208,6 +207,10 @@ def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tu
     """
     """
     return set(make_resonance_motif(term.res) for term in list_of_terms)
+def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
+    """
+    """
+    return set(ResonanceMotif(term.res) for term in list_of_terms)
 
 
 def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):

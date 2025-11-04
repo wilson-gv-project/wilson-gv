@@ -5,8 +5,8 @@ from typing import Callable
 import copy
 
 import numpy as np
-from wilson_suite.wilson_derive.abstractions import PolProp
-from wilson_suite.wilson_intensities.amplitudes.term_parts import PropsCollection, VibPerturbedTerm
+from wilson_suite.wilson_derive.abstractions import PolProp, VibPerturbedTerm
+from wilson_suite.wilson_intensities.amplitudes.term_parts import PropsCollection
 from wilson_suite.wilson_intensities.amplitudes.utils import generate_index_choices_general
 from wilson_suite.wilson_main.abstractions import MolPropsCollection
 

@@ -4,12 +4,14 @@ Evaluator functions for WilsonSimulation
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
 from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
-from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices
+from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-from wilson_suite.wilson_intensities.amplitudes.term_parts import VibPerturbedTerm, ResonanceMotif, VibStatesData, EvaluationDataAndConfigs
+from wilson_suite.wilson_intensities.amplitudes.term_parts import (ResonanceMotif, VibStatesData, 
+                                                                   EvaluationDataAndConfigs, ParameterSet,
+                                                                   TermParametersChoice, SpectralFeature)
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -31,6 +33,16 @@ def terms_evaluator_general(system: 'MolecularSystem' = None,
                     do_diagn: bool = None,
                     selected_combs: list = None,
                     collect_all: bool = False) -> dict:
+    """
+    needs list of terms to be evaluated
+
+    each term evaluated for a list of parameter sets 
+        - for a parameter set - res_location and amplitude coefficient
+    
+    but then make mapping for each res_location make list of contributors [term, parameter set] info
+    so each location is associated with other info to make a SpectralFeature
+
+    """
     '''
 
     res_motifs = {}
@@ -78,15 +90,14 @@ def terms_evaluator_general(system: 'MolecularSystem' = None,
 
     '''
 
-    term_coeffs_per_index = {}
-
     # Results: Each resonance motif entry i gets a dictionary ((index tuple), (resonance location tuple))
     # motif_res_loc = {'motif 1': {(500., 1200.): [(1, 2), (1, 3)],(500., 1400.): [(1, 4)]}}
     motif_res_loc = {}
-    
-    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=())
+
+    har_states_labels = tuple([list(state.harm_quanta_coeffs.keys())[0][0] for state in vib_ana_setup.states if state.harmonic_WF])
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=har_states_labels)
     vibdiff_cache = VibDiffCache()
-    # props = {p.trivial_name: p for p in props}
+
     props = MolPropsCollection(properties=props)
 
     data_and_configs = EvaluationDataAndConfigs(props_data=props,
@@ -98,19 +109,65 @@ def terms_evaluator_general(system: 'MolecularSystem' = None,
     precalculated = precalculate_unique_coeff_parts(need_to_precalc=to_precalculate, 
                                                     data_and_configs=data_and_configs)
 
+    term_coeffs_per_index = {}
+
+    unique_res_motifs = identify_unique_resmotifs(derived_terms)
+
+    motif_res_loc: dict[ResonanceMotif, dict] = {}
+
+    for res_motif in unique_res_motifs:
+        this_motif_res_locs = find_resonance_locations_wrt_index_choices(motif=res_motif,
+                                                                         vibstates_data=vibstates_data,
+                                                                         vibdiff_cache=vibdiff_cache,
+                                                                         spec_window=None)
+        motif_res_loc.update(this_motif_res_locs)
+
+    # exit()
+    
+    terms_for_motifs: dict[ResonanceMotif,list[VibPerturbedTerm]] = {res_motif: [] for res_motif in unique_res_motifs}
+    
     for vibterm in derived_terms:
         res_motif = ResonanceMotif(vibterm.res)
-
-        motif_res_loc[res_motif] = find_resonance_locations_wrt_index_choices(motif=res_motif,
-                                                                              vibstates_data=vibstates_data,
-                                                                              vibdiff_cache=vibdiff_cache,
-                                                                              spec_window=None)
+        for u_motif in unique_res_motifs:
+            if u_motif == res_motif:
+                terms_for_motifs[u_motif].append(vibterm)
 
         # Direct invocation in features_to_draw assembler also possible
         term_coeffs_per_index[vibterm] = evaluate_term_coeffs(term=vibterm, 
-                                                              relevant_indices=motif_res_loc[res_motif].values(),
+                                                              relevant_indices=[k for i in motif_res_loc[res_motif].values() for k in i],
                                                               necessary_data=precalculated)
+    
+    # a SpectralFeature instanse holds a res_location and list of states parameters that give this res_location; 
+    #       the amplitude coefficient is a value in the dict
+    features_to_draw = {}
 
+    for res_motif in motif_res_loc:
+
+        for location_tuple, list_state_dicts in motif_res_loc[res_motif].items():
+            lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
+            list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+            spec_feature = SpectralFeature(location=location_tuple, 
+                                           term_contributions=[TermParametersChoice(term_keys=tuple(t.h() for t in terms_for_motifs[res_motif]),
+                                                                                   states_parameters=lst_params)])
+            if location_tuple not in features_to_draw:
+                features_to_draw[location_tuple] = sum(list_to_sum), spec_feature
+            else:
+                new_specfeat = spec_feature.union(features_to_draw[location_tuple][1])
+                features_to_draw[location_tuple] = sum(list_to_sum), new_specfeat
+
+    print('features_to_draw\n', features_to_draw)
+
+    # domains_with_features = determine_domains_and_features(features_to_draw)
+    # domain_grids = get_domain_grids(domains_with_features)
+
+    # for d in domains_with_features:
+    #     domain_grid_values = get_numerical_grids(domain_grids[d])
+    #     for f in domains_with_features[d]:
+    #         domain_grid_values += evaluate_feature_on_grid(domains_with_features[d][f], domain_grids[d], opt: lineshape
+    #         fns)
+
+            # Option A: Add up domain grid values into evaluation result 
+            # Option B: Return only domain info and domain grid values
 
 # TermND with TermsEvaluator
 def terms_evaluator(system,
