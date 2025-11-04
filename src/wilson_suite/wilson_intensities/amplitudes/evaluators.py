@@ -156,8 +156,9 @@ def terms_evaluator_general(system: 'MolecularSystem' = None,
                 features_to_draw[location_tuple] = sum(list_to_sum), new_specfeat
 
     print('features_to_draw\n', features_to_draw)
-
-    # domains_with_features = determine_domains_and_features(features_to_draw)
+    res_loc_tuples = [(ax[1] for ax in location_tuple) for location_tuple in features_to_draw.keys()]
+    print('res_loc_tuples', res_loc_tuples)
+    # domains_with_features = find_clusters_by_distance()
     # domain_grids = get_domain_grids(domains_with_features)
 
     # for d in domains_with_features:

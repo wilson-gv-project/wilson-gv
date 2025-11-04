@@ -1,25 +1,27 @@
-import wilson_suite.wilson_intensities.amplitudes.domains
+from wilson_suite.wilson_intensities.amplitudes import domains
 
 
 def test_find_domain_groups_by_distance():
     print()
 
-    points = [[1., 3.], [5., 11.], [4., 2.], [12., 6.], [8., 2.], [11., 4.]]
-    print(points, len(points))
+    points = [(1., 3.), (5., 11.), (4., 2.), (12., 6.), (8., 2.), (11., 4.)]
 
-    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=10.)
-    assert len(groups) == 3
-    print(groups)
+    groups1 = domains.find_clusters_by_distance(points, distance_threshold=10., linkage='single')
+    groups2 = domains.find_clusters_by_distance(points, distance_threshold=10., linkage='ward')
 
-    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=12.)
+    assert len(groups1) == 1
+    assert len(groups2) == 3
+
+    groups = domains.find_clusters_by_distance(points, distance_threshold=12., linkage='ward')
     assert len(groups) == 2
-    print(groups)
 
-    groups = wilson_suite.wilson_intensities.amplitudes.domains.find_domain_groups_by_distance(points, distance_threshold=4.)
-    assert len(groups) == 4
-    print(groups)
+    groups1 = domains.find_clusters_by_distance(points, distance_threshold=4., linkage='single')
+    groups2 = domains.find_clusters_by_distance(points, distance_threshold=4., linkage='ward')
+    assert len(groups1) == 3
+    assert len(groups2) == 4
+    print(groups2)
 
 
 def test_find_domain_distance_threshold():
     print()
-    wilson_suite.wilson_intensities.amplitudes.domains.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
+    domains.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
