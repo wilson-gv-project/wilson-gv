@@ -16,12 +16,10 @@ def test_plt_latex():
     get_plt_latex(expr6)
 
 def test_saved():
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
-    latex_strs = [t.to_latex() for t in terms_fuller_list]
+    latex_strs = [t.to_latex() for t in terms_fuller_flat]
     for n, t_latex in enumerate(latex_strs):
         get_plt_latex(t_latex, savename=f'term{n}.svg')
 

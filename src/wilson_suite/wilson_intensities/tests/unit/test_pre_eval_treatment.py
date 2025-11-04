@@ -4,10 +4,9 @@ import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
 
 def test_PropsCollection_get_avegaded_props():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
+
     t_inds = [0, 1, -2, -1]
     # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -49,10 +48,9 @@ PropsCollection(props=[PolProp(ops = [QOperator(o = 0, op_type = None, ax = None
 
 def test_ResonanceMotif():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
+    
     t_inds = [0, 1, -2, -1]
     # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]

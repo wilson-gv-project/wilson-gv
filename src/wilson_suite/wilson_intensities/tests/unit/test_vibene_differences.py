@@ -7,10 +7,8 @@ from wilson_suite.wilson_main.abstractions import VibState
 
 def test_identify_unique_vibdiff_motifs():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
     # t_inds = [0, 1, 2, -3, -2, -1]
     t_inds = range(len(terms_fuller_flat))
@@ -24,10 +22,8 @@ def test_identify_unique_vibdiff_motifs():
 def test_calculate_vibenedenom_tensor():
     print('\n')
 
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
     # t_inds = [0, 1, 2, -3, -2, -1]
     t_inds = [0, -1]
@@ -59,10 +55,8 @@ def test_calculate_vibenedenom_tensor():
 def test_identify_vibenedenom():
     print('\n')
 
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
     # t_inds = [0, 1, 2, -3, -2, -1]
     t_inds = [0, -1]

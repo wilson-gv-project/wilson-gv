@@ -13,10 +13,9 @@ def generate_props_data_Nmodes(N_modes):
 
 def test_terms_evaluator_general():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
+
     t_inds = [0, 1,-1, -2, -3]
     terms_select: list['wm_abst.VibPerturbedTerm'] = [terms_fuller_flat[tID] for tID in t_inds]
 
@@ -65,10 +64,9 @@ def test_terms_evaluator_general():
 
 def test_terms_evaluator_general_degen_states():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
+    
     t_inds = [0, 1,-1, -2, -3]
     terms_select: list['wm_abst.VibPerturbedTerm'] = [terms_fuller_flat[tID] for tID in t_inds]
 

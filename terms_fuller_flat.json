@@ -1,0 +1,2002 @@
+[
+  {
+    "coeff": [
+      -1,
+      4
+    ],
+    "props": [  
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 2,
+        "inds": [
+          "a",
+          "b"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      4
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 2,
+        "inds": [
+          "a",
+          "b"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": true
+      },
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      8
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "c"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b",
+            "c"
+          ]
+        },
+        "sr": {
+          "q": [
+            "a"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "b",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b"
+          ]
+        },
+        "sr": {
+          "q": [
+            "a"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "b",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": true
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      8
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "c"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "c"
+          ]
+        },
+        "sr": {
+          "q": [
+            "b"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b"
+          ]
+        },
+        "sr": {
+          "q": [
+            "b"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      8
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "c"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b"
+          ]
+        },
+        "sr": {
+          "q": [
+            "c"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b"
+          ]
+        },
+        "sr": {
+          "q": [
+            "b"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      -1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "b",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b"
+          ]
+        },
+        "sr": {
+          "q": [
+            "a"
+          ]
+        },
+        "is_pert_wf_diff": true
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "b",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": true
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      16
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "c",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": true
+      },
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  },
+  {
+    "coeff": [
+      1,
+      8
+    ],
+    "props": [
+      {
+        "ops": [
+          {
+            "o": 0,
+            "op_type": null,
+            "ax": null
+          },
+          {
+            "o": 3,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "b"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 1,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "a"
+        ]
+      },
+      {
+        "ops": [
+          {
+            "o": 2,
+            "op_type": null,
+            "ax": null
+          }
+        ],
+        "dord": 1,
+        "inds": [
+          "c"
+        ]
+      },
+      {
+        "ops": [],
+        "dord": 3,
+        "inds": [
+          "a",
+          "b",
+          "c"
+        ]
+      }
+    ],
+    "freqterms": [
+      {
+        "sl": {
+          "q": [
+            "a"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": true
+      },
+      {
+        "sl": {
+          "q": [
+            "b"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      },
+      {
+        "sl": {
+          "q": [
+            "c"
+          ]
+        },
+        "sr": {
+          "q": []
+        },
+        "is_pert_wf_diff": false
+      }
+    ],
+    "res": [
+      {
+        "diff": {
+          "sl": {
+            "q": []
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "-A",
+          "B"
+        ],
+        "id": null
+      },
+      {
+        "diff": {
+          "sl": {
+            "q": [
+              "a",
+              "b"
+            ]
+          },
+          "sr": {
+            "q": [
+              "a"
+            ]
+          }
+        },
+        "pf": [
+          "B"
+        ],
+        "id": null
+      }
+    ],
+    "was_sorted": true
+  }
+]

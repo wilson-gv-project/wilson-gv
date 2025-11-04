@@ -9,10 +9,8 @@ from ....wilson_utils.logger import setup_logger
 setup_logger("wilson", level=logging.DEBUG)
 
 def get_expressions():
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
     
     t_inds = [0, 1,-1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -35,10 +33,8 @@ def test_expr1():
 
 
 def test_identify_unique_avrgmotifs():
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
     t_inds = [0, 1,-1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -52,10 +48,8 @@ def test_identify_unique_avrgmotifs():
 
 
 def test_make_avrg_props_motif():
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
 
     collect_simple = []
     t_inds = [0, -2]
@@ -152,10 +146,9 @@ props = dict_to_proplist(props_data)
 
 def test_make_func_to_compute_avrg():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
+
     t_inds = [0, 1, -2, -1]
     # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -810,10 +803,8 @@ def test_identify_unique_avrg_tensors():
 
 def test_identify_unique_avrg_tensors2():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
     
     t_inds = [0, 1, -1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]

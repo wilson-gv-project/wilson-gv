@@ -75,10 +75,8 @@ def test_VibPerturbedTerm_repr():
 def test_VibPerturbedTerm_full_repr():
     
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_list = get_terms_from_json()
 
     for i, t in enumerate(terms_fuller_list):
         print('\n ---', i)
@@ -100,16 +98,14 @@ def test_VibPerturbedTerm_latex():
     terms = generate_only_res_cond_evv_term_selection()
     latex_strs = [t.to_latex() for t in terms]
 
-    assert latex_strs == ['\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
-                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)}', 
-                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
-                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{,a} -B)(\\omega_{b,a} -B)}', 
-                          '\\frac{1}{4}\\frac{1}{}\\frac{1}{(\\omega_{,a} -B)(\\omega_{,a} -A+B)}']
+    assert latex_strs == ['\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)}', 
+                          '\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{(\\omega_{,a} -B)(\\omega_{b,a} -B)}', 
+                          '\\frac{1}{4}\\frac{1}{(\\omega_{,a} -B)(\\omega_{,a} -A+B)}']
     
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_list = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_list = get_terms_from_json()
 
     latex_strs = [t.to_latex() for t in terms_fuller_list]
     assert latex_strs[0] == '\\frac{-1}{4}\\frac{1}{\\omega_{a,}\\omega_{b,}}\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{b}}\\frac{\\partial^{2}\\alpha_{\\alpha\\delta}}{\\partial Q_{a}\\partial Q_{b}}\\frac{1}{(\\omega_{,a} +A-B)(\\omega_{b,a} -B)}'

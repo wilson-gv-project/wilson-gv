@@ -83,7 +83,11 @@ def SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH():
 
     return translated_terms
 
-
+def get_terms_from_json():
+    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_utils.paths import SUITE_ROOT
+    print(SUITE_ROOT)
+    return VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
 
 # # QC calculations/vibana parameters
 # mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)

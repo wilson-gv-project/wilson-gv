@@ -9,10 +9,8 @@ from wilson_suite.wilson_main.abstractions import VibState
 
 def test_identify_precalc_unique_coeff_parts():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
     
     t_inds = [0, 1,-1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -38,10 +36,8 @@ def generate_props_data4modes():
 
 def test_precalculate_unique_coeff_parts():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
     
     t_inds = [0, 1, -1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
@@ -79,10 +75,8 @@ def test_precalculate_unique_coeff_parts():
 
 def test_evaluate_term_coeffs():
     print()
-    from wilson_suite.fixtures import SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-    terms_fuller = SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH()
-    terms_fuller_flat = derived_terms_dict_to_dicts(terms_fuller, tolistonly=True)
+    from wilson_suite.fixtures import get_terms_from_json
+    terms_fuller_flat = get_terms_from_json()
     
     t_inds = [0, 1,-1, -2, -3]
     terms_select: list[VibPerturbedTerm] = [terms_fuller_flat[tID] for tID in t_inds]

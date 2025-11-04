@@ -4,6 +4,8 @@
 *.json
 *.log
 
+!terms_fuller_flat.json
+
 .VSCodeCounter/
 
 # Byte-compiled / optimized / DLL files

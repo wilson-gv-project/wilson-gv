@@ -1,5 +1,6 @@
 from fractions import Fraction
 import copy
+import json
 
 class QOperator:
     """
@@ -1049,6 +1050,103 @@ class VibPerturbedTerm:
                 return freqterms_str
         else:
             return coefficients_str + freqterms_str + properties_str + res_conditions_str
+
+    def to_dict(self) -> dict:
+        """Convert VibPerturbedTerm to a dictionary for JSON serialization"""
+        return {
+            "coeff": [self.coeff.numerator, self.coeff.denominator],
+            "props": [
+                {
+                    "ops": [{"o": op.o, "op_type": op.op_type, "ax": op.ax} for op in p.ops],
+                    "dord": p.dord,
+                    "inds": p.inds
+                } for p in self.props
+            ],
+            "freqterms": [
+                {
+                    "sl": {"q": ft.sl.q},
+                    "sr": {"q": ft.sr.q},
+                    "is_pert_wf_diff": ft.is_pert_wf_diff
+                } for ft in self.freqterms
+            ],
+            "res": [
+                {
+                    "diff": {
+                        "sl": {"q": r.diff.sl.q},
+                        "sr": {"q": r.diff.sr.q}
+                    },
+                    "pf": r.pf,
+                    "id": r.id
+                } for r in self.res
+            ],
+            "was_sorted": self.was_sorted
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'VibPerturbedTerm':
+        """Create VibPerturbedTerm from a dictionary"""
+        # Reconstruct coefficient
+        coeff = Fraction(data["coeff"][0], data["coeff"][1])
+        
+        # Reconstruct properties
+        props = []
+        for p in data["props"]:
+            ops = [QOperator(op["o"], op["op_type"], op["ax"]) for op in p["ops"]]
+            prop = PolProp(ops, p["dord"])
+            prop.inds = p["inds"]
+            props.append(prop)
+        
+        # Reconstruct frequency terms
+        freqterms = []
+        for ft in data["freqterms"]:
+            sl = HarmOscStateSymbolic(ft["sl"]["q"])
+            sr = HarmOscStateSymbolic(ft["sr"]["q"])
+            freqterms.append(VibDiffTerm(sl, sr, ft["is_pert_wf_diff"]))
+        
+        # Reconstruct resonance conditions
+        res = []
+        for r in data["res"]:
+            sl = HarmOscStateSymbolic(r["diff"]["sl"]["q"])
+            sr = HarmOscStateSymbolic(r["diff"]["sr"]["q"])
+            diff = VibDiffTerm(sl, sr)
+            res.append(ResonanceCondition(diff, r["pf"], r["id"]))
+        
+        # Create instance
+        instance = cls(coeff, props, freqterms, res)
+        instance.was_sorted = data["was_sorted"]
+        return instance
+
+    def to_json(self, filepath: str = None) -> str:
+        """Convert to JSON string or save to file"""
+        json_str = json.dumps(self.to_dict(), indent=2)
+        if filepath:
+            with open(filepath, 'w') as f:
+                f.write(json_str)
+        return json_str
+
+    @classmethod
+    def from_json(cls, json_str: str = None, filepath: str = None) -> 'VibPerturbedTerm':
+        """Create instance from JSON string or file"""
+        if filepath:
+            with open(filepath) as f:
+                data = json.load(f)
+        else:
+            data = json.loads(json_str)
+        return cls.from_dict(data)
+    
+    @classmethod
+    def save_many_to_json(cls, terms: list['VibPerturbedTerm'], filepath: str):
+        """Save multiple terms to a single JSON file"""
+        terms_data = [term.to_dict() for term in terms]
+        with open(filepath, 'w') as f:
+            json.dump(terms_data, f, indent=2)
+
+    @classmethod
+    def load_many_from_json(cls, filepath: str) -> list['VibPerturbedTerm']:
+        """Load multiple terms from a JSON file"""
+        with open(filepath) as f:
+            terms_data = json.load(f)
+        return [cls.from_dict(term_data) for term_data in terms_data]
 
 
 class TransitionIntegral:

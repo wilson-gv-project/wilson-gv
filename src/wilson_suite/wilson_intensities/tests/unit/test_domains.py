@@ -25,3 +25,6 @@ def test_find_domain_groups_by_distance():
 def test_find_domain_distance_threshold():
     print()
     domains.find_distance_threshold(1e6, {'A': 3.8, 'B': 3.8})
+
+def test_terms():
+    print()
