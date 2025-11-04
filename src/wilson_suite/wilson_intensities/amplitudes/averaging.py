@@ -29,9 +29,9 @@ def isotropic_average_for_props_and_field(term, experiment):
 
     # 2: Get f, M, g
     # When properties are all electric dipole properties (not sure what happens if not), then f and g are the same thing
-    # (except that f applies to A and g applies to P)
+    # (except that f applies to A and g applies to P) - so it's then sufficient to get f (= g) and M
 
-    # The exact organization of 3, 4, 5 may be adjusted
+    # The exact organization of 3, 4, 5 may be adjusted (now for all electric dipole properties)
 
     # 3. Form K = M * g * p
 
@@ -42,7 +42,8 @@ def isotropic_average_for_props_and_field(term, experiment):
     # Need to find out:
     # - How does A represent general polarization setups?
     #   - I think I have a decent idea now: For e.g. a beam in the z direction, use the x and y components to define the polarization
-    #   - Should be able to consider both linear and circularly polarized light
+    #   - Should be able to consider both linear and circularly polarized light: 3110: Yes indeed it looks so
+    #   - FIXME: Find out magnitude of polarization vector: Should be some kind of unit-like vector
     #   - For beams whose wavevector is not purely in a Cartesian direction, will need to be some extra angle stuff but should be manageable
     # - Could einsum be a smart thing to use here?
     # - How to best bring in polarization information from the experiment?
@@ -50,6 +51,66 @@ def isotropic_average_for_props_and_field(term, experiment):
     #   - Not sure how to handle "mixed" polarization setups (i.e. beaming/detecting light with several polarizations), but leave that for now
     # - How to make sure that the ranks of the microscopic and macroscopic tensors (and their combination on averaging)
     # are properly kept track of/aligned?
+
+    # Outside tasks:
+    # - Change detector_location attribute to be "detector_facing"? NO (OK)
+    # - Choose convention for polarization definition OK
+    # - Generate complete laboratory-axis polarization vectors OK
+    # - Change in integration testing scripts: Make linear polarization but in a choice of direction WAIT
+    # - Change wilson-intensities start to determine laser polarization term for experiment (or compute and send from main)
+    # - Harmonize the ranks of pulses to the ranks of polarization property Greek indices
+
+
+    # Technical/physics questions:
+    # - Polarization changes for negative wavevectors?
+    #           - I think (from literature) that the polarization then is complex conjugated:
+    #               - Overall pulse phase is simple complex conjugation
+    #               - Since I am limiting to linear polarization there is no question about any changes in polarization unit vector
+    #               - See if Mukamel offers any more on this
+    # - Polarization/overall phase for detection?
+    #   - Overall phase: Not sure and also not sure if it matters
+    #   - Polarization vector: I presume to be handled by polarization filter (in general more than one choice detectable)
+    # - Taking real parts of incident/outgoing field modes?
+    # - All the polarization considerations w.r.t. evaluating as response function
+    #   - Recall that the microscopic parts of the response function are the same (although selected for by phase-matching
+    #   and spectral domain considerations, and that the polarization/"tabletop" pulse considerations
+    #   a) properly recombine them (which is a polarization direction matter only and is not complicated with linear polarization), and
+    #   b) I don't think other effects (overall phase, specific pulse time envelopes) effect changes that are important to us:
+    #       - They would likely have to do with some propagation of overall phase
+    #       - Field strength considerations would be more or less a simple multiplication
+    #       - Pulse shape considerations are not in the present scope and it's an established limitation to us
+    # - Check Mukamel for full understanding of wave-mixing's emergence of phase-matching direction OK
+    #   - No changes there to above findings
+    #   - negative k vectors appear to have c.c. polarization
+
+    # CONCLUSION 251103: Can proceed with implementation and settle the remaining details at a later stage
+    # Recap of all known remaining details:'
+    # - Overall phase now enforced as zero for each pulse, any limitations? Phase of outgoing signal?
+    # - Correct in polarization filter thinking?
+    # - Taking real part?
+    # - Full "evaluating as response function" check for inconsistencies
+    # - c.c. polarization for negative k vectors dbl chk (no changes upon c.c. with my zero overall phase and linear pol.?)
+    #   - for prev. and "real part", cos(-wt) and cos(wt) are same but sin(-wt) and sin(wt) are opposite phase. Is that an issue here?
+
+
+
+
+
+    # The main routine should take:
+    # - The laser polarization term (a vector)
+    # - An order parameter n
+
+    # The result of the main routine should be:
+    # - A structure associating a tuple of Greek/electromagnetic perturbation
+    #   operator index: axis value pairs with a coefficient, defining the orientational average.
+    # E.g.: for a quadratic response function with Cartesian index labels 123 (alpha beta gamma),
+    # the sum 0.5 * Beta_zzz + 2.0 * Beta_xzy would be expressed (x = 0, y = 1, z = 2) in a form like
+    # [(3: 2, 1: 2, 2: 2): 0.5, (1: 0, 3: 2, 2: 3): 2.0] (orderings deliberately mixed for this example)
+    # Alternatively, return Cartesian rank mapping as separate dictionary and keep one Cartesian tuple in coeff list
+    # I like this last option better
+
+
+
 
 
 
@@ -64,9 +125,11 @@ def get_pol_laser(pol):
     A = get_pol_tensor(A, pol)
     A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
 
+    print('A', A)
+
     f = get_iso_f(len(pol))
 
-    pl = np.zeros((len(f)))
+    pl = np.zeros((len(f)), dtype=complex)
 
     for i in range(len(f)):
 

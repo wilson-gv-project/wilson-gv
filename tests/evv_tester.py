@@ -39,9 +39,9 @@ PREP_ONLY = True
 def run():
     # ================================================
     # ---- EXPERIMENT
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='ideal', maxstr=1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
-    pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
-    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
+    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='ideal', maxstr=1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[1.0, 0.0, 0.0], id=1)
+    pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[1.0, 0.0, 0.0], id=2)
+    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[1.0, 0.0, 0.0], id=3)
 
     pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
 
@@ -52,7 +52,7 @@ def run():
 
     detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq', 
                                                          detector_location=[0.0, 0.0, 1.0],
-                                                         detection_polarization=[0.0, 0.0, 1.0],
+                                                         detection_polarization=[1.0, 0.0, 0.0],
                                                          detection_range=[0.003 + 0.0001*i for i in range(101)],
                                                          wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
 

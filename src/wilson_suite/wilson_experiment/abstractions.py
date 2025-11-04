@@ -3,6 +3,8 @@ from typing import List, Optional, Iterable
 from operator import itemgetter
 import copy
 
+from wilson_suite.wilson_derive.abstractions import HarmOscStateSymbolic
+
 
 # TODO: SpecDetector and SpecScan as dataclasses?
 # TODO: Expand functionality according to below TODOs
@@ -18,10 +20,11 @@ class SpecDetector:
     If detection_method is "integrated", then the detection data is a scalar
     Currently, only "freq" (frequency-range) detection is supported.
 
-    detector_location: List of floats: Optional explicit vector location in space. Currently not used.
+    detector_location: List of floats: Unit vector describing the direction in which the detector is facing.
+    Default: [0.0, 0.0, 1.0]. Currently only used for defining polarization filtering.
 
-    detection_polarization: List of floats: Detect only light with this specific polarization vector.
-    Currently not used.
+    detection_polarization: List of floats: Detect only light with this specific polarization vector. Default:
+    [1.0, 0.0, 0.0].
 
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
@@ -36,10 +39,8 @@ class SpecDetector:
     """
     detection_method: str
     
-    # TODO add check (len 3 array or list)
     detector_location: Optional[List[float]] = None
     
-    # TODO add check
     detection_polarization: Optional[List[float]] = None
     
     # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
@@ -47,12 +48,21 @@ class SpecDetector:
     wv_filter: Optional[List[dict]] = None
     ignore_collinear: bool = True
 
+    overall_phase: complex = 1.0 + 0.0j
+
     def __post_init__(self):
         if self.detection_method not in {'time', 'freq', 'int'}:
             raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
 
         if self.detection_range is None and (self.detection_method in ['time']):
             raise AssertionError("The detection range must be specified when the detector is set to 'time' or 'freq' detection")
+
+        if not self.overall_phase == 1.0 + 0.0j:
+            raise AssertionError('Detector overall phase currently restricted to zero shift')
+
+        if not(abs(self.overall_phase) - 1.0 > 1e-10):
+            raise AssertionError('Detector overall phase must be of unit length')
+
 
 @dataclass
 class SpecScan:
@@ -99,8 +109,14 @@ class EmPulse:
         wavevector--frequency combination in the experiment
         - For pulses where cf_uv != 0.0, then cf must be 0.0
     dev: float: Deviation parameter (e.g. broadness of Gaussian pulse)
-    wv: float: Wavevector travel direction
-    pol: float: Polarization (only linearly polarized light currently countenanced)
+    wv: floats: Unit wavevector propagation direction with respect to laboratory axes
+    pol: floats: Polarization: Unit vector describing polarization direction with respect to laboratory axes
+        - Must be orthogonal to wavevector
+        - Only linear polarization currently supported (no phase difference between orthogonal components of
+        polarization vector in plane of polarization)
+        - Default: [1.0, 0.0, 0.0]
+    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse. Currently enforced as (1.0, 0.0)
+
     id: integer: Pulse ID label
     """
     env: str
@@ -115,7 +131,8 @@ class EmPulse:
     cf_uv: float = 0.0
     dev: float = None
     wv: List[float] = None
-    pol: List[float] = None
+    pol: List[float] = [1.0, 0.0, 0.0]
+    overall_phase: complex = 1.0 + 0.0j
     id: int = None
 
     def __post_init__(self):
@@ -160,10 +177,10 @@ class EmPulse:
                 raise AssertionError('The pulse wavevector must be a len 3 list of floats')
 
         # Polarization: Specify the polarization of the pulse
-        # Currently supports unit linear polarization (TODO: Add support for circular polarization (as function)?)
+        # Currently supports unit linear polarization
         if self.pol is None:
-            print('No polarization was specified for pulse, defaulting to unit z direction wavevector')
-            self.pol = [0.0, 0.0, 1.0]
+            print('No polarization was specified for pulse, defaulting to unit x direction polarization')
+            self.pol = [1.0, 0.0, 0.0]
         else:
             if isinstance(self.pol, list):
                 if len(self.pol) == 3:
@@ -173,12 +190,25 @@ class EmPulse:
                             print('Wavevector was normalized')
                         self.pol = [i/pol_len for i in self.pol]
 
+                        wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
+
+                        if not(wv_pol_dot == 0.0):
+                            raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
+
                     else:
-                        raise AssertionError('The pulse wavevector must be a len 3 list of floats')
+                        raise AssertionError('The polarization vector must be a len 3 list of floats')
                 else:
-                    raise AssertionError('The pulse wavevector must be a len 3 list of floats')
+                    raise AssertionError('The polarization vector must be a len 3 list of floats')
             else:
-                raise AssertionError('The pulse wavevector must be a len 3 list of floats')
+                raise AssertionError('The polarization must be a len 3 list of floats')
+
+        if not self.overall_phase == 1.0 + 0.0j:
+            raise AssertionError('Overall phase currently restricted to zero shift')
+
+        if not(abs(self.overall_phase) - 1.0 > 1e-10):
+            raise AssertionError('The overall phase must be of unit length')
+
+
 
 
 # The field consists of a collection of pulses
@@ -688,6 +718,18 @@ class VibExperiment:
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
 
+        self.all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
+
+        for i in self.field.pulses:
+            self.all_polarizations.append(copy.deepcopy[i])
+
+        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+
+        self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+
+        print('all polarizations', self.all_polarizations)
+        print('pol avg vector', self.polarization_avg_vector)
+
 
     def findDimensionality(self) -> int:
         """
@@ -783,3 +825,4 @@ class VibExperiment:
             interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
 
         return int_sequences
+
