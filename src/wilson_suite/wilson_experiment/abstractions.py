@@ -39,9 +39,9 @@ class SpecDetector:
     """
     detection_method: str
     
-    detector_location: Optional[List[float]] = None
+    detector_location: Optional[tuple[float]] = None
     
-    detection_polarization: Optional[List[float]] = None
+    detection_polarization: Optional[tuple[float]] = None
     
     # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
     detection_range: Optional[List[float]] = None
@@ -60,7 +60,7 @@ class SpecDetector:
         if not self.overall_phase == 1.0 + 0.0j:
             raise AssertionError('Detector overall phase currently restricted to zero shift')
 
-        if not(abs(self.overall_phase) - 1.0 > 1e-10):
+        if not(abs(self.overall_phase) - 1.0 < 1e-10):
             raise AssertionError('Detector overall phase must be of unit length')
 
 
@@ -114,7 +114,7 @@ class EmPulse:
         - Must be orthogonal to wavevector
         - Only linear polarization currently supported (no phase difference between orthogonal components of
         polarization vector in plane of polarization)
-        - Default: [1.0, 0.0, 0.0]
+        - Default: (1.0, 0.0, 0.0)
     overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse. Currently enforced as (1.0, 0.0)
 
     id: integer: Pulse ID label
@@ -130,8 +130,8 @@ class EmPulse:
     cf: float = None
     cf_uv: float = 0.0
     dev: float = None
-    wv: List[float] = None
-    pol: List[float] = dc_field(default_factory=lambda: [1.0, 0.0, 0.0])
+    wv: tuple[float] = (0.0, 0.0, 1.0)
+    pol: tuple[float] = (1.0, 0.0, 0.0)
     overall_phase: complex = 1.0 + 0.0j
     id: int = None
 
@@ -157,55 +157,47 @@ class EmPulse:
                 raise AssertionError('An pulse of the "ideal" type must have a (monochromatic) "carrier" frequency')
         
         # Wavevector: In which unit vector direction is the pulse wave travelling
-        if self.wv is None:
-            print('No wavevector was specified for pulse, defaulting to unit z direction wavevector')
-            self.wv = [0.0, 0.0, 1.0]
-        else:
-            if isinstance(self.wv, list):
-                if len(self.wv) == 3:
-                    if all([isinstance(i, float) for i in self.wv]):
-                        wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
-                        if not wv_len == 1.0:
-                            print('Wavevector was normalized')
-                        self.wv = [i/wv_len for i in self.wv]
+        if isinstance(self.wv, tuple):
+            if len(self.wv) == 3:
+                if all([isinstance(i, float) for i in self.wv]):
+                    wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
+                    if not wv_len == 1.0:
+                        print('Wavevector was normalized')
+                    self.wv = [i/wv_len for i in self.wv]
 
-                    else:
-                        raise AssertionError('The pulse wavevector must be a len 3 list of floats')
                 else:
-                    raise AssertionError('The pulse wavevector must be a len 3 list of floats')
+                    raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
             else:
-                raise AssertionError('The pulse wavevector must be a len 3 list of floats')
+                raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
+        else:
+            raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
 
         # Polarization: Specify the polarization of the pulse
         # Currently supports unit linear polarization
-        if self.pol is None:
-            print('No polarization was specified for pulse, defaulting to unit x direction polarization')
-            self.pol = [1.0, 0.0, 0.0]
-        else:
-            if isinstance(self.pol, list):
-                if len(self.pol) == 3:
-                    if all([isinstance(i, float) for i in self.pol]):
-                        pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
-                        if not pol_len == 1.0:
-                            print('Wavevector was normalized')
-                        self.pol = [i/pol_len for i in self.pol]
+        if isinstance(self.pol, tuple):
+            if len(self.pol) == 3:
+                if all([isinstance(i, float) for i in self.pol]):
+                    pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
+                    if not pol_len == 1.0:
+                        print('Wavevector was normalized')
+                    self.pol = [i/pol_len for i in self.pol]
 
-                        wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
+                    wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
 
-                        if not(wv_pol_dot == 0.0):
-                            raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
+                    if not(wv_pol_dot == 0.0):
+                        raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
 
-                    else:
-                        raise AssertionError('The polarization vector must be a len 3 list of floats')
                 else:
-                    raise AssertionError('The polarization vector must be a len 3 list of floats')
+                    raise AssertionError('The polarization vector must be a len 3 tuple of floats')
             else:
-                raise AssertionError('The polarization must be a len 3 list of floats')
+                raise AssertionError('The polarization vector must be a len 3 tuple of floats')
+        else:
+            raise AssertionError('The polarization must be a len 3 tuple of floats')
 
         if not self.overall_phase == 1.0 + 0.0j:
             raise AssertionError('Overall phase currently restricted to zero shift')
 
-        if not(abs(self.overall_phase) - 1.0 > 1e-10):
+        if not((abs(self.overall_phase) - 1.0) < 1e-10):
             raise AssertionError('The overall phase must be of unit length')
 
 
@@ -721,14 +713,11 @@ class VibExperiment:
         self.all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
 
         for i in self.field.pulses:
-            self.all_polarizations.append(copy.deepcopy[i])
+            self.all_polarizations.append(copy.deepcopy(i.pol))
 
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 
         self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
-
-        print('all polarizations', self.all_polarizations)
-        print('pol avg vector', self.polarization_avg_vector)
 
 
     def findDimensionality(self) -> int:
