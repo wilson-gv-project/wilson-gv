@@ -274,59 +274,26 @@ class WilsonSimulation:
 		self.fillResults(data_dict=obtainer(self.requestData()))
 
 
-	def evaluateAsResponseFunction(self,
-								   evaluator: Callable[[
-								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
+	def evaluateSpectrum(self,
+                         evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
 								   SpecEvalSetup, VibAnaSetup, bool], tuple[np.ndarray, dict]],
-								   do_diagn: bool=False):
+                         do_diagn: bool=False):
 		"""
-		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
-		experiment pulse strength information and without regard to further experiment information except terms)
+		Evaluate the spectrum
 
 		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
-		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		class: Must take a system, an experiment, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
 		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
 		if not self.vib_ana_setup.isAllSet:
-			raise AssertionError('VibAnaSetup is not ready for evaluateAsResponseFunction()')
-
-		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
-				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
-				 do_diagn=do_diagn)
-	
-		if do_diagn:
-			self.spec, diagn = evaluator(**context)
-			self.updDiagnostics(upd_dict=diagn)
-			
-			if not isinstance(self.diagn, dict):
-				raise AssertionError('Diagnostics result must be dictionary')
-		else:
-			self.spec, _ = evaluator(**context)
-
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
-
-
-	def evaluateFull(self, evaluator: Callable[[
-								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]],
-								   do_diagn: bool=False):
-		"""
-		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
-
-		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
-		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
-		vibrational analysis setup and return the spectral data as a numpy ndarray
-		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
+			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
 
 		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
 				 do_diagn=do_diagn)
-		
-		self.spec = evaluator(**context)
-
+	
 		if do_diagn:
 			self.spec, diagn = evaluator(**context)
 			self.updDiagnostics(upd_dict=diagn)

@@ -4,40 +4,6 @@ import copy
 
 
 def isotropic_average_for_props_and_field(term, experiment):
-    """
-    Take a collection of properties and an experiment and determine the appropriate orientational average
-    """
-
-    # Outline of routine:
-
-    # The average is formed as the contraction A * f * M * g * P (see JCP 67, 5026)
-    # A is a tensor describing a laboratory-frame quantity: Here it represents the polarization of the incident/detected radiation
-    # P is a tensor describing a molecule-frame quantity: Here it represents some relevant part of a response property (e.g.,
-    # for four-wave mixing 2D-IR, this is one term's collection of polarization properties
-    # f and g are collections resulting from evaluating strings of Kronecker deltas and Levi-Civita symbols according to the
-    # JCP 67, 5026 procedure. The result is a collection of references to tensor components of A (f) or P (g) that fulfill the conditions as
-    # dictated by each Kronecker/Levi-Civita string (one string leads to a given number of tensor components, and the collection is over all strings)
-    # The f and g collections are created from tabulated strings. They have a "positive" and "negative" part. The positive part signifies that the
-    # components specified inside are to be added. The negative part (only relevant if there was a Levi-Civita symbol during the evaluation (which happens at
-    # odd orders) signifies that the components are to be subtracted
-    # M is a matrix collecting coefficients associated with the orientational averaging (it is here tabulated for orders up to 6 but can in principle
-    # be calculated).
-
-    # 1: Fails:
-    # a) Fail if the order is > 6
-    # b) Fail if not all of the polarization properties are electric dipole polarization properties
-
-    # 2: Get f, M, g
-    # When properties are all electric dipole properties (not sure what happens if not), then f and g are the same thing
-    # (except that f applies to A and g applies to P) - so it's then sufficient to get f (= g) and M
-
-    # The exact organization of 3, 4, 5 may be adjusted (now for all electric dipole properties)
-
-    # 3. Form K = M * g * p
-
-    # 4. Form L = f * K
-
-    # 5. Form the result A * L
 
     # Need to find out:
     # - How does A represent general polarization setups?
@@ -91,6 +57,7 @@ def isotropic_average_for_props_and_field(term, experiment):
     # - Full "evaluating as response function" check for inconsistencies
     # - c.c. polarization for negative k vectors dbl chk (no changes upon c.c. with my zero overall phase and linear pol.?)
     #   - for prev. and "real part", cos(-wt) and cos(wt) are same but sin(-wt) and sin(wt) are opposite phase. Is that an issue here?
+    # - Unit vectorization for polarization? Probably already settled but can double check
 
 
 
@@ -111,21 +78,25 @@ def isotropic_average_for_props_and_field(term, experiment):
 
 
 
-
-
-
     pass
 
-# Calculate transposed 'laser polarization term' (the term (A * f) in (A * f * M * g * P) in JCP 141, 204103)
-# The argument pol is a list of vectors
+# FIXME: Verify this routine thoroughly with tests
 def get_pol_laser(pol):
+    """
+    Calculate transposed 'laser polarization term' (the term (A * f) in (A * f * M * g * P) in JCP 141, 204103)
+    pol: list of len 3 lists specifying polarization vectors
+    """
 
     A = 1.0
 
     A = get_pol_tensor(A, pol)
     A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
 
+    print('A', A)
+
     f = get_iso_f(len(pol))
+
+    print('f', f)
 
     pl = np.zeros((len(f)), dtype=complex)
 
@@ -137,13 +108,20 @@ def get_pol_laser(pol):
         for j in range(len(f[i][1])):
             pl[i] -= A[tuple(f[i][1][j])]
 
-    return np.transpose(pl)
+    print('A * f', np.transpose(pl))
+
+    return [i for i in pl]
 
 
-# Create polarization tensor from individual 3D polarization vectors of incident light
-# Polarization vector elements are in general complex-valued
-# Inital value of pol_tensor is 1.0
 def get_pol_tensor(pol_tensor, pol):
+    """
+    Create polarization tensor from individual 3D polarization vectors of incident light by forming Kronecker product
+    Polarization vector elements are in general complex-valued
+    Inital value of pol_tensor is 1.0
+
+    pol: 3D polarization vectors
+    Tail-recursive: Return is a rank len(pol) 3 x 3 x 3 ... array
+    """
 
     if len(pol) == 0:
         return pol_tensor
@@ -151,132 +129,187 @@ def get_pol_tensor(pol_tensor, pol):
     else:
         return get_pol_tensor(np.kron(pol_tensor, np.array(copy.deepcopy(pol[len(pol) - 1]))), pol[0:len(pol) -1])
 
-def mdk(a, b):
+def mdk(a: int, b: int):
+    """
+    Kronecker delta over three spatial dimensions
+
+    Takes integers a and b for ranks and returns list of dictionaries each of valid pairs of axes for these ranks
+    """
 
     return [
-        {(a - 1): 0, (b - 1): 0},
-        {(a - 1): 1, (b - 1): 1},
-        {(a - 1): 2, (b - 1): 2}
+        {a: 0, b: 0},
+        {a: 1, b: 1},
+        {a: 2, b: 2}
     ]
 
-def mdl(a, b, c):
+def mdl(a: int, b: int, c: int):
+    """
+    Levi-Civita terms
+
+    Takes integers a, b, c for ranks and returns two lists, each consisting of dictionaries each of valid triples of
+    axes for these ranks:
+    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
+    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
+    """
 
     return [
-        [{(a - 1): 0, (b - 1): 1, (c - 1): 2},
-         {(a - 1): 1, (b - 1): 2, (c - 1): 0},
-         {(a - 1): 2, (b - 1): 0, (c - 1): 1}],
-        [{(a - 1): 2, (b - 1): 1, (c - 1): 0},
-         {(a - 1): 1, (b - 1): 0, (c - 1): 2},
-         {(a - 1): 0, (b - 1): 2, (c - 1): 1}]
+        [{a: 0, b: 1, c: 2},
+         {a: 1, b: 2, c: 0},
+         {a: 2, b: 0, c: 1}],
+        [{a: 2, b: 1, c: 0},
+         {a: 1, b: 0, c: 2},
+         {a: 0, b: 2, c: 1}]
     ]
 
-def make_iso_f(n, kron, lc):
+def make_iso_f_element(n, kron, lc):
+    """
+    Determine full set of valid axis values for each rank given a string of Kronecker deltas and Levi-Civita symbols
+    for individual doubles/triples of ranks. This is an element of the f (g) vector
+
+    n: Total order (strictly speaking redundant when all ranks are represented in the Kronecker/Levi-Civita collection)
+    kron: List of Kronecker delta valid axis values for given ranks (see mdk())
+    lc: List of two lists (coefficient +1 and -1): Levi-civita valid axis values for given ranks (see mdl())
+
+    Returns two lists of lists:
+    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
+    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
+    - Note that the second list may be empty if no elements are to be subtracted (i.e. no Levi-Civita)
+    """
 
     # Make two lists of lists in iso_f: One for addition and another for subtraction
     iso_f = []
 
-    iso_f_first = meso_iso_f(kron, [[0*i for i in range(n)]])
-    iso_f.append(iso_f_first)
+    # Call meso_iso_f: iso_f argument is a dummy recursion seed
+    iso_f.append(meso_iso_f_element(kron, [['dummy' for i in range(n)]]))
 
-    # Are there only Kronecker deltas to take care of? If so, then no subtraction
+    # Are there only Kronecker deltas to take care of? If so, then no subtraction: Make tuples of valid axis combs. and return
     if len(lc) == 0:
-        return [iso_f[0], []]
+
+        # Check if all ranks were covered
+        for i in iso_f[0]:
+             if 'dummy' in i:
+                 raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
+
+        return [[tuple(i) for i in iso_f[0]], []]
+
 
     # If not, proceed to do Levi-Civita handling
     iso_f.append(copy.deepcopy(iso_f[0]))
 
+    # FIXME: Test this to end of fn specifically: No big reason to suspect problems but I don't recall how this worked
     bperm = [[0], [1]]
-
     for i in range(len(bperm)):
 
         this_lc = []
         for j in range(len(bperm[i])):
             this_lc.append(lc[j][bperm[i][j]])
 
-        iso_f[sum(bperm[i]) % 2] = meso_iso_f(this_lc, iso_f[sum(bperm[i]) % 2])
+        iso_f[sum(bperm[i]) % 2] = meso_iso_f_element(this_lc, iso_f[sum(bperm[i]) % 2])
 
-    return iso_f
+    # Check if all ranks were covered
+    for i in iso_f[0]:
+        if 'dummy' in i:
+            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
 
-def meso_iso_f(dicts, iso_f):
+    for i in iso_f[1]:
+        if 'dummy' in i:
+            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
 
-        if len(dicts) > 0:
+    # Make tuples of valid axis combs. and return
+    return [[tuple(i) for i in iso_f[0]], [tuple(i) for i in iso_f[1]]]
 
-            new_iso_f = []
+def meso_iso_f_element(dicts, iso_f):
+    """
+    Helper function: Take list of Kronecker or Levi-Civita (resp. mdk() or mdl(), see
+    return structure there) dictionaries of rank : element pairs and return a set of valid collected axis combinations
 
-            for i in range(len(iso_f)):
+    Returns a list of lists: (Partially or fully covered (depending on completeness of dicts in covering ranks)) lists of
+    valid axis combinations
+    """
 
-                this_iso_f = copy.deepcopy(iso_f[i])
-                for j in range(len(dicts[0])):
-                    curr_iso_f = copy.deepcopy(this_iso_f)
-                    for k in dicts[0][j].keys():
+    # FIXME: This appears to fill ranks according to the dictionaries
+    if len(dicts) > 0:
 
-                        curr_iso_f[k] = dicts[0][j][k]
+        new_iso_f = []
 
-                    new_iso_f.append(copy.deepcopy(curr_iso_f))
+        for i in range(len(iso_f)):
 
-            iso_f = copy.deepcopy(new_iso_f)
-            result = meso_iso_f(dicts[1:len(dicts)], iso_f)
-            return result
+            this_iso_f = copy.deepcopy(iso_f[i])
+            for j in range(len(dicts[0])):
+                curr_iso_f = copy.deepcopy(this_iso_f)
+                for k in dicts[0][j].keys():
 
-        else:
+                    curr_iso_f[k] = dicts[0][j][k]
 
-            return iso_f
+                new_iso_f.append(copy.deepcopy(curr_iso_f))
 
+        iso_f = copy.deepcopy(new_iso_f)
+        result = meso_iso_f_element(dicts[1:len(dicts)], iso_f)
+        return result
 
-# Currently only 3D
-# Maybe necessary to rewrite for higher dimensions for e.g. quadrupole effects
+    else:
+
+        return iso_f
+
 def get_iso_f(n):
+    """
+    Get an f (or also called g when applied to microscopic part) term
+
+    n: Requested tensor rank
+
+    Returns: List of f elements (each of make_iso_f_element structure, see that routine for specification)
+    """
 
     if n == 2:
 
         return [
-            make_iso_f(2, [mdk(0, 1)], []),
+            make_iso_f_element(2, [mdk(0, 1)], []),
         ]
 
 
     elif n == 3:
 
         return [
-            make_iso_f(3, [], [mdl(0, 1, 2)]),
+            make_iso_f_element(3, [], [mdl(0, 1, 2)]),
         ]
 
     elif n == 4:
 
         return [
-            make_iso_f(4, [mdk(0, 1), mdk(2, 3)], []),
-            make_iso_f(4, [mdk(0, 2), mdk(1, 3)], []),
-            make_iso_f(4, [mdk(0, 3), mdk(1, 2)], [])
+            make_iso_f_element(4, [mdk(0, 1), mdk(2, 3)], []),
+            make_iso_f_element(4, [mdk(0, 2), mdk(1, 3)], []),
+            make_iso_f_element(4, [mdk(0, 3), mdk(1, 2)], [])
         ]
 
     elif n == 5:
 
         return [
-            make_iso_f(5, [mdk(3, 4)], [mdl(0, 1, 2)]),
-            make_iso_f(5, [mdk(2, 4)], [mdl(0, 1, 3)]),
-            make_iso_f(5, [mdk(2, 3)], [mdl(0, 1, 4)]),
-            make_iso_f(5, [mdk(1, 4)], [mdl(0, 2, 3)]),
-            make_iso_f(5, [mdk(1, 3)], [mdl(0, 2, 4)]),
-            make_iso_f(5, [mdk(1, 2)], [mdl(0, 3, 4)])
+            make_iso_f_element(5, [mdk(3, 4)], [mdl(0, 1, 2)]),
+            make_iso_f_element(5, [mdk(2, 4)], [mdl(0, 1, 3)]),
+            make_iso_f_element(5, [mdk(2, 3)], [mdl(0, 1, 4)]),
+            make_iso_f_element(5, [mdk(1, 4)], [mdl(0, 2, 3)]),
+            make_iso_f_element(5, [mdk(1, 3)], [mdl(0, 2, 4)]),
+            make_iso_f_element(5, [mdk(1, 2)], [mdl(0, 3, 4)])
         ]
 
     elif n == 6:
 
         return [
-            make_iso_f(6, [mdk(0, 1), mdk(2, 3), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(0, 1), mdk(2, 4), mdk(3, 5)], []),
-            make_iso_f(6, [mdk(0, 1), mdk(2, 5), mdk(3, 4)], []),
-            make_iso_f(6, [mdk(0, 2), mdk(1, 3), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(0, 2), mdk(1, 4), mdk(3, 5)], []),
-            make_iso_f(6, [mdk(0, 2), mdk(1, 5), mdk(3, 4)], []),
-            make_iso_f(6, [mdk(0, 3), mdk(1, 2), mdk(4, 5)], []),
-            make_iso_f(6, [mdk(0, 3), mdk(1, 4), mdk(2, 5)], []),
-            make_iso_f(6, [mdk(0, 3), mdk(1, 5), mdk(2, 4)], []),
-            make_iso_f(6, [mdk(0, 4), mdk(1, 2), mdk(3, 5)], []),
-            make_iso_f(6, [mdk(0, 4), mdk(1, 3), mdk(2, 5)], []),
-            make_iso_f(6, [mdk(0, 4), mdk(1, 5), mdk(2, 3)], []),
-            make_iso_f(6, [mdk(0, 5), mdk(1, 2), mdk(3, 4)], []),
-            make_iso_f(6, [mdk(0, 5), mdk(1, 3), mdk(2, 4)], []),
-            make_iso_f(6, [mdk(0, 5), mdk(1, 4), mdk(2, 3)], [])
+            make_iso_f_element(6, [mdk(0, 1), mdk(2, 3), mdk(4, 5)], []),
+            make_iso_f_element(6, [mdk(0, 1), mdk(2, 4), mdk(3, 5)], []),
+            make_iso_f_element(6, [mdk(0, 1), mdk(2, 5), mdk(3, 4)], []),
+            make_iso_f_element(6, [mdk(0, 2), mdk(1, 3), mdk(4, 5)], []),
+            make_iso_f_element(6, [mdk(0, 2), mdk(1, 4), mdk(3, 5)], []),
+            make_iso_f_element(6, [mdk(0, 2), mdk(1, 5), mdk(3, 4)], []),
+            make_iso_f_element(6, [mdk(0, 3), mdk(1, 2), mdk(4, 5)], []),
+            make_iso_f_element(6, [mdk(0, 3), mdk(1, 4), mdk(2, 5)], []),
+            make_iso_f_element(6, [mdk(0, 3), mdk(1, 5), mdk(2, 4)], []),
+            make_iso_f_element(6, [mdk(0, 4), mdk(1, 2), mdk(3, 5)], []),
+            make_iso_f_element(6, [mdk(0, 4), mdk(1, 3), mdk(2, 5)], []),
+            make_iso_f_element(6, [mdk(0, 4), mdk(1, 5), mdk(2, 3)], []),
+            make_iso_f_element(6, [mdk(0, 5), mdk(1, 2), mdk(3, 4)], []),
+            make_iso_f_element(6, [mdk(0, 5), mdk(1, 3), mdk(2, 4)], []),
+            make_iso_f_element(6, [mdk(0, 5), mdk(1, 4), mdk(2, 3)], [])
         ]
 
     else:
@@ -285,17 +318,21 @@ def get_iso_f(n):
 
 
 def get_iso_mat(n):
+    """
+    Get the matrix M used in orientational averaging between macroscopic and microscopic vectors (here tabulated)
+
+    n: Orientational average rank parameter
+    """
 
     if n == 2:
         #FIXME: Factor 1/3? NOW UPD
 
-        return 1.0/3.0
+        return np.array([[1.0]]) / 3.0
 
     elif n == 3:
 
         # FIXME: Factor 1/6? NOW UPD
-
-        return 1.0/6.0
+        return np.array([[1.0]]) / 6.0
 
     elif n == 4:
 
@@ -340,87 +377,6 @@ def get_iso_mat(n):
 
         raise ValueError('Unsupported get_iso_mat order:', n)
 
-
-# Author: Magnus Ringholm
-# this used to be in a separate file - mtRspfuncs.py
-
-class mtRspfuncs:
-
-# Class containing information and routine for fetching value of derivatives used in microscopic terms
-
-    def __init__(self, operators, modes):
-
-# The lists 'operators' and 'modes_rsp' contain lists specifying the operators and normal
-# modes involved in the differentiation
-# Let's say the operators are mu_alpha, mu_beta, and mu_delta diff. w.r.t. modes a (twice)
-# and b (once). This is d**3beta / (da**2 * db). This would give
-# operators = [0, 1, 3] and modes = [1, 0]
-# UPDATE 2014: Identify by name, not number (example above would be ['a', 'b', 'd'] and ['b', 'a']
-# Also: allow for several quantities, so each of operators and modes are lists of lists
-# FURTHER UPDATE: Go back to identify by number (do mapping from identifiers used in sympy)
-
-        self.operators = operators
-        self.modes = modes
-        self.ind_cache = {}
-        self.value_cache = {}
-        self.cachesize = 0
-
-    def val(self, d, tensors, mode_indices, pl, iso_mat, iso_f):
-
-
-        for i in range(self.cachesize):
-            if self.ind_cache[i] == mode_indices:
-                return self.value_cache[i]
-
-        # Not sure about proper dimensions, original assignment below commented out, use len(iso_f) instead for now
-        #P = np.zeros(sum([len(self.operators[i]) for i in range(len(self.operators))]))
-        P = np.zeros(len(pl))
-
-        for i in range(len(iso_f)):
-
-            # First add
-            for j in range(len(iso_f[i][0])):
-
-                new_val = 1.0
-
-                for k in range(len(self.operators)):
-
-                    if not(self.operators[k][0] == 'z'):
-                        this_ind = tuple([iso_f[i][0][j][m] for m in [alphanum[p] for p in self.operators[k]]])
-
-                    else:
-                        this_ind = (0,)
-
-                    new_val = new_val * tensors.tensor_value(d, self.operators[k], this_ind, [mode_indices[m] for m in self.modes[k]])
-
-                P[i] += new_val
-
-            # Then subtract
-            for j in range(len(iso_f[i][1])):
-
-                new_val = 1.0
-
-                for k in range(len(self.operators)):
-
-                    if not(self.operators[k][0] == 'z'):
-                        this_ind = tuple([iso_f[i][1][j][m] for m in [alphanum[p] for p in self.operators[k]]])
-
-                    else:
-                        this_ind = (0,)
-
-                    new_val = new_val * tensors.tensor_value(d, self.operators[k], this_ind, [mode_indices[m] for m in self.modes[k]])
-
-                P[i] -= new_val
-
-        ans = np.dot(pl, np.dot(iso_mat, P))
-
-        self.ind_cache[self.cachesize] = copy.deepcopy(mode_indices)
-        self.value_cache[self.cachesize] = ans
-        self.cachesize += 1
-
-        return ans
-
-
 def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
     """
     Now is set for the EVV experiment and for ZZZZ polarization.
@@ -447,4 +403,83 @@ def getPolarizationAveragingExpression(num_pulses: int, polarization: str):
     if num_pulses==4:
         if polarization=="ZZZZ":
             return get_AlphaBetaGammaDelta_indices(num_f=num_pulses), 1./15
+
+def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
+    """
+    Get the arrays of indices to be summed and a prefactor of the averaging expression
+    Functioning for non-electric dipole polarization properties not investigated/supported
+
+    rank: Integer: The rank of the orientational average. For electric dipole polarization properties, the rank is
+    certainly equal to the number of ranks underlying the laser polarization term
+
+    laser_pol: The "laser polarization" term: A term of the form A * f from JCP 67, 5026. Concerns the "macroscopic"
+    part of the averaging and is an experiment-specific (pulse-set-up-specific) quantity.
+
+    The purpose of this routine is to determine which elements of a "microscopic" tensor w.r.t "molecular axes" must
+    be combined (and with which coefficients) to form the appropriate orientational average combination under the extant
+    polarization setup of the experiement; i.e., in the contraction A * f * M * g * P (see JCP 67, 5026), form the
+    product A * f * M * g expressed a linear combination of elements of rank N tensor P over Cartesian axis elements.
+    A routine possessing P can then assemble the finished average by evaluating this linear combination.
+
+    Returns: A dictionary {Component tuple 1: coefficient, Component tuple 2: coefficient, ...}
+    """
+
+    # 1: Fails:
+    # Fail if the order is > 6
+    if rank > 6:
+        raise ValueError('Averaging ranks > 6 not supported')
+    elif rank < 2:
+        raise ValueError('Averaging ranks < 2 not valid')
+
+    # 2: Get M, g (f)
+
+    iso_mat_m = get_iso_mat(rank)
+    iso_vec_f = get_iso_f(rank)
+
+    print('Laser polarization term:', laser_pol)
+    print('M:', iso_mat_m)
+    print('f:', iso_vec_f)
+
+    # 3. Form the linear combination recipe dot(A * f, M * g)
+
+    linear_combination = {}
+
+    for i in range(len(iso_vec_f)):
+        for j in range(len(iso_vec_f)):
+
+            # Elements for addition
+            for k in iso_vec_f[j][0]:
+
+                # If already registered, update coefficient
+                if k in linear_combination:
+                    linear_combination[k] += laser_pol[i] * iso_mat_m[i, j]
+
+                # Otherwise make new entry
+                else:
+                    linear_combination[k] = laser_pol[i] * iso_mat_m[i, j]
+
+            # Elements for subtraction
+            for k in iso_vec_f[j][1]:
+
+                # If already registered, update coefficient
+                if k in linear_combination:
+                    linear_combination[k] -= laser_pol[i] * iso_mat_m[i, j]
+
+                # Otherwise make new entry
+                else:
+                    linear_combination[k] = -1.0 * laser_pol[i] * iso_mat_m[i, j]
+
+    print('Linear combination result:', linear_combination)
+
+    # Prune zero elements
+    marked_for_deletion = []
+
+    for i in linear_combination:
+        if linear_combination[i] == 0.0:
+            marked_for_deletion.append(i)
+
+    for i in marked_for_deletion:
+        del linear_combination[i]
+
+    return linear_combination
 

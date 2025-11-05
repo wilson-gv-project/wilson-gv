@@ -315,6 +315,7 @@ class EvaluationDataAndConfigs:
     avrg_tensors: dict = None
     avrg_expr_tensor_mapping: dict = None
     vibenedenoms_tensors: dict = None
+    pulse_polarization_vector: list = None
 
 
 @dataclass(frozen=True)

@@ -20,7 +20,7 @@ def evv_experiment() -> ws_experiment.abstractions.VibExperiment:
     pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
-    pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
     field_a = ws.experiment.abstractions.ElectricField(pulses)
     order = len(pulses)

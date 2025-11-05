@@ -89,6 +89,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: Eva
     for avrg_tensor in need_to_precalc['avrg_tensors']:
         data.avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
                                                                         polarization=data_and_configs.polarization,
+                                                                        #pulse_polarization_vector=data_and_configs.pulse_polarization_vector,
                                                                         number_of_nmodes=data_and_configs.number_of_nmodes,
                                                                         props_data=data_and_configs.props_data)   
     for ve_denom in need_to_precalc['vibenedenoms_tensors']:

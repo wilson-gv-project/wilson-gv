@@ -214,7 +214,7 @@ class ElectricField:
     be specified, the use of pulses in ElectricField must have each pulse be assigned an ordinal integer ID starting from 1
     """
 
-    pulses: List[EmPulse]
+    pulses: tuple[EmPulse]
 
     def __post_init__(self):
 
@@ -728,12 +728,17 @@ class VibExperiment:
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
 
-        self.all_polarizations = []
+        # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
+        # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
+        all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
 
-        # Here I establish a convention: Macroscopic ranks are with respect to pulse time ordering EXCEPT detected field which is first
+        # Could probably be done more elegantly but works
+        for i in range(len(self.field.pulses)):
+            for j in self.field.pulses:
+                if j.id == i + 1:
+                    all_polarizations.append(copy.deepcopy(j.pol))
 
-        for i in self.field.pulses:
-            self.all_polarizations.append(copy.deepcopy(i.pol))
+        self.all_polarizations = all_polarizations
 
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 
