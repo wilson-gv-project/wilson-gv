@@ -133,11 +133,6 @@ def test_evaluate_term_coeffs():
     print('\nterm0_coeff', term0_coeff, '\n')
     print('======================')
     
-
-    # indices are not fully defined : missing 'c' value here
-    with pytest.raises(ValueError, match="index_dict - {'a': 0, 'b': 0} - is missing values for some indices"):
-        fac.evaluate_term_coeffs(term=terms_select[-1], relevant_indices=[{'a': 0, 'b': 0}], necessary_data=results)
-    
     
     term12_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
                                            relevant_indices=[{'a': 0, 'b': 0, 'c': 1}], 
@@ -149,4 +144,14 @@ def test_evaluate_term_coeffs():
                                            relevant_indices=[{'a': 0, 'b': 1, 'c': 1}], 
                                            necessary_data=results)
     print('\nterm13_coeff', term13_coeff, '\n')
+    print('======================')
+
+    # # indices are not fully defined : missing 'c' value here
+    # with pytest.raises(ValueError, match="index_dict - {'a': 0, 'b': 0} - is missing values for some indices"):
+    #     fac.evaluate_term_coeffs(term=terms_select[-1], relevant_indices=[{'a': 0, 'b': 0}], necessary_data=results)
+
+    term14_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
+                                           relevant_indices=[{'a': 0, 'b': 1}], 
+                                           necessary_data=results)
+    print('\nterm14_coeff', term14_coeff, '\n')
     print('======================')

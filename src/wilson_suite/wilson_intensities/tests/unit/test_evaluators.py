@@ -1,4 +1,4 @@
-from ...amplitudes.evaluators import terms_evaluator_general
+from ...amplitudes.evaluators import terms_evaluator_general, terms_evaluator_general_compilation
 from ....wilson_main import abstractions as wm_abst
 import numpy as np
 
@@ -21,17 +21,28 @@ def test_terms_evaluator_general():
 
     # vib_ana_setup needs to have vibstates
     vibana = wm_abst.VibAnaSetup()
-    vibana.setStates((wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
-                      wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
-                      wm_abst.VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True),
-                      wm_abst.VibState(harm_quanta_coeffs={(0, 1, 1):1.}, state_label='0,1,1', energy=3318., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(0, 0):1.}, state_label='0,0', energy=1864., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(0, 1):1.}, state_label='0,1', energy=2264., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(1, 1):1.}, state_label='1,1', energy=2364., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(1, 2):1.}, state_label='1,2', energy=3704., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(2, 2):1.}, state_label='2,2', energy=7103., harmonic_WF=False),
-                      wm_abst.VibState(harm_quanta_coeffs={(0, 2):1.}, state_label='0,2', energy=2114., harmonic_WF=False),
-                      ))
+    vibana.setStates((
+                        wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
+                        wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
+                        wm_abst.VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=1234., harmonic_WF=True),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 0):1.}, state_label='0,0', energy=1864., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 1):1.}, state_label='0,1', energy=2255., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(1, 1):1.}, state_label='1,1', energy=2368., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(1, 2):1.}, state_label='1,2', energy=2360., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(2, 2):1.}, state_label='2,2', energy=2362., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 2):1.}, state_label='0,2', energy=2274., harmonic_WF=False),
+                        # Adding 3-quanta states:
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 0, 0):1.}, state_label='0,0,0', energy=2685., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(1, 1, 1):1.}, state_label='1,1,1', energy=3581., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(2, 2, 2):1.}, state_label='2,2,2', energy=3690., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 1, 2):1.}, state_label='0,1,2', energy=3742., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 1, 1):1.}, state_label='0,1,1', energy=3318., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 2, 2):1.}, state_label='0,2,2', energy=3680., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 0, 1):1.}, state_label='0,0,1', energy=3155., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(0, 0, 2):1.}, state_label='0,0,2', energy=3498., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(1, 1, 2):1.}, state_label='1,1,2', energy=3594., harmonic_WF=False),
+                        wm_abst.VibState(harm_quanta_coeffs={(1, 2, 2):1.}, state_label='1,2,2', energy=3642., harmonic_WF=False),
+                    ))
     system = wm_abst.MolecularSystem(name='mock', natoms=3, linear=False)
 
     props_data = generate_props_data_Nmodes(system.Nnmodes)
@@ -66,7 +77,7 @@ def test_terms_evaluator_general_degen_states():
     print()
     from wilson_suite.fixtures import get_terms_from_json
     terms_fuller_flat = get_terms_from_json()
-    
+
     t_inds = [0, 1,-1, -2, -3]
     terms_select: list['wm_abst.VibPerturbedTerm'] = [terms_fuller_flat[tID] for tID in t_inds]
 
@@ -122,3 +133,4 @@ def test_terms_evaluator_general_degen_states():
                             vib_ana_setup=vibana, 
                             derived_terms=terms_select, 
                             props=props)
+    

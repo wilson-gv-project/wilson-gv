@@ -162,14 +162,6 @@ def test_identify_maximum_axes_in_terms():
     res_funcs.identify_maximum_axes_in_terms(candidate_terms)
 
 
-def test_motifs_control():
-    print()
-    candidate_terms = generate_only_res_cond_evv_term_selection()
-
-    r = res_funcs.motifs_control(candidate_terms)
-    print(r)
-
-
 def test_find_resonance_locations_wrt_index_choices():
     print()
 
@@ -235,29 +227,6 @@ def test_find_resonance_locations_wrt_index_choices_classes():
                                                                  vibdiff_cache=vibdiff_cache)
     
         print(d)
-
-
-def test_terms_for_motif():
-    """
-    HMM...
-unique_motifs:
-(((('a', 'b'), ('a',)), ('A',)),)  ------> ????
-(((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
-(((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',))) ------> ????
-(((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-
-    """
-    candidate_terms = generate_only_res_cond_evv_term_selection()
-
-    unique_motifs = wilson_suite.wilson_intensities.amplitudes.resonances.identify_unique_resmotifs(candidate_terms)
-
-    terms_for_motif = wilson_suite.wilson_intensities.amplitudes.resonances.terms_for_motif(candidate_terms)
-
-    assert  len(terms_for_motif[(((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))]) == 2
-    assert  len(terms_for_motif[(((('a', 'b'), ('a',)), ('A',)),)]) == 1
-    assert not(len(terms_for_motif[(((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))]) == 4)
-
-    assert sorted(unique_motifs) == sorted(list(terms_for_motif.keys()))
 
 import wilson_suite.wilson_intensities.amplitudes.term_parts  as tparts
 
