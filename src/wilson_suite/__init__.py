@@ -1,4 +1,4 @@
-# from . import fixtures
+from . import fixtures
 # from . import parsing
 
 # from . import molprops

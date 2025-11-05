@@ -125,8 +125,6 @@ def get_pol_laser(pol):
     A = get_pol_tensor(A, pol)
     A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
 
-    print('A', A)
-
     f = get_iso_f(len(pol))
 
     pl = np.zeros((len(f)), dtype=complex)
@@ -182,7 +180,6 @@ def make_iso_f(n, kron, lc):
 
     # Are there only Kronecker deltas to take care of? If so, then no subtraction
     if len(lc) == 0:
-        print('iso f', iso_f)
         return [iso_f[0], []]
 
     # If not, proceed to do Levi-Civita handling
@@ -197,8 +194,6 @@ def make_iso_f(n, kron, lc):
             this_lc.append(lc[j][bperm[i][j]])
 
         iso_f[sum(bperm[i]) % 2] = meso_iso_f(this_lc, iso_f[sum(bperm[i]) % 2])
-
-    print('iso f', iso_f)
 
     return iso_f
 
