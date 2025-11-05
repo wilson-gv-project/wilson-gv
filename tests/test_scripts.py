@@ -6,7 +6,18 @@ from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 import numpy as np
 from wilson_suite.wilson_utils.printing import separatorprint
 
-def test_evv_tester_dataclasses():
+def test_evv_tester_prep_only():
+    """
+    simple run with no pickling
+    """
+    import evv_tester as evv_tester
+    evv_tester.TO_PICKLES = []
+    evv_tester.PREP_ONLY = True
+    wilsim = evv_tester.run()
+
+    assert hasattr(wilsim, 'spec')
+
+def test_evv_tester_full():
     """
     simple run with no pickling
     """
