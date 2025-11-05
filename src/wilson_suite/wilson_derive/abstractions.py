@@ -1247,17 +1247,27 @@ class VibContribTerm:
 
         self.freqdiff.append(new_term)
 
-    def dressWithPulseInteractions(self, int_seq: list[dict]):
+    def dressWithPulseInteractions(self, int_seq: tuple[dict]):
         """
-        Substitute interaction dummy indices in my resonance conditions with an earlier found specific pulse interaction sequence
+        Substitute interaction dummy indices in my resonance conditions
+        and in my polarization property axes with those of a specific pulse interaction sequence
 
-        int_seq: list of dictionaries [{interaction #1 pulse label: sign}, {int. #2 pulse label: sign}, ...]
+        int_seq: tuple of dictionaries ({interaction #1 pulse label: sign}, {int. #2 pulse label: sign}, ...)
         """
+        # FIXME: Must get tests as part of averaging work
 
-        # This is confus, must be a better way to write this
+        int_ids = [list(i.keys())[0] for i in int_seq]
+
+        # Dress perturbing frequencies of resonance conditions
         for i in self.res:
             for j in range(len(i.pf)):
-                i.pf[j] = list(int_seq[j].keys())[0] * int_seq[j][list(int_seq[j].keys())[0]]
+                i.pf[j] = int_ids[i.pf[j] - 1] * int_seq[j][int_ids[i.pf[j]  - 1]]
+
+        # Dress operators of polarization properties
+        for i in self.ints:
+            for j in i.prop.ops:
+                if not j.o == 0:
+                    j.o = int_ids[j.o - 1]
 
 
     def allUVCancels(self, cfs_uv: dict, tol: float=0.0) -> bool:

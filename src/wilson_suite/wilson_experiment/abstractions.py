@@ -210,11 +210,24 @@ class ElectricField:
     Class to represent an electromagnetic field consisting of one or more pulses
     
     ----
-    pulses: List of EmPulse instances: The pulses making up the field
+    pulses: List of EmPulse instances: The pulses making up the field. While EmPulse itself does not require an ID to
+    be specified, the use of pulses in ElectricField must have each pulse be assigned an ordinal integer ID starting from 1
     """
-    # FIXME: Consider: Pulses as dictionary with IDs?
+
     pulses: List[EmPulse]
 
+    def __post_init__(self):
+
+        pulse_id_target = [i + 1 for i in range(len(self.pulses))]
+        for i in self.pulses:
+            if not i.id in pulse_id_target:
+                raise ValueError('Pulse ID', i.id, ' of field not found in ordinal list')
+            else:
+                pulse_id_target.remove(i.id)
+
+        # This condition should never be met but just to be safe
+        if not pulse_id_target == []:
+            raise AssertionError('Collection of pulse IDs do not correspond to ordinal list')
 
 def get_carrier_freqs_uv(pulses) -> dict:
     """
@@ -715,7 +728,9 @@ class VibExperiment:
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
 
-        self.all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
+        self.all_polarizations = []
+
+        # Here I establish a convention: Macroscopic ranks are with respect to pulse time ordering EXCEPT detected field which is first
 
         for i in self.field.pulses:
             self.all_polarizations.append(copy.deepcopy(i.pol))
@@ -788,7 +803,7 @@ class VibExperiment:
             # Termination condition
             # If this interaction sequence satisfied the wavevector filter, append it
             if rem_wv == {}:
-                res.append(curr_int)
+                res.append(tuple(curr_int))
 
             # Recursion
             else:

@@ -22,7 +22,6 @@ def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=
     mech_anharm_limit: integer: Limitation on mechanical order of anharmonicity (default = 1)
     """
 
-
     op_omega = abst.QOperator(wu_common.op_omega_label_int)
     ops_pert = tuple([abst.QOperator(wu_common.op_labels_int[i]) for i in range(experiment.order)])
 
