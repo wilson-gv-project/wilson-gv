@@ -5,8 +5,8 @@ RESONANCES in VibPerturbedTerm
 import numpy as np
 from wilson_suite.wilson_analysis.render.render import get_axes_in_resmotif
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
-from wilson_suite.wilson_intensities.amplitudes.vibene_differences import get_vibdiff_motif, VibDiff, VibDiffCache
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif, GeometricObject
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiff, VibDiffCache
 import copy
 
 from wilson_suite.wilson_intensities.amplitudes.utils import initialize_resonance_dict
@@ -104,7 +104,7 @@ def get_RHS_motif(motif: ResonanceMotif,
 def solve_LSE_motif(motif: ResonanceMotif,
                     parameters: ParameterSet, vibdata: VibStatesData,
                     vibdiff_cache: VibDiffCache,
-                    unit: str='Eh'):
+                    unit: str='Eh') -> GeometricObject:
     """
     solving a linear system of equations
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
@@ -126,7 +126,7 @@ def solve_LSE_motif(motif: ResonanceMotif,
         from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
         num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
 
-        return {num_to_ax[i]: float(val) for i, val in enumerate(solution)}
+        return GeometricObject({num_to_ax[i]: float(val) for i, val in enumerate(solution)})
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
 
@@ -159,17 +159,16 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
-    # print('index_choices', index_choices)
 
     for idxs in index_choices:
-        # print('idxs', idxs)
         parameters = ParameterSet(idxs)
         location_d = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
-        location_key = tuple(location_d.items())
+        # print('\nlocation_d', location_d) # (('A', 3130.0), ('B', 2410.0))
+        print('location_d.coordinates', location_d.coordinates)
+        location_key = location_d.coordinates
 
         if spec_window is None or is_location_in_window(location_d, window=spec_window, margin={}):
             results[motif].setdefault(location_key, []).append(idxs)
-    # print('\n---------- find_resonance_locations_wrt_index_choices', results)
     return results
 
 
@@ -203,11 +202,11 @@ def get_indlabels_in_resmotif(motif: tuple):
     return set(label for labels in indlabels_list for label in labels)
 
 
-def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
-    """
-    """
-    return set(make_resonance_motif(term.res) for term in list_of_terms)
-def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
+# def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
+#     """
+#     """
+#     return set(make_resonance_motif(term.res) for term in list_of_terms)
+def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[ResonanceMotif]:
     """
     """
     return set(ResonanceMotif(term.res) for term in list_of_terms)
@@ -217,34 +216,8 @@ def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):
     """
     """
     unique = identify_unique_resmotifs(list_of_terms)
-    axes: list[tuple[str]] = [cond[1] for motif in list(unique) for cond in motif]
+    axes: list[tuple[str]] = [cond.pf for motif in unique for cond in motif]
 
     axes_in_these_terms = set([ax_tuple[0].strip('-') for ax_tuple in axes])
     return len(axes_in_these_terms)
 
-
-def motifs_control(list_of_terms: list['VibPerturbedTerm']):
-    """
-    what axes are in the motifs and give info and suggestions
-    """
-    total_num_axes = identify_maximum_axes_in_terms(list_of_terms)
-    unique = identify_unique_resmotifs(list_of_terms)
-    axes_per_motif = {m: get_axes_in_resmotif(motif=m) for m in unique}
-
-    return axes_per_motif, total_num_axes
-
-
-def terms_for_motif(terms: list['VibPerturbedTerm']) -> dict[tuple, list]:
-    """
-    """
-    terms_for_motif: dict[tuple, list] = {}
-
-    for t in terms:
-        this_term_motif = make_resonance_motif(t.res)
-
-        if this_term_motif in terms_for_motif:
-            terms_for_motif[this_term_motif].append(copy.deepcopy(t))
-        else:
-            terms_for_motif[this_term_motif] = [copy.deepcopy(t)]
-
-    return terms_for_motif
