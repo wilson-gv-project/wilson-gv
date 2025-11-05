@@ -49,14 +49,11 @@ def SIMPLE_REPRESENTATIVE_FIXTURE_OR_SMTH():
     # TODO for MR
     import wilson_suite as ws
 
-    pulse_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=50.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
-                                                pol=[0.0, 0.0, 1.0], id=1)
-    pulse_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=58.0, cf=0.0, cf_uv=0.00, wv=[0.0, 0.0, 1.0],
-                                                    pol=[0.0, 0.0, 1.0], id=2)
-    pulse_3 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc=110.0, cf=0.0, cf_uv=0.08, wv=[0.0, 0.0, 1.0],
-                                                    pol=[0.0, 0.0, 1.0], id=3)
+    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='ideal', maxstr=1.0e-5, tc = 50.0, cf=0.00, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+    pulse_ir_2 = ws.experiment.abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
-    pulses = [pulse_1, pulse_2, pulse_3]
+    pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
 
     field_a = ws.experiment.abstractions.ElectricField(pulses)
     order = len(pulses)
