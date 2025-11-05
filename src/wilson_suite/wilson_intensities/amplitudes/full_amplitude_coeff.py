@@ -5,6 +5,7 @@ import wilson_suite.wilson_intensities.amplitudes.averaged_props as avrgprops
 import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 import numpy as np
+import copy
 
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, ResonanceMotif, EvaluationDataAndConfigs
 if TYPE_CHECKING:
@@ -72,7 +73,6 @@ def identify_precalc_unique_coeff_parts(terms: list['VibPerturbedTerm']) -> dict
             'avrg_expr_tensor_mapping': avrgprops.make_unique_avrg_tensors_mapping(avrg_expressions),
             'vibenedenoms_tensors': vediff.identify_vibenedenoms(terms),
             'vibdiff_motifs': vediff.identify_unique_vibdiff_motifs(terms)
-            # 'resonances_motifs': identify_unique_resmotifs(terms)
             }
 
 def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: EvaluationDataAndConfigs):
@@ -80,11 +80,6 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: Eva
         data = {'avrg_tensors': {}}
 
     """
-    # data = {'avrg_tensors': {}, 
-    #         'avrg_expr_tensor_mapping': need_to_precalc['avrg_expr_tensor_mapping'],
-    #         'vibenedenoms_tensors': {},
-    #         'props_data': data_and_configs.props_data}
-    import copy
 
     data = copy.deepcopy(data_and_configs)
     data.avrg_tensors = {}
@@ -92,20 +87,13 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: Eva
     data.vibenedenoms_tensors = {}
 
     for avrg_tensor in need_to_precalc['avrg_tensors']:
-        # data['avrg_tensors'][avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
-        #                                                                     polarization=data_and_configs.polarization,
-        #                                                                     number_of_nmodes=data_and_configs.number_of_nmodes,
-        #                                                                     props_data=data_and_configs.props_data)
         data.avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
                                                                         polarization=data_and_configs.polarization,
                                                                         number_of_nmodes=data_and_configs.number_of_nmodes,
                                                                         props_data=data_and_configs.props_data)   
     for ve_denom in need_to_precalc['vibenedenoms_tensors']:
-        # data['vibenedenoms_tensors'][ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
-        #                                                                              vibstates_data=data_and_configs.vibstates_data)
         data.vibenedenoms_tensors[ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
                                                                                     vibstates_data=data_and_configs.vibstates_data)
-    # data['vibdiff_cache'] = vediff.VibDiffCache()
     data.vibdiff_cache = vediff.VibDiffCache()
     return data
 
@@ -113,7 +101,6 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: Eva
 def evaluate_term_coeffs(term: 'VibPerturbedTerm', 
                          relevant_indices: list[dict], 
                          necessary_data: EvaluationDataAndConfigs, 
-                        #  necessary_data: dict, 
                          zero_tol: float = 1e-18) -> dict[ParameterSet, float]:
     """
     safety function to check relevant_indices?
@@ -136,8 +123,6 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
     avrg_expr = avrgprops.PropsCollection(props=term.props).get_averaged_props().sort()
     non_avrg_expr = avrgprops.PropsCollection(props=term.props).get_non_averaged_props()
 
-    # print('avrg_expr', avrg_expr)
-    # print('necessary_data.avrg_expr_tensor_mapping.keys()', necessary_data.avrg_expr_tensor_mapping.keys())
     avrg_tensor_expr = necessary_data.avrg_expr_tensor_mapping[avrg_expr]
     avrg_tensor = necessary_data.avrg_tensors[avrg_tensor_expr]
     
@@ -148,20 +133,12 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
 
     idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
     term_idx_all = sorted(idx_summ + idx_nonsumm)
-    # print('term_idx_all', term_idx_all)
-    print('\nrelevant_indices', relevant_indices, '\n')
-    # print('idx_summ, idx_nonsumm', idx_summ, idx_nonsumm)
 
     for index_dict in relevant_indices:
-        print('[index in index_dict for index in term_idx_all]', [index in index_dict for index in term_idx_all])
-        # print('index_dict', type(index_dict))
-        print('index_dict', index_dict)
-        # print('term_idx_all', term_idx_all)
 
         if not all([index in index_dict for index in term_idx_all]):
             # index_dict {'a': 0, 'b': 0}
             to_summ_over = [index for index in term_idx_all if index not in index_dict]
-            # print('to_summ', to_summ_over)
             # to_summ ['c']
             n_modes = necessary_data.number_of_nmodes
             nm_idxs = list(range(n_modes))
@@ -172,20 +149,17 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
             
             # Generate all possible combinations for missing indices
             value_combinations = itertools.product(nm_idxs, repeat=len(to_summ_over))
-            # print('value_combinations', list(value_combinations))
 
             for values in value_combinations:
                 new_dict = index_dict.copy()  # Create a copy of original dict
                 for idx, summ_index in enumerate(to_summ_over):
                     new_dict[summ_index] = values[idx]
                 inds_w_summ_over.append(new_dict)
-            # print('inds_w_summ_over', inds_w_summ_over)
+
             computed = evaluate_term_coeffs(term=term, 
                                     relevant_indices=inds_w_summ_over, 
                                     necessary_data=necessary_data)
-            # print('computed', computed)
             result = sum(list(computed.values()))
-            # print(result)
             results[ParameterSet(index_dict)] = result
             continue
             # raise ValueError(f'index_dict - {index_dict} - is missing values for some indices')
