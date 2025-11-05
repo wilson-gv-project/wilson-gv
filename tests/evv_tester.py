@@ -46,7 +46,7 @@ def run():
     pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
-    pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
     field_a = ws.experiment.abstractions.ElectricField(pulses)
     order = len(pulses)
@@ -244,7 +244,7 @@ def run():
     if not PREP_ONLY:
         from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
         logger.info('  >>> Going to evaluate now...\n')
-        sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+        sim.evaluateSpectrum(evaluator=terms_evaluator)
         intensities_spec = np.abs(sim.spec)**2
         logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 

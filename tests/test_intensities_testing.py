@@ -77,7 +77,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(1.))**2
 
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
     
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -153,7 +153,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(Gamma))**2
 
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -280,7 +280,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -405,7 +405,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     
 
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator, do_diagn=True)
+    sim.evaluateSpectrum(evaluator=terms_evaluator, do_diagn=True)
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print(sim.diagn)
     print('ratio', reference/sim.spec[0,0])
@@ -537,7 +537,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -619,7 +619,7 @@ def test_amplitude_mock_offresonance_one_elterm():
     from functools import partial
     # eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
     eval_selected = partial(terms_evaluator, collect_all=True)
-    sim.evaluateAsResponseFunction(evaluator=eval_selected)
+    sim.evaluateSpectrum(evaluator=eval_selected)
     # sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
     print(sim.diagn)
     print(f'reference {reference:.5e}')
@@ -765,7 +765,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
     from functools import partial
     eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
-    sim.evaluateAsResponseFunction(evaluator=eval_selected)
+    sim.evaluateSpectrum(evaluator=eval_selected)
 
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print('ratio', reference/sim.spec[0,0])

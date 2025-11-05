@@ -291,7 +291,7 @@ import numpy as np
 np.set_printoptions(precision=4)
 
 from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+sim.evaluateSpectrum(evaluator=terms_evaluator)
 intensities_spec = np.abs(sim.spec) ** 2
 
 hist, bin_edges = np.histogram(intensities_spec, bins=10)
