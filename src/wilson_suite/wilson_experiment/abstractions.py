@@ -535,6 +535,8 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict:
             new_dress_v_a = {}
 
             for k in range(len(j)):
+                if k > 2:
+                    raise ValueError('Current version enables maximum 3 axes')
                 new_dress_v_a[cap_alpha_labels[k]] = j[k]
 
             dressed_valid_axes.append(copy.deepcopy(new_dress_v_a))
@@ -583,6 +585,9 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict:
 
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
+        if i > 2:
+            raise ValueError('Current version enables maximum 3 axes')
+        
         # Dress canonical indepentent variables with axis labels
         canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
 

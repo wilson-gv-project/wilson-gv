@@ -26,6 +26,9 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
         running_vars = []
 
         for j in range(len(i)):
+            if j > 2:
+                raise ValueError('Current version enables maximum 3 axes')
+            
             if not i[j] == 0:
 
                 curr_ax = axes[cap_alpha_labels[j]]
@@ -51,6 +54,9 @@ def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
 
             # Assemble ID tuple in axis variables
             for j in range(len(i)):
+                if j > 2:
+                    raise ValueError('Current version enables maximum 3 axes')
+                
                 id_tuple_in_axis_vars[cap_alpha_labels[j]] = i[j]
 
             return id_tuple_in_axis_vars
