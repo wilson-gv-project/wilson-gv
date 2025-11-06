@@ -253,10 +253,17 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
         motif_res_loc, terms_for_motifs, term_coeffs_per_index
     )
     
-    distance_thresholds = {}
-    window_type = ...
-    linkage = ...
+    print('\nfeatures_to_draw[list(features_to_draw.keys())[0]]', features_to_draw[list(features_to_draw.keys())[0]])
+    print('\nfeatures_to_draw[list(features_to_draw.keys())[0]]', list(features_to_draw.keys())[0].dims)
+    axes_labels = list(features_to_draw.keys())[0].dims
+    # exit()
 
+    distance_thresholds = {ax_lbl: 5. for ax_lbl in axes_labels}
+    window_type = 'rectangular'
+    linkage = 'single'
+
+    print('\nfeatures_to_draw', features_to_draw)
+    
     domains_with_features = domains.find_feature_clusters_by_distance(features=features_to_draw,
                                                                      distance_thresholds=distance_thresholds,
                                                                      window_type=window_type,

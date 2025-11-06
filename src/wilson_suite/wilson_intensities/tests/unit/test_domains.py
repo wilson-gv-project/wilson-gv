@@ -46,7 +46,7 @@ def generate_props_data_Nmodes(N_modes):
             'qff':     np.zeros((N_modes, N_modes, N_modes, N_modes)),
             }
 
-def get_features_from_terms():
+def get_data_evaluators_tests() -> dict:
     from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
     from wilson_suite.fixtures import get_terms_from_json
     terms_fuller_flat = get_terms_from_json()
@@ -100,16 +100,21 @@ def get_features_from_terms():
         p.addValues(values=props_data[trname])
         props.append(p)
 
-    print(system.Nnmodes)
+    return dict(system=system,
+                vib_ana_setup=vibana, 
+                derived_terms=terms_select, 
+                props=props)
 
-    features = get_features_from_terms_for_eval(system=system, 
-                                        vib_ana_setup=vibana, 
-                                        derived_terms=terms_select, 
-                                        props=props)
+def get_features_from_terms():
+
+    datadict = get_data_evaluators_tests()
+    print(datadict['system'].Nnmodes)
+
+    features = get_features_from_terms_for_eval(**datadict)
     return features
 
 
-def test_terms_evaluator_general_compilation():
+def test_terms_features():
     print()
     
     features = get_features_from_terms()

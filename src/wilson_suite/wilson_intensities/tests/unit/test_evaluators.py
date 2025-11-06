@@ -204,3 +204,10 @@ def test_evaluate_domain_on_grid():
     # print(rec_domains_dict[4])
 
     evaluators.evaluate_domain_on_grid(domain=rec_domains_dict[4])
+
+def test_terms_evaluator_general_compilation():
+    print()
+    from .test_domains import get_data_evaluators_tests
+    datadict = get_data_evaluators_tests()
+
+    evaluators.terms_evaluator_general_compilation(**datadict)
