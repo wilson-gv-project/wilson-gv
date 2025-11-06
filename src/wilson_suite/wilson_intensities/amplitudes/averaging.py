@@ -80,6 +80,8 @@ def isotropic_average_for_props_and_field(term, experiment):
 
     pass
 
+# FIXME: Type hints for all
+
 # FIXME: Verify this routine thoroughly with tests
 def get_pol_laser(pol):
     """
@@ -92,13 +94,15 @@ def get_pol_laser(pol):
     A = get_pol_tensor(A, pol)
     A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
 
-    print('A', A)
+    #print('A', A)
 
     f = get_iso_f(len(pol))
 
-    print('f', f)
+    #print('f', f)
 
-    pl = np.zeros((len(f)), dtype=complex)
+    # NOTE: This is real-valued for now since it only currently deals with linear polarization and assumed overall
+    # phase of zero. If any of these conditions are relaxed this must be changed to be complex-valued
+    pl = np.zeros((len(f)))
 
     for i in range(len(f)):
 
@@ -108,9 +112,9 @@ def get_pol_laser(pol):
         for j in range(len(f[i][1])):
             pl[i] -= A[tuple(f[i][1][j])]
 
-    print('A * f', np.transpose(pl))
+    #print('A * f', np.transpose(pl))
 
-    return [i for i in pl]
+    return [float(i) for i in pl]
 
 
 def get_pol_tensor(pol_tensor, pol):
@@ -410,7 +414,9 @@ def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
     Functioning for non-electric dipole polarization properties not investigated/supported
 
     rank: Integer: The rank of the orientational average. For electric dipole polarization properties, the rank is
-    certainly equal to the number of ranks underlying the laser polarization term
+    certainly equal to the number of ranks underlying the laser polarization term. NOTE: There might be further issues
+    to consider for non-dipole approximation operators and so I keep the rank argument for now, noting that it might
+    be found redundant after this consideration.
 
     laser_pol: The "laser polarization" term: A term of the form A * f from JCP 67, 5026. Concerns the "macroscopic"
     part of the averaging and is an experiment-specific (pulse-set-up-specific) quantity.
@@ -436,9 +442,9 @@ def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
     iso_mat_m = get_iso_mat(rank)
     iso_vec_f = get_iso_f(rank)
 
-    print('Laser polarization term:', laser_pol)
-    print('M:', iso_mat_m)
-    print('f:', iso_vec_f)
+    #print('Laser polarization term:', laser_pol)
+    #print('M:', iso_mat_m)
+    #print('f:', iso_vec_f)
 
     # 3. Form the linear combination recipe dot(A * f, M * g)
 
@@ -469,7 +475,7 @@ def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
                 else:
                     linear_combination[k] = -1.0 * laser_pol[i] * iso_mat_m[i, j]
 
-    print('Linear combination result:', linear_combination)
+    #print('Linear combination result:', linear_combination)
 
     # Prune zero elements
     marked_for_deletion = []
