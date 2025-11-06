@@ -51,7 +51,6 @@ def generate_LHS_motif(motif: ResonanceMotif):
     # max_different_nm_index = len(motif.get_nm_indices())
     max_different_freq_axes = motif.get_max_different_freq_axes()
     num_axes = len(max_different_freq_axes)
-    # print('max_different_freq_axes', max_different_freq_axes)
 
     if num_axes == 1:
         num_axes = len(motif)
@@ -93,10 +92,8 @@ def get_RHS_motif(motif: ResonanceMotif,
                                                     parameters, 
                                                     vibdata)
         vib_diff_w_value.cache_it(vibdiff_cache=vibdiff_cache)
-        # print('vib_diff_w_value', vib_diff_w_value.energy_difference(au=(unit=='Eh')))
         constants.append((-1)*vib_diff_w_value.energy_difference(au=(unit=='Eh')))
 
-    # print('constants', constants)
     return constants
 
 
@@ -144,7 +141,7 @@ def _generate_index_choices(motif: ResonanceMotif, vibstates_data: 'VibStatesDat
 def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
                                                vibstates_data: 'VibStatesData',
                                                vibdiff_cache: 'VibDiffCache',
-                                               spec_window=None) -> dict:
+                                               spec_window=None) -> dict[ResonanceMotif,dict[GeometricObject,list]]:
     """
     """
     from ..amplitudes.term_parts import ParameterSet
@@ -156,18 +153,19 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     # {motif 1: {(500., 1200.): [(1, 2), (1, 3)],
     #           (500., 1400.): [(1, 4)], ...}}
 
-    results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
+    # results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
+    results: dict[ResonanceMotif,dict[GeometricObject,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
 
     for idxs in index_choices:
         parameters = ParameterSet(idxs)
-        location_d = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
+        location_key = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
         # print('\nlocation_d', location_d) # (('A', 3130.0), ('B', 2410.0))
-        print('location_d.coordinates', location_d.coordinates)
-        location_key = location_d.coordinates
+        # print('location_d.coordinates', location_d.coordinates)
+        # print('location_d', location_d)
 
-        if spec_window is None or is_location_in_window(location_d, window=spec_window, margin={}):
+        if spec_window is None or is_location_in_window(location_key, window=spec_window, margin={}):
             results[motif].setdefault(location_key, []).append(idxs)
     return results
 

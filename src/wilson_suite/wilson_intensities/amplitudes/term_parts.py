@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
 from ...wilson_derive.abstractions import VibPerturbedTerm
-from typing import TYPE_CHECKING, Union, Literal, Tuple
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..amplitudes.vibene_differences import VibDiffCache
 
@@ -337,8 +337,9 @@ class TermParametersChoice:
 
 @dataclass(frozen=True)
 class SpectralFeature:
-    location: tuple[float, ...]
-    term_contributions: list[TermParametersChoice] # grouped by res_motif
+    location: 'GeometricObject'
+    term_contributions: tuple[TermParametersChoice] # grouped by res_motif
+    amplitude_coeff: float = None
 
     def __hash__(self) -> int:
         return hash((self.location, self.term_contributions))
@@ -356,7 +357,7 @@ class SpectralFeature:
         else:
             raise ValueError('Cannot make a union of SpectralFeatures is location is not the same')
 
-from typing import Union, Literal, Tuple
+from typing import Union, Literal, Tuple, Optional, List
 
 # Type aliases
 CoordValue = Union[float, Literal['all']]
@@ -447,156 +448,166 @@ class GeometricObject:
 
 # -------------------------------------------------------
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from typing import Optional, Tuple, List, Union
 import numpy as np
-from typing import Tuple
 
 @dataclass
 class SpectralWindow(ABC):
     """Abstract base class for N-dimensional spectral windows."""
     shape: Tuple[int, ...]
-    
-    def __new__(cls, *args, **kwargs):
-        if cls == SpectralWindow:
-            raise TypeError("Cannot instantiate abstract class.")
-        return super().__new__(cls)
-    
-    @abstractmethod
-    def generate(self) -> np.ndarray:
-        """Generate the N-dimensional window coefficients."""
-        pass
-    
-    def __call__(self) -> np.ndarray:
-        """Allow the window to be called like a function."""
-        return self.generate()
-    
-    @property
-    def ndim(self) -> int:
-        """Return the number of dimensions."""
-        return len(self.shape)
+    bounds: Optional[Tuple[Tuple[float, float], ...]] = None
+    labels: Optional[Tuple[str, ...]] = None
+    features: List['SpectralFeature'] = field(default_factory=list)
 
-
-@dataclass
-class RectangularWindow(SpectralWindow):
-    """Rectangular (boxcar) window - all coefficients are 1 in N dimensions.
-    
-    Attributes:
-        shape: Tuple defining the N-dimensional shape
-        bounds: Optional tuple of (min, max) pairs for each dimension.
-                If None, defaults to (0, shape[i]) for each dimension.
-        labels: Optional tuple of strings labeling each axis.
-                If None, defaults to capital letters A, B, C, etc.
-    """
-    bounds: Tuple[Tuple[float, float], ...] = None
-    labels: Tuple[str, ...] = None
-    _label_to_index: dict[str, int] = field(init=False, repr=False)
-    
     def __post_init__(self):
-        """Initialize bounds and labels if not provided."""
-        # Initialize bounds
+        from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
+
+        # --- bounds ---
         if self.bounds is None:
-            object.__setattr__(self, 'bounds', tuple((0.0, float(n)) for n in self.shape))
+            self.bounds = tuple((0.0, float(n)) for n in self.shape)
         elif len(self.bounds) != len(self.shape):
-            raise ValueError(
-                f"bounds dimensionality ({len(self.bounds)}) must match "
-                f"shape dimensionality ({len(self.shape)})"
-            )
-            
-        # Initialize labels
+            raise ValueError("bounds must match shape dimensionality")
+
+        # --- labels ---
         if self.labels is None:
-            from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
             if len(self.shape) > len(cap_alpha_labels):
                 raise ValueError(f"Not enough predefined labels for {len(self.shape)} dimensions.")
-            object.__setattr__(self, 'labels', tuple(cap_alpha_labels[:len(self.shape)]))
+            self.labels = tuple(cap_alpha_labels[:len(self.shape)])
         elif len(self.labels) != len(self.shape):
-            raise ValueError(
-                f"Labels length ({len(self.labels)}) must match shape length ({len(self.shape)})"
-            )
-            
-        # Create label to index mapping
-        object.__setattr__(self, '_label_to_index', 
-                          {label: i for i, label in enumerate(self.labels)})
-    
-    def generate(self) -> np.ndarray:
-        """Generate N-dimensional rectangular window coefficients."""
-        return np.ones(self.shape)
-    
+            raise ValueError("labels must match shape dimensionality")
+
+        # --- label-index map ---
+        self._label_to_index = {label: i for i, label in enumerate(self.labels)}
+
+    # -----------------------
+    # Basic properties
+    # -----------------------
+    @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    @property
+    def extent(self) -> Tuple[float, ...]:
+        return tuple(max_val - min_val for min_val, max_val in self.bounds)
+
+    @property
+    def volume(self) -> float:
+        return np.prod(self.extent)
+
+    @property
+    def center(self) -> Tuple[float, ...]:
+        return tuple((min_val + max_val) / 2 for min_val, max_val in self.bounds)
+
+    # -----------------------
+    # Axis utilities
+    # -----------------------
     def axis_index(self, key: Union[int, str]) -> int:
-        """Resolve axis index from label or integer."""
-        if isinstance(key, str):
-            return self._label_to_index[key]
-        return key
+        return self._label_to_index[key] if isinstance(key, str) else key
 
     def axis_bounds(self, key: Union[int, str]) -> Tuple[float, float]:
-        """Return bounds for given axis (by label or index)."""
         return self.bounds[self.axis_index(key)]
-    
+
     def axis_extent(self, key: Union[int, str]) -> float:
-        """Return extent for given axis."""
         min_val, max_val = self.axis_bounds(key)
         return max_val - min_val
 
     def axis_coords(self, key: Union[int, str]) -> np.ndarray:
-        """Return coordinate values along a labeled axis."""
         i = self.axis_index(key)
         n = self.shape[i]
         min_val, max_val = self.bounds[i]
         return np.linspace(min_val, max_val, n, endpoint=False)
 
     def meshgrids(self) -> Tuple[np.ndarray, ...]:
-        """Generate coordinate grids for each dimension."""
         coords_1d = [self.axis_coords(i) for i in range(self.ndim)]
         return np.meshgrid(*coords_1d, indexing='ij')
-    
+
     def grid_flat(self) -> np.ndarray:
-        """
-        Generate flattened coordinate grid.
-        flat like a stack of coordinates:
-            [[0. 0.]
-            [0. 1.]
-            [0. 2.]
-            [1. 0.]
-            [1. 1.]
-            [1. 2.]]
-        """
         grids = self.meshgrids()
         return np.stack([g.ravel() for g in grids], axis=1)
-    
+
     def contains(self, points: np.ndarray) -> np.ndarray:
-        """Check if points are within the window bounds."""
         points = np.asarray(points)
         if points.shape[-1] != self.ndim:
-            raise ValueError(
-                f"Points must have {self.ndim} coordinates in last dimension, "
-                f"got {points.shape[-1]}"
-            )
-        
+            raise ValueError(f"Points must have {self.ndim} coordinates in last dimension.")
         inside = np.ones(points.shape[:-1], dtype=bool)
         for i, (min_val, max_val) in enumerate(self.bounds):
             inside &= (points[..., i] >= min_val) & (points[..., i] < max_val)
-        
         return inside
-    
-    @property
-    def extent(self) -> Tuple[float, ...]:
-        """Get the extent (width) of each dimension."""
-        return tuple(max_val - min_val for min_val, max_val in self.bounds)
-    
-    @property
-    def volume(self) -> float:
-        """Get the total volume (area for 2D, length for 1D) of the window."""
-        return np.prod(self.extent)
-    
-    @property
-    def center(self) -> Tuple[float, ...]:
-        """Get the center coordinates of the window."""
-        return tuple((min_val + max_val) / 2 for min_val, max_val in self.bounds)
-    
+
+    # -----------------------
+    # Abstract interface
+    # -----------------------
+    @abstractmethod
+    def generate(self) -> np.ndarray:
+        """Generate the N-dimensional window coefficients."""
+        pass
+
+    def __call__(self) -> np.ndarray:
+        return self.generate()
+
     def __getitem__(self, key):
-        """Allow accessing axis coordinates using labels or sequences of labels."""
+        """Access axis coordinates via label or tuple of labels."""
         if isinstance(key, str):
             return self.axis_coords(key)
         elif isinstance(key, (list, tuple)):
             return tuple(self.axis_coords(k) for k in key)
         raise TypeError("Key must be a label or sequence of labels.")
+
+    # -----------------------
+    # Feature handling (unchanged)
+    # -----------------------
+    def add_feature(self, feature: 'SpectralFeature') -> None:
+        self.features.append(feature)
+
+    def add_features(self, features: list['SpectralFeature']) -> None:
+        self.features.extend(features)
+
+    def features_in_bounds(self) -> list['SpectralFeature']:
+        filtered = []
+        for f in self.features:
+            coords = f.location
+            inside = True
+            for label, (min_val, max_val) in zip(self.labels, self.bounds):
+                val = coords[label]
+                if val == "all":
+                    continue
+                if not (min_val <= val < max_val):
+                    inside = False
+                    break
+            if inside:
+                filtered.append(f)
+        return filtered
+
+
+@dataclass
+class RectangularWindow(SpectralWindow):
+    """Rectangular (boxcar) window - all coefficients are 1."""
+    def generate(self) -> np.ndarray:
+        return np.ones(self.shape)
+
+    @classmethod
+    def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
+        """Create a rectangular window that bounds given features."""
+        if not features:
+            raise ValueError("Feature list cannot be empty")
+
+        # Collect all numeric coords per axis
+        axis_vals: dict[str, list[float]] = {}
+        for f in features:
+            for axis, val in f.location.coordinates:
+                if val != 'all':
+                    axis_vals.setdefault(axis, []).append(float(val))
+
+        # Determine bounds and shape
+        bounds = []
+        for axis, vals in sorted(axis_vals.items()):
+            min_val, max_val = min(vals) - padding, max(vals) + padding
+            bounds.append((min_val, max_val))
+        shape = tuple(len(axis_vals[a]) for a in sorted(axis_vals))
+
+        # Construct the window and assign features
+        window = cls(shape=shape, bounds=tuple(bounds))
+        window.add_features(features)
+        return window

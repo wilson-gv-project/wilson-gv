@@ -5,7 +5,7 @@ import pytest
 
 def test_cannot_instantiate_abstract_class():
     """SpectralWindow cannot be instantiated directly."""
-    with pytest.raises(TypeError, match="Cannot instantiate abstract class"):
+    with pytest.raises(TypeError, match="Can't instantiate abstract class SpectralWindow without an implementation for abstract method 'generate'"):
         SpectralWindow((10,))
 
 
@@ -116,7 +116,7 @@ def test_custom_bounds():
 
 def test_bounds_dimensionality_mismatch():
     """Test that mismatched bounds dimensionality raises error."""
-    with pytest.raises(ValueError, match="bounds dimensionality.*must match"):
+    with pytest.raises(ValueError, match="bounds must match shape dimensionality"):
         RectangularWindow((10, 20), bounds=((-5.0, 5.0),))
 
 

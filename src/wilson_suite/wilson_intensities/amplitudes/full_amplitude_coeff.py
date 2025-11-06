@@ -203,5 +203,4 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
 
         # should be a single float result always?
         results[ParameterSet(index_dict)] = float(term.coeff) * float(product)
-        print('product', float(product))
     return results
