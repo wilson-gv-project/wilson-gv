@@ -52,52 +52,6 @@ def group_PropsColls_by_numerator(list_props_collections: list['PropsCollection'
         groups_here.setdefault(props_collection.identify_avrg_motif(), []).append(props_collection)
     return groups_here
 
-def make_func_to_compute_avrg(*,
-                     avrg_expression: 'PropsCollection',
-                     polarization: str = 'ZZZZ') -> Callable[[dict, 'MolPropsCollection'], float]:
-    """
-    [x] DONE
-    for an expression with properties data values, 
-    compute average with given polarization setup for a choice of normal mode indices
-    """
-    num_pulses = len(avrg_expression.get_cart_axes()) # should this be a set?
-    from .averaging import getPolarizationAveragingExpression
-
-    # polarization='ZZZZ' - only this one is possible now
-    polarization_avrg_terms, prefactor = getPolarizationAveragingExpression(num_pulses=num_pulses, polarization=polarization)
-
-    def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
-        """
-        index_choices: dict, props_data: 'MolPropsCollection'
-        """
-        from ..utils.spectrum_utils import greek_list, num_Greek
-        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-
-        total = 0.
-
-        for cart_axes in polarization_avrg_terms:
-            greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
-            product = 1.
-
-            for prop in avrg_expression:
-                el_operators = prop.ops
-                differentiation_order = prop.dord
-
-                prop_tuple_key = prop_trivname(ord_el=len(el_operators), ord_geo=differentiation_order)
-
-                nm_inds = tuple([index_choices[i] for i in prop.inds])
-                cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
-                all_inds = (*nm_inds, *cart_inds)
-                # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                product *= props_data.get(prop_tuple_key).vals[all_inds]
-
-            if product != 0.:
-                logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes}: {product}")
-                
-            total += product
-
-        return total * prefactor
-    return compute_for_idx_choice
 
 def make_gen_func_to_compute_avrg(*,
                               avrg_expression: 'PropsCollection',
@@ -152,26 +106,28 @@ def make_gen_func_to_compute_avrg(*,
 
 
 def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
-                          polarization: str,
-                          #pulse_polarization_vector: list,
+                          pulse_polarization_vector: list,
+                          props_data: 'MolPropsCollection',
                           number_of_nmodes: int,
-                          props_data: 'MolPropsCollection'):
+                          nm_inds_choices: list[int]):
     """
     [x] DONE
 
     Precalculating the full tensor for given avrg_expression
+
+    nm_inds_choices - could be generated with for all normal modes with:
+        nm_inds_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
+
     """
     mode_inds = set(avrg_expression.get_mode_indices())
-    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
 
-    func = make_func_to_compute_avrg(avrg_expression=avrg_expression, polarization=polarization)
     # Indicating generalized version for updating
-    #func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
+    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
-    for idx in ind_choices:
-        full_tensor[tuple(dict(sorted(idx.items())).values())] = func(idx, props_data)
+    for idx in nm_inds_choices:
+        full_tensor[tuple(dict(sorted(idx.items())).values())] = func_general(idx, props_data)
 
     return full_tensor
 

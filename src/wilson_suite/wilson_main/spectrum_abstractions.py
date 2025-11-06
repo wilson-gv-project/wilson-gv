@@ -261,7 +261,7 @@ class EvaluationInfo:
 		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
 	"""
 	freq_variables: dict
-	Gamma: float
+	Gamma: dict
 	Gamma_unit: str
 	freq_condition: str = None
 	fixed_variables: dict = field(default_factory=lambda: dict())

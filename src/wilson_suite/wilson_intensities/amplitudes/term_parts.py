@@ -309,8 +309,8 @@ class EvaluationDataAndConfigs:
     # props_data: list['MolecularProperty']
     props_data: MolPropsCollection
     vibstates_data: 'VibStatesData'
-    polarization: str
     number_of_nmodes: int
+    nm_inds_choices: list[int]
     vibdiff_cache: 'VibDiffCache' = None
     avrg_tensors: dict = None
     avrg_expr_tensor_mapping: dict = None
@@ -336,10 +336,11 @@ class TermParametersChoice:
         return (self.term_keys == other.term_keys and 
                 self.states_parameters == other.states_parameters)
 
-@dataclass(frozen=True)
+@dataclass
 class SpectralFeature:
     location: 'GeometricObject'
     term_contributions: tuple[TermParametersChoice] # grouped by res_motif
+    lineshape_parameter: dict = None
     amplitude_coeff: float = None
 
     def __hash__(self) -> int:
@@ -354,7 +355,8 @@ class SpectralFeature:
     def union(self, other: 'SpectralFeature'):
         if self.location == other.location:
             return SpectralFeature(location=self.location, 
-                                   term_contributions=self.term_contributions+other.term_contributions)
+                                   term_contributions=self.term_contributions+other.term_contributions,
+                                   amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff)
         else:
             raise ValueError('Cannot make a union of SpectralFeatures is location is not the same')
 
@@ -427,11 +429,6 @@ class GeometricObject:
         return f"{type_name}({coords})"
 
 
-# @dataclass
-# class SpectralWindow:
-
-# from abc import ABC
-
 # Source - https://stackoverflow.com/questions/60590442/abstract-dataclass-without-abstract-methods-in-python-prohibit-instantiation
 # Posted by Jundiaius
 # Retrieved 11/5/2025, License - CC-BY-SA 4.0
@@ -450,17 +447,24 @@ class GeometricObject:
 # -------------------------------------------------------
 
 from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
+# from abc import ABC, abstractmethod
 from typing import Optional, Tuple, List, Union
 import numpy as np
 
 @dataclass
-class SpectralWindow(ABC):
-    """Abstract base class for N-dimensional spectral windows."""
+class SpectralWindow():
+    """N-dimensional rectangular domain."""
+
+
+
+@dataclass
+class RectangularDomain():
+    """N-dimensional rectangular domain."""
     shape: Tuple[int, ...]
-    bounds: Optional[Tuple[Tuple[float, float], ...]] = None
+    # bounds: Optional[Tuple[Tuple[float, float], ...]] = None
+    bounds: SpectralWindow = None
     labels: Optional[Tuple[str, ...]] = None
-    features: List['SpectralFeature'] = field(default_factory=list)
+    full_features: List['SpectralFeature'] = field(default_factory=list)
 
     def __post_init__(self):
         from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
@@ -481,7 +485,32 @@ class SpectralWindow(ABC):
 
         # --- label-index map ---
         self._label_to_index = {label: i for i, label in enumerate(self.labels)}
+    
+    @classmethod
+    def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
+        """Create a rectangular window that bounds given features."""
+        if not features:
+            raise ValueError("Feature list cannot be empty")
 
+        # Collect all numeric coords per axis
+        axis_vals: dict[str, list[float]] = {}
+        for f in features:
+            for axis, val in f.location.coordinates:
+                if val != 'all':
+                    axis_vals.setdefault(axis, []).append(float(val))
+
+        # Determine bounds and shape
+        bounds = []
+        for axis, vals in sorted(axis_vals.items()):
+            min_val, max_val = min(vals) - padding, max(vals) + padding
+            bounds.append((min_val, max_val))
+        shape = tuple(len(axis_vals[a]) for a in sorted(axis_vals))
+
+        # Construct the window and assign features
+        window = cls(shape=shape, bounds=tuple(bounds))
+        window.add_full_features(features)
+        return window
+    
     # -----------------------
     # Basic properties
     # -----------------------
@@ -532,18 +561,20 @@ class SpectralWindow(ABC):
         points = np.asarray(points)
         if points.shape[-1] != self.ndim:
             raise ValueError(f"Points must have {self.ndim} coordinates in last dimension.")
+        
         inside = np.ones(points.shape[:-1], dtype=bool)
+        
+        # iterate over dimensions(axes) of the domain
         for i, (min_val, max_val) in enumerate(self.bounds):
+            # in-place "addition" of arrays with booleans - "addition" with AND operator
             inside &= (points[..., i] >= min_val) & (points[..., i] < max_val)
         return inside
 
     # -----------------------
     # Abstract interface
     # -----------------------
-    @abstractmethod
     def generate(self) -> np.ndarray:
-        """Generate the N-dimensional window coefficients."""
-        pass
+        return np.ones(self.shape)
 
     def __call__(self) -> np.ndarray:
         return self.generate()
@@ -559,15 +590,15 @@ class SpectralWindow(ABC):
     # -----------------------
     # Feature handling (unchanged)
     # -----------------------
-    def add_feature(self, feature: 'SpectralFeature') -> None:
-        self.features.append(feature)
+    def add_full_feature(self, feature: 'SpectralFeature') -> None:
+        self.full_features.append(feature)
 
-    def add_features(self, features: list['SpectralFeature']) -> None:
-        self.features.extend(features)
+    def add_full_features(self, features: list['SpectralFeature']) -> None:
+        self.full_features.extend(features)
 
     def features_in_bounds(self) -> list['SpectralFeature']:
         filtered = []
-        for f in self.features:
+        for f in self.full_features:
             coords = f.location
             inside = True
             for label, (min_val, max_val) in zip(self.labels, self.bounds):
@@ -581,34 +612,3 @@ class SpectralWindow(ABC):
                 filtered.append(f)
         return filtered
 
-
-@dataclass
-class RectangularWindow(SpectralWindow):
-    """Rectangular (boxcar) window - all coefficients are 1."""
-    def generate(self) -> np.ndarray:
-        return np.ones(self.shape)
-
-    @classmethod
-    def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
-        """Create a rectangular window that bounds given features."""
-        if not features:
-            raise ValueError("Feature list cannot be empty")
-
-        # Collect all numeric coords per axis
-        axis_vals: dict[str, list[float]] = {}
-        for f in features:
-            for axis, val in f.location.coordinates:
-                if val != 'all':
-                    axis_vals.setdefault(axis, []).append(float(val))
-
-        # Determine bounds and shape
-        bounds = []
-        for axis, vals in sorted(axis_vals.items()):
-            min_val, max_val = min(vals) - padding, max(vals) + padding
-            bounds.append((min_val, max_val))
-        shape = tuple(len(axis_vals[a]) for a in sorted(axis_vals))
-
-        # Construct the window and assign features
-        window = cls(shape=shape, bounds=tuple(bounds))
-        window.add_features(features)
-        return window
