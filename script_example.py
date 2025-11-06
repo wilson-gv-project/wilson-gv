@@ -168,7 +168,7 @@ logger.debug(sim.spec_eval_setup)
 if not PREP_ONLY:
     from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
     logger.info('  >>> Going to evaluate now...\n')
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
     intensities_spec = np.abs(sim.spec)**2
     logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
 

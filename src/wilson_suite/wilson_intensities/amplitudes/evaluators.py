@@ -24,9 +24,9 @@ import numpy as np
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-
-# TermND with TermsEvaluator
+# General term evaluator "as response function"
 def terms_evaluator_general(system: 'MolecularSystem' = None,
+                    experiment: 'VibExperiment' = None,
                     derived_terms: list['VibPerturbedTerm'] = None,
                     props: list['MolecularProperty'] = None,
                     spec_eval_setup = None, 
@@ -103,8 +103,9 @@ def terms_evaluator_general(system: 'MolecularSystem' = None,
 
     data_and_configs = EvaluationDataAndConfigs(props_data=props,
                                                 vibstates_data=vibstates_data,
-                                                polarization='ZZZZ', #!
-                                                number_of_nmodes=system.Nnmodes)
+                                                polarization='ZZZZ',
+                                                number_of_nmodes=system.Nnmodes,
+                                                pulse_polarization_vector=experiment.polarization_avg_vector)
 
     to_precalculate = identify_precalc_unique_coeff_parts(terms=derived_terms)
     precalculated = precalculate_unique_coeff_parts(need_to_precalc=to_precalculate, 

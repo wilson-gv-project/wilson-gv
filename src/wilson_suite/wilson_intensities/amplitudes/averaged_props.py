@@ -99,9 +99,62 @@ def make_func_to_compute_avrg(*,
         return total * prefactor
     return compute_for_idx_choice
 
+def make_gen_func_to_compute_avrg(*,
+                              avrg_expression: 'PropsCollection',
+                              pulse_polarization_vector: list) -> Callable[[dict, 'MolPropsCollection'], float]:
+    """
+    [x] DONE
+    for an expression with properties data values,
+    compute average with given polarization setup for a choice of normal mode indices
+    """
+    num_pulses = len(avrg_expression.get_cart_axes())  # should this be a set?
+    from .averaging import getGeneralPolarizationAveragingExpression
+
+    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank = num_pulses,
+                                                                        laser_pol = pulse_polarization_vector)
+
+    def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
+        """
+        index_choices: dict, props_data: 'MolPropsCollection'
+        """
+        from ..utils.spectrum_utils import greek_list, num_Greek
+        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+        total = 0.
+
+        for cart_axes in polarization_linear_comb:
+
+            # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
+            # couldn't think of any but want to discuss and double check for safety
+            greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
+
+            product = 1.
+
+            for prop in avrg_expression:
+
+                prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
+
+                nm_inds = tuple([index_choices[i] for i in prop.inds])
+                cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
+                all_inds = (*nm_inds, *cart_inds)
+
+                # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
+                product *= props_data.get(prop_tuple_key).vals[all_inds]
+
+            if product != 0.:
+                logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
+
+            total += product * polarization_linear_comb[cart_axes]
+
+        return total
+
+    return compute_for_idx_choice
+
 
 def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
-                          polarization: str, number_of_nmodes: int,
+                          polarization: str,
+                          #pulse_polarization_vector: list,
+                          number_of_nmodes: int,
                           props_data: 'MolPropsCollection'):
     """
     [x] DONE
@@ -110,7 +163,10 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     """
     mode_inds = set(avrg_expression.get_mode_indices())
     ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
+
     func = make_func_to_compute_avrg(avrg_expression=avrg_expression, polarization=polarization)
+    # Indicating generalized version for updating
+    #func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 

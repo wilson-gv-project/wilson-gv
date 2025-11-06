@@ -28,6 +28,28 @@ def test_evv_tester_full():
 
     assert hasattr(wilsim, 'spec')
 
+def test_evv_tester_general_prep_only():
+    """
+    simple run with no pickling
+    """
+    import evv_tester_general_evaluator as evv_tester_general
+    evv_tester_general.TO_PICKLES = []
+    evv_tester_general.PREP_ONLY = True
+    wilsim = evv_tester_general.run()
+
+    assert hasattr(wilsim, 'spec')
+
+def test_evv_tester_general_full():
+    """
+    simple run with no pickling
+    """
+    import evv_tester_general_evaluator as evv_tester_general
+    evv_tester_general.TO_PICKLES = []
+    evv_tester_general.PREP_ONLY = False
+    wilsim = evv_tester_general.run()
+
+    assert hasattr(wilsim, 'spec')
+
 def test_evv_terms_tester():
     import evv_terms_tester
 
