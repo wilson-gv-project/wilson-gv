@@ -1,5 +1,5 @@
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscStateSymbolic, PolProp, VibDiffTerm
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
 from ...wilson_derive.abstractions import VibPerturbedTerm
@@ -336,279 +336,67 @@ class TermParametersChoice:
         return (self.term_keys == other.term_keys and 
                 self.states_parameters == other.states_parameters)
 
-@dataclass
-class SpectralFeature:
-    location: 'GeometricObject'
-    term_contributions: tuple[TermParametersChoice] # grouped by res_motif
-    lineshape_parameter: dict = None
-    amplitude_coeff: float = None
-
-    def __hash__(self) -> int:
-        return hash((self.location, self.term_contributions))
-    
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, SpectralFeature):
-            return False
-        return (self.location == other.location and 
-                self.term_contributions == other.term_contributions)
-
-    def union(self, other: 'SpectralFeature'):
-        if self.location == other.location:
-            return SpectralFeature(location=self.location, 
-                                   term_contributions=self.term_contributions+other.term_contributions,
-                                   amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff)
-        else:
-            raise ValueError('Cannot make a union of SpectralFeatures is location is not the same')
-
-from typing import Union, Literal, Tuple, Optional, List
-
-# Type aliases
-CoordValue = Union[float, Literal['all']]
-Coordinates = Tuple[Tuple[str, CoordValue], ...]
-
-class GeometricObject:
-    """
-    Represents geometric objects in N-dimensional space that are hashable.
-    
-    Examples:
-        Point:      (('A', 1864.0), ('B', 900.0))
-        Line:       (('A', 1864.0), ('B', 'all'))
-        Plane:      (('A', 'all'), ('B', 'all'), ('C', 1200.0))
-    """
-    def __init__(self, coord_dict: dict[str, CoordValue]):
-        # Convert dict to sorted tuple of tuples for consistent hashing
-        self.coordinates: Coordinates = tuple(sorted(coord_dict.items()))
-    
-    @property
-    def dims(self) -> tuple[str, ...]:
-        return tuple(k for k, _ in self.coordinates)
-    
-    @property
-    def values(self) -> tuple[CoordValue, ...]:
-        return tuple(v for _, v in self.coordinates)
-    
-    @property
-    def dimensionality(self) -> int:
-        """Returns dimensionality of the object (0=point, 1=line, 2=plane, etc)"""
-        return sum(1 for v in self.values if v == 'all')
-    
-    def __getitem__(self, axis: str) -> CoordValue:
-        for k, v in self.coordinates:
-            if k == axis:
-                return v
-        raise KeyError(f"Axis {axis} not found")
-    
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, GeometricObject):
-            return NotImplemented
-        return self.coordinates == other.coordinates
-    
-    def __hash__(self) -> int:
-        return hash(self.coordinates)
-    
-    def is_point(self) -> bool:
-        return self.dimensionality == 0
-    
-    def is_line(self) -> bool:
-        return self.dimensionality == 1
-    
-    def is_plane(self) -> bool:
-        return self.dimensionality == 2
-    
-    def __repr__(self) -> str:
+    def get_res_motifs(self, terms_hashes: dict[int, 'VibPerturbedTerm']):
         """
-        Returns a string representation showing type and coordinates.
+        terms_for_motifs - dict[ResonanceMotif, list['VibPerturbedTerm']]
+        """
+        resmotifs_here = [ResonanceMotif(terms_hashes[term_hash].res) for term_hash in self.term_keys]
+
+        if len(set(resmotifs_here)) == 1:
+            return resmotifs_here[0]
         
-        Examples:
-            Point(A=1864.0, B=900.0)
-            Line(A=1864.0, B=all)
-            Plane(A=all, B=all, C=1200.0)
-        """
-        type_name = "Point" if self.is_point() else "Line" if self.is_line() else "Plane" if self.is_plane() else "Object"
-        coords = ", ".join(f"{k}={v}" for k, v in self.coordinates)
-        return f"{type_name}({coords})"
+        raise ValueError('This group of terms do not have the same ResonanceMotif')
 
-
-# Source - https://stackoverflow.com/questions/60590442/abstract-dataclass-without-abstract-methods-in-python-prohibit-instantiation
-# Posted by Jundiaius
-# Retrieved 11/5/2025, License - CC-BY-SA 4.0
-
-# @dataclass
-# class SpectralWindow(ABC): 
-#     def __new__(cls, *args, **kwargs): 
-#         if cls == SpectralWindow or cls.__bases__[0] == SpectralWindow: 
-#             raise TypeError("Cannot instantiate abstract class.") 
-#         return super().__new__(cls)
-
-# @dataclass
-# class RectanglelWindow(SpectralWindow):
-    
 
 # -------------------------------------------------------
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 # from abc import ABC, abstractmethod
-from typing import Optional, Tuple, List, Union
 import numpy as np
 
-@dataclass
-class SpectralWindow():
-    """N-dimensional rectangular domain."""
+def is_tuple_of_tuples(my_variable):
+    if not isinstance(my_variable, tuple):
+        return False
+
+    for item in my_variable:
+        if not isinstance(item, tuple):
+            return False
+
+    return True
 
 
 
-@dataclass
-class RectangularDomain():
-    """N-dimensional rectangular domain."""
-    shape: Tuple[int, ...]
-    # bounds: Optional[Tuple[Tuple[float, float], ...]] = None
-    bounds: SpectralWindow = None
-    labels: Optional[Tuple[str, ...]] = None
-    full_features: List['SpectralFeature'] = field(default_factory=list)
+def safe_arange_inclusive_scaled(start, stop, step):
+    """
+    google ai
 
-    def __post_init__(self):
-        from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
-
-        # --- bounds ---
-        if self.bounds is None:
-            self.bounds = tuple((0.0, float(n)) for n in self.shape)
-        elif len(self.bounds) != len(self.shape):
-            raise ValueError("bounds must match shape dimensionality")
-
-        # --- labels ---
-        if self.labels is None:
-            if len(self.shape) > len(cap_alpha_labels):
-                raise ValueError(f"Not enough predefined labels for {len(self.shape)} dimensions.")
-            self.labels = tuple(cap_alpha_labels[:len(self.shape)])
-        elif len(self.labels) != len(self.shape):
-            raise ValueError("labels must match shape dimensionality")
-
-        # --- label-index map ---
-        self._label_to_index = {label: i for i, label in enumerate(self.labels)}
+    Generates a range by scaling to integers, including the stop value. 
+    Best for decimal steps like 0.1, 0.01 etc.
+    """
+    # Scale inputs to integers
+    start_int = round(start / step)
+    stop_int = round(stop / step)
     
-    @classmethod
-    def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
-        """Create a rectangular window that bounds given features."""
-        if not features:
-            raise ValueError("Feature list cannot be empty")
-
-        # Collect all numeric coords per axis
-        axis_vals: dict[str, list[float]] = {}
-        for f in features:
-            for axis, val in f.location.coordinates:
-                if val != 'all':
-                    axis_vals.setdefault(axis, []).append(float(val))
-
-        # Determine bounds and shape
-        bounds = []
-        for axis, vals in sorted(axis_vals.items()):
-            min_val, max_val = min(vals) - padding, max(vals) + padding
-            bounds.append((min_val, max_val))
-        shape = tuple(len(axis_vals[a]) for a in sorted(axis_vals))
-
-        # Construct the window and assign features
-        window = cls(shape=shape, bounds=tuple(bounds))
-        window.add_full_features(features)
-        return window
+    # Create the integer range, going one step further than 'stop_int' to guarantee inclusion
+    int_range = np.arange(start_int, stop_int + 1) 
     
-    # -----------------------
-    # Basic properties
-    # -----------------------
-    @property
-    def ndim(self) -> int:
-        return len(self.shape)
+    # Scale back down
+    return int_range * step
 
-    @property
-    def extent(self) -> Tuple[float, ...]:
-        return tuple(max_val - min_val for min_val, max_val in self.bounds)
+def linspace_with_step(start, stop, step):
+    """
+    Generates a range using np.linspace that respects exact start/stop points 
+    while accepting a step size input. Includes the stop point.
+    """
+    # Calculate the number of intervals required using integer math logic 
+    # to avoid floating point accumulation errors
+    num_intervals = round((stop - start) / step)
+    
+    # The number of points is the number of intervals + 1 (fencepost error principle)
+    num_points = int(num_intervals) + 1
+    
+    # Use linspace, which is precise with boundaries, now that we have the exact num_points
+    return np.linspace(start, stop, num=num_points, endpoint=True)
 
-    @property
-    def volume(self) -> float:
-        return np.prod(self.extent)
 
-    @property
-    def center(self) -> Tuple[float, ...]:
-        return tuple((min_val + max_val) / 2 for min_val, max_val in self.bounds)
-
-    # -----------------------
-    # Axis utilities
-    # -----------------------
-    def axis_index(self, key: Union[int, str]) -> int:
-        return self._label_to_index[key] if isinstance(key, str) else key
-
-    def axis_bounds(self, key: Union[int, str]) -> Tuple[float, float]:
-        return self.bounds[self.axis_index(key)]
-
-    def axis_extent(self, key: Union[int, str]) -> float:
-        min_val, max_val = self.axis_bounds(key)
-        return max_val - min_val
-
-    def axis_coords(self, key: Union[int, str]) -> np.ndarray:
-        i = self.axis_index(key)
-        n = self.shape[i]
-        min_val, max_val = self.bounds[i]
-        return np.linspace(min_val, max_val, n, endpoint=False)
-
-    def meshgrids(self) -> Tuple[np.ndarray, ...]:
-        coords_1d = [self.axis_coords(i) for i in range(self.ndim)]
-        return np.meshgrid(*coords_1d, indexing='ij')
-
-    def grid_flat(self) -> np.ndarray:
-        grids = self.meshgrids()
-        return np.stack([g.ravel() for g in grids], axis=1)
-
-    def contains(self, points: np.ndarray) -> np.ndarray:
-        points = np.asarray(points)
-        if points.shape[-1] != self.ndim:
-            raise ValueError(f"Points must have {self.ndim} coordinates in last dimension.")
-        
-        inside = np.ones(points.shape[:-1], dtype=bool)
-        
-        # iterate over dimensions(axes) of the domain
-        for i, (min_val, max_val) in enumerate(self.bounds):
-            # in-place "addition" of arrays with booleans - "addition" with AND operator
-            inside &= (points[..., i] >= min_val) & (points[..., i] < max_val)
-        return inside
-
-    # -----------------------
-    # Abstract interface
-    # -----------------------
-    def generate(self) -> np.ndarray:
-        return np.ones(self.shape)
-
-    def __call__(self) -> np.ndarray:
-        return self.generate()
-
-    def __getitem__(self, key):
-        """Access axis coordinates via label or tuple of labels."""
-        if isinstance(key, str):
-            return self.axis_coords(key)
-        elif isinstance(key, (list, tuple)):
-            return tuple(self.axis_coords(k) for k in key)
-        raise TypeError("Key must be a label or sequence of labels.")
-
-    # -----------------------
-    # Feature handling (unchanged)
-    # -----------------------
-    def add_full_feature(self, feature: 'SpectralFeature') -> None:
-        self.full_features.append(feature)
-
-    def add_full_features(self, features: list['SpectralFeature']) -> None:
-        self.full_features.extend(features)
-
-    def features_in_bounds(self) -> list['SpectralFeature']:
-        filtered = []
-        for f in self.full_features:
-            coords = f.location
-            inside = True
-            for label, (min_val, max_val) in zip(self.labels, self.bounds):
-                val = coords[label]
-                if val == "all":
-                    continue
-                if not (min_val <= val < max_val):
-                    inside = False
-                    break
-            if inside:
-                filtered.append(f)
-        return filtered
 

@@ -1,4 +1,5 @@
 from wilson_suite.wilson_intensities.amplitudes import domains
+from ...amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralWindow
 
 
 def test_find_domain_groups_by_distance():
@@ -54,8 +55,10 @@ def get_data_evaluators_tests() -> dict:
     t_inds = [0, 1,-1, -2, -3]
     terms_select: list['VibPerturbedTerm'] = [terms_fuller_flat[tID] for tID in t_inds]
 
+    system = wm_abst.MolecularSystem(name='mock', natoms=3, linear=False)
+
     # vib_ana_setup needs to have vibstates
-    vibana = wm_abst.VibAnaSetup()
+    vibana = wm_abst.VibAnaSetup(system=system)
     vibana.setStates((
             wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
             wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
@@ -78,7 +81,6 @@ def get_data_evaluators_tests() -> dict:
             wm_abst.VibState(harm_quanta_coeffs={(1, 1, 2):1.}, state_label='1,1,2', energy=3594., harmonic_WF=False),
             wm_abst.VibState(harm_quanta_coeffs={(1, 2, 2):1.}, state_label='1,2,2', energy=3642., harmonic_WF=False),
         ))
-    system = wm_abst.MolecularSystem(name='mock', natoms=3, linear=False)
 
     props_data = generate_props_data_Nmodes(system.Nnmodes)
     # cart axes (0, 1, 1, 0) - 0 1 2 3
@@ -99,16 +101,27 @@ def get_data_evaluators_tests() -> dict:
         p = wm_abst.MolecularProperty(prop_spec={}, trivial_name=trname, vals=props_data[trname])
         p.addValues(values=props_data[trname])
         props.append(p)
+    
+    from ...amplitudes.spectrum_composition import SpectralFeature, Box
+    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup, EvaluationInfo
+    from ....fixtures import evv_experiment
 
+    spec_eval_setup = SpecEvalSetup(ev_info=EvaluationInfo(spectral_window=SpectralWindow(box=Box({'A': (1550., 2359.), 
+                                                                                               'B': (800., 1300.)})),
+                                                           Gamma={'A': 9.5, 'B': 16.5}))
+    experiment = evv_experiment()
     return dict(system=system,
                 vib_ana_setup=vibana, 
                 derived_terms=terms_select, 
-                props=props)
+                props=props,
+                experiment=experiment,
+                spec_eval_setup=spec_eval_setup,
+                domain_distance_thresholds={'A': 12., 'B': 12.})
 
 def get_features_from_terms():
 
     datadict = get_data_evaluators_tests()
-    print(datadict['system'].Nnmodes)
+    print(datadict.keys())
 
     features = get_features_from_terms_for_eval(**datadict)
     return features
@@ -174,3 +187,68 @@ def test_find_feature_clusters_by_distance():
         # print(rec_windows_dict[window].bounds)
         print('\n', rec_windows_dict[window])
 
+
+def test_compute_box_adjacency():
+    print()
+    features = get_features_from_terms()
+    # print('features', features)
+    for f in features:
+        print(f.lineshape_parameter)
+    points_from_features = [feat.location._coord_dict for feat in features]
+    halfwidths_list_from_features = [feat.lineshape_parameter for feat in features]
+    
+    rectangular_boxes = domains.points_to_bounds(points_from_features, halfwidths_list_from_features)
+    res = domains.compute_box_adjacency(rectangular_boxes)
+    print(res)
+
+# def test_cluster_features_by_box_overlap_nd():
+#     print()
+#     features = get_features_from_terms()
+#     r = domains.cluster_features_by_box_overlap_nd(features)
+#     for k in r:
+#         print(k, '----\n', r[k], '\n')
+
+
+# def test_make_domains_from_feat_clusters():
+#     print()
+#     features = get_features_from_terms()
+#     clusters = domains.cluster_features_by_box_overlap_nd(features)
+
+#     r = domains.make_domains_from_feat_clusters(clusters)
+#     print(r)
+
+def test_features_to_clusters():
+    print()
+    features = get_features_from_terms()
+    rr = domains.features_to_clusters(features=features)
+
+    for k in rr:
+        print(k, '----\n', rr[k], '\n')
+
+def test_feat_clusters_to_domains():
+    features = get_features_from_terms()
+    feat_clusters = domains.features_to_clusters(features=features)
+    # print('\nfeat_clusters', feat_clusters)
+
+    # from ...amplitudes.spectrum_composition import SpectralFeature
+
+    clusters = []
+    for fc in feat_clusters:
+        # print('\nfeat_clusters[fc]', feat_clusters[fc])
+        clusters.append(RectangularDomain.from_features(feat_clusters[fc]))
+        # clusters.append(RectangularDomain())
+    
+    print('\nclusters', len(clusters))
+    print('\nclusters', clusters)
+    return
+    # domain = RectangularDomain.from_features(features)
+    # domain.bounds.intersect(spec_window_full)
+
+    doms = domains.feat_clusters_to_domains(clusters=clusters)
+    print('doms', doms)
+
+    for d in doms:
+        print(d, '----\n', doms[d], '\n')
+        print('\n[sf.bounds for sf in doms[d]]', [sf.bounds for sf in doms[d]])
+        u = SpectralWindow.union([sf.bounds for sf in doms[d]])
+        print('\n----- union', u)

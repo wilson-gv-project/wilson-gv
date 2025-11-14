@@ -1,6 +1,7 @@
 import numpy as np
 from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
 import wilson_suite.wilson_intensities.amplitudes.resonances as res_funcs
+from ...amplitudes.spectrum_composition import SpectroscopicAxis
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 import wilson_suite.wilson_main.abstractions
@@ -246,3 +247,71 @@ def test_ResonanceMotif():
         print('get_vibdiffs', t_resmotif.get_vibdiffs())
         print('get_freq_axes', t_resmotif.get_freq_axes())
         print('get_nm_indices', t_resmotif.get_nm_indices())
+
+
+def test_fixt():
+    print()
+    from ....fixtures import get_eval_ready_evv_terms, evv_experiment
+    t = get_eval_ready_evv_terms()
+
+    experiment = evv_experiment()
+    valid_axis_combs = experiment.valid_axis_combs
+    for i in valid_axis_combs:
+        print('ind vars?', i)
+        for omg in valid_axis_combs[i]:
+            print('axes_choice', omg)
+    print('\nexperiment.canonical_axes', experiment.canonical_axes)
+    print('\nchosen', experiment.valid_axis_combs[((-1,), (2,))][3], '\n')
+
+    from ...amplitudes.spectrum_composition import SpectroscopicAxes
+    chosen_axes = experiment.valid_axis_combs[((-1,), (2,))][3]
+    axs = []
+    for ax in chosen_axes:
+        # SpectroscopicAxis({ax:chosen_axes[ax]})
+        axis = SpectroscopicAxis(label=ax, indep_vars=tuple(chosen_axes[ax]))
+        axs.append(axis)
+        print(axis, hash(axis))
+    spec_axes = SpectroscopicAxes(tuple(axs))
+    print(spec_axes)
+
+
+
+def test_compute_res_condition():
+    print()
+    from wilson_suite.fixtures import get_terms_from_json, evv_experiment
+    terms_fuller_flat = get_terms_from_json()
+    
+    experiment = evv_experiment()
+
+    from ...amplitudes.spectrum_composition import SpectroscopicAxes
+    chosen_axes = experiment.valid_axis_combs[((-1,), (2,))][3]
+    axs = []
+    for ax in chosen_axes:
+        # SpectroscopicAxis({ax:chosen_axes[ax]})
+        axis = SpectroscopicAxis(label=ax, indep_vars=tuple(chosen_axes[ax]))
+        axs.append(axis)
+        print(axis, hash(axis))
+    
+    spec_axes = SpectroscopicAxes(tuple(axs))
+    print('\nspec_axes', spec_axes)
+    spec_axes_from_dict = SpectroscopicAxes.from_axes_dict(chosen_axes)
+    print('\nchosen_axes', chosen_axes)
+    print('\nspec_axes_from_dict', spec_axes_from_dict)
+
+    assert spec_axes_from_dict == spec_axes
+
+    t_inds = [0, 1, -2, -1]
+    t_inds = [0,]
+    # t_inds = range(len(terms_fuller_flat))
+    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
+
+    experiment = evv_experiment()
+    print('\nexp', experiment.valid_axis_combs)
+    print('\nexp', list(experiment.valid_axis_combs.keys()))
+
+    # print('\nall choices:')
+    # for i in 
+    for t in terms_select:
+        t_resmotif = tparts.ResonanceMotif(t.res)
+        for rc in t_resmotif:
+            res_funcs.compute_res_condition(rc, spec_axes)

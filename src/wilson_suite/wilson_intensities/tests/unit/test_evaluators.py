@@ -1,5 +1,5 @@
 import wilson_suite.wilson_intensities.amplitudes.evaluators as evaluators #terms_evaluator_general, terms_evaluator_general_compilation
-from wilson_suite.wilson_intensities.amplitudes import domains
+from wilson_suite.wilson_intensities.amplitudes import domains as domfuncs
 from ....wilson_main import abstractions as wm_abst
 import numpy as np
 
@@ -190,7 +190,7 @@ def test_evaluate_domain_on_grid():
                                                 derived_terms=terms_select, 
                                                 props=props)
     print('features len', len(features))
-    rec_domains_dict = domains.find_feature_clusters_by_distance(features=features, 
+    rec_domains_dict = domfuncs.find_feature_clusters_by_distance(features=features, 
                                                          distance_thresholds={'A': 10., 'B': 10.}, 
                                                          linkage='single')
     count = 0
@@ -209,5 +209,41 @@ def test_terms_evaluator_general_compilation():
     print()
     from .test_domains import get_data_evaluators_tests
     datadict = get_data_evaluators_tests()
+    print('datadict', list(datadict.keys()))
 
     evaluators.terms_evaluator_general_compilation(**datadict)
+
+def test_evaluate_feature_on_grid():
+    print()
+    from .test_domains import get_features_from_terms, get_data_evaluators_tests
+    datadict = get_data_evaluators_tests()
+    
+    features = get_features_from_terms()
+    print(features)
+
+    spec_window = datadict['spec_eval_setup'].ev_info.spectral_window
+
+    print('\nspec_window', spec_window)
+    from ...amplitudes.spectrum_composition import SpectralFeature, Box, RectangularDomain
+    spec_window_with_features = SpectralFeature.filter_to_spec_window(features, spec_window)
+    print('\nspec_window_with_features', spec_window_with_features)
+
+    feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
+    domains = domfuncs.features_to_clusters(features=feat_all)
+    # print('\ndomains', domains)
+    domains_in_window = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]]), full_features=domains[d]) for d in domains]
+    
+    # print('\ndomains_in_window', domains_in_window)
+    
+    domain3 = domains_in_window[3]
+    d3_all_feats = domain3.full_features + domain3.contrib_features
+    print(d3_all_feats)
+
+    spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
+    subgrids = domfuncs.cut_grid_with_indices_dict_nd(spec_grid, domains_in_window)
+    
+    print('\nsubgrids', subgrids[domain3])
+
+    terms_hashes = {t.h(): t for t in datadict['derived_terms']}
+    evaluators.evaluate_feature_on_grid(feature=d3_all_feats[0], meshgrids=subgrids[domain3]['grid'], terms_hashes=terms_hashes)
+

@@ -5,7 +5,8 @@ RESONANCES in VibPerturbedTerm
 import numpy as np
 from wilson_suite.wilson_analysis.render.render import get_axes_in_resmotif
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif, GeometricObject
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiff, VibDiffCache
 import copy
 
@@ -66,7 +67,7 @@ def generate_LHS_motif(motif: ResonanceMotif):
         coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
 
         for alpha_label, coefficient in coeffs.items():
-             # Reverse the sign and place it in the correct position
+             # Reverse the sign (FIXME???) and place it in the correct position
              coeff_matrix[i, num_cap_alpha_labels[alpha_label]] = -1 * np.sign(coefficient)
 
     return coeff_matrix
@@ -101,7 +102,7 @@ def get_RHS_motif(motif: ResonanceMotif,
 def solve_LSE_motif(motif: ResonanceMotif,
                     parameters: ParameterSet, vibdata: VibStatesData,
                     vibdiff_cache: VibDiffCache,
-                    unit: str='Eh') -> GeometricObject:
+                    unit: str='Eh') -> ResLocGeoObject:
     """
     solving a linear system of equations
     coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
@@ -123,7 +124,7 @@ def solve_LSE_motif(motif: ResonanceMotif,
         from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
         num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
 
-        return GeometricObject({num_to_ax[i]: float(val) for i, val in enumerate(solution)})
+        return ResLocGeoObject({num_to_ax[i]: float(val) for i, val in enumerate(solution)})
     except np.linalg.LinAlgError as e:
         print("Error solving linear system:", e)
 
@@ -141,7 +142,7 @@ def _generate_index_choices(motif: ResonanceMotif, vibstates_data: 'VibStatesDat
 def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
                                                vibstates_data: 'VibStatesData',
                                                vibdiff_cache: 'VibDiffCache',
-                                               spec_window=None) -> dict[ResonanceMotif,dict[GeometricObject,list]]:
+                                               spec_window=None) -> dict[ResonanceMotif,dict[ResLocGeoObject,list]]:
     """
     """
     from ..amplitudes.term_parts import ParameterSet
@@ -154,7 +155,7 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     #           (500., 1400.): [(1, 4)], ...}}
 
     # results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
-    results: dict[ResonanceMotif,dict[GeometricObject,list]] = {motif: {}}
+    results: dict[ResonanceMotif,dict[ResLocGeoObject,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
 
@@ -218,4 +219,12 @@ def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):
 
     axes_in_these_terms = set([ax_tuple[0].strip('-') for ax_tuple in axes])
     return len(axes_in_these_terms)
+
+
+def compute_res_condition(res_cond: ResonanceCondition, spec_axes):
+    
+    axis_tupleID: tuple[str] = tuple(res_cond.pf)
+    sign_coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
+    print(sign_coeffs)
+    return
 

@@ -1,231 +1,226 @@
-from ...amplitudes.term_parts import SpectralWindow, RectangularWindow
+from ...amplitudes.spectrum_composition import Box, ResLocGeoObject, SpectralWindow, RectangularDomain, Grid
+from ...amplitudes.spectrum_composition import SpectralFeature
 from dataclasses import dataclass
 import numpy as np
 import pytest
 
-def test_cannot_instantiate_abstract_class():
-    """SpectralWindow cannot be instantiated directly."""
-    with pytest.raises(TypeError, match="Can't instantiate abstract class SpectralWindow without an implementation for abstract method 'generate'"):
-        SpectralWindow((10,))
-
-
-def test_cannot_instantiate_direct_subclass_without_implementation():
-    """Direct subclass without generate() implementation cannot be instantiated."""
-    @dataclass
-    class IncompleteWindow(SpectralWindow):
-        pass
-    
-    with pytest.raises(TypeError):
-        IncompleteWindow((10,))
-
-
-def test_rectangular_1d_window():
-    """Test 1D rectangular window."""
-    window = RectangularWindow((64,))
-    result = window.generate()
-    
-    assert result.shape == (64,)
-    assert result.ndim == 1
-    assert np.all(result == 1.0)
-    assert result.dtype == np.float64
-
-
-def test_rectangular_2d_window():
-    """Test 2D rectangular window."""
-    window = RectangularWindow((32, 48))
-    result = window.generate()
-    print('\n', result)
-
-    assert result.shape == (32, 48)
-    assert result.ndim == 2
-    assert np.all(result == 1.0)
-    assert window.ndim == 2
-
-
-def test_rectangular_3d_window():
-    """Test 3D rectangular window."""
-    window = RectangularWindow((16, 16, 16))
-    result = window.generate()
-    
-    assert result.shape == (16, 16, 16)
-    assert result.ndim == 3
-    assert np.all(result == 1.0)
-    assert window.ndim == 3
-
-
-def test_callable_interface():
-    """Test that window can be called like a function."""
-    window = RectangularWindow((10, 10))
-    result1 = window.generate()
-    result2 = window()
+def test_spectral_window():
     print()
-    print(result1)
-    print(result2)
 
-    assert np.array_equal(result1, result2)
+    sw1d = SpectralWindow(bounds=((5., 10.),))
+
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 3.5})
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 3.5})
+    res_loc1d_c = ResLocGeoObject({'A': 9.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 3.5})
 
 
-def test_asymmetric_shape():
-    """Test window with asymmetric shape."""
-    window = RectangularWindow((10, 20, 30))
-    result = window.generate()
+
+def test_filter_to_spec_window():
+    print()
+
+    sw1d = SpectralWindow(box=Box({'A': (5., 10.)}))
+
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 1.5})
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 1.5})
+    res_loc1d_c = ResLocGeoObject({'A': 3.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 1.5})
+
+    sp = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3], sw1d)
+    print(sp)
+
+    print('\nfull_features', sp.full_features)
+    print('\ncontrib_features', sp.contrib_features)
+
+    q = SpectralFeature.find_clusters_by_distance(spec_features=sp.full_features, 
+                                                  distance_thresholds={'A': 6.},
+                                                  linkage='ward')    
+    print('\n', q)
+    print(len(q))
+
+
+def test_filter_to_spec_window_2():
+    print()
+    sw1d_a = SpectralWindow(box=Box({'A': (5., 30.)}))
+
+    res_loc1d_d = ResLocGeoObject({'A': 15.})
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5}, term_contributions=())
+    res_loc1d_e = ResLocGeoObject({'A': 27.5})
+    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5}, term_contributions=())
+    res_loc1d_f = ResLocGeoObject({'A': 5.5})
+    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5}, term_contributions=())
+    res_loc1d_g = ResLocGeoObject({'A': 4.})
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5}, term_contributions=())
+    res_loc1d_h = ResLocGeoObject({'A': 36.})
+    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5}, term_contributions=())
+
+    spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3, sf4, sf5], sw1d_a)
+    print('\n', spec_window1)
+
+    print('\nfull_features', len(spec_window1.full_features), spec_window1.full_features)
+    print('\ncontrib_features', len(spec_window1.contrib_features), spec_window1.contrib_features)
     
-    assert result.shape == (10, 20, 30)
-    assert np.all(result == 1.0)
-
-
-def test_single_element_dimensions():
-    """Test window with single element in some dimensions."""
-    window = RectangularWindow((1, 10, 1))
-    result = window.generate()
+    from wilson_suite.wilson_intensities.amplitudes import domains
+    feat_all = spec_window1.full_features + spec_window1.contrib_features
+    doms = domains.features_to_clusters(features=feat_all)
+    print('\n\ndoms\n', doms)
+    for d in doms:
+        print('\n', d)
+        print(doms[d])
     
-    assert result.shape == (1, 10, 1)
-    assert np.all(result == 1.0)
+    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]])) for d in doms]
 
+    # print('\n')
+    # for d in formal_doms:
+    #     print(d, '\n')
+    print('\n(spec_window1.box)', spec_window1.box)
 
-def test_ndim_property():
-    """Test ndim property returns correct dimensionality."""
-    assert RectangularWindow((10,)).ndim == 1
-    assert RectangularWindow((10, 10)).ndim == 2
-    assert RectangularWindow((10, 10, 10)).ndim == 3
+    for rd in formal_doms:
+        rd.box = rd.box.intersect(spec_window1.box)
 
+    print('\n')
+    for d in formal_doms:
+        print(d, '\n')
 
-def test_multiple_generate_calls_consistent():
-    """Test that multiple calls to generate() produce consistent results."""
-    window = RectangularWindow((20, 20))
-    result1 = window.generate()
-    result2 = window.generate()
+    gr = spec_window1.sample_grid({'A': 100})
+    print(gr.T)
+    # gr = spec_window1.sample_grid({'A': 40})
+    # print(gr.T)
+    # gr = spec_window1.sample_grid({'A': 20})
+    # print(gr.T)
+    # Grid()
+    print('\n(spec_window1)', spec_window1)
     
-    assert np.array_equal(result1, result2)
-    assert result1 is not result2  # Should be different objects
 
 
-def test_default_bounds():
-    """Test default bounds are set correctly."""
-    window = RectangularWindow((10, 20))
+def cut_grid_with_indices_dict(grid: dict[str, np.ndarray], domains: list):
+    """
+    Cut subgrids from a structured 2D meshgrid so that both bounds are covered.
+    Returns a dict mapping each domain.box -> {'A', 'B', 'indices'}.
+    """
+    A = grid['A']
+    B = grid['B']
+    a_coords = np.unique(A[:, 0])
+    b_coords = np.unique(B[0, :])
+
+    subgrids = {}
+
+    for domain in domains:
+        box = domain.box
+        bounds = box.bounds
+        a_min, a_max = bounds['A']
+        b_min, b_max = bounds['B']
+
+        # Find index ranges covering the bounds
+        i_min = np.searchsorted(a_coords, a_min, side="right") - 1
+        i_max = np.searchsorted(a_coords, a_max, side="left")
+        j_min = np.searchsorted(b_coords, b_min, side="right") - 1
+        j_max = np.searchsorted(b_coords, b_max, side="left")
+
+        # Clamp to grid limits
+        i_min = max(i_min, 0)
+        j_min = max(j_min, 0)
+        i_max = min(i_max, len(a_coords) - 1)
+        j_max = min(j_max, len(b_coords) - 1)
+
+        # Extract subgrids
+        sub_A = A[i_min:i_max + 1, j_min:j_max + 1]
+        sub_B = B[i_min:i_max + 1, j_min:j_max + 1]
+
+        # Store in dict
+        subgrids[box] = {
+            "A": sub_A,
+            "B": sub_B,
+            "indices": (slice(i_min, i_max + 1), slice(j_min, j_max + 1))
+        }
+
+    return subgrids
+
+
+
+def test_filter_to_spec_window_2_2d():
+    print()
+    sw1d_a = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
+
+    res_loc1d_d = ResLocGeoObject({'A': 15., 'B': 55.})
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    res_loc1d_e = ResLocGeoObject({'A': 27.5, 'B': 58.8})
+    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    res_loc1d_f = ResLocGeoObject({'A': 5.5, 'B': 47.2})
+    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    res_loc1d_g = ResLocGeoObject({'A': 4., 'B': 43.8})
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    res_loc1d_h = ResLocGeoObject({'A': 36., 'B': 46.2})
+    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+
+    spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3, sf4, sf5], sw1d_a)
+    print('\n', spec_window1)
+
+    print('\nfull_features', len(spec_window1.full_features), spec_window1.full_features)
+    print('\ncontrib_features', len(spec_window1.contrib_features), spec_window1.contrib_features)
     
-    assert window.bounds == ((0.0, 10.0), (0.0, 20.0))
-
-
-def test_custom_bounds():
-    """Test custom bounds."""
-    window = RectangularWindow((10, 20), bounds=((-5.0, 5.0), (0.0, 100.0)))
+    from wilson_suite.wilson_intensities.amplitudes import domains
+    feat_all = spec_window1.full_features + spec_window1.contrib_features
+    doms = domains.features_to_clusters(features=feat_all)
+    print('\n\ndoms\n', doms)
+    for d in doms:
+        print('\n', d)
+        print(doms[d])
     
-    assert window.bounds == ((-5.0, 5.0), (0.0, 100.0))
+    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]])) for d in doms]
 
+    print('\n(spec_window1.box)', spec_window1.box)
 
-def test_bounds_dimensionality_mismatch():
-    """Test that mismatched bounds dimensionality raises error."""
-    with pytest.raises(ValueError, match="bounds must match shape dimensionality"):
-        RectangularWindow((10, 20), bounds=((-5.0, 5.0),))
+    for rd in formal_doms:
+        rd.box = rd.box.intersect(spec_window1.box)
 
+    print('\n')
+    for d in formal_doms:
+        print(d, '\n')
 
-def test_grid_1d():
-    """Test grid generation for 1D window."""
-    window = RectangularWindow((5,), bounds=((0.0, 10.0),))
-    grids = window.meshgrids()
+    spec_grid = spec_window1.sample_grid({'A': 10, 'B': 10})
+    print(spec_grid)
+    print('\n(spec_window1)', spec_window1)
     
-    assert len(grids) == 1
-    assert grids[0].shape == (5,)
-    np.testing.assert_array_almost_equal(grids[0], [0.0, 2.0, 4.0, 6.0, 8.0])
 
-
-def test_grid_2d():
-    """Test grid generation for 2D window."""
-    window = RectangularWindow((3, 4), bounds=((-1.0, 2.0), (0.0, 4.0)))
-    grids = window.meshgrids()
+    subgrids = domains.cut_grid_with_indices_dict_nd(spec_grid, formal_doms)
+    print('\n')
+    for d in subgrids:
+        print(d)
+        print(subgrids[d], '\n')
+        print(spec_grid['B'][subgrids[d]['indices']])
     
-    assert len(grids) == 2
-    assert grids[0].shape == (3, 4)
-    assert grids[1].shape == (3, 4)
+    domains.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values()))
+    print('\n\n', spec_grid['result'])
 
 
-def test_grid_flat_1d():
-    """Test flattened grid for 1D window."""
-    window = RectangularWindow((5,), bounds=((0.0, 5.0),))
-    flat_grid = window.grid_flat()
+def test_SpectralWindow_intersect():
+    print()
+    domain_a = SpectralWindow(bounds=((5., 30.),))
     
-    assert flat_grid.shape == (5, 1)
-    np.testing.assert_array_almost_equal(flat_grid[:, 0], [0.0, 1.0, 2.0, 3.0, 4.0])
+    sw1d_b = SpectralWindow(bounds=((1., 33.),))
+    print(domain_a.intersect(sw1d_b))
 
-
-def test_grid_flat_2d():
-    """Test flattened grid for 2D window."""
-    window = RectangularWindow((2, 3), bounds=((0.0, 2.0), (0.0, 3.0)))
-    flat_grid = window.grid_flat()
+    sw1d_c = SpectralWindow(bounds=((15., 20.),))
+    print(domain_a.intersect(sw1d_c))
     
-    assert flat_grid.shape == (6, 2)
-    assert flat_grid.shape[0] == 2 * 3  # Total points
+    sw1d_d = SpectralWindow(bounds=((18., 20.),))
+    print(domain_a.intersect(sw1d_d))
 
 
-def test_contains_inside():
-    """Test points inside bounds."""
-    window = RectangularWindow((10, 10), bounds=((0.0, 10.0), (0.0, 10.0)))
+def test_SpectralWindow_intersect_2d():
+    print()
+    domain_a = SpectralWindow(bounds=((5., 30.), (45., 50.)))
     
-    points = np.array([[5.0, 5.0], [1.0, 9.0], [0.0, 0.0]])
-    result = window.contains(points)
+    sw1d_b = SpectralWindow(bounds=((1., 33.),(55., 57.)))
+    assert domain_a.intersect(sw1d_b) is None 
+
+    sw1d_c = SpectralWindow(bounds=((15., 20.), (41., 57.)))
+    assert domain_a.intersect(sw1d_c).bounds == ((15.0, 20.0), (45.0, 50.0))
     
-    assert np.all(result == [True, True, True])
-
-
-def test_contains_outside():
-    """Test points outside bounds."""
-    window = RectangularWindow((10, 10), bounds=((0.0, 10.0), (0.0, 10.0)))
-    
-    points = np.array([[10.0, 5.0], [-1.0, 5.0], [5.0, 10.0]])
-    result = window.contains(points)
-    
-    assert np.all(result == [False, False, False])
-
-
-def test_contains_mixed():
-    """Test mix of inside and outside points."""
-    window = RectangularWindow((10, 10), bounds=((0.0, 10.0), (0.0, 10.0)))
-    
-    points = np.array([[5.0, 5.0], [15.0, 5.0], [5.0, -1.0]])
-    result = window.contains(points)
-    
-    assert np.all(result == [True, False, False])
-
-
-def test_contains_wrong_dimensionality():
-    """Test contains with wrong number of dimensions."""
-    window = RectangularWindow((10, 10))
-    
-    with pytest.raises(ValueError, match="must have.*coordinates"):
-        window.contains(np.array([[1.0, 2.0, 3.0]]))
-
-
-def test_extent():
-    """Test extent calculation."""
-    window = RectangularWindow((10, 20), bounds=((-5.0, 5.0), (0.0, 100.0)))
-    
-    assert window.extent == (10.0, 100.0)
-
-
-def test_volume_1d():
-    """Test volume for 1D window (length)."""
-    window = RectangularWindow((10,), bounds=((0.0, 10.0),))
-    
-    assert window.volume == 10.0
-
-
-def test_volume_2d():
-    """Test volume for 2D window (area)."""
-    window = RectangularWindow((10, 20), bounds=((0.0, 5.0), (0.0, 10.0)))
-    
-    assert window.volume == 50.0
-
-
-def test_volume_3d():
-    """Test volume for 3D window."""
-    window = RectangularWindow((10, 10, 10), bounds=((0.0, 2.0), (0.0, 3.0), (0.0, 4.0)))
-    
-    assert window.volume == 24.0
-
-
-def test_center():
-    """Test center calculation."""
-    window = RectangularWindow((10, 20), bounds=((-5.0, 5.0), (0.0, 100.0)))
-    
-    assert window.center == (0.0, 50.0)
+    sw1d_d = SpectralWindow(bounds=((33., 35.), (41., 47.)))
+    assert domain_a.intersect(sw1d_d) is None
