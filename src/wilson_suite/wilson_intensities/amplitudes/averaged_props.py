@@ -120,13 +120,14 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
 
     """
     mode_inds = set(avrg_expression.get_mode_indices())
+    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
 
     # Indicating generalized version for updating
     func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
-    for idx in nm_inds_choices:
+    for idx in ind_choices:
         full_tensor[tuple(dict(sorted(idx.items())).values())] = func_general(idx, props_data)
 
     return full_tensor

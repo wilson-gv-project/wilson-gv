@@ -510,7 +510,7 @@ def find_axes_recursion(ind_vars: tuple, valid_axes: list, curr_ax_list: list, p
             # New recursion with entry from superset
             find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
 
-def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict:
+def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict[tuple, list[dict]]:
     """
     Find valid axes choices for one phase-matching direction.
 
@@ -559,7 +559,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict:
 
     return valid_axes
 
-def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict:
+def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict[str, list[tuple]]:
     """
     Find canonical axes for one phase-matching direction.
 
@@ -607,7 +607,7 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict:
     return canonical_axes
 
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
-def find_canonical_axes(all_ind_var_cfgs_p):
+def find_canonical_axes(all_ind_var_cfgs_p: dict) -> dict[str, list[tuple]]:
     """
     Find canonical axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
 
@@ -635,7 +635,7 @@ def find_canonical_axes(all_ind_var_cfgs_p):
     return final_canonical_axes
 
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
-def find_valid_axes(all_ind_var_cfgs_p: dict) -> dict:
+def find_valid_axes(all_ind_var_cfgs_p: dict) -> dict[tuple, list[dict[str, list[tuple]]]]:
     """
     Find valid axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
 

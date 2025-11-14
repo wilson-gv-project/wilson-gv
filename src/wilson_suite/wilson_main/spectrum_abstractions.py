@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
 
 import logging
 logger = logging.getLogger("wilson")
@@ -260,14 +261,15 @@ class EvaluationInfo:
 	fixed_variables - a dict of values for the non-varied fixed variables 
 		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
 	"""
-	freq_variables: dict
-	Gamma: dict
-	Gamma_unit: str
+	freq_variables: dict = None
+	Gamma: dict = None
+	Gamma_unit: str = None
 	freq_condition: str = None
 	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 	spec_result: np.ndarray | dict = None
 	margins: dict = None
+	spectral_window: SpectralWindow = None
 
 	@property
 	def spec_window_bounds(self):

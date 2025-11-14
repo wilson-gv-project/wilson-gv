@@ -355,6 +355,10 @@ class ResonanceCondition:
         self.pf = pf
         self.id = id
 
+    @property
+    def pf_dict(self):
+        return {i.strip('-'): -1 if '-' in i else 1 for i in self.pf}
+
     def __repr__(self):
         return f'ResCond(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
 
