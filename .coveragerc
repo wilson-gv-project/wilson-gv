@@ -1,0 +1,18 @@
+[run]
+branch = True
+source = wilson_suite
+omit =
+    */__init__.py
+    */tests/*
+    */test_*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    @abc.abstractmethod
+
+precision = 2
+show_missing = True
+skip_covered = True
+
