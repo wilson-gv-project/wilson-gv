@@ -302,6 +302,7 @@ class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] # grouped by res_motif
     lineshape_parameter: dict
+    lineshape_parameter_single: float = 1.5
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
@@ -390,8 +391,8 @@ class SpectralFeature:
 
         return rec_windows_dict
 
-    def get_res_motifs(self, terms_hashes: dict[int, 'VibPerturbedTerm']) -> list[ResonanceMotif]:
-        return [i.get_res_motifs(terms_hashes) for i in self.term_contributions]
+    def get_res_motifs(self) -> list[ResonanceMotif]:
+        return [i.res_motif for i in self.term_contributions]
 
 
 @dataclass

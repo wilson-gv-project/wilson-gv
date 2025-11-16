@@ -251,6 +251,7 @@ class VibDiff:
                     index_dict: dict,
                     vibstates_data: VibStatesData) -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
+        # print('\nindex_dict', index_dict, type(index_dict))
         # Get state labels from symbolic term
         left_label, right_label = make_vibdiff_key(vibdiff_term_symb, index_dict)
         # Look up states in vibstates_data
@@ -382,26 +383,6 @@ def make_sorted_vibdiff_key(left: str, right: str) -> tuple[str, str]:
         return (left, right)
     return (right, left)
 
-
-def compute_vibdiff_w_bank(vibdiff_term: VibDiffTerm, index_dict: dict, 
-                           vibdiff_bank: VibDiffCache, 
-                           vibstates_data: VibStatesData):
-    """
-    vibdiff_term   - symbolic expression
-    index_dict     - values for symbols => index tuple or index key label
-    vibstates_data - vib states data 
-
-    vibdiff_bank   - compute and register if not there; if there - retrieve
-    """
-    # diff_tuple_label = make_sorted_vibdiff_key(*make_vibdiff_key(vibdiff_term, index_dict))
-    diff_tuple_label = make_vibdiff_key(vibdiff_term, index_dict)
-    print('diff_tuple_label', diff_tuple_label)
-    if not vibdiff_bank.get(diff_tuple_label):
-
-        e_value = compute_vibdiff(diff_tuple_label, vibstates_data)
-        vibdiff_bank.register(diff_tuple_label, e_value=e_value)
-    print('vibdiff_bank', vibdiff_bank)
-    return vibdiff_bank.get(diff_tuple_label)
 
 def compute_vibdiff(diff_tuple_label: tuple[str, str], vibstates_data: VibStatesData):
     """

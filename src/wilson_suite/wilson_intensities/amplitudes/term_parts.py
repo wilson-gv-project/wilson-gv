@@ -1,5 +1,6 @@
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscStateSymbolic, PolProp, VibDiffTerm
 from dataclasses import dataclass
+from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import NumericalResonanceMotif
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
 from ...wilson_derive.abstractions import VibPerturbedTerm
@@ -307,10 +308,10 @@ class VibStatesData:
 @dataclass()
 class EvaluationDataAndConfigs:
     # props_data: list['MolecularProperty']
-    props_data: MolPropsCollection
-    vibstates_data: 'VibStatesData'
-    number_of_nmodes: int
-    nm_inds_choices: list[int]
+    props_data: MolPropsCollection = None
+    vibstates_data: 'VibStatesData' = None
+    number_of_nmodes: int = None
+    nm_inds_choices: list[int] = None
     vibdiff_cache: 'VibDiffCache' = None
     avrg_tensors: dict = None
     avrg_expr_tensor_mapping: dict = None
@@ -324,7 +325,7 @@ class TermParametersChoice:
     term_key - hash(VibPerturbedTerm)
     now those terms would have the same res_motif
     """
-    term_keys: tuple[int]
+    terms: tuple[VibPerturbedTerm]
     states_parameters: tuple[ParameterSet]
 
     def __hash__(self) -> int:
@@ -336,11 +337,13 @@ class TermParametersChoice:
         return (self.term_keys == other.term_keys and 
                 self.states_parameters == other.states_parameters)
 
-    def get_res_motifs(self, terms_hashes: dict[int, 'VibPerturbedTerm']):
-        """
-        terms_for_motifs - dict[ResonanceMotif, list['VibPerturbedTerm']]
-        """
-        resmotifs_here = [ResonanceMotif(terms_hashes[term_hash].res) for term_hash in self.term_keys]
+    @property
+    def term_keys(self) -> tuple[int]:
+        return tuple(t.h() for t in self.terms)
+
+    @property
+    def res_motif(self):
+        resmotifs_here = [ResonanceMotif(term.res) for term in self.terms]
 
         if len(set(resmotifs_here)) == 1:
             return resmotifs_here[0]
@@ -399,4 +402,65 @@ def linspace_with_step(start, stop, step):
     return np.linspace(start, stop, num=num_points, endpoint=True)
 
 
+from typing import Callable
 
+@dataclass
+class EvalTerm:
+    """
+    Parametrized term - VibPertTerm but with abc parameters specified.
+
+    resonance_function - resonance part parametrized for this term
+    """
+    prefactor: float
+    # function of grid → value
+    resonance_function: Callable[[ParameterSet, VibStatesData, 'VibDiffCache', float], float]
+    parameters: dict                              # anything needed for the term
+
+@dataclass
+class EvalFeature:
+    location: dict  # {'A':1100,'B':2300}
+    terms: list[EvalTerm]
+    amplitude: float
+    lineshape_param: float
+
+def evaluate_resonance(motif: NumericalResonanceMotif,
+                       mesh: dict[str, np.ndarray],
+                       gamma: float) -> np.ndarray:
+    total = 0
+    for term in motif.res_conds:
+        pfreq = sum(mesh[ax] * term.pf_dict[ax] for ax in term.axes)
+        z = term.vib_energy_diff - pfreq - 1j * gamma
+        total += term.coef / z
+    return total
+
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
+
+def make_resonance_function(res_motif: ResonanceMotif, 
+                            meshgrids: dict[str, np.ndarray]) -> Callable:
+    """
+    take symbolic ResonanceMotif and make a function for 
+    """
+    pfreqs_for_res_motif = {}
+    
+    for rc in res_motif:
+        pfreqs_for_res_motif[rc] = sum([meshgrids[ax.strip('-')] * rc.pf_dict[ax.strip('-')] for ax in rc.pf])
+    
+    def param_func(param_set: ParameterSet, vibstates_data: VibStatesData, 
+                   vibdiff_cache: 'VibDiffCache', lineshape_parameter: float):
+        rs_difs_num = []
+        
+        for rc in res_motif:
+            # for each resonace condition (rc) compute vibdiff part
+            vd = vediff.VibDiff.from_symbolic(rc.diff, param_set, vibstates_data)
+            vd.cache_it(vibdiff_cache)
+            print('\nvd', vd)
+            # for this resonance condition get grids for axes
+
+            # in reciprocal centimeters
+            rc_num = vd.energy_difference(au=False) - pfreqs_for_res_motif[rc] - 1j*lineshape_parameter
+            
+            # in au
+            rs_difs_num.append(convNu2Ene(rc_num))
+        return 
+    
+    return param_func

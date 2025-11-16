@@ -1,6 +1,7 @@
 """
 Evaluator functions for WilsonSimulation
 """
+from .numerical_abstractions import NumericalResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralFeature, SpectralWindow, Box
 from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
@@ -8,7 +9,7 @@ from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData, ResonanceCondition
 import wilson_suite.wilson_intensities.amplitudes.domains as domfuncs
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from wilson_suite.wilson_intensities.amplitudes.term_parts import (ResonanceMotif, VibStatesData, EvaluationDataAndConfigs, ParameterSet,
@@ -155,21 +156,97 @@ def evaluate_on_grid(grid_info_dict: dict['RectangularDomain', dict]) -> np.ndar
 def evaluate_domain_on_grid(domain: 'RectangularDomain', domain_grid):
     return
 
+
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
+
 def evaluate_feature_on_grid(feature: SpectralFeature, 
                              meshgrids: dict[str, np.ndarray],
-                             terms_hashes: dict[int, 'VibPerturbedTerm']) -> np.ndarray:
-    coeff = feature.amplitude_coeff
-    res_motifs = feature.get_res_motifs(terms_hashes)
-    # print('\nres_motifs', res_motifs)
+                             necessary_data: EvaluationDataAndConfigs) -> np.ndarray:
+
+    # one res motif per a group of terms contributing (united by same res motif)
+    # one res motif per TermParametersChoice
+
+    term_contributions_rcs: dict[int, list] = {}
+    states_parameters: dict[int, list] = {}
+
+    for i, term_group in enumerate(feature.term_contributions):
+        states_parameters[i] = []
+        term_contributions_rcs[i] = []
+        
+        for st_params in term_group.states_parameters:
+            states_parameters[i].append(st_params)
+
+        for rc in term_group.res_motif:
+            term_contributions_rcs[i].append(rc)
+
+
+    # collect for each term_group_i (one motif group) results for each parameter set
+    resonances_t: dict[int, list] = {}
+
+    for term_group_i in states_parameters:
+        # in one terms group
+        term_rcs: list[ResonanceCondition] = term_contributions_rcs[term_group_i]
+        
+        resonances_t[term_group_i] = {}
+
+        for params in states_parameters[term_group_i]:
+            # for combination of parameters for this terms group
+            
+            rs_difs_num = []
+            
+            for rc in term_rcs:
+                # for each resonace condition (rc) compute vibdiff part
+                vd = vediff.VibDiff.from_symbolic(rc.diff, params, necessary_data.vibstates_data)
+                vd.cache_it(necessary_data.vibdiff_cache)
+                print('\nvd', vd)
+                
+                # for this resonance condition get grids for axes
+                pfreqs = sum([meshgrids[ax.strip('-')] * rc.pf_dict[ax.strip('-')] for ax in rc.pf])
+
+                # in reciprocal centimeters
+                rc_num = vd.energy_difference(au=False) - pfreqs - 1j*feature.lineshape_parameter_single
+                
+                # in au
+                rs_difs_num.append(convNu2Ene(rc_num))
+
+            from functools import reduce
+            import operator
+
+            product = reduce(operator.mul, rs_difs_num)
+            resonances_t[term_group_i][params] = 1./product
+
+    # now sum up all results with their coeffs
+    full_result = 0. + 0.j
+    for term_group_i in resonances_t:
+        this_motif_result = 0. + 0.j
+        for param_set in resonances_t[term_group_i]:
+            this_motif_result += resonances_t[term_group_i][param_set]
+        full_result += this_motif_result
+    # grid multiplied with the total coefficient here
+    return full_result * feature.amplitude_coeff
+
+from .term_parts import EvalFeature
+
+def evaluate_eval_feature_on_grid(
+    feature: EvalFeature,
+    meshgrid: dict[str, np.ndarray],
+) -> np.ndarray:
     
-    rc_for_product = []
+    result = 0
+    for term in feature.terms:
+        term_val = term.resonance_function(meshgrid)
+        result += term.prefactor * term_val
+    return result * feature.amplitude
 
-    for motif in res_motifs:
-        print('\n', motif, 'pfs:', motif.get_freq_axes())
-        for rc in motif:
-            print('\nrc.pf', rc.pf, rc.pf_dict)
-
-    return
+def evaluate_resonance_on_grid(compiled: NumericalResonanceMotif,
+                               meshgrids: dict[str, np.ndarray],
+                               gamma: float):
+    total = 0
+    for res_conds in compiled.res_conds:
+        pfreq = sum(meshgrids[ax] * res_conds.pf_dict[ax] for ax in res_conds.pf_dict)
+        z = res_conds.vib_energy_diff - pfreq - 1j*gamma
+        total += 1. / z
+    return total
 
 
 def initialize_evaluation_data(system: 'MolecularSystem',
@@ -268,7 +345,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             # disregard locations where coefficient is zero
             if amplitude_coeff != 0.:
                 spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=tuple([TermParametersChoice(term_keys=tuple(t.h() for t in terms_for_motifs[res_motif]),
+                                            term_contributions=tuple([TermParametersChoice(terms=tuple(terms_for_motifs[res_motif]),
                                                                                     states_parameters=lst_params)]),
                                             lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
                                             amplitude_coeff=amplitude_coeff)

@@ -75,7 +75,8 @@ def identify_precalc_unique_coeff_parts(terms: list['VibPerturbedTerm']) -> dict
             'vibdiff_motifs': vediff.identify_unique_vibdiff_motifs(terms)
             }
 
-def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: EvaluationDataAndConfigs):
+def precalculate_unique_coeff_parts(need_to_precalc: dict, 
+                                    data_and_configs: EvaluationDataAndConfigs):
     """
         data = {'avrg_tensors': {}}
 
@@ -85,7 +86,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict, data_and_configs: Eva
     data.avrg_tensors = {}
     data.avrg_expr_tensor_mapping = need_to_precalc['avrg_expr_tensor_mapping']
     data.vibenedenoms_tensors = {}
-
+    # print('\ndata_and_configs.props_data', data_and_configs.props_data, type(data_and_configs.props_data))
     for avrg_tensor in need_to_precalc['avrg_tensors']:
         data.avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
                                                                         pulse_polarization_vector=data_and_configs.pulse_polarization_vector,

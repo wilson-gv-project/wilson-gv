@@ -196,8 +196,8 @@ def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['S
     # feature_boxes = points_to_bounds(points_from_features, halfwidths_list_from_features)
     feature_boxes = [f.feat_box for f in features]
     feature_ls = [f.lineshape_parameter for f in features]
-    print('feature_boxes', feature_boxes)
-    print('feature_ls', feature_ls)
+    # print('feature_boxes', feature_boxes)
+    # print('feature_ls', feature_ls)
     adjacency = compute_box_adjacency(feature_boxes)
 
     return connected_components_from_adjacency(adjacency, features)

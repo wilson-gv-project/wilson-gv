@@ -78,7 +78,7 @@ def test_feature_get_res_motifs():
     terms_hashes = {t.h(): t for t in terms_select}
     # print(terms_hashes)
     
-    res_motifs_feat0 = features[0].get_res_motifs(terms_hashes)
+    res_motifs_feat0 = features[0].get_res_motifs()
     
     print(res_motifs_feat0)
     for refmotif in res_motifs_feat0:
