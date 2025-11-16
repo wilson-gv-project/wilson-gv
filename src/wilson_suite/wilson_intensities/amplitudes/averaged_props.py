@@ -71,6 +71,16 @@ def make_gen_func_to_compute_avrg(*,
         """
         index_choices: dict, props_data: 'MolPropsCollection'
         """
+        # print('type props_data', type(props_data))
+        if not isinstance(props_data, MolPropsCollection):
+            if isinstance(props_data, list):
+                if isinstance(props_data[0], MolPropsCollection):
+                    props_data = MolPropsCollection(props_data)
+                else:
+                    raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
+            else:
+                raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
+        
         from ..utils.spectrum_utils import greek_list, num_Greek
         from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
