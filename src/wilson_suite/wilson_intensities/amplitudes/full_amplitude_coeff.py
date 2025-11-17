@@ -99,7 +99,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict,
     data.vibdiff_cache = vediff.VibDiffCache()
     return data
 
-
+# NOTE: Have a more thorough look at this together
 def evaluate_term_coeffs(term: 'VibPerturbedTerm', 
                          relevant_indices: list[dict], 
                          necessary_data: EvaluationDataAndConfigs, 
