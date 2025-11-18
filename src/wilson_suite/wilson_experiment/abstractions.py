@@ -5,6 +5,86 @@ import copy
 
 from wilson_suite.wilson_derive.abstractions import HarmOscStateSymbolic
 
+@dataclass
+class PhaseMatchingCondition:
+    """
+    Class to represent a phase-matching condition
+
+    pulse_id_signs: A dictionary of {pulse id: sign} pairs (both are integers).
+    Example: For the phase-matching condition -k1 + k2 + k3, pulse_id_signs is {1: -1, 2: 1, 3: 1}
+
+    phasematch_cond_id: Optional argument defining an identifier for this phase-matching condition (default: None)
+    """
+
+    pulse_id_signs: dict
+    phasematch_cond_id: int = None
+
+@dataclass
+class IndependentVariableChoiceSet:
+    """
+    Class to represent a valid set of independent variables choices for a phase-matching condition
+
+    phasematch_cond: A PhaseMatchingCondition instance defining the phase-matching condition for which this variable
+    set is specified
+
+    ind_var_groups: A three-fold tuple structure defining valid groups of independent variables as
+    (((group 1 variable 1), (group 1 variable 2), ...), ((group 2 variable 1), (group 2 variable 2), ...)
+
+    Example: If the valid groups of independent variables are the pair (-w1, w2) or the combination -w1 + w2,
+    ind_var_groups is (((-1), (2)), ((-1, 2))) - i.e.:
+        - The outermost tuple is length 2 since there are two choices
+        - The first such entry is length 2 since there are two independent variables (-w1 and w2), and each such entry
+        is length 1 since the independent variables refer to one (signed) pulse ID each
+        - The second such entry is length 1 since there is there only one independent variable (-w1 + w2), and that
+        entry is length 2 since that independent variable consists of a combination of two (signed) pulse ID references
+
+
+    """
+    phasematch_cond: PhaseMatchingCondition
+
+    ind_var_groups: tuple[tuple[tuple]]
+
+@dataclass
+class AxisChoiceSet:
+    """
+    Class to represent a valid set of choices of axes for a choice of independent variables
+
+    ind_vars: A two-fold tuple describing a choice ("group") of independent variables in terms of (signed) pulse IDs
+    ((variable 1 (all signed) pulse ID 1, ID 2, ...), (variable 2 (all signed) pulse ID 1, ID 2, ...)). See explanation
+    of ind_var_groups in class IndependentVariableChoice set for more details.
+
+    valid_axis_combs: A tuple of dictionaries, each dictionary describing a valid choice of axes for this choice of
+    independent variables. Each of these dictionaries is structured in the form
+    {axis label: tuple of independent variables whose sum defines the axis}.
+
+    Example 1: For the independent variables -w1 and w2, suppose that two valid choices of axes were identified:
+        - Axis 'A': -w1 and axis 'B': w2
+        - Axis 'A': -w1 and axis 'B': -w1 + w2
+
+    Then valid_axis_combs would be as follows:
+    ( {'A': ((-1)), 'B': ((2))}, {'A': ((-1)), 'B': ((-1), (2))}
+
+    Example 2: If there were two independent variables -w1 + w2 and w3, suppose that two valid choices of axes were
+    identified
+        - Axis 'A': -w1 + w2 and axis 'B': w3
+        - Axis 'A': -w1 + w2 and axis 'B': -w1 + w2 + w3
+
+    Then valid_axis_combinations would be as follows:
+    ( {'A': ((-1, 2)), 'B': ((3))}, {'A': ((-1, 2)), 'B': ((-1, 2), (3))}
+
+    (Note the difference in the nature of -w1 + w2 between the two examples: In example 1, since the independent variables
+    are -w1 and w2, their combination in axis 'B' in the second valid choice of axes is registered as ((-1), (2)) [this is
+    here an axis composed of two independent variables that consist of one signed pulse ID reference each],
+    while in example 2, since the independent variable are (-w1 + w2) [parentheses added for emphasis] and w3,
+    the occurrence of -w1 + w2 in the valid axis choices is instead registered as (-1, 2) [and not ((-1), (2)) since
+    the independent variable in question consists of a (linear combination of) two signed pulse ID references. See also
+    descriptions in IndependentVariableChoiceSet]
+
+    """
+
+    ind_vars: tuple[tuple]
+    valid_axis_combs: tuple[dict]
+
 
 # TODO: SpecDetector and SpecScan as dataclasses?
 # TODO: Expand functionality according to below TODOs
@@ -727,6 +807,7 @@ class VibExperiment:
         self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
         self.canonical_axes = find_canonical_axes(self.indep_vars)
+
 
         # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
         # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
