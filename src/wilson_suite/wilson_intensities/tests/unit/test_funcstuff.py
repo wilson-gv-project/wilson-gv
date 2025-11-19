@@ -82,12 +82,12 @@ def test_EvaluationTerm():
                                        wilson_suite.wilson_main.abstractions.VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.)),
                                    harmonic_osc_states_labels=(1, 3))
     
-    # res = solve_LSE_motif(resonances=(r1, r2), parameters=params, vibdata=vibdata)
+    res = solve_LSE_motif(resonances=(r1, r2), parameters=params, vibdata=vibdata)
 
-    # res_point = f_abst.ResonancePoint(location=(res['w1'], res['w2']), 
-    #                                   term_id=et.short_id, 
-    #                                   parameters=params,
-    #                                   factor_value=None,
-    #                                   Gamma=3.14)
-    # print(res_point)
+    res_point = f_abst.ResonancePoint(location=(res['w1'], res['w2']), 
+                                      term_id=et.short_id, 
+                                      parameters=params,
+                                      factor_value=None,
+                                      Gamma=3.14)
+    print(res_point)
 

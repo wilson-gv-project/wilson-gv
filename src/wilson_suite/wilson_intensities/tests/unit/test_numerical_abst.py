@@ -73,27 +73,3 @@ def test_compile_feature():
             assert isinstance(motif, NumericalResonanceMotif)
     # Add more specific assertions based on expected values
 
-
-# from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-
-# def test_compile_resonance_motif():
-#     """Test compile_resonance_motif function"""
-#     # Setup mock objects and data
-#     # (In a real test, you would create actual instances with meaningful data)
-#     res_motif = ResonanceMotif(...)  # Fill with appropriate test data
-#     param_set = ParameterSet(...)    # Fill with appropriate test data
-#     vib_data = VibStatesData(...)    # Fill with appropriate test data
-#     vibdiff_cache = VibDiffCache()   # Initialize empty cache
-
-#     # Call the function to test
-#     numerical_motif = compile_resonance_motif(
-#         res_motif,
-#         param_set,
-#         vib_data,
-#         vibdiff_cache
-#     )
-
-#     # Assertions to verify correctness
-#     assert isinstance(numerical_motif, NumericalResonanceMotif)
-#     assert len(numerical_motif.res_conds) == len(res_motif)
-#     # Add more specific assertions based on expected values
