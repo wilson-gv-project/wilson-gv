@@ -398,7 +398,7 @@ class SpectralWindow:
         for ax in self.bounds:
             mn, mx = self.bounds[ax]
             adjusted_mx = mx + (mx - mn) / dim_sizes[ax]
-            axes[ax] = np.linspace(mn, adjusted_mx, dim_sizes[ax], endpoint=False)
+            axes[ax] = np.linspace(mn, adjusted_mx, dim_sizes[ax], endpoint=False) # adjust min too???
 
         coords_vectors = list(axes.values())
         grid = np.meshgrid(*coords_vectors, indexing="ij")

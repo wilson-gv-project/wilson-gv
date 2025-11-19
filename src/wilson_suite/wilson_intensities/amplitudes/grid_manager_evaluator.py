@@ -15,7 +15,7 @@ from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import Co
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, RectangularDomain, SpectralFeature, SpectralWindow
 
 import logging
-logger = logging.getLogger("wilson."+__name__)
+logger = logging.getLogger("wilson")
 
 
 # =============================================================================

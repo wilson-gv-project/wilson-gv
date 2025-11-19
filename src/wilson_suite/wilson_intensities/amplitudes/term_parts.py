@@ -241,6 +241,7 @@ class EvalTermCollection:
 class ParameterSet(Mapping):
     """
     Dict-like holder of "parameter label -> index value" mapping
+    Normal mode indices
 
     index value should be in VibState label space, so it's a string likely
     """

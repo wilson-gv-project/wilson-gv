@@ -11,7 +11,7 @@ from ...amplitudes.grid_manager_evaluator import SpectralEvaluator
 
 import logging
 from ....wilson_utils.logger import setup_logger
-setup_logger("wilson_suite.", level=logging.DEBUG)
+setup_logger("wilson", level=logging.INFO)
 
 def test_example_new_api_asserts():
     """Example of using the new clean API with actual assertions instead of prints."""
@@ -20,6 +20,7 @@ def test_example_new_api_asserts():
     # Setup
     # -------------------------
     spec_window = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
+    print('\nspec_window before', spec_window)
     
     rc1 = ResonanceCondition.make_from_tuples(
         left_state=('a', 'b'),
@@ -69,6 +70,7 @@ def test_example_new_api_asserts():
 
     # Filter spectral features to the window
     spec_window = SpectralFeature.filter_to_spec_window([sf1, sf4], spec_window)
+    print('\nspec_window after', spec_window)
 
     vib_ana_setup = prep_vibanasetup_with_degen_states()
     vib_data = VibStatesData(vib_ana_setup.states)
@@ -81,8 +83,8 @@ def test_example_new_api_asserts():
     # -------------------------
     full_grid = evaluator.evaluate_spectrum(
         spec_window=spec_window,
-        grid_resolution={'A': 10, 'B': 10},
-        verbose=False,
+        grid_resolution={'A': 10, 'B': 10}, # 10 points in each axis
+        verbose=True,
         return_type='grid',
     )
 
@@ -115,7 +117,7 @@ def test_example_new_api_asserts():
     region_results = evaluator.evaluate_spectrum(
         spec_window=spec_window,
         grid_resolution={'A': 10, 'B': 10},
-        verbose=False,
+        verbose=True,
         return_type='regions',
     )
 
@@ -135,9 +137,11 @@ def test_example_new_api_asserts():
     full2, r2 = evaluator.evaluate_spectrum(
         spec_window=spec_window,
         grid_resolution={'A': 10, 'B': 10},
-        verbose=False,
+        verbose=True,
         return_type='both',
     )
+    np.set_printoptions(linewidth=180, precision=3)
 
+    print('\n', full2['result'])
     assert 'result' in full2
     assert isinstance(r2, dict)
