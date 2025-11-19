@@ -355,6 +355,17 @@ class ResonanceCondition:
         self.pf = pf
         self.id = id
 
+    @classmethod
+    def make_from_tuples(cls, left_state: tuple, right_state: tuple, pert_freqs: tuple):
+        """
+        res_cond_dict: Dictionary {'left': tuple, 'right': tuple, 'pert_freqs': tuple}
+        """
+        left_state = HarmOscStateSymbolic(list(left_state))
+        right_state = HarmOscStateSymbolic(list(right_state))
+        diff = VibDiffTerm(sl=left_state, sr=right_state)
+
+        return cls(diff=diff, pf=pert_freqs)
+
     @property
     def pf_dict(self):
         return {i.strip('-'): -1 if '-' in i else 1 for i in self.pf}
