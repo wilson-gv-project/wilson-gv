@@ -7,7 +7,7 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 import numpy as np
 import copy
 
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, ResonanceMotif, EvaluationDataAndConfigs
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, ResonanceMotif, EvaluationDataAndConfigs, FreqTermsCollection
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
@@ -128,7 +128,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
     avrg_tensor_expr = necessary_data.avrg_expr_tensor_mapping[avrg_expr]
     avrg_tensor = necessary_data.avrg_tensors[avrg_tensor_expr]
     
-    freqterms = vediff.FreqTermsCollection(freqterms=term.freqterms)
+    freqterms = FreqTermsCollection(freqterms=term.freqterms)
     extra_freqterms = freqterms.get_pert_wf_diff()
 
     vibenedenoms_tensor = necessary_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
