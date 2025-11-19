@@ -410,16 +410,6 @@ class SpectralWindow:
     def bounds(self) -> tuple[tuple[float, float], ...]:
         return self.box.bounds
 
-    # def __post_init__(self):
-    #     if not is_tuple_of_tuples(self.bounds):
-    #         raise ValueError("Bounds should be provided as a tuple of tuples")
-
-    #     if not all(len(b) == 2 for b in self.bounds):
-    #         raise ValueError("Each bound must be a (min, max) pair.")
-    #     for i, (mn, mx) in enumerate(self.bounds):
-    #         if mn > mx:
-    #             raise ValueError(f"Invalid bound {i}: min >= max ({mn} >= {mx})")
-
     @property
     def ndim(self) -> int:
         return len(self.bounds)
@@ -437,85 +427,26 @@ class SpectralWindow:
             inside &= (points[..., i] >= mn) & (points[..., i] < mx)
         return inside
 
-    # def contains_feature(self, spec_feature: SpectralFeature) -> bool:
-    #     """Return boolean for whether SpectralFeature lies inside the window."""
-    #     spec_feature_ndim = len(spec_feature.location.values)
-    #     if spec_feature_ndim != self.ndim:
-    #         raise ValueError(f"Expected SpectralFeature with a location with {self.ndim} coords, got {spec_feature_ndim}")
 
-    #     inside = True
-    #     for i, (mn, mx) in enumerate(self.bounds):
-    #         inside &= (spec_feature.location.values[i] >= mn) & (spec_feature.location.values[i] <= mx)
-    #     return inside
+    def sample_grid(self, dim_sizes: Dict) -> Tuple[List[np.ndarray], Dict[str, np.ndarray]]:
+        """
+        Generate a regular grid of points spanning the window.
+        """
 
-    # def contributing_feature(self, spec_feature: SpectralFeature) -> bool:
-    #     """
-    #     Return boolean for whether SpectralFeature is contributing to this window, 
-    #         based on lineshape_parameter of this SpectralFeature
-    #     """
-    #     spec_feature_ndim = len(spec_feature.location.coordinates)
-    #     if spec_feature_ndim != self.ndim:
-    #         raise ValueError(f"Expected SpectralFeature with a location with {self.ndim} coords, got {spec_feature_ndim}")
-
-    #     lineshape_params = list(spec_feature.lineshape_parameter.values())
-    #     contributing = True
-    #     for i, (mn, mx) in enumerate(self.bounds):
-    #         Gamma = lineshape_params[i]
-    #         # FIXME??   2*Gamma ??
-    #         contributing &= (spec_feature.location.values[i] >= mn-2*Gamma) & (spec_feature.location.values[i] <= mx+2*Gamma)
-    #     return contributing and not self.contains_feature(spec_feature)
-
-    def sample_grid(self, dim_sizes: Dict) -> Dict[str, np.ndarray]:
-        """Generate a regular grid of points spanning the window."""
         if len(dim_sizes) != self.ndim:
             raise ValueError("Grid shape must match dimensionality.")
-
         axes = {}
         for ax in self.bounds:
             mn, mx = self.bounds[ax]
             adjusted_mx = mx + (mx - mn) / dim_sizes[ax]
             axes[ax] = np.linspace(mn, adjusted_mx, dim_sizes[ax], endpoint=False)
-            # axes.append(np.linspace(mn, mx, dim_sizes[ax], endpoint=True))
-        # grid = np.stack(np.meshgrid(*list(axes.values()), indexing="ij"), axis=-1)
-        grid = np.meshgrid(*list(axes.values()), indexing="ij")
+
+        coords_vectors = list(axes.values())
+        grid = np.meshgrid(*coords_vectors, indexing="ij")
         grid_d = {ax: grid[i] for i, ax in enumerate(axes)}
-        return grid_d
-        # return grid.reshape(-1, self.ndim)
+        
+        return axes, grid_d
 
-    # def expand(self, padding: dict[str, float]) -> "SpectralWindow":
-    #     """Return a new window expanded by `padding` in all directions."""
-    #     pad_vals = list(padding.values())
-    #     self.bounds = tuple((mn - pad_vals[i], mx + pad_vals[i]) for i, (mn, mx) in enumerate(self.bounds))
-    #     # return SpectralWindow(tuple((mn - pad_vals[i], mx + pad_vals[i]) for i, (mn, mx) in enumerate(self.bounds)))
-
-    # def intersect(self, other: "SpectralWindow") -> Optional["SpectralWindow"]:
-    #     """Return the overlapping rectangular region, or None if no overlap."""
-    #     if self.ndim != other.ndim:
-    #         raise ValueError("Windows must have the same dimensionality.")
-
-    #     overlap_bounds = []
-    #     for (mn1, mx1), (mn2, mx2) in zip(self.bounds, other.bounds):
-    #         lower = max(mn1, mn2)
-    #         upper = min(mx1, mx2)
-    #         if lower >= upper:
-    #             # No overlap in this dimension - no intersection
-    #             return None
-    #         overlap_bounds.append((lower, upper))
-
-    #     self.bounds = tuple(overlap_bounds)
-
-    #     return self
-
-    # @classmethod
-    # def union(cls, windows: list["SpectralWindow"]):
-    #     # union_bounds = []
-    #     all_mins = []
-    #     all_maxes = []
-    #     for w in windows:
-    #         for dim_bounds in w.bounds:
-    #             all_mins.append(dim_bounds[0])
-    #             all_maxes.append(dim_bounds[1])
-    #     return cls(tuple([min(all_mins), max(all_maxes)]))
 
     def find_clusters_by_distance(self,
                                   spec_window_full: 'SpectralWindow',
@@ -524,13 +455,11 @@ class SpectralWindow:
 
         spec_features = self.full_features + self.contrib_features
 
-        # features_locs = {loc_geo_obj.values:features[loc_geo_obj][1] for loc_geo_obj in features}
         features_locs = {feature.location.values: feature for feature in spec_features}
         from wilson_suite.wilson_intensities.amplitudes import domains
 
         clusters = domains.find_points_clusters_by_distance(res_locations=list(features_locs.keys()),
                                                             distance_thresholds=distance_thresholds,
-                                                            # spec_window_full=spec_window_full,
                                                             linkage=linkage)
         rec_windows_dict = {}
 
@@ -541,8 +470,6 @@ class SpectralWindow:
                 domain.box.expand(paddig_dict)
             domain.box.intersect(spec_window_full)
             rec_windows_dict[g] = domain
-
-            # rec_windows_dict[g] = RectangularDomain.from_features([features_locs[i] for i in clusters[g]])
 
         return rec_windows_dict
 

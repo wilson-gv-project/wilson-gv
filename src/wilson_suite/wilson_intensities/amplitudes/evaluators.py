@@ -1,10 +1,9 @@
 """
 Evaluator functions for WilsonSimulation
 """
-from .numerical_abstractions import NumericalResonanceMotif
-from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralFeature, SpectralWindow, Box
-from ...wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
-from ..utils import mainVibStates2arraydict, check_energy_unit, convNu2Ene
+from .numerical_abstractions import NumericalResonanceMotif, CompiledTermGroup, compile_feature
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralFeature, Box
+from ..utils import convNu2Ene
 from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
@@ -12,8 +11,10 @@ from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, 
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData, ResonanceCondition
 import wilson_suite.wilson_intensities.amplitudes.domains as domfuncs
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-from wilson_suite.wilson_intensities.amplitudes.term_parts import (ResonanceMotif, VibStatesData, EvaluationDataAndConfigs, ParameterSet,
+from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDataAndConfigs, ParameterSet,
                                                                    TermParametersChoice)
+from .term_parts import EvalFeature
+import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -108,14 +109,11 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
         motif_res_loc, terms_for_motifs, term_coeffs_per_index, spec_eval_setup.ev_info.Gamma
     )
     
-    # print('\nall_features', all_features, '\n')
 
     spec_window = spec_eval_setup.ev_info.spectral_window
-    # print('\nspec_window', spec_window)
 
     spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
     
-    # print('\nspec_window_with_features', spec_window_with_features)
     feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
     domains = domfuncs.features_to_clusters(features=feat_all)
     formal_domains = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]])) for d in domains]
@@ -123,8 +121,11 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     for domain in formal_domains:
         domain.box = domain.box.intersect(spec_window_with_features.box)
     
-    spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
-    subgrids = domfuncs.cut_grid_with_indices_dict_nd(spec_grid, formal_domains)
+    coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
+    
+    subgrids = domfuncs.cut_grid_with_coords_nd(full_meshgrids=spec_grid, 
+                                                axis_coords=coords_vectors,
+                                                domains=formal_domains)
     
     # modifies spec_grid dict
     domfuncs.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values())) # upd result_func
@@ -132,121 +133,94 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     grid_values_all_domains = spec_grid['result']
 
 
-    print('\n\nspec_eval_setup\n', spec_eval_setup)
     return grid_values_all_domains
 
 
 def get_domain_grids():
     return
 
-def evaluate_on_grid(grid_info_dict: dict['RectangularDomain', dict]) -> np.ndarray:
+
+def evaluate_all_on_grids(grid_info_dict: dict['RectangularDomain', dict], 
+                          vib_data, vibdiff_cache, gamma) -> np.ndarray:
     """
     grid_info_dict = {domain: {'indices': slices,
                                'grid': {'A': meshgrid, 'B': meshgrid}}, ...}
 
     parameter of res location/feature location
+
+    returns:
+
+    domains_result = {domain: evaluated grid (np.ndarray), ...}
     """
-    domain_grids = grid_info_dict['grid']
-    domain_result = 0. + 0.j
 
     for domain in grid_info_dict:
-        domain_result += evaluate_domain_on_grid(domain, domain_grids)
-    return
+        print('\nevaluating domain', domain)
+        domains_grids = grid_info_dict[domain]['grid']
+        grid_info_dict[domain]['result'] = evaluate_domain(domain, domains_grids, 
+                                                           vib_data, vibdiff_cache, gamma)
+        print('\ndomain result', grid_info_dict[domain]['result'])
+    return grid_info_dict
 
-def evaluate_domain_on_grid(domain: 'RectangularDomain', domain_grid):
-    return
 
+def evaluate_domain(domain: 'RectangularDomain', dom_subgrids: dict, 
+                    vib_data, vibdiff_cache, gamma):
+    """
+    sum of evaluations for all features in this domain
+    """
+    domain_result = 0. + 0.j
 
-import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
-
-def evaluate_feature_on_grid(feature: SpectralFeature, 
-                             meshgrids: dict[str, np.ndarray],
-                             necessary_data: EvaluationDataAndConfigs) -> np.ndarray:
-
-    # one res motif per a group of terms contributing (united by same res motif)
-    # one res motif per TermParametersChoice
-
-    term_contributions_rcs: dict[int, list] = {}
-    states_parameters: dict[int, list] = {}
-
-    for i, term_group in enumerate(feature.term_contributions):
-        states_parameters[i] = []
-        term_contributions_rcs[i] = []
+    dom_all_feats = domain.full_features + domain.contrib_features
+    print('\ndomain features', dom_all_feats)
+    for feature in dom_all_feats:
+        compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
+        print('\ncompiled_groups before', compiled_groups)
+        print('\nevaluating feature', evaluate_feature_on_grid(compiled_groups, dom_subgrids, 
+                                                               gamma=gamma, amplitude_coeff=feature.amplitude_coeff))
         
-        for st_params in term_group.states_parameters:
-            states_parameters[i].append(st_params)
-
-        for rc in term_group.res_motif:
-            term_contributions_rcs[i].append(rc)
+        domain_result += evaluate_feature_on_grid(compiled_groups, dom_subgrids, 
+                                                  gamma=gamma, amplitude_coeff=feature.amplitude_coeff)
+    return domain_result
 
 
-    # collect for each term_group_i (one motif group) results for each parameter set
-    resonances_t: dict[int, list] = {}
-
-    for term_group_i in states_parameters:
-        # in one terms group
-        term_rcs: list[ResonanceCondition] = term_contributions_rcs[term_group_i]
-        
-        resonances_t[term_group_i] = {}
-
-        for params in states_parameters[term_group_i]:
-            # for combination of parameters for this terms group
-            
-            rs_difs_num = []
-            
-            for rc in term_rcs:
-                # for each resonace condition (rc) compute vibdiff part
-                vd = vediff.VibDiff.from_symbolic(rc.diff, params, necessary_data.vibstates_data)
-                vd.cache_it(necessary_data.vibdiff_cache)
-                print('\nvd', vd)
-                
-                # for this resonance condition get grids for axes
-                pfreqs = sum([meshgrids[ax.strip('-')] * rc.pf_dict[ax.strip('-')] for ax in rc.pf])
-
-                # in reciprocal centimeters
-                rc_num = vd.energy_difference(au=False) - pfreqs - 1j*feature.lineshape_parameter_single
-                
-                # in au
-                rs_difs_num.append(convNu2Ene(rc_num))
-
-            from functools import reduce
-            import operator
-
-            product = reduce(operator.mul, rs_difs_num)
-            resonances_t[term_group_i][params] = 1./product
-
-    # now sum up all results with their coeffs
-    full_result = 0. + 0.j
-    for term_group_i in resonances_t:
-        this_motif_result = 0. + 0.j
-        for param_set in resonances_t[term_group_i]:
-            this_motif_result += resonances_t[term_group_i][param_set]
-        full_result += this_motif_result
-    # grid multiplied with the total coefficient here
-    return full_result * feature.amplitude_coeff
-
-from .term_parts import EvalFeature
-
-def evaluate_eval_feature_on_grid(
-    feature: EvalFeature,
-    meshgrid: dict[str, np.ndarray],
-) -> np.ndarray:
-    
-    result = 0
-    for term in feature.terms:
-        term_val = term.resonance_function(meshgrid)
-        result += term.prefactor * term_val
-    return result * feature.amplitude
-
-def evaluate_resonance_on_grid(compiled: NumericalResonanceMotif,
+def evaluate_res_motif_on_grid(compiled_res_motif: NumericalResonanceMotif,
                                meshgrids: dict[str, np.ndarray],
                                gamma: float):
-    total = 0
-    for res_conds in compiled.res_conds:
+    """
+    compiled_res_motif: NumericalResonanceMotif - 1 resonanse motif for a ParameterSet
+
+    Should work for a single specific compiled NumericalResonanceMotif, i.e., with a choice of ParameterSet, 
+        and VibStatesData and VibDiffCache for states
+
+    meshgrids - dictionary of axes labels with meshgrid np.ndarrays as values
+
+    gamma - should generally be Gamma_{mn}, so a value for given chioce of vib_diff/normal modes/states
+    """
+    total = 1.
+    for res_conds in compiled_res_motif.res_conds:
+
         pfreq = sum(meshgrids[ax] * res_conds.pf_dict[ax] for ax in res_conds.pf_dict)
+        
         z = res_conds.vib_energy_diff - pfreq - 1j*gamma
-        total += 1. / z
+        total *= 1. / z
+    print('\ntotal evaluate_res_motif_on_grid', total)
     return total
+
+
+def evaluate_feature_on_grid(compiled_groups: list[CompiledTermGroup],
+                             meshgrids: dict[str, np.ndarray],
+                             gamma: float,
+                             amplitude_coeff: float):
+    """
+    
+    """
+    full = 0.
+    print('\ncompiled_groups', compiled_groups)
+    for group in compiled_groups:
+        for motif in group.resonance_motifs:
+            full += evaluate_res_motif_on_grid(motif, meshgrids, gamma)
+    print('\namplitude_coeff', amplitude_coeff)
+    print('\nfull', full)
+    return amplitude_coeff * full
 
 
 def initialize_evaluation_data(system: 'MolecularSystem',
@@ -256,13 +230,10 @@ def initialize_evaluation_data(system: 'MolecularSystem',
     """
     Initialize data structures needed for term evaluation.
     """
-    har_states_labels = tuple([list(state.harm_quanta_coeffs.keys())[0][0] 
-                             for state in vib_ana_setup.states if state.harmonic_WF])
+    # har_states_labels = tuple([list(state.harm_quanta_coeffs.keys())[0][0] 
+    #                          for state in vib_ana_setup.states if state.harmonic_WF])
     
-    vibstates_data = VibStatesData(
-        allstates=tuple(vib_ana_setup.states), 
-        harmonic_osc_states_labels=har_states_labels
-    )
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states))
     
     vibdiff_cache = VibDiffCache()
     props = MolPropsCollection(properties=props)

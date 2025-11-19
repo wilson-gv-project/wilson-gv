@@ -1,9 +1,8 @@
 from wilson_suite.wilson_intensities.amplitudes import domains
-from ...amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralWindow
+from ...amplitudes.spectrum_composition import RectangularDomain, SpectralWindow
 
 
 def test_find_domain_groups_by_distance():
-    print()
 
     points = [(1., 3.), (5., 11.), (4., 2.), (12., 6.), (8., 2.), (11., 4.)]
 
@@ -20,7 +19,6 @@ def test_find_domain_groups_by_distance():
     groups2 = domains.find_points_clusters_by_distance(points, distance_thresholds={'A': 4., 'B': 4.}, linkage='ward')
     assert len(groups1) == 3
     assert len(groups2) == 4
-    print(groups2)
 
 
 def test_find_domain_distance_threshold():
@@ -102,7 +100,7 @@ def get_data_evaluators_tests() -> dict:
         p.addValues(values=props_data[trname])
         props.append(p)
     
-    from ...amplitudes.spectrum_composition import SpectralFeature, Box
+    from ...amplitudes.spectrum_composition import Box
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup, EvaluationInfo
     from ....fixtures import evv_experiment
 
@@ -121,7 +119,6 @@ def get_data_evaluators_tests() -> dict:
 def get_features_from_terms():
 
     datadict = get_data_evaluators_tests()
-    print(datadict.keys())
 
     features = get_features_from_terms_for_eval(**datadict)
     return features
@@ -201,21 +198,6 @@ def test_compute_box_adjacency():
     res = domains.compute_box_adjacency(rectangular_boxes)
     print(res)
 
-# def test_cluster_features_by_box_overlap_nd():
-#     print()
-#     features = get_features_from_terms()
-#     r = domains.cluster_features_by_box_overlap_nd(features)
-#     for k in r:
-#         print(k, '----\n', r[k], '\n')
-
-
-# def test_make_domains_from_feat_clusters():
-#     print()
-#     features = get_features_from_terms()
-#     clusters = domains.cluster_features_by_box_overlap_nd(features)
-
-#     r = domains.make_domains_from_feat_clusters(clusters)
-#     print(r)
 
 def test_features_to_clusters():
     print()
@@ -241,14 +223,3 @@ def test_feat_clusters_to_domains():
     print('\nclusters', len(clusters))
     print('\nclusters', clusters)
     return
-    # domain = RectangularDomain.from_features(features)
-    # domain.bounds.intersect(spec_window_full)
-
-    doms = domains.feat_clusters_to_domains(clusters=clusters)
-    print('doms', doms)
-
-    for d in doms:
-        print(d, '----\n', doms[d], '\n')
-        print('\n[sf.bounds for sf in doms[d]]', [sf.bounds for sf in doms[d]])
-        u = SpectralWindow.union([sf.bounds for sf in doms[d]])
-        print('\n----- union', u)

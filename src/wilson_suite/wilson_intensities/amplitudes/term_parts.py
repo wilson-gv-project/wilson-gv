@@ -4,9 +4,11 @@ from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import Nu
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
 from ...wilson_derive.abstractions import VibPerturbedTerm
+from typing import Callable
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ..amplitudes.vibene_differences import VibDiffCache
+    from ..amplitudes.vibene_differences import VibDiffCache, VibDiff
+    from .spectrum_composition import ResLocGeoObject
 
 @dataclass
 class PropsCollection:
@@ -154,10 +156,35 @@ class ResonanceMotif:
     
     @classmethod
     def from_tuples(cls, tupleOfTuples):
+        """
+        motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
+        motif2 = (((('a', 'b'), ('a',)), ('A',)),)
+        motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+        motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+        """
         r_conditions = []
         for rc_tuple in tupleOfTuples:
             rc = ResonanceCondition(diff=VibDiffTerm(sl=HarmOscStateSymbolic(q=rc_tuple[0][0]),
                                                      sr=HarmOscStateSymbolic(q=rc_tuple[0][1])), pf=rc_tuple[1])
+            r_conditions.append(rc)
+        return cls(r_conditions)
+
+    @classmethod
+    def from_dicts(cls, res_conds_listdict: list[dict]):
+        """
+        motif3 = (
+                  ((left-('',), right-('a',)), pert_freqs-('B',)), 
+                  ((left-('',), right-('a',)), pert_freqs-('A', '-B')))
+
+        res_conds_dict = [{'left': tuple, 'right': tuple, 'pert_freqs': tuple},
+                          {'left': tuple, 'right': tuple, 'pert_freqs': tuple}]
+        """
+        r_conditions = []
+
+        for rc_dict in res_conds_listdict:
+            rc = ResonanceCondition(diff=VibDiffTerm(sl=HarmOscStateSymbolic(q=rc_dict['left']),
+                                                     sr=HarmOscStateSymbolic(q=rc_dict['right'])), 
+                                                     pf=rc_dict['pert_freqs'])
             r_conditions.append(rc)
         return cls(r_conditions)
 
@@ -268,7 +295,7 @@ class VibStatesData:
     Holds vib states data and can compute vib states energy differences
     """
     allstates: tuple[VibState]
-    harmonic_osc_states_labels: tuple
+    # harmonic_osc_states_labels: tuple[int]
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
@@ -284,6 +311,9 @@ class VibStatesData:
             for vlabel_b, energy_b in self.allenergies_map:
                 self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
 
+    @property
+    def harmonic_osc_states_labels(self):
+        return tuple([int(i.state_label) for i in self.allstates if i.harmonic_WF])
 
     def get_harmonic_osc_states(self):
         """
@@ -318,37 +348,47 @@ class EvaluationDataAndConfigs:
     vibenedenoms_tensors: dict = None
     pulse_polarization_vector: list = None
 
+from dataclasses import dataclass, field
+from typing import Tuple
+
 
 @dataclass(frozen=True)
 class TermParametersChoice:
     """
-    term_key - hash(VibPerturbedTerm)
-    now those terms would have the same res_motif
+    Minimal representation of a group of terms that share a resonance motif.
+    Each term is identified only by its integer term_id.
+
+    in compile_feature() 
     """
-    terms: tuple[VibPerturbedTerm]
-    states_parameters: tuple[ParameterSet]
+    res_motif: "ResonanceMotif"
+    states_parameters: Tuple["ParameterSet"]
+    term_ids: Tuple[int] = field(default_factory=tuple)
 
-    def __hash__(self) -> int:
-        return hash((self.term_keys, self.states_parameters))
-    
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, TermParametersChoice):
-            return False
-        return (self.term_keys == other.term_keys and 
-                self.states_parameters == other.states_parameters)
+    def __hash__(self):
+        return hash((self.term_ids, self.states_parameters))
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, TermParametersChoice)
+            and self.term_ids == other.term_ids
+            and self.states_parameters == other.states_parameters
+        )
+    # ---------------------------------------------------------
+    # Properties / helpers
+    # ---------------------------------------------------------
     @property
-    def term_keys(self) -> tuple[int]:
+    def term_keys(self) -> Tuple[int]:
+        """Symbolic IDs of terms based on VibPerturbedTerm.h()."""
         return tuple(t.h() for t in self.terms)
 
-    @property
-    def res_motif(self):
-        resmotifs_here = [ResonanceMotif(term.res) for term in self.terms]
-
-        if len(set(resmotifs_here)) == 1:
-            return resmotifs_here[0]
-        
-        raise ValueError('This group of terms do not have the same ResonanceMotif')
+    def _infer_res_motif(self):
+        """Derives resonance motif from the term objects."""
+        motifs = {ResonanceMotif(term.res) for term in self.terms}
+        if len(motifs) != 1:
+            raise ValueError(
+                "All terms in TermParametersChoice must share the same ResonanceMotif"
+            )
+        return motifs.pop()  # the unique motif
 
 
 # -------------------------------------------------------
@@ -402,7 +442,6 @@ def linspace_with_step(start, stop, step):
     return np.linspace(start, stop, num=num_points, endpoint=True)
 
 
-from typing import Callable
 
 @dataclass
 class EvalTerm:
@@ -411,10 +450,17 @@ class EvalTerm:
 
     resonance_function - resonance part parametrized for this term
     """
-    prefactor: float
+    amplitude_coeff: float
+    res_loc: 'ResLocGeoObject'
     # function of grid → value
-    resonance_function: Callable[[ParameterSet, VibStatesData, 'VibDiffCache', float], float]
-    parameters: dict                              # anything needed for the term
+    compiled_res_motif: NumericalResonanceMotif # needs states data to be compiled; can be evaluated with meshgrids
+    parameters: dict
+
+    @classmethod
+    def from_VibPertTerm():
+        
+        return
+
 
 @dataclass
 class EvalFeature:
@@ -423,17 +469,9 @@ class EvalFeature:
     amplitude: float
     lineshape_param: float
 
-def evaluate_resonance(motif: NumericalResonanceMotif,
-                       mesh: dict[str, np.ndarray],
-                       gamma: float) -> np.ndarray:
-    total = 0
-    for term in motif.res_conds:
-        pfreq = sum(mesh[ax] * term.pf_dict[ax] for ax in term.axes)
-        z = term.vib_energy_diff - pfreq - 1j * gamma
-        total += term.coef / z
-    return total
 
-import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
+
+
 
 def make_resonance_function(res_motif: ResonanceMotif, 
                             meshgrids: dict[str, np.ndarray]) -> Callable:
@@ -451,7 +489,7 @@ def make_resonance_function(res_motif: ResonanceMotif,
         
         for rc in res_motif:
             # for each resonace condition (rc) compute vibdiff part
-            vd = vediff.VibDiff.from_symbolic(rc.diff, param_set, vibstates_data)
+            vd = VibDiff.from_symbolic(rc.diff, param_set, vibstates_data)
             vd.cache_it(vibdiff_cache)
             print('\nvd', vd)
             # for this resonance condition get grids for axes

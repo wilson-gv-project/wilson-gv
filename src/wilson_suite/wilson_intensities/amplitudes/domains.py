@@ -222,24 +222,19 @@ def get_distance_threshold(dynamic_range: float|int, Gamma_axes: dict) -> dict:
     at Gamma/2 - 4/5 of maximum
     """
     multiplier = float(np.sqrt((dynamic_range-1.)/dynamic_range))
-    # gammas = [-1j*G for G in Gamma_axes.values()]
-    # dist_ax = [G*multiplier for G in Gamma_axes.values()]
     dist_ax = {ax: G*multiplier for ax, G in Gamma_axes.items()}
 
-    # gamma_prod = np.prod(gammas)
-    # base_intensity = 1./gamma_prod
-    # min_to_show = base_intensity/dynamic_range
-
     return dist_ax
-    # raise NotImplementedError('find_distance_threshold not finished yet')
 
 
 def get_domain_grids(domains_with_features):
 
     pass
 
-def cut_grid_with_indices_dict_nd(grid: dict[str, np.ndarray], 
-                                  domains: list['RectangularDomain']) -> dict['RectangularDomain', dict]:
+
+def cut_grid_with_coords_nd(full_meshgrids: dict[str, np.ndarray], 
+                            axis_coords: dict[str, np.ndarray], 
+                            domains: list['RectangularDomain']) -> dict['RectangularDomain', dict]:
     """
     General N-dimensional version.
     
@@ -253,53 +248,57 @@ def cut_grid_with_indices_dict_nd(grid: dict[str, np.ndarray],
             "indices": tuple(slice_i, slice_j, ...)
         }
     """
-    # get axis names and coordinate arrays
-    axes = list(grid.keys())
-    shape = next(iter(grid.values())).shape
-    
-    # Each axis has coordinates varying along its dimension
-    axis_coords = {}
-    for ax in axes:
-        # Take unique coordinate values along that axis
-        # Find the dimension where variation occurs
-        arr = grid[ax]
-        axis_dim = np.argmin([np.allclose(np.take(arr, 0, i), arr) for i in range(arr.ndim)])
-        axis_coords[ax] = np.unique(np.moveaxis(arr, axis_dim, 0)[..., 0])
+    axes = list(full_meshgrids.keys())
+
+    shapes = {v.shape for v in full_meshgrids.values()}
+    if len(shapes) != 1:
+        raise ValueError("Meshgrids must have same shape")
 
     subgrids = {}
 
     for domain in domains:
-        box = domain.box
-        bounds = box.bounds
+        bounds = domain.box.bounds
+
+        grid_axes = set(full_meshgrids.keys())
+        domain_axes = set(bounds.keys())
+
+        if grid_axes != domain_axes:
+            raise ValueError(
+                f"Domain axes {domain_axes} do not match grid axes {grid_axes}"
+            )
 
         slices = []
+
         for ax in axes:
-            coords = axis_coords[ax]
+            coords = axis_coords[ax]    # <-- use provided 1D coords
             mn, mx = bounds[ax]
 
             i_min = np.searchsorted(coords, mn, side="right") - 1
             i_max = np.searchsorted(coords, mx, side="left")
+
             i_min = max(i_min, 0)
             i_max = min(i_max, len(coords) - 1)
 
             slices.append(slice(i_min, i_max + 1))
 
-        # slice the subgrids
-        subgrid = {ax: grid[ax][tuple(slices)] for ax in axes}
-        subgrids[domain] = {"grid": subgrid, "indices": tuple(slices)}
+        # slice the subgrids - prep subgrids from slices
+        subgrid = {ax: full_meshgrids[ax][tuple(slices)] for ax in axes}
+        
+        subgrids[domain] = {"grid": subgrid, "indices": tuple(slices), "result": None}
 
     return subgrids
 
+
+
 def insert_results_to_grid_nd(grid: dict[str, np.ndarray],
-                              subgrids: dict['RectangularDomain', dict],
-                              result_func: Callable,
+                              subgrids_with_results: dict['RectangularDomain', dict],
                               result_key="result") -> None:
     """
     Compute results for each subgrid and place them back into the full grid.
     
     Args:
         grid: main grid dict (each axis -> np.ndarray)
-        subgrids: output of cut_grid_with_indices_dict_nd
+        subgrids: output of cut_grid_with_coords_nd
         result_func: callable(subgrid_dict) -> np.ndarray of same shape as subgrid
         result_key: str, key to store in main grid dict
     
@@ -310,10 +309,11 @@ def insert_results_to_grid_nd(grid: dict[str, np.ndarray],
     if result_key not in grid:
         grid[result_key] = np.zeros_like(first_axis, dtype=float)
 
-    for domain, info in subgrids.items():
-        subgrid = info["grid"]
+    for domain, info in subgrids_with_results.items():
         indices = info["indices"]
 
         # Compute result for this subgrid
-        result_sub = result_func(subgrid)
+        result_sub = info['result']
+        print('\nresult_sub', result_sub)
+
         grid[result_key][indices] += result_sub

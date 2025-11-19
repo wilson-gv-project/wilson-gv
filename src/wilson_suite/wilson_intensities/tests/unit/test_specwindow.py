@@ -72,7 +72,7 @@ def test_filter_to_spec_window_2():
         print('\n', d)
         print(doms[d])
     
-    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]])) for d in doms]
+    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]]), full_features=doms[d]) for d in doms]
 
     # print('\n')
     # for d in formal_doms:
@@ -86,8 +86,8 @@ def test_filter_to_spec_window_2():
     for d in formal_doms:
         print(d, '\n')
 
-    gr = spec_window1.sample_grid({'A': 100})
-    print(gr.T)
+    coords_vectors, gr = spec_window1.sample_grid({'A': 100})
+    # print(gr.T)
     # gr = spec_window1.sample_grid({'A': 40})
     # print(gr.T)
     # gr = spec_window1.sample_grid({'A': 20})
@@ -141,60 +141,92 @@ def cut_grid_with_indices_dict(grid: dict[str, np.ndarray], domains: list):
     return subgrids
 
 
+from wilson_suite.wilson_intensities.amplitudes import domains
 
 def test_filter_to_spec_window_2_2d():
     print()
     sw1d_a = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
 
     res_loc1d_d = ResLocGeoObject({'A': 15., 'B': 55.})
-    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=10.)
     res_loc1d_e = ResLocGeoObject({'A': 27.5, 'B': 58.8})
-    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=20.)
     res_loc1d_f = ResLocGeoObject({'A': 5.5, 'B': 47.2})
-    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=30.)
     res_loc1d_g = ResLocGeoObject({'A': 4., 'B': 43.8})
-    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=40.)
     res_loc1d_h = ResLocGeoObject({'A': 36., 'B': 46.2})
-    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=())
+    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=50.)
 
     spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3, sf4, sf5], sw1d_a)
-    print('\n', spec_window1)
+    print('\nspec_window1', spec_window1)
+    exit()
 
-    print('\nfull_features', len(spec_window1.full_features), spec_window1.full_features)
-    print('\ncontrib_features', len(spec_window1.contrib_features), spec_window1.contrib_features)
+    # print('\nfull_features', len(spec_window1.full_features), spec_window1.full_features)
+    # print('\ncontrib_features', len(spec_window1.contrib_features), spec_window1.contrib_features)
     
-    from wilson_suite.wilson_intensities.amplitudes import domains
     feat_all = spec_window1.full_features + spec_window1.contrib_features
     doms = domains.features_to_clusters(features=feat_all)
-    print('\n\ndoms\n', doms)
-    for d in doms:
-        print('\n', d)
-        print(doms[d])
-    
-    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]])) for d in doms]
 
-    print('\n(spec_window1.box)', spec_window1.box)
+    print('\nfeat_all', len(feat_all), feat_all)
+    print('\n')
+    print('Number of domains formed:', len(doms))
+    print('\n')
+
+    # print('\n\ndoms\n', doms)
+    # for d in doms:
+    #     print('\n', d)
+    #     print(doms[d])
+    
+    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]]), full_features=doms[d]) for d in doms]
+    print('\nformal_doms', len(formal_doms), formal_doms)
+
+    # print('\n(spec_window1.box)', spec_window1.box)
 
     for rd in formal_doms:
         rd.box = rd.box.intersect(spec_window1.box)
 
-    print('\n')
-    for d in formal_doms:
-        print(d, '\n')
+    # print('\n')
+    # for d in formal_doms:
+    #     print(d, '\n')
 
-    spec_grid = spec_window1.sample_grid({'A': 10, 'B': 10})
-    print(spec_grid)
-    print('\n(spec_window1)', spec_window1)
+
     
 
-    subgrids = domains.cut_grid_with_indices_dict_nd(spec_grid, formal_doms)
-    print('\n')
-    for d in subgrids:
-        print(d)
-        print(subgrids[d], '\n')
-        print(spec_grid['B'][subgrids[d]['indices']])
+def test_evaluate_all_on_grids():
+    spec_window1 = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
+
+    res_loc1d_d = ResLocGeoObject({'A': 15., 'B': 55.})
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=10.)
+    res_loc1d_g = ResLocGeoObject({'A': 4., 'B': 43.8})
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=40.)
+    spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf4], spec_window1)
     
-    domains.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values()))
+    feat_all = spec_window1.full_features + spec_window1.contrib_features
+    doms = domains.features_to_clusters(features=feat_all)
+    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]]), full_features=doms[d]) for d in doms]
+
+    coords_vectors, spec_grid = spec_window1.sample_grid({'A': 10, 'B': 10})
+    subgrids = domains.cut_grid_with_coords_nd(spec_grid, coords_vectors, formal_doms)
+
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes import evaluators
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+    from .test_evaluators import prep_vibanasetup_with_degen_states
+    vib_ana_setup = prep_vibanasetup_with_degen_states()
+    vib_data = VibStatesData(vib_ana_setup.states)
+    vibdiff_cache = VibDiffCache()
+
+    subgrids_with_results = evaluators.evaluate_all_on_grids(subgrids, vib_data=vib_data, vibdiff_cache=vibdiff_cache, gamma=2.0)
+    exit()
+
+    # print('\n')
+    # for d in subgrids_with_results:
+    #     print(d)
+    #     print(subgrids_with_results[d], '\n')
+
+    domains.insert_results_to_grid_nd(spec_grid, subgrids_with_results, result_key='result')
+    
     print('\n\n', spec_grid['result'])
 
 
