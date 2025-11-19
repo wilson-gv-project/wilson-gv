@@ -4,10 +4,13 @@ VIB DIFFERENCES in VibPerturbedTerm
 import numpy as np
 import itertools
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm, VibDiffTerm
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
 from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+from dataclasses import dataclass, field
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData
 
 def identify_unique_vibdiff_motifs(list_of_terms: list['VibPerturbedTerm']):
     all_vibdiffs = []
@@ -115,7 +118,7 @@ class VibDiffBank:
 
 
 def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
-                      parameters: ParameterSet,
+                      parameters: 'ParameterSet',
                       allstates_map: dict, unit='Eh') -> float:
     """
     left, right - vibrational states labels for left and right state
@@ -135,7 +138,7 @@ def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
         raise NotImplementedError('This unit of energy is not supported')
 
 def calculate_vibenedenom_tensor(vibenedenom_inds: tuple, 
-                                 vibstates_data: VibStatesData):
+                                 vibstates_data: 'VibStatesData'):
     """
     should be using harmonic uncorrected vib ene levels!!!
     """
@@ -151,7 +154,7 @@ def calculate_vibenedenom_tensor(vibenedenom_inds: tuple,
 
 
 def calculate_vibenedenoms(unique_vibenedenoms: list[set], 
-                           vibstates_data: VibStatesData):
+                           vibstates_data: 'VibStatesData'):
     """
     can be done as vector multiplication
     """
@@ -162,10 +165,10 @@ def calculate_vibenedenoms(unique_vibenedenoms: list[set],
     
     return results
 
-from wilson_suite.wilson_intensities.amplitudes.term_parts import FreqTermsCollection
 def identify_vibenedenoms(terms: list['VibPerturbedTerm']):
     """
     """
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import FreqTermsCollection
     return set([FreqTermsCollection(freqterms=t.freqterms).get_num_indices_vibenedenom() for t in terms])
 
 
@@ -191,7 +194,6 @@ def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, 
     
     return (left_state_label, right_state_label)
 
-from dataclasses import dataclass, field
 
 @dataclass
 class VibDiff:
@@ -249,7 +251,7 @@ class VibDiff:
     def from_symbolic(cls, 
                     vibdiff_term_symb: VibDiffTerm,
                     index_dict: dict,
-                    vibstates_data: VibStatesData) -> 'VibDiff':
+                    vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
         # print('\nindex_dict', index_dict, type(index_dict))
         # Get state labels from symbolic term
@@ -384,7 +386,7 @@ def make_sorted_vibdiff_key(left: str, right: str) -> tuple[str, str]:
     return (right, left)
 
 
-def compute_vibdiff(diff_tuple_label: tuple[str, str], vibstates_data: VibStatesData):
+def compute_vibdiff(diff_tuple_label: tuple[str, str], vibstates_data: 'VibStatesData'):
     """
     
     """
