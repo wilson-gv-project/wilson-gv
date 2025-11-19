@@ -3,18 +3,15 @@ Evaluator functions for WilsonSimulation
 """
 from .numerical_abstractions import NumericalResonanceMotif, CompiledTermGroup, compile_feature
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralFeature, Box
-from ..utils import convNu2Ene
 from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData, ResonanceCondition
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData
 import wilson_suite.wilson_intensities.amplitudes.domains as domfuncs
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDataAndConfigs, ParameterSet,
                                                                    TermParametersChoice)
-from .term_parts import EvalFeature
-import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -154,11 +151,9 @@ def evaluate_all_on_grids(grid_info_dict: dict['RectangularDomain', dict],
     """
 
     for domain in grid_info_dict:
-        print('\nevaluating domain', domain)
         domains_grids = grid_info_dict[domain]['grid']
         grid_info_dict[domain]['result'] = evaluate_domain(domain, domains_grids, 
                                                            vib_data, vibdiff_cache, gamma)
-        print('\ndomain result', grid_info_dict[domain]['result'])
     return grid_info_dict
 
 
@@ -170,12 +165,8 @@ def evaluate_domain(domain: 'RectangularDomain', dom_subgrids: dict,
     domain_result = 0. + 0.j
 
     dom_all_feats = domain.full_features + domain.contrib_features
-    print('\ndomain features', dom_all_feats)
     for feature in dom_all_feats:
         compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
-        print('\ncompiled_groups before', compiled_groups)
-        print('\nevaluating feature', evaluate_feature_on_grid(compiled_groups, dom_subgrids, 
-                                                               gamma=gamma, amplitude_coeff=feature.amplitude_coeff))
         
         domain_result += evaluate_feature_on_grid(compiled_groups, dom_subgrids, 
                                                   gamma=gamma, amplitude_coeff=feature.amplitude_coeff)
@@ -202,7 +193,6 @@ def evaluate_res_motif_on_grid(compiled_res_motif: NumericalResonanceMotif,
         
         z = res_conds.vib_energy_diff - pfreq - 1j*gamma
         total *= 1. / z
-    print('\ntotal evaluate_res_motif_on_grid', total)
     return total
 
 
@@ -214,12 +204,11 @@ def evaluate_feature_on_grid(compiled_groups: list[CompiledTermGroup],
     
     """
     full = 0.
-    print('\ncompiled_groups', compiled_groups)
+
     for group in compiled_groups:
         for motif in group.resonance_motifs:
             full += evaluate_res_motif_on_grid(motif, meshgrids, gamma)
-    print('\namplitude_coeff', amplitude_coeff)
-    print('\nfull', full)
+
     return amplitude_coeff * full
 
 

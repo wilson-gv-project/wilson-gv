@@ -11,10 +11,8 @@ import numpy as np
 import pandas as pd
 from CQCParse.relay import DataVault
 from ..amplitudes.averaging import get_AlphaBetaGammaDelta_indices
-from ..utils.utils import prep_data_load, get_package_root
-from ..amplitudes.termND import TermND
+from ..utils.utils import prep_data_load
 from ..utils import DataForPrecalc
-from ..amplitudes.termsEvaluator import TermsEvaluator
 from ..utils.spectrum_utils import SimulationConfig
 from ..utils import debug_mode
 
@@ -218,64 +216,7 @@ def avrg_xyz_indices() -> tuple[np.ndarray|list, float]:
     Fixture to compute averaging indices.
     """
     return get_AlphaBetaGammaDelta_indices(num_f=4), 1/15.
-@pytest.fixture(scope="module")
-def setup_term(dict_8terms: dict, MOL_setup_parser: dict, spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
-    """
-    Factory fixture to set up TermND instances with parsed data and loaded calculations.
-    Uses a hardcoded dictionary of terms from EVV pen-and-paper derivations
-    """
-    term_funcs = {}
 
-    for mol,spec_setup in spectrum_setup.items():
-        def create_term(term_id: int|str) -> TermND:
-            term = TermND(term_id, dict_8terms[term_id]) #! dict_8terms or derived_terms_json
-            parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
-            parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-            if spectrum_setup[mol].old_new_dict is not None:
-                parsed_data.upd_indices_several_parts(spectrum_setup[mol].old_new_dict)
-            deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-            term.load_calc_data(
-                properties_data=deriv_data,
-                allstates=allstates,
-                harmonic_states=harmonic_states,
-                mode_indices=mode_indices,
-                gammaCompsAll=spectrum_setup[mol].gammaCompsAll
-            )
-            term.vibstates = vib_ana_setup.states
-
-            return term
-        term_funcs[mol] = create_term
-    return term_funcs
-@pytest.fixture(scope="module")
-def setup_term_derived(derived_terms_json: dict, 
-                       MOL_setup_parser: dict, 
-                       spectrum_setup: dict) -> dict: #! dict_8terms or derived_terms_json
-    """
-    Factory fixture to set up TermND instances with parsed data and loaded calculations.
-    Uses terms derived with wilson_derive and saved into a json file 
-    then retrieved from it as a dictionary of terms like in the previous function
-
-    """
-    term_funcs = {}
-
-    for mol,spec_setup in spectrum_setup.items():
-        def create_term(term_id: int|str) -> TermND:
-            term = TermND(term_id, derived_terms_json[term_id]) #! dict_8terms or derived_terms_json
-            parsed_data = MOL_setup_parser[mol].parse(linear_molecule=False)
-            parsed_data.get_vpt2(vpt2settings={'anharmonic_type': 'GVPT2'}, list2exclude=None, print_level=0)
-            if spectrum_setup[mol].old_new_dict is not None:
-                parsed_data.upd_indices_several_parts(spectrum_setup[mol].old_new_dict)
-            deriv_data, allstates, harmonic_states, mode_indices = prep_data_load(parsed_data)
-            term.load_calc_data(
-                properties_data=deriv_data,
-                allstates=allstates,
-                harmonic_states=harmonic_states,
-                mode_indices=mode_indices,
-                gammaCompsAll=spectrum_setup[mol].gammaCompsAll
-            )
-            return term
-        term_funcs[mol] = create_term
-    return term_funcs
 
 @pytest.fixture(scope="module")
 def data_for_precalc(setup_term: dict, spectrum_setup: dict) -> dict:
@@ -345,38 +286,6 @@ def data_for_precalc_derived(setup_term_derived: dict, spectrum_setup: dict) -> 
                                  harmonic_arrays_Eh=term_with_data.harmonic_arrays_Eh)
         precalcs[mol] = alldata
     return precalcs
-@pytest.fixture(scope="module")
-def terms_collection(data_for_precalc: dict, setup_term: dict, dict_8terms: dict) -> dict: #! dict_8terms or derived_terms_json
-    """
-    Fixture to create a TermsEvaluator with precalculated data.
-    Based on pen-and-paper derived terms. See setup_term above
-    """
-    terms_cols = {}
-
-    for mol,term_setup in setup_term.items():
-        terms = [term_setup(i) for i in range(len(dict_8terms))] #! dict_8terms or derived_terms_json
-        te = TermsEvaluator(terms)
-        te.identify_to_precalculate()
-        precalc_dict = te.precalculate(data_for_precalc[mol])
-        terms_cols[mol] = (te, precalc_dict)
-    return terms_cols
-@pytest.fixture(scope="module")
-def terms_collection_derived(data_for_precalc_derived: dict, setup_term_derived: dict, 
-                             derived_terms_json: dict) -> dict: #! dict_8terms or derived_terms_json
-    """
-    Fixture to create a TermsEvaluator with precalculated data.
-    Based on terms derived with wilson_derived. See setup_term_derived above
-    """
-    terms_cols = {}
-
-    for mol,term_setup in setup_term_derived.items():
-        terms = [term_setup(i) for i in range(len(derived_terms_json))] #! dict_8terms or derived_terms_json
-        te = TermsEvaluator(terms)
-        te.identify_to_precalculate()
-        precalc_dict = te.precalculate(data_for_precalc_derived[mol])
-        terms_cols[mol] = (te, precalc_dict)
-    return terms_cols
-
 
 # ---------------- Fixtures ----------------
 # @pytest.fixture(scope="module",params=["FORM", "OXAC2"])

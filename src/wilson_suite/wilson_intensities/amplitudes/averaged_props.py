@@ -5,7 +5,6 @@ from typing import Callable
 import copy
 
 import numpy as np
-from wilson_suite.wilson_derive.abstractions import PolProp, VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.term_parts import PropsCollection
 from wilson_suite.wilson_intensities.amplitudes.utils import generate_index_choices_general
 from wilson_suite.wilson_main.abstractions import MolPropsCollection
@@ -13,33 +12,6 @@ from wilson_suite.wilson_main.abstractions import MolPropsCollection
 import logging
 logger = logging.getLogger("wilson")
 
-def simple_prop_ID(property: 'PolProp') -> tuple[tuple, int]:
-    """
-    !USING TUPLES OF TUPLES
-    """
-    operators = tuple([op.o for op in property.ops])
-    return (operators, property.dord)
-
-
-def make_avrg_props_motif(props: list['PolProp']) -> set[tuple]:
-    """
-    !USING TUPLES OF TUPLES
-
-    indices below are concrete, after '|' but could be others, main part of ID is in the numerator
-    {((0, 3), 1),  ---- \\frac{\\partial\\alpha_{\\alpha\\delta}} | e.g. {\\partial Q_{b}}
-     ((2,), 1),    ---- \\frac{\\partial\\mu_{\\gamma}} | e.g. {\\partial Q_{b}}
-     ((1,), 1)}    ---- \\frac{\\partial\\mu_{\\beta}} | e.g. {\\partial Q_{a}}
-    """
-    num_unique_inds = len(set([ind for prop in props for ind in prop.inds if prop.ops]))
-    return tuple(simple_prop_ID(prop) for prop in props if prop.ops) + (num_unique_inds,)
-
-
-def identify_unique_avrgmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[PropsCollection]:
-    """
-    motif contains props and total number of unique indices in them together
-    ??? --- not usefull now?
-    """
-    return set(PropsCollection(term.props).identify_avrg_motif() for term in list_of_terms)
 
 def group_PropsColls_by_numerator(list_props_collections: list['PropsCollection']) -> dict[PropsCollection, list[PropsCollection]]:
     """
@@ -71,7 +43,6 @@ def make_gen_func_to_compute_avrg(*,
         """
         index_choices: dict, props_data: 'MolPropsCollection'
         """
-        # print('type props_data', type(props_data))
         if not isinstance(props_data, MolPropsCollection):
             if isinstance(props_data, list):
                 if isinstance(props_data[0], MolPropsCollection):
@@ -276,16 +247,6 @@ def identify_unique_avrg_tensors(avrg_expressions: list[PropsCollection]) -> lis
     """
     return set(make_unique_avrg_tensors_mapping(avrg_expressions).values())
 
-
-def get_avrg_motif_relation(avrg_expr_main: PropsCollection, avrg_expr_sub: PropsCollection, index_dict: dict):
-    sub_encoded = nm_indices_repetition_reduce_deriv_symmetry(avrg_expr_sub)
-    main_encoded = nm_indices_repetition_reduce_deriv_symmetry(avrg_expr_main)
-    
-    fill_list = [0] * len(main_encoded)
-    for i, actual_ind in enumerate(tuple(avrg_expr_sub.get_mode_indices())):
-        fill_list[i] = index_dict[actual_ind]
-    
-    return fill_list
 
 def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
     """Map expr to indices according to base expression's unique symbols."""

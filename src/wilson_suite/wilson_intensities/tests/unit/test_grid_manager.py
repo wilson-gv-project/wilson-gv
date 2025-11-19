@@ -9,6 +9,9 @@ from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDif
 from ...amplitudes.spectrum_composition import SpectralFeature, Box, ResLocGeoObject, SpectralWindow
 from ...amplitudes.grid_manager_evaluator import SpectralEvaluator
 
+import logging
+from ....wilson_utils.logger import setup_logger
+setup_logger("wilson_suite.", level=logging.DEBUG)
 
 def test_example_new_api_asserts():
     """Example of using the new clean API with actual assertions instead of prints."""

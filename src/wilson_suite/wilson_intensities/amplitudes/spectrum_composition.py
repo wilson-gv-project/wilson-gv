@@ -1,8 +1,7 @@
 import numpy as np
 import copy
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.domains import points_to_bounds, compute_box_adjacency, connected_components_from_adjacency
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, TermParametersChoice, is_tuple_of_tuples, safe_arange_inclusive_scaled
+from wilson_suite.wilson_intensities.amplitudes.domains import points_to_bounds
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, TermParametersChoice, safe_arange_inclusive_scaled
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Union, Optional, Literal
@@ -13,8 +12,6 @@ class Grid:
     """
     """
     meshgrids: Tuple[np.ndarray, ...]
-    # ndim: int
-    # grid_coords: Tuple
 
 # type aliases
 Min_bound = float
@@ -61,7 +58,6 @@ class Box:
                     "Bounds must be a tuple of (min, max) pairs, "
                     "e.g. ((0.0, 1.0), (5.0, 10.0))."
                 )
-            # self.bounds_tuple = bounds
             # Give numeric or string axis labels consistently
             self.axes = tuple(str(i) for i in range(len(bounds)))
             self.bounds = {str(i): b for i, b in enumerate(bounds)}
@@ -139,41 +135,6 @@ class Box:
             union_bounds[ax] = (min(mins), max(maxs))
         return cls(union_bounds)
 
-    # @classmethod
-    # def union_if_connected(
-    #     cls,
-    #     boxes: List["Box"],
-    #     adjacency_fn=compute_box_adjacency,
-    #     on_disconnected="raise",  # options: "raise", "none", "components"
-    # ) -> "Box" | None | List["Box"]:
-    #     """
-    #     Return a single union only if the boxes form one connected component and share axes.
-    #     Behavior when disconnected:
-    #       - "raise": raises ValueError
-    #       - "none": returns None
-    #       - "components": returns unions per connected component (same as unions_of_connected_components)
-    #     """
-    #     sigs = {tuple(sorted(b.axes)) for b in boxes}
-    #     if len(sigs) != 1:
-    #         msg = "Boxes must share the same axis set to test connectivity jointly."
-    #         if on_disconnected == "raise":
-    #             raise ValueError(msg)
-    #         elif on_disconnected == "none":
-    #             return None
-
-    #     # axis_order = next(iter(sigs))
-    #     # bounds = boxes_to_bounds(boxes, axis_order)
-    #     adjacency = adjacency_fn(bounds)
-    #     comps = connected_components_from_adjacency(adjacency, boxes)
-    #     if len(comps) == 1:
-    #         return cls.union_all(boxes)
-    #     if on_disconnected == "raise":
-    #         raise ValueError(f"Boxes are not a single connected component; found {len(comps)} components.")
-    #     elif on_disconnected == "none":
-    #         return None
-    #     elif on_disconnected == "components":
-    #         # flatten to unions of components
-    #         return [cls.union_all(comp) for comp in comps.values()]
 
     def contains_box(self, other: "Box") -> bool:
         shared_axes = set(self.axes) & set(other.axes)
@@ -219,7 +180,7 @@ class Box:
             raise ValueError(f"Expected SpectralFeature with a location with {self.ndim} coords, got {spec_feature_ndim}")
 
         if spec_feature.lineshape_parameter is None:
-            raise ValueError(f"Expected SpectralFeature with `lineshape_parameter` attribute")
+            raise ValueError("Expected SpectralFeature with `lineshape_parameter` attribute")
 
         contributing = True
         for ax, (mn, mx) in self.bounds.items():
@@ -358,7 +319,6 @@ class SpectralFeature:
         contrib_features = []
 
         for feature in spec_features:
-            # print('\nspec_window.box', spec_window.box)
             if spec_window.box.contains_feature(feature, mode='loc'):
                 feature.feat_type = 'full'
                 full_features.append(feature)
@@ -377,7 +337,6 @@ class SpectralFeature:
                                   distance_thresholds: dict,
                                   linkage: str = 'single'):
 
-        # features_locs = {loc_geo_obj.values:features[loc_geo_obj][1] for loc_geo_obj in features}
         features_locs = {feature.location.values: feature for feature in spec_features}
         from wilson_suite.wilson_intensities.amplitudes import domains
 
@@ -490,23 +449,11 @@ class RectangularDomain:
     union_lvl0_mask: np.ndarray = None # should be of the shape of the grid of lvl1 domain
 
     def __post_init__(self):
-        from wilson_suite.wilson_utils.common_labels import cap_alpha_labels
 
         # --- bounds ---
         if isinstance(self.box, tuple) or isinstance(self.box, dict):  # allow legacy tuple bounds
             self.box = Box(self.box)
         
-        # if self.bounds.ndim != len(self.shape):
-        #     raise ValueError("Bounds dimensionality must match shape length.")
-
-        # --- labels ---
-        # if self.labels is None:
-        #     if len(self.shape) > len(cap_alpha_labels):
-        #         raise ValueError(f"Not enough predefined labels for {len(self.shape)} dimensions.")
-        #     self.labels = tuple(cap_alpha_labels[:len(self.shape)])
-        # elif len(self.labels) != len(self.shape):
-        #     raise ValueError("Labels must match shape dimensionality.")
-
         # --- label-index map ---
         if self.labels is not None:
             self._label_to_index = {label: i for i, label in enumerate(self.labels)}
@@ -555,7 +502,6 @@ class RectangularDomain:
         for axis, vals in sorted(axis_vals.items()):
             min_val, max_val = min(vals) - padding, max(vals) + padding
             bounds.append((min_val, max_val))
-        shape = tuple(len(axis_vals[a]) for a in sorted(axis_vals))
 
         window = SpectralWindow(Box(tuple(bounds)))
         domain = cls(bounds=window)
@@ -574,10 +520,7 @@ class RectangularDomain:
 
         i = self.axis_index(key)
         min_val, max_val = self.box.bounds[i]
-        print('min_val, max_val', min_val, max_val)
-        print(safe_arange_inclusive_scaled(min_val, max_val, steps_axes[key]))
         return safe_arange_inclusive_scaled(min_val, max_val, steps_axes[key])
-        # return linspace_with_step(min_val, max_val, steps_axes[key])
 
     def axis_index(self, key: Union[int, str]) -> int:
             """Resolve axis index from label or integer."""

@@ -2,9 +2,9 @@
 DOMAINS of RESONANCE LOCATIONS
 """
 import numpy as np
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
+from typing import List, Tuple, Dict, Optional
 
-# from .spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralWindow
 if TYPE_CHECKING:
     from .spectrum_composition import SpectralFeature, RectangularDomain, Box
 
@@ -45,32 +45,7 @@ def find_points_clusters_by_distance(res_locations: list[tuple],
     
     return groups
 
-# def find_feature_clusters_by_distance(features: dict['GeometricObject', 
-#                                                      tuple[float, 'SpectralFeature']], 
-#                                       distance_thresholds: dict[str, float], 
-#                                       spec_window_full: 'SpectralWindow',
-#                                       linkage: str = "single") -> dict[int, 'RectangularDomain']:
-#     """
-#     take features dict, find clusters of them based on location and distances
 
-#     return a dict of int key and SpectralWindow instance value
-#     """
-#     features_locs = {loc_geo_obj.values:features[loc_geo_obj] for loc_geo_obj in features}
-
-#     clusters = find_points_clusters_by_distance(res_locations=list(features_locs.keys()), 
-#                                          distance_thresholds=distance_thresholds,
-#                                          linkage=linkage)
-#     rec_windows_dict = {}
-    
-#     for g in clusters:
-#         domain = RectangularDomain.from_features([features_locs[i] for i in clusters[g]])
-#         domain.bounds.intersect(spec_window_full)
-#         rec_windows_dict[g] = domain
-
-#     return rec_windows_dict
-
-from typing import List, Tuple, Dict, Union, Optional
-# def compute_box_adjacency(boxes: List[List[Tuple[float, float]]]) -> np.ndarray:
 def compute_box_adjacency(boxes: List['Box']) -> np.ndarray:
     """
     Compute adjacency for N-dimensional rectangular boxes (bounds given as min/max per dimension).
@@ -90,11 +65,11 @@ def compute_box_adjacency(boxes: List['Box']) -> np.ndarray:
     return adjacency
 
 def compute_box_adjacency(
-    boxes: List["Box"],
-    *,
-    touch_inclusive: bool = True,
-    axis_order: Optional[Tuple[str, ...]] = None,
-) -> np.ndarray:
+                            boxes: List["Box"],
+                            *,
+                            touch_inclusive: bool = True,
+                            axis_order: Optional[Tuple[str, ...]] = None,
+                        ) -> np.ndarray:
     """
     Minimal adjacency for axis-labeled Boxes.
     Assumes all boxes are comparable on the given axis_order.
@@ -133,17 +108,9 @@ def compute_box_adjacency(
                 adj[i, j] = adj[j, i] = True
     return adj
 
-# def points_to_bounds(points: List[Dict[str,float]], 
-#                      halfwidths_list: List[Dict[str,float]]) -> List[Tuple[Tuple[float,float]]]:
-#     axes = list(points[0].keys())
-#     return [
-#         tuple([(p[axis]-hw[axis], p[axis]+hw[axis]) for axis in axes])
-#         for p, hw in zip(points, halfwidths_list)
-#     ]
 
 def points_to_bounds(points: List[Dict[str,float]], 
                      halfwidths_list: List[Dict[str,float]]) -> List[Tuple[Tuple[float,float]]]:
-    axes = list(points[0].keys())
     return [
         {axis: (p[axis]-hw[axis], p[axis]+hw[axis]) for axis in p}
         for p, hw in zip(points, halfwidths_list)
@@ -191,13 +158,8 @@ def connected_components_from_adjacency(adjacency: np.ndarray, box_objects: list
 def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['SpectralFeature']]:
     """
     """
-    # points_from_features = [feat.location._coord_dict for feat in features]
-    # halfwidths_list_from_features = [feat.lineshape_parameter for feat in features]
-    # feature_boxes = points_to_bounds(points_from_features, halfwidths_list_from_features)
     feature_boxes = [f.feat_box for f in features]
     feature_ls = [f.lineshape_parameter for f in features]
-    # print('feature_boxes', feature_boxes)
-    # print('feature_ls', feature_ls)
     adjacency = compute_box_adjacency(feature_boxes)
 
     return connected_components_from_adjacency(adjacency, features)
@@ -207,9 +169,7 @@ def feat_clusters_to_domains(clusters: list['RectangularDomain']) -> dict[int, l
     """
     """
     cluster_boxes = [c.box.bounds for c in clusters]
-    print('\ncluster_boxes', cluster_boxes)
     cluster_adjacency = compute_box_adjacency(cluster_boxes)
-    print('\ncluster_adjacency', cluster_adjacency)
     return connected_components_from_adjacency(cluster_adjacency, clusters)
 
 # --------------------------------------------
@@ -226,10 +186,6 @@ def get_distance_threshold(dynamic_range: float|int, Gamma_axes: dict) -> dict:
 
     return dist_ax
 
-
-def get_domain_grids(domains_with_features):
-
-    pass
 
 
 def cut_grid_with_coords_nd(full_meshgrids: dict[str, np.ndarray], 
@@ -314,6 +270,5 @@ def insert_results_to_grid_nd(grid: dict[str, np.ndarray],
 
         # Compute result for this subgrid
         result_sub = info['result']
-        print('\nresult_sub', result_sub)
 
         grid[result_key][indices] += result_sub

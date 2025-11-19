@@ -6,7 +6,7 @@ import itertools
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm, VibDiffTerm
 from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -18,11 +18,9 @@ def identify_unique_vibdiff_motifs(list_of_terms: list['VibPerturbedTerm']):
     for term in list_of_terms:
         for res in term.res:
             all_vibdiffs.append(sorted([len(set(res.diff.sl.q)), len(set(res.diff.sr.q))]))
-            # all_vibdiffs.append(tuple([tuple(res.diff.sl.q), tuple(res.diff.sr.q)]))            
 
         for frt in term.freqterms:
             all_vibdiffs.append(sorted([len(set(frt.sl.q)), len(set(frt.sr.q))]))
-            # all_vibdiffs.append(tuple([tuple(frt.sl.q), tuple(frt.sr.q)]))
 
     return set(tuple(vd) for vd in all_vibdiffs)
 
@@ -181,8 +179,6 @@ def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, 
     left_state_symb = vibdiff_term.sl.q
     right_state_symb = vibdiff_term.sr.q
 
-    # print('>> left', [str(index_dict[i]) for i in left_state_symb])
-    # print('>> right', [str(index_dict[i]) for i in right_state_symb])
 
     left_state_label = ','.join(sorted([str(index_dict[i]) for i in left_state_symb]))
     right_state_label = ','.join(sorted([str(index_dict[i]) for i in right_state_symb]))
@@ -205,9 +201,6 @@ class VibDiff:
     left: VibState
     right: VibState
     
-    # def __repr__(self):
-        # return f'[{self.left.state_label}, {self.right.state_label}]'
-
     def is_zero_state(self, state: VibState) -> bool:
         """
         Check if state is a zero (ground) state.
@@ -253,7 +246,6 @@ class VibDiff:
                     index_dict: dict,
                     vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
-        # print('\nindex_dict', index_dict, type(index_dict))
         # Get state labels from symbolic term
         left_label, right_label = make_vibdiff_key(vibdiff_term_symb, index_dict)
         # Look up states in vibstates_data

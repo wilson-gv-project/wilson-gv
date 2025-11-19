@@ -59,10 +59,3 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     else:
         return tuple([fig, ax, contour, cbar]), {}
 
-
-def get_axes_in_resmotif(motif: tuple):
-    """
-    for ResonanceMotif
-    """
-    return set([ax.strip('-') for rcond in motif for ax in rcond[1]])
-

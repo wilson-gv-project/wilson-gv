@@ -14,6 +14,9 @@ import numpy as np
 from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, RectangularDomain, SpectralFeature, SpectralWindow
 
+import logging
+logger = logging.getLogger("wilson."+__name__)
+
 
 # =============================================================================
 # 1. PHYSICS LAYER - Pure calculations, no side effects
@@ -275,26 +278,26 @@ class SpectralEvaluator:
         regions = self.grid_mgr.create_regions(grid_resolution)
         
         if verbose:
-            print(f"Created {len(regions)} grid regions")
+            logger.info(f"Created {len(regions)} grid regions")
         
         # Step 2: Evaluate each region
         region_results = {}
         for region in regions:
             if verbose:
-                print(f"\nEvaluating region with {len(region.features)} features")
+                logger.info(f"\nEvaluating region with {len(region.features)} features")
             
             region_results[region] = self._evaluate_region(region, verbose)
             
             if verbose:
                 intensity = region_results[region]
-                print(f"  Region shape: {intensity.shape}")
-                print(f"  Max intensity: {np.max(np.abs(intensity))}")
+                logger.info(f"  Region shape: {intensity.shape}")
+                logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
         
         # Step 3: Assemble into full grid
         if return_type in ['grid', 'both']:
             self.grid_mgr.place_results_into_grid(region_results)
             if verbose:
-                print(f"\nAssembled full grid with shape: {self.grid_mgr.full_grid['result'].shape}")
+                logger.info(f"\nAssembled full grid with shape: {self.grid_mgr.full_grid['result'].shape}")
         
         # Return based on type
         if return_type == 'grid':
@@ -333,7 +336,7 @@ class SpectralEvaluator:
         # Sum contributions from all features
         for feature in region.features:
             if verbose:
-                print(f"  Feature: amplitude={feature.amplitude_coeff}")
+                logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
             
             result += self._evaluate_feature(feature, region.coords, verbose)
             
@@ -348,7 +351,7 @@ class SpectralEvaluator:
         compiled_groups = self.compiler.compile_feature(feature)
         
         if verbose:
-            print(f"    Compiled into {len(compiled_groups)} term groups")
+            logger.info(f"    Compiled into {len(compiled_groups)} term groups")
         
         # Sum all compiled groups
         feature_sum = np.zeros_like(
@@ -395,37 +398,3 @@ def evaluate_all_on_grids(grid_info_dict: Dict['RectangularDomain', dict],
     
     return grid_info_dict
 
-
-# =============================================================================
-# 6. EXAMPLE USAGE
-# =============================================================================
-
-# def example_new_api():
-#     """Example of using the new clean API."""
-    
-#     # Setup (same as before)
-#     from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
-#     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-#     from ..tests.unit.test_evaluators import prep_vibanasetup_with_degen_states
-
-#     vib_ana_setup = prep_vibanasetup_with_degen_states()
-#     vib_data = VibStatesData(vib_ana_setup.states)
-#     vibdiff_cache = VibDiffCache()
-    
-#     # Create spectral window with features
-#     spec_window = create_test_spec_window()  # Your existing setup
-    
-#     # NEW CLEAN API:
-#     evaluator = SpectralEvaluator(vib_data, vibdiff_cache, gamma=2.0)
-    
-#     results = evaluator.evaluate_spectrum(
-#         spec_window=spec_window,
-#         grid_resolution={'A': 10, 'B': 10},
-#         verbose=True
-#     )
-    
-#     # Results is a clean dict: GridRegion -> intensity array
-#     for region, intensity in results.items():
-#         print(f"Region has {len(region.features)} features")
-#         print(f"Intensity shape: {intensity.shape}")
-#         print(f"Max intensity: {np.max(np.abs(intensity))}")

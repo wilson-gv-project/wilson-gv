@@ -1,10 +1,17 @@
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscStateSymbolic, PolProp, VibDiffTerm
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import NumericalResonanceMotif
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-from ...wilson_main.abstractions import MolecularProperty, MolPropsCollection
-from ...wilson_derive.abstractions import VibPerturbedTerm
+from ...wilson_main.abstractions import MolPropsCollection
 from typing import Callable
+from wilson_suite.wilson_main.abstractions import VibState
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+from collections.abc import Mapping
+
+import numpy as np
+from typing import Tuple
+
+import copy
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..amplitudes.vibene_differences import VibDiffCache, VibDiff
@@ -202,7 +209,6 @@ class ResonanceMotif:
         return total_num_axes - len(self.resonance_conditions)
     
     def get_vibdiffs(self):
-        # return {i: tuple([tuple(cond.diff.sl.q), tuple(cond.diff.sr.q)]) for i, cond in enumerate(self.resonance_conditions)}
         return {i: cond.diff for i, cond in enumerate(self.resonance_conditions)}
     def get_freq_axes(self):
         return {i: tuple(cond.pf) for i, cond in enumerate(self.resonance_conditions)}
@@ -230,8 +236,7 @@ class EvalTermCollection:
     """
     terms: list[EvalVibPerturbedTerm]
 
-from collections.abc import Mapping
-import copy
+
 
 class ParameterSet(Mapping):
     """
@@ -286,8 +291,7 @@ class ParameterSet(Mapping):
     def from_dict(cls, parameters):
         return cls(parameters)
 
-from wilson_suite.wilson_main.abstractions import VibState
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
 
 @dataclass
 class VibStatesData:
@@ -295,7 +299,6 @@ class VibStatesData:
     Holds vib states data and can compute vib states energy differences
     """
     allstates: tuple[VibState]
-    # harmonic_osc_states_labels: tuple[int]
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
@@ -337,7 +340,6 @@ class VibStatesData:
 
 @dataclass()
 class EvaluationDataAndConfigs:
-    # props_data: list['MolecularProperty']
     props_data: MolPropsCollection = None
     vibstates_data: 'VibStatesData' = None
     number_of_nmodes: int = None
@@ -348,8 +350,7 @@ class EvaluationDataAndConfigs:
     vibenedenoms_tensors: dict = None
     pulse_polarization_vector: list = None
 
-from dataclasses import dataclass, field
-from typing import Tuple
+
 
 
 @dataclass(frozen=True)
@@ -393,9 +394,6 @@ class TermParametersChoice:
 
 # -------------------------------------------------------
 
-from dataclasses import dataclass
-# from abc import ABC, abstractmethod
-import numpy as np
 
 def is_tuple_of_tuples(my_variable):
     if not isinstance(my_variable, tuple):
@@ -491,7 +489,6 @@ def make_resonance_function(res_motif: ResonanceMotif,
             # for each resonace condition (rc) compute vibdiff part
             vd = VibDiff.from_symbolic(rc.diff, param_set, vibstates_data)
             vd.cache_it(vibdiff_cache)
-            print('\nvd', vd)
             # for this resonance condition get grids for axes
 
             # in reciprocal centimeters

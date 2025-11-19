@@ -3,14 +3,11 @@ RESONANCE LOCATIONS for ResonanceMotif/VibPerturbedTerm
 RESONANCES in VibPerturbedTerm
 """
 import numpy as np
-from wilson_suite.wilson_analysis.render.render import get_axes_in_resmotif
-from wilson_suite.wilson_derive.abstractions import ResonanceCondition, VibPerturbedTerm
+from wilson_suite.wilson_derive.abstractions import  VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiff, VibDiffCache
-import copy
 
-from wilson_suite.wilson_intensities.amplitudes.utils import initialize_resonance_dict
 
 def is_location_in_window(location: dict, window: dict, margins: dict=None):
     """
@@ -49,7 +46,6 @@ def generate_LHS_motif(motif: ResonanceMotif):
     """
     from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
     # maximum different normal mode index across all tuples
-    # max_different_nm_index = len(motif.get_nm_indices())
     max_different_freq_axes = motif.get_max_different_freq_axes()
     num_axes = len(max_different_freq_axes)
 
@@ -154,7 +150,6 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     # {motif 1: {(500., 1200.): [(1, 2), (1, 3)],
     #           (500., 1400.): [(1, 4)], ...}}
 
-    # results: dict[ResonanceMotif,dict[tuple,list]] = {motif: {}}
     results: dict[ResonanceMotif,dict[ResLocGeoObject,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
@@ -162,35 +157,11 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     for idxs in index_choices:
         parameters = ParameterSet(idxs)
         location_key = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')
-        # print('\nlocation_d', location_d) # (('A', 3130.0), ('B', 2410.0))
-        # print('location_d.coordinates', location_d.coordinates)
-        # print('location_d', location_d)
 
         if spec_window is None or is_location_in_window(location_key, window=spec_window, margin={}):
             results[motif].setdefault(location_key, []).append(idxs)
     return results
 
-
-def crop_resonances_to_window(resonances: tuple[dict], spec_window: dict, margins) -> list[dict]:
-    """
-    take collection of res loc dicts and return a new collection of only ones in the window
-    """
-    return [resloc for resloc in resonances if is_location_in_window(resloc, window=spec_window, margins=margins)]
-
-
-def make_resonance_motif(res_conds: list['ResonanceCondition']) -> tuple:
-    """
-    """
-    conditions = []
-
-    for cond in res_conds:
-
-        new_pf = tuple(cond.pf)
-        new_diff = tuple([tuple(cond.diff.sl.q), tuple(cond.diff.sr.q)])
-
-        conditions.append(tuple([new_diff, new_pf]))
-
-    return tuple(conditions)
 
 
 def get_indlabels_in_resmotif(motif: tuple):
@@ -201,10 +172,7 @@ def get_indlabels_in_resmotif(motif: tuple):
     return set(label for labels in indlabels_list for label in labels)
 
 
-# def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[tuple]:
-#     """
-#     """
-#     return set(make_resonance_motif(term.res) for term in list_of_terms)
+
 def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[ResonanceMotif]:
     """
     """
@@ -221,10 +189,5 @@ def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):
     return len(axes_in_these_terms)
 
 
-def compute_res_condition(res_cond: ResonanceCondition, spec_axes):
-    
-    axis_tupleID: tuple[str] = tuple(res_cond.pf)
-    sign_coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
-    print(sign_coeffs)
-    return
+
 

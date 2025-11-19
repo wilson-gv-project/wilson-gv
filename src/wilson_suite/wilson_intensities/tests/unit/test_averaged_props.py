@@ -1,8 +1,10 @@
-import wilson_suite.wilson_intensities.amplitudes.averaged_props
 import wilson_suite.wilson_intensities.amplitudes.term_parts as tparts
 import wilson_suite.wilson_intensities.amplitudes.averaged_props as avrgprops
 from typing import Callable
 from wilson_suite.wilson_main.abstractions import MolPropsCollection, MolecularProperty
+import wilson_suite.wilson_derive.abstractions as wd_abst
+import wilson_suite.wilson_intensities.amplitudes.term_parts as term_abst
+import numpy as np
 
 import logging
 from ....wilson_utils.logger import setup_logger
@@ -14,7 +16,6 @@ def get_expressions():
     
     t_inds = [0, 1,-1, -2, -3]
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
-    # terms_select = terms_fuller_flat
 
     return [tparts.PropsCollection(t.props) for t in terms_select]
 
@@ -32,42 +33,6 @@ def test_expr1():
         print(i)
 
 
-def test_identify_unique_avrgmotifs():
-    from wilson_suite.fixtures import get_terms_from_json
-    terms_fuller_flat = get_terms_from_json()
-
-    t_inds = [0, 1,-1, -2, -3]
-    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
-    terms_select = terms_fuller_flat
-
-    unique = wilson_suite.wilson_intensities.amplitudes.averaged_props.identify_unique_avrgmotifs(terms_select)
-    print('\n\n')
-    for i in unique:
-        print(i)
-    print(len(unique))
-
-
-def test_make_avrg_props_motif():
-    from wilson_suite.fixtures import get_terms_from_json
-    terms_fuller_flat = get_terms_from_json()
-
-    collect_simple = []
-    t_inds = [0, -2]
-    for tID in t_inds:
-        term = terms_fuller_flat[tID]
-
-        # get only avrg props
-        # props_with_cart_axes = [prop.to_latex() for prop in term.props if prop.ops]
-        props_with_cax_simple = [wilson_suite.wilson_intensities.amplitudes.averaged_props.simple_prop_ID(prop) for prop in term.props if prop.ops]
-
-        collect_simple.append(set(tuple(props_with_cax_simple)))
-        pp = wilson_suite.wilson_intensities.amplitudes.averaged_props.make_avrg_props_motif(term.props)
-        print(props_with_cax_simple)
-        print(pp)
-
-import wilson_suite.wilson_derive.abstractions as wd_abst
-import wilson_suite.wilson_intensities.amplitudes.term_parts as term_abst
-import numpy as np
 
 polhess = np.zeros((4, 4, 3, 3))
 
@@ -150,7 +115,6 @@ def test_make_func_to_compute_avrg():
     terms_fuller_flat = get_terms_from_json()
 
     t_inds = [0, 1, -2, -1]
-    # t_inds = range(len(terms_fuller_flat))
     terms_select = [terms_fuller_flat[tID] for tID in t_inds]
     
     motifs_coll = []
@@ -278,10 +242,7 @@ def test_precalculate_avrg_tensor():
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
 
-    # t1 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
-    # print(t1)
 
-    # polgrad['b'][0, 3] * dipgrad['b'][1] * dipgrad['a'][2]
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
     polhess.inds = ['a', 'b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -291,10 +252,7 @@ def test_precalculate_avrg_tensor():
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
 
-    # t2 = avrgprops.precalculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=props_data)
-    # print(t2)
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
     polhess.inds = ['a', 'b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -306,7 +264,6 @@ def test_precalculate_avrg_tensor():
     t3 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
     print(t3)
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
     polhess.inds = ['a', 'b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -319,7 +276,6 @@ def test_precalculate_avrg_tensor():
     print(t4)
     print(np.allclose(t3, t4))
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
     polgrad.inds = ['b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -331,7 +287,6 @@ def test_precalculate_avrg_tensor():
     t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
     print(t5)
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
     polgrad.inds = ['c']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -346,7 +301,6 @@ def test_precalculate_avrg_tensor():
 
     print(np.allclose(t5, t6))
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
     polgrad.inds = ['b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -370,10 +324,7 @@ def test_precalculate_avrg_tensor_focused():
     
     # cart axes (0, 1, 1, 0) - 0 1 2 3
     # nm modes (a=0, b=1, c=2)
-    # props_data['dipgrad'][0, 1] = 0.15
 
-    # props_data['dipgrad'][2, 1] = 0.15
-    # props_data['polgrad'][1, 0, 0] = 0.3
     props_data['dipgrad'][0, 1] = 0.15
     props_data['dipgrad'][1, 1] = 0.3
     props_data['polgrad'][0, 0, 0] = 0.3
@@ -391,9 +342,7 @@ def test_precalculate_avrg_tensor_focused():
                                             number_of_nmodes=4, props_data=MolPropsCollection(props))
     print(avrg_expr1)
     print(np.transpose(np.nonzero(t5)))
-    # print(t5.shape)
 
-    # polgrad['b'][0, 3] * dipgrad['a'][1] * dipgrad['c'][2]
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
     polgrad.inds = ['c']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -404,7 +353,6 @@ def test_precalculate_avrg_tensor_focused():
     avrg_expr2 = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
     t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr2, polarization='ZZZZ', 
                                             number_of_nmodes=4, props_data=MolPropsCollection(props))
-    # print(t6)
     print(avrg_expr2)
     print(np.transpose(np.nonzero(t6)))
 
@@ -425,7 +373,6 @@ def test_precalculate_avrg_tensor_focused():
     avrg_expr3 = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
     t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr3, polarization='ZZZZ', 
                                             number_of_nmodes=4, props_data=MolPropsCollection(props))
-    # print(t7)
     print(avrg_expr3)
     print(np.transpose(np.nonzero(t7)))
 

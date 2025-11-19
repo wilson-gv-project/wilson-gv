@@ -1,13 +1,12 @@
 from typing import TYPE_CHECKING, Any
 
-from wilson_suite.wilson_intensities.amplitudes.resonances import identify_unique_resmotifs
 import wilson_suite.wilson_intensities.amplitudes.averaged_props as avrgprops
 import wilson_suite.wilson_intensities.amplitudes.vibene_differences as vediff
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 import numpy as np
 import copy
 
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, ResonanceMotif, EvaluationDataAndConfigs, FreqTermsCollection
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, EvaluationDataAndConfigs, FreqTermsCollection
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
@@ -29,33 +28,7 @@ Extra info on top of VibPerturbedTerm and its components:
 """
 FULL TERM COEFFICIENT for VibPerturbedTerm
 """
-def calculate_term_coeffs_for_indices(terms: list['VibPerturbedTerm'], 
-                                      motif_res_loc, data_and_configs: EvaluationDataAndConfigs):
 
-    # Suggestion sketch for overall steps
-
-    # Identify all unique parts that can be precalculated for a sensible partitioning of the term parts
-    # One function here
-    need_to_precalc = identify_precalc_unique_coeff_parts(terms)
-
-    # Perform the precalculation and keep in a structure to yet be decided
-    # One function here
-    precalculated_data = precalculate_unique_coeff_parts(need_to_precalc, data_and_configs)
-    
-    # Current implementation target for the previous two fns: Make them work in the general care and
-    # don't worry about optimization yet
-
-    results = {}
-    # Calculate the coefficients for the terms by combining the precalculated parts
-    # One function here
-    for term in terms:
-        this_res_motif = ResonanceMotif(term.res)
-        rel_inds = [...]
-        evaluate_term_coeffs(term, relevant_indices=rel_inds, necessary_data=precalculated_data)
-
-    # Would return a structure {term: {resonance index tuple: term coeff, ...}, ...}
-
-    return results
 
 def identify_precalc_unique_coeff_parts(terms: list['VibPerturbedTerm']) -> dict[str, Any]:
     """
@@ -86,7 +59,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict,
     data.avrg_tensors = {}
     data.avrg_expr_tensor_mapping = need_to_precalc['avrg_expr_tensor_mapping']
     data.vibenedenoms_tensors = {}
-    # print('\ndata_and_configs.props_data', data_and_configs.props_data, type(data_and_configs.props_data))
+
     for avrg_tensor in need_to_precalc['avrg_tensors']:
         data.avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
                                                                         pulse_polarization_vector=data_and_configs.pulse_polarization_vector,

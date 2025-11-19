@@ -9,10 +9,11 @@ result_grid
 
 """
 import numpy as np
-import itertools
-from typing import Iterable, Generator, ClassVar, Dict, Any, Self
-from dataclasses import dataclass, field
+from typing import ClassVar, Any, Self
+from dataclasses import dataclass
 from collections import Counter
+from wilson_suite.wilson_main.abstractions import VibState
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 from collections.abc import Mapping
 import copy
@@ -73,8 +74,7 @@ class ParameterSet(Mapping):
     def from_dict(cls, parameters):
         return cls(parameters)
 
-from wilson_suite.wilson_main.abstractions import VibState
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
 
 @dataclass
 class VibStatesData:
