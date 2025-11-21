@@ -6,21 +6,41 @@ import copy
 from wilson_suite.wilson_derive.abstractions import HarmOscStateSymbolic
 
 @dataclass
+class SignedPulseTuple:
+    """
+    Class to represent a collection of signed references to pulse IDs. Applicable as a representation of an independent
+    variable, but not limited to this.
+
+    pulse_refs: A tuple of signed references to pulse IDs
+    Example: For the independent variable -w1 + w2, a pulse_refs representation is (-1, 2)
+    Example: For the phase-matching condition -k1 + k2 + k3, a pulse_refs representation is (-1, 2, 3)
+    """
+    pulse_refs: tuple
+
+@dataclass
 class PhaseMatchingCondition:
     """
     Class to represent a phase-matching condition
 
-    pulse_id_signs: A dictionary of {pulse id: sign} pairs (both are integers).
-    Example: For the phase-matching condition -k1 + k2 + k3, pulse_id_signs is {1: -1, 2: 1, 3: 1}
-
-    phasematch_cond_id: Optional argument defining an identifier for this phase-matching condition (default: None)
+    pulse_refs: A SignedPulseTuple instance defining the phase-matching conditions
+    phasematch_cond_id: Optional integer argument defining an identifier for this phase-matching condition (default: None)
     """
 
-    pulse_id_signs: dict
+    pulses: SignedPulseTuple
     phasematch_cond_id: int = None
 
 @dataclass
-class IndependentVariableChoiceSet:
+class IndependentVariableSet:
+    """
+    Class to represent a group of independent variables.
+
+    var_set: A tuple of SignedPulseTuple instances
+    """
+
+    var_set = tuple[SignedPulseTuple]
+
+@dataclass
+class IndependentVariableChoices:
     """
     Class to represent a valid set of independent variables choices for a phase-matching condition
 
@@ -31,21 +51,40 @@ class IndependentVariableChoiceSet:
     (((group 1 variable 1), (group 1 variable 2), ...), ((group 2 variable 1), (group 2 variable 2), ...)
 
     Example: If the valid groups of independent variables are the pair (-w1, w2) or the combination -w1 + w2,
-    ind_var_groups is (((-1), (2)), ((-1, 2))) - i.e.:
-        - The outermost tuple is length 2 since there are two choices
-        - The first such entry is length 2 since there are two independent variables (-w1 and w2), and each such entry
-        is length 1 since the independent variables refer to one (signed) pulse ID each
-        - The second such entry is length 1 since there is there only one independent variable (-w1 + w2), and that
-        entry is length 2 since that independent variable consists of a combination of two (signed) pulse ID references
-
-
+    ind_var_groups is (A, B), where:
+        - A is a IndependentVariableSet instance of the form (I, II), where:
+            - I is a SignedPulseTuple instance with pulse_refs attribute = (-1,)
+            - II is a SignedPulseTuple instance with pulse_refs attribute = (2,)
+        - A is a IndependentVariableSet instance of the form (III,), where:
+            - III is a SignedPulseTuple instance with pulse_refs attribute = (-1, 2)
     """
     phasematch_cond: PhaseMatchingCondition
-
-    ind_var_groups: tuple[tuple[tuple]]
+    var_groups: tuple[IndependentVariableSet]
 
 @dataclass
-class AxisChoiceSet:
+class SpectralAxis:
+    """
+    Class to represent a choice of spectral axis
+
+    label: A string describing the name of this axis
+    """
+
+    label: str
+    var_group: IndependentVariableSet
+
+@dataclass
+class SpectralAxisChoice:
+    """
+    Class to represent a full choice of spectral axes
+
+    label: A string describing the name of this axis
+
+    """
+    axes: tuple
+
+
+@dataclass
+class SpectralAxisChoiceSet:
     """
     Class to represent a valid set of choices of axes for a choice of independent variables
 
@@ -61,32 +100,51 @@ class AxisChoiceSet:
         - Axis 'A': -w1 and axis 'B': w2
         - Axis 'A': -w1 and axis 'B': -w1 + w2
 
-    Then valid_axis_combs would be as follows:
-    ( {'A': ((-1)), 'B': ((2))}, {'A': ((-1)), 'B': ((-1), (2))}
+    Then valid_axis_combs would be of the form (I, II) where
+        - I is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+            - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
+            on the form (X,), where
+                - X is a SignedPulseTuple instance with the pulse_refs attribute (-1,)
+            - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
+            on the form (X,), where
+                - X is a SignedPulseTuple instance with the pulse_refs attribute (2,)
+        - II is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+            - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
+            on the form (X,), where
+                - X is a SignedPulseTuple instance with the pulse_refs attribute (-1,)
+            - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
+            on the form (X, Y), where
+                - X is a SignedPulseTuple instance with the pulse_refs attribute (-1,)
+                - X is a SignedPulseTuple instance with the pulse_refs attribute (2,)
 
     Example 2: If there were two independent variables -w1 + w2 and w3, suppose that two valid choices of axes were
     identified
         - Axis 'A': -w1 + w2 and axis 'B': w3
         - Axis 'A': -w1 + w2 and axis 'B': -w1 + w2 + w3
 
-    Then valid_axis_combinations would be as follows:
-    ( {'A': ((-1, 2)), 'B': ((3))}, {'A': ((-1, 2)), 'B': ((-1, 2), (3))}
-
-    (Note the difference in the nature of -w1 + w2 between the two examples: In example 1, since the independent variables
-    are -w1 and w2, their combination in axis 'B' in the second valid choice of axes is registered as ((-1), (2)) [this is
-    here an axis composed of two independent variables that consist of one signed pulse ID reference each],
-    while in example 2, since the independent variable are (-w1 + w2) [parentheses added for emphasis] and w3,
-    the occurrence of -w1 + w2 in the valid axis choices is instead registered as (-1, 2) [and not ((-1), (2)) since
-    the independent variable in question consists of a (linear combination of) two signed pulse ID references. See also
-    descriptions in IndependentVariableChoiceSet]
+    Then valid_axis_combs would be of the form (I, II) where
+    - I is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+        - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
+        on the form (X,), where
+            - X is a SignedPulseTuple instance with the pulse_refs attribute (-1, 2)
+        - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
+        on the form (X,), where
+            - X is a SignedPulseTuple instance with the pulse_refs attribute (3,)
+    - II is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+        - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
+        on the form (X,), where
+            - X is a SignedPulseTuple instance with the pulse_refs attribute (-1, 2)
+        - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
+        on the form (X, Y), where
+            - X is a SignedPulseTuple instance with the pulse_refs attribute (-1, 2)
+            - X is a SignedPulseTuple instance with the pulse_refs attribute (3,)
 
     """
 
-    ind_vars: tuple[tuple]
-    valid_axis_combs: tuple[dict]
+    ind_vars: IndependentVariableSet
+    valid_axis_combs: tuple[SpectralAxisChoice]
 
 
-# TODO: SpecDetector and SpecScan as dataclasses?
 # TODO: Expand functionality according to below TODOs
 
 @dataclass

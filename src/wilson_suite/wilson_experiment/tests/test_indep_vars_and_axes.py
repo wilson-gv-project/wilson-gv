@@ -1,6 +1,11 @@
 from wilson_suite import fixtures as ws_fixtures
 from wilson_suite.wilson_experiment.abstractions import PhaseMatchingCondition, IndependentVariableChoiceSet, AxisChoiceSet
 
+
+def test_signed_pulse_tuple():
+
+    pass
+
 def test_phase_matching_condition():
 
     phasematch_id = 0
@@ -29,15 +34,25 @@ def test_phase_matching_condition():
 
         i += 1
 
-def test_independent_variable_choice_set():
 
-    # Show structure with loop that asserts values
+def test_independent_variable_set():
 
     pass
 
-def test_axis_choice_set():
+def test_independent_variable_choices():
 
-    # Show structure with loop that asserts values
+    pass
+
+
+def test_spectral_axis():
+
+    pass
+
+def test_spectral_axis_choice():
+
+    pass
+
+def test_spectral_axis_choice_set():
 
     pass
 
