@@ -1,5 +1,5 @@
 from wilson_suite import fixtures as ws_fixtures
-from wilson_suite.wilson_experiment.abstractions import PhaseMatchingCondition, IndependentVariableChoiceSet, AxisChoiceSet
+from wilson_suite.wilson_experiment.abstractions import PhaseMatchingCondition, IndependentVariableChoices, SpectralAxisChoices
 
 
 def test_signed_pulse_tuple():

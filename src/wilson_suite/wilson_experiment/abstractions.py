@@ -3,8 +3,6 @@ from typing import List, Optional, Iterable
 from operator import itemgetter
 import copy
 
-from wilson_suite.wilson_derive.abstractions import HarmOscStateSymbolic
-
 @dataclass
 class SignedPulseTuple:
     """
@@ -22,14 +20,13 @@ class PhaseMatchingCondition:
     """
     Class to represent a phase-matching condition
 
-    pulse_refs: A SignedPulseTuple instance defining the phase-matching conditions
-    phasematch_cond_id: Optional integer argument defining an identifier for this phase-matching condition (default: None)
+    pulses: A SignedPulseTuple instance defining the phase-matching conditions
+    id: Optional integer argument defining an identifier for this phase-matching condition (default: None)
     """
 
     pulses: SignedPulseTuple
-    phasematch_cond_id: int = None
+    id: int = None
 
-@dataclass
 class IndependentVariableSet:
     """
     Class to represent a group of independent variables.
@@ -37,9 +34,10 @@ class IndependentVariableSet:
     var_set: A tuple of SignedPulseTuple instances
     """
 
-    var_set = tuple[SignedPulseTuple]
+    def __init__(self, var_set: tuple[SignedPulseTuple]):
 
-@dataclass
+        self.var_set = var_set
+
 class IndependentVariableChoices:
     """
     Class to represent a valid set of independent variables choices for a phase-matching condition
@@ -47,8 +45,7 @@ class IndependentVariableChoices:
     phasematch_cond: A PhaseMatchingCondition instance defining the phase-matching condition for which this variable
     set is specified
 
-    ind_var_groups: A three-fold tuple structure defining valid groups of independent variables as
-    (((group 1 variable 1), (group 1 variable 2), ...), ((group 2 variable 1), (group 2 variable 2), ...)
+    var_groups: A tuple of IndependentVariableSet instances describing different choices of independent variable sets
 
     Example: If the valid groups of independent variables are the pair (-w1, w2) or the combination -w1 + w2,
     ind_var_groups is (A, B), where:
@@ -58,57 +55,65 @@ class IndependentVariableChoices:
         - A is a IndependentVariableSet instance of the form (III,), where:
             - III is a SignedPulseTuple instance with pulse_refs attribute = (-1, 2)
     """
-    phasematch_cond: PhaseMatchingCondition
-    var_groups: tuple[IndependentVariableSet]
 
-@dataclass
+    def __init__(self, phasematch_cond: PhaseMatchingCondition, var_groups: tuple[IndependentVariableSet]):
+
+        self.phasematch_cond = phasematch_cond
+        self.var_groups = var_groups
+
+
 class SpectralAxis:
     """
     Class to represent a choice of spectral axis
 
     label: A string describing the name of this axis
+    var_set: An IndependentVariableSet instance describing the independent variables making up this axis
     """
 
-    label: str
-    var_group: IndependentVariableSet
+    def __init__(self, label: str,  var_set: IndependentVariableSet):
 
-@dataclass
-class SpectralAxisChoice:
+        self.label = label
+        self.var_set = var_set
+
+class SpectralAxisSet:
     """
     Class to represent a full choice of spectral axes
 
-    label: A string describing the name of this axis
-
+    axes: A tuple of SpectralAxis instances
     """
-    axes: tuple
+
+    def __init__(self, axes: tuple[SpectralAxis]):
+
+        self.axes = axes
 
 
 @dataclass
-class SpectralAxisChoiceSet:
+class SpectralAxisChoices:
     """
-    Class to represent a valid set of choices of axes for a choice of independent variables
+    Class to represent a valid set of choices of axes for a choice of independent variables and a phase-matching condition
 
-    ind_vars: A two-fold tuple describing a choice ("group") of independent variables in terms of (signed) pulse IDs
+    phasematch_cond: A PhaseMatchingCondition instance describing the phase-matching condition for which this data was determined
+
+    ind_vars: An IndependentVariableSet instance describing a choice ("group") of independent variables in terms of (signed) pulse IDs
     ((variable 1 (all signed) pulse ID 1, ID 2, ...), (variable 2 (all signed) pulse ID 1, ID 2, ...)). See explanation
-    of ind_var_groups in class IndependentVariableChoice set for more details.
+    of var_set in class IndependentVariableSet for more details.
 
-    valid_axis_combs: A tuple of dictionaries, each dictionary describing a valid choice of axes for this choice of
-    independent variables. Each of these dictionaries is structured in the form
-    {axis label: tuple of independent variables whose sum defines the axis}.
+    valid_axis_combs: A tuple of SpectralAxisSet instances, each describing a valid choice of axes for this choice of
+    independent variables.
 
     Example 1: For the independent variables -w1 and w2, suppose that two valid choices of axes were identified:
         - Axis 'A': -w1 and axis 'B': w2
         - Axis 'A': -w1 and axis 'B': -w1 + w2
 
     Then valid_axis_combs would be of the form (I, II) where
-        - I is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+        - I is SpectralAxisSet instance with 'axes' attribute of the form (i, ii), where
             - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
             on the form (X,), where
                 - X is a SignedPulseTuple instance with the pulse_refs attribute (-1,)
             - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
             on the form (X,), where
                 - X is a SignedPulseTuple instance with the pulse_refs attribute (2,)
-        - II is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+        - II is SpectralAxisSet instance with 'axes' attribute of the form (i, ii), where
             - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
             on the form (X,), where
                 - X is a SignedPulseTuple instance with the pulse_refs attribute (-1,)
@@ -123,14 +128,14 @@ class SpectralAxisChoiceSet:
         - Axis 'A': -w1 + w2 and axis 'B': -w1 + w2 + w3
 
     Then valid_axis_combs would be of the form (I, II) where
-    - I is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+    - I is SpectralAxisSet instance with 'axes' attribute of the form (i, ii), where
         - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
         on the form (X,), where
             - X is a SignedPulseTuple instance with the pulse_refs attribute (-1, 2)
         - ii is a SpectralAxis instance with label attribute 'B' and var_group attribute with the var_set attribute
         on the form (X,), where
             - X is a SignedPulseTuple instance with the pulse_refs attribute (3,)
-    - II is SpectralAxisChoice instance with 'axes' attribute of the form (i, ii), where
+    - II is SpectralAxisSet instance with 'axes' attribute of the form (i, ii), where
         - i is a SpectralAxis instance with label attribute 'A' and var_group attribute with the var_set attribute
         on the form (X,), where
             - X is a SignedPulseTuple instance with the pulse_refs attribute (-1, 2)
@@ -141,9 +146,11 @@ class SpectralAxisChoiceSet:
 
     """
 
-    ind_vars: IndependentVariableSet
-    valid_axis_combs: tuple[SpectralAxisChoice]
+    def __init__(self, phasematch_cond: PhaseMatchingCondition, ind_vars: IndependentVariableSet, valid_axis_combs: tuple[SpectralAxisSet]):
 
+        self.phasematch_cond = phasematch_cond
+        self.ind_vars = ind_vars
+        self.valid_axis_combs = valid_axis_combs
 
 # TODO: Expand functionality according to below TODOs
 
@@ -301,7 +308,7 @@ class EmPulse:
                     wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
                     if not wv_len == 1.0:
                         print('Wavevector was normalized')
-                    self.wv = [i/wv_len for i in self.wv]
+                    self.wv = tuple([i/wv_len for i in self.wv])
 
                 else:
                     raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
@@ -499,7 +506,7 @@ def find_branching_indep_var_combs(combs: list, orig_vars: list, curr_comb: list
             find_branching_indep_var_combs(combs, orig_vars, new_comb_ir, curr_epoch + 1)
 
 
-def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_dir: dict) -> list:
+def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_dir: SignedPulseTuple) -> tuple[IndependentVariableSet]:
     """
     Determine possible (non-ordered) configurations of (IR-range) independent variables for a set of IR or UV/VIS-range pulses
     for a given phase-matching condition.
@@ -516,6 +523,14 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
     raw_ind_vars_p = []
     cfuv = get_carrier_freqs_uv(pulses)
 
+    # Translate SignedPulseTuple data to form used in this fn {pulse ID: sign, ...}
+    pm_dir_dict = {}
+    for i in pm_dir.pulse_refs:
+        if i < 0:
+            pm_dir_dict[i * - 1] = -1
+        else:
+            pm_dir_dict[i] = 1
+
     # Loop over epochs
     for i in range(len(epochs)):
 
@@ -529,11 +544,11 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
 
             # Dress UV/VIS-range pulses with phase-matching sign
             if not(cfuv[k] == 0.0):
-                cfuv_this_pm[k] = cfuv[k] * pm_dir[k]
-                uv_this.append(k * pm_dir[k])
+                cfuv_this_pm[k] = cfuv[k] * pm_dir_dict[k]
+                uv_this.append(k * pm_dir_dict[k])
 
             else:
-                ir_this.append(k * pm_dir[k])
+                ir_this.append(k * pm_dir_dict[k])
 
         uv_this = sorted(uv_this)
         ir_this = sorted(ir_this)
@@ -582,9 +597,22 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
     # Do the branching combinatorics over any UV/VIS partitions with more than one option
     find_branching_indep_var_combs(ind_vars_p, raw_ind_vars_p, seed_comb, 0)
 
-    return ind_vars_p
+    # Translate to IndependentVariableSet instance
 
-def find_indep_exp_variables(pulses: list[EmPulse], epochs: list, phasematch_dirs: dict) -> dict:
+    transl_sets = []
+
+    # Each i should result in an IndependentVariableSet
+    for i in ind_vars_p:
+
+        my_new_ind_vars = []
+        for j in i:
+            my_new_ind_vars.append(SignedPulseTuple(j))
+
+        transl_sets.append(IndependentVariableSet( tuple(my_new_ind_vars) ))
+
+    return tuple(transl_sets)
+
+def find_indep_exp_variables(pulses: list[EmPulse], epochs: list, phasematch_dirs: list[PhaseMatchingCondition]) -> list[IndependentVariableChoices]:
     """
     Outer loop over phase-matching conditions for use with find_indep_vars_for_one_phasematch.
 
@@ -601,10 +629,11 @@ def find_indep_exp_variables(pulses: list[EmPulse], epochs: list, phasematch_dir
                                  entry.
     """
 
-    all_ind_var_cfgs_p = {}
+    all_ind_var_cfgs_p = []
 
     for p in phasematch_dirs:
-        all_ind_var_cfgs_p[p] = copy.deepcopy(find_indep_vars_for_one_phasematch(pulses, epochs, phasematch_dirs[p]))
+
+        all_ind_var_cfgs_p.append(IndependentVariableChoices(p, find_indep_vars_for_one_phasematch(pulses, epochs, p.pulses) ) )
 
     return all_ind_var_cfgs_p
 
@@ -648,7 +677,7 @@ def find_axes_recursion(ind_vars: tuple, valid_axes: list, curr_ax_list: list, p
             # New recursion with entry from superset
             find_axes_recursion(ind_vars, valid_axes, new_ax_list, pos + 1)
 
-def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict[tuple, list[dict]]:
+def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices) -> dict[tuple, list[SpectralAxisSet]]:
     """
     Find valid axes choices for one phase-matching direction.
 
@@ -656,8 +685,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict[tuple, list[
                     See return structure of find_indep_exp_variables.
 
     Returns: dict: valid_axes: For each set of independent variable choices (keys), return a list of
-    valid axis choices. Each such list entry is a dictionary {dummy axis label: list of independent variables
-    comprising axis}
+    valid axis choices. Each such list entry is a SpectralAxisSet instance
     """
 
 
@@ -667,8 +695,21 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict[tuple, list[
     valid_axes = {}
     seed_ax_list = []
 
+    # Translate to internal format
+
+    ind_vars_internal = []
+
+    for i in ind_vars.var_groups:
+
+        new_group = []
+
+        for j in i.var_set:
+            new_group.append(j.pulse_refs)
+
+        ind_vars_internal.append(copy.deepcopy(new_group))
+
     # Loop over independent variable collection choices
-    for i in ind_vars:
+    for i in ind_vars_internal:
 
         curr_valid_axes = []
 
@@ -695,15 +736,42 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: list) -> dict[tuple, list[
         # Enter in dictionary by sorted independent variable tuples
         valid_axes[tuple(sorted(i))] = copy.deepcopy(dressed_valid_axes)
 
+    # Translate to SpectralAxisChoices
+    transl_valid_axes = {}
+
+    for i in valid_axes:
+
+        new_combs = []
+
+        # Each j to yield a SpectralAxisSet
+        for j in range(len(valid_axes[i])):
+
+            new_set = []
+
+            for k in valid_axes[i][j]:
+
+                this_axis_set = []
+
+                for m in valid_axes[i][j][k]:
+                    this_axis_set.append(SignedPulseTuple(m))
+
+                new_set.append(SpectralAxis(k, IndependentVariableSet(tuple(this_axis_set))))
+
+            new_combs.append(SpectralAxisSet(tuple(new_set)))
+
+        transl_valid_axes[i] = tuple(new_combs)
+
     return valid_axes
 
-def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict[str, list[tuple]]:
+def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoices:
     """
-    Find canonical axes for one phase-matching direction.
+    Find valid axes choices for one phase-matching direction.
 
-    ind_var_cfgs_p: List of lists: independent variables for one phase-matching condition.
+    ind_var: List of lists of tuples: independent variables for one phase-matching condition.
                     See return structure of find_indep_exp_variables.
 
+    Returns: dict: valid_axes: For each set of independent variable choices (keys), return a list of
+    valid axis choices. Each such list entry is a SpectralAxisSet instance
     Returns: dict: canonical_axes: For the canonical independent variable choice,
                    return a dictionary {axis dummy label: independent variable}
 
@@ -723,8 +791,23 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict[str, li
 
     canonical_axes = {}
 
+    # Translate to internal format
+
+    ind_vars_internal = []
+
+    for i in ind_vars.var_groups:
+
+        new_group = []
+
+        for j in i.var_set:
+            new_group.append(j.pulse_refs)
+
+        ind_vars_internal.append(copy.deepcopy(new_group))
+
     # Find entry/-ies with the most independent variables
-    for i in ind_var_cfgs_p:
+    for i in ind_vars_internal:
+
+        print('iv i', i)
         if len(i) == max_len_ind:
             max_len_entries.append(copy.deepcopy(sorted(i)))
 
@@ -734,74 +817,89 @@ def find_canonical_axes_for_one_phasematch(ind_var_cfgs_p: list) -> dict[str, li
 
     max_len_entries = sorted(max_len_entries)
 
+    print('max len entries', max_len_entries)
+
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
         if i > 2:
             raise ValueError('Current version enables maximum 3 axes')
         
-        # Dress canonical indepentent variables with axis labels
+        # Dress canonical independent variables with axis labels
         canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
 
-    return canonical_axes
+    print('canonic', canonical_axes)
+
+    # Translate to SpectralAxisChoices
+    transl_canonical_axes = {}
+    new_combs = []
+    new_set = []
+
+    for k in canonical_axes:
+
+        this_axis_set = []
+
+        for m in canonical_axes[k]:
+            this_axis_set.append(SignedPulseTuple(m))
+
+        new_set.append(SpectralAxis(k, IndependentVariableSet(tuple(this_axis_set))))
+
+    new_combs.append(SpectralAxisSet(tuple(new_set)))
+
+    transl_canonical_axes[tuple(max_len_entries[0])] = tuple(new_combs)
+
+    return transl_canonical_axes
 
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
-def find_canonical_axes(all_ind_var_cfgs_p: dict) -> dict[str, list[tuple]]:
+def find_canonical_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> SpectralAxisSet:
     """
     Find canonical axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
 
-    all_ind_var_cfgs_p: Dictionary of independent variables. See return structure of find_indep_exp_variables.
+    all_ind_var_cfgs_p: List of IndependentVariableChoices. See that class' definition and find_indep_exp_variables
 
-    Returns: dict: final_canonical_axes: For the canonical independent variable choice
-    (see find_canonical_axes_for_one_phasematch), return a dictionary {axis dummy label: independent variable}
-    """
-
-    from itertools import permutations
-
-    canonical_axes_p = {}
-
-    for i in all_ind_var_cfgs_p:
-        canonical_axes_p[i] = find_canonical_axes_for_one_phasematch(all_ind_var_cfgs_p[i])
-
-    final_canonical_axes = canonical_axes_p[0]
-
-    # For several PM directions, take intersection of cfgs shared between all PM directions
-    if len(canonical_axes_p) > 1:
-        raise NotImplementedError('Support for axis determination over more than one phasematching direction not implemented')
-        for i in valid_axes_p[1:]:
-            final_canonical_axes = final_canonical_axes.intersection(i)
-
-    return final_canonical_axes
-
-# TODO: Have option to let user fix one or more axes and recurse starting from that instead
-def find_valid_axes(all_ind_var_cfgs_p: dict) -> dict[tuple, list[dict[str, list[tuple]]]]:
-    """
-    Find valid axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
-
-    all_ind_var_cfgs_p: Dictionary of independent variables. See return structure of find_indep_exp_variables.
-
-    Returns: dict: final_valid_axes: For each set of independent variable choices (keys), return a list of
-    valid axis choices. Each such list entry is a dictionary {dummy axis label: list of independent variables
-    comprising axis}
+    Returns: dict: final_canonical_axes: For the canonical independent variable choice, a description of
+    tha canonical axis choice.
     """
 
     # Find valid axes for each phase-matching direction
-    valid_axes_p = {}
-
+    valid_axes = []
 
     for i in all_ind_var_cfgs_p:
 
-        valid_axes_p[i] = find_valid_axes_cfgs_for_one_phasematch(all_ind_var_cfgs_p[i])
+        new_axes = find_canonical_axes_for_one_phasematch(i)
 
-    # Format of final_valid_ind_vars: set(valid axis cfg 1, ...)
-    final_valid_axes = valid_axes_p[0]
+        for j in new_axes:
 
-    # For several PM directions, take intersection of cfgs shared between all PM directions
-    if len(valid_axes_p) > 1:
-        raise NotImplementedError('Support for axis determination over more than one phasematching direction not implemented')
-        for i in valid_axes_p[1:]:
-            final_valid_axes = final_valid_axes.intersection(i)
+            print('j', j)
 
-    return final_valid_axes
+            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, j, tuple(new_axes[j])))
+
+    return valid_axes
+
+# TODO: Have option to let user fix one or more axes and recurse starting from that instead
+def find_valid_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> list[SpectralAxisChoices]:
+    """
+    Find valid axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
+
+    all_ind_var_cfgs_p: List of IndependentVariableChoices. See that class' definition and find_indep_exp_variables
+
+    Returns: list[SpectralAxisChoices]: final_valid_axes: For each set of independent variable choices, a description of
+    valid axis choices. Each such list entry is a SpectralAxisChoices instance
+    """
+
+    # Find valid axes for each phase-matching direction
+    valid_axes = []
+
+    for i in all_ind_var_cfgs_p:
+
+        new_axes = find_valid_axes_cfgs_for_one_phasematch(i)
+
+        for j in new_axes:
+
+            print('j va', j)
+
+            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, j, tuple(new_axes[j])))
+
+    return valid_axes
 
 
 @dataclass
@@ -832,7 +930,7 @@ class VibExperiment:
 
     def __post_init__(self):
 
-        relevant_phasematch = {}
+        relevant_phasematch = []
 
         # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
         if self.detector.wv_filter is None:
@@ -843,18 +941,28 @@ class VibExperiment:
 
             for i in iter_prod([1, -1], repeat=len(self.field.pulses)):
 
-                new_phasematch = {}
-                for j in range(len(self.field.pulses)):
-                    new_phasematch[self.field.pulses[j].id] = i[j]
+                new_phasematch = []
 
-                relevant_phasematch[k] = copy.deepcopy(new_phasematch)
+                for j in range(len(self.field.pulses)):
+                    new_phasematch.append(self.field.pulses[j].id * i[j])
+
+                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
                 k += 1
 
         else:
 
+            k = 0
+
             for i in range(len(self.detector.wv_filter)):
 
-                relevant_phasematch[i] = self.detector.wv_filter[i]
+                new_phasematch = []
+
+                for j in self.detector.wv_filter[i]:
+                    new_phasematch.append(j * self.detector.wv_filter[i][j])
+
+                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
+                k += 1
+
 
         self.relevant_phasematch = relevant_phasematch
 
