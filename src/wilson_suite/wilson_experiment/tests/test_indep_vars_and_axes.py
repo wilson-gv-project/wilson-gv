@@ -1,8 +1,14 @@
 import pytest
 
 from wilson_suite import fixtures as ws_fixtures
+
+# FIXME: After separating classes from indep var and abstractions, split imports as appropriate between resp test files
 from wilson_suite.wilson_experiment.abstractions import (SignedPulseTuple, PhaseMatchingCondition,
-        IndependentVariableSet, IndependentVariableChoices, SpectralAxis, SpectralAxisSet, SpectralAxisChoices)
+        IndependentVariableSet, IndependentVariableChoices, SpectralAxis, SpectralAxisSet, SpectralAxisChoices,
+        find_subsets_making_orig, find_branching_indep_var_combs, find_indep_vars_for_one_phasematch,
+        find_indep_exp_variables, find_axes_recursion, find_valid_axes_cfgs_for_one_phasematch,
+        find_canonical_axes_for_one_phasematch, find_canonical_axes, find_valid_axes,
+        SpecDetector, SpecScan, EmPulse, ElectricField, VibExperiment, get_carrier_freqs_uv, find_epochs, uv_cancels)
 
 def test_signed_pulse_tuple():
 
@@ -230,37 +236,7 @@ def test_spectral_axis_choice_set():
 
 def test_find_subsets_making_orig():
 
-    evv_exp = ws_fixtures.evv_experiment_pulse_1_and_2_coincident()
 
-    print('relevant phase-matching conditions', evv_exp.relevant_phasematch)
-    print('interaction sequences', evv_exp.int_sequences)
-    print('independent variables', evv_exp.indep_vars)
-    print('valid axis combinations', evv_exp.valid_axis_combs)
-    print('canonical axes', evv_exp.canonical_axes)
-
-    for i in evv_exp.valid_axis_combs:
-        print('New axis combinations')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
-
-    for i in evv_exp.canonical_axes:
-        print('Canonical axes')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
 
     pass
 
@@ -295,5 +271,37 @@ def test_find_canonical_axes():
     pass
 
 def test_find_valid_axes():
+
+    evv_exp = ws_fixtures.evv_experiment_pulse_1_and_2_coincident()
+
+    print('relevant phase-matching conditions', evv_exp.relevant_phasematch)
+    print('interaction sequences', evv_exp.int_sequences)
+    print('independent variables', evv_exp.indep_vars)
+    print('valid axis combinations', evv_exp.valid_axis_combs)
+    print('canonical axes', evv_exp.canonical_axes)
+
+    for i in evv_exp.valid_axis_combs:
+        print('New axis combinations')
+        print(i.phasematch_cond)
+        for j in i.valid_axis_combs:
+            for k in j.axes:
+                print(k.label)
+                for m in k.var_set.var_set:
+                    print(m.pulse_refs)
+        print('For independent variables')
+        for j in i.ind_vars.var_set:
+            print(j.pulse_refs)
+
+    for i in evv_exp.canonical_axes:
+        print('Canonical axes')
+        print(i.phasematch_cond)
+        for j in i.valid_axis_combs:
+            for k in j.axes:
+                print(k.label)
+                for m in k.var_set.var_set:
+                    print(m.pulse_refs)
+        print('For independent variables')
+        for j in i.ind_vars.var_set:
+            print(j.pulse_refs)
 
     pass
