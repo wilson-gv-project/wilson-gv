@@ -9,11 +9,23 @@ class SignedPulseTuple:
     Class to represent a collection of signed references to pulse IDs. Applicable as a representation of an independent
     variable, but not limited to this.
 
-    pulse_refs: A tuple of signed references to pulse IDs
+    pulse_refs: A tuple of signed integer references to pulse IDs
     Example: For the independent variable -w1 + w2, a pulse_refs representation is (-1, 2)
     Example: For the phase-matching condition -k1 + k2 + k3, a pulse_refs representation is (-1, 2, 3)
     """
+
     pulse_refs: tuple
+
+    def __post_init__(self):
+
+        if not isinstance(self.pulse_refs, tuple):
+            raise TypeError('pulse_refs must be a tuple of integers')
+
+        else:
+            for i in self.pulse_refs:
+                if not isinstance(i, int):
+                    raise TypeError('pulse_refs must be a tuple of integers')
+
 
 @dataclass
 class PhaseMatchingCondition:
@@ -27,6 +39,19 @@ class PhaseMatchingCondition:
     pulses: SignedPulseTuple
     id: int = None
 
+    def __post_init__(self):
+
+        if not isinstance(self.pulses, SignedPulseTuple):
+            raise TypeError('pulses must be a SignedPulseTuple instance')
+
+        if not isinstance(self.id, int):
+            if not self.id == None:
+                raise TypeError('If not None, self.id must be nonnegative integer')
+        else:
+            if self.id < 0:
+                raise TypeError('self.id must be nonnegative integer')
+
+@dataclass
 class IndependentVariableSet:
     """
     Class to represent a group of independent variables.
@@ -34,10 +59,33 @@ class IndependentVariableSet:
     var_set: A tuple of SignedPulseTuple instances
     """
 
-    def __init__(self, var_set: tuple[SignedPulseTuple]):
+    var_set: tuple[SignedPulseTuple]
 
-        self.var_set = var_set
+    def __post_init__(self):
 
+        if not isinstance(self.var_set, tuple):
+            raise TypeError('var_set must be a tuple of SignedPulseTuple instances')
+        else:
+            for i in self.var_set:
+                if not isinstance(i, SignedPulseTuple):
+                    raise TypeError('var_set must be a tuple of SignedPulseTuple instances')
+
+        enc_ids = []
+
+        for i in self.var_set:
+            for j in i.pulse_refs:
+                if j >= 0:
+                    if not j in enc_ids:
+                        enc_ids.append(j)
+                    else:
+                        raise ValueError('Pulse IDs must not repeat in variable set')
+                else:
+                    if not -1 * j in enc_ids:
+                        enc_ids.append(-1 * j)
+                    else:
+                        raise ValueError('Pulse IDs must not repeat in variable set')
+
+@dataclass
 class IndependentVariableChoices:
     """
     Class to represent a valid set of independent variables choices for a phase-matching condition
@@ -56,12 +104,21 @@ class IndependentVariableChoices:
             - III is a SignedPulseTuple instance with pulse_refs attribute = (-1, 2)
     """
 
-    def __init__(self, phasematch_cond: PhaseMatchingCondition, var_groups: tuple[IndependentVariableSet]):
+    phasematch_cond: PhaseMatchingCondition
+    var_groups: tuple[IndependentVariableSet]
 
-        self.phasematch_cond = phasematch_cond
-        self.var_groups = var_groups
+    def __post_init__(self):
 
+        if not isinstance(self.phasematch_cond, PhaseMatchingCondition):
+            raise TypeError('phasematch_cond must be a PhaseMatchingCondition instance')
+        if not isinstance(self.var_groups, tuple):
+            raise TypeError('var_groups must be a tuple of IndependentVariableSet instances')
+        else:
+            for i in self.var_groups:
+                if not isinstance(i, IndependentVariableSet):
+                    raise TypeError('var_groups must be a tuple of IndependentVariableSet instances')
 
+@dataclass
 class SpectralAxis:
     """
     Class to represent a choice of spectral axis
@@ -70,21 +127,43 @@ class SpectralAxis:
     var_set: An IndependentVariableSet instance describing the independent variables making up this axis
     """
 
-    def __init__(self, label: str,  var_set: IndependentVariableSet):
+    label: str
+    var_set: IndependentVariableSet
 
-        self.label = label
-        self.var_set = var_set
+    def __post_init__(self):
 
+        if not isinstance(self.label, str):
+            raise TypeError('label must be a string')
+        if not isinstance(self.var_set, IndependentVariableSet):
+            raise TypeError('var_set must be an IndependentVariableSet instance')
+
+@dataclass
 class SpectralAxisSet:
     """
     Class to represent a full choice of spectral axes
 
-    axes: A tuple of SpectralAxis instances
+    axes: A tuple of SpectralAxis instances. All axes must have different names
     """
 
-    def __init__(self, axes: tuple[SpectralAxis]):
+    axes: tuple[SpectralAxis]
 
-        self.axes = axes
+    def __post_init__(self):
+
+        if not isinstance(self.axes, tuple):
+            raise TypeError('axes must be a tuple of SpectralAxis instances')
+        else:
+            for i in self.axes:
+                if not isinstance(i, SpectralAxis):
+                    raise TypeError('axes must be a tuple of SpectralAxisSet instances')
+
+        enc_names = []
+
+        for i in self.axes:
+            if not i.label in enc_names:
+                enc_names.append(i.label)
+            else:
+                raise ValueError('All axes in set must have unique labels')
+
 
 
 @dataclass
@@ -146,11 +225,22 @@ class SpectralAxisChoices:
 
     """
 
-    def __init__(self, phasematch_cond: PhaseMatchingCondition, ind_vars: IndependentVariableSet, valid_axis_combs: tuple[SpectralAxisSet]):
+    phasematch_cond: PhaseMatchingCondition
+    ind_vars: IndependentVariableSet
+    valid_axis_combs: tuple[SpectralAxisSet]
 
-        self.phasematch_cond = phasematch_cond
-        self.ind_vars = ind_vars
-        self.valid_axis_combs = valid_axis_combs
+    def __post_init__(self):
+
+        if not isinstance(self.phasematch_cond, PhaseMatchingCondition):
+            raise TypeError('phasematch_cond must be PhaseMatchingCondition instance')
+        if not isinstance(self.ind_vars, IndependentVariableSet):
+            raise TypeError('ind_vars must be IndependentVariableSet instance')
+        if not isinstance(self.valid_axis_combs, tuple):
+            raise TypeError('phasematch_cond must be a tuple of SpectralAxisSet instances')
+        else:
+            for i in self.valid_axis_combs:
+                if not isinstance(i, SpectralAxisSet):
+                    raise TypeError('phasematch_cond must be a tuple of SpectralAxisSet instances')
 
 # TODO: Expand functionality according to below TODOs
 
@@ -761,7 +851,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
 
         transl_valid_axes[i] = tuple(new_combs)
 
-    return valid_axes
+    return transl_valid_axes
 
 def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoices:
     """
@@ -807,7 +897,6 @@ def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoice
     # Find entry/-ies with the most independent variables
     for i in ind_vars_internal:
 
-        print('iv i', i)
         if len(i) == max_len_ind:
             max_len_entries.append(copy.deepcopy(sorted(i)))
 
@@ -817,8 +906,6 @@ def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoice
 
     max_len_entries = sorted(max_len_entries)
 
-    print('max len entries', max_len_entries)
-
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
         if i > 2:
@@ -826,8 +913,6 @@ def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoice
         
         # Dress canonical independent variables with axis labels
         canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
-
-    print('canonic', canonical_axes)
 
     # Translate to SpectralAxisChoices
     transl_canonical_axes = {}
@@ -871,7 +956,9 @@ def find_canonical_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) ->
 
             print('j', j)
 
-            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, j, tuple(new_axes[j])))
+            new_iv_set = IndependentVariableSet(tuple([SignedPulseTuple(k) for k in j]))
+
+            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, new_iv_set, tuple(new_axes[j])))
 
     return valid_axes
 
@@ -895,9 +982,13 @@ def find_valid_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> lis
 
         for j in new_axes:
 
-            print('j va', j)
+            print('j', j)
 
-            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, j, tuple(new_axes[j])))
+            new_iv_set = IndependentVariableSet(tuple([SignedPulseTuple(k) for k in j]))
+
+            print('new ax j', new_axes[j])
+
+            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, new_iv_set, tuple(new_axes[j])))
 
     return valid_axes
 
