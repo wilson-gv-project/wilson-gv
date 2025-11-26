@@ -6,7 +6,7 @@ from .main_functions import find_props_and_max_state_lvl
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
 from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_experiment.abstractions import VibExperiment
+from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np

@@ -7,25 +7,25 @@ import logging
 logger = logging.getLogger("wilson.")
 
 
-def evv_experiment() -> ws_experiment.abstractions.VibExperiment:
+def evv_experiment() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
     Returns VibExperiment instance for EVV experiment
     """
     import wilson_suite as ws
 
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 50.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_1 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 50.0, cf=0.0, cf_uv=0.0,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
-    pulse_ir_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_2 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
-    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
+    pulse_uvvis_1 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
-    field_a = ws.experiment.abstractions.ElectricField(pulses)
+    field_a = ws.experiment.experiment_abstractions.ElectricField(pulses)
     order = len(pulses)
 
-    detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
+    detector_a = ws.experiment.experiment_abstractions.SpecDetector(detection_method='freq',
                                                          detector_location=(0.0, 0.0, 1.0),
                                                          detection_polarization=(1.0, 0.0, 0.0),
                                                          detection_range=[0.003 + 0.0001 * i for i in range(101)],
@@ -34,33 +34,33 @@ def evv_experiment() -> ws_experiment.abstractions.VibExperiment:
     # Push one carrier freq
     scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
     scan_range_a = [0.0001 * i for i in range(101)]
-    scan_a = ws.experiment.abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
+    scan_a = ws.experiment.experiment_abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
 
-    experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field_a,
+    experiment_a = ws.experiment.experiment_abstractions.VibExperiment(order=order, field=field_a,
                                                             detector=detector_a,
                                                             scans=[scan_a],
                                                             magn_conditions=[[-1, 2]])
     return experiment_a
 
-def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.abstractions.VibExperiment:
+def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
     Returns VibExperiment instance for EVV experiment
     """
     import wilson_suite as ws
 
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_1 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
-    pulse_ir_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_2 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
-    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
+    pulse_uvvis_1 = ws.experiment.experiment_abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
                                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
-    field_a = ws.experiment.abstractions.ElectricField(pulses)
+    field_a = ws.experiment.experiment_abstractions.ElectricField(pulses)
     order = len(pulses)
 
-    detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
+    detector_a = ws.experiment.experiment_abstractions.SpecDetector(detection_method='freq',
                                                          detector_location=(0.0, 0.0, 1.0),
                                                          detection_polarization=(1.0, 0.0, 0.0),
                                                          detection_range=[0.003 + 0.0001 * i for i in range(101)],
@@ -69,9 +69,9 @@ def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.abstractions.VibE
     # Push one carrier freq
     scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
     scan_range_a = [0.0001 * i for i in range(101)]
-    scan_a = ws.experiment.abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
+    scan_a = ws.experiment.experiment_abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
 
-    experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field_a,
+    experiment_a = ws.experiment.experiment_abstractions.VibExperiment(order=order, field=field_a,
                                                             detector=detector_a,
                                                             scans=[scan_a],
                                                             magn_conditions=[[-1, 2]])

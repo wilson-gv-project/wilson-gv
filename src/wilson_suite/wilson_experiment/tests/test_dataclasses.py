@@ -2,7 +2,7 @@
 check_if_jsonsafe - is it a format that can be written in JSON file with json library. 
 Generally, it would also mean that the object is serialized into a dictionary here.
 """
-from ...wilson_experiment import abstractions as we_abst_dataclass
+from ...wilson_experiment import experiment_abstractions as we_abst_dataclass
 from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
 import os 

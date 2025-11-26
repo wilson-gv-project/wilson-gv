@@ -6,7 +6,7 @@ import os.path
 from rich.pretty import pprint
 
 from ..wilson_derive import abstractions as wd_abst
-from ..wilson_experiment import abstractions as we_abst
+from ..wilson_experiment import experiment_abstractions as we_abst
 
 from ..wilson_derive.main import get_fully_enhanced_terms
 from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts

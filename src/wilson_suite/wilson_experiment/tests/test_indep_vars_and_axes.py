@@ -2,13 +2,13 @@ import pytest
 
 from wilson_suite import fixtures as ws_fixtures
 
-# FIXME: After separating classes from indep var and abstractions, split imports as appropriate between resp test files
-from wilson_suite.wilson_experiment.abstractions import (SignedPulseTuple, PhaseMatchingCondition,
-        IndependentVariableSet, IndependentVariableChoices, SpectralAxis, SpectralAxisSet, SpectralAxisChoices,
-        find_subsets_making_orig, find_branching_indep_var_combs, find_indep_vars_for_one_phasematch,
-        find_indep_exp_variables, find_axes_recursion, find_valid_axes_cfgs_for_one_phasematch,
-        find_canonical_axes_for_one_phasematch, find_canonical_axes, find_valid_axes,
-        SpecDetector, SpecScan, EmPulse, ElectricField, VibExperiment, get_carrier_freqs_uv, find_epochs, uv_cancels)
+
+from wilson_suite.wilson_experiment.indep_vars_and_axes import (SignedPulseTuple, PhaseMatchingCondition,
+                IndependentVariableSet, IndependentVariableChoices, SpectralAxis, SpectralAxisSet, SpectralAxisChoices,
+                find_subsets_making_orig, find_branching_indep_var_combs, find_indep_vars_for_one_phasematch,
+                find_indep_exp_variables, find_axes_recursion, find_valid_axes_cfgs_for_one_phasematch,
+                find_canonical_axes_for_one_phasematch, find_canonical_axes, find_valid_axes)
+
 
 def test_signed_pulse_tuple():
 

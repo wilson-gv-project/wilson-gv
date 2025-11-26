@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
     from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-    from wilson_suite.wilson_experiment.abstractions import VibExperiment
+    from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 
 import numpy as np
 

@@ -1,4 +1,4 @@
-from ..wilson_experiment.abstractions import VibExperiment
+from ..wilson_experiment.experiment_abstractions import VibExperiment
 from . import abstractions as abst
 from . import dbl_pert_expansion
 from . import hermaut
