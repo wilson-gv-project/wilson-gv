@@ -286,7 +286,8 @@ def find_subsets_making_orig(subsets: list, acc: list, orig: list, res: list):
 
 def find_branching_indep_var_combs(combs: list, orig_vars: list, curr_comb: list, curr_epoch: int):
     """
-    Make branching choices of different valid UV/VIS partitioning choices (tail-recursive)
+    Make branching choices of different valid UV/VIS partitioning choices (tail-recursive). IR-range pulses are
+    added without branching since they each constitute an independent variable.
 
     combs: list: Accumulated combinations (tail-recursion result)
     orig_vars: list: Original variables (with branches as multi-entry lists)
@@ -294,14 +295,20 @@ def find_branching_indep_var_combs(combs: list, orig_vars: list, curr_comb: list
     curr_epoch: int: Current epoch counter
     """
 
+    # Termination criterion
     if curr_epoch == len(orig_vars):
         combs.append(copy.deepcopy(curr_comb))
 
+    # Otherwise recurse over epochs
     else:
+
+        # Take incoming combination and copy it for amendment and recursion
         new_comb_ir = copy.deepcopy(curr_comb)
 
+        # First add all IR range pulses in this epoch (No
         uv_start = 0
         for i in orig_vars[curr_epoch]:
+
             if not isinstance(i, list):
                 uv_start += 1
                 new_comb_ir.append(i)
@@ -384,19 +391,24 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
 
         # Which collections of UV/VIS pulses that cancel do together add up to the full set of UV/VIS pulses in this epoch?
         if i < (len(epochs) - 1):
+
             find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
+
         else:
             # In last epoch they do not need to cancel since the resulting signal is presumed to go to the detector
             for j in uv_superset:
+
                 acc = []
                 find_subsets_making_orig(uv_superset_cancel, acc, list(j), uv_subs_res)
 
         # IR-range pulses become independent variables directly
         for j in ir_this:
+            print('adding ir this', tuple([j]))
             raw_ind_vars_p_epoch.append(tuple([j]))
 
         # Different UV/VIS partitions of all the UV/VIS pulses in this epoch become branching options
         if not (uv_subs_res == []):
+            print('adding uv res', uv_subs_res)
             raw_ind_vars_p_epoch.append(uv_subs_res)
 
         # No need to add if no independent variables found
@@ -409,7 +421,13 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
     seed_comb = []
 
     # Do the branching combinatorics over any UV/VIS partitions with more than one option
+    print('branching')
+    print(ind_vars_p, raw_ind_vars_p, seed_comb)
+
     find_branching_indep_var_combs(ind_vars_p, raw_ind_vars_p, seed_comb, 0)
+
+    print('result')
+    print(ind_vars_p)
 
     # Translate to IndependentVariableSet instance
 

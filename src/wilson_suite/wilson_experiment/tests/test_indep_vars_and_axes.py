@@ -236,13 +236,124 @@ def test_spectral_axis_choice_set():
 
 def test_find_subsets_making_orig():
 
+    # Current recursion accumulator
+    acc = []
 
+    # Results accumulator
+    uv_subs_res = []
 
-    pass
+    # Signed list of pulse IDs set to be UV/VIS range (in current epoch): The "original collection"
+    uv_this = [-3, 1, 2]
+
+    # Subsets of uv_this found to have cancelling UV/VIS range frequency components
+    uv_superset_cancel = [(-3, 1, 2), (1, 2), (-3,)]
+
+    # Tail-recursive
+    find_subsets_making_orig(uv_superset_cancel, acc, uv_this, uv_subs_res)
+
+    # Here, the signed collection of pulses 1, 2 and -3, and the collection (1, 2) and (-3) should both be found to
+    # constitute the original collection
+    assert sorted(uv_subs_res) == [[(-3, 1, 2)], [(1, 2), (-3,)]]
+
+    # More extensive example
+    uv_subs_res = []
+    uv_this = [-4, -3, 1, 2, 5]
+    uv_superset_cancel = [(-4, -3, 1, 2), (1, -3, 2), (-4,), (5,), (5, -4)]
+    find_subsets_making_orig(uv_superset_cancel, [], uv_this, uv_subs_res)
+
+    assert sorted(uv_subs_res) == [[(-4, -3, 1, 2), (5,)], [(1, -3, 2), (-4,), (5,)], [(1, -3, 2), (5, -4)]]
+
+    # Malformed uv this ref
+    uv_subs_res = []
+    uv_this = [-4, 'a', -3, 1, 2]
+    uv_superset_cancel = [(-4, -3, 1, 2), (-3, 1, 2), (-4,), (5,), (5, -4)]
+
+    with pytest.raises(TypeError):
+        find_subsets_making_orig(uv_superset_cancel, [], uv_this, uv_subs_res)
+
+    # Malformed cancellation element
+    uv_subs_res = []
+    uv_this = [-4, 5, -3, 1, 2]
+    uv_superset_cancel = [(-4, -3, 1, 2), (-3, 1, 2), (-4,), (5,), ('a', -4)]
+
+    with pytest.raises(TypeError):
+        find_subsets_making_orig(uv_superset_cancel, [], uv_this, uv_subs_res)
+
+    # Both above cases: There would be cancelling set if elements were blindly read but TypeError is raised
+    # because of malformation: This is neither a bug nor an intended feature
+    uv_subs_res = []
+    uv_this = [-4, 'a', -3, 1, 2]
+    uv_superset_cancel = [(-4, -3, 1, 2), (-3, 1, 2), (-4,), (5,), ('a', -4)]
+
+    with pytest.raises(TypeError):
+        find_subsets_making_orig(uv_superset_cancel, [], uv_this, uv_subs_res)
 
 def test_find_branching_indep_var_combs():
 
-    pass
+    # Current recursion accumulator
+    seed_comb = []
+
+    # Results accumulator
+    ind_vars_p = []
+
+    # Epoch counter
+    curr_epoch = 0
+
+    # Original identified independent variables where individual branching choices are structured in
+    # Format:
+    #   - Outermost list over epochs. In each epoch:
+    #   - Tuples of IR range pulses (signed) in this epoch first, then a list
+    #   of options for combinations of UV/VIS (signed) pulses in this epoch. For each such option:
+    #   - A list of tuples describing collections of UV/VIS pulses that together constitute all the UV/VIS pulses
+    #   in this epoch and where each tuple denotes a UV/VIS collection whose sum UV/VIS frequency component sums to 0
+
+    # Here: Two epochs.
+    # - Epoch 1: Pulses 4 and 5 are IR range pulses. Pulses -3, 1, 2 are UV/VIS pulses, where
+    #   two partitionings exist so that in each partition in each partitioning, the UV/VIS freq components sum to zero:
+    #   *  w1_UV + w2_UV - w3_UV sum to zero
+    #   * -w3_UV sums to zero and w1_UV + w2_UV sum to zero (NOTE: Fictitious example since pulse 3
+    #   would then in practice be classified as an IR range pulse by earlier routines, but this has no bearing on
+    #   the functionality presently being tested)
+    # - Epoch 2: Pulse 6 is an IR range pulse. Pulses -7, 8 are UV/VIS pulses, where
+    #   two partitionings exist so that in each partition in each partitioning, the UV/VIS freq components sum to zero:
+    #   * -w7_UV + w8_UV sums to zero
+    #   * -w7_UV sums to zero and w8_UV sums to zero (NOTE: Same comment as for -w3_UV applies here)
+    orig_vars = [[(4,), (5,), [[(-3, 1, 2)], [(-3,), (1, 2)]] ], [(6,), [[(-7,), (8,)], [(-7, 8)]] ]]
+
+    find_branching_indep_var_combs(ind_vars_p, orig_vars, seed_comb, curr_epoch)
+
+    # There are therefore two options for choices of UV/VIS combinations in each epoch, so we expect four combinations
+    # altogether:
+    assert ind_vars_p == [
+                          [(4,), (5,), (-3, 1, 2), (6,), (-7,), (8,)],
+                          [(4,), (5,), (-3, 1, 2), (6,), (-7, 8)],
+                          [(4,), (5,), (-3,), (1, 2), (6,), (-7,), (8,)],
+                          [(4,), (5,), (-3,), (1, 2), (6,), (-7, 8)]
+                          ]
+
+    # Simpler test cases
+
+    # Two IR range pulses in one epoch: Should give same pulses back as ind vars
+    seed_comb = []
+    ind_vars_p = []
+    orig_vars = [[(1,), (2,)]]
+    find_branching_indep_var_combs(ind_vars_p, orig_vars, seed_comb, 0)
+    assert ind_vars_p == [ [(1,), (2,)] ]
+
+    # Two IR range pulses in different epochs: Should give same result as prev
+    seed_comb = []
+    ind_vars_p = []
+    orig_vars = [[(1,)], [(2,)]]
+    find_branching_indep_var_combs(ind_vars_p, orig_vars, seed_comb, 0)
+    assert ind_vars_p == [ [(1,), (2,)] ]
+
+    # One epoch, three UV/VIS pulses that cancel (and no more granular cancellations):
+    # Should give same collection as the single ind var
+    seed_comb = []
+    ind_vars_p = []
+    orig_vars = [[[[(1, 2, -3)]]]]
+    find_branching_indep_var_combs(ind_vars_p, orig_vars, seed_comb, 0)
+    assert ind_vars_p == [ [(1, 2, -3)] ]
 
 def test_find_indep_vars_for_one_phasematch():
 
@@ -273,6 +384,10 @@ def test_find_canonical_axes():
 def test_find_valid_axes():
 
     evv_exp = ws_fixtures.evv_experiment_pulse_1_and_2_coincident()
+
+    evv_exp = ws_fixtures.evv_experiment()
+
+    evv_exp = ws_fixtures.experiment_beta_alpha_cars()
 
     print('relevant phase-matching conditions', evv_exp.relevant_phasematch)
     print('interaction sequences', evv_exp.int_sequences)
