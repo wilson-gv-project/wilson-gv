@@ -403,12 +403,10 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
 
         # IR-range pulses become independent variables directly
         for j in ir_this:
-            print('adding ir this', tuple([j]))
             raw_ind_vars_p_epoch.append(tuple([j]))
 
         # Different UV/VIS partitions of all the UV/VIS pulses in this epoch become branching options
         if not (uv_subs_res == []):
-            print('adding uv res', uv_subs_res)
             raw_ind_vars_p_epoch.append(uv_subs_res)
 
         # No need to add if no independent variables found
@@ -421,13 +419,7 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
     seed_comb = []
 
     # Do the branching combinatorics over any UV/VIS partitions with more than one option
-    print('branching')
-    print(ind_vars_p, raw_ind_vars_p, seed_comb)
-
     find_branching_indep_var_combs(ind_vars_p, raw_ind_vars_p, seed_comb, 0)
-
-    print('result')
-    print(ind_vars_p)
 
     # Translate to IndependentVariableSet instance
 
@@ -466,6 +458,7 @@ list[IndependentVariableChoices]:
     all_ind_var_cfgs_p = []
 
     for p in phasematch_dirs:
+
         all_ind_var_cfgs_p.append(
             IndependentVariableChoices(p, find_indep_vars_for_one_phasematch(pulses, epochs, p.pulses)))
 
@@ -534,6 +527,8 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
 
     ind_vars_internal = []
 
+    print('ind vars to internal', ind_vars)
+
     for i in ind_vars.var_groups:
 
         new_group = []
@@ -550,6 +545,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
 
         # Permute each independent variable collection for full combinatorics; accumulate new entries (inside recursion)
         for j in permutations(i):
+
             find_axes_recursion(j, curr_valid_axes, seed_ax_list, 0)
 
         curr_valid_axes = sorted(copy.deepcopy(curr_valid_axes))
@@ -712,7 +708,7 @@ def find_canonical_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) ->
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
 def find_valid_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> list[SpectralAxisChoices]:
     """
-    Find valid axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
+    Find valid axes for a collection of phase-matching directions.
 
     all_ind_var_cfgs_p: List of IndependentVariableChoices. See that class' definition and find_indep_exp_variables
 

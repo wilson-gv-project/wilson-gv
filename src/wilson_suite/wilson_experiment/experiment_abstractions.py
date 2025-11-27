@@ -176,7 +176,7 @@ class EmPulse:
                     pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
                     if not pol_len == 1.0:
                         print('Wavevector was normalized')
-                    self.pol = [i/pol_len for i in self.pol]
+                    self.pol = tuple([i/pol_len for i in self.pol])
 
                     wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
 
