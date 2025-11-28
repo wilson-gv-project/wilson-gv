@@ -1,9 +1,5 @@
 import copy
-
 import pytest
-
-from wilson_suite import fixtures as ws_fixtures
-
 
 from wilson_suite.wilson_experiment.indep_vars_and_axes import (SignedPulseTuple, PhaseMatchingCondition,
                 IndependentVariableSet, IndependentVariableChoices, SpectralAxis, SpectralAxisSet, SpectralAxisChoices,
@@ -656,8 +652,6 @@ def test_find_valid_axes_cfgs_for_one_phasematch():
 
     axes_cfgs = find_valid_axes_cfgs_for_one_phasematch(indep_var_choices[0])
 
-    print('res', axes_cfgs)
-
     # Results are organized as dictionaries with internal representation of independent variable set
     assert ((-1,), (2,)) in axes_cfgs
 
@@ -723,104 +717,213 @@ def test_find_valid_axes():
 
     axes_cfgs = find_valid_axes(indep_var_choices)
 
-    # Results are organized as dictionaries with internal representation of independent variable set
+    # Two choice sets (two phase-matching directions and one set of independent variables each)
+    assert len(axes_cfgs) == 2
+
+    # First phase-matching direction
+    assert axes_cfgs[0].phasematch_cond.pulses.pulse_refs == (-1, 2, 3)
+    assert axes_cfgs[0].phasematch_cond.id == 1
+
+    # Independent vars: -w1 and w2
     assert axes_cfgs[0].ind_vars.var_set[0].pulse_refs == (-1,)
     assert axes_cfgs[0].ind_vars.var_set[1].pulse_refs == (2,)
 
-    # CONTINUE HERE: FINISH THESE ASSERTIONS
+    # Four axis configurations
+    assert len(axes_cfgs[0].valid_axis_combs) == 4
+
+    # First configuration: A = -w1, B = -w1 + w2
+    assert axes_cfgs[0].valid_axis_combs[0].axes[0].label == 'A'
+    assert len(axes_cfgs[0].valid_axis_combs[0].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[0].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+
+    assert axes_cfgs[0].valid_axis_combs[0].axes[1].label == 'B'
+    assert len(axes_cfgs[0].valid_axis_combs[0].axes[1].var_set.var_set) == 2
+    assert axes_cfgs[0].valid_axis_combs[0].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs[0].valid_axis_combs[0].axes[1].var_set.var_set[1].pulse_refs == (2,)
+
+    # Second configuration: A = -w1, B = w2
+    assert axes_cfgs[0].valid_axis_combs[1].axes[0].label == 'A'
+    assert len(axes_cfgs[0].valid_axis_combs[1].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[1].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+
+    assert axes_cfgs[0].valid_axis_combs[1].axes[1].label == 'B'
+    assert len(axes_cfgs[0].valid_axis_combs[1].axes[1].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[1].axes[1].var_set.var_set[0].pulse_refs == (2,)
+
+    # Third configuration: A = w2, B = -w1
+    assert axes_cfgs[0].valid_axis_combs[2].axes[0].label == 'A'
+    assert len(axes_cfgs[0].valid_axis_combs[2].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[2].axes[0].var_set.var_set[0].pulse_refs == (2,)
+
+    assert axes_cfgs[0].valid_axis_combs[2].axes[1].label == 'B'
+    assert len(axes_cfgs[0].valid_axis_combs[2].axes[1].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[2].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+
+    # Fourth configuration: A = w2, B = -w1 + w2
+    assert axes_cfgs[0].valid_axis_combs[3].axes[0].label == 'A'
+    assert len(axes_cfgs[0].valid_axis_combs[3].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[0].valid_axis_combs[3].axes[0].var_set.var_set[0].pulse_refs == (2,)
+
+    assert axes_cfgs[0].valid_axis_combs[3].axes[1].label == 'B'
+    assert len(axes_cfgs[0].valid_axis_combs[3].axes[1].var_set.var_set) == 2
+    assert axes_cfgs[0].valid_axis_combs[3].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs[0].valid_axis_combs[3].axes[1].var_set.var_set[1].pulse_refs == (2,)
 
 
-    # Four axis configurations should be found for this independent variable set
-    # NOTE: The combinatorics here are not exhaustive: Internal permutations of 'A' and 'B' axes over a configuration
-    # would yield more combinations, some of which can be equal to other configurations. This is disregarded for now
-    # and can be pursued if relevant in the future.
-    assert len(axes_cfgs[((-1,), (2,))]) == 4
+    # Second phase-matching direction
+    assert axes_cfgs[1].phasematch_cond.pulses.pulse_refs == (1, -2, 3)
+    assert axes_cfgs[1].phasematch_cond.id == 2
 
-    # First configuration: Axis 'A' is -w1, axis 'B' is -w1  + w2
-    assert axes_cfgs[((-1,), (2,))][0].axes[0].label == 'A'
-    assert len(axes_cfgs[((-1,), (2,))][0].axes[0].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][0].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    # Independent vars: w1 and -w2
+    assert axes_cfgs[1].ind_vars.var_set[0].pulse_refs == (-2,)
+    assert axes_cfgs[1].ind_vars.var_set[1].pulse_refs == (1,)
 
-    assert axes_cfgs[((-1,), (2,))][0].axes[1].label == 'B'
-    assert len(axes_cfgs[((-1,), (2,))][0].axes[1].var_set.var_set) == 2
-    assert axes_cfgs[((-1,), (2,))][0].axes[1].var_set.var_set[0].pulse_refs == (-1,)
-    assert axes_cfgs[((-1,), (2,))][0].axes[1].var_set.var_set[1].pulse_refs == (2,)
+    # Four axis configurations
+    assert len(axes_cfgs[1].valid_axis_combs) == 4
 
-    # Second configuration: Axis 'A' is -w1, axis 'B' is w2
-    assert axes_cfgs[((-1,), (2,))][1].axes[0].label == 'A'
-    assert len(axes_cfgs[((-1,), (2,))][1].axes[0].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][1].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    # First configuration: A = -w2, B = -w2 + w1
+    assert axes_cfgs[1].valid_axis_combs[0].axes[0].label == 'A'
+    assert len(axes_cfgs[1].valid_axis_combs[0].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[0].axes[0].var_set.var_set[0].pulse_refs == (-2,)
 
-    assert axes_cfgs[((-1,), (2,))][1].axes[1].label == 'B'
-    assert len(axes_cfgs[((-1,), (2,))][1].axes[1].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][1].axes[1].var_set.var_set[0].pulse_refs == (2,)
+    assert axes_cfgs[1].valid_axis_combs[0].axes[1].label == 'B'
+    assert len(axes_cfgs[1].valid_axis_combs[0].axes[1].var_set.var_set) == 2
+    assert axes_cfgs[1].valid_axis_combs[0].axes[1].var_set.var_set[0].pulse_refs == (-2,)
+    assert axes_cfgs[1].valid_axis_combs[0].axes[1].var_set.var_set[1].pulse_refs == (1,)
 
-    # Third configuration: Axis 'A' is w2, axis 'B' is -w1
-    assert axes_cfgs[((-1,), (2,))][2].axes[0].label == 'A'
-    assert len(axes_cfgs[((-1,), (2,))][2].axes[0].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][2].axes[0].var_set.var_set[0].pulse_refs == (2,)
+    # Second configuration: A = -w2, B = w1
+    assert axes_cfgs[1].valid_axis_combs[1].axes[0].label == 'A'
+    assert len(axes_cfgs[1].valid_axis_combs[1].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[1].axes[0].var_set.var_set[0].pulse_refs == (-2,)
 
-    assert axes_cfgs[((-1,), (2,))][2].axes[1].label == 'B'
-    assert len(axes_cfgs[((-1,), (2,))][2].axes[1].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][2].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs[1].valid_axis_combs[1].axes[1].label == 'B'
+    assert len(axes_cfgs[1].valid_axis_combs[1].axes[1].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[1].axes[1].var_set.var_set[0].pulse_refs == (1,)
 
-    # Fourth configuration: Axis 'A' is w2, axis 'B' is -w1 + w2
-    assert axes_cfgs[((-1,), (2,))][3].axes[0].label == 'A'
-    assert len(axes_cfgs[((-1,), (2,))][3].axes[0].var_set.var_set) == 1
-    assert axes_cfgs[((-1,), (2,))][3].axes[0].var_set.var_set[0].pulse_refs == (2,)
+    # Third configuration: A = w1, B = -w2
+    assert axes_cfgs[1].valid_axis_combs[2].axes[0].label == 'A'
+    assert len(axes_cfgs[1].valid_axis_combs[2].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[2].axes[0].var_set.var_set[0].pulse_refs == (1,)
 
-    assert axes_cfgs[((-1,), (2,))][3].axes[1].label == 'B'
-    assert len(axes_cfgs[((-1,), (2,))][3].axes[1].var_set.var_set) == 2
-    assert axes_cfgs[((-1,), (2,))][3].axes[1].var_set.var_set[0].pulse_refs == (-1,)
-    assert axes_cfgs[((-1,), (2,))][0].axes[1].var_set.var_set[1].pulse_refs == (2,)
+    assert axes_cfgs[1].valid_axis_combs[2].axes[1].label == 'B'
+    assert len(axes_cfgs[1].valid_axis_combs[2].axes[1].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[2].axes[1].var_set.var_set[0].pulse_refs == (-2,)
+
+    # Fourth configuration: A = w1, B = -w2 + w1
+    assert axes_cfgs[1].valid_axis_combs[3].axes[0].label == 'A'
+    assert len(axes_cfgs[1].valid_axis_combs[3].axes[0].var_set.var_set) == 1
+    assert axes_cfgs[1].valid_axis_combs[3].axes[0].var_set.var_set[0].pulse_refs == (1,)
+
+    assert axes_cfgs[1].valid_axis_combs[3].axes[1].label == 'B'
+    assert len(axes_cfgs[1].valid_axis_combs[3].axes[1].var_set.var_set) == 2
+    assert axes_cfgs[1].valid_axis_combs[3].axes[1].var_set.var_set[0].pulse_refs == (-2,)
+    assert axes_cfgs[1].valid_axis_combs[3].axes[1].var_set.var_set[1].pulse_refs == (1,)
+
+    # NOTE: Can consider making more test cases here (e.g. more indep vars for one phase-matching condition)
 
 
 def test_find_canonical_axes_for_one_phasematch():
 
-    pass
+    # EVV with all pulses at different times
+    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+
+    pulses = [pulse_a, pulse_b, pulse_c]
+    epochs = [[1], [2], [3]]
+    pm_dir = [PhaseMatchingCondition(SignedPulseTuple(pulse_refs=(-1, 2, 3)), 1)]
+
+    indep_var_choices = find_indep_exp_variables(pulses, epochs, pm_dir)
+
+    axes_cfgs = find_canonical_axes_for_one_phasematch(indep_var_choices[0])
+
+    # The canonical axes here are A: -w1 and B: w2
+    assert len(axes_cfgs.axes) == 2
+    assert axes_cfgs.axes[0].label == 'A'
+    assert axes_cfgs.axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs.axes[1].label == 'B'
+    assert axes_cfgs.axes[1].var_set.var_set[0].pulse_refs == (2,)
+
+
+    # Complicated setup: Two IR pulses in first epoch, one IR pulse and four UV/VIS in 2nd epoch, where the UV/VIS
+    # pulses have two different cancelling partitionings, and one UV/VIS pulse in the 3rd epoch not eligible to form
+    # an independent variable
+    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=3)
+    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=4)
+    pulse_e = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=5)
+    pulse_f = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=6)
+    pulse_g = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.0, id=7)
+    pulse_h = EmPulse(env='impulsive', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.072, id=8)
+
+    pulses = [pulse_a, pulse_b, pulse_c, pulse_d, pulse_e, pulse_f, pulse_g, pulse_h]
+    epochs = [[1, 2], [3, 4, 5, 6, 7], [8]]
+    pm_dir = [PhaseMatchingCondition(SignedPulseTuple(pulse_refs=(-1, 2, 3, -4, 5, -6, 7, -8)), 1)]
+
+    indep_var_choices = find_indep_exp_variables(pulses, epochs, pm_dir)
+    axes_cfgs = find_canonical_axes_for_one_phasematch(indep_var_choices[0])
+
+    # The canonical axes here are A: -w1, B: w2, C: w7 (IR before UV/VIS in epoch), D: w5 - w6, E: w3 - w4
+    assert len(axes_cfgs.axes) == 5
+    assert axes_cfgs.axes[0].label == 'A'
+    assert axes_cfgs.axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs.axes[1].label == 'B'
+    assert axes_cfgs.axes[1].var_set.var_set[0].pulse_refs == (2,)
+    assert axes_cfgs.axes[2].label == 'C'
+    assert axes_cfgs.axes[2].var_set.var_set[0].pulse_refs == (7,)
+    assert axes_cfgs.axes[3].label == 'D'
+    assert axes_cfgs.axes[3].var_set.var_set[0].pulse_refs == (-6, 5)
+    assert axes_cfgs.axes[4].label == 'E'
+    assert axes_cfgs.axes[4].var_set.var_set[0].pulse_refs == (-4, 3)
+
+
 
 def test_find_canonical_axes():
 
-    pass
+    # Not much extra to test here currently over test_find_canonical_axes_for_one_phasematch
 
-def test_dummy():
+    # EVV with all pulses at different times
+    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
 
-    evv_exp = ws_fixtures.evv_experiment_pulse_1_and_2_coincident()
+    pulses = [pulse_a, pulse_b, pulse_c]
+    epochs = [[1], [2], [3]]
+    pm_dir = [PhaseMatchingCondition(SignedPulseTuple(pulse_refs=(-1, 2, 3)), 1)]
 
-    evv_exp = ws_fixtures.evv_experiment()
+    indep_var_choices = find_indep_exp_variables(pulses, epochs, pm_dir)
 
-    evv_exp = ws_fixtures.experiment_beta_alpha_cars()
+    axes_cfgs = find_canonical_axes(indep_var_choices)
 
-    print('relevant phase-matching conditions', evv_exp.relevant_phasematch)
-    print('interaction sequences', evv_exp.int_sequences)
-    print('independent variables', evv_exp.indep_vars)
-    print('valid axis combinations', evv_exp.valid_axis_combs)
-    print('canonical axes', evv_exp.canonical_axes)
+    # The canonical axes here are A: -w1 and B: w2
+    assert len(axes_cfgs.axes) == 2
+    assert axes_cfgs.axes[0].label == 'A'
+    assert axes_cfgs.axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert axes_cfgs.axes[1].label == 'B'
+    assert axes_cfgs.axes[1].var_set.var_set[0].pulse_refs == (2,)
 
-    for i in evv_exp.valid_axis_combs:
-        print('New axis combinations')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
 
-    for i in evv_exp.canonical_axes:
-        print('Canonical axes')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
+    # EVV with all pulses at different times
+    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
 
-    pass
+    pulses = [pulse_a, pulse_b, pulse_c]
+    epochs = [[1], [2], [3]]
+
+    # Here two phase-matching directions
+    pm_dir_a = PhaseMatchingCondition(SignedPulseTuple(pulse_refs=(-1, 2, 3)), 1)
+    pm_dir_b = PhaseMatchingCondition(SignedPulseTuple(pulse_refs=(1, -2, 3)), 2)
+
+    indep_var_choices = find_indep_exp_variables(pulses, epochs, [pm_dir_a, pm_dir_b])
+
+    # Should fail because > 1 phase-matching directions not supported yet
+    # NOTE: However, this case is an example of a situation where canonical axes could in fact be identified:
+    # Canonical axes for pm_dir_a are identified as A: -w1 and B: w2, while for pm_dir_b, they are
+    # identified as A: w1 and B: -w2 (i.e. just overall opposite sign). Future implementation should support this
+    with pytest.raises(ValueError):
+        axes_cfgs = find_canonical_axes(indep_var_choices)
+
 
 

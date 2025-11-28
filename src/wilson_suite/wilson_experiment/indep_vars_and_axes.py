@@ -527,8 +527,6 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
 
     ind_vars_internal = []
 
-    print('ind vars to internal', ind_vars)
-
     for i in ind_vars.var_groups:
 
         new_group = []
@@ -595,7 +593,7 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
     return transl_valid_axes
 
 
-def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoices:
+def find_canonical_axes_for_one_phasematch(ind_vars: IndependentVariableChoices) -> SpectralAxisSet:
     """
     Find valid axes choices for one phase-matching direction.
 
@@ -640,25 +638,22 @@ def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoice
     for i in ind_vars_internal:
 
         if len(i) == max_len_ind:
-            max_len_entries.append(copy.deepcopy(sorted(i)))
+            max_len_entries.append(copy.deepcopy(i))
 
         elif len(i) > max_len_ind:
             max_len_ind = len(i)
-            max_len_entries = [copy.deepcopy(sorted(i))]
+            max_len_entries = [copy.deepcopy(i)]
 
     max_len_entries = sorted(max_len_entries)
 
     # Since max len entries is sorted, I can make a canonical choice with the first entry
     for i in range(len(max_len_entries[0])):
-        if i > 2:
-            raise ValueError('Current version enables maximum 3 axes')
 
         # Dress canonical independent variables with axis labels
         canonical_axes[cap_alpha_labels[i]] = [max_len_entries[0][i]]
 
-    # Translate to SpectralAxisChoices
+    # Translate to SpectralAxisSet
     transl_canonical_axes = {}
-    new_combs = []
     new_set = []
 
     for k in canonical_axes:
@@ -670,39 +665,37 @@ def find_canonical_axes_for_one_phasematch(ind_vars: list) -> SpectralAxisChoice
 
         new_set.append(SpectralAxis(k, IndependentVariableSet(tuple(this_axis_set))))
 
-    new_combs.append(SpectralAxisSet(tuple(new_set)))
-
-    transl_canonical_axes[tuple(max_len_entries[0])] = tuple(new_combs)
-
-    return transl_canonical_axes
+    return SpectralAxisSet(tuple(new_set))
 
 
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
+# TODO: Add support for more than one independent variable choice set (usually means more than one phase-matching
+# condition)
 def find_canonical_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> SpectralAxisSet:
     """
-    Find canonical axes for a collection of phase-matching directions. FIXME: > 1 pm directions not yet supported
+    Find canonical axes for a collection of phase-matching directions.
 
     all_ind_var_cfgs_p: List of IndependentVariableChoices. See that class' definition and find_indep_exp_variables
 
-    Returns: dict: final_canonical_axes: For the canonical independent variable choice, a description of
-    tha canonical axis choice.
+    Returns: A SpectralAxisSet instance describing the canonical axes
     """
 
-    # Find valid axes for each phase-matching direction
-    valid_axes = []
+
+    if len(all_ind_var_cfgs_p) > 1:
+        raise ValueError('Only one independent variable choice set currently supported')
 
     for i in all_ind_var_cfgs_p:
 
-        new_axes = find_canonical_axes_for_one_phasematch(i)
+        canonical_axes = find_canonical_axes_for_one_phasematch(i)
 
-        for j in new_axes:
-            print('j', j)
+        # TODO for > 1 ind var choice set support:
+        # Make the canonical axes for the further sets
+        # Check if the results are related to the first canonical axes by a simple transformation
+        # If no, raise ValueError (no canonical axes could be found)
+        # If yes, pass to next set
+        # If all pass relation test, return the canonical axes
 
-            new_iv_set = IndependentVariableSet(tuple([SignedPulseTuple(k) for k in j]))
-
-            valid_axes.append(SpectralAxisChoices(i.phasematch_cond, new_iv_set, tuple(new_axes[j])))
-
-    return valid_axes
+    return canonical_axes
 
 
 # TODO: Have option to let user fix one or more axes and recurse starting from that instead
@@ -724,12 +717,8 @@ def find_valid_axes(all_ind_var_cfgs_p: list[IndependentVariableChoices]) -> lis
         new_axes = find_valid_axes_cfgs_for_one_phasematch(i)
 
         for j in new_axes:
-            print('j', j)
 
             new_iv_set = IndependentVariableSet(tuple([SignedPulseTuple(k) for k in j]))
-
-            print('new ax j', new_axes[j])
-
             valid_axes.append(SpectralAxisChoices(i.phasematch_cond, new_iv_set, tuple(new_axes[j])))
 
     return valid_axes

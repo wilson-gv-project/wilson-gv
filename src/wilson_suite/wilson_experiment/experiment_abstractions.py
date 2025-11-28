@@ -297,7 +297,12 @@ class VibExperiment:
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
         self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
-        self.canonical_axes = find_canonical_axes(self.indep_vars)
+
+        # If no canonical axes can be determined, set to None
+        try:
+            self.canonical_axes = find_canonical_axes(self.indep_vars)
+        except ValueError:
+            self.canonical_axes = None
 
 
         # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
