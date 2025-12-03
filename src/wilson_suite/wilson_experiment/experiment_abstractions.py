@@ -27,8 +27,6 @@ class SpecDetector:
 
     wv_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
     phase-matching direction(s)
-    # FIXME: Putting sign in a list seems unnecessary, consider rm and rework. Or maybe OK if considering multiple
-    directions for same puls at once?
 
     ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
     Currently not used.
@@ -40,8 +38,8 @@ class SpecDetector:
     detection_polarization: Optional[tuple[float]] = None
     
     # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
-    detection_range: Optional[List[float]] = None
-    wv_filter: Optional[List[dict]] = None
+    detection_range: Optional[list[float]] = None
+    wv_filter: Optional[list[dict]] = None
     ignore_collinear: bool = True
 
     overall_phase: complex = 1.0 + 0.0j
@@ -50,14 +48,49 @@ class SpecDetector:
         if self.detection_method not in {'time', 'freq', 'int'}:
             raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
 
-        if self.detection_range is None and (self.detection_method in ['time']):
-            raise AssertionError("The detection range must be specified when the detector is set to 'time' or 'freq' detection")
-
         if not self.overall_phase == 1.0 + 0.0j:
-            raise AssertionError('Detector overall phase currently restricted to zero shift')
+            raise ValueError('Detector overall phase currently restricted to zero shift')
 
+        # Will currently not be reach because of restriction to zero shift, but will be relevant when that is lifted
         if not(abs(self.overall_phase) - 1.0 < 1e-10):
-            raise AssertionError('Detector overall phase must be of unit length')
+            raise ValueError('Detector overall phase must be of unit length')
+
+@dataclass
+class ScanObject:
+    """
+    Class to represent some attribute of the experiment which could be scanned. Currently not in use.
+
+    category: String: The (main) category of the object to be scanned, e.g. "pulse" or "detector"
+    subcategory: String: The subcategory of the object to be scanned, e.g. "cf" (carrier frequency)
+    id: Integer: An integer identifier for the specific instance of the main category, e.g. if 'category' is "pulse"
+        (of which there are typically several, labelled by integer indices), then the present 'id' attribute
+        tells which of these pulses are meant in this scan object
+    coeff: Float: Coefficient: As a scan is performed across a range (see SpecScan), 'coeff' tells which scaling to use
+    for the scan range increments when applying them to the present scan object. For example, one might want to have a
+    scan that increases one parameter according to the scan range while concurrently decreasing another parameter twice
+    as rapidly. This can be represented by associating the scan with two scan objects referring to the respective
+    parameters, where the first has 'coeff' == 1.0 and the second has 'coeff' == -2.0. Default: 1.0.
+    """
+
+    category: str
+    subcategory: str
+    id: int = 0
+    coeff: float = 1.0
+
+
+    def __post_init__(self):
+
+        # Testing against currently recognized scan categories/subcategories.
+        # Presence in these lists is required but not sufficient to
+        # indicate actual support for a specific scan.
+
+        valid_scan_objs = ['pulse', 'detector']
+        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
+
+        if not self.category in valid_scan_objs:
+            raise ValueError('Scan category not supported')
+        if not self.subcategory in valid_scan_attributes[self.category]:
+            raise ValueError('Scan subcategory not supported')
 
 
 @dataclass
@@ -65,29 +98,28 @@ class SpecScan:
     """
     Class to represent a spectral scan (adding to the dimensionality of a spectrum)
 
-    ----
-    scan_objs: [['object 1 category', 'object 1 id' [or dummy], 'object 1 attribute', 'multiplier'],
-                ['object 2 category', ...]]: Tells what is being scanned here
+    scan_objs: Tuple of ScanObject instances: Tells what this scan will vary
 
-    range: Iterable of numbers over which scan objects are varied (scaled by their multipliers)
+    range: Iterable over which scan objects are varied (scaled by their multipliers as represented by
+    their 'coeff' attributes)
     """
 
-    # TODO: Later the scans could involve a greater variety of parameters that can be varied on a range
-    
-    # TODO: Check if ranges are valid
-    scan_objs: List
+    scan_objs: tuple[ScanObject]
     range: Iterable
 
     def __post_init__(self):
-        valid_scan_objs = ['pulse', 'detector']
-        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
 
-        for i in self.scan_objs:
-            if i[0] not in valid_scan_objs:
-                raise AssertionError("The scan object must be one of", valid_scan_objs, 'but is instead', i[0])
-            if i[2] not in valid_scan_attributes[i[0]]:
-                raise AssertionError("The scan attribute for", i[0], 'must be one of', valid_scan_attributes[i[0]], 'but is instead', i[2])
+        from collections.abc import Iterable
 
+        if not (isinstance(self.scan_objs, tuple)):
+            raise TypeError('scan_objs must be a tuple of ScanObject instances')
+        else:
+            for i in self.scan_objs:
+                if not (isinstance(i, ScanObject)):
+                    raise TypeError('scan_objs must be a list of ScanObject instances')
+
+        if not isinstance(self.range, Iterable):
+            raise TypeError('range is not iterable')
 
 @dataclass
 class EmPulse:
@@ -291,7 +323,10 @@ class VibExperiment:
 
         self.relevant_phasematch = relevant_phasematch
 
+        # FIXME: Replace with try...except in case not sufficient data specified
         self.dim = self.findDimensionality()
+
+
         self.epochs = find_epochs(self.field)
         self.int_sequences = self.findInteractionSequences()
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
@@ -347,6 +382,8 @@ class VibExperiment:
         Using detector and scans information, make formatted print report of each dimension of the spectral data
         that carrying out this experiment would produce
         """
+
+        # FIXME: Add try...except to catch if self does not contain required information
 
         d = 0
         for i in self.scans:
