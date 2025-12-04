@@ -115,6 +115,15 @@ def test_spec_scan():
 
 def test_em_pulse():
 
+    # An infrared pulse from the EVV experiment
+    pulse_a = EmPulse(env='gaussian', maxstr=1.0e-5, tc = 100.0, cf_uv=0.0,
+                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    # A UV/VIS pulse from the EVV experiment
+    pulse_b = EmPulse(env='gaussian', maxstr=1.0e-5, tc = 120.0, cf_uv=0.072,
+                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+
     pass
 
 def test_electric_field():
