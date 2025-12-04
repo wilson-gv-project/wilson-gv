@@ -115,6 +115,116 @@ def test_spec_scan():
 
 def test_em_pulse():
 
+    # An infrared-range pulse with:
+    # - Envelope strength maximum of 1e-5 a.u.
+    # - Time envelope centerpoint at 100 a.u.
+    # - Time envelope deviation parameter 2.0 a.u.
+    # - Carrier frequency 0.005 a.u
+    # - No UV/VIS component of carrier frequency
+    # - Wavevector (0.0, 1.0, 0.0) (laboratory axes)
+    # - Polarization vector (0.0, 0.0, 1.0) (laboratory axes)
+    # - No overall phase shift (here replicating default)
+    # - (Integer) identifier label: 1
+
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 0.005, dev = 2.0, cf_uv=0.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
+
+    assert pulse_a.env == 'gaussian'
+    assert pulse_a.tc == 100.0
+    assert pulse_a.cf == 0.005
+    assert pulse_a.dev == 2.0
+    assert pulse_a.cf_uv == 0.0
+    assert pulse_a.maxstr == 1.0e-5
+    assert pulse_a.wv == (0.0, 1.0, 0.0)
+    assert pulse_a.pol == (0.0, 0.0, 1.0)
+    assert pulse_a.overall_phase == 1.0 + 0.0j
+    assert pulse_a.id == 1
+
+    # The choice of deviation parameter is non-limiting and should therefore result in the pulse being
+    # neither impulsive-tending or continuous-wave-tending
+    assert not(pulse_a.tendsImpulsive())
+    assert not(pulse_a.tendsContinuous())
+
+    # A UV/VIS impulsive-tending pulse. Leaving several parameters to their defaul values.
+    # For impulsive-tending pulses, the carrier frequency argument is optional
+
+    pulse_b = EmPulse(env='gaussian', tc = 120.0, dev=0.0, cf_uv = 0.072)
+    assert pulse_b.env == 'gaussian'
+    assert pulse_b.tc == 120.0
+    assert pulse_b.cf == None # Default value
+    assert pulse_b.dev == 0.0
+    assert pulse_b.cf_uv == 0.072
+    assert pulse_b.maxstr == 0.0 # Default
+    assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
+    assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
+    assert pulse_b.overall_phase == 1.0 + 0.0j # Default
+    assert pulse_b.id == None # Default
+
+    assert pulse_b.tendsImpulsive()
+    assert not(pulse_b.tendsContinuous())
+
+    # A CW-tending IR range pulse. For continuous-wave-tending
+    # pulses, the time centerpoint argument is optional
+    from math import inf as infinity
+    pulse_c = EmPulse(env='gaussian', cf = 0.003, dev = infinity)
+    assert pulse_c.env == 'gaussian'
+    assert pulse_c.tc == None # Default value
+    assert pulse_c.cf == 0.003
+    assert pulse_c.dev == infinity
+
+    assert not(pulse_c.tendsImpulsive())
+    assert pulse_c.tendsContinuous()
+
+    # Unrecognized pulse envelope
+    with pytest.raises((ValueError)):
+        pulse_bogus = EmPulse(env='bogus', tc=120.0, dev=0.0, cf_uv=0.072)
+
+    # Non-zero cf parameter with non-zero cf_uv parameter
+    with pytest.raises((ValueError)):
+        pulse_bogus = EmPulse(env='bogus', tc=120.0, cf=0.001, dev=2.0, cf_uv=0.072)
+
+    # Negative cf_uv parameter
+    with pytest.raises((ValueError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=-0.072)
+
+    # Negative cf parameter
+    with pytest.raises((ValueError)):
+        pulse_bogus = EmPulse(env='gaussian', cf = -0.003, dev = infinity)
+
+    # Missing required parameter for non-limiting pulse shape
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=2.0, cf_uv=0.072)
+
+    # Missing required parameter for non-limiting pulse shape
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001)
+
+    # Missing required parameter for non-limiting pulse shape
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', cf=0.001, dev=2.0)
+
+    # Wavevector not len 3 tuple of floats
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
+                              wv=('bogus', 0.0, 0.0))
+
+    # Polarization not len 3 tuple of floats
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
+                              pol=(1.0, 0.0, 0.0, 0.0))
+
+    # Wavevector and polarization not orthogonal
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
+                              wv =(1.0, 0.0, 0.0), pol=(1.0, 0.0, 0.0))
+
+    # Non-zero shift in overall phase
+    with pytest.raises((AssertionError)):
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
+                              overall_phase=0.0 + 1.0j)
+
+def test_make_gaussian_pulse():
+
     # An infrared pulse from the EVV experiment
     pulse_a = EmPulse(env='gaussian', maxstr=1.0e-5, tc = 100.0, cf_uv=0.0,
                       wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
@@ -125,6 +235,7 @@ def test_em_pulse():
 
 
     pass
+
 
 def test_electric_field():
 

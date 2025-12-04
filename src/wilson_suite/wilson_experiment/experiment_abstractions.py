@@ -128,8 +128,8 @@ class EmPulse:
     Class to represent an electromagnetic pulse
     
     ----
-    env: String: Pulse time-domain envelope: The only current valid choice is "gaussian".
-    maxstr: Float: Pulse amplitude at maximum of envelope
+    env: String: Pulse time-domain envelope type: The only current valid choice is "gaussian".
+    maxstr: Float: Pulse amplitude at maximum of envelope. Default: Zero strength
     tc: Float: Point in time at which pulse envelope is at maximum
     cf: float: (Infrared-range) carrier frequency
     cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation).
@@ -151,13 +151,12 @@ class EmPulse:
     """
     env: str
     
-    maxstr: float
-
     tc: float = None
     cf: float = None
     dev: float = None
 
     cf_uv: float = 0.0
+    maxstr: float = 0.0
 
     wv: tuple[float] = (0.0, 0.0, 1.0)
     pol: tuple[float] = (1.0, 0.0, 0.0)
@@ -185,8 +184,14 @@ class EmPulse:
                 raise ValueError('A carrier frequency must be nonnegative')
 
         if self.env == 'gaussian':
-            if self.cf is None or self.dev is None or self.tc is None:
-                raise AssertionError('A Gaussian pulse must have a carrier frequency, a time deviation parameter and a time at which the temporal envelope is at its maximum')
+            if self.cf is None:
+                if not self.dev == 0.0:
+                    raise AssertionError('A non-impulsive-tending Gaussian pulse must have a carrier frequency')
+            if self.tc is None:
+                if not self.dev == infinity:
+                    raise AssertionError('A non-continuous-wave-tending Gaussian pulse must have a parameter describing the time at which the temporal envelope is at its maximum')
+            if self.dev is None:
+                raise AssertionError('A Gaussian pulse must have a time deviation parameter')
 
         # Wavevector: In which unit vector direction is the pulse wave travelling
         if isinstance(self.wv, tuple):
@@ -257,31 +262,51 @@ class EmPulse:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
 
-def make_impulsive_pulse(maxstr: float, tc: float = None, cf: float = None, cf_uv: float = 0.0,
+
+def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
+                        wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
+                        overall_phase: complex = 1.0 + 0.0j, id: int = None):
+    """
+    Helper function: Makes a Gaussian EmPulse instance with the selected parameters.
+    See EmPulse for a definition of these parameters.
+
+    Required arguments: tc, cf, dev.
+    """
+
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id)
+
+
+def make_impulsive_gaussian_pulse(tc: float, cf: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
                          overall_phase: complex = 1.0 + 0.0j, id: int = None):
     """
-    Helper function: Makes an impulsive-tending EmPulse instance with the selected parameters.
-    See EmPulse for a definition of these parameters. The present function does not accept a dev parameter
+    Helper function: Makes an impulsive-tending Gaussian EmPulse instance with the selected parameters.
+    See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
     because it is zero for an impulsive pulse and this is carried out explicitly in the call below. All
     other parameters are transferred directly to the EmPulse instance creation.
+
+    Required arguments: tc. All other arguments optional.
     """
 
-    return EmPulse(maxstr = maxstr, tc = tc, cf = cf, dev = 0.0, cf_uv = cf_uv, wv = wv, pol = pol,
-                   overall_phase = overall_phase, id = id)
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id)
 
-def make_cw_pulse(maxstr: float, tc: float = None, cf: float = None, cf_uv: float = 0.0,
+def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
                          overall_phase: complex = 1.0 + 0.0j, id: int = None):
     """
-    Helper function: Makes an continuous-wave-tending EmPulse instance with the selected parameters.
-    See EmPulse for a definition of these parameters. The present function does not accept a dev parameter
+    Helper function: Makes a continuous-wave-tending Gaussian EmPulse instance with the selected parameters.
+    See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
     because it is infinity for a cw pulse and this is carried out explicitly in the call below. All
     other parameters are transferred directly to the EmPulse instance creation.
+
+    Required arguments: cf. All other arguments optional. NOTE changed ordering of cf and tc arguments compared to
+    other make_..._pulse functions because of this optionality.
     """
 
-    return EmPulse(maxstr = maxstr, tc = tc, cf = cf, dev = infinity, cf_uv = cf_uv, wv = wv, pol = pol,
-                   overall_phase = overall_phase, id = id)
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id)
 
 # The field consists of a collection of pulses
 @dataclass
