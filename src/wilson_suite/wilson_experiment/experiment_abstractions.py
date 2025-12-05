@@ -343,22 +343,15 @@ class VibExperiment:
     field: ElectricField instance: A "base" perturbing field (upon which scans may be imposed)
     detector: SpecDetector instance: The detector for this experiment
     scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
-    magn_conditions: List of lists [[sign*pulse i (is always of lower frequency than...), sign*pulse j], ...]:
-    Magnitude conditions for later use in identifying terms that will not become fully resononant in this experiment
+    magn_conditions: List of lists [[sign*pulse i (is always of significantly lower frequency than...), sign*pulse j], ...]:
+    Magnitude conditions for later use in identifying terms that will not become fully resononant in this experiment.
+    Example: [[(i, -j, k], ...]: w_i - w_j + w_k significantly > 0, ...
     """
 
-    # field should be an electricField instance:
-
-    # scans is a list of specRange instances
-    # Each scan adds a spectral dimension
-    # magn_conditions is a list of imposed pulse magnitude conditions
-    # Format: [[(i, -j, k], ...]: w_i - w_j + w_k sign. > 0, ...
-
-    order: int
     field: ElectricField
     detector: SpecDetector
     scans: list[SpecScan] = None
-    magn_conditions: list = dc_field(default_factory=lambda: list)
+    magn_conditions: list = None
 
     def __post_init__(self):
 
@@ -366,13 +359,18 @@ class VibExperiment:
                                                                         find_indep_exp_variables, find_valid_axes,
                                                                         find_canonical_axes)
 
+        # Establishes an assumption: The order is the same as the number of pulses in the field
+        # It is furthermore (but not strictly from this) assumed that in the experiment, the system will interact
+        # once with each pulse
+        self.order = len(self.field.pulses)
+
+        # Determine which phase-matching condition(s) will come under consideration in this experiment
         relevant_phasematch = []
 
         # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
         if self.detector.wv_filter is None:
 
             from itertools import product as iter_prod
-
             k = 0
 
             for i in iter_prod([1, -1], repeat=len(self.field.pulses)):
@@ -385,6 +383,7 @@ class VibExperiment:
                 relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
                 k += 1
 
+        # Otherwise, registered only that/those specified for the detector
         else:
 
             k = 0
@@ -399,17 +398,24 @@ class VibExperiment:
                 relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
                 k += 1
 
-
         self.relevant_phasematch = relevant_phasematch
 
         # FIXME: Replace with try...except in case not sufficient data specified
         self.dim = self.findDimensionality()
 
-
+        # Determine pulse "epochs" - i.e. disjoint (or taken to be disjoint) time partitions of the pulses
         self.epochs = find_epochs(self.field)
+
+        # Determine which interaction orderings are causally possible
         self.int_sequences = self.findInteractionSequences()
+
+        # Register UV/VIS range carrier frequencies of field for convenience
         self.cfuv = get_carrier_freqs_uv(self.field.pulses)
+
+        # Find valid choices of independent variables
         self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
+
+        # Find valid choices of spectral axes given the choices of independent variables determined above
         self.valid_axis_combs = find_valid_axes(self.indep_vars)
 
         # If no canonical axes can be determined, set to None
@@ -418,7 +424,7 @@ class VibExperiment:
         except ValueError:
             self.canonical_axes = None
 
-
+        # Register all polarization vectors (associated with the detector and pulses) for convenience
         # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
         # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
         all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
@@ -431,10 +437,9 @@ class VibExperiment:
 
         self.all_polarizations = all_polarizations
 
+        # Determine the macroscopic orientational average polarization vector
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-
         self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
-
 
     def findDimensionality(self) -> int:
         """
@@ -558,8 +563,8 @@ def find_epochs(field, tol: float=0.0) -> list:
     """
 
     for i in field.pulses:
-        if i.env not in ['ideal', 'impulsive']:
-            raise AssertionError('Can currently only determine epochs for fields consisting of only ideal or impulsive pulses')
+        if not i.tendsImpulsive():
+            raise AssertionError('Can currently only determine epochs for fields with impulsive-tending pulses')
         if i.id is None:
             raise AssertionError('All pulses must have IDs for valid epoch determination')
 

@@ -3,7 +3,8 @@ import pytest
 from wilson_suite import fixtures as ws_fixtures
 
 from wilson_suite.wilson_experiment.experiment_abstractions import (SpecDetector, ScanObject, SpecScan,
-                    EmPulse, ElectricField, VibExperiment, get_carrier_freqs_uv, find_epochs, uv_cancels)
+                    EmPulse, make_gaussian_pulse, make_impulsive_gaussian_pulse, make_cw_gaussian_pulse,
+                    ElectricField, VibExperiment, get_carrier_freqs_uv, find_epochs, uv_cancels)
 
 def test_spec_detector():
 
@@ -125,7 +126,6 @@ def test_em_pulse():
     # - Polarization vector (0.0, 0.0, 1.0) (laboratory axes)
     # - No overall phase shift (here replicating default)
     # - (Integer) identifier label: 1
-
     pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 0.005, dev = 2.0, cf_uv=0.0, maxstr=1.0e-5,
                       wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
 
@@ -145,9 +145,8 @@ def test_em_pulse():
     assert not(pulse_a.tendsImpulsive())
     assert not(pulse_a.tendsContinuous())
 
-    # A UV/VIS impulsive-tending pulse. Leaving several parameters to their defaul values.
+    # A UV/VIS impulsive-tending pulse. Leaving several parameters to their default values.
     # For impulsive-tending pulses, the carrier frequency argument is optional
-
     pulse_b = EmPulse(env='gaussian', tc = 120.0, dev=0.0, cf_uv = 0.072)
     assert pulse_b.env == 'gaussian'
     assert pulse_b.tc == 120.0
@@ -225,21 +224,86 @@ def test_em_pulse():
 
 def test_make_gaussian_pulse():
 
-    # An infrared pulse from the EVV experiment
-    pulse_a = EmPulse(env='gaussian', maxstr=1.0e-5, tc = 100.0, cf_uv=0.0,
-                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+    # Same kind of pulse as first example in test_em_pulse
+    pulse_a = make_gaussian_pulse(100.0, 0.005, 2.0, cf_uv=0.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
 
-    # A UV/VIS pulse from the EVV experiment
-    pulse_b = EmPulse(env='gaussian', maxstr=1.0e-5, tc = 120.0, cf_uv=0.072,
-                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+    assert pulse_a.env == 'gaussian'
+    assert pulse_a.tc == 100.0
+    assert pulse_a.cf == 0.005
+    assert pulse_a.dev == 2.0
+    assert pulse_a.cf_uv == 0.0
+    assert pulse_a.maxstr == 1.0e-5
+    assert pulse_a.wv == (0.0, 1.0, 0.0)
+    assert pulse_a.pol == (0.0, 0.0, 1.0)
+    assert pulse_a.overall_phase == 1.0 + 0.0j
+    assert pulse_a.id == 1
 
+    assert not(pulse_a.tendsImpulsive())
+    assert not(pulse_a.tendsContinuous())
 
-    pass
+def test_make_impulsive_gaussian_pulse():
 
+    # A UV/VIS impulsive-tending pulse. Leaving several parameters to their default values.
+    pulse_b = make_impulsive_gaussian_pulse(tc = 120.0)
+    assert pulse_b.env == 'gaussian'
+    assert pulse_b.tc == 120.0
+    assert pulse_b.cf == None # Default value
+    assert pulse_b.dev == 0.0
+    assert pulse_b.cf_uv == 0.0 # Default
+    assert pulse_b.maxstr == 0.0 # Default
+    assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
+    assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
+    assert pulse_b.overall_phase == 1.0 + 0.0j # Default
+    assert pulse_b.id == None # Default
+
+    assert pulse_b.tendsImpulsive()
+    assert not(pulse_b.tendsContinuous())
+
+def test_make_cw_gaussian_pulse():
+
+    # A CW-tending IR range pulse. Only the (IR-range) carrier frequency argument needs to be specified.
+    from math import inf as infinity
+    pulse_c = make_cw_gaussian_pulse(0.003)
+    assert pulse_c.env == 'gaussian'
+    assert pulse_c.tc == None # Default value
+    assert pulse_c.cf == 0.003
+    assert pulse_c.dev == infinity
+
+    assert not(pulse_c.tendsImpulsive())
+    assert pulse_c.tendsContinuous()
 
 def test_electric_field():
 
-    pass
+    # Simple 3-pulse field
+
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=2)
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=3)
+
+    # Pulse ids out of order but that doesn't matter as long as all IDs from 1 to num of pulses are represented
+    pulses = (pulse_a, pulse_c, pulse_b)
+
+    field = ElectricField(pulses)
+
+    # Not a lot to test here
+    assert len(field.pulses) == 3
+    assert isinstance(field.pulses[0], EmPulse)
+    assert isinstance(field.pulses[1], EmPulse)
+    assert isinstance(field.pulses[2], EmPulse)
+
+    # Identifiers in sequence but don't start at 1
+    with pytest.raises(ValueError):
+        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=0)
+        pulses_bogus = (pulse_0, pulse_a, pulse_b)
+        field_bogus = ElectricField(pulses_bogus)
+
+    # Identifiers start at 1 but not in sequence
+    with pytest.raises(ValueError):
+        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=0)
+        pulses_bogus = (pulse_a, pulse_b, pulse_d)
+        field_bogus = ElectricField(pulses_bogus)
+
 
 def test_vib_experiment():
 
@@ -283,16 +347,5 @@ def test_dummy():
         for j in i.ind_vars.var_set:
             print(j.pulse_refs)
 
-    for i in evv_exp.canonical_axes:
-        print('Canonical axes')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
 
     pass
