@@ -339,21 +339,48 @@ class VibExperiment:
     """
     Class to represent a vibrational wave-mixing experiment
 
-    ----
     field: ElectricField instance: A "base" perturbing field (upon which scans may be imposed)
+
     detector: SpecDetector instance: The detector for this experiment
+
     scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
-    magn_conditions: List of lists [[sign*pulse i (is always of significantly lower frequency than...), sign*pulse j], ...]:
-    Magnitude conditions for later use in identifying terms that will not become fully resononant in this experiment.
-    Example: [[(i, -j, k], ...]: w_i - w_j + w_k significantly > 0, ...
+
+    magn_conditions: Tuple of tuples: Magnitude conditions for use in identifying terms that will not become
+    fully resononant in this experiment. Format: Outer tuple collects magnitude conditions. Each inner tuple is
+    a magnitude condition and consists of signed pulse references (NOTE: Currently not using the SignedPulseTuple class)
+    where the sum of the associated frequencies are understood to be significantly > 0, where "significantly > 0" means
+    "never close to zero".
+    Example: ( (-1, 2), (2, 3, -4) ) denotes two magnitude conditions:
+        a) -w1 + w2 is always significantly > 0,
+        b) w2 + w3 - w4 is always significantly > 0
     """
 
     field: ElectricField
     detector: SpecDetector
-    scans: list[SpecScan] = None
-    magn_conditions: list = None
+    scans: tuple[SpecScan] = None
+    magn_conditions: tuple[tuple] = None
 
     def __post_init__(self):
+
+        if not isinstance(self.field, ElectricField):
+            raise TypeError('The field attribute must be an ElectricField instance')
+
+        if not isinstance(self.detector, SpecDetector):
+            raise TypeError('The detector attribute must be a SpecDetector instance')
+
+        if self.scans is not None:
+            if not isinstance(self.scans, tuple):
+                raise TypeError('The scans attribute, if specified, must be a tuple of SpecScan instances')
+            for i in self.scans:
+                if not isinstance(i, SpecScan):
+                    raise TypeError('The scans attribute, if specified, must be a tuple of SpecScan instances')
+
+        if self.magn_conditions is not None:
+            if not isinstance(self.magn_conditions, tuple):
+                raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
+            for i in self.magn_conditions:
+                if not isinstance(i, tuple):
+                    raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
 
         from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
                                                                         find_indep_exp_variables, find_valid_axes,
@@ -460,28 +487,6 @@ class VibExperiment:
                 return d + 1
 
         return d
-    
-    def tellDimensions(self):
-        """
-        Using detector and scans information, make formatted print report of each dimension of the spectral data
-        that carrying out this experiment would produce
-        """
-
-        # FIXME: Add try...except to catch if self does not contain required information
-
-        d = 0
-        for i in self.scans:
-            d += 1
-            print('Dimension', i, 'is a scan:', i.scan_objs, 'over the range', i.range)
-
-        if self.detector.detection_method == 'time':
-            print('Dimension', i, 'is a scan over the time-domain detection range', self.detector.detection_range)
-
-        elif self.detector.detection_method == 'freq':
-            if self.detector.detection_range is not None:
-                print('Dimension', i, 'is a scan over the frequency-domain detection range', self.detector.detection_range)
-
-        return
     
     def findInteractionSequences(self) -> list:
         """

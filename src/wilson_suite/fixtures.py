@@ -38,22 +38,22 @@ def evv_experiment() -> ws_experiment.experiment_abstractions.VibExperiment:
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=[scan_a], magn_conditions=[[-1, 2]])
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a), magn_conditions=((-1, 2),),)
 
 def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
-    Returns VibExperiment instance for EVV experiment
+    Returns VibExperiment instance for an EVV experiment variant with pulse 1 and 2 coincident in time
     """
     import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 
     pulse_ir_1 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
-                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
     pulse_ir_2 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
-                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
     pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
-                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
@@ -71,7 +71,7 @@ def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstra
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=[scan_a], magn_conditions=[[-1, 2]])
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a), magn_conditions=((-1, 2),),)
 
 def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
@@ -111,7 +111,7 @@ def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExp
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=[scan_a], magn_conditions=[[-1, 2]])
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a))
 
 def evv_terms() -> list[VibPerturbedTerm]:
     """

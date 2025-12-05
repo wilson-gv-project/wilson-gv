@@ -307,6 +307,108 @@ def test_electric_field():
 
 def test_vib_experiment():
 
+    pulse_ir_1 = make_impulsive_gaussian_pulse(tc=50.0, cf=0.0, cf_uv=0.0,
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    pulse_ir_2 = make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_1 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
+
+    field_a = ElectricField(pulses)
+
+    detector_a = SpecDetector(detection_method='freq',
+                                   detector_location=(0.0, 0.0, 1.0),
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                   wv_filter=[{1: -1, 2: 1, 3: 1}])
+
+    # Push one carrier freq
+    scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = ScanObject('detector', 'detection_range', id=0, coeff=1.0)
+    scan_range_a = [0.0001 * i for i in range(101)]
+    scan_a = SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+
+    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+
+    # Some attribute testing given a light touch since already covered by respective class tests
+    assert len(exp_a.field.pulses) == 3
+    assert exp_a.detector.detection_method == 'freq'
+    assert len(exp_a.scans) == 1
+
+    assert exp_a.magn_conditions == ((-1, 2),)
+
+    # Assertions about post-init attributes: When these are obtained using VibExperiment methods, these assertions
+    # also serve to cover those methods
+    assert len(exp_a.relevant_phasematch) == 1
+    assert exp_a.relevant_phasematch[0].id == 0
+    assert exp_a.relevant_phasematch[0].pulses.pulse_refs == (-1, 2, 3)
+    assert exp_a.dim == 2
+    assert exp_a.epochs == [[1], [2], [3]] # Three epochs
+    assert exp_a.int_sequences == [ ({1: -1}, {2: 1}, {3: 1}) ] # Only one interaction sequence: First -w1, then w2, then w3
+    assert exp_a.cfuv == {1: 0.0, 2: 0.0, 3: 0.072} # Only pulse 3 has a nonzero UV/VIS freq component
+
+    # One set of independent variables: -w1 and w2
+    assert len(exp_a.indep_vars) == 1
+    assert exp_a.indep_vars[0].phasematch_cond.id == 0
+    assert exp_a.indep_vars[0].phasematch_cond.pulses.pulse_refs == (-1, 2, 3)
+    assert exp_a.indep_vars[0].var_groups[0].var_set[0].pulse_refs == (-1,)
+    assert exp_a.indep_vars[0].var_groups[0].var_set[1].pulse_refs == (2,)
+
+    # See test_find_valid_axes for more information about structure
+    assert len(exp_a.valid_axis_combs) == 1
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[0].label == 'A'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].label == 'B'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].var_set.var_set[1].pulse_refs == (2,)
+
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[0].label == 'A'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[1].label == 'B'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[1].var_set.var_set[0].pulse_refs == (2,)
+
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[0].label == 'A'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[0].var_set.var_set[0].pulse_refs == (2,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[1].label == 'B'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[0].label == 'A'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[0].var_set.var_set[0].pulse_refs == (2,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].label == 'B'
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].var_set.var_set[1].pulse_refs == (2,)
+
+    # Canonical axes: A: -w1, B: w2
+    assert exp_a.canonical_axes.axes[0].label == 'A'
+    assert exp_a.canonical_axes.axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.canonical_axes.axes[1].label == 'B'
+    assert exp_a.canonical_axes.axes[1].var_set.var_set[0].pulse_refs == (2,)
+
+    # All pulses (and detector polarization filter): Linearly polarized light in the x direction
+    assert exp_a.all_polarizations == [(1.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 0.0, 0.0)]
+
+    # NOTE: May revise result after unit tests for avg vector
+    assert exp_a.polarization_avg_vector == [1.0, 1.0, 1.0]
+
+
+    # Wrong data for VibExperiment
+
+    # Relevant phasematch all directions (no detector filter)
+
+    # Indeterminate dimensionality
+
+    # Combinable: Different epochs (own test fn), int sequences, cfuv (own test fn),  indep vars, axis combs, canonical axes, polarization, polarization averaging vector
+
+
+
+
+
+
+
     pass
 
 def test_get_carrier_freqs_uv():
