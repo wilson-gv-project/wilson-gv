@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field as dc_field
-from typing import List, Optional, Iterable
+from dataclasses import dataclass
+from typing import Optional, Iterable
 from operator import itemgetter
 import copy
 from math import inf as infinity
@@ -585,6 +585,9 @@ def find_epochs(field, tol: float=0.0) -> list:
     Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
     """
 
+    if not(tol == 0.0):
+        raise ValueError('Non-zero tolerance not yet supported in find_epochs')
+
     for i in field.pulses:
         if not i.tendsImpulsive():
             raise AssertionError('Can currently only determine epochs for fields with impulsive-tending pulses')
@@ -603,15 +606,38 @@ def find_epochs(field, tol: float=0.0) -> list:
             curr_time = i[0]
         epochs[epoch].append(i[1])
 
-    return epochs
+    sorted_epochs = []
+
+    for i in epochs:
+        sorted_epochs.append(sorted(i))
+
+    return sorted_epochs
 
 def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=1e-10) -> bool:
+    """
+    Do the UV/VIS frequency components of this collection of pulses cancel?
+
+    coll: tuple: (Signed) pulse ID references
+    cfs_uv: dictionary {non-signed pulse ID: non-signed UV/VIS frequency component, ...}
+    tol: Tolerance: If the magnitude of the requested combination of freq components is beneath tol,
+    then accept as cancelling
+
+    return: True if cancellation was determined, False otherwise
+
+    # FIXME: This routine is a bit confusingly made but should
+    """
+
+
+    if tol < 0.0:
+        raise ValueError('The tolerance must be a nonnegative number')
 
     acc = 0.0
 
     for i in coll:
+
         sgn = (i > 0) - (i < 0)
-        acc += cfs_uv[sgn*i]
+
+        acc += sgn * cfs_uv[sgn * i]
 
     sgnacc = (acc > 0) - (acc < 0)
 

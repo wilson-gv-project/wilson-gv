@@ -356,7 +356,6 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
     for i in range(len(epochs)):
 
         raw_ind_vars_p_epoch = []
-        cfuv_this_pm = {}
         uv_this = []
         ir_this = []
 
@@ -365,7 +364,6 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
 
             # Dress UV/VIS-range pulses with phase-matching sign
             if not (cfuv[k] == 0.0):
-                cfuv_this_pm[k] = cfuv[k] * pm_dir_dict[k]
                 uv_this.append(k * pm_dir_dict[k])
 
             else:
@@ -383,7 +381,7 @@ def find_indep_vars_for_one_phasematch(pulses: list[EmPulse], epochs: list, pm_d
         # Which subsets have UV/VIS components that cancel?
         for j in uv_superset:
 
-            if uv_cancels(j, cfuv_this_pm):
+            if uv_cancels(j, cfuv):
                 uv_superset_cancel.append(j)
 
         acc = []

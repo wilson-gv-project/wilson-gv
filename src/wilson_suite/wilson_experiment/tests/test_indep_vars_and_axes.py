@@ -357,10 +357,10 @@ def test_find_branching_indep_var_combs():
 def test_find_indep_vars_for_one_phasematch():
 
     # Four UV/VIS range pulses over two epochs
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.072, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.072, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.144, id=3)
-    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=120.0, cf=0.0, cf_uv=0.072, id=4)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.072, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
+    pulse_d = EmPulse(env='gaussian', maxstr=1e-05, tc=120.0, cf=0.0, dev=0.0, cf_uv=0.072, id=4)
 
     pulses = [pulse_a, pulse_b, pulse_c, pulse_d]
 
@@ -377,9 +377,9 @@ def test_find_indep_vars_for_one_phasematch():
     assert indep_vars[0].var_set[0].pulse_refs == (-3, 1, 2)
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]
@@ -393,14 +393,14 @@ def test_find_indep_vars_for_one_phasematch():
     # Complicated setup: Two IR pulses in first epoch, one IR pulse and four UV/VIS in 2nd epoch, where the UV/VIS
     # pulses have two different cancelling partitionings, and one UV/VIS pulse in the 3rd epoch not eligible to form
     # an independent variable
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=3)
-    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=4)
-    pulse_e = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=5)
-    pulse_f = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=6)
-    pulse_g = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.0, id=7)
-    pulse_h = EmPulse(env='impulsive', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.072, id=8)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.072, id=3)
+    pulse_d = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.072, id=4)
+    pulse_e = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=5)
+    pulse_f = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=6)
+    pulse_g = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.0, id=7)
+    pulse_h = EmPulse(env='gaussian', maxstr=1e-05, tc=50.0, cf=0.0, dev=0.0, cf_uv=0.072, id=8)
 
     pulses = [pulse_a, pulse_b, pulse_c, pulse_d, pulse_e, pulse_f, pulse_g, pulse_h]
     epochs = [[1, 2], [3, 4, 5, 6, 7], [8]]
@@ -432,11 +432,11 @@ def test_find_indep_vars_for_one_phasematch():
     assert indep_vars[1].var_set[3].pulse_refs == (-6, -4, 3, 5)
 
     # Two "Raman-like pulses" in first epoch, three UV/VIS pulses in 2nd epoch with two different ways of cancelling
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.072, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.072, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=3)
-    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=4)
-    pulse_e = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=5)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.072, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=3)
+    pulse_d = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=4)
+    pulse_e = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=5)
 
     pulses = [pulse_a, pulse_b, pulse_c, pulse_d, pulse_e]
     epochs = [[1, 2], [3, 4, 5]]
@@ -459,11 +459,11 @@ def test_find_indep_vars_for_one_phasematch():
 def test_find_indep_exp_variables():
 
     # Two IR pulses in first epoch, three UV/VIS pulses in 2nd epoch (same abs val UV/VIS freq component)
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=3)
-    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=4)
-    pulse_e = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.036, id=5)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=3)
+    pulse_d = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=4)
+    pulse_e = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.036, id=5)
 
     pulses = [pulse_a, pulse_b, pulse_c, pulse_d, pulse_e]
     epochs = [[1, 2], [3, 4, 5]]
@@ -640,9 +640,9 @@ def test_find_axes_recursion():
 def test_find_valid_axes_cfgs_for_one_phasematch():
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]
@@ -703,9 +703,9 @@ def test_find_valid_axes_cfgs_for_one_phasematch():
 def test_find_valid_axes():
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]
@@ -825,9 +825,9 @@ def test_find_valid_axes():
 def test_find_canonical_axes_for_one_phasematch():
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]
@@ -848,14 +848,14 @@ def test_find_canonical_axes_for_one_phasematch():
     # Complicated setup: Two IR pulses in first epoch, one IR pulse and four UV/VIS in 2nd epoch, where the UV/VIS
     # pulses have two different cancelling partitionings, and one UV/VIS pulse in the 3rd epoch not eligible to form
     # an independent variable
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=3)
-    pulse_d = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.072, id=4)
-    pulse_e = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=5)
-    pulse_f = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=6)
-    pulse_g = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.0, id=7)
-    pulse_h = EmPulse(env='impulsive', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.072, id=8)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.072, id=3)
+    pulse_d = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.072, id=4)
+    pulse_e = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=5)
+    pulse_f = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=6)
+    pulse_g = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.0, id=7)
+    pulse_h = EmPulse(env='gaussian', maxstr=1e-05, tc=50.0, cf=0.0, dev=0.0, cf_uv=0.072, id=8)
 
     pulses = [pulse_a, pulse_b, pulse_c, pulse_d, pulse_e, pulse_f, pulse_g, pulse_h]
     epochs = [[1, 2], [3, 4, 5, 6, 7], [8]]
@@ -884,9 +884,9 @@ def test_find_canonical_axes():
     # Not much extra to test here currently over test_find_canonical_axes_for_one_phasematch
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]
@@ -905,9 +905,9 @@ def test_find_canonical_axes():
 
 
     # EVV with all pulses at different times
-    pulse_a = EmPulse(env='impulsive', maxstr=1e-05, tc=10.0, cf=0.0, cf_uv=0.0, id=1)
-    pulse_b = EmPulse(env='impulsive', maxstr=1e-05, tc=20.0, cf=0.0, cf_uv=0.0, id=2)
-    pulse_c = EmPulse(env='impulsive', maxstr=1e-05, tc=30.0, cf=0.0, cf_uv=0.144, id=3)
+    pulse_a = EmPulse(env='gaussian', maxstr=1e-05, tc=10.0, cf=0.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_b = EmPulse(env='gaussian', maxstr=1e-05, tc=20.0, cf=0.0, dev=0.0, cf_uv=0.0, id=2)
+    pulse_c = EmPulse(env='gaussian', maxstr=1e-05, tc=30.0, cf=0.0, dev=0.0, cf_uv=0.144, id=3)
 
     pulses = [pulse_a, pulse_b, pulse_c]
     epochs = [[1], [2], [3]]

@@ -503,41 +503,95 @@ def test_vib_experiment():
 
 def test_get_carrier_freqs_uv():
 
-    pass
+    # Simple four-pulse setup
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.144, id=2)
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=3)
+    pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.0, id=4)
+
+    pulses = (pulse_a, pulse_b, pulse_c, pulse_d)
+    field = ElectricField(pulses)
+
+    cfuv = get_carrier_freqs_uv(field.pulses)
+
+    # Uncomplicated function so not much to test
+    assert isinstance(cfuv, dict)
+    assert len(cfuv) == 4
+    assert cfuv[1] == 0.072
+    assert cfuv[2] == 0.144
+    assert cfuv[3] == 0.072
+    assert cfuv[4] == 0.0
 
 def test_find_epochs():
 
-    pass
+    # Simple four-pulse setup all at same time
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.144, id=2)
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=3)
+    pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.0, id=4)
+
+    pulses = (pulse_a, pulse_b, pulse_c, pulse_d)
+    field = ElectricField(pulses)
+
+    epochs_a = find_epochs(field)
+
+    # Should return one epoch with all pulses
+    assert epochs_a == [[1, 2, 3, 4]]
+
+    # New setup with more variation
+    pulse_a = EmPulse(env='gaussian', tc=10.0, dev=0.0, cf_uv=0.072, id=5)
+    pulse_b = EmPulse(env='gaussian', tc=50.0, dev=0.0, cf_uv=0.144, id=2)
+    pulse_c = EmPulse(env='gaussian', tc=50.0, dev=0.0, cf_uv=0.072, id=4)
+    pulse_d = EmPulse(env='gaussian', tc=100.0, dev=0.0, cf_uv=0.0, id=3)
+    pulse_e = EmPulse(env='gaussian', tc=100.0, dev=0.0, cf_uv=0.0, id=1)
+    pulse_f = EmPulse(env='gaussian', tc=100.0, dev=0.0, cf_uv=0.0, id=6)
+    pulse_g = EmPulse(env='gaussian', tc=100.00001, dev=0.0, cf_uv=0.0, id=7)
+
+    pulses = (pulse_a, pulse_e, pulse_c, pulse_b, pulse_d, pulse_f, pulse_g)
+    field = ElectricField(pulses)
+
+    epochs_b = find_epochs(field)
+
+    # Should return four epochs with p
+    assert epochs_b == [[5], [2, 4], [1, 3, 6], [7]]
+
+    # Nonzero tolerance for what is to be considered "simultaneous" or "same epoch" not yet supported
+    with pytest.raises(ValueError):
+        epochs_bogus = find_epochs(field, tol=0.0000001)
+
+    # Non-impulsive-tending pulse
+    with pytest.raises(AssertionError):
+        pulse_d = EmPulse(env='gaussian', tc=100.0, dev=2.0, cf_uv=0.0, id=3)
+        pulses = (pulse_a, pulse_e, pulse_c, pulse_b, pulse_d, pulse_f, pulse_g)
+        field = ElectricField(pulses)
+        epochs_bogus = find_epochs(field)
+
 
 def test_uv_cancels():
 
-    pass
+    # Simple example
+    cfs_uv = {1: 0.072, 2: 0.072}
 
-def test_dummy():
+    assert uv_cancels((1, -2), cfs_uv)
+    assert not uv_cancels((1, 2), cfs_uv)
 
-    evv_exp = ws_fixtures.evv_experiment_pulse_1_and_2_coincident()
+    # More involved situations
+    cfs_uv = {1: 0.072, 2: 0.072, 3: 0.144, 4: 0.072, 5: 0.036, 6: 0.035999, 7: 0.035999999999}
 
-    evv_exp = ws_fixtures.evv_experiment()
+    assert not uv_cancels((1, -3), cfs_uv)
+    assert uv_cancels((2, -3, 1), cfs_uv)
+    assert uv_cancels((-3, 2, 4), cfs_uv)
+    assert uv_cancels((5, -7), cfs_uv)
+    assert not uv_cancels((-5, 6), cfs_uv)
 
-    evv_exp = ws_fixtures.experiment_beta_alpha_cars()
+    # Difference small but above default 1e-10 tolerance
+    assert not uv_cancels((1, 2, -3, 4, -5, -6), cfs_uv)
 
-    print('relevant phase-matching conditions', evv_exp.relevant_phasematch)
-    print('interaction sequences', evv_exp.int_sequences)
-    print('independent variables', evv_exp.indep_vars)
-    print('valid axis combinations', evv_exp.valid_axis_combs)
-    print('canonical axes', evv_exp.canonical_axes)
+    # With raised tolerance, now accepted as cancelling
+    assert uv_cancels((1, 2, -3, 4, -5, -6), cfs_uv, tol=0.001)
 
-    for i in evv_exp.valid_axis_combs:
-        print('New axis combinations')
-        print(i.phasematch_cond)
-        for j in i.valid_axis_combs:
-            for k in j.axes:
-                print(k.label)
-                for m in k.var_set.var_set:
-                    print(m.pulse_refs)
-        print('For independent variables')
-        for j in i.ind_vars.var_set:
-            print(j.pulse_refs)
+    # Negative tolerance
+    with pytest.raises(ValueError):
+        bogus = uv_cancels((1, -2), cfs_uv, tol=-0.002)
 
 
-    pass
