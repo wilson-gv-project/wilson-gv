@@ -394,22 +394,112 @@ def test_vib_experiment():
     # NOTE: May revise result after unit tests for avg vector
     assert exp_a.polarization_avg_vector == [1.0, 1.0, 1.0]
 
-
     # Wrong data for VibExperiment
+    with pytest.raises(TypeError):
+        exp_bogus = VibExperiment(field='bogus', detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+
+    with pytest.raises(TypeError):
+        exp_a = VibExperiment(field=field_a, detector='bogus', scans=(scan_a,), magn_conditions=((-1, 2),), )
+
+    with pytest.raises(TypeError):
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=('bogus',), magn_conditions=((-1, 2),), )
+
+    with pytest.raises(TypeError):
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=([-1, 2],), )
 
     # Relevant phasematch all directions (no detector filter)
+    # NOTE: Currently raises assertion error because the interaction sequence finder is not set up to work with
+    # more than one phase-matching direction (and requires it to be specified in the detector)
+    with pytest.raises(AssertionError):
 
-    # Indeterminate dimensionality
+        detector_a = SpecDetector(detection_method='freq',
+                                       detector_location=(0.0, 0.0, 1.0),
+                                       detection_polarization=(1.0, 0.0, 0.0),
+                                       detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                       )
 
-    # Combinable: Different epochs (own test fn), int sequences, cfuv (own test fn),  indep vars, axis combs, canonical axes, polarization, polarization averaging vector
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
+    # More than one phase-matching direction in detector filter
+    with pytest.raises(AssertionError):
 
+        detector_a = SpecDetector(detection_method='freq',
+                                  detector_location=(0.0, 0.0, 1.0),
+                                  detection_polarization=(1.0, 0.0, 0.0),
+                                  detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                  wv_filter=[{1: -1, 2: 1, 3: 1}, {1: 1, 2: 1, 3: -1}])
 
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
+    # More exotic setup, testing some of the things that are changed compared to the previous
+    pulse_ir_3 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.0,
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=4)
 
+    pulse_uvvis_2 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=5)
 
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1, pulse_ir_3, pulse_uvvis_2)
 
-    pass
+    field_a = ElectricField(pulses)
+
+    detector_a = SpecDetector(detection_method='freq',
+                                   detector_location=(0.0, 0.0, 1.0),
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                   wv_filter=[{1: -1, 2: 1, 3: 1, 4: 1, 5:-1}])
+
+    # Scan IR pulse 1 carrier freq
+    scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = ScanObject('detector', 'detection_range', id=0, coeff=1.0)
+
+    # Scan a Raman-like freq. difference
+    # NOTE: Not decided yet if this kind of scan should be expressed as scanning cf or cf_uv for UV/VIS pulses
+    scan_obj_c = ScanObject('pulse', 'cf', id=3, coeff=0.5)
+    scan_obj_d = ScanObject('pulse', 'cf', id=5, coeff=-0.5)
+
+    scan_range_a = [0.0001 * i for i in range(101)]
+    scan_range_b = [0.0001 * i for i in range(101)]
+
+    scan_a = SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+    scan_b = SpecScan(scan_objs=(scan_obj_c, scan_obj_d, scan_obj_b), range=scan_range_b)
+
+    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a, scan_b))
+
+    # Three epochs
+    assert exp_a.epochs == [[1], [2], [3, 4, 5]]
+
+    # Six possible interaction sequences: All permutations of pulses 3, 4, 5
+    assert exp_a.int_sequences == [
+        ({1: -1}, {2: 1}, {3: 1}, {4: 1}, {5: -1}),
+        ({1: -1}, {2: 1}, {3: 1}, {5: -1}, {4: 1}),
+        ({1: -1}, {2: 1}, {4: 1}, {3: 1}, {5: -1}),
+        ({1: -1}, {2: 1}, {4: 1}, {5: -1}, {3: 1}),
+        ({1: -1}, {2: 1}, {5: -1}, {3: 1}, {4: 1}),
+        ({1: -1}, {2: 1}, {5: -1}, {4: 1}, {3: 1})
+    ]
+
+    # Pulses 3 and 5 have non-zero UV/VIS freq components
+    assert exp_a.cfuv == {1: 0.0, 2: 0.0, 3: 0.072, 4: 0.0, 5: 0.072}
+
+    # Independent variables: -w1, w2, w4, and - w5 + w3
+    assert len(exp_a.indep_vars) == 1
+    assert exp_a.indep_vars[0].var_groups[0].var_set[0].pulse_refs == (-1,)
+    assert exp_a.indep_vars[0].var_groups[0].var_set[1].pulse_refs == (2,)
+    assert exp_a.indep_vars[0].var_groups[0].var_set[2].pulse_refs == (4,)
+    assert exp_a.indep_vars[0].var_groups[0].var_set[3].pulse_refs == (-5, 3)
+
+    # Canonical axes: A: -w1, B: w2, C: w4, D: w3 - w5
+    assert len(exp_a.canonical_axes.axes) == 4
+    assert exp_a.canonical_axes.axes[0].label == 'A'
+    assert exp_a.canonical_axes.axes[0].var_set.var_set[0].pulse_refs == (-1,)
+    assert exp_a.canonical_axes.axes[1].label == 'B'
+    assert exp_a.canonical_axes.axes[1].var_set.var_set[0].pulse_refs == (2,)
+    assert exp_a.canonical_axes.axes[2].label == 'C'
+    assert exp_a.canonical_axes.axes[2].var_set.var_set[0].pulse_refs == (4,)
+    assert exp_a.canonical_axes.axes[3].label == 'D'
+    assert exp_a.canonical_axes.axes[3].var_set.var_set[0].pulse_refs == (-5, 3)
+
+    # FIXME: Add test for polarization avg vector once unit tests for that are finished
 
 def test_get_carrier_freqs_uv():
 

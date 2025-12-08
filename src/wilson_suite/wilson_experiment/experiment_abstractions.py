@@ -382,6 +382,7 @@ class VibExperiment:
                 if not isinstance(i, tuple):
                     raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
 
+
         from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
                                                                         find_indep_exp_variables, find_valid_axes,
                                                                         find_canonical_axes)
@@ -428,7 +429,10 @@ class VibExperiment:
         self.relevant_phasematch = relevant_phasematch
 
         # FIXME: Replace with try...except in case not sufficient data specified
-        self.dim = self.findDimensionality()
+        try:
+            self.dim = self.findDimensionality()
+        except AssertionError:
+            self.dim = None
 
         # Determine pulse "epochs" - i.e. disjoint (or taken to be disjoint) time partitions of the pulses
         self.epochs = find_epochs(self.field)
@@ -479,12 +483,21 @@ class VibExperiment:
         d = 0
         d += len(self.scans)
 
+        # Time or frequency series adds a dimension
         if self.detector.detection_method == 'time':
-            return d + 1
-        
+            if self.detector.detection_range is not None:
+                return d + 1
+
         elif self.detector.detection_method == 'freq':
             if self.detector.detection_range is not None:
                 return d + 1
+
+        # Integrated intensity does not add a dimension
+        elif self.detector.detection_method == 'int':
+            return d
+
+        else:
+            raise AssertionError('Cannot determine dimensionality: Unrecognized detection method')
 
         return d
     
@@ -531,8 +544,13 @@ class VibExperiment:
 
                             interactionRecurse(res, new_int, new_rem_wv, t, epochs)
 
+
+
         if self.detector.wv_filter is None:
             raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')
+
+        if len(self.detector.wv_filter) > 1:
+            raise AssertionError('Interaction sequence determination currently not supported for more than one phase-matching direction')
 
         int_sequences = []
         int_seed = []

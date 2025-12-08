@@ -556,8 +556,6 @@ def find_valid_axes_cfgs_for_one_phasematch(ind_vars: IndependentVariableChoices
             new_dress_v_a = {}
 
             for k in range(len(j)):
-                if k > 2:
-                    raise ValueError('Current version enables maximum 3 axes')
                 new_dress_v_a[cap_alpha_labels[k]] = j[k]
 
             dressed_valid_axes.append(copy.deepcopy(new_dress_v_a))
