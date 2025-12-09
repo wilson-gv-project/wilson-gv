@@ -129,9 +129,11 @@ def get_eval_ready_evv_terms():
     import wilson_suite as ws
 
     experiment_a = evv_experiment()
-    terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
 
-    return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
+    print('valid ax combs', experiment_a.valid_axis_combs[0])
+    print('len valid ax combs', len(experiment_a.valid_axis_combs[0].valid_axis_combs))
+    return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[0].valid_axis_combs[3])
 
 def get_terms_from_json():
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm

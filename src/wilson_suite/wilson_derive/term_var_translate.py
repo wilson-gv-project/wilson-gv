@@ -1,5 +1,6 @@
 import copy
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 
 
 def find_pulse_id_tuples_as_axis_vars(id_tuple: tuple, axes: dict):
@@ -102,16 +103,25 @@ def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_ax
 
 # FIXME: Currently translating only for resonance conditions: If later using non-static pol props, then may
 # need extra handling for UV parts of that? Not sure
-def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axes: dict) -> list[VibPerturbedTerm]:
+def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis_set: SpectralAxisSet) -> list[VibPerturbedTerm]:
     """
     Translate terms represented in terms of pulse IDs to be represented in terms of chosen axes
 
     terms: list of VibPerturbedTerm instances: The terms to be translated
-    chosen_axes: dictionary of {axis dummy label: list of independent variables in axis} pairs
+    chosen_axes: SpectralAxisSet instance: Choice of axes to which to translate
 
     Returns: translated_terms: list of VibPerturbedTerm instances: The terms thus translated
 
     """
+
+    # Translate chosen_axes to internal format
+    chosen_axes = {}
+    for i in chosen_axis_set.axes:
+        curr_vars = []
+        for j in i.var_set.var_set:
+            curr_vars.append(j.pulse_refs)
+
+        chosen_axes[i.label] = copy.deepcopy(curr_vars)
 
     # Walk through all terms and identify all pulse ID tuples used
     pulse_id_tuples = []

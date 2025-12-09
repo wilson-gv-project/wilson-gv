@@ -258,19 +258,17 @@ def test_fixt():
 
     experiment = evv_experiment()
     valid_axis_combs = experiment.valid_axis_combs
-    for i in valid_axis_combs:
-        print('ind vars?', i)
-        for omg in valid_axis_combs[i]:
-            print('axes_choice', omg)
-    print('\nexperiment.canonical_axes', experiment.canonical_axes)
-    print('\nchosen', experiment.valid_axis_combs[((-1,), (2,))][3], '\n')
 
     from ...amplitudes.spectrum_composition import SpectroscopicAxes
-    chosen_axes = experiment.valid_axis_combs[((-1,), (2,))][3]
+    chosen_axes = experiment.valid_axis_combs[0].valid_axis_combs[3]
     axs = []
-    for ax in chosen_axes:
+    for ax in chosen_axes.axes:
         # SpectroscopicAxis({ax:chosen_axes[ax]})
-        axis = SpectroscopicAxis(label=ax, indep_vars=tuple(chosen_axes[ax]))
+        curr_vars = []
+        for var in ax.var_set.var_set:
+            curr_vars.append(var.pulse_refs)
+
+        axis = SpectroscopicAxis(label=ax.label, indep_vars=tuple(curr_vars))
         axs.append(axis)
         print(axis, hash(axis))
     spec_axes = SpectroscopicAxes(tuple(axs))
@@ -286,11 +284,15 @@ def test_compute_res_condition():
     experiment = evv_experiment()
 
     from ...amplitudes.spectrum_composition import SpectroscopicAxes
-    chosen_axes = experiment.valid_axis_combs[((-1,), (2,))][3]
+    chosen_axes = experiment.valid_axis_combs[0].valid_axis_combs[3]
     axs = []
-    for ax in chosen_axes:
+    for ax in chosen_axes.axes:
         # SpectroscopicAxis({ax:chosen_axes[ax]})
-        axis = SpectroscopicAxis(label=ax, indep_vars=tuple(chosen_axes[ax]))
+        curr_vars = []
+        for var in ax.var_set.var_set:
+            curr_vars.append(var.pulse_refs)
+
+        axis = SpectroscopicAxis(label=ax.label, indep_vars=tuple(curr_vars))
         axs.append(axis)
         print(axis, hash(axis))
     
