@@ -38,7 +38,7 @@ def evv_experiment() -> ws_experiment.experiment_abstractions.VibExperiment:
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a), magn_conditions=((-1, 2),),)
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
 def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
@@ -71,7 +71,7 @@ def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstra
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a), magn_conditions=((-1, 2),),)
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
 def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
@@ -111,7 +111,7 @@ def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExp
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a))
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
 def evv_terms() -> list[VibPerturbedTerm]:
     """
@@ -134,7 +134,7 @@ def get_eval_ready_evv_terms():
     return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
 
 def get_terms_from_json():
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
     return VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
 
