@@ -1,13 +1,11 @@
 import pytest
 
-from wilson_suite.wilson_derive.vib_rsp_sos import (PolPropSOSRecursion, RspTermSOSRecursion, get_vib_sos,
+from wilson_suite.wilson_derive.vib_rsp_sos import (get_vib_sos,
                                                     make_op_sel_set, get_op_combs_rec_t, vib_contribs_abstract)
+from wilson_suite.wilson_derive.abstractions import PolPropSOSRecursion
+
 
 def test_pol_prop_sos_recursion():
-
-    pass
-
-def test_rsp_term_sos_recursion():
 
     pass
 

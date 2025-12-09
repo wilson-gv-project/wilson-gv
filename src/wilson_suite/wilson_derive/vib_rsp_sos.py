@@ -1,103 +1,11 @@
-from .abstractions import VibDiffTerm, ResonanceCondition, VibContribTerm, PolProp, TransitionIntegral, QOperator, VibStateSymbolic
+from .abstractions import VibDiffTerm, ResonanceCondition, PolProp, TransitionIntegral, QOperator, VibStateSymbolic, \
+    PolPropSOSRecursion
+from .response_terms import VibContribTerm, RspTermSOSRecursion
 from fractions import Fraction
 import itertools
 import copy
 
-# FIXME: The functionality in this file needs a refactoring/cleanup
-
-class PolPropSOSRecursion:
-    """
-    (Electronic) polarization property for use in SOS recursion
-    """
-
-    # Takes set of operators, bra and ket vibrational states left and right
-    def __init__(self, order: int, left, right):
-        """
-        order: Integer: Order of property
-        left: VibStateSymbolic: Bra state of integral
-        right: VibStateSymbolic: Ket state of integral
-        """
-
-        # Integer: order of property
-        self.order = order
-        self.left = left
-        self.right = right
-
-        # FIXME: Is omega here vestigial?
-        self.omega = 1
-
-        # Operators associated with self
-        self.ops = []
-
-    def addOperator(self, op):
-        """
-        Add operator
-
-        op: QOperator: The operator to be added
-        """
-        self.ops.append(op)
-
-    def present(self):
-        """
-        Formatted printing of own attributes
-        """
-
-        if self.omega:
-            print('('  + str(self.order + 1) + ')' +  ' ' + self.left.s + ',' + self.right.s + ' (a)')
-
-        else:
-            print('(' + str(self.order) + ')' + ' ' + self.left.s + ',' + self.right.s)
-
-        print('Operators:', [i.o for i in self.ops])
-
-
-class RspTermSOSRecursion:
-    """
-    Auxiliary class to represent a response function term undergoing recursion (only used during this recursion)
-    FIXME: This class is possibly redundant and replacement with VibContribTerm can be considered
-    """
-
-    def __init__(self, a: list, rsp_omega: PolPropSOSRecursion, b: list, freq: list, k: list):
-        """
-        a: List: Integrals to the left of the integral containing the "omega" operator
-        rsp_omega: PolPropSOSRecursion instance denoting the integral containing the
-        operator coupling to the detected field
-        b: List: Integrals to the right of the integral containing the "omega" operator
-        freq: List of (dummy) frequency arguments denoting the n-th interaction with the field
-        k: List: Integral operator order argument (for combinatorics summation) FIXME: Possibly outdated
-        """
-
-        self.a = a
-        self.rsp_omega = rsp_omega
-        self.b = b
-        self.freq = freq
-        self.k = k
-
-        # Power of 1/hbar
-        self.hbar = 0
-
-        # Coefficient of self
-        self.coeff = 1
-
-    def present(self):
-        """
-        Formatted printing of own attributes
-        """
-
-        print('Overall coefficient', self.coeff)
-
-        for i in self.a:
-            i.present()
-
-        self.rsp_omega.present()
-
-        for i in self.b:
-            i.present()
-
-        for i in self.freq:
-            i.present()
-
-
+# FIXME: The functionality in this file needs a refactoring/cleanup (UPDATE DEC 2025: Moved classes to separate files)
 
 def vib_contribs_abstract(maxord: int, states: list[VibStateSymbolic], ops: tuple[QOperator, ...]) -> list:
     """

@@ -1,5 +1,6 @@
 import copy
-from .abstractions import PolProp, VibStateSymbolic, TransitionIntegral, VibDiffTerm, VibContribTerm
+from .abstractions import PolProp, VibStateSymbolic, TransitionIntegral, VibDiffTerm
+from .response_terms import VibContribTerm
 from fractions import Fraction
 
 # TODO: Implement arbitrary-order electrical/mechanical expansion

@@ -46,7 +46,7 @@ def generate_props_data_Nmodes(N_modes):
             }
 
 def get_data_evaluators_tests() -> dict:
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from ....wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.fixtures import get_terms_from_json
     terms_fuller_flat = get_terms_from_json()
 

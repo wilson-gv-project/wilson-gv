@@ -1,5 +1,5 @@
 from . import wilson_derive as ws_derive
-from .wilson_derive.abstractions import VibPerturbedTerm
+from .wilson_derive.response_terms import VibPerturbedTerm
 from . import wilson_experiment as ws_experiment
 
 import logging

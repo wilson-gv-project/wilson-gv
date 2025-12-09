@@ -5,6 +5,7 @@ import pickle
 import os.path
 from rich.pretty import pprint
 
+import wilson_suite.wilson_derive.response_terms
 from ..wilson_derive import abstractions as wd_abst
 from ..wilson_experiment import experiment_abstractions as we_abst
 
@@ -37,7 +38,7 @@ def get_EVV_derived_terms():
 
         pprint(flat_derived_terms)
 
-        pprint([i for i in dir(wd_abst.VibPerturbedTerm) if '__' not in i])
+        pprint([i for i in dir(wilson_suite.wilson_derive.response_terms.VibPerturbedTerm) if '__' not in i])
 
         pprint(flat_derived_terms[0].__dict__)
 
@@ -82,7 +83,7 @@ def evv_experiment() -> we_abst.VibExperiment:
     experiment_a = we_abst.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
     return experiment_a
 
-def evv_terms() -> list[wd_abst.VibPerturbedTerm]:
+def evv_terms() -> list[wilson_suite.wilson_derive.response_terms.VibPerturbedTerm]:
     """
     Returns EVV terms derived with wilson_derive
     """

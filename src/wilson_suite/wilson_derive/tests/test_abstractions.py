@@ -1,8 +1,7 @@
 import pytest
 
 from wilson_suite.wilson_derive.abstractions import (QOperator, HarmOscStateSymbolic, VibStateSymbolic, PolProp,
-                                                     VibDiffTerm, ResonanceCondition, VibPerturbedTerm,
-                                                     TransitionIntegral, VibContribTerm, LineShape)
+                                                     VibDiffTerm, ResonanceCondition, TransitionIntegral, LineShape)
 
 def test_q_operator():
 
@@ -28,15 +27,7 @@ def test_resonance_condition():
 
     pass
 
-def test_vib_perturbed_term():
-
-    pass
-
 def test_transition_integral():
-
-    pass
-
-def test_vib_contrib_term():
 
     pass
 

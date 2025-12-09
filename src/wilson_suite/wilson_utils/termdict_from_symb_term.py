@@ -1,4 +1,4 @@
-from ..wilson_derive.abstractions import VibPerturbedTerm
+from ..wilson_derive.response_terms import VibPerturbedTerm
 from ..wilson_utils.prop_trivname import prop_trivname
 
 def state_list_to_str(stl: list):

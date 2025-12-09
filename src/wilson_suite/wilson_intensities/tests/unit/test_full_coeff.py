@@ -1,6 +1,6 @@
 import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, PropsCollection, EvaluationDataAndConfigs
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_main.abstractions import MolPropsCollection, MolecularProperty
 import pytest
 import numpy as np

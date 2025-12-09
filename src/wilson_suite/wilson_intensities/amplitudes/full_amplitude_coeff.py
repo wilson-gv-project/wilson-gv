@@ -8,8 +8,7 @@ import copy
 
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, EvaluationDataAndConfigs, FreqTermsCollection
 if TYPE_CHECKING:
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 
 """
 Extra info on top of VibPerturbedTerm and its components:
