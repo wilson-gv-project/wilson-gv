@@ -244,7 +244,10 @@ def get_vib_sos(op_omega: QOperator, ops: tuple[QOperator, ...], maxord: int, st
             # Resonance conditions
             for m in range(len(R[maxord][i].freq)):
                 one_new_res = copy.deepcopy(R[maxord][i].freq[m])
-                one_new_res.permute(freq_mask)
+                # NOTE: There used to be a call to make permutation (according to freq_mask) leading to a method
+                # that did nothing - it is assumed to be out of date (likely about permutation with respect to
+                # dummy interaction indices which does not seem necessary with the now explicit reference to pulses).
+                # Have removed the method but keep this comment for reference until fully settled.
                 new_res.append(one_new_res)
 
             R_vibContrib.append(VibContribTerm(

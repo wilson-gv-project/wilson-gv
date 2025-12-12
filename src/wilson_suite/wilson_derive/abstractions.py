@@ -1,36 +1,47 @@
 import copy
 
+from dataclasses import dataclass
 
+@dataclass
 class QOperator:
     """
     Quantum-mechanical operator denoting an interaction with the field
+
+    o: Operator label (integer)
+
+    The next arguments are optional since derivations may be carried out without their specification and generating
+    the specific terms arising from a choice of multipole expansion regime can be carried out at a later stage
+    (avoiding repetitive derivations of similarly structured terms)
+
+    op_type: String (default None): Optional specification of operator type
+    ax: Tuple of integers (default None): Optional specification of Cartesian axis composition of operator (for the
+    electric dipole operator, this would be (3,), while for e.g. the electric quadrupole operator, this would
+    be (3, 3))
     """
 
-    def __init__(self, o: int, op_type: str=None, ax: tuple=None):
-        """
-        o: Operator label (integer)
+    o: int
+    op_type: str = None
+    ax: tuple = None
 
-        The next arguments are optional since derivations may be carried out without their specification and generating
-        the specific terms arising from a choice of multipole expansion regime can be carried out at a later stage
-        (avoiding repetitive derivations of similarly structured terms)
+    def __post_init__(self):
 
-        op_type: String (default None): Optional specification of operator type
-        ax: Tuple (default None): Optional specification of Cartesian axis composition of operator (for the
-        electric dipole operator, this would be (3,), while for e.g. the electric quadrupole operator, this would
-        be (3, 3))
-        """
-
-        if not(isinstance(o, int)):
+        if not(isinstance(self.o, int)):
             raise TypeError('All operator labels in qOperator must be integers')
 
-        self.o = o
+        if self.op_type is not None:
+            if not(isinstance(self.op_type, str)):
+                raise TypeError('Operator type argument must be string if specified')
 
-        self.op_type = op_type
-        self.ax = ax
+        if self.ax is not None:
+            if not(isinstance(self.ax, tuple)):
+                raise TypeError('Axis argument must, if specified, be a tuple of integers')
+            else:
+                for i in self.ax:
+                    if not isinstance(i, int):
+                        raise TypeError('Axis argument must, if specified, be a tuple of integers')
 
     def __repr__(self):
         return f'QOperator(o = {self.o}, op_type = {self.op_type}, ax = {self.ax})'
-
     def __hash__(self):
         return hash( ( self.o, self.op_type, self.ax ) )
     def __eq__(self, other):
@@ -38,32 +49,6 @@ class QOperator:
             return self.o == other.o and self.ax == other.ax and self.op_type == other.op_type
         return False
     
-    def to_latex(self):
-        return
-    
-    def setOperatorType(self, op_type: str, ax: tuple):
-        """
-        Set the operator type with associated axis argument. See __init__ for argument explanation
-        """
-
-        self.op_type = op_type
-        self.ax = ax
-
-    def permute(self, mask):
-        """
-        Permutation function: Change operator labels according to permutation mask
-        Currently unimplemented/not needed
-        """
-        pass
-
-    def h(self):
-        """
-        Hash function
-        """
-
-        return hash( ( self.o, self.op_type, self.ax ) )
-
-
 class HarmOscStateSymbolic:
     """
     Symbol-described harmonic oscillator state class
@@ -76,6 +61,17 @@ class HarmOscStateSymbolic:
         One-quantum b: q = ['b']
         Three-quantum a,a,b: q = ['a', 'a', 'b']
         """
+
+        if not isinstance(q, list):
+            raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
+
+        for i in q:
+
+            if not isinstance(i, str):
+                raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
+
+            if not len(i) == 1:
+                raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
 
         # Sort
         self.q = sorted(q)
@@ -101,9 +97,21 @@ class VibStateSymbolic:
         is_ground: Is this state always the ground vibrational state?
         """
 
-        # FIXME: May add test to verify that s is hashable because it needs to be
+        try:
+            h = hash(s)
+        except TypeError:
+            raise TypeError('State label must be hashable')
+
         self.s = s
+
+        if not isinstance(mbu, list):
+            raise TypeError('Must-be-unequal argument must be a list')
+
         self.mbu = mbu
+
+        if not isinstance(is_ground, bool):
+            raise TypeError('The is_ground argument must be a Boolean')
+
         self.is_ground = is_ground
 
     def mbuFulfilled(self, states_as_quanta: dict) -> bool:
@@ -156,10 +164,12 @@ class VibDiffTerm:
         self.sl = sl
         self.sr = sr
 
+        if not isinstance(is_pert_wf_diff, bool):
+            raise TypeError('is_pert_wf_diff must be a Boolean')
+
         self.is_pert_wf_diff = is_pert_wf_diff
 
     def __repr__(self):
-        # return f'VibDiffTerm(sl = {self.sl}, sr = {self.sr}, is_pert_wf_diff = {self.is_pert_wf_diff})'
         return f'[sl={self.sl}, sr={self.sr}], pert_wf={str(self.is_pert_wf_diff)[0]}'
 
     def __hash__(self):
@@ -214,9 +224,9 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list[str]=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
         """
-        diff: VibDiffTerm instance: State energy level difference
+        diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic
         pf: Perturbing field frequency labels (their sum to be subtracted when evaluating)
         id: Optional integer id term for potential later handling of grouped
         resonance conditions in lineshape evaluation
@@ -224,11 +234,30 @@ class ResonanceCondition:
 
         # Energy difference
         if not(isinstance(diff, VibDiffTerm)):
-            raise TypeError('The energy difference must be a VibDiffTerm instance')
+            raise TypeError('The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
+        else:
+            if not isinstance(diff.sl, HarmOscStateSymbolic):
+                raise TypeError(
+                    'The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
+
+            if not isinstance(diff.sl, HarmOscStateSymbolic):
+                raise TypeError(
+                    'The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
 
         self.diff = diff
 
+        if not isinstance(pf, list):
+            raise TypeError('Perturbing frequency labels must be list of strings or integers')
+        for i in pf:
+            if not (isinstance(i, str) or isinstance(i, int)):
+                raise TypeError('Perturbing frequency labels must be list of strings or integers')
+
         self.pf = pf
+
+        if id is not None:
+            if not isinstance(id, int):
+                raise TypeError('Optional identifier must, if specified, be an integer')
+
         self.id = id
 
     @classmethod
@@ -264,17 +293,6 @@ class ResonanceCondition:
         upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in self.pf]
         return rf'(\omega_{{{self.diff.to_latex()}}} {''.join(upd_pf_sign)})'
 
-    def permute(self, mask: dict):
-        """
-        Permute frequency labels according to mask
-        FIXME: May not currently be needed (previously permuted dummy labels)
-
-        mask: Dictionary {label from: label to}
-        """
-
-        for i in range(len(self.pf)):
-            self.pf[i] = mask[self.pf[i]]
-
     def h(self) -> int:
         """
         Hashing function
@@ -307,8 +325,6 @@ class ResonanceCondition:
         instead_trimmed (default None): Instead evaluate wrt. a trimmed resonance (trimmed according to
         other known information about equivalences)
         """
-
-
         if instead_trimmed is None:
 
             q_bra_net = copy.deepcopy(self.diff.sl.q)
@@ -434,15 +450,23 @@ class ResonanceCondition:
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
-        Return False if this is definitely not possible.
+        Return False if this is definitely not possible. Clarification: Returns True if answer is indeterminate
+        (i.e. "If I can't find a definite 'no' I will return 'yes'" since it as far as I can tell is still possible)
 
-        magn_conditions: List [[A = signed freq i, B = signed freq j], ...] signifying that
-        B - A > 0
+        magn_conditions: List [[A = signed freq i, B = signed freq j, ...],
+                               [C = signed freq k, ...],
+                                ...], signifying that
+                         A + B + ... > 0 (by a significant margin)
+                         C + ... > 0 (ibid.)
+                         ...
+
+        A "significant margin" is here not unambiguous, but one useful definition can be "greater than the longest
+        distance where the lineshape is visible around a lineshape"
 
         prev_res (default: None): List of ResonanceCondition instances telling (if any) the preceding
         resonance condition to be satisfied
 
-        This routing could be extended as follows:
+        This routine could be extended as follows:
         TODO: Can also combine with freq ranges (first rm according to conditions and then actual ranges for remaining?)
         TODO: For now just walk through conditions. Later, apply all combinations of conditions
         to exhaust opportunities for eliminating all
@@ -458,7 +482,6 @@ class ResonanceCondition:
         if prev_res is not None:
 
             all_in = True
-            any_in = False
 
             for i in prev_res.diff.sl.q:
                 if not(i in diff_test.sl.q):
@@ -485,14 +508,14 @@ class ResonanceCondition:
                     pf_test.remove(i)
 
 
-        # Start off sign as indeterminate
+        # Start off sign as unset
         pf_overall_sign = None
 
         for i in magn_conditions:
 
             rmd = False
 
-            # Try one way, if match then rm and store sign, if no match then try other way
+            # Try one way (pulse signs as given), if match then rm and store sign, if no match then try other way
             match = True
             for j in i:
                 if match:
@@ -504,14 +527,21 @@ class ResonanceCondition:
                     pf_test.remove(j)
                 rmd = True
 
-                # Setting for first time
+                # Setting for first time. Note that this overall sign includes the convention
+                # that perturbing frequencies in a resonance condition are subtracted from the state energy
+                # level differences. Example:
+                # magn_conditions is [[-1, 2]] (i.e. -w1 + w2 > 0)
+                # pf is [-1, 2]
+                # Therefore, pf_overall_sign is -1 (subtracting something known to be positive)
                 if pf_overall_sign is None:
                     pf_overall_sign = -1
 
-                # Conflicting with earlier condition so return
-                elif pf_overall_sign == -1:
+                # Conflicting with earlier condition so return True (cannot rule out resonance)
+                elif pf_overall_sign == 1:
                     return True
 
+            # If condition not recognized first way, try the other way
+            # (opposite pulse signs, condition is now < 0 instead of > 0).
             if not rmd:
 
                 match = True
@@ -522,37 +552,67 @@ class ResonanceCondition:
                 if match:
                     for j in i:
                         pf_test.remove(-1 * j)
-                    rmd = True
 
-                    # Setting for first time
+                    # Setting for first time (opposite sign since other way)
                     if pf_overall_sign is None:
                         pf_overall_sign = 1
 
-                    # Conflicting with earlier condition so return
+                    # Conflicting with earlier condition so return True
                     elif pf_overall_sign == -1:
                         return True
 
-        res_sgn = None
-        if (len(pf_test) == 1):
-            res_sgn = (pf_test[0] < 0) - (pf_test[0] > 0)
+        # Reaching this point of the routine means that all (if any) magnitude conditions that were met
+        # were found to point to the same sign (and we have removed the corresponding pulse references from pf_test
+        # Therefore, pf_test contains all "residual" pulse references (if any) for which the magnitude conditions could
+        # not be used to determine a sign. Under the assumption that unsigned frequency ranges are always positive
+        # (i.e. a reference to w_i is always positive, while a reference to -w_i is always negative), then,
+        # if these remaining pulse references all have the same sign, and if either a) no magnitude conditions were
+        # applied or b) the overall sign as determined by the magnitude conditions corresponds to the sign of these
+        # remaining pulses, then we can determine an overall sign for the full collection of perturbing frequencies.
 
+        # Initialize "sign of residual pulse references" as unset
+        res_sgn = None
+
+        # Find out if all residual pulse references have the same sign and if so, which
+        if (len(pf_test) > 0):
+            for i in pf_test:
+                res_sgn_i = (i < 0) - (i > 0)
+
+                # Setting for the first time
+                if res_sgn is None:
+                    res_sgn = res_sgn_i
+
+                # If the current sign does not match previous signs, return True (cannot rule out resonance)
+                elif not(res_sgn_i == res_sgn):
+                    return True
+
+        # This means no perturbing frequencies: Should not be encountered in practice but included for completeness
+        # Returning True (cannot rule out resonance) to be on the safe side even though resonance could
+        # in fact then frequently be ruled out
         if res_sgn is None and pf_overall_sign is None:
             return True
 
         else:
+            # If no magnitude conditions applied, set sign to residual sign
             if pf_overall_sign is None:
                 pf_overall_sign = res_sgn
+
             else:
+                # If magnitude conditions applied and a residual sign was determined, they need to match in order
+                # for resonance to be possible to rule out
                 if res_sgn is not None:
                     if not res_sgn == pf_overall_sign:
                         return True
 
+        # Get sign of state energy level difference
         sd_overall_sign = self.netStateSign(instead_trimmed=diff_test)
 
         # Special flag for indeterminate sign
         if sd_overall_sign == -3:
             return True
 
+        # State energy level difference sign and perturbing frequencies must be opposite in order for
+        # resonance to be possible
         if sd_overall_sign == -1:
             if pf_overall_sign == 1:
                 return True
@@ -718,6 +778,52 @@ class PolProp:
         return rf'\frac{{{num_denom[0]}}}{{{num_denom[1]}}}'
 
 
+class PolPropSOSRecursion:
+    """
+    (Electronic) polarization property for use in SOS recursion
+    """
+
+    # Takes set of operators, bra and ket vibrational states left and right
+    def __init__(self, order: int, left, right):
+        """
+        order: Integer: Order of property
+        left: VibStateSymbolic: Bra state of integral
+        right: VibStateSymbolic: Ket state of integral
+        """
+
+        # Integer: order of property
+        self.order = order
+        self.left = left
+        self.right = right
+
+        # FIXME: Is omega here vestigial?
+        self.omega = 1
+
+        # Operators associated with self
+        self.ops = []
+
+    def addOperator(self, op):
+        """
+        Add operator
+
+        op: QOperator: The operator to be added
+        """
+        self.ops.append(op)
+
+    def present(self):
+        """
+        Formatted printing of own attributes
+        """
+
+        if self.omega:
+            print('('  + str(self.order + 1) + ')' +  ' ' + self.left.s + ',' + self.right.s + ' (a)')
+
+        else:
+            print('(' + str(self.order) + ')' + ' ' + self.left.s + ',' + self.right.s)
+
+        print('Operators:', [i.o for i in self.ops])
+
+
 class TransitionIntegral:
     """
     Transition integral class
@@ -774,47 +880,3 @@ class TransitionIntegral:
         self.prop.present()
 
 
-class PolPropSOSRecursion:
-    """
-    (Electronic) polarization property for use in SOS recursion
-    """
-
-    # Takes set of operators, bra and ket vibrational states left and right
-    def __init__(self, order: int, left, right):
-        """
-        order: Integer: Order of property
-        left: VibStateSymbolic: Bra state of integral
-        right: VibStateSymbolic: Ket state of integral
-        """
-
-        # Integer: order of property
-        self.order = order
-        self.left = left
-        self.right = right
-
-        # FIXME: Is omega here vestigial?
-        self.omega = 1
-
-        # Operators associated with self
-        self.ops = []
-
-    def addOperator(self, op):
-        """
-        Add operator
-
-        op: QOperator: The operator to be added
-        """
-        self.ops.append(op)
-
-    def present(self):
-        """
-        Formatted printing of own attributes
-        """
-
-        if self.omega:
-            print('('  + str(self.order + 1) + ')' +  ' ' + self.left.s + ',' + self.right.s + ' (a)')
-
-        else:
-            print('(' + str(self.order) + ')' + ' ' + self.left.s + ',' + self.right.s)
-
-        print('Operators:', [i.o for i in self.ops])

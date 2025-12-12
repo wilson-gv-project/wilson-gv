@@ -262,7 +262,7 @@ class EmPulse:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
 
-
+# FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
 def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
