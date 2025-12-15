@@ -120,26 +120,6 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
                                                                grid_resolution=spec_eval_setup.ev_info.grid_resolution, return_type='grid')
 
 
-    # feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
-    # domains = domfuncs.features_to_clusters(features=feat_all)
-    # formal_domains = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]])) for d in domains]
-    
-    # for domain in formal_domains:
-    #     domain.box = domain.box.intersect(spec_window_with_features.box)
-    
-    # coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
-    
-    # subgrids = domfuncs.cut_grid_with_coords_nd(full_meshgrids=spec_grid, 
-    #                                             axis_coords=coords_vectors,
-    #                                             domains=formal_domains)
-    
-    # # modifies spec_grid dict
-    # domfuncs.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values())) # upd result_func
-
-    # grid_values_all_domains = spec_grid['result']
-
-
-
     return grid_values_all_domains
 
 
