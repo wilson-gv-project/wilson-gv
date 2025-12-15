@@ -111,23 +111,33 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
 
     spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
     
-    feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
-    domains = domfuncs.features_to_clusters(features=feat_all)
-    formal_domains = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]])) for d in domains]
-    
-    for domain in formal_domains:
-        domain.box = domain.box.intersect(spec_window_with_features.box)
-    
-    coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
-    
-    subgrids = domfuncs.cut_grid_with_coords_nd(full_meshgrids=spec_grid, 
-                                                axis_coords=coords_vectors,
-                                                domains=formal_domains)
-    
-    # modifies spec_grid dict
-    domfuncs.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values())) # upd result_func
+    #### <--- SpectralEvaluator.evaluate_spectrum
 
-    grid_values_all_domains = spec_grid['result']
+    from .grid_manager_evaluator import SpectralEvaluator
+
+    spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=4.2) # FIXME gamma value type
+    grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=spec_window_with_features, 
+                                                               grid_resolution=spec_eval_setup.ev_info.grid_resolution, return_type='grid')
+
+
+    # feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
+    # domains = domfuncs.features_to_clusters(features=feat_all)
+    # formal_domains = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]])) for d in domains]
+    
+    # for domain in formal_domains:
+    #     domain.box = domain.box.intersect(spec_window_with_features.box)
+    
+    # coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
+    
+    # subgrids = domfuncs.cut_grid_with_coords_nd(full_meshgrids=spec_grid, 
+    #                                             axis_coords=coords_vectors,
+    #                                             domains=formal_domains)
+    
+    # # modifies spec_grid dict
+    # domfuncs.insert_results_to_grid_nd(spec_grid, subgrids, result_func=lambda sg: sum(sg.values())) # upd result_func
+
+    # grid_values_all_domains = spec_grid['result']
+
 
 
     return grid_values_all_domains
@@ -305,8 +315,11 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             # disregard locations where coefficient is zero
             if amplitude_coeff != 0.:
                 spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=tuple([TermParametersChoice(terms=tuple(terms_for_motifs[res_motif]),
-                                                                                    states_parameters=lst_params)]),
+                                            # term_contributions=tuple([TermParametersChoice(terms=tuple(terms_for_motifs[res_motif]),
+                                            #                                         states_parameters=lst_params)]),
+                                            term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
+                                                                                           states_parameters=lst_params, 
+                                                                                           term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )]),
                                             lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
                                             amplitude_coeff=amplitude_coeff)
                 if spec_feature not in features_to_draw:

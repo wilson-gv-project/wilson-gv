@@ -270,6 +270,7 @@ class EvaluationInfo:
 	spec_result: np.ndarray | dict = None
 	margins: dict = None
 	spectral_window: SpectralWindow = None
+	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
 
 	@property
 	def spec_window_bounds(self):
