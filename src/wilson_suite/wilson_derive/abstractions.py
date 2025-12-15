@@ -446,12 +446,19 @@ class ResonanceCondition:
             return False
 
     # FIXME: Functionality not general yet
-    def couldBeResonantWithFieldByConditions(self, magn_conditions: list, prev_res=None):
+    def couldBeResonantWithFieldByConditions(self, magn_conditions: list, given_prev_res=None):
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
-        Return False if this is definitely not possible. Clarification: Returns True if answer is indeterminate
-        (i.e. "If I can't find a definite 'no' I will return 'yes'" since it as far as I can tell is still possible)
+        Return False only if this is definitely not possible.
+
+        Clarification: Returns True if answer is indeterminate or if arguments were not of the required form, or if
+        the present instance's "pf" argument is not given in terms of (signed integer) pulse references
+        (i.e. "If I can't find a definite 'no' I will return 'yes'" since it as far as I can tell resonance
+        is still possible)
+
+        Optionally, with the given_prev_res argument specified, determine the answer to the same question as above
+        given that the resonance condition given by given_prev_res was satisfied.
 
         magn_conditions: List [[A = signed freq i, B = signed freq j, ...],
                                [C = signed freq k, ...],
@@ -463,14 +470,41 @@ class ResonanceCondition:
         A "significant margin" is here not unambiguous, but one useful definition can be "greater than the longest
         distance where the lineshape is visible around a lineshape"
 
-        prev_res (default: None): List of ResonanceCondition instances telling (if any) the preceding
-        resonance condition to be satisfied
+        given_prev_res (default: None): ResonanceCondition instance telling (if any) the preceding
+        resonance condition that was satisfied. Optional argument which will then adapt the functionining of this
+        method as described at the beginning of this documentation string.:
+        If the contents of given_prev_res for each attribute are a subset of the present instance,
+        then these respective parts can be trimmed from the present instance and the resonance possibility determined
+        (in the same way) with respect to the trimmed condition.
 
         This routine could be extended as follows:
         TODO: Can also combine with freq ranges (first rm according to conditions and then actual ranges for remaining?)
-        TODO: For now just walk through conditions. Later, apply all combinations of conditions
+        TODO: For now just walking through conditions. Later, could apply all combinations of conditions
         to exhaust opportunities for eliminating all
         """
+
+        # Catching if perturbing frequencies not specified as (signed integer) pulse references and returning True
+        # (cannot rule out resonance)
+        # This functionality currently not supported for other specifications of perturbing freqs. (e.g. axis labels)
+        # This is not currently a hindrance to the overall functioning because this method is currently invoked
+        # while perturbing freqs. are still specified in terms of pulse references
+        for i in self.pf:
+            if not isinstance(i, int):
+                return True
+
+        # Corresponding catch for magnitude conditions: A usable magnitude conditions set must be
+        # a list of lists of (signed integer) pulse references; otherwise, return True (cannot rule out resonance)
+        for i in magn_conditions:
+            if not isinstance(i, list):
+                return True
+            for j in i:
+                if not isinstance(j, int):
+                    return True
+
+        # If prev_res is not a ResonanceCondition instance, it cannot be used so return True (cannot rule out resonance)
+        if given_prev_res is not None:
+            if not isinstance(given_prev_res, ResonanceCondition):
+                return True
 
         # Use conditions to trim blocks of definite sign
         # If all blocks are rmvd, see if results point to definite overall sign
@@ -479,32 +513,31 @@ class ResonanceCondition:
         diff_test  = copy.deepcopy(self.diff)
 
         # For now simply trim last resonance from present
-        if prev_res is not None:
+        if given_prev_res is not None:
 
             all_in = True
 
-            for i in prev_res.diff.sl.q:
+            for i in given_prev_res.diff.sl.q:
                 if not(i in diff_test.sl.q):
                     all_in = False
 
-            for i in prev_res.diff.sr.q:
+            for i in given_prev_res.diff.sr.q:
                 if not(i in diff_test.sr.q):
                     all_in = False
 
-            # This test possibly redundant
-            for i in prev_res.pf:
+            for i in given_prev_res.pf:
                 if not(i in pf_test):
                     all_in = False
 
             if all_in:
 
-                for i in prev_res.diff.sl.q:
+                for i in given_prev_res.diff.sl.q:
                     diff_test.sl.q.remove(i)
 
-                for i in prev_res.diff.sr.q:
+                for i in given_prev_res.diff.sr.q:
                     diff_test.sr.q.remove(i)
 
-                for i in prev_res.pf:
+                for i in given_prev_res.pf:
                     pf_test.remove(i)
 
 
@@ -513,53 +546,55 @@ class ResonanceCondition:
 
         for i in magn_conditions:
 
-            rmd = False
+            if len(i) > 0:
 
-            # Try one way (pulse signs as given), if match then rm and store sign, if no match then try other way
-            match = True
-            for j in i:
-                if match:
-                    if j not in pf_test:
-                        match = False
+                rmd = False
 
-            if match:
-                for j in i:
-                    pf_test.remove(j)
-                rmd = True
-
-                # Setting for first time. Note that this overall sign includes the convention
-                # that perturbing frequencies in a resonance condition are subtracted from the state energy
-                # level differences. Example:
-                # magn_conditions is [[-1, 2]] (i.e. -w1 + w2 > 0)
-                # pf is [-1, 2]
-                # Therefore, pf_overall_sign is -1 (subtracting something known to be positive)
-                if pf_overall_sign is None:
-                    pf_overall_sign = -1
-
-                # Conflicting with earlier condition so return True (cannot rule out resonance)
-                elif pf_overall_sign == 1:
-                    return True
-
-            # If condition not recognized first way, try the other way
-            # (opposite pulse signs, condition is now < 0 instead of > 0).
-            if not rmd:
-
+                # Try one way (pulse signs as given), if match then rm and store sign, if no match then try other way
                 match = True
                 for j in i:
                     if match:
-                        if -1 * j not in pf_test:
+                        if j not in pf_test:
                             match = False
+
                 if match:
                     for j in i:
-                        pf_test.remove(-1 * j)
+                        pf_test.remove(j)
+                    rmd = True
 
-                    # Setting for first time (opposite sign since other way)
+                    # Setting for first time. Note that this overall sign includes the convention
+                    # that perturbing frequencies in a resonance condition are subtracted from the state energy
+                    # level differences. Example:
+                    # magn_conditions is [[-1, 2]] (i.e. -w1 + w2 > 0)
+                    # pf is [-1, 2]
+                    # Therefore, pf_overall_sign is -1 (subtracting something known to be positive)
                     if pf_overall_sign is None:
-                        pf_overall_sign = 1
+                        pf_overall_sign = -1
 
-                    # Conflicting with earlier condition so return True
-                    elif pf_overall_sign == -1:
+                    # Conflicting with earlier condition so return True (cannot rule out resonance)
+                    elif pf_overall_sign == 1:
                         return True
+
+                # If condition not recognized first way, try the other way
+                # (opposite pulse signs, condition is now < 0 instead of > 0).
+                if not rmd:
+
+                    match = True
+                    for j in i:
+                        if match:
+                            if -1 * j not in pf_test:
+                                match = False
+                    if match:
+                        for j in i:
+                            pf_test.remove(-1 * j)
+
+                        # Setting for first time (opposite sign since other way)
+                        if pf_overall_sign is None:
+                            pf_overall_sign = 1
+
+                        # Conflicting with earlier condition so return True
+                        elif pf_overall_sign == -1:
+                            return True
 
         # Reaching this point of the routine means that all (if any) magnitude conditions that were met
         # were found to point to the same sign (and we have removed the corresponding pulse references from pf_test
