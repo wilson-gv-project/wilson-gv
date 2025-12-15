@@ -49,7 +49,7 @@ class PhysicsCalculator:
             # Calculate photon frequency: sum over axes
             pfreq = sum(coords[ax] * res_cond.pf_dict[ax] 
                        for ax in res_cond.pf_dict)
-            
+            axis_here = res_cond.pf_dict
             # Resonance denominator
             z = res_cond.vib_energy_diff - pfreq - 1j * self.gamma
             total *= 1.0 / z

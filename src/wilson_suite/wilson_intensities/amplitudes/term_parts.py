@@ -378,19 +378,19 @@ class TermParametersChoice:
     # ---------------------------------------------------------
     # Properties / helpers
     # ---------------------------------------------------------
-    @property
-    def term_keys(self) -> Tuple[int]:
-        """Symbolic IDs of terms based on VibPerturbedTerm.h()."""
-        return tuple(t.h() for t in self.terms)
+    # @property
+    # def term_keys(self) -> Tuple[int]:
+    #     """Symbolic IDs of terms based on VibPerturbedTerm.h()."""
+    #     return tuple(t.h() for t in self.terms)
 
-    def _infer_res_motif(self):
-        """Derives resonance motif from the term objects."""
-        motifs = {ResonanceMotif(term.res) for term in self.terms}
-        if len(motifs) != 1:
-            raise ValueError(
-                "All terms in TermParametersChoice must share the same ResonanceMotif"
-            )
-        return motifs.pop()  # the unique motif
+    # def _infer_res_motif(self):
+    #     """Derives resonance motif from the term objects."""
+    #     motifs = {ResonanceMotif(term.res) for term in self.terms}
+    #     if len(motifs) != 1:
+    #         raise ValueError(
+    #             "All terms in TermParametersChoice must share the same ResonanceMotif"
+    #         )
+    #     return motifs.pop()  # the unique motif
 
 
 # -------------------------------------------------------
