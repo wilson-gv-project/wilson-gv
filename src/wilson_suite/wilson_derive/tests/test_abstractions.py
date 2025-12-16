@@ -1,7 +1,7 @@
 import pytest
 
 from wilson_suite.wilson_derive.abstractions import (QOperator, HarmOscStateSymbolic, VibStateSymbolic, PolProp,
-                                                     VibDiffTerm, ResonanceCondition, TransitionIntegral, LineShape)
+                                                     VibDiffTerm, ResonanceCondition, TransitionIntegral)
 
 def test_q_operator():
 
@@ -355,14 +355,155 @@ def test_line_shape():
 
 def test_pol_prop():
 
+    operator_a = QOperator(2)
+    operator_b = QOperator(3)
+    operator_c = QOperator(5)
 
-    pass
+    operators = [operator_a, operator_b, operator_c]
+
+    pol_prop_a = PolProp(operators)
+
+    assert pol_prop_a.ops[0].o == 2
+    assert pol_prop_a.ops[1].o == 3
+    assert pol_prop_a.ops[2].o == 5
+    assert pol_prop_a.dord == 0
+
+    pol_prop_a = PolProp(operators, dord=3)
+    assert pol_prop_a.dord == 3
+
+    pol_prop_a.setDerivOrder(2)
+    assert pol_prop_a.dord == 2
+
+    # Testing setInds
+
+    pol_prop_a.setInds(['b', 'a'])
+    # Sorted at set
+    assert pol_prop_a.inds == ['a', 'b']
+
+    with pytest.raises(ValueError):
+        pol_prop_a.setInds(['b', 'a', 'c'])
+
+    # Testing epochContained
+    epochs_a = [[1, 2, 3, 4, 5], [6]]
+    epochs_b = [[1, 2, 3, 4], [5]]
+    epochs_c = [[1], [4, 2, 3]]
+    epochs_d = [[1], [2, 3], [4]]
+
+    assert pol_prop_a.epochContained(epochs_a, op_ind_omega = 7)
+    assert not(pol_prop_a.epochContained(epochs_b, op_ind_omega=6))
+    assert pol_prop_a.epochContained(epochs_c, op_ind_omega = 5)
+    assert not(pol_prop_a.epochContained(epochs_d, op_ind_omega=5))
+
+    # Type errors:
+
+    # Non-list operators argument
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(tuple(operators))
+
+    # Non-QOperator instances in operator list
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp([operator_a, 'bogus', operator_c])
+
+    # Non-integer differentiation order
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators, dord='bogus')
+
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        pol_prop_a.setDerivOrder('bogus')
+
+    # setInds: inds not list
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        pol_prop_a.setDerivOrder(5)
+        pol_prop_a.setInds('bogus')
+
+    # setInds: inds not list of single-char strings
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        pol_prop_a.setDerivOrder(3)
+        pol_prop_a.setInds(['a', 'bogus', 'c'])
+
+    # epochContained: malformed epochs
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        epochs_bogus = ([1, 2, 3, 4, 5], [6])
+        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
+
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        epochs_bogus = [(1, 2, 3, 4, 5), [6]]
+        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
+
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        epochs_bogus = [[1, 2, 3, 'bogus', 5], [6]]
+        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
+
+    # epochContained: op_ind_omega wrong type
+    with pytest.raises(TypeError):
+        pol_prop_a = PolProp(operators)
+        epochs_bogus = [[1, 2, 3, 4, 5], [6]]
+        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega='bogus')
 
 def test_pol_prop_sos_recursion():
 
+    operator_a = QOperator(2)
+    operator_b = QOperator(3)
 
-    pass
+    state_a = VibStateSymbolic('A')
+    state_b = VibStateSymbolic('B', mbu=['A'])
+
+    # FIXME: Return to this test once relevant attributes/methods settled during code pass/unit test work on
+    # vib_rsp_sos
+    assert False
+
 
 def test_transition_integral():
 
-    pass
+    state_a = VibStateSymbolic('A')
+    state_b = VibStateSymbolic('B', mbu=['A'])
+
+    operator_a = QOperator(2)
+    operator_b = QOperator(3)
+    operator_c = QOperator(5)
+    operators = [operator_a, operator_b, operator_c]
+    pol_prop_a = PolProp(operators, dord=3)
+
+    t_int = TransitionIntegral(state_a, state_b, pol_prop_a)
+
+    # Just a few spot checks since this is verified in separate test
+    assert t_int.prop.ops[1].o == 3
+    assert t_int.prop.dord == 3
+    assert t_int.bra.s == 'A'
+    assert t_int.ket.mbu == ['A']
+
+    t_int.setBra(state_b)
+    assert t_int.bra.s == 'B'
+
+    t_int.setKet(state_a)
+    assert t_int.ket.s == 'A'
+
+    # Bogus
+
+    # bra argument not VibStateSymbolic
+    with pytest.raises(TypeError):
+        t_int = TransitionIntegral('bogus', state_b, pol_prop_a)
+
+    # ket argument not VibStateSymbolic
+    with pytest.raises(TypeError):
+        t_int = TransitionIntegral(state_a, 'bogus', pol_prop_a)
+
+    # prop argument not PolProp
+    with pytest.raises(TypeError):
+        t_int = TransitionIntegral(state_a, state_b, 'bogus')
+
+    # set_bra bra argument not VibStateSymbolic
+    with pytest.raises(TypeError):
+        t_int = TransitionIntegral(state_a, state_b, pol_prop_a)
+        t_int.setBra('bogus')
+
+    # set_ket ket argument not VibStateSymbolic
+    with pytest.raises(TypeError):
+        t_int = TransitionIntegral(state_a, state_b, pol_prop_a)
+        t_int.setKet('bogus')

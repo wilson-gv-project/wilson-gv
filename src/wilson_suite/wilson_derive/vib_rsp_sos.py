@@ -1,5 +1,5 @@
-from .abstractions import VibDiffTerm, ResonanceCondition, PolProp, TransitionIntegral, QOperator, VibStateSymbolic, \
-    PolPropSOSRecursion
+from .abstractions import (VibDiffTerm, ResonanceCondition, PolProp, TransitionIntegral, QOperator, VibStateSymbolic,
+    PolPropSOSRecursion)
 from .response_terms import VibContribTerm, RspTermSOSRecursion
 from fractions import Fraction
 import itertools

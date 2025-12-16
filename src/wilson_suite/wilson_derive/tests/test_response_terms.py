@@ -12,4 +12,7 @@ def test_vib_perturbed_term():
 
 def test_vib_contrib_term():
 
+    # NOTE: Test allRspEpochContained for wider selection of cfgs; see if non-counting ordered pulse refs still give
+    # correct result
+
     pass

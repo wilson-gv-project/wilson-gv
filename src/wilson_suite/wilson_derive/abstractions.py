@@ -704,8 +704,12 @@ class PolProp:
         dord: Integer: Order of geometric differentiation
         """
 
+        if not isinstance(ops, list):
+            raise TypeError('Operator argument must be a list of QOperator instances')
+
         if not (all([isinstance(i, QOperator) for i in ops])):
             raise TypeError('All operator arguments in PolProp must be QOperator instances')
+
         self.ops = ops
 
         if not (isinstance(dord, int)):
@@ -729,6 +733,9 @@ class PolProp:
 
         dord: Integer: Order of differentiation
         """
+        if not (isinstance(dord, int)):
+            raise TypeError('Differentiation order in PolProp must be integer')
+
         self.dord = dord
 
     def setInds(self, inds: list[str]):
@@ -739,7 +746,16 @@ class PolProp:
         """
 
         if not len(inds) == self.dord:
-            raise AssertionError('Normal mode indices must have same length as differentiation order')
+            raise ValueError('Normal mode indices must have same length as differentiation order')
+
+        if not isinstance(inds, list):
+            raise TypeError('Indices must be given as list of characters')
+        for i in inds:
+            if not isinstance(i, str):
+                raise TypeError('Indices must be given as list of characters')
+            if not len(i) == 1:
+                raise TypeError('Indices must be given as list of characters')
+
         self.inds = sorted(inds)
 
     def h(self) -> int:
@@ -749,7 +765,7 @@ class PolProp:
 
         return hash((tuple([i.h() for i in self.ops]), self.dord, tuple(self.inds)))
 
-    def epochContained(self, epochs: list, op_ind_omega: int) -> bool:
+    def epochContained(self, epochs: list[list[int]], op_ind_omega: int) -> bool:
         """
         Boolean: Do all electromagnetic operators in this property belong to the same pulse epoch?
 
@@ -757,17 +773,30 @@ class PolProp:
         op_ind_omega: Label of omega (detected field) operator
         """
 
-        # FIXME: Dress epochs with interaction number instead of pulse number? Check if epochs made with pulse or interaction ids
+        if not isinstance(epochs, list):
+            raise TypeError('Epochs must be given as list of lists of integer pulse references')
+
+        if not (all([isinstance(i, list) for i in epochs])):
+            raise TypeError('Epochs must be given as list of lists of integer pulse references')
+
+        for i in epochs:
+            if not (all([isinstance(j, int) for j in i])):
+                raise TypeError('Epochs must be given as list of lists of integer pulse references')
+
+        if not isinstance(op_ind_omega, int):
+            raise TypeError('Index of omega operator must be given as integer')
+
         my_op_ids = [i.o for i in self.ops]
 
-        # If omega is one of the operators, all of the others must belong to the last epoch
+        # If omega is one of the operators, all of the others must belong to the last epoch:
+        # (Epochs are given according to incident pulses and do not contain any reference to the emitted wave)
         if op_ind_omega in my_op_ids:
             for i in my_op_ids:
                 if not (i == op_ind_omega):
                     if not i in epochs[len(epochs) - 1]:
                         return False
 
-        # Otherwise, all operators must belong to the same epoch
+        # Otherwise, all operators must belong to the same epoch but it need not be the last
         else:
 
             required_epoch = None
@@ -780,7 +809,7 @@ class PolProp:
                 if not i in epochs[required_epoch]:
                     return False
 
-        # If not ruled out by prev checks, then the ops. in this rsp fn are indeed epoch contained
+        # If not ruled out by prev checks, then the ops. in this PolProp are indeed epoch contained
         return True
 
     def present(self):
@@ -816,15 +845,28 @@ class PolProp:
 class PolPropSOSRecursion:
     """
     (Electronic) polarization property for use in SOS recursion
+
+    FIXME: Relevance of order argument unclear (could be vestigial): Return to this as part of work on vib_rsp_sos
+        - If relevant, should increment order upon addition of operator?
+        - If relevant, should not always initialize to order zero? If so, remove as init parameter?
     """
 
     # Takes set of operators, bra and ket vibrational states left and right
-    def __init__(self, order: int, left, right):
+    def __init__(self, order: int, left: VibStateSymbolic, right: VibStateSymbolic):
         """
         order: Integer: Order of property
         left: VibStateSymbolic: Bra state of integral
         right: VibStateSymbolic: Ket state of integral
         """
+
+        if not isinstance(order, int):
+            raise TypeError('Order argument must be integer')
+
+        if not isinstance(left, VibStateSymbolic):
+            raise TypeError('Bra state argument must be VibStateSymbolic instance')
+
+        if not isinstance(right, VibStateSymbolic):
+            raise TypeError('Ket state argument must be VibStateSymbolic instance')
 
         # Integer: order of property
         self.order = order
@@ -837,12 +879,15 @@ class PolPropSOSRecursion:
         # Operators associated with self
         self.ops = []
 
-    def addOperator(self, op):
+    def addOperator(self, op: QOperator):
         """
         Add operator
 
         op: QOperator: The operator to be added
         """
+        if not isinstance(op, QOperator):
+            raise TypeError('operator argument must be QOperator')
+
         self.ops.append(op)
 
     def present(self):
