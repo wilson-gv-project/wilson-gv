@@ -300,6 +300,7 @@ class VibStatesData:
     Holds vib states data and can compute vib states energy differences
     """
     allstates: tuple[VibState]
+    harmonic_osc_states_labels: tuple[int] = None
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
@@ -315,16 +316,15 @@ class VibStatesData:
             for vlabel_b, energy_b in self.allenergies_map:
                 self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
 
-    @property
-    def harmonic_osc_states_labels(self):
-        return tuple([int(i.state_label) for i in self.allstates if i.harmonic_WF])
 
     def get_harmonic_osc_states(self):
         """
         i.state_label - TODO: make a convention, rules how to describe vibstates
         now i.state_label is str
         """
-        harm_states = {int(i.state_label): i.energy for i in self.allstates if i.harmonic_WF}
+        harm_states_str = [i for i in self.allstates if ',' not in i.state_label and i.state_label!='zero']
+        harm_states = {int(i.state_label): i.energy for i in harm_states_str if int(i.state_label) in self.harmonic_osc_states_labels}
+
         return dict(sorted(harm_states.items()))
     
     def get_state_by_label(self, state_label):
