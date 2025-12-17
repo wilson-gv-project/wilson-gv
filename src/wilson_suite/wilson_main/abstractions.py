@@ -217,18 +217,12 @@ class VibState:
 	InitVar - is an init-only variable
 	This seems to be okay for now, but should mind this feature
 	"""
-	# s: InitVar[dict] = field(repr=False) # 
 	harm_quanta_coeffs: dict[tuple[int, ...], float]
 	energy: float = 0.0
 	displacement: Any = None
 	serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
 	state_label: str = None
 	harmonic_WF: bool = None
-	# def __post_init__(self, s):
-	# 	self.serial_s = {",".join(k): v for k, v in s.items()}
-
-	# def __post_init__(self):
-	# 	self.serial_s = {",".join(k): v for k, v in self.s.items()}
 
 	def __post_init__(self) -> None:
 		"""Convert tuple keys to comma-separated strings for JSON serialization."""
@@ -341,6 +335,8 @@ class VibAnaSetup:
 		self.states = states
 
 	def upd_exclude_modes(self, upd_exclude_modes: list = None):
+		"overwrites self.exclude_modes"
+		
 		if self.exclude_modes is None:
 			if self.system is not None:
 				self.exclude_modes = []

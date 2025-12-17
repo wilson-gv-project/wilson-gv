@@ -155,7 +155,7 @@ def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 
 # WilsonSimulation related functions
 
-def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[MolecularProperty]:
+def find_props(terms, freqs: str='static') -> list[MolecularProperty]:
 
 	props = []
 	

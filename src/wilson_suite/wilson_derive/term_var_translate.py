@@ -133,14 +133,12 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis
                 for m in k.res:
                     if not tuple(sorted(m.pf)) in pulse_id_tuples:
                         pulse_id_tuples.append(tuple(copy.deepcopy(sorted(m.pf))))
-    print('\npulse_id_tuples', pulse_id_tuples)
 
     # Take the chosen axes and call fn to express all ind vars in terms of these
     id_tuples_in_axis_vars = {}
 
     for i in pulse_id_tuples:
         id_tuples_in_axis_vars[i] = find_pulse_id_tuples_as_axis_vars(i, chosen_axes)
-    print('\nid_tuples_in_axis_vars', id_tuples_in_axis_vars)
     # Go through each term and translate; make structure of same shape as original to return
     translated_terms = {}
     for i in terms:

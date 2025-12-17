@@ -7,7 +7,6 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     dict_with_data = {}
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
-    print('requested_data_dict _______________', requested_data_dict.keys())
 
     requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'], 
                                 'normal_modes': requested_data_dict['nc_sqrt_eigval']})

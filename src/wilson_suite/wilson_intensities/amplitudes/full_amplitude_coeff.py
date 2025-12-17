@@ -38,6 +38,7 @@ def identify_precalc_unique_coeff_parts(terms: list['VibPerturbedTerm']) -> dict
     2. non-orient. avrg. props. - skip further if zero
     2. vibdiffs_bank - will be cached - calculated on the fly and saved
     """
+
     avrg_expressions = [avrgprops.PropsCollection(props=term.props).get_averaged_props().sort() for term in terms]
 
     return {
@@ -67,7 +68,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict,
                                                                         nm_inds_choices=data_and_configs.nm_inds_choices)   
     for ve_denom in need_to_precalc['vibenedenoms_tensors']:
         data.vibenedenoms_tensors[ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
-                                                                                    vibstates_data=data_and_configs.vibstates_data)
+                                                                                  vibstates_data=data_and_configs.vibstates_data)
     data.vibdiff_cache = vediff.VibDiffCache()
     return data
 
@@ -154,6 +155,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
                 product *= NON_AVRG
 
         avrg_index_tuple = avrgprops.get_ind_tuple_from_base(expr=avrg_expr, base_expr=avrg_tensor_expr, index_dict=index_dict)
+
         AVRG = avrg_tensor[avrg_index_tuple]
         
         if np.isclose(AVRG, zero_tol):
