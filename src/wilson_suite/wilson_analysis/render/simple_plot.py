@@ -285,7 +285,6 @@ def render_spectrum(intensities, w1m, w2m, filename, dynamic_range, num_level_ti
     """
     Helper function to render the spectrum figure.
     """
-    # from rich import print
     from ... wilson_intensities.utils.utils import coolprint
 
     coolprint('1. Setting figure...')
@@ -301,7 +300,6 @@ def render_spectrum(intensities, w1m, w2m, filename, dynamic_range, num_level_ti
 
     np.set_printoptions(precision=4,suppress=False)
 
-    # print('\nlevels_nums', np.array(levels_nums))
     print('\nlevels_nums_str', levels_nums_str)
     print('levels_ticks', np.array(levels_ticks), '\n')
 
