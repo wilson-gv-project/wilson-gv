@@ -110,10 +110,13 @@ def compute_box_adjacency(
 
 
 def points_to_bounds(points: List[Dict[str,float]], 
-                     halfwidths_list: List[Dict[str,float]]) -> List[Tuple[Tuple[float,float]]]:
+                     halfwidth: float) -> List[Tuple[Tuple[float,float]]]:
+    # FIXME should know combination of states to get the Gamma; now it's using a single value everywhere
+    # halfwidth - doesn't have to be simply Gamma, shouldn't...
+
     return [
-        {axis: (p[axis]-hw[axis], p[axis]+hw[axis]) for axis in p}
-        for p, hw in zip(points, halfwidths_list)
+        {axis: (p[axis]-halfwidth, p[axis]+halfwidth) for axis in p}
+        for p in points
     ]
 
 def make_domains_from_feat_clusters(clusters: dict[int, list['SpectralFeature']]):
