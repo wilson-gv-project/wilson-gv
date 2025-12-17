@@ -116,10 +116,11 @@ class GridManager:
         # Get all features
         all_features = (self.spec_window.full_features + 
                        self.spec_window.contrib_features)
-        
+
         # Cluster features into domains
         from . import domains
         clusters = domains.features_to_clusters(features=all_features)
+
         formal_domains = [
             RectangularDomain(
                 box=Box.union([f.feat_box for f in clusters[c]]),
@@ -138,7 +139,7 @@ class GridManager:
         subgrids = domains.cut_grid_with_coords_nd(
             full_grid, coords_vectors, formal_domains
         )
-        
+
         # Create GridRegion objects
         regions = []
         for idx, (domain, grid_info) in enumerate(subgrids.items()):
@@ -175,6 +176,7 @@ class GridManager:
             full_grid = grid_mgr.place_results_into_grid(results)
             # Now full_grid['result'] contains assembled spectrum
         """
+
         if self.full_grid is None:
             raise ValueError("Must call create_regions() before place_results_into_grid()")
         
@@ -276,7 +278,7 @@ class SpectralEvaluator:
         # Step 1: Partition into regions
         self.grid_mgr = GridManager(spec_window)
         regions = self.grid_mgr.create_regions(grid_resolution)
-        
+
         if verbose:
             logger.info(f"Created {len(regions)} grid regions")
         
@@ -301,7 +303,7 @@ class SpectralEvaluator:
         
         # Return based on type
         if return_type == 'grid':
-            return self.grid_mgr.full_grid
+            return self.grid_mgr.full_grid['result']
         elif return_type == 'regions':
             return region_results
         elif return_type == 'both':
