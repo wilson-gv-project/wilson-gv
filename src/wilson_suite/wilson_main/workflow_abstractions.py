@@ -90,8 +90,9 @@ class WilsonSimulation:
 
 		self.system = system
 
-	def addTerms(self, terms: list[VibPerturbedTerm], extend: bool=False):
+	def addTerms(self, terms: dict, extend: bool=False):
 		"""
+		FIXME, not a list
 		Add terms
 
 		terms: List of VibPerturbedTerm instances: The terms to be added
@@ -221,9 +222,6 @@ class WilsonSimulation:
 		data_dict: dict - {data_name: values}
 
 		"""
-		print('\nin fillResults')
-		print(data_dict)
-		print('self.residual_vib_info start fill', self.residual_vib_info.keys())
 
 		for p in self.props:
 			p.addValues(data_dict.get(p.trivial_name))
@@ -234,7 +232,7 @@ class WilsonSimulation:
 				states_dict: dict = data_dict.get(k)
 
 				for state, energy in states_dict.items():
-					states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy))
+					states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
 
 				self.vib_ana_setup.setStates(states=states_list)
 				self.residual_vib_info[k] = data_dict.get(k)
@@ -243,8 +241,6 @@ class WilsonSimulation:
 				self.residual_vib_info[k] = data_dict.get(k)
 				setattr(self.vib_ana_setup, k, data_dict.get(k))
 
-		print('self.residual_vib_info', self.residual_vib_info)
-		print('self.vib_ana_setup', self.vib_ana_setup)
 
 	def requestData(self) -> dict:
 		"""
@@ -254,14 +250,8 @@ class WilsonSimulation:
 		for p in self.props:
 			data_dict[p.trivial_name] = p.calc_setup
 		
-		print('\nin request: self.residual_vib_info', self.residual_vib_info.keys())
-
 		for k, v in self.residual_vib_info.items():
 			data_dict[k] = v
-		
-		print('\nin requestData')
-		print(data_dict)
-		print(data_dict.keys())
 		
 		return data_dict
 	
@@ -303,8 +293,8 @@ class WilsonSimulation:
 		else:
 			self.spec, _ = evaluator(**context)
 
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+		# if not isinstance(self.spec, np.ndarray):
+		# 	raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,

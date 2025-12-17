@@ -153,7 +153,6 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     results: dict[ResonanceMotif,dict[ResLocGeoObject,list]] = {motif: {}}
 
     index_choices = _generate_index_choices(motif, vibstates_data)
-
     for idxs in index_choices:
         parameters = ParameterSet(idxs)
         location_key = solve_LSE_motif(motif, parameters, vibstates_data, vibdiff_cache, unit='cm-1')

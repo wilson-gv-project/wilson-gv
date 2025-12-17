@@ -141,7 +141,6 @@ def calculate_vibenedenom_tensor(vibenedenom_inds: tuple,
     should be using harmonic uncorrected vib ene levels!!!
     """
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-    
     vector = convNu2Ene(np.array(list(vibstates_data.get_harmonic_osc_states().values())))
     
     # 'i,j,k->ijk'
