@@ -184,7 +184,7 @@ class Box:
 
         contributing = True
         for ax, (mn, mx) in self.bounds.items():
-            Gamma = spec_feature.lineshape_parameter[ax]
+            Gamma = spec_feature.lineshape_parameter
             # FIXME??   2*Gamma ??
             # in place ADDition
             contributing &= (spec_feature.location._coord_dict[ax] >= mn-2*Gamma) & (spec_feature.location._coord_dict[ax] <= mx+2*Gamma)
@@ -269,9 +269,10 @@ class SpectralFeature:
     feat_box: Box = None
     
     def __post_init__(self):
+        # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
             bounds = points_to_bounds(points=[self.location._coord_dict],
-                                    halfwidths_list=[self.lineshape_parameter])[0]
+                                    halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
@@ -325,7 +326,6 @@ class SpectralFeature:
             if spec_window.box.contributing_feature(feature):
                 feature.feat_type = 'contributing'
                 contrib_features.append(feature)
-
         upd_spec_window = copy.deepcopy(spec_window)
         upd_spec_window.full_features = full_features
         upd_spec_window.contrib_features = contrib_features
