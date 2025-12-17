@@ -69,7 +69,7 @@ def get_features_from_terms_for_eval(system: 'MolecularSystem',
 # General term evaluator "as response function"
 def terms_evaluator_general_compilation(system: 'MolecularSystem',
                                         experiment: 'VibExperiment',
-                                        derived_terms: list['VibPerturbedTerm'],
+                                        derived_terms: dict[int, dict[tuple, list['VibPerturbedTerm']]],
                                         props: list['MolecularProperty'],
                                         spec_eval_setup: 'SpecEvalSetup' = None,
                                         vib_ana_setup: 'VibAnaSetup' = None,
@@ -79,13 +79,22 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     """
     Evaluate terms and generate spectral features.
     """
+    diagn = {}
+
     # Initialize evaluation/precalculation data
     vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
         system, experiment, vib_ana_setup, props
     )
-    
+
+    # FIXME - make a function for a flat list
+    terms_as_list = []
+    for i in derived_terms:
+        for j in derived_terms[i]:
+            for t in derived_terms[i][j]:
+                terms_as_list.append(t)
+
     # Precalculate coefficient parts
-    to_precalculate = identify_precalc_unique_coeff_parts(terms=derived_terms)
+    to_precalculate = identify_precalc_unique_coeff_parts(terms=terms_as_list)
     precalculated = precalculate_unique_coeff_parts(
         need_to_precalc=to_precalculate,
         data_and_configs=data_and_configs
@@ -93,20 +102,23 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     
     # Process resonance motifs
     motif_res_loc, terms_for_motifs = process_resonance_motifs(
-        derived_terms, vibstates_data, vibdiff_cache
+        terms_as_list, vibstates_data, vibdiff_cache
     )
-    
+
     # Evaluate term coefficients
     term_coeffs_per_index = evaluate_terms(
-        derived_terms, motif_res_loc, precalculated
+        terms_as_list, motif_res_loc, precalculated
     )
     
+    # FIXME: maybe should be checked earlier
+    if spec_eval_setup is None:
+        raise ValueError('SpecEvalSetup is not set')
+
     # Get features to draw
     all_features = get_features_to_draw(
         motif_res_loc, terms_for_motifs, term_coeffs_per_index, spec_eval_setup.ev_info.Gamma
     )
     
-
     spec_window = spec_eval_setup.ev_info.spectral_window
 
     spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
@@ -119,8 +131,8 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=spec_window_with_features, 
                                                                grid_resolution=spec_eval_setup.ev_info.grid_resolution, return_type='grid')
 
-
-    return grid_values_all_domains
+    # print('grid_values_all_domains\n',grid_values_all_domains, type( grid_values_all_domains))
+    return grid_values_all_domains, diagn
 
 
 def get_domain_grids():
@@ -211,8 +223,9 @@ def initialize_evaluation_data(system: 'MolecularSystem',
     """
     # har_states_labels = tuple([list(state.harm_quanta_coeffs.keys())[0][0] 
     #                          for state in vib_ana_setup.states if state.harmonic_WF])
-    
-    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states))
+
+    include_list = tuple([int(v[0]) for v in list(vib_ana_setup.nc_sqrt_eigval.keys()) if int(v[0]) not in vib_ana_setup.exclude_modes])
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=include_list)
     
     vibdiff_cache = VibDiffCache()
     props = MolPropsCollection(properties=props)
@@ -261,7 +274,6 @@ def evaluate_terms(derived_terms: list['VibPerturbedTerm'],
     Evaluate coefficients for all terms.
     """
     term_coeffs_per_index = {}
-    
     for vibterm in derived_terms:
         res_motif = ResonanceMotif(vibterm.res)
         term_coeffs_per_index[vibterm] = evaluate_term_coeffs(
