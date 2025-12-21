@@ -13,6 +13,7 @@ from ..wilson_derive.derive import get_fully_enhanced_terms
 from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from wilson_suite.fixtures import evv_experiment, get_eval_ready_evv_terms
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -100,7 +101,7 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
             derived_terms = pickle.load(handle)
         sim.addTerms(terms=derived_terms)
     else:
-        sim.getTerms(deriver=get_fully_enhanced_terms)
+        sim.addTerms(terms=get_eval_ready_evv_terms())
         with open(terms_file_path, 'wb') as handle:
             pickle.dump(sim.terms, handle, protocol=pickle.HIGHEST_PROTOCOL)
     # -------------------------

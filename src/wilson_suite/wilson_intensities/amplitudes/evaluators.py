@@ -122,16 +122,20 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
     spec_window = spec_eval_setup.ev_info.spectral_window
 
     spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
-    
+    # upd spec window
+    spec_eval_setup.ev_info.spectral_window = spec_window_with_features
+
     #### <--- SpectralEvaluator.evaluate_spectrum
 
     from .grid_manager_evaluator import SpectralEvaluator
 
-    spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=4.2) # FIXME gamma value type
+    spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=spec_eval_setup.ev_info.Gamma) # FIXME gamma value type
     grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=spec_window_with_features, 
                                                                grid_resolution=spec_eval_setup.ev_info.grid_resolution, return_type='grid')
 
     # print('grid_values_all_domains\n',grid_values_all_domains, type( grid_values_all_domains))
+    diagn['spec_evaluator'] = spec_evaluator
+
     return grid_values_all_domains, diagn
 
 

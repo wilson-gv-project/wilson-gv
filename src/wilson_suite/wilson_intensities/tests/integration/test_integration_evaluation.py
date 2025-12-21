@@ -95,27 +95,12 @@ def test_full_integration():
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
 
+    print('sim.vib_ana_setup.nc_sqrt_eigval', sim.vib_ana_setup.nc_sqrt_eigval)
+    exit()
+
     from ...amplitudes.evaluators import terms_evaluator_general_compilation
     np.set_printoptions(linewidth=280, precision=3)
     sim.evaluateSpectrum(evaluator=terms_evaluator_general_compilation)
-
-    _, ax_dict = spectral_window.sample_grid(sim.spec_eval_setup.ev_info.grid_resolution)
-
-    from ....wilson_analysis.render.simple_plot import render_spectrum, set_figure, prep_levels
-    dyn_range = 1000
-
-    # # render_spectrum(abs(sim.spec)**2, ax_dict['A'], ax_dict['B'], 'integrtest.svg', dyn_range, num_level_ticks=10, nicetitle='yes')
-    # levels_nums, levels_ticks, levels_nums_str = prep_levels(
-    #                             d_max=np.max(abs(sim.spec)**2),
-    #                             dynamic_range=dyn_range,
-    #                             num_level_ticks=num_level_ticks
-    #                             )
-    # fig, ax = set_figure(figsize=(35, 45), font_dict={'size': 20}, to_save=True)
-    # cont = ax.contourf(ax_dict['A'], ax_dict['B'], abs(sim.spec)**2,
-    #                 levels=levels, cmap=cmap  #'hot_r'
-    #                 # , norm=colorbar_norm
-    #                 , extend='max'
-    #                 )
     
     import matplotlib.pyplot as plt
 

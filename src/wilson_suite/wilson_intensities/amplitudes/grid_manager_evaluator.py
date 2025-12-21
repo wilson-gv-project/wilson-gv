@@ -97,7 +97,11 @@ class GridRegion:
 
 
 class GridManager:
-    """Manages grid partitioning and coordinate systems."""
+    """
+    Manages grid partitioning and coordinate systems.
+
+    
+    """
     
     def __init__(self, spec_window: 'SpectralWindow'):
         self.spec_window = spec_window
