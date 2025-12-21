@@ -77,33 +77,33 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 def do_full_vib_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
 				   tuple[dict, dict, list[VibState], dict]]):
-		"""
-		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
-		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
-		self.nc_eigvec) and the (regime-specific) vibrational states
+	"""
+	Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
+	vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
+	self.nc_eigvec) and the (regime-specific) vibrational states
 
-		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
-		__init__ for detailed argument specification: Must take as input a system, a set of properties,
-		a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
-		the associated eigenvectors and the vibrational states as VibState instances
-		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
-		with self as self.system
-		"""
-		if vib_ana.nc_sqrt_eigval is not None or vib_ana.states is not None or vib_ana.nc_eigvec is not None:
-			raise AssertionError('Full analysis requested but some of the results are already present')
+	props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+	analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
+	__init__ for detailed argument specification: Must take as input a system, a set of properties,
+	a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
+	the associated eigenvectors and the vibrational states as VibState instances
+	system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+	with self as self.system
+	"""
+	if vib_ana.nc_sqrt_eigval is not None or vib_ana.states is not None or vib_ana.nc_eigvec is not None:
+		raise AssertionError('Full analysis requested but some of the results are already present')
 
-		if vib_ana.regime is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+	if vib_ana.regime is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if vib_ana.system is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
-		
-		context = {'system': vib_ana.system, 'props': props, 
-			 	   'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo}
-		
-		# To return: nc_sqrt_eigval, nc_eigvec, states, diagn
-		return analyzer(**context)
+	if vib_ana.system is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+	
+	context = {'system': vib_ana.system, 'props': props, 
+				'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo}
+	
+	# To return: nc_sqrt_eigval, nc_eigvec, states, diagn
+	return analyzer(**context)
 	
 def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty], anharmonic_analyzer:
 						Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
