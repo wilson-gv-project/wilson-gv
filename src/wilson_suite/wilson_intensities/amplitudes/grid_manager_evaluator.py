@@ -106,8 +106,18 @@ class GridManager:
     def __init__(self, spec_window: 'SpectralWindow'):
         self.spec_window = spec_window
         self.full_grid = None  # Store full grid dict
-        
-    def create_regions(self, grid_resolution: Dict[str, int]) -> List[GridRegion]:
+    
+    def make_fullgrid(self, grid_resolution: Dict[str, int]):
+        self.coords_vectors, self.full_grid = self.spec_window.sample_grid(grid_resolution)
+    
+    def _cut_fullgrid_to_domains(self, formal_domains):
+        from . import domains
+        subgrids = domains.cut_grid_to_domains_nd(
+            self.full_grid, self.coords_vectors, formal_domains
+        )
+        return subgrids
+
+    def create_regions(self) -> List[GridRegion]:
         """
         Partition spectrum into regions based on feature clustering.
         
@@ -117,32 +127,12 @@ class GridManager:
         Returns:
             List of GridRegion objects
         """
-        # Get all features
-        all_features = (self.spec_window.full_features + 
-                       self.spec_window.contrib_features)
-
-        # Cluster features into domains
-        from . import domains
-        clusters = domains.features_to_clusters(features=all_features)
-
-        formal_domains = [
-            RectangularDomain(
-                box=Box.union([f.feat_box for f in clusters[c]]),
-                full_features=clusters[c]
-            )
-            for c in clusters
-        ]
+        formal_domains = self.spec_window.find_clusters_by_featboxes()
         
-        # Create full grid
-        coords_vectors, full_grid = self.spec_window.sample_grid(grid_resolution)
+        if self.full_grid is None:
+            raise ValueError("full_grid is None in this GridManager")
         
-        # Store full grid for later assembly
-        self.full_grid = full_grid
-        
-        # Cut grid into subgrids
-        subgrids = domains.cut_grid_with_coords_nd(
-            full_grid, coords_vectors, formal_domains
-        )
+        subgrids = self._cut_fullgrid_to_domains(formal_domains)
 
         # Create GridRegion objects
         regions = []

@@ -144,7 +144,7 @@ def test_evaluate_feature_on_grid():
 
     coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
 
-    domains_with_subgrids = domfuncs.cut_grid_with_coords_nd(full_meshgrids=spec_grid, 
+    domains_with_subgrids = domfuncs.cut_grid_to_domains_nd(full_meshgrids=spec_grid, 
                                                              axis_coords=coords_vectors,
                                                              domains=domains_in_window)
     

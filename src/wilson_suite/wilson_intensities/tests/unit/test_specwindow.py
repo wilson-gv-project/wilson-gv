@@ -207,7 +207,7 @@ def test_evaluate_all_on_grids():
     formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]]), full_features=doms[d]) for d in doms]
 
     coords_vectors, spec_grid = spec_window1.sample_grid({'A': 10, 'B': 10})
-    subgrids = domains.cut_grid_with_coords_nd(spec_grid, coords_vectors, formal_doms)
+    subgrids = domains.cut_grid_to_domains_nd(spec_grid, coords_vectors, formal_doms)
 
     from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
     from wilson_suite.wilson_intensities.amplitudes import evaluators
