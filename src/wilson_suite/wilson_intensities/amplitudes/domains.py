@@ -160,6 +160,7 @@ def connected_components_from_adjacency(adjacency: np.ndarray, box_objects: list
 
 def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['SpectralFeature']]:
     """
+    takes features and, based on those feature boxes overlapping, returns clusters
     """
     feature_boxes = [f.feat_box for f in features]
     feature_ls = [f.lineshape_parameter for f in features]
@@ -191,7 +192,7 @@ def get_distance_threshold(dynamic_range: float|int, Gamma_axes: dict) -> dict:
 
 
 
-def cut_grid_with_coords_nd(full_meshgrids: dict[str, np.ndarray], 
+def cut_grid_to_domains_nd(full_meshgrids: dict[str, np.ndarray], 
                             axis_coords: dict[str, np.ndarray], 
                             domains: list['RectangularDomain']) -> dict['RectangularDomain', dict]:
     """
