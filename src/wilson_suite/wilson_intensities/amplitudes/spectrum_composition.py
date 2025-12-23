@@ -407,31 +407,34 @@ class SpectralWindow:
         return axes, grid_d
 
 
-    def find_clusters_by_distance(self,
-                                  spec_window_full: 'SpectralWindow',
-                                  distance_thresholds: dict,
-                                  linkage: str = 'single') -> dict[int, 'RectangularDomain']:
+    def find_clusters_by_featboxes(self) -> tuple['RectangularDomain']:
 
-        spec_features = self.full_features + self.contrib_features
+        all_features = (self.full_features + 
+                       self.contrib_features)
 
-        features_locs = {feature.location.values: feature for feature in spec_features}
-        from wilson_suite.wilson_intensities.amplitudes import domains
-
-        clusters = domains.find_points_clusters_by_distance(res_locations=list(features_locs.keys()),
-                                                            distance_thresholds=distance_thresholds,
-                                                            linkage=linkage)
-        rec_windows_dict = {}
-
-        for g in clusters:
-            domain = RectangularDomain.from_features([features_locs[i] for i in clusters[g]])
-            for feature in domain.full_features:
-                paddig_dict = {k:2*v for k,v in feature.lineshape_parameter.items()}
-                domain.box.expand(paddig_dict)
-            domain.box.intersect(spec_window_full)
-            rec_windows_dict[g] = domain
-
-        return rec_windows_dict
-
+        from . import domains
+        clusters = domains.features_to_clusters(features=all_features)
+        
+        if not isinstance(clusters, dict):
+            print('\nclusters are:\n', clusters)
+            raise ValueError("Clusters should be in a dictionary")
+        for c in clusters:
+            if not isinstance(clusters[c], list):
+                print('\nclusters are:\n', clusters)
+                raise ValueError("Clusters should be given as a list of SpectralFeatures")
+            for f in clusters[c]:
+                if not isinstance(f, SpectralFeature):
+                    print('\nclusters are:\n', clusters)
+                    raise ValueError("List does not contain SpectralFeatures")
+        
+        formal_domains = tuple([
+            RectangularDomain(
+                box=Box.union([f.feat_box for f in clusters[c]]),
+                full_features=clusters[c]
+            )
+            for c in clusters
+        ])
+        return formal_domains
 
 @dataclass
 class RectangularDomain:
