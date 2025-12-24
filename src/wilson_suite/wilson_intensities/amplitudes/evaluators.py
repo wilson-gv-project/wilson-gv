@@ -42,8 +42,6 @@ def prepDataForEval(system, experiment, vib_ana_setup, props):
     """
     put data in a form for use on the evaluation step
     """
-
-    # Initialize evaluation/precalculation data
     vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
         system, experiment, vib_ana_setup, props
     )
@@ -135,6 +133,9 @@ def initialize_evaluation_data(system: 'MolecularSystem',
     #                          for state in vib_ana_setup.states if state.harmonic_WF])
 
     include_list = tuple([int(v[0]) for v in list(vib_ana_setup.nc_sqrt_eigval.keys()) if int(v[0]) not in vib_ana_setup.exclude_modes])
+    if include_list == tuple():
+        raise ValueError("include_list of included normal modes labels is empty")
+    
     vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=include_list)
     
     vibdiff_cache = VibDiffCache()

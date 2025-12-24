@@ -14,3 +14,5 @@ Then all 6 parts are multiplied together into the result.
 
 """
 from .averaging import get_iso_f, get_AlphaBetaGammaDelta_indices
+from . import spectrum_composition
+from . import evaluation_wf

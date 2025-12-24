@@ -28,7 +28,6 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
             from dataclasses import asdict
 
             these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], **asdict(o))
-
             
             dict_with_data.update(these_results_dict)
 

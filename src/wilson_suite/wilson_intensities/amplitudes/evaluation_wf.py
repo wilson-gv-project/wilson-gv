@@ -47,7 +47,7 @@ class EvaluationWorkflow:
             raise ValueError("Simulation object must have a non-empty 'props' attribute.")
         
 
-    def run(self, keep_intermediates: bool = False):
+    def run(self, *, keep_intermediates: bool = False):
         """Run evaluation, return (spectrum, info_dict)"""
         self._validate_inputs()
         start = time.time()
@@ -145,7 +145,7 @@ class EvaluationWorkflow:
                                self.simulation.vib_ana_setup, self.simulation.props)
     
     def _prep_complilers(self, vib_data, vibdiff_cache, gamma):
-        self.physics = PhysicsCalculator(vib_data, vibdiff_cache, gamma)
+        self.physics = PhysicsCalculator(gamma)
         self.compiler = FeatureCompiler(vib_data, vibdiff_cache)
 
     def _process_resonances(self, terms_list, vib_data, vib_cache):
