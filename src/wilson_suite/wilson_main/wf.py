@@ -79,10 +79,23 @@ class WilsonSimulation:
     @property
     def is_ready(self) -> bool:
         """Check if ready to evaluate (has properties with data)"""
-        return (self.is_configured and 
-                self.props is not None and 
-                len(self.props) > 0 and
-                all(hasattr(p, 'vals') and p.vals is not None for p in self.props))
+        # print(f'self.is_configured {self.is_configured}\nself.props is not None {self.props is not None}\nlen(self.props) > 0 {len(self.props) > 0}')
+        # print(f"for p in self.props: { {p.trivial_name: p.vals is not None for p in self.props} }") 
+        # print(f'self.vib_ana_setup.isAllSet {self.vib_ana_setup.isAllSet}')       
+        conds = {'not self.is_configured': self.is_configured , 
+                'not self.props is not None': self.props is not None , 
+                'not len(self.props) > 0': len(self.props) > 0 ,
+                f'p.trivial_name: p.vals is not None for p in self.props: {{p.trivial_name: p.vals is not None for p in self.props}}': all(p.vals is not None for p in self.props) ,
+                'not self.vib_ana_setup.isAllSet': self.vib_ana_setup.isAllSet}
+        final = True
+
+        for c in conds:
+            final &= conds[c]
+            if not conds[c]:
+                print(c)
+                return final
+
+        return final
     
     @property
     def has_spectrum(self) -> bool:
@@ -269,8 +282,15 @@ class WilsonSimulation:
             values: values
         """
         data_request = self.requestData()
-        data = obtainer(data_request)
+        print('data_request', data_request.keys())
+        try:
+            data = obtainer(data_request)
+        except Exception as e:
+            # print("data_request", data_request)
+            # print(e)
+            raise ValueError('Smth went wrong in the obtainer')
         self.fillResults(data)
+    
     
     # ==================== Evaluation & Rendering ====================
     
@@ -307,7 +327,7 @@ class WilsonSimulation:
         workflow = EvaluationWorkflow(self)
         self._workflow = workflow
 
-        self.spec, info = workflow.run(keep_intermediates)
+        self.spec, info = workflow.run(keep_intermediates=keep_intermediates)
 
         if self.diagn is None:
             self.diagn = {}

@@ -25,9 +25,7 @@ logger = logging.getLogger("wilson")
 class PhysicsCalculator:
     """Pure physics calculations for resonance conditions."""
     
-    def __init__(self, vib_data, vibdiff_cache, gamma: float):
-        self.vib_data = vib_data
-        self.vibdiff_cache = vibdiff_cache
+    def __init__(self, gamma: float):
         self.gamma = gamma
     
     def evaluate_resonance_motif(self, 
@@ -232,7 +230,7 @@ class SpectralEvaluator:
     """
     
     def __init__(self, vib_data, vibdiff_cache, gamma: float):
-        self.physics = PhysicsCalculator(vib_data, vibdiff_cache, gamma)
+        self.physics = PhysicsCalculator(gamma)
         self.compiler = FeatureCompiler(vib_data, vibdiff_cache)
         self.grid_mgr = None  # Set during evaluate_spectrum
         
