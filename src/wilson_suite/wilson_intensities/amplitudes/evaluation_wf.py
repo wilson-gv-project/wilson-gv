@@ -26,10 +26,38 @@ class StepExecutionError(WorkflowError):
         self.original_exception = original_exception
 
 class EvaluationWorkflow:
-    """Simple workflow that tracks steps and captures intermediates on error"""
+    """
+    A workflow that tracks steps and captures intermediates on error
     
-    def __init__(self, simulation: "WilsonSimulation"):
-        self.simulation = simulation
+    Can work with a WilsonSimulation in a prepared state (READY) or stanalone with provided necessary inputs.
+    
+    """
+    
+    def __init__(self, simulation: "WilsonSimulation"=None, *, 
+                 terms=None, number_of_modes=None, props=None, 
+                 spec_eval_setup=None, vib_ana_setup=None, pulse_polarization_vector=None):
+        
+        # does not make it possible to override any component at the init stage, but possible to do it later? 
+        # is it safe or desired?
+        if simulation:
+            self.terms = simulation.terms
+            self.number_of_modes = simulation.system.Nnmodes
+
+            self.props = simulation.props
+            self.spec_eval_setup = simulation.spec_eval_setup
+            self.vib_ana_setup = simulation.vib_ana_setup
+
+            self.pulse_polarization_vector = simulation.exp.polarization_avg_vector
+        else:
+            self.terms = terms
+            self.number_of_modes = number_of_modes
+
+            self.props = props
+            self.spec_eval_setup = spec_eval_setup
+            self.vib_ana_setup = vib_ana_setup
+
+            self.pulse_polarization_vector = pulse_polarization_vector
+
         self.results = {}
         self.timing = {}
         self.failed_at = None
@@ -39,13 +67,18 @@ class EvaluationWorkflow:
         """
         WilsonSimulation at this point should have necessary data
         """
-        if not hasattr(self.simulation, 'terms') or not self.simulation.terms:
-            raise ValueError("Simulation object must have a non-empty 'terms' attribute.")
-        if not hasattr(self.simulation, 'system') or not self.simulation.system:
-            raise ValueError("Simulation object must have a non-empty 'system' attribute.")
-        if not hasattr(self.simulation, 'props') or not self.simulation.props:
-            raise ValueError("Simulation object must have a non-empty 'props' attribute.")
-        
+        if not self.terms:
+            raise ValueError("Non-empty 'terms' should be provided")
+        if not self.number_of_modes:
+            raise ValueError("'number_of_modes' should be provided")
+        if not self.props:
+            raise ValueError("Non-empty 'props'  should be provided")
+        if not self.vib_ana_setup.isAllSet:
+            raise ValueError("'vib_ana_setup' should be all set (vib_ana_setup.isAllSet)")
+        # validate spec_eval_setup, pulse_polarization_vector, number_of_modes(?)
+
+        # if len(self.pulse_polarization_vector) !=3:
+            # raise ValueError("'pulse_polarization_vector' should be a length 3 vector") -- is it true?
 
     def run(self, *, keep_intermediates: bool = False):
         """Run evaluation, return (spectrum, info_dict)"""
@@ -74,13 +107,13 @@ class EvaluationWorkflow:
 
             grid_manager = self._step('make_GridManager',
                 lambda: self._make_GridManager(spec_window))
-            grid_manager.make_fullgrid(self.simulation.spec_eval_setup.ev_info.grid_resolution)
+            grid_manager.make_fullgrid(self.spec_eval_setup.ev_info.grid_resolution)
             
             regions = self._step('make_regions',
                 lambda: self._make_regions(grid_manager))
             
             self._step('prep_complilers',
-                lambda: self._prep_complilers(vib_data, vib_cache, self.simulation.spec_eval_setup.ev_info.Gamma))
+                lambda: self._prep_complilers(vib_data, vib_cache, self.spec_eval_setup.ev_info.Gamma))
             
             regions_results = self._step('evaluate_regions',
                 lambda: self._evaluate_regions(regions))
@@ -118,10 +151,7 @@ class EvaluationWorkflow:
         """Execute step, track timing and result"""
         self.failed_at = name
         start = time.time()
-        # try:
         result = func()
-        # except Exception as e:
-        #     raise StepExecutionError(name, e) from e
         self.timing[name] = time.time() - start
         self.results[name] = result
         # self._save_checkpoint(name)  # Save checkpoint
@@ -133,7 +163,7 @@ class EvaluationWorkflow:
         Make flat list of VibPerturbedTerm from the dict
         """
         from wilson_suite.wilson_intensities.amplitudes.evaluators import prepTermsForEval
-        terms = prepTermsForEval(self.simulation.terms)
+        terms = prepTermsForEval(self.terms)
         if not terms:
             raise ValueError("No terms were prepared with prepTermsForEval(). Check the input terms.")
         return terms
@@ -141,8 +171,8 @@ class EvaluationWorkflow:
     def _prep_data(self):
         from wilson_suite.wilson_intensities.amplitudes.evaluators import prepDataForEval
         
-        return prepDataForEval(self.simulation.system, self.simulation.exp, 
-                               self.simulation.vib_ana_setup, self.simulation.props)
+        return prepDataForEval(self.number_of_modes, self.pulse_polarization_vector, 
+                               self.vib_ana_setup, self.props)
     
     def _prep_complilers(self, vib_data, vibdiff_cache, gamma):
         self.physics = PhysicsCalculator(gamma)
@@ -168,12 +198,12 @@ class EvaluationWorkflow:
         return get_features_to_draw(
             motif_res_loc=motif_locs, terms_for_motifs=terms_for_motifs,
             term_coeffs_per_index=coefficients,
-            lineshape_parameter=self.simulation.spec_eval_setup.ev_info.Gamma)
+            lineshape_parameter=self.spec_eval_setup.ev_info.Gamma)
     
     def _place_in_specwindow(self, features) -> "SpectralWindow":
         from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
         return SpectralFeature.filter_to_spec_window(
-            features, self.simulation.spec_eval_setup.ev_info.spectral_window)
+            features, self.spec_eval_setup.ev_info.spectral_window)
     
     def _make_GridManager(self, spec_window):
         from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
@@ -250,8 +280,8 @@ class EvaluationWorkflow:
     def _evaluate_spectrum(self, spec_window, vib_data, vib_cache):
         from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import SpectralEvaluator
         evaluator = SpectralEvaluator(vib_data, vib_cache, 
-                                     gamma=self.simulation.spec_eval_setup.ev_info.Gamma)
+                                     gamma=self.spec_eval_setup.ev_info.Gamma)
         return evaluator.evaluate_spectrum(
             spec_window=spec_window,
-            grid_resolution=self.simulation.spec_eval_setup.ev_info.grid_resolution,
+            grid_resolution=self.spec_eval_setup.ev_info.grid_resolution,
             return_type='grid')
