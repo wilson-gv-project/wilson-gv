@@ -4,7 +4,6 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, ResonanceMotif, VibStatesData
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiff
 
 @dataclass
@@ -39,7 +38,7 @@ def compile_resonance_motif(res_motif: 'ResonanceMotif',
         vd = VibDiff.from_symbolic(rc.diff, param_set, vib_data)
         vd.cache_it(vibdiff_cache)
 
-        energy = convNu2Ene(vd.energy_difference(au=False))
+        energy = vd.energy_difference(au=True)
         pf = rc.pf_dict
 
         compiled.append(NumericalResonanceCondition(
