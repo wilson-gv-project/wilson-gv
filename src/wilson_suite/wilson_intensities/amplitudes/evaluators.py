@@ -38,12 +38,12 @@ def prepTermsForEval(terms):
                 terms_as_list.append(t)
     return terms_as_list
 
-def prepDataForEval(system, experiment, vib_ana_setup, props):
+def prepDataForEval(number_of_nmodes, pulse_polarization_vector, vib_ana_setup, props):
     """
     put data in a form for use on the evaluation step
     """
     vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
-        system, experiment, vib_ana_setup, props
+        number_of_nmodes, pulse_polarization_vector, vib_ana_setup, props
     )
     
     return vibstates_data, vibdiff_cache, data_and_configs
@@ -122,8 +122,8 @@ def terms_evaluator_general_compilation(system: 'MolecularSystem',
 
 
 
-def initialize_evaluation_data(system: 'MolecularSystem',
-                               experiment: 'VibExperiment',
+def initialize_evaluation_data(number_of_nmodes: int,
+                               pulse_polarization_vector: np.ndarray,
                                vib_ana_setup: 'VibAnaSetup',
                                props: list['MolecularProperty']) -> tuple[VibStatesData, VibDiffCache, EvaluationDataAndConfigs]:
     """
@@ -143,9 +143,9 @@ def initialize_evaluation_data(system: 'MolecularSystem',
     
     data_and_configs = EvaluationDataAndConfigs(props_data=props,
                                                 vibstates_data=vibstates_data,
-                                                number_of_nmodes=system.Nnmodes,
-                                                nm_inds_choices=vib_ana_setup.modes_indices,
-                                                pulse_polarization_vector=experiment.polarization_avg_vector)
+                                                number_of_nmodes=number_of_nmodes,
+                                                nm_inds_choices=include_list,
+                                                pulse_polarization_vector=pulse_polarization_vector)
     
     return vibstates_data, vibdiff_cache, data_and_configs
 
