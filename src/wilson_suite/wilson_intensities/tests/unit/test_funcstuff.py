@@ -12,27 +12,64 @@ from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_ab
 from wilson_suite.wilson_intensities.amplitudes.resonances import solve_LSE_motif
 import json
 
+import pytest
+from dataclasses import FrozenInstanceError
+
 import wilson_suite.wilson_main.abstractions
 
 def test_ParameterSet():
-    print()
     o1 = ParameterSet(dict(a=3, b=4, c=4))
     o2 = ParameterSet(dict(a=3, b=4, c=4))
     o3 = ParameterSet(dict(a=1, b=4, c=4))
-    print(o1.indices())
-    print(o1.parameter_labels())
+
     assert o1.indices() == [3, 4, 4]
     assert o1.parameter_labels() == ['a', 'b', 'c']
 
     assert o1 == o2
     assert o1 != o3
+    assert o2 != o3
+    
+    assert len(o1) == 4  # includes "zero"
+    assert set(o1) == {"a", "b", "c", "zero"}
 
-    print({o1:2.3, o2:3.4, o3:4.3})
-    
+    assert o1["a"] == 3
+    assert o1["b"] == 4
+    assert o1["c"] == 4
+
+    assert "zero" in o1
+    assert "zero" in o2
+    assert "zero" in o3
+
+    assert o1["zero"] == "zero"
+    assert o1[""] == "zero"
+
     json_str = json.dumps(o1.to_dict())
-    print(json_str)
+    assert json_str == '{"a": 3, "b": 4, "c": 4, "zero": "zero"}'
     
-    assert True
+    # ------------
+    d = {o1: 1.0, o2: 2.0, o3: 3.0}
+
+    # o1 and o2 are the same key
+    assert len(d) == 2
+    assert d[o1] == 2.0
+    assert d[o2] == 2.0
+    assert d[o3] == 3.0
+    
+    # ------------
+    o = ParameterSet(dict(a=3))
+    with pytest.raises(TypeError):
+        o._parameters["b"] = 4
+
+    with pytest.raises(FrozenInstanceError):
+        o._parameters = {}
+    
+    # ------------
+    d = o.to_dict()
+    d["b"] = 4
+
+    # original object unchanged
+    assert "b" not in o
+    assert o == ParameterSet(dict(a=3))
 
 def test_ResonanceWaveMatch():
     print()
