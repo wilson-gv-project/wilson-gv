@@ -1,17 +1,15 @@
 """
 Evaluator functions for WilsonSimulation
 """
-from .numerical_abstractions import NumericalResonanceMotif, CompiledTermGroup, compile_feature
-from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import RectangularDomain, ResLocGeoObject, SpectralFeature, Box
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject, SpectralFeature
 from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif, VibStatesData
-import wilson_suite.wilson_intensities.amplitudes.domains as domfuncs
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDataAndConfigs, ParameterSet,
-                                                                   TermParametersChoice)
+                                                                   TermParametersChoice, PrecalculatedData)
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -38,99 +36,13 @@ def prepTermsForEval(terms):
                 terms_as_list.append(t)
     return terms_as_list
 
-def prepDataForEval(number_of_nmodes, pulse_polarization_vector, vib_ana_setup, props):
+def prepDataForEval(number_of_nmodes: int,
+                    pulse_polarization_vector: np.ndarray,
+                    vib_ana_setup: 'VibAnaSetup',
+                    props: list['MolecularProperty']) -> tuple[VibStatesData, VibDiffCache, EvaluationDataAndConfigs]:
     """
     put data in a form for use on the evaluation step
     """
-    vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
-        number_of_nmodes, pulse_polarization_vector, vib_ana_setup, props
-    )
-    
-    return vibstates_data, vibdiff_cache, data_and_configs
-
-# General term evaluator "as response function"
-def terms_evaluator_general_compilation(system: 'MolecularSystem',
-                                        experiment: 'VibExperiment',
-                                        derived_terms: dict[int, dict[tuple, list['VibPerturbedTerm']]],
-                                        props: list['MolecularProperty'],
-                                        spec_eval_setup: 'SpecEvalSetup' = None,
-                                        vib_ana_setup: 'VibAnaSetup' = None,
-                                        domain_distance_thresholds: dict = None,
-                                        do_diagn: bool = None) -> dict[ResLocGeoObject, 
-                                                                       tuple[float, SpectralFeature]]:
-    """
-    Evaluate terms and generate spectral features.
-    """
-    diagn = {}
-
-    # Initialize evaluation/precalculation data
-    vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
-        system, experiment, vib_ana_setup, props
-    )
-
-    # FIXME - make a function for a flat list
-    terms_as_list = []
-    for i in derived_terms:
-        for j in derived_terms[i]:
-            for t in derived_terms[i][j]:
-                terms_as_list.append(t)
-
-    # Precalculate coefficient parts
-    to_precalculate = identify_precalc_unique_coeff_parts(terms=terms_as_list)
-    precalculated = precalculate_unique_coeff_parts(
-        need_to_precalc=to_precalculate,
-        data_and_configs=data_and_configs
-    )
-    
-    # Process resonance motifs
-    motif_res_loc, terms_for_motifs = process_resonance_motifs(
-        terms_as_list, vibstates_data, vibdiff_cache
-    )
-
-    # Evaluate term coefficients
-    term_coeffs_per_index = evaluate_terms_coeffs(
-        terms_as_list, motif_res_loc, precalculated
-    )
-    
-    # FIXME: maybe should be checked earlier
-    if spec_eval_setup is None:
-        raise ValueError('SpecEvalSetup is not set')
-
-    # Get features to draw
-    all_features = get_features_to_draw(
-        motif_res_loc, terms_for_motifs, term_coeffs_per_index, spec_eval_setup.ev_info.Gamma
-    )
-    
-    spec_window = spec_eval_setup.ev_info.spectral_window
-
-    spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
-    # upd spec window
-    spec_eval_setup.ev_info.spectral_window = spec_window_with_features
-
-    #### <--- SpectralEvaluator.evaluate_spectrum
-
-    from .grid_manager_evaluator import SpectralEvaluator
-
-    spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=spec_eval_setup.ev_info.Gamma) # FIXME gamma value type
-    grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=spec_window_with_features, 
-                                                               grid_resolution=spec_eval_setup.ev_info.grid_resolution, return_type='grid')
-
-    # print('grid_values_all_domains\n',grid_values_all_domains, type( grid_values_all_domains))
-    diagn['spec_evaluator'] = spec_evaluator
-
-    return grid_values_all_domains, diagn
-
-
-
-def initialize_evaluation_data(number_of_nmodes: int,
-                               pulse_polarization_vector: np.ndarray,
-                               vib_ana_setup: 'VibAnaSetup',
-                               props: list['MolecularProperty']) -> tuple[VibStatesData, VibDiffCache, EvaluationDataAndConfigs]:
-    """
-    Initialize data structures needed for term evaluation.
-    """
-    # har_states_labels = tuple([list(state.harm_quanta_coeffs.keys())[0][0] 
-    #                          for state in vib_ana_setup.states if state.harmonic_WF])
 
     include_list = tuple([int(v[0]) for v in list(vib_ana_setup.nc_sqrt_eigval.keys()) if int(v[0]) not in vib_ana_setup.exclude_modes])
     if include_list == tuple():
@@ -146,8 +58,9 @@ def initialize_evaluation_data(number_of_nmodes: int,
                                                 number_of_nmodes=number_of_nmodes,
                                                 nm_inds_choices=include_list,
                                                 pulse_polarization_vector=pulse_polarization_vector)
-    
+
     return vibstates_data, vibdiff_cache, data_and_configs
+
 
 def process_resonance_motifs(derived_terms: list['VibPerturbedTerm'],
                             vibstates_data: VibStatesData,
@@ -180,7 +93,8 @@ def process_resonance_motifs(derived_terms: list['VibPerturbedTerm'],
 
 def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
                   motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject]],
-                  precalculated: EvaluationDataAndConfigs) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
+                  data_and_configs: EvaluationDataAndConfigs,
+                  precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
     """
     Evaluate coefficients for all terms.
     """
@@ -190,7 +104,7 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
         term_coeffs_per_index[vibterm] = evaluate_term_coeffs(
             term=vibterm,
             relevant_indices=[k for i in motif_res_loc[res_motif].values() for k in i],
-            necessary_data=precalculated
+            necessary_data=(data_and_configs, precalculated)
         )
     
     return term_coeffs_per_index
