@@ -6,7 +6,12 @@ from ...wilson_main.abstractions import MolPropsCollection
 from typing import Callable
 from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-from collections.abc import Mapping
+# from collections.abc import Mapping
+
+
+from typing import Mapping, Iterator
+from types import MappingProxyType
+
 
 import numpy as np
 from typing import Tuple
@@ -238,61 +243,121 @@ class EvalTermCollection:
 
 
 
-class ParameterSet(Mapping):
-    """
-    Dict-like holder of "parameter label -> index value" mapping
-    Normal mode indices
+# class ParameterSet(Mapping):
+#     """
+#     Dict-like holder of "parameter label -> index value" mapping
+#     Normal mode indices
 
-    index value should be in VibState label space, so it's a string likely
-    """
-    def __init__(self, parameters):
+#     index value should be in VibState label space, so it's a string likely
+#     """
+#     def __init__(self, parameters):
 
-        if not isinstance(parameters, dict):
-            raise TypeError("ParameterSet must be initialized with a dictionary.")
-        parameters = copy.deepcopy(parameters)
+#         if not isinstance(parameters, dict):
+#             raise TypeError("ParameterSet must be initialized with a dictionary.")
+#         parameters = copy.deepcopy(parameters)
         
-        if 'zero' not in parameters:
-            parameters['zero'] = 'zero'
-        self._parameters = dict(parameters)
-        self._hash = hash(frozenset(self._parameters.items()))
+#         if 'zero' not in parameters:
+#             parameters['zero'] = 'zero'
+#         self._parameters = dict(parameters)
+#         self._hash = hash(frozenset(self._parameters.items()))
 
-    def parameter_labels(self):
-        return [i for i in list(self._parameters.keys()) if i!='zero']
+#     def parameter_labels(self):
+#         return [i for i in list(self._parameters.keys()) if i!='zero']
     
-    def indices(self):
-        return [i for i in list(self._parameters.values()) if i!='zero']
+#     def indices(self):
+#         return [i for i in list(self._parameters.values()) if i!='zero']
 
-    def __getitem__(self, key):
-        if key=='':
+#     def __getitem__(self, key):
+#         if key=='':
+#             key = 'zero'
+#         return self._parameters[key]
+
+#     def __iter__(self):
+#         return iter(self._parameters)
+
+#     def __len__(self):
+#         return len(self._parameters)
+
+#     def __hash__(self):
+#         return self._hash
+
+#     def __repr__(self):
+#         repr_d = {k:v for k,v in self._parameters.items() if k!='zero'}
+#         return f"{self.__class__.__name__}({repr_d})"
+
+#     def __eq__(self, other):
+#         if isinstance(other, ParameterSet):
+#             return self._parameters == other._parameters
+#         return False
+    
+#     def to_dict(self):
+#         return self._parameters
+
+#     @classmethod
+#     def from_dict(cls, parameters):
+#         return cls(parameters)
+
+
+@dataclass(frozen=True)
+class ParameterSet(Mapping[str, int]):
+    """
+    Immutable mapping of parameter label -> index value.
+    """
+    _parameters: Mapping[str, int]
+
+    def __init__(self, parameters: Mapping[str, int]):
+        if not isinstance(parameters, Mapping):
+            raise TypeError("ParameterSet must be initialized with a mapping.")
+
+        params = dict(parameters)
+
+        if 'zero' not in params:
+            params['zero'] = 'zero'
+
+        object.__setattr__(
+            self,
+            "_parameters",
+            MappingProxyType(params),
+        )
+
+    # --- Mapping interface ---
+
+    def __getitem__(self, key: str):
+        if key == '':
             key = 'zero'
         return self._parameters[key]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._parameters)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._parameters)
 
-    def __hash__(self):
-        return self._hash
-
-    def __repr__(self):
-        repr_d = {k:v for k,v in self._parameters.items() if k!='zero'}
-        return f"{self.__class__.__name__}({repr_d})"
+    # --- Equality & hashing ---
 
     def __eq__(self, other):
-        if isinstance(other, ParameterSet):
-            return self._parameters == other._parameters
-        return False
-    
+        if not isinstance(other, ParameterSet):
+            return NotImplemented
+        return self._parameters == other._parameters
+
+    def __hash__(self):
+        # Order-independent, value-based hash
+        return hash(frozenset(self._parameters.items()))
+
+    # --- Convenience ---
+
+    def parameter_labels(self):
+        return [k for k in self._parameters if k != 'zero']
+
+    def indices(self):
+        return [v for v in self._parameters.values() if v != 'zero']
+
     def to_dict(self):
-        return self._parameters
+        return dict(self._parameters)
 
-    @classmethod
-    def from_dict(cls, parameters):
-        return cls(parameters)
-
-
+    def __repr__(self):
+        repr_d = {k: v for k, v in self._parameters.items() if k != 'zero'}
+        return f"{self.__class__.__name__}({repr_d})"
 
 @dataclass
 class VibStatesData:
@@ -339,20 +404,21 @@ class VibStatesData:
         else:
             raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
 
-@dataclass()
+@dataclass(frozen=True)
 class EvaluationDataAndConfigs:
     props_data: MolPropsCollection = None
     vibstates_data: 'VibStatesData' = None
     number_of_nmodes: int = None
     nm_inds_choices: list[int] = None
+    pulse_polarization_vector: list = None
+
+
+@dataclass()
+class PrecalculatedData:
     vibdiff_cache: 'VibDiffCache' = None
     avrg_tensors: dict = None
     avrg_expr_tensor_mapping: dict = None
     vibenedenoms_tensors: dict = None
-    pulse_polarization_vector: list = None
-
-
-
 
 @dataclass(frozen=True)
 class TermParametersChoice:
@@ -375,23 +441,6 @@ class TermParametersChoice:
             and self.term_ids == other.term_ids
             and self.states_parameters == other.states_parameters
         )
-    # ---------------------------------------------------------
-    # Properties / helpers
-    # ---------------------------------------------------------
-    # @property
-    # def term_keys(self) -> Tuple[int]:
-    #     """Symbolic IDs of terms based on VibPerturbedTerm.h()."""
-    #     return tuple(t.h() for t in self.terms)
-
-    # def _infer_res_motif(self):
-    #     """Derives resonance motif from the term objects."""
-    #     motifs = {ResonanceMotif(term.res) for term in self.terms}
-    #     if len(motifs) != 1:
-    #         raise ValueError(
-    #             "All terms in TermParametersChoice must share the same ResonanceMotif"
-    #         )
-    #     return motifs.pop()  # the unique motif
-
 
 # -------------------------------------------------------
 

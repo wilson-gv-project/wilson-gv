@@ -6,7 +6,7 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 import numpy as np
 import copy
 
-from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, EvaluationDataAndConfigs, FreqTermsCollection
+from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, EvaluationDataAndConfigs, FreqTermsCollection, PrecalculatedData
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 
@@ -54,28 +54,27 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict,
         data = {'avrg_tensors': {}}
 
     """
-
-    data = copy.deepcopy(data_and_configs)
-    data.avrg_tensors = {}
-    data.avrg_expr_tensor_mapping = need_to_precalc['avrg_expr_tensor_mapping']
-    data.vibenedenoms_tensors = {}
-
+    avrg_tensors = {}
     for avrg_tensor in need_to_precalc['avrg_tensors']:
-        data.avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
+        avrg_tensors[avrg_tensor] = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_tensor, 
                                                                         pulse_polarization_vector=data_and_configs.pulse_polarization_vector,
                                                                         props_data=data_and_configs.props_data,
                                                                         number_of_nmodes=data_and_configs.number_of_nmodes,
                                                                         nm_inds_choices=data_and_configs.nm_inds_choices)   
+    vibenedenoms_tensors = {}
     for ve_denom in need_to_precalc['vibenedenoms_tensors']:
-        data.vibenedenoms_tensors[ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
+        vibenedenoms_tensors[ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
                                                                                   vibstates_data=data_and_configs.vibstates_data)
-    data.vibdiff_cache = vediff.VibDiffCache()
-    return data
+    
+    return PrecalculatedData(vibdiff_cache=vediff.VibDiffCache(),
+                             avrg_tensors=avrg_tensors, 
+                             avrg_expr_tensor_mapping=need_to_precalc['avrg_expr_tensor_mapping'],
+                             vibenedenoms_tensors=vibenedenoms_tensors)
 
 # NOTE: Have a more thorough look at this together
 def evaluate_term_coeffs(term: 'VibPerturbedTerm', 
                          relevant_indices: list[dict], 
-                         necessary_data: EvaluationDataAndConfigs, 
+                         necessary_data: tuple[EvaluationDataAndConfigs, PrecalculatedData], 
                          zero_tol: float = 1e-18) -> dict[ParameterSet, float]:
     """
     safety function to check relevant_indices?
@@ -93,18 +92,19 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
 
     # Return data or associate with term instance question not settled yet
     results = {}
-
+    data_and_configs, precalculated_data = necessary_data
+    
     # AVRG and NON_AVRG
     avrg_expr = avrgprops.PropsCollection(props=term.props).get_averaged_props().sort()
     non_avrg_expr = avrgprops.PropsCollection(props=term.props).get_non_averaged_props()
 
-    avrg_tensor_expr = necessary_data.avrg_expr_tensor_mapping[avrg_expr]
-    avrg_tensor = necessary_data.avrg_tensors[avrg_tensor_expr]
+    avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
+    avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]
     
     freqterms = FreqTermsCollection(freqterms=term.freqterms)
     extra_freqterms = freqterms.get_pert_wf_diff()
 
-    vibenedenoms_tensor = necessary_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
+    vibenedenoms_tensor = precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
 
     idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
     term_idx_all = sorted(idx_summ + idx_nonsumm)
@@ -115,7 +115,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
             # index_dict {'a': 0, 'b': 0}
             to_summ_over = [index for index in term_idx_all if index not in index_dict]
             # to_summ ['c']
-            n_modes = necessary_data.number_of_nmodes
+            n_modes = data_and_configs.number_of_nmodes
             nm_idxs = list(range(n_modes))
             
             # Create new index dictionaries for all combinations
@@ -146,7 +146,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
             na_prop_inds = tuple([index_dict[i] for i in non_avrg_prop.inds])
             triv_name = prop_trivname(ord_el=len(non_avrg_prop.ops), ord_geo=non_avrg_prop.dord)
 
-            NON_AVRG = necessary_data.props_data.get(triv_name).vals[na_prop_inds]
+            NON_AVRG = data_and_configs.props_data.get(triv_name).vals[na_prop_inds]
 
             if np.isclose(NON_AVRG, zero_tol):
                 results[ParameterSet(index_dict)] =  0.
@@ -167,8 +167,8 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
         # VIBDIFF_TERMS is_pert_wf_diff
         for vibdiff in extra_freqterms:
             vib_diff_w_value = vediff.VibDiff.from_symbolic(vibdiff, index_dict, 
-                                                            necessary_data.vibstates_data)
-            vib_diff_w_value.cache_it(vibdiff_cache=necessary_data.vibdiff_cache)
+                                                            data_and_configs.vibstates_data)
+            vib_diff_w_value.cache_it(vibdiff_cache=precalculated_data.vibdiff_cache)
 
             product *= 1./ vib_diff_w_value.energy_difference(au=True)
 
