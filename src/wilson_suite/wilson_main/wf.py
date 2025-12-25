@@ -323,15 +323,17 @@ class WilsonSimulation:
         else:
             self.spec, _ = evaluator(**context)
 
-    def evaluate(self, keep_intermediates):
-        workflow = EvaluationWorkflow(self)
+    def evaluate(self):
+        from ..wilson_intensities.amplitudes.evaluation_wf import make_evaluation_inputs
+        eval_inputs = make_evaluation_inputs(simulation=self)
+        workflow = EvaluationWorkflow(inputs=eval_inputs)
         self._workflow = workflow
 
-        self.spec, info = workflow.run(keep_intermediates=keep_intermediates)
+        self.spec  = workflow.run()
 
-        if self.diagn is None:
-            self.diagn = {}
-        self.diagn.update(info)
+        # if self.diagn is None:
+        #     self.diagn = {}
+        # self.diagn.update(info)
 
 
     def render(self, renderer, do_diagn: bool = False):

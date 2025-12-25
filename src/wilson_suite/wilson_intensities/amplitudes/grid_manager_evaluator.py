@@ -214,7 +214,7 @@ class FeatureCompiler:
         resonance conditions ready for grid evaluation.
         """
         # Import here to avoid circular dependencies
-        from .evaluators import compile_feature
+        from .numerical_abstractions import compile_feature
         return compile_feature(feature, self.vib_data, self.vibdiff_cache)
 
 

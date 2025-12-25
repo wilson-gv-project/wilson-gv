@@ -1,12 +1,29 @@
 import time
 import numpy as np
-from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import FeatureCompiler, PhysicsCalculator
+from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import PhysicsCalculator
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, SpectralFeature
-    from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager, GridRegion
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup
+    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
+    from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
+
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
+from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
+
+from wilson_suite.wilson_intensities.amplitudes.evaluators import prepTermsForEval
+from wilson_suite.wilson_intensities.amplitudes.evaluators import prepDataForEval
+from wilson_suite.wilson_intensities.amplitudes.evaluators import process_resonance_motifs
+from wilson_suite.wilson_intensities.amplitudes.evaluators import (
+    evaluate_terms_coeffs, precalculate_unique_coeff_parts, 
+    identify_precalc_unique_coeff_parts
+)
+from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw
+
+from contextlib import contextmanager
 
 import logging
 logger = logging.getLogger("wilson")
@@ -25,6 +42,106 @@ class StepExecutionError(WorkflowError):
         self.step_name = step_name
         self.original_exception = original_exception
 
+@dataclass
+class EvaluationContext:
+    """
+    Execution metadata for a single EvaluationWorkflow run.
+    This class is intentionally non-scientific.
+    """
+    verbose: bool = False
+
+    # name -> elapsed seconds
+    timing: dict[str, float] = field(default_factory=dict)
+
+    # name of the step currently executing / last failed
+    failed_at: str = None
+
+    # optional: step name -> arbitrary object
+    intermediates: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EvaluationInputs:
+    terms: Any
+    number_of_modes: int
+    props: Any
+    spec_eval_setup: 'SpecEvalSetup'
+    vib_ana_setup: 'VibAnaSetup'
+    pulse_polarization_vector: tuple[float, float, float]
+
+def make_evaluation_inputs(
+                            *,
+                            simulation: "WilsonSimulation" = None,
+                            terms=None,
+                            number_of_modes=None,
+                            props=None,
+                            spec_eval_setup=None,
+                            vib_ana_setup=None,
+                            pulse_polarization_vector=None,
+                        ) -> EvaluationInputs:
+    """
+    Create EvaluationInputs either from a WilsonSimulation
+    or from explicitly provided components.
+
+    Exactly one source of truth must be used.
+    """
+
+    if simulation is not None:
+        if any(x is not None for x in (
+            terms, number_of_modes, props,
+            spec_eval_setup, vib_ana_setup,
+            pulse_polarization_vector,
+        )):
+            raise ValueError(
+                "Provide either simulation OR explicit inputs, not both"
+            )
+
+        # Extract and normalize from simulation
+        terms = simulation.terms
+        number_of_modes = simulation.system.Nnmodes
+        props = simulation.props
+        spec_eval_setup = simulation.spec_eval_setup
+        vib_ana_setup = simulation.vib_ana_setup
+        pulse_polarization_vector = tuple(
+            simulation.exp.polarization_avg_vector
+        )
+
+    # ---- validation of completeness ----
+
+    missing = [
+        name for name, value in {
+            "terms": terms,
+            "number_of_modes": number_of_modes,
+            "props": props,
+            "spec_eval_setup": spec_eval_setup,
+            "vib_ana_setup": vib_ana_setup,
+            "pulse_polarization_vector": pulse_polarization_vector,
+        }.items()
+        if value is None
+    ]
+
+    if missing:
+        raise ValueError(
+            f"Missing required inputs: {', '.join(missing)}"
+        )
+
+    # ---- light normalization / sanity checks ----
+
+    if len(pulse_polarization_vector) != 3:
+        raise ValueError(
+            "pulse_polarization_vector must be length 3"
+        )
+
+    return EvaluationInputs(
+        terms=terms,
+        number_of_modes=number_of_modes,
+        props=props,
+        spec_eval_setup=spec_eval_setup,
+        vib_ana_setup=vib_ana_setup,
+        pulse_polarization_vector=tuple(pulse_polarization_vector),
+    )
+
+
 class EvaluationWorkflow:
     """
     A workflow that tracks steps and captures intermediates on error
@@ -32,256 +149,187 @@ class EvaluationWorkflow:
     Can work with a WilsonSimulation in a prepared state (READY) or stanalone with provided necessary inputs.
     
     """
-    
-    def __init__(self, simulation: "WilsonSimulation"=None, *, 
-                 terms=None, number_of_modes=None, props=None, 
-                 spec_eval_setup=None, vib_ana_setup=None, pulse_polarization_vector=None):
-        
-        # does not make it possible to override any component at the init stage, but possible to do it later? 
-        # is it safe or desired?
-        if simulation:
-            self.terms = simulation.terms
-            self.number_of_modes = simulation.system.Nnmodes
+    def __init__(self, inputs: EvaluationInputs, parallel=None, verbose=False):
+        self.ctx = EvaluationContext(verbose=verbose)        
+        self.inputs = inputs
+        self.parallel = parallel
+        self.artifacts = {}
 
-            self.props = simulation.props
-            self.spec_eval_setup = simulation.spec_eval_setup
-            self.vib_ana_setup = simulation.vib_ana_setup
-
-            self.pulse_polarization_vector = simulation.exp.polarization_avg_vector
-        else:
-            self.terms = terms
-            self.number_of_modes = number_of_modes
-
-            self.props = props
-            self.spec_eval_setup = spec_eval_setup
-            self.vib_ana_setup = vib_ana_setup
-
-            self.pulse_polarization_vector = pulse_polarization_vector
-
-        self.results = {}
-        self.timing = {}
-        self.failed_at = None
-        self.verbose = False
 
     def _validate_inputs(self):
         """
         WilsonSimulation at this point should have necessary data
         """
-        if not self.terms:
+        if not self.inputs.terms:
             raise ValueError("Non-empty 'terms' should be provided")
-        if not self.number_of_modes:
+        if not self.inputs.number_of_modes:
             raise ValueError("'number_of_modes' should be provided")
-        if not self.props:
+        if not self.inputs.props:
             raise ValueError("Non-empty 'props'  should be provided")
-        if not self.vib_ana_setup.isAllSet:
+        if not self.inputs.vib_ana_setup.isAllSet:
             raise ValueError("'vib_ana_setup' should be all set (vib_ana_setup.isAllSet)")
         # validate spec_eval_setup, pulse_polarization_vector, number_of_modes(?)
 
-        # if len(self.pulse_polarization_vector) !=3:
-            # raise ValueError("'pulse_polarization_vector' should be a length 3 vector") -- is it true?
+        if not self.inputs.pulse_polarization_vector or len(self.inputs.pulse_polarization_vector) != 3:
+            raise ValueError("'pulse_polarization_vector' should be a length 3 vector") # -- is it true?
 
-    def run(self, *, keep_intermediates: bool = False):
+    @contextmanager
+    def step(self, name):
+        self.ctx.failed_at = name
+        start = time.time()
+        try:
+            yield
+        finally:
+            self.ctx.timing[name] = time.time() - start
+
+
+    def run(self):
         """Run evaluation, return (spectrum, info_dict)"""
         self._validate_inputs()
-        start = time.time()
         
         try:
-            # prep steps
-            terms_list = self._step('prep_terms', self._prep_terms)
-            vib_data, vib_cache, data_configs = self._step('prep_data', self._prep_data)
+            # Step 1: Preparation
+            with self.step("prep_terms"):
+                self.artifacts["terms"] = prepTermsForEval(self.inputs.terms)
 
+            with self.step("prep_data"): # could be in data inputs
+                self.artifacts["vib_data"], self.artifacts["vibdiff_cache"], self.artifacts["data_configs"] = prepDataForEval(self.inputs.number_of_modes, 
+                                                                 self.inputs.pulse_polarization_vector, 
+                                                                 self.inputs.vib_ana_setup, 
+                                                                 self.inputs.props)
+
+            # self._save_checkpoint('Step1')  # Save checkpoint
+
+            # Step 2: Process resonances and calculate coefficients
             # get resonances locations for all terms
-            motif_locs, terms_for_motifs = self._step('process_resonances', 
-                lambda: self._process_resonances(terms_list, vib_data, vib_cache))
-            
-            coefficients = self._step('term_coefficients',
-                lambda: self._calc_coefficients(terms_list, motif_locs, data_configs))
-            
-            features = self._step('all_features',
-                lambda: self._extract_features(motif_locs, terms_for_motifs, coefficients))
-            
-            spec_window = self._step('place_in_specwindow',
-                lambda: self._place_in_specwindow(features))
-            
+            with self.step("process_resonances"):
+                self.artifacts["motif_locs"], self.artifacts["terms_for_motifs"] = process_resonance_motifs(self.artifacts["terms"],
+                                                                                                            self.artifacts["vib_data"],
+                                                                                                            self.artifacts["vibdiff_cache"])
+            with self.step("term_coefficients"):
+                self.artifacts["need_precalc"] = identify_precalc_unique_coeff_parts(terms=self.artifacts["terms"])
+                self.artifacts["precalculated"] = precalculate_unique_coeff_parts(
+                    need_to_precalc=self.artifacts["need_precalc"], data_and_configs=self.artifacts["data_configs"])
+                self.artifacts["coefficients"] = evaluate_terms_coeffs(self.artifacts["terms"],
+                                                                       self.artifacts["motif_locs"],
+                                                                       self.artifacts["data_configs"],
+                                                                       self.artifacts["precalculated"])
 
+            # self._save_checkpoint('Step2')  # Save checkpoint
 
-            grid_manager = self._step('make_GridManager',
-                lambda: self._make_GridManager(spec_window))
-            grid_manager.make_fullgrid(self.spec_eval_setup.ev_info.grid_resolution)
+            # Step 3: Extract features and place them in the spectral window
+            with self.step("all_features"):
+                self.artifacts["features"] = get_features_to_draw(motif_res_loc=self.artifacts["motif_locs"], 
+                                                                  terms_for_motifs=self.artifacts["terms_for_motifs"],
+                                                                  term_coeffs_per_index=self.artifacts["coefficients"],
+                                                                  lineshape_parameter=self.inputs.spec_eval_setup.ev_info.Gamma)
+            with self.step("place_in_specwindow"):
+                self.artifacts['spec_window'] = SpectralFeature.filter_to_spec_window(self.artifacts["features"], self.inputs.spec_eval_setup.ev_info.spectral_window)
             
-            regions = self._step('make_regions',
-                lambda: self._make_regions(grid_manager))
-            
-            self._step('prep_complilers',
-                lambda: self._prep_complilers(vib_data, vib_cache, self.spec_eval_setup.ev_info.Gamma))
-            
-            regions_results = self._step('evaluate_regions',
-                lambda: self._evaluate_regions(regions))
-            
-            self._step('assemble_fullgrid',
-                lambda: self._assemble_fullgrid(grid_manager, regions_results))
+            # self._save_checkpoint('Step3')  # Save checkpoint
 
-            
-            info = {'timing': self.timing, 'total_time': time.time() - start}
-            if keep_intermediates:
-                info['intermediates'] = self.results
-            
-            return grid_manager.full_grid, info
+            # Step 4: Grid management and region evaluation
+            with self.step("make_grid_manager"):
+                self.artifacts['grid_manager'] = GridManager(self.artifacts['spec_window'])
+                self.artifacts['grid_manager'].make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
+
+            with self.step("make_regions"):
+                self.artifacts['regions'] = self.artifacts['grid_manager'].create_regions()
+
+            with self.step("physics"):
+                self.artifacts['physics'] = PhysicsCalculator(self.inputs.spec_eval_setup.ev_info.Gamma)
+                
+            with self.step("regions_results"):
+                self.artifacts['regions_results'] = evaluate_regions(self.artifacts['regions'], 
+                                                                     self.artifacts["vib_data"], 
+                                                                     self.artifacts["vibdiff_cache"],
+                                                                     self.artifacts['physics'],
+                                                                     self.ctx.verbose)
+                        
+            # self._save_checkpoint('Step4')  # Save checkpoint
+
+            # Step 5: Assemble the full grid
+            with self.step("place_results"):
+                self.artifacts['grid_manager'].place_results_into_grid(self.artifacts['regions_results'])
+
+            # Return results
+            return self.artifacts['grid_manager'].full_grid
             
         except Exception as e:
-            # On error, always include intermediates
-            info = {
-                'timing': self.timing,
-                'total_time': time.time() - start,
-                'failed_at': self.failed_at,
-                'error': str(e),
-                'intermediates': self.results,
-            }
-
-            raise type(e)(f"Failed at '{self.failed_at}': {e}") from e
-
-    def _save_checkpoint(self, name):
+            raise type(e)(
+                f"Failed at '{self.ctx.failed_at}': {e}"
+            ) from e
+ 
+    def _save_checkpoint(self, name: str):
+        """
+        FIXME: self.results are not serializable yet
+        """
         import json
 
         # Save intermediate results to a file or log them
         with open(f'checkpoint_{name}.json', 'w') as f:
             json.dump(self.results, f)
-    
-    def _step(self, name, func):
-        """Execute step, track timing and result"""
-        self.failed_at = name
-        start = time.time()
-        result = func()
-        self.timing[name] = time.time() - start
-        self.results[name] = result
-        # self._save_checkpoint(name)  # Save checkpoint
-        return result
-    
-    # Step implementations
-    def _prep_terms(self):
-        """
-        Make flat list of VibPerturbedTerm from the dict
-        """
-        from wilson_suite.wilson_intensities.amplitudes.evaluators import prepTermsForEval
-        terms = prepTermsForEval(self.terms)
-        if not terms:
-            raise ValueError("No terms were prepared with prepTermsForEval(). Check the input terms.")
-        return terms
-    
-    def _prep_data(self):
-        from wilson_suite.wilson_intensities.amplitudes.evaluators import prepDataForEval
+
+
+def evaluate_regions(regions: list["GridRegion"], 
+                     vib_data, vibdiff_cache, physics,
+                     verbose):
+
+    # Step 2: Evaluate each region
+    region_results = {}
+    for region in regions:
+        if verbose:
+            logger.info(f"\nEvaluating region with {len(region.features)} features")
         
-        return prepDataForEval(self.number_of_modes, self.pulse_polarization_vector, 
-                               self.vib_ana_setup, self.props)
-    
-    def _prep_complilers(self, vib_data, vibdiff_cache, gamma):
-        self.physics = PhysicsCalculator(gamma)
-        self.compiler = FeatureCompiler(vib_data, vibdiff_cache)
-
-    def _process_resonances(self, terms_list, vib_data, vib_cache):
-        from wilson_suite.wilson_intensities.amplitudes.evaluators import process_resonance_motifs
-        return process_resonance_motifs(terms_list, vib_data, vib_cache)
-    
-    def _calc_coefficients(self, terms_list, motif_locs, data_configs):
-        from wilson_suite.wilson_intensities.amplitudes.evaluators import (
-            evaluate_terms_coeffs, precalculate_unique_coeff_parts, 
-            identify_precalc_unique_coeff_parts
-        )
-        need_precalc = identify_precalc_unique_coeff_parts(terms=terms_list)
-        precalculated = precalculate_unique_coeff_parts(
-            need_to_precalc=need_precalc, data_and_configs=data_configs)
-
-        return evaluate_terms_coeffs(terms_list, motif_locs, precalculated=precalculated)
-    
-    def _extract_features(self, motif_locs, terms_for_motifs, coefficients) -> list["SpectralFeature"]:
-        from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw
-        return get_features_to_draw(
-            motif_res_loc=motif_locs, terms_for_motifs=terms_for_motifs,
-            term_coeffs_per_index=coefficients,
-            lineshape_parameter=self.spec_eval_setup.ev_info.Gamma)
-    
-    def _place_in_specwindow(self, features) -> "SpectralWindow":
-        from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
-        return SpectralFeature.filter_to_spec_window(
-            features, self.spec_eval_setup.ev_info.spectral_window)
-    
-    def _make_GridManager(self, spec_window):
-        from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
-        return GridManager(spec_window)
-
-    def _make_fullgrid(self, grid_manager: "GridManager"):
-        grid_manager.make_fullgrid()
-
-    def _make_regions(self, grid_manager: "GridManager") -> list["GridRegion"]:
-        return grid_manager.create_regions()
-
-    def _evaluate_regions(self, regions: list["GridRegion"]):
-
-        # Step 2: Evaluate each region
-        region_results = {}
-        for region in regions:
-            if self.verbose:
-                logger.info(f"\nEvaluating region with {len(region.features)} features")
-            
-            region_results[region] = self._evaluate_region(region, self.verbose)
-            
-            if self.verbose:
-                intensity = region_results[region]
-                logger.info(f"  Region shape: {intensity.shape}")
-                logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
-        return region_results
-    
-    def _evaluate_region(self, 
-                        region: "GridRegion",
-                        verbose: bool = False) -> np.ndarray:
-        """Evaluate all features in a single grid region."""
-        # Initialize result array
-        result = np.zeros_like(
-            next(iter(region.coords.values())), 
-            dtype=complex
-        )
-        
-        # Sum contributions from all features
-        for feature in region.features:
-            if verbose:
-                logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
-            
-            result += self._evaluate_feature(feature, region.coords, verbose)
-            
-        return result
-    
-    def _evaluate_feature(self,
-                         feature: 'SpectralFeature',
-                         coords: dict[str, np.ndarray],
-                         verbose: bool = False) -> np.ndarray:
-        """Evaluate a single feature on grid coordinates."""
-        # Compile feature to numerical form
-        compiled_groups = self.compiler.compile_feature(feature)
+        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, physics, verbose)
         
         if verbose:
-            logger.info(f"    Compiled into {len(compiled_groups)} term groups")
-        
-        # Sum all compiled groups
-        feature_sum = np.zeros_like(
-            next(iter(coords.values())),
-            dtype=complex
-        )
-        
-        for group in compiled_groups:
-            feature_sum += self.physics.evaluate_compiled_group(group, coords)
-        
-        # Apply amplitude coefficient
-        return feature.amplitude_coeff * feature_sum
+            intensity = region_results[region]
+            logger.info(f"  Region shape: {intensity.shape}")
+            logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
+    return region_results
+
+def evaluate_region(region: "GridRegion",
+                    vib_data, vibdiff_cache, physics,
+                    verbose: bool = False) -> np.ndarray:
+    """Evaluate all features in a single grid region."""
+    # Initialize result array
+    result = np.zeros_like(
+        next(iter(region.coords.values())), 
+        dtype=complex
+    )
     
-    def _assemble_fullgrid(self, grid_manager: "GridManager", region_results):
-        grid_manager.place_results_into_grid(region_results)
+    # Sum contributions from all features
+    for feature in region.features:
+        if verbose:
+            logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
+        
+        result += evaluate_feature(feature, vib_data, vibdiff_cache, physics, region.coords, verbose)
+        
+    return result
 
+def evaluate_feature(feature: 'SpectralFeature', 
+                     vib_data, vibdiff_cache, physics,
+                     coords: dict[str, np.ndarray],
+                     verbose: bool = False) -> np.ndarray:
+    """Evaluate a single feature on grid coordinates."""
+    # Compile feature to numerical form
+    from .numerical_abstractions import compile_feature
+    compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
 
-    def _evaluate_spectrum(self, spec_window, vib_data, vib_cache):
-        from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import SpectralEvaluator
-        evaluator = SpectralEvaluator(vib_data, vib_cache, 
-                                     gamma=self.spec_eval_setup.ev_info.Gamma)
-        return evaluator.evaluate_spectrum(
-            spec_window=spec_window,
-            grid_resolution=self.spec_eval_setup.ev_info.grid_resolution,
-            return_type='grid')
+    
+    if verbose:
+        logger.info(f"    Compiled into {len(compiled_groups)} term groups")
+    
+    # Sum all compiled groups
+    feature_sum = np.zeros_like(
+        next(iter(coords.values())),
+        dtype=complex
+    )
+    
+    for group in compiled_groups:
+        feature_sum += physics.evaluate_compiled_group(group, coords)
+    
+    # Apply amplitude coefficient
+    return feature.amplitude_coeff * feature_sum
+
