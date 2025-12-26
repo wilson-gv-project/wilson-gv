@@ -8,6 +8,7 @@ from typing import List, Tuple, Dict, Optional
 if TYPE_CHECKING:
     from .spectrum_composition import SpectralFeature, RectangularDomain, Box
 
+# UNUSED by extention
 def find_points_clusters_by_distance(res_locations: list[tuple], 
                             distance_thresholds: dict[str, float], 
                             linkage="single") -> dict[int, list[tuple]]:

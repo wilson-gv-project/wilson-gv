@@ -1,5 +1,3 @@
-from unittest.mock import Mock, patch
-
 import wilson_suite as ws
 from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
 import numpy as np

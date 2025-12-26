@@ -28,8 +28,8 @@ class Box:
     box would be slightly smaller than grid, so the grid includes the whole box for sure
     """
     bounds: Union[Tuple[Dim_bounds, ...], Dict[str, Dim_bounds]]
-    grid: Grid = None
-    has_grid: bool = None
+    grid: Grid = None # UNUSED
+    has_grid: bool = None # UNUSED
 
     def __init__(self,
                  bounds: Union[Tuple[Dim_bounds, ...], Dict[str, Dim_bounds]],
@@ -87,6 +87,7 @@ class Box:
     # -------------------------------------------------
     # Box modifications
     # -------------------------------------------------
+    # UNUSED - useful for analysis or for future?
     def expand(self, padding: dict[str, float], inplace: bool = False):
         new_bounds = {}
         for axis in self.axes:
@@ -102,6 +103,7 @@ class Box:
     # -------------------------------------------------
     # Box operations
     # -------------------------------------------------
+    # UNUSED - useful for analysis or for future?
     def intersect(self, other: "Box") -> Optional["Box"]:
         common_axes = set(self.axes) & set(other.axes)
         if not common_axes:
@@ -144,6 +146,7 @@ class Box:
             for ax in shared_axes
         )
 
+    # UNUSED - useful for analysis or for future?
     def overlaps(self, other: "Box") -> bool:
         shared_axes = set(self.axes) & set(other.axes)
         return all(
@@ -208,6 +211,7 @@ class ResLocGeoObject:
         # Convert dict to sorted tuple of tuples for consistent hashing
         self.coordinates: Coordinates = tuple(sorted(coord_dict.items()))
 
+    # UNUSED - useful for analysis or for future?
     @property
     def dims(self) -> tuple[str, ...]:
         return tuple(k for k, _ in self.coordinates)
@@ -286,6 +290,7 @@ class SpectralFeature:
                 and self.lineshape_parameter == other.lineshape_parameter 
                 and self.term_contributions == other.term_contributions)
 
+    # UNUSED
     @classmethod
     def share_location(cls, features: list['SpectralFeature']):
         if len(features)<2:
@@ -332,6 +337,7 @@ class SpectralFeature:
 
         return upd_spec_window
 
+    # UNUSED
     @classmethod
     def find_clusters_by_distance(cls, spec_features: list['SpectralFeature'],
                                   distance_thresholds: dict,
@@ -350,6 +356,7 @@ class SpectralFeature:
 
         return rec_windows_dict
 
+    # UNUSED
     def get_res_motifs(self) -> list[ResonanceMotif]:
         return [i.res_motif for i in self.term_contributions]
 
@@ -373,10 +380,12 @@ class SpectralWindow:
     def ndim(self) -> int:
         return len(self.bounds)
 
+    # UNUSED
     @property
     def widths(self) -> Tuple[float, ...]:
         return tuple(mx - mn for mn, mx in self.bounds)
 
+    # UNUSED
     def contains(self, points: np.ndarray) -> np.ndarray:
         """Return boolean mask of which points lie inside the window."""
         if points.shape[-1] != self.ndim:
@@ -467,18 +476,23 @@ class RectangularDomain:
     # -----------------------------------------------------------
     # Feature utilities
     # -----------------------------------------------------------
+    # UNUSED by extention
     def add_full_features(self, features: List['SpectralFeature']):
         self.full_features.extend(features)
 
+    # UNUSED
     def add_a_full_feature(self, feature: 'SpectralFeature'):
         self.full_features.append(feature)
 
+    # UNUSED
     def add_contrib_features(self, features: List['SpectralFeature']):
         self.contrib_features.extend(features)
 
+    # UNUSED
     def add_a_contrib_feature(self, feature: 'SpectralFeature'):
         self.contrib_features.append(feature)
 
+    # UNUSED - so far? useful for analysis?
     def features_in_bounds(self) -> List['SpectralFeature']:
         """Return features whose coordinates lie inside the domain's window."""
         if not self.full_features:
@@ -487,6 +501,7 @@ class RectangularDomain:
         mask = self.box.contains(coords)
         return [f for f, m in zip(self.full_features, mask) if m]
 
+    # UNUSED by extention
     @classmethod
     def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
         """Create a domain whose window tightly bounds given features."""
@@ -511,6 +526,7 @@ class RectangularDomain:
         domain.add_full_features(features)
         return domain
 
+    # UNUSED
     def generate_meshgrids(self, steps_axes) -> Tuple[np.ndarray, ...]:
         """Generate coordinate grids for each dimension."""
 
@@ -518,6 +534,7 @@ class RectangularDomain:
 
         return np.meshgrid(*coords_1d, indexing='ij')
 
+    # UNUSED by extention
     def axis_coords(self, key: Union[int, str], steps_axes) -> np.ndarray:
         """Return coordinate values along a labeled axis."""
 
@@ -525,6 +542,7 @@ class RectangularDomain:
         min_val, max_val = self.box.bounds[i]
         return safe_arange_inclusive_scaled(min_val, max_val, steps_axes[key])
 
+    # UNUSED by extention
     def axis_index(self, key: Union[int, str]) -> int:
             """Resolve axis index from label or integer."""
 
@@ -533,6 +551,7 @@ class RectangularDomain:
             return key
 
 
+# UNUSED by extention
 @dataclass
 class SpectroscopicAxis:
     """
@@ -549,6 +568,7 @@ class SpectroscopicAxis:
         return hash((self.label, self.indep_vars))
 
 
+# UNUSED
 @dataclass
 class SpectroscopicAxes:
     """

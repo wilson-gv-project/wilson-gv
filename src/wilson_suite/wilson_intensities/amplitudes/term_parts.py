@@ -66,12 +66,14 @@ class PropsCollection:
         groups = [p.inds if p.inds is not None else [] for p in self.props]
         return [idx for p_inds in groups for idx in p_inds]
     
+    # UNUSED
     def get_mode_indices_grouped(self):
         return [p.inds if p.inds is not None else [] for p in self.props]
     
     def get_mode_indices_group_template(self):
         return [len(p.inds) if p.inds is not None else [] for p in self.props]
     
+    # UNUSED
     def get_total_difforder(self):
         return sum([p.dord for p in self.props])
     
@@ -166,6 +168,7 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    # UNUSED?
     @classmethod
     def from_tuples(cls, tupleOfTuples):
         """
@@ -181,6 +184,7 @@ class ResonanceMotif:
             r_conditions.append(rc)
         return cls(r_conditions)
 
+    # UNUSED
     @classmethod
     def from_dicts(cls, res_conds_listdict: list[dict]):
         """
@@ -209,12 +213,15 @@ class ResonanceMotif:
         """
         return len(self.resonance_conditions)
     
+    # UNUSED
     @property
     def resonance_location_class(self, total_num_axes):
         return total_num_axes - len(self.resonance_conditions)
     
+    # UNUSED
     def get_vibdiffs(self):
         return {i: cond.diff for i, cond in enumerate(self.resonance_conditions)}
+    # UNUSED
     def get_freq_axes(self):
         return {i: tuple(cond.pf) for i, cond in enumerate(self.resonance_conditions)}
     
@@ -223,24 +230,6 @@ class ResonanceMotif:
     
     def get_nm_indices(self):
         return set([label for cond in self.resonance_conditions for i in cond.diff for label in i.q])
-
-# class ResonanceCondValue:
-
-@dataclass(frozen=True)
-class EvalVibPerturbedTerm:
-    """
-    properties - both averaged and non-averaged together generally
-    """
-    properties: PropsCollection
-    resonance_motif: ResonanceMotif
-
-
-@dataclass(frozen=True)
-class EvalTermCollection:
-    """
-    """
-    terms: list[EvalVibPerturbedTerm]
-
 
 
 # class ParameterSet(Mapping):
@@ -376,6 +365,7 @@ class VibStatesData:
         self.allstates_map = {i.state_label: i for i in self.allstates}
         self._storage = dict()
 
+    # UNUSED
     def _fill_storage(self):
         for vlabel_a, energy_a in self.allenergies_map:
             for vlabel_b, energy_b in self.allenergies_map:
@@ -398,6 +388,7 @@ class VibStatesData:
         else:
             raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
     
+    # UNUSED
     def get_energy_by_label(self, state_label):
         if state_label in self.allstates_map:
             return self.allenergies_map.get(state_label)
@@ -445,6 +436,7 @@ class TermParametersChoice:
 # -------------------------------------------------------
 
 
+# UNUSED
 def is_tuple_of_tuples(my_variable):
     if not isinstance(my_variable, tuple):
         return False
