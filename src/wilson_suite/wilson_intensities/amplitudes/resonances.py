@@ -1,6 +1,8 @@
 """
 RESONANCE LOCATIONS for ResonanceMotif/VibPerturbedTerm
 RESONANCES in VibPerturbedTerm
+
+functions are either used or not (marked UNUSED)
 """
 import numpy as np
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
@@ -162,7 +164,7 @@ def find_resonance_locations_wrt_index_choices(motif: ResonanceMotif,
     return results
 
 
-
+# UNUSED
 def get_indlabels_in_resmotif(motif: tuple):
     """
     for ResonanceMotif
@@ -177,7 +179,7 @@ def identify_unique_resmotifs(list_of_terms: list['VibPerturbedTerm']) -> set[Re
     """
     return set(ResonanceMotif(term.res) for term in list_of_terms)
 
-
+# UNUSED
 def identify_maximum_axes_in_terms(list_of_terms: list['VibPerturbedTerm']):
     """
     """

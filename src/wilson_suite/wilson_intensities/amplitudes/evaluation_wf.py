@@ -1,15 +1,15 @@
 import time
 import numpy as np
-from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import PhysicsCalculator
 
 from dataclasses import dataclass, field
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
     from wilson_suite.wilson_main.abstractions import VibAnaSetup
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
     from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
+    from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
 from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
@@ -236,16 +236,13 @@ class EvaluationWorkflow:
             with self.step("make_regions"):
                 self.artifacts['regions'] = self.artifacts['grid_manager'].create_regions()
 
-            with self.step("physics"):
-                self.artifacts['physics'] = PhysicsCalculator(self.inputs.spec_eval_setup.ev_info.Gamma)
-                
             with self.step("regions_results"):
                 self.artifacts['regions_results'] = evaluate_regions(self.artifacts['regions'], 
                                                                      self.artifacts["vib_data"], 
                                                                      self.artifacts["vibdiff_cache"],
-                                                                     self.artifacts['physics'],
+                                                                     self.inputs.spec_eval_setup.ev_info.Gamma,
                                                                      self.ctx.verbose)
-                        
+
             # self._save_checkpoint('Step4')  # Save checkpoint
 
             # Step 5: Assemble the full grid
@@ -272,7 +269,7 @@ class EvaluationWorkflow:
 
 
 def evaluate_regions(regions: list["GridRegion"], 
-                     vib_data, vibdiff_cache, physics,
+                     vib_data, vibdiff_cache, gamma,
                      verbose):
 
     # Step 2: Evaluate each region
@@ -281,7 +278,7 @@ def evaluate_regions(regions: list["GridRegion"],
         if verbose:
             logger.info(f"\nEvaluating region with {len(region.features)} features")
         
-        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, physics, verbose)
+        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, gamma, verbose)
         
         if verbose:
             intensity = region_results[region]
@@ -290,7 +287,7 @@ def evaluate_regions(regions: list["GridRegion"],
     return region_results
 
 def evaluate_region(region: "GridRegion",
-                    vib_data, vibdiff_cache, physics,
+                    vib_data, vibdiff_cache, gamma,
                     verbose: bool = False) -> np.ndarray:
     """Evaluate all features in a single grid region."""
     # Initialize result array
@@ -304,12 +301,12 @@ def evaluate_region(region: "GridRegion",
         if verbose:
             logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
         
-        result += evaluate_feature(feature, vib_data, vibdiff_cache, physics, region.coords, verbose)
+        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords, verbose)
         
     return result
 
 def evaluate_feature(feature: 'SpectralFeature', 
-                     vib_data, vibdiff_cache, physics,
+                     vib_data, vibdiff_cache, gamma,
                      coords: dict[str, np.ndarray],
                      verbose: bool = False) -> np.ndarray:
     """Evaluate a single feature on grid coordinates."""
@@ -328,8 +325,44 @@ def evaluate_feature(feature: 'SpectralFeature',
     )
     
     for group in compiled_groups:
-        feature_sum += physics.evaluate_compiled_group(group, coords)
+        feature_sum += evaluate_compiled_group(group, coords, gamma)
     
     # Apply amplitude coefficient
     return feature.amplitude_coeff * feature_sum
 
+
+def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
+                             coords: Dict[str, np.ndarray],
+                             gamma: float) -> np.ndarray:
+    """
+    Calculate resonance motif contribution at grid points.
+    
+    Args:
+        motif: Compiled resonance motif with conditions
+        coords: Dict of axis_label -> meshgrid array
+        
+    Returns:
+        Complex array with resonance contributions
+    """
+    total = np.ones_like(next(iter(coords.values())), dtype=complex)
+    
+    for res_cond in motif.res_conds:
+        # Calculate photon frequency: sum over axes
+        pfreq = sum(coords[ax] * res_cond.pf_dict[ax] 
+                    for ax in res_cond.pf_dict)
+        # Resonance denominator
+        z = res_cond.vib_energy_diff - pfreq - 1j * gamma
+        total *= 1.0 / z
+        
+    return total
+
+def evaluate_compiled_group(group: 'CompiledTermGroup',
+                            coords: Dict[str, np.ndarray],
+                            gamma: float) -> np.ndarray:
+    """Sum all resonance motifs in a compiled group."""
+    result = np.zeros_like(next(iter(coords.values())), dtype=complex)
+    
+    for motif in group.resonance_motifs:
+        result += evaluate_resonance_motif(motif, coords, gamma)
+        
+    return result

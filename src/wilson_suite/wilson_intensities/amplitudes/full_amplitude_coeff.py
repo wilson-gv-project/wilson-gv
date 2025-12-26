@@ -1,3 +1,9 @@
+"""
+Docstring for wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff
+
+All functions are used in evaluation
+"""
+
 from typing import TYPE_CHECKING, Any
 
 import wilson_suite.wilson_intensities.amplitudes.averaged_props as avrgprops

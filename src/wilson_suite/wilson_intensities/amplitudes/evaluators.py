@@ -67,7 +67,7 @@ def process_resonance_motifs(derived_terms: list['VibPerturbedTerm'],
                             vibdiff_cache: VibDiffCache) -> tuple[dict[ResonanceMotif, ResLocGeoObject], 
                                                                   dict[ResonanceMotif, list['VibPerturbedTerm']]]:
     """
-    Process resonance motifs and find their locations.
+    Take a list of terms and process resonance motifs and find their locations.
     """
     unique_res_motifs = identify_unique_resmotifs(derived_terms)
     motif_res_loc: dict[ResonanceMotif, ResLocGeoObject] = {}
