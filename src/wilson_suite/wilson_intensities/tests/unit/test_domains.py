@@ -1,6 +1,8 @@
 from wilson_suite.wilson_intensities.amplitudes import domains
 from ...amplitudes.spectrum_composition import RectangularDomain, SpectralWindow
-
+# from ...amplitudes.evaluators import get_features_from_terms_for_eval
+from ....wilson_main import abstractions as wm_abst
+import numpy as np
 
 def test_find_domain_groups_by_distance():
 
@@ -32,10 +34,6 @@ def test_terms():
     terms_fuller_flat = get_terms_from_json()
 
 
-from ...amplitudes.evaluators import get_features_from_terms_for_eval
-from ....wilson_main import abstractions as wm_abst
-import numpy as np
-
 def generate_props_data_Nmodes(N_modes):
     return {'dipgrad': np.ones((N_modes, 3)), 
             'diphess': np.zeros((N_modes, N_modes, 3)),
@@ -57,6 +55,7 @@ def get_data_evaluators_tests() -> dict:
 
     # vib_ana_setup needs to have vibstates
     vibana = wm_abst.VibAnaSetup(system=system)
+    vibana.nc_sqrt_eigval
     vibana.setStates((
             wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
             wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
@@ -79,6 +78,7 @@ def get_data_evaluators_tests() -> dict:
             wm_abst.VibState(harm_quanta_coeffs={(1, 1, 2):1.}, state_label='1,1,2', energy=3594., harmonic_WF=False),
             wm_abst.VibState(harm_quanta_coeffs={(1, 2, 2):1.}, state_label='1,2,2', energy=3642., harmonic_WF=False),
         ))
+    vibana.nc_sqrt_eigval = {('0',): 964, ('1',): 1234., ('2',): 1234.}
 
     props_data = generate_props_data_Nmodes(system.Nnmodes)
     # cart axes (0, 1, 1, 0) - 0 1 2 3
@@ -116,12 +116,12 @@ def get_data_evaluators_tests() -> dict:
                 spec_eval_setup=spec_eval_setup,
                 domain_distance_thresholds={'A': 12., 'B': 12.})
 
-def get_features_from_terms():
+# def get_features_from_terms():
 
-    datadict = get_data_evaluators_tests()
+#     datadict = get_data_evaluators_tests()
 
-    features = get_features_from_terms_for_eval(**datadict)
-    return features
+#     features = get_features_from_terms_for_eval(**datadict)
+#     return features
 
 
 def test_terms_features():

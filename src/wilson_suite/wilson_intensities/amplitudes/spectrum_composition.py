@@ -267,7 +267,6 @@ class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] # grouped by res_motif
     lineshape_parameter: dict
-    lineshape_parameter_single: float = 1.5
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
@@ -457,8 +456,6 @@ class RectangularDomain:
     labels: Optional[Tuple[str, ...]] = None
     full_features: List['SpectralFeature'] = field(default_factory=list)
     contrib_features: List['SpectralFeature'] = field(default_factory=list)
-    level_clustered: int = None
-    union_lvl0_mask: np.ndarray = None # should be of the shape of the grid of lvl1 domain
 
     def __post_init__(self):
 

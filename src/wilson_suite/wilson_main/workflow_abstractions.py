@@ -314,17 +314,19 @@ class WilsonSimulation:
 	# 	from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
 	# 	return GridManager(self.spec_eval_setup.ev_info.spectral_window)
 
-	def evaluate(self, keep_intermediates):
-		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
+	def evaluate(self):
+		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
 
-		workflow = EvaluationWorkflow(self)
+		eval_inputs = make_evaluation_inputs(simulation=self)
+		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
-
-		self.spec, info = workflow.run(keep_intermediates)
-
+		try:
+			self.spec = workflow.run()
+		except Exception as e:
+			print(e)
 		if self.diagn is None:
 			self.diagn = {}
-		self.diagn.update(info)
+		self.diagn.update({'artifacts': workflow.artifacts})
 
 
 	def evaluateSpectrum(self,

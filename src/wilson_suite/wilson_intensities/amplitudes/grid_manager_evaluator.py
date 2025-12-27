@@ -39,8 +39,12 @@ class GridRegion:
     def features(self) -> List['SpectralFeature']:
         """All features that contribute to this region."""
         return self.domain.full_features + self.domain.contrib_features
-
-
+    
+    @property
+    def coords_au(self):
+        from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+        return {k:convNu2Ene(v) for k,v in self.coords.items()}
+    
 class GridManager:
     """
     Manages grid partitioning and coordinate systems.

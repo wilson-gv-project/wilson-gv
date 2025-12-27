@@ -10,6 +10,13 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
     from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
     from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import PrecalculatedData, VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import EvaluationDataAndConfigs, ParameterSet, ResonanceMotif
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, ResLocGeoObject
+    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
 from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
@@ -68,6 +75,24 @@ class EvaluationInputs:
     spec_eval_setup: 'SpecEvalSetup'
     vib_ana_setup: 'VibAnaSetup'
     pulse_polarization_vector: tuple[float, float, float]
+
+@dataclass
+class EvaluationArtifacts:
+    terms: list = None
+    vib_data: 'VibStatesData' = None
+    vibdiff_cache: 'VibDiffCache' = None
+    data_configs: 'EvaluationDataAndConfigs' = None
+    motif_locs: dict['ResonanceMotif', 'ResLocGeoObject'] = None
+    terms_for_motifs: dict['ResonanceMotif', list['VibPerturbedTerm']] = None
+    need_precalc: dict[str, Any] = None
+    precalculated: 'PrecalculatedData' = None
+    coefficients: dict['VibPerturbedTerm', dict['ParameterSet', float]] = None
+    features: list[SpectralFeature] = None
+    spec_window: 'SpectralWindow' = None
+    grid_manager: GridManager = None
+    regions: list['GridRegion'] = None
+    regions_results: Dict[str, np.ndarray] = None
+
 
 def make_evaluation_inputs(
                             *,
@@ -153,7 +178,7 @@ class EvaluationWorkflow:
         self.ctx = EvaluationContext(verbose=verbose)        
         self.inputs = inputs
         self.parallel = parallel
-        self.artifacts = {}
+        self.artifacts = EvaluationArtifacts()
 
 
     def _validate_inputs(self):
@@ -190,10 +215,10 @@ class EvaluationWorkflow:
         try:
             # Step 1: Preparation
             with self.step("prep_terms"):
-                self.artifacts["terms"] = prepTermsForEval(self.inputs.terms)
+                self.artifacts.terms = prepTermsForEval(self.inputs.terms)
 
             with self.step("prep_data"): # could be in data inputs
-                self.artifacts["vib_data"], self.artifacts["vibdiff_cache"], self.artifacts["data_configs"] = prepDataForEval(self.inputs.number_of_modes, 
+                self.artifacts.vib_data, self.artifacts.vibdiff_cache, self.artifacts.data_configs = prepDataForEval(self.inputs.number_of_modes, 
                                                                  self.inputs.pulse_polarization_vector, 
                                                                  self.inputs.vib_ana_setup, 
                                                                  self.inputs.props)
@@ -203,54 +228,67 @@ class EvaluationWorkflow:
             # Step 2: Process resonances and calculate coefficients
             # get resonances locations for all terms
             with self.step("process_resonances"):
-                self.artifacts["motif_locs"], self.artifacts["terms_for_motifs"] = process_resonance_motifs(self.artifacts["terms"],
-                                                                                                            self.artifacts["vib_data"],
-                                                                                                            self.artifacts["vibdiff_cache"])
+                self.artifacts.motif_locs, self.artifacts.terms_for_motifs = process_resonance_motifs(self.artifacts.terms,
+                                                                                                            self.artifacts.vib_data,
+                                                                                                            self.artifacts.vibdiff_cache)
             with self.step("term_coefficients"):
-                self.artifacts["need_precalc"] = identify_precalc_unique_coeff_parts(terms=self.artifacts["terms"])
-                self.artifacts["precalculated"] = precalculate_unique_coeff_parts(
-                    need_to_precalc=self.artifacts["need_precalc"], data_and_configs=self.artifacts["data_configs"])
-                self.artifacts["coefficients"] = evaluate_terms_coeffs(self.artifacts["terms"],
-                                                                       self.artifacts["motif_locs"],
-                                                                       self.artifacts["data_configs"],
-                                                                       self.artifacts["precalculated"])
+                self.artifacts.need_precalc = identify_precalc_unique_coeff_parts(terms=self.artifacts.terms)
+                self.artifacts.precalculated = precalculate_unique_coeff_parts(
+                    need_to_precalc=self.artifacts.need_precalc, data_and_configs=self.artifacts.data_configs)
+                self.artifacts.coefficients = evaluate_terms_coeffs(self.artifacts.terms,
+                                                                       self.artifacts.motif_locs,
+                                                                       self.artifacts.data_configs,
+                                                                       self.artifacts.precalculated)
 
             # self._save_checkpoint('Step2')  # Save checkpoint
 
             # Step 3: Extract features and place them in the spectral window
             with self.step("all_features"):
-                self.artifacts["features"] = get_features_to_draw(motif_res_loc=self.artifacts["motif_locs"], 
-                                                                  terms_for_motifs=self.artifacts["terms_for_motifs"],
-                                                                  term_coeffs_per_index=self.artifacts["coefficients"],
-                                                                  lineshape_parameter=self.inputs.spec_eval_setup.ev_info.Gamma)
+                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
+                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
+                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
+                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
+                else:
+                    raise ValueError('Gamma cannot be converted from the given unit to au')
+                    
+                self.artifacts.features = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
+                                                                  terms_for_motifs=self.artifacts.terms_for_motifs,
+                                                                  term_coeffs_per_index=self.artifacts.coefficients,
+                                                                  lineshape_parameter=gamma)
             with self.step("place_in_specwindow"):
-                self.artifacts['spec_window'] = SpectralFeature.filter_to_spec_window(self.artifacts["features"], self.inputs.spec_eval_setup.ev_info.spectral_window)
+                self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
             
             # self._save_checkpoint('Step3')  # Save checkpoint
 
             # Step 4: Grid management and region evaluation
             with self.step("make_grid_manager"):
-                self.artifacts['grid_manager'] = GridManager(self.artifacts['spec_window'])
-                self.artifacts['grid_manager'].make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
+                self.artifacts.grid_manager = GridManager(self.artifacts.spec_window)
+                self.artifacts.grid_manager.make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
 
             with self.step("make_regions"):
-                self.artifacts['regions'] = self.artifacts['grid_manager'].create_regions()
+                self.artifacts.regions = self.artifacts.grid_manager.create_regions()
 
             with self.step("regions_results"):
-                self.artifacts['regions_results'] = evaluate_regions(self.artifacts['regions'], 
-                                                                     self.artifacts["vib_data"], 
-                                                                     self.artifacts["vibdiff_cache"],
-                                                                     self.inputs.spec_eval_setup.ev_info.Gamma,
+                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
+                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma)
+                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
+                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
+                else:
+                    raise ValueError('Gamma cannot be converted from the given unit to au')
+                self.artifacts.regions_results = evaluate_regions(self.artifacts.regions, 
+                                                                     self.artifacts.vib_data, 
+                                                                     self.artifacts.vibdiff_cache,
+                                                                     gamma,
                                                                      self.ctx.verbose)
 
             # self._save_checkpoint('Step4')  # Save checkpoint
 
             # Step 5: Assemble the full grid
             with self.step("place_results"):
-                self.artifacts['grid_manager'].place_results_into_grid(self.artifacts['regions_results'])
+                self.artifacts.grid_manager.place_results_into_grid(self.artifacts.regions_results)
 
             # Return results
-            return self.artifacts['grid_manager'].full_grid
+            return self.artifacts.grid_manager.full_grid
             
         except Exception as e:
             raise type(e)(
@@ -301,7 +339,7 @@ def evaluate_region(region: "GridRegion",
         if verbose:
             logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
         
-        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords, verbose)
+        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords_au, verbose)
         
     return result
 
