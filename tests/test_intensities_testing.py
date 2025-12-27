@@ -45,7 +45,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
 
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
-
+    
     assert termsdicts[1] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('diphess', ('a', 'b'), ('G',))), 
                              'non_averaged_props': None, 'termA_pref': 0.25, 'termB_pref': 1.0, 
                              'vibene_denom': ('a', 'b'), 'vibenediff': None, 

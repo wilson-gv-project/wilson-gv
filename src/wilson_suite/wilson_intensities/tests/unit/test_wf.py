@@ -114,6 +114,7 @@ def test_workflow_run_with_keep_intermediates_real_wfsim():
     print(mock_sim.is_ready)
     print(mock_sim.is_configured)
     
+    print(mock_sim.vib_ana_setup.nc_sqrt_eigval)
     mock_sim.evaluate()
 
     # assert 'timing' in mock_sim.diagn

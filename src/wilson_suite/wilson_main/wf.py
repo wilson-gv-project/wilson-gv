@@ -328,12 +328,13 @@ class WilsonSimulation:
         eval_inputs = make_evaluation_inputs(simulation=self)
         workflow = EvaluationWorkflow(inputs=eval_inputs)
         self._workflow = workflow
-
-        self.spec  = workflow.run()
-
-        # if self.diagn is None:
-        #     self.diagn = {}
-        # self.diagn.update(info)
+        try:
+            self.spec = workflow.run()
+        except Exception as e:
+            print(e)
+        if self.diagn is None:
+            self.diagn = {}
+        self.diagn.update({'artifacts': workflow.artifacts})
 
 
     def render(self, renderer, do_diagn: bool = False):

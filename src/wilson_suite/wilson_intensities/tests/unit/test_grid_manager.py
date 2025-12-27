@@ -7,7 +7,6 @@ from wilson_suite.wilson_intensities.amplitudes.term_parts import (
 )
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from ...amplitudes.spectrum_composition import SpectralFeature, Box, ResLocGeoObject, SpectralWindow
-from ...amplitudes.grid_manager_evaluator import SpectralEvaluator
 
 import logging
 from ....wilson_utils.logger import setup_logger
