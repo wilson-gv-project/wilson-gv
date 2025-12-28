@@ -169,6 +169,30 @@ def derived_terms_dict_to_dicts(derived_terms, tolistonly: bool=False):
 
     return result_list
 
+def derived_terms_flat(derived_terms, tolistonly: bool=False):
+    """
+    put data in a form for use on the evaluation step
+    """
+
+    # FIXME - make a function for a flat list
+    result_list = []
+    result_dict = {}
+    
+    count = 0
+
+    for key_num_anharms in derived_terms:
+        for anharms_tuple in derived_terms[key_num_anharms]:
+            for term in derived_terms[key_num_anharms][anharms_tuple]:
+                
+                if tolistonly:
+                    result_list.append(term)
+                else:
+                    result_dict[f'{count}_{anharms_tuple}'] = term
+                count += 1
+    if tolistonly:
+        return result_list
+    else:
+        return result_dict
 
 def flip_modes_indices(term_dict, upd_dict):
     """

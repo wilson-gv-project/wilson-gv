@@ -282,12 +282,12 @@ class WilsonSimulation:
             values: values
         """
         data_request = self.requestData()
-        print('data_request', data_request.keys())
+        # print('data_request', data_request.keys())
         try:
             data = obtainer(data_request)
         except Exception as e:
             # print("data_request", data_request)
-            # print(e)
+            print(e)
             raise ValueError('Smth went wrong in the obtainer')
         self.fillResults(data)
     

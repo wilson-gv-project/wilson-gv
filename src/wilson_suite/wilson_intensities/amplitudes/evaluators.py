@@ -14,27 +14,38 @@ from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDat
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
-    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-    from wilson_suite.wilson_experiment.abstractions import VibExperiment
+
+from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
 
 import numpy as np
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def prepTermsForEval(terms):
+def prepTermsForEval(terms: dict | list) -> list:
     """
     put data in a form for use on the evaluation step
     """
+    if isinstance(terms, type([])):
+        for t in terms:
+            if not isinstance(t, VibPerturbedTerm):
+                raise ValueError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
+        return terms
+    
+    if isinstance(terms, type({})):
+        for t_key in terms:
+            if isinstance(terms[t_key], type({})):
 
-    # FIXME - make a function for a flat list
-    terms_as_list = []
-    for i in terms:
-        for j in terms[i]:
-            for t in terms[i][j]:
-                terms_as_list.append(t)
-    return terms_as_list
+                terms_as_list = []
+                for i in terms:
+                    for j in terms[i]:
+                        for t in terms[i][j]:
+                            terms_as_list.append(t)
+                return terms_as_list
+            else:
+                if not isinstance(terms[t_key], VibPerturbedTerm):
+                    raise ValueError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
+                return list(terms.values())
 
 def prepDataForEval(number_of_nmodes: int,
                     pulse_polarization_vector: np.ndarray,
