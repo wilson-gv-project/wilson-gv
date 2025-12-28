@@ -2,7 +2,7 @@ import wilson_suite as ws
 import numpy as np
 
 
-def test_evaluation_general_customdata():
+def test_evaluation_general_customdata_1elterm():
     print()
     from ..unit.test_domains import get_data_evaluators_tests
     datadict = get_data_evaluators_tests()
@@ -56,7 +56,6 @@ def test_evaluation_general_customdata():
 
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
     flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
-    print(flat_dict.keys())
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
     mock_sim.terms = [flat_dict['1_(1, 0)']]
@@ -64,19 +63,109 @@ def test_evaluation_general_customdata():
     print('\n', flat_dict['1_(1, 0)'].to_latex())
 
     mock_sim.evaluate()
-    # print(mock_sim._workflow.artifacts.features)
+    
+    for f in mock_sim._workflow.artifacts.features:
+        print(f.location, f.term_contributions[0].term_ids)
+    
+    region = mock_sim._workflow.artifacts.regions[0]
+    feat1 = region.domain.full_features[0]
+    feat_coeff = feat1.amplitude_coeff
+    term_contributions = feat1.term_contributions
+
+    print('\nterm_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
+    print('feat_coeff', feat_coeff)
+
+    np.set_printoptions(linewidth=280, precision=1)
+    for k,v in mock_sim._workflow.artifacts.grid_manager.full_grid.items():
+        print(k,v)
+    print('\n==========')
+    
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    r_res = ws.intensities.amplitudes.evaluation_wf.evaluate_region(region, 
+                                                            mock_sim._workflow.artifacts.vib_data, 
+                                                            mock_sim._workflow.artifacts.vibdiff_cache, 
+                                                            convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
+    ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
+    assert np.allclose(r_res, ref_res)
+    
+    assert np.allclose(ref_res, mock_sim.spec['result'])
+
+def test_evaluation_general_customdata_1mechterm():
+    print()
+    from ..unit.test_domains import get_data_evaluators_tests
+    datadict = get_data_evaluators_tests()
+    # 'system', 'vib_ana_setup', 'derived_terms', 'props', 
+    # 'experiment', 'spec_eval_setup', 'domain_distance_thresholds'
+    
+    np.set_printoptions(linewidth=180, precision=3)
+
+    from wilson_suite.wilson_main.wf import WilsonSimulation
+    # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
+
+    from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
+    from ....fixtures import evv_experiment
+    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
+    
+    terms = get_fully_enhanced_terms(experiment=evv_experiment())
+    axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
+    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+
+    mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
+                                                     lvl_theory='B3LYP', 
+                                                     basis_set='cc-pVQZ', 
+                                                     base_file_loc=CQCPARSE_ROOT+'/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
+    bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
+    spectral_window = SpectralWindow(box=Box(bounds_dict))
+
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
+                                                          'Gamma': 1., 'Gamma_unit': 'cm-1',
+                                                          'grid_resolution': {'A': 1, 'B': 1}})
+    mock_sim = WilsonSimulation()
+    mock_sim.terms = evv_terms
+    mock_sim.system = mol_system
+    mock_sim.exp = evv_experiment()
+    mock_sim.vib_ana_setup = vib_ana
+    
+    mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
+    mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
+    mock_sim.dressPropsWithSetup()
+
+    mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
+
+    # use simple model data
+    mock_sim.system = datadict['system']
+    mock_sim.props = datadict['props']
+    mock_sim.vib_ana_setup = datadict['vib_ana_setup']
+
+    print('\nmock_sim.is_ready', mock_sim.is_ready)
+
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+    flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
+
+    # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
+    mock_sim.terms = [flat_dict['8_(0, 1)']]
+    
+    print('\n', flat_dict['8_(0, 1)'].to_latex())
+
+    mock_sim.evaluate()
+
+    for f in mock_sim._workflow.artifacts.features:
+        print(f.location, f.term_contributions[0].term_ids)
 
     region = mock_sim._workflow.artifacts.regions[0]
     feat1 = region.domain.full_features[0]
     feat_coeff = feat1.amplitude_coeff
     term_contributions = feat1.term_contributions
-    print('\nterm_contributions[0].res_motif', term_contributions[0].res_motif)
-    print('term_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
+    
+    print('\nterm_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
+    print('feat_coeff', feat_coeff)
 
     np.set_printoptions(linewidth=280, precision=1)
     for k,v in mock_sim._workflow.artifacts.grid_manager.full_grid.items():
-        print(k)
-        print(v)
+        print(k,v)
     print('\n==========')
     
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -148,8 +237,8 @@ def test_full_integration():
     print(sim.spec['B'].T)
     print(sim.spec['result'].T)
 
-    import matplotlib.pyplot as plt
+    # import matplotlib.pyplot as plt
 
-    plt.imshow(np.log(abs(sim.spec['result'])**2).T, interpolation='none', origin="upper") # now folows A,B arrays - down and to the left
-    plt.show()
+    # plt.imshow(np.log(abs(sim.spec['result'])**2).T, interpolation='none', origin="upper") # now folows A,B arrays - down and to the left
+    # plt.show()
 
