@@ -23,18 +23,30 @@ import numpy as np
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def prepTermsForEval(terms):
+def prepTermsForEval(terms: dict | list) -> list:
     """
     put data in a form for use on the evaluation step
     """
+    if isinstance(terms, type([])):
+        for t in terms:
+            if not isinstance(t, VibPerturbedTerm):
+                raise ValueError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
+        return terms
 
-    # FIXME - make a function for a flat list
-    terms_as_list = []
-    for i in terms:
-        for j in terms[i]:
-            for t in terms[i][j]:
-                terms_as_list.append(t)
-    return terms_as_list
+    if isinstance(terms, type({})):
+        for t_key in terms:
+            if isinstance(terms[t_key], type({})):
+
+                terms_as_list = []
+                for i in terms:
+                    for j in terms[i]:
+                        for t in terms[i][j]:
+                            terms_as_list.append(t)
+                return terms_as_list
+            else:
+                if not isinstance(terms[t_key], VibPerturbedTerm):
+                    raise ValueError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
+                return list(terms.values())
 
 def prepDataForEval(number_of_nmodes: int,
                     pulse_polarization_vector: np.ndarray,

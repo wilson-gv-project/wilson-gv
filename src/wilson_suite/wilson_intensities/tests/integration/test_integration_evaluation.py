@@ -1,10 +1,8 @@
 import wilson_suite as ws
 import numpy as np
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup
 
-def test_terms_evaluator_general_compilation():
+
+def test_evaluation_general_customdata():
     print()
     from ..unit.test_domains import get_data_evaluators_tests
     datadict = get_data_evaluators_tests()
@@ -52,20 +50,28 @@ def test_terms_evaluator_general_compilation():
     # use simple model data
     mock_sim.system = datadict['system']
     mock_sim.props = datadict['props']
-    mock_sim.vib_ana_setup: 'VibAnaSetup' = datadict['vib_ana_setup']
+    mock_sim.vib_ana_setup = datadict['vib_ana_setup']
 
-    print(mock_sim.is_ready)
+    print('\nmock_sim.is_ready', mock_sim.is_ready)
+
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+    flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
+    print(flat_dict.keys())
+
+    # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
+    mock_sim.terms = [flat_dict['1_(1, 0)']]
+    
+    print('\n', flat_dict['1_(1, 0)'].to_latex())
 
     mock_sim.evaluate()
-
-    # print(mock_sim._workflow.artifacts.spec_window.full_features)
-    # print(len(mock_sim._workflow.artifacts.spec_window.full_features))
-
-    # domain = mock_sim._workflow.artifacts.spec_window.find_clusters_by_featboxes()[0]
-    # print(domain)
+    # print(mock_sim._workflow.artifacts.features)
 
     region = mock_sim._workflow.artifacts.regions[0]
-    feat_coeff = region.domain.full_features[0].amplitude_coeff
+    feat1 = region.domain.full_features[0]
+    feat_coeff = feat1.amplitude_coeff
+    term_contributions = feat1.term_contributions
+    print('\nterm_contributions[0].res_motif', term_contributions[0].res_motif)
+    print('term_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
 
     np.set_printoptions(linewidth=280, precision=1)
     for k,v in mock_sim._workflow.artifacts.grid_manager.full_grid.items():
@@ -117,31 +123,6 @@ def test_full_integration():
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     sim.dressPropsWithSetup()
 
-    from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
-    style_config = PlotConfig(
-        figsize=(35, 45),
-        label_fontsize=30,
-        font_dict={'size': 24},
-        colormap='hot_r',  # Better contrast colormap
-        saturation_color='#FF00FF',
-        dpi=350,
-        tick_step=200.0,  # Step size for both axes ticks
-        equal_aspect=True,  # Force equal aspect ratio for axes
-        no_data_color='#E0E0E0',  # Light gray
-        below_range_color='#F8F8F8',  # Very light gray
-        data_edge_color='black',
-        data_edge_width=0.75,
-        y_min=0,
-        y_max=4500,
-        colorbar_main_label="Intensity",
-        colorbar_padding=0.02,
-        show_top_ticks=True,
-        show_right_ticks=True,
-        x_tick_rotation=45,
-        colormap_spacing='log',
-        colormap_power=0.5,
-    )
-
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     
     bounds_dict = {'A': (0., 5000.), 'B': (0., 5000.)}
@@ -151,18 +132,8 @@ def test_full_integration():
     evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
                                                           'Gamma': 4.7, 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 10, 'B': 10}})
-    rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
-                                                 'dynamic_range': 500, 
-                                                 'num_levels': 15, 
-                                                 'reference_max': None,
-                                                 'spec_data_operations': 'abs()**2',
-                                                 'projection': '2d', 
-                                                 'filename': 'smth.svg',
-                                                 'backend': 'matplotlib',
-                                                 'to_save': True,
-                                                 'style_config': style_config})
     
-    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi, rnd_info=rndi)
+    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
     sim.addSpecEvalSetup(eval_setup)
 
