@@ -317,11 +317,23 @@ class VibAnaSetup:
 		   'e': vibst.e, 'd': vibst.d} for vibst in getattr(self, 'states')]
 
 	@property
+	def has_all_states(self):
+		"""
+		#FIXME: now state level (number of quanta) is obtained from the label!
+		"""
+		if self.states is None:
+			return False
+		states_lvls = [len(st.state_label.split(',')) for st in self.states]
+		if self.max_state_lvl in states_lvls:
+			return True
+		return False
+
+	@property
 	def isAllSet(self):
 		"""
 		Checking status of VibAna data.
 		"""
-		if self.nc_sqrt_eigval is not None and self.states is not None:
+		if self.nc_sqrt_eigval is not None and self.has_all_states:
 			return True
 		return False
 	
