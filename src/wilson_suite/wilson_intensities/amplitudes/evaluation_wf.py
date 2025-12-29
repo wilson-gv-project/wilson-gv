@@ -233,7 +233,7 @@ class EvaluationWorkflow:
         self._validate_inputs()
         
         try:
-            # Step 1: Preparation
+            # Part 1: Preparation
             with self.step("prep_terms"):
                 self.artifacts.terms = prepTermsForEval(self.inputs.terms)
 
@@ -245,7 +245,7 @@ class EvaluationWorkflow:
 
             # self._save_checkpoint('Step1')  # Save checkpoint
 
-            # Step 2: Process resonances and calculate coefficients
+            # Part 2: Process resonances and calculate coefficients
             # get resonances locations for all terms
             with self.step("process_resonances"):
                 self.artifacts.motif_locs, self.artifacts.terms_for_motifs = process_resonance_motifs(self.artifacts.terms,
@@ -262,7 +262,7 @@ class EvaluationWorkflow:
 
             # self._save_checkpoint('Step2')  # Save checkpoint
 
-            # Step 3: Extract features and place them in the spectral window
+            # Part 3: Extract features and place them in the spectral window
             with self.step("all_features"):
                 if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
                     gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
@@ -280,7 +280,7 @@ class EvaluationWorkflow:
             
             # self._save_checkpoint('Step3')  # Save checkpoint
 
-            # Step 4: Grid management and region evaluation
+            # Part 4: Grid management and region evaluation
             with self.step("make_grid_manager"):
                 self.artifacts.grid_manager = GridManager(self.artifacts.spec_window)
                 self.artifacts.grid_manager.make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
@@ -303,7 +303,7 @@ class EvaluationWorkflow:
 
             # self._save_checkpoint('Step4')  # Save checkpoint
 
-            # Step 5: Assemble the full grid
+            # Part 5: Assemble the full grid
             with self.step("place_results"):
                 self.artifacts.grid_manager.place_results_into_grid(self.artifacts.regions_results)
 
