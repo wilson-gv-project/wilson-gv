@@ -246,12 +246,7 @@ def test_full_integration():
 
     # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
     # matplotlib expects [y, x] ordering for images
-    if Z.shape == (len(y), len(x)):
-        print('\nNOT transposing\n')
-        toplot = Z
-    else:
-        print('\ntransposing\n')
-        toplot = Z.T
+    toplot = Z.T
 
     plt.pcolormesh(x, y, toplot, shading="auto")
     plt.xlabel('A')
@@ -326,12 +321,7 @@ def test_full_integration_H2O_molecule():
 
     # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
     # matplotlib expects [y, x] ordering for images
-    if Z.shape == (len(y), len(x)):
-        print('\nNOT transposing\n')
-        toplot = Z
-    else:
-        print('\ntransposing\n')
-        toplot = Z.T
+    toplot = Z.T
 
     plt.pcolormesh(x, y, toplot, shading="auto")
     plt.xlabel('A')
