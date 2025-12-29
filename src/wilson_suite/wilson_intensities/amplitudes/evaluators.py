@@ -147,8 +147,6 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             # disregard locations where coefficient is zero
             if amplitude_coeff != 0.:
                 spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            # term_contributions=tuple([TermParametersChoice(terms=tuple(terms_for_motifs[res_motif]),
-                                            #                                         states_parameters=lst_params)]),
                                             term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
                                                                                            states_parameters=lst_params, 
                                                                                            term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )]),
