@@ -250,7 +250,7 @@ class EvaluationWorkflow:
                     gamma = self.inputs.spec_eval_setup.ev_info.Gamma
                 else:
                     raise ValueError('Gamma cannot be converted from the given unit to au')
-                    
+                # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
                 self.artifacts.features = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
