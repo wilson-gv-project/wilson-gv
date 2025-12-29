@@ -43,7 +43,10 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
 
         else:
             raise AssertionError('Unsupported source type for data obtainer')
-    
+    # print('\nrequested', requested_data_dict.keys())
+    # print('\nanharmonic_states', requested_data_dict['anharmonic_states'])
+
+    # print('\ndict_with_data nanharmonic_states', dict_with_data['anharmonic_states'])
     return dict_with_data
 
 

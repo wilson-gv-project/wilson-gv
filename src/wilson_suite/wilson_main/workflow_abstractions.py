@@ -324,6 +324,8 @@ class WilsonSimulation:
 			self.spec = workflow.run()
 		except Exception as e:
 			print(e)
+			raise type(e)() from e
+		
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})

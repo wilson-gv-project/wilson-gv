@@ -182,7 +182,7 @@ def test_evaluation_general_customdata_1mechterm():
 def test_full_integration():
     print()
     from ....fixtures import evv_experiment
-    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
+    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_experiment = evv_experiment()
     terms = ws.derive.main.get_fully_enhanced_terms(experiment=evv_experiment)
@@ -192,7 +192,7 @@ def test_full_integration():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=CQCPARSE_ROOT+'/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
+                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     from wilson_suite.wilson_main.wf import WilsonSimulation
     sim = WilsonSimulation()
@@ -202,6 +202,87 @@ def test_full_integration():
     sim.addTerms(terms=evv_terms) # terms
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
+
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
+    
+    sim.addSystem(mol_system)
+    sim.addVibAnaSetup(vib_ana)
+    sim.addPropEvalSetup(eval_uniform=calc_setup)
+    
+    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
+    sim.dressPropsWithSetup()
+
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
+    
+    bounds_dict = {'A': (0., 5000.), 'B': (0., 5000.)}
+
+    spectral_window = SpectralWindow(box=Box(bounds_dict))
+
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
+                                                          'Gamma': 4.7, 'Gamma_unit': 'cm-1',
+                                                          'grid_resolution': {'A': 7, 'B': 10}})
+    
+    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
+
+    sim.addSpecEvalSetup(eval_setup)
+
+    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    sim.getResults(obtainer=wilson_data_obtainer)
+
+    sim.evaluate()
+
+    np.set_printoptions(linewidth=280, precision=1)
+
+
+    print(sim.spec['A'])
+    print(sim.spec['B'])
+    print(sim.spec['result'])
+
+    import matplotlib.pyplot as plt
+
+    Z = np.log(np.abs(sim.spec['result'])**2)
+    x = np.unique(sim.spec['A'])
+    y = np.unique(sim.spec['B'])
+
+    # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
+    # matplotlib expects [y, x] ordering for images
+    if Z.shape == (len(y), len(x)):
+        print('\nNOT transposing\n')
+        toplot = Z
+    else:
+        print('\ntransposing\n')
+        toplot = Z.T
+
+    plt.pcolormesh(x, y, toplot, shading="auto")
+    plt.xlabel('A')
+    plt.ylabel('B')
+    plt.colorbar(label='log intensity')
+    plt.show()
+
+
+def test_full_integration_H2O_molecule():
+    print()
+    from ....fixtures import evv_experiment
+    from wilson_suite.wilson_utils.paths import SUITE_ROOT
+
+    evv_experiment = evv_experiment()
+    terms = ws.derive.main.get_fully_enhanced_terms(experiment=evv_experiment)
+    axes_choice = evv_experiment.valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
+    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
+                                                     lvl_theory='HF', 
+                                                     basis_set='STO-3G', 
+                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+
+    from wilson_suite.wilson_main.wf import WilsonSimulation
+    sim = WilsonSimulation()
+
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
+    sim.addExperiment(evv_experiment)
+    sim.addTerms(terms=evv_terms) # terms
+
+    mol_system = ws.main.abstractions.MolecularSystem(name='h2o', natoms=3)
 
     vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
     
@@ -233,12 +314,27 @@ def test_full_integration():
 
     np.set_printoptions(linewidth=280, precision=1)
 
-    print(sim.spec['A'].T)
-    print(sim.spec['B'].T)
-    print(sim.spec['result'].T)
+    print(sim.spec['A'])
+    print(sim.spec['B'])
+    print(sim.spec['result'])
 
-    # import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
-    # plt.imshow(np.log(abs(sim.spec['result'])**2).T, interpolation='none', origin="upper") # now folows A,B arrays - down and to the left
-    # plt.show()
+    Z = np.log(np.abs(sim.spec['result'])**2)
+    x = np.unique(sim.spec['A'])
+    y = np.unique(sim.spec['B'])
 
+    # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
+    # matplotlib expects [y, x] ordering for images
+    if Z.shape == (len(y), len(x)):
+        print('\nNOT transposing\n')
+        toplot = Z
+    else:
+        print('\ntransposing\n')
+        toplot = Z.T
+
+    plt.pcolormesh(x, y, toplot, shading="auto")
+    plt.xlabel('A')
+    plt.ylabel('B')
+    plt.colorbar(label='log intensity')
+    plt.show()
