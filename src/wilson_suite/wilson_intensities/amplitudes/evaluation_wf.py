@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
     from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
     from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
@@ -71,7 +71,7 @@ class EvaluationContext:
 class EvaluationInputs:
     terms: Any
     number_of_modes: int
-    props: Any
+    props: list["MolecularProperty"]
     spec_eval_setup: 'SpecEvalSetup'
     vib_ana_setup: 'VibAnaSetup'
     pulse_polarization_vector: tuple[float, float, float]
@@ -98,10 +98,10 @@ def make_evaluation_inputs(
                             *,
                             simulation: "WilsonSimulation" = None,
                             terms=None,
-                            number_of_modes=None,
-                            props=None,
-                            spec_eval_setup=None,
-                            vib_ana_setup=None,
+                            number_of_modes: int = None,
+                            props: list["MolecularProperty"] = None,
+                            spec_eval_setup: 'SpecEvalSetup' = None,
+                            vib_ana_setup: 'VibAnaSetup' = None,
                             pulse_polarization_vector=None,
                         ) -> EvaluationInputs:
     """
@@ -174,16 +174,29 @@ class EvaluationWorkflow:
     Can work with a WilsonSimulation in a prepared state (READY) or stanalone with provided necessary inputs.
     
     """
-    def __init__(self, inputs: EvaluationInputs, parallel=None, verbose=False):
-        self.ctx = EvaluationContext(verbose=verbose)        
+    def __init__(self, inputs: EvaluationInputs, parallel=None, verbose: bool = False):
+        """
+        ctx = EvaluationContext which would hold timing, failures, intermediates(?) saved during the run
+        artifacts = EvaluationArtifacts holds the intermediate artifacts of the run which are used at other points of the run
+
+        Parameters:
+            inputs: EvaluationInputs - has ( terms, number_of_modes, props(with vals), 
+                                             spec_eval_setup, vib_ana_setup, 
+                                             pulse_polarization_vector(for orientational avrg) )
+
+        run() method - a sequence of executed steps; intermediate results are needed for further steps and are saved in self.artifacts
+        """
+        self.ctx = EvaluationContext(verbose=verbose)
+        self.artifacts = EvaluationArtifacts()
+
         self.inputs = inputs
         self.parallel = parallel
-        self.artifacts = EvaluationArtifacts()
 
 
     def _validate_inputs(self):
         """
-        WilsonSimulation at this point should have necessary data
+        WilsonSimulation at this point should have necessary data.
+
         """
         if not self.inputs.terms:
             raise ValueError("Non-empty 'terms' should be provided")
@@ -191,6 +204,11 @@ class EvaluationWorkflow:
             raise ValueError("'number_of_modes' should be provided")
         if not self.inputs.props:
             raise ValueError("Non-empty 'props'  should be provided")
+        else:
+            for p in self.inputs.props:
+                if p.vals is None:
+                    raise ValueError(f"Property {p.trivial_name} has vals=None")
+
         if not self.inputs.vib_ana_setup.isAllSet:
             raise ValueError("'vib_ana_setup' should be all set (vib_ana_setup.isAllSet)")
         # validate spec_eval_setup, pulse_polarization_vector, number_of_modes(?)
@@ -209,7 +227,9 @@ class EvaluationWorkflow:
 
 
     def run(self):
-        """Run evaluation, return (spectrum, info_dict)"""
+        """
+        Run evaluation, return dict with axes and results grid
+        """
         self._validate_inputs()
         
         try:
@@ -299,6 +319,7 @@ class EvaluationWorkflow:
         """
         FIXME: self.results are not serializable yet
         """
+        raise NotImplementedError('_save_checkpoint')
         import json
 
         # Save intermediate results to a file or log them
