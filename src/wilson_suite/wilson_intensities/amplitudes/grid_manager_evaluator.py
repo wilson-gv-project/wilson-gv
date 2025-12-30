@@ -45,16 +45,16 @@ class GridRegion:
         from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
         return {k:convNu2Ene(v) for k,v in self.coords.items()}
     
+@dataclass
 class GridManager:
     """
     Manages grid partitioning and coordinate systems.
 
     
     """
-    
-    def __init__(self, spec_window: 'SpectralWindow'):
-        self.spec_window = spec_window
-        self.full_grid = None  # Store full grid dict
+    spec_window: 'SpectralWindow'
+    full_grid = None # Store full grid dict
+
     
     def make_fullgrid(self, grid_resolution: Dict[str, int]):
         self.coords_vectors, self.full_grid = self.spec_window.sample_grid(grid_resolution)
