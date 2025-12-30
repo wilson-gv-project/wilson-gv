@@ -190,6 +190,7 @@ class WilsonSimulation:
         
         self.props, self.residual_vib_info, self.vib_ana_setup.max_state_lvl = \
             find_props_and_max_state_lvl(self.terms, self.vib_ana_setup, freqs)
+        print('self.vib_ana_setup.max_state_lvl', self.vib_ana_setup.max_state_lvl)
     
     @needs('props')
     def dressPropsWithSetup(self):

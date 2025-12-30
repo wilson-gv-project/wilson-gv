@@ -51,6 +51,7 @@ def test_evaluation_general_customdata_1elterm():
     mock_sim.system = datadict['system']
     mock_sim.props = datadict['props']
     mock_sim.vib_ana_setup = datadict['vib_ana_setup']
+    mock_sim.vib_ana_setup.max_state_lvl = 3 # there is an issue for the underlying reason for this
 
     print('\nmock_sim.is_ready', mock_sim.is_ready)
 
@@ -61,6 +62,8 @@ def test_evaluation_general_customdata_1elterm():
     mock_sim.terms = [flat_dict['1_(1, 0)']]
     
     print('\n', flat_dict['1_(1, 0)'].to_latex())
+
+    print(mock_sim.vib_ana_setup.max_state_lvl)
 
     mock_sim.evaluate()
     
@@ -139,6 +142,7 @@ def test_evaluation_general_customdata_1mechterm():
     mock_sim.system = datadict['system']
     mock_sim.props = datadict['props']
     mock_sim.vib_ana_setup = datadict['vib_ana_setup']
+    mock_sim.vib_ana_setup.max_state_lvl = 3 # there is an issue for the underlying reason for this
 
     print('\nmock_sim.is_ready', mock_sim.is_ready)
 
