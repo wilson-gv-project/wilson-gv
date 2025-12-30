@@ -416,33 +416,18 @@ class SpectralWindow:
 
 
     def find_clusters_by_featboxes(self) -> tuple['RectangularDomain']:
-
-        all_features = (self.full_features + 
-                       self.contrib_features)
+        all_features = self.full_features + self.contrib_features
 
         from . import domains
         clusters = domains.features_to_clusters(features=all_features)
-        
-        if not isinstance(clusters, dict):
-            print('\nclusters are:\n', clusters)
-            raise ValueError("Clusters should be in a dictionary")
-        for c in clusters:
-            if not isinstance(clusters[c], list):
-                print('\nclusters are:\n', clusters)
-                raise ValueError("Clusters should be given as a list of SpectralFeatures")
-            for f in clusters[c]:
-                if not isinstance(f, SpectralFeature):
-                    print('\nclusters are:\n', clusters)
-                    raise ValueError("List does not contain SpectralFeatures")
-        
-        formal_domains = tuple([
-            RectangularDomain(
-                box=Box.union([f.feat_box for f in clusters[c]]),
-                full_features=clusters[c]
-            )
+
+        # validation (optional, see note below)
+
+        return tuple(
+            RectangularDomain.from_features(clusters[c])
             for c in clusters
-        ])
-        return formal_domains
+        )
+
 
 @dataclass
 class RectangularDomain:
@@ -493,31 +478,13 @@ class RectangularDomain:
         mask = self.box.contains(coords)
         return [f for f, m in zip(self.full_features, mask) if m]
 
-    # UNUSED by extention
+
     @classmethod
-    def from_features(cls, features: List['SpectralFeature'], padding: float = 0.0):
-        """Create a domain whose window tightly bounds given features."""
-        if not features:
-            raise ValueError("Feature list cannot be empty.")
-
-        # Collect all numeric coords per axis
-        axis_vals: dict[str, list[float]] = {}
-        for f in features:
-            for axis, val in f.location.coordinates:
-                if val != "all":
-                    axis_vals.setdefault(axis, []).append(float(val))
-
-        # Determine bounds and shape
-        bounds = []
-        for axis, vals in sorted(axis_vals.items()):
-            min_val, max_val = min(vals) - padding, max(vals) + padding
-            bounds.append((min_val, max_val))
-
-        window = SpectralWindow(Box(tuple(bounds)))
-        domain = cls(bounds=window)
-        domain.add_full_features(features)
-        return domain
-
+    def from_features(cls, features: list[SpectralFeature]):
+        return cls(
+            box=Box.union([f.feat_box for f in features]),
+            full_features=features
+        )
 
 # UNUSED by extention
 @dataclass
