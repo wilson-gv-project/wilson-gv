@@ -326,6 +326,8 @@ class VibAnaSetup:
 		states_lvls = [len(st.state_label.split(',')) for st in self.states]
 		if self.max_state_lvl in states_lvls:
 			return True
+		print('states_lvls', states_lvls)
+		print('self.max_state_lvl', self.max_state_lvl)
 		return False
 
 	@property
@@ -335,6 +337,8 @@ class VibAnaSetup:
 		"""
 		if self.nc_sqrt_eigval is not None and self.has_all_states:
 			return True
+		print('self.nc_sqrt_eigval is not None', self.nc_sqrt_eigval is not None)
+		print('self.has_all_states', self.has_all_states)
 		return False
 	
 	def setStates(self, states: list[VibState]):
