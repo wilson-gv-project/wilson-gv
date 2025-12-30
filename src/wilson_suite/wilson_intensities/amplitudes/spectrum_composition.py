@@ -452,8 +452,6 @@ class RectangularDomain:
 
     """
     box: Box
-    shape: Tuple[int, ...] = None
-    labels: Optional[Tuple[str, ...]] = None
     full_features: List['SpectralFeature'] = field(default_factory=list)
     contrib_features: List['SpectralFeature'] = field(default_factory=list)
 
@@ -463,9 +461,6 @@ class RectangularDomain:
         if isinstance(self.box, tuple) or isinstance(self.box, dict):  # allow legacy tuple bounds
             self.box = Box(self.box)
         
-        # --- label-index map ---
-        if self.labels is not None:
-            self._label_to_index = {label: i for i, label in enumerate(self.labels)}
 
     def __hash__(self):
         return hash(tuple([self.box, tuple(self.full_features), tuple(self.contrib_features)]))
@@ -522,30 +517,6 @@ class RectangularDomain:
         domain = cls(bounds=window)
         domain.add_full_features(features)
         return domain
-
-    # UNUSED
-    def generate_meshgrids(self, steps_axes) -> Tuple[np.ndarray, ...]:
-        """Generate coordinate grids for each dimension."""
-
-        coords_1d = [self.axis_coords(i, steps_axes) for i in self.labels]
-
-        return np.meshgrid(*coords_1d, indexing='ij')
-
-    # UNUSED by extention
-    def axis_coords(self, key: Union[int, str], steps_axes) -> np.ndarray:
-        """Return coordinate values along a labeled axis."""
-
-        i = self.axis_index(key)
-        min_val, max_val = self.box.bounds[i]
-        return safe_arange_inclusive_scaled(min_val, max_val, steps_axes[key])
-
-    # UNUSED by extention
-    def axis_index(self, key: Union[int, str]) -> int:
-            """Resolve axis index from label or integer."""
-
-            if isinstance(key, str):
-                return self._label_to_index[key]
-            return key
 
 
 # UNUSED by extention
