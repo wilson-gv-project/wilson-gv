@@ -1,10 +1,7 @@
 import pytest
 
-from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm, VibContribTerm, RspTermSOSRecursion
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm, VibContribTerm
 
-def test_rsp_term_sos_recursion():
-
-    pass
 
 def test_vib_perturbed_term():
 

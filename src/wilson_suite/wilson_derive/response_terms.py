@@ -3,7 +3,7 @@ import json
 from fractions import Fraction
 
 from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, ResonanceCondition, QOperator, \
-    HarmOscStateSymbolic, TransitionIntegral, PolPropSOSRecursion
+    HarmOscStateSymbolic, TransitionIntegral
 
 
 class VibPerturbedTerm:
@@ -589,49 +589,3 @@ class VibContribTerm:
 
         print('')
 
-
-class RspTermSOSRecursion:
-    """
-    Auxiliary class to represent a response function term undergoing recursion (only used during this recursion)
-    FIXME: This class is possibly redundant and replacement with VibContribTerm can be considered
-    """
-
-    def __init__(self, a: list, rsp_omega: PolPropSOSRecursion, b: list, freq: list, k: list):
-        """
-        a: List: Integrals to the left of the integral containing the "omega" operator
-        rsp_omega: PolPropSOSRecursion instance denoting the integral containing the
-        operator coupling to the detected field
-        b: List: Integrals to the right of the integral containing the "omega" operator
-        freq: List of (dummy) frequency arguments denoting the n-th interaction with the field
-        k: List: Integral operator order argument (for combinatorics summation) FIXME: Possibly outdated
-        """
-
-        self.a = a
-        self.rsp_omega = rsp_omega
-        self.b = b
-        self.freq = freq
-        self.k = k
-
-        # Power of 1/hbar
-        self.hbar = 0
-
-        # Coefficient of self
-        self.coeff = 1
-
-    def present(self):
-        """
-        Formatted printing of own attributes
-        """
-
-        print('Overall coefficient', self.coeff)
-
-        for i in self.a:
-            i.present()
-
-        self.rsp_omega.present()
-
-        for i in self.b:
-            i.present()
-
-        for i in self.freq:
-            i.present()

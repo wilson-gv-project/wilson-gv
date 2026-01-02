@@ -312,6 +312,25 @@ def test_resonance_condition():
     # Previous resonance argument not ResonanceCondition
     assert res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0, given_prev_res='deviating_form')
 
+    # Extra test: Not HarmOscStateSymbolic states in VibDiffTerm
+    # This is allowed but precludes the use of some methods
+    vibstate_symb_a = VibStateSymbolic('A')
+    vibstate_symb_b = VibStateSymbolic('B')
+    vd_harm_a_0 = VibDiffTerm(vibstate_symb_a, vibstate_symb_b)
+    pert_freq_1m2 = [1, -2]
+
+    res_cond_a_0_symb = ResonanceCondition(vd_harm_a_0, pert_freq_1m2)
+
+    assert res_cond_a_0_symb.diff.sl.s == 'A'
+    assert res_cond_a_0_symb.diff.sr.s == 'B'
+
+    with pytest.raises(TypeError):
+        bogus = res_cond_a_0_symb.netStateSign()
+
+    with pytest.raises(TypeError):
+        magn_conditions_m2_m_1_gt_0 = [[-1, 2]]
+        bogus = res_cond_a_0_symb.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0)
+
     # Bogus:
 
     # Not VibDiffTerm
@@ -319,15 +338,6 @@ def test_resonance_condition():
         harm_osc_a = HarmOscStateSymbolic(['a'])
         harm_osc_0 = HarmOscStateSymbolic([])
         vd_harm_a_0_bogus = [harm_osc_a, harm_osc_0]
-        pert_freq_1m2 = [1, -2]
-
-        res_cond_a_0_bogus = ResonanceCondition(vd_harm_a_0_bogus, pert_freq_1m2)
-
-    # Not HarmOscStateSymbolic states in VibDiffTerm
-    with pytest.raises(TypeError):
-        vibstate_symb_a = VibStateSymbolic('A')
-        vibstate_symb_b = VibStateSymbolic('B')
-        vd_harm_a_0_bogus = [vibstate_symb_a, vibstate_symb_b]
         pert_freq_1m2 = [1, -2]
 
         res_cond_a_0_bogus = ResonanceCondition(vd_harm_a_0_bogus, pert_freq_1m2)
@@ -350,8 +360,6 @@ def test_line_shape():
     # Functionality not currently used, deferring tests
 
     pass
-
-
 
 def test_pol_prop():
 
@@ -456,8 +464,7 @@ def test_pol_prop_sos_recursion():
 
     # FIXME: Return to this test once relevant attributes/methods settled during code pass/unit test work on
     # vib_rsp_sos
-    assert False
-
+    pass
 
 def test_transition_integral():
 

@@ -226,7 +226,10 @@ class ResonanceCondition:
 
     def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
         """
-        diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic
+        diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
+              - Several methods will only work with the states in HarmOscStateSymbolic form
+              - However, having states as VibStateSymbolic instances is relevant in earlier stages of the overall term
+              derivation process
         pf: Perturbing field frequency labels (their sum to be subtracted when evaluating)
         id: Optional integer id term for potential later handling of grouped
         resonance conditions in lineshape evaluation
@@ -234,15 +237,7 @@ class ResonanceCondition:
 
         # Energy difference
         if not(isinstance(diff, VibDiffTerm)):
-            raise TypeError('The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
-        else:
-            if not isinstance(diff.sl, HarmOscStateSymbolic):
-                raise TypeError(
-                    'The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
-
-            if not isinstance(diff.sl, HarmOscStateSymbolic):
-                raise TypeError(
-                    'The energy difference must be a VibDiffTerm instance w.r.t. HarmOscStateSymbolic states')
+            raise TypeError('The energy difference must be a VibDiffTerm instance')
 
         self.diff = diff
 
@@ -325,6 +320,12 @@ class ResonanceCondition:
         instead_trimmed (default None): Instead evaluate wrt. a trimmed resonance (trimmed according to
         other known information about equivalences)
         """
+
+        # VibDiffTerm has its own type check where sl and sr must be same class, therefore checking one is sufficient here
+        if not(isinstance(self.diff.sl, HarmOscStateSymbolic)):
+            raise TypeError('The netStateSign method works only with a VibDiffTerm composed of HarmOscStateSymbolic instances')
+
+
         if instead_trimmed is None:
 
             q_bra_net = copy.deepcopy(self.diff.sl.q)
@@ -373,6 +374,12 @@ class ResonanceCondition:
 
         pulse_freq_spans: Dictionary {pulse #i: [lower range, upper range], ...}
         """
+
+        # VibDiffTerm has its own type check where sl and sr must be same class, therefore checking one is sufficient here
+        if not (isinstance(self.diff.sl, HarmOscStateSymbolic)):
+            raise TypeError(
+                'The netStateSign method works only with a VibDiffTerm composed of HarmOscStateSymbolic instances')
+
         pfr_curr = {}
 
         for i in self.pf:
@@ -482,6 +489,11 @@ class ResonanceCondition:
         TODO: For now just walking through conditions. Later, could apply all combinations of conditions
         to exhaust opportunities for eliminating all
         """
+
+        # VibDiffTerm has its own type check where sl and sr must be same class, therefore checking one is sufficient here
+        if not(isinstance(self.diff.sl, HarmOscStateSymbolic)):
+            raise TypeError(
+                'The netStateSign method works only with a VibDiffTerm composed of HarmOscStateSymbolic instances')
 
         # Catching if perturbing frequencies not specified as (signed integer) pulse references and returning True
         # (cannot rule out resonance)
@@ -687,9 +699,6 @@ class LineShape:
         # Possible evaluator function?
         self.evaluator = evaluator
 
-
-
-
 class PolProp:
     """
     Polarization property differentiated zero or more times w.r.t. geometrical displacement
@@ -840,68 +849,6 @@ class PolProp:
         num_denom = prop_trivialname_latex(geo=curr_diff_inds, el=curr_ops)
 
         return rf'\frac{{{num_denom[0]}}}{{{num_denom[1]}}}'
-
-
-class PolPropSOSRecursion:
-    """
-    (Electronic) polarization property for use in SOS recursion
-
-    FIXME: Relevance of order argument unclear (could be vestigial): Return to this as part of work on vib_rsp_sos
-        - If relevant, should increment order upon addition of operator?
-        - If relevant, should not always initialize to order zero? If so, remove as init parameter?
-    """
-
-    # Takes set of operators, bra and ket vibrational states left and right
-    def __init__(self, order: int, left: VibStateSymbolic, right: VibStateSymbolic):
-        """
-        order: Integer: Order of property
-        left: VibStateSymbolic: Bra state of integral
-        right: VibStateSymbolic: Ket state of integral
-        """
-
-        if not isinstance(order, int):
-            raise TypeError('Order argument must be integer')
-
-        if not isinstance(left, VibStateSymbolic):
-            raise TypeError('Bra state argument must be VibStateSymbolic instance')
-
-        if not isinstance(right, VibStateSymbolic):
-            raise TypeError('Ket state argument must be VibStateSymbolic instance')
-
-        # Integer: order of property
-        self.order = order
-        self.left = left
-        self.right = right
-
-        # FIXME: Is omega here vestigial?
-        self.omega = 1
-
-        # Operators associated with self
-        self.ops = []
-
-    def addOperator(self, op: QOperator):
-        """
-        Add operator
-
-        op: QOperator: The operator to be added
-        """
-        if not isinstance(op, QOperator):
-            raise TypeError('operator argument must be QOperator')
-
-        self.ops.append(op)
-
-    def present(self):
-        """
-        Formatted printing of own attributes
-        """
-
-        if self.omega:
-            print('('  + str(self.order + 1) + ')' +  ' ' + self.left.s + ',' + self.right.s + ' (a)')
-
-        else:
-            print('(' + str(self.order) + ')' + ' ' + self.left.s + ',' + self.right.s)
-
-        print('Operators:', [i.o for i in self.ops])
 
 
 class TransitionIntegral:
