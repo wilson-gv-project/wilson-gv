@@ -265,8 +265,8 @@ class ResLocGeoObject:
 @dataclass
 class SpectralFeature:
     location: 'ResLocGeoObject'
-    term_contributions: tuple[TermParametersChoice] # grouped by res_motif
-    lineshape_parameter: dict
+    term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
+    lineshape_parameter: dict = None
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
