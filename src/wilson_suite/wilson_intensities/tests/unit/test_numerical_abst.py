@@ -50,26 +50,3 @@ def test_compile_resonance_motif():
     assert isinstance(numerical_motif, NumericalResonanceMotif)
     assert len(numerical_motif.res_conds) == len(res_motif)
 
-
-def test_compile_feature():
-    """Test compile_feature function"""
-    # Setup mock objects and data
-    feature = SpectralFeature(...)  # Fill with appropriate test data
-    vib_data = VibStatesData(...)   # Fill with appropriate test data
-    vibdiff_cache = VibDiffCache()  # Initialize empty cache
-
-    # Call the function to test
-    compiled_groups = compile_feature(
-        feature,
-        vib_data,
-        vibdiff_cache
-    )
-
-    # Assertions to verify correctness
-    assert isinstance(compiled_groups, list)
-    for group in compiled_groups:
-        assert isinstance(group, CompiledTermGroup)
-        for motif in group.resonance_motifs:
-            assert isinstance(motif, NumericalResonanceMotif)
-    # Add more specific assertions based on expected values
-

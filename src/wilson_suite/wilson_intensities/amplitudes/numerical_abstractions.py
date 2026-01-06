@@ -60,6 +60,9 @@ def compile_feature(feature: 'SpectralFeature',
     """
     
     """
+    if feature.term_contributions is None:
+        raise ValueError("This feature cannot be compiled without term_contributions attributed to it")
+    
     compiled_groups = []
 
     for term_group in feature.term_contributions:

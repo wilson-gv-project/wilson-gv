@@ -61,12 +61,12 @@ def test_precalculate_unique_coeff_parts():
                                    harmonic_osc_states_labels=(0, 1, 2))
     
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
-    
+
     settings = EvaluationDataAndConfigs(props_data=MolPropsCollection(props),
                                         vibstates_data=vibdata,
-                                        polarization='ZZZZ',
-                                        number_of_nmodes=4)
-    
+                                        pulse_polarization_vector=[1., 1., 1.],
+                                        number_of_nmodes=4, 
+                                        nm_inds_choices=[0, 1, 2, 3])
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
     print(results)
@@ -110,8 +110,9 @@ def test_evaluate_term_coeffs():
 
     settings = EvaluationDataAndConfigs(props_data=MolPropsCollection(props),
                                         vibstates_data=vibdata,
-                                        polarization='ZZZZ',
-                                        number_of_nmodes=4)
+                                        pulse_polarization_vector=[1., 1., 1.],
+                                        number_of_nmodes=4, 
+                                        nm_inds_choices=[0, 1, 2, 3])
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
@@ -129,20 +130,20 @@ def test_evaluate_term_coeffs():
 
     term0_coeff = fac.evaluate_term_coeffs(term=terms_select[0], 
                                            relevant_indices=[{'a': 0, 'b': 0}], 
-                                           necessary_data=results)
+                                           necessary_data=(settings, results))
     print('\nterm0_coeff', term0_coeff, '\n')
     print('======================')
     
     
     term12_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
                                            relevant_indices=[{'a': 0, 'b': 0, 'c': 1}], 
-                                           necessary_data=results)
+                                           necessary_data=(settings, results))
     print('\nterm12_coeff', term12_coeff, '\n')
     print('======================')
 
     term13_coeff = fac.evaluate_term_coeffs(term=terms_select[-3], 
                                            relevant_indices=[{'a': 0, 'b': 1, 'c': 1}], 
-                                           necessary_data=results)
+                                           necessary_data=(settings, results))
     print('\nterm13_coeff', term13_coeff, '\n')
     print('======================')
 
@@ -152,6 +153,6 @@ def test_evaluate_term_coeffs():
 
     term14_coeff = fac.evaluate_term_coeffs(term=terms_select[-1], 
                                            relevant_indices=[{'a': 0, 'b': 1}], 
-                                           necessary_data=results)
+                                           necessary_data=(settings, results))
     print('\nterm14_coeff', term14_coeff, '\n')
     print('======================')

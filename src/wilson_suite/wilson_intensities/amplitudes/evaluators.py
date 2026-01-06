@@ -121,11 +121,28 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
     
     return term_coeffs_per_index
 
+def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
+                                     vibstates_data: VibStatesData,
+                                     vibdiff_cache: VibDiffCache,
+                                     lineshape_parameter: float=None) -> list[SpectralFeature]:
+    """
+    SpectralFeature: 
+        location
+        term_contributions = None
+        lineshape_parameter = None
+        amplitude_coeff = None
+        feat_type: str = None - updated when sorted
+        feat_box: Box = None - post-init if lineshape_parameter
+    """
+    motif_res_loc, terms_for_motifs = process_resonance_motifs(derived_terms, vibstates_data, vibdiff_cache)
+    
+    return get_features_to_draw(motif_res_loc, terms_for_motifs, lineshape_parameter=lineshape_parameter)
+
 def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]], 
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
                                                      dict[ParameterSet, float]]=None,
-                         lineshape_parameter: dict[str, float]=None) -> list[SpectralFeature]:
+                         lineshape_parameter: float=None) -> list[SpectralFeature]:
     """
 
     lineshape_parameter - uniform lineshape parameters (for all axes) for each feature for now
@@ -137,8 +154,13 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
     for res_motif in motif_res_loc:
 
         for res_geo_obj, list_state_dicts in motif_res_loc[res_motif].items():
+
+            lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
+            term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
+                                        states_parameters=lst_params, 
+                                        term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
+            
             if term_coeffs_per_index is not None:
-                lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
                 list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
                 amplitude_coeff = sum(list_to_sum)
             else:
@@ -147,9 +169,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             # disregard locations where coefficient is zero
             if amplitude_coeff != 0.:
                 spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
-                                                                                           states_parameters=lst_params, 
-                                                                                           term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )]),
+                                            term_contributions=term_contributions,
                                             lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
                                             amplitude_coeff=amplitude_coeff)
                 if spec_feature not in features_to_draw:

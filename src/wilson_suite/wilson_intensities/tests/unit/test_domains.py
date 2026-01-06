@@ -1,6 +1,6 @@
 from wilson_suite.wilson_intensities.amplitudes import domains
 from ...amplitudes.spectrum_composition import RectangularDomain, SpectralWindow
-# from ...amplitudes.evaluators import get_features_from_terms_for_eval
+from ...amplitudes.evaluators import get_features_from_terms_for_eval
 from ....wilson_main import abstractions as wm_abst
 import numpy as np
 
@@ -44,7 +44,16 @@ def generate_props_data_Nmodes(N_modes):
             }
 
 def get_data_evaluators_tests() -> dict:
-    from ....wilson_derive.response_terms import VibPerturbedTerm
+    """
+    dict(system=system,
+        vib_ana_setup=vibana,
+        derived_terms=terms_select,
+        props=props,
+        experiment=experiment,
+        spec_eval_setup=spec_eval_setup,
+        domain_distance_thresholds={'A': 12., 'B': 12.})
+    """
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.fixtures import get_terms_from_json
     terms_fuller_flat = get_terms_from_json()
 
@@ -116,24 +125,28 @@ def get_data_evaluators_tests() -> dict:
                 spec_eval_setup=spec_eval_setup,
                 domain_distance_thresholds={'A': 12., 'B': 12.})
 
-# def get_features_from_terms():
+def get_features_from_terms(lineshape_parameter:float = 9.5):
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 
-#     datadict = get_data_evaluators_tests()
+    datadict = get_data_evaluators_tests()
+    include_list = tuple([int(v[0]) for v in list(datadict['vib_ana_setup'].nc_sqrt_eigval.keys()) if int(v[0]) not in datadict['vib_ana_setup'].exclude_modes])
 
-#     features = get_features_from_terms_for_eval(**datadict)
-#     return features
+    vibstates_data = VibStatesData(allstates=tuple(datadict['vib_ana_setup'].states),
+                                   harmonic_osc_states_labels=include_list)
+    vibdiff_cache = VibDiffCache()
+
+    features = get_features_from_terms_for_eval(datadict['derived_terms'],
+                                                vibstates_data,
+                                                vibdiff_cache, lineshape_parameter)
+    return features
 
 
 def test_terms_features():
     print()
     
     features = get_features_from_terms()
-    features_locs = [loc_geo_obj.values for loc_geo_obj in features]
-    print('\nfeatures', list(features.values()))
-    print('\nfeatures_locs', features_locs)
-    spec_features = [i[1] for i in list(features.values())]
-    print('\nspec_features', set(spec_features))
-    # from ...amplitudes.term_parts import SpectralFeature, GeometricObject, TermParametersChoice, ParameterSet
+    features_locs = [feat.location.values for feat in features]
 
     assert set(features_locs) == set([(1864.0, 900.0), (2255.0, 1291.0), (2274.0, 1310.0), 
                                       (2255.0, 1021.0), (2368.0, 1134.0), (2360.0, 1126.0), 
@@ -144,11 +157,7 @@ def test_terms_features():
 def test_find_clusters_by_distance():
     print()
     features = get_features_from_terms()
-
-    features_locs = [loc_geo_obj.values for loc_geo_obj in features]
-    print('\nfeatures', features)
-    print('\nfeatures_locs', features_locs)
-    # exit()
+    features_locs = [feat.location.values for feat in features]
 
     clusters = domains.find_points_clusters_by_distance(res_locations=features_locs, 
                                                  distance_thresholds={'A': 10., 'B': 10.}, 
@@ -169,39 +178,26 @@ def test_find_clusters_by_distance():
                         1: [(2255.0, 1021.0), (2274.0, 1040.0)], 
                         2: [(2368.0, 1134.0), (2360.0, 1126.0), (2362.0, 1128.0)]}.values())
 
-
-def test_find_feature_clusters_by_distance():
-    print()
-    features = get_features_from_terms()
-
-    # print('\nfeatures', features)
-
-    rec_windows_dict = domains.find_feature_clusters_by_distance(features=features, 
-                                                         distance_thresholds={'A': 10., 'B': 10.}, 
-                                                         linkage='single')
-    # print('\nrec_windows_dict', rec_windows_dict)
-    for window in rec_windows_dict:
-        # print(rec_windows_dict[window].bounds)
-        print('\n', rec_windows_dict[window])
-
-
+"""
 def test_compute_box_adjacency():
     print()
     features = get_features_from_terms()
-    # print('features', features)
     for f in features:
-        print(f.lineshape_parameter)
+        f.lineshape_parameter = 1.5
+
     points_from_features = [feat.location._coord_dict for feat in features]
-    halfwidths_list_from_features = [feat.lineshape_parameter for feat in features]
     
-    rectangular_boxes = domains.points_to_bounds(points_from_features, halfwidths_list_from_features)
+    rectangular_boxes = domains.points_to_bounds(points_from_features, halfwidth=1.5)
+    
     res = domains.compute_box_adjacency(rectangular_boxes)
     print(res)
-
+    
+"""
 
 def test_features_to_clusters():
     print()
     features = get_features_from_terms()
+    print([f.feat_box for f in features])
     rr = domains.features_to_clusters(features=features)
 
     for k in rr:
@@ -210,16 +206,10 @@ def test_features_to_clusters():
 def test_feat_clusters_to_domains():
     features = get_features_from_terms()
     feat_clusters = domains.features_to_clusters(features=features)
-    # print('\nfeat_clusters', feat_clusters)
-
-    # from ...amplitudes.spectrum_composition import SpectralFeature
 
     clusters = []
     for fc in feat_clusters:
-        # print('\nfeat_clusters[fc]', feat_clusters[fc])
+        print('\nfeat_clusters[fc]', feat_clusters[fc])
         clusters.append(RectangularDomain.from_features(feat_clusters[fc]))
-        # clusters.append(RectangularDomain())
     
     print('\nclusters', len(clusters))
-    print('\nclusters', clusters)
-    return

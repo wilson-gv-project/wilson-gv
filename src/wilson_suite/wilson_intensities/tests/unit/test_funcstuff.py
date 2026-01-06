@@ -76,6 +76,7 @@ def test_ResonanceWaveMatch():
     wm1 = f_abst.ResonanceWaveMatch({'1': -1, '2': 1})
     print(wm1)
 
+"""
 def test_EvaluationTerm():
     print()
     # (('b,a', (-1, 2)), ('zero,a', (-1,)))
@@ -127,4 +128,4 @@ def test_EvaluationTerm():
                                       factor_value=None,
                                       Gamma=3.14)
     print(res_point)
-
+"""

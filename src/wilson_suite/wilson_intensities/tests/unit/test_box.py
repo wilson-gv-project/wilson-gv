@@ -125,11 +125,11 @@ def test_box_overlaps():
 
 def test_box_contains_feature():
     print()
-    b = Box({'A': (7.0, 12.0), 'B': (25.0, 35.0)})
+    b = Box({'A': (7.0, 15.0), 'B': (25.0, 35.0)})
 
-    res_loc1d_a = ResLocGeoObject({'A': 10., 'B': 27.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 3.5, 'B': 1.})
-    assert b.contains_feature(sf1, mode='box')
+    res_loc1d_a = ResLocGeoObject({'A': 10., 'B': 27.7})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=2.5)
+    assert b.contains_feature(sf1, mode='box') # the whole box of this feature lies within Box b
     assert b.contains_feature(sf1, mode='loc')
 
     sf1a = copy.deepcopy(sf1)
@@ -137,13 +137,13 @@ def test_box_contains_feature():
     with pytest.raises(ValueError, match="Need to add a box for this feature"):
         b.contains_feature(sf1a, mode='box')
 
-    res_loc1d_b = ResLocGeoObject({'A': 7.5, 'B': 15.})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 3.5, 'B': 3.})
+    res_loc1d_b = ResLocGeoObject({'A': 6.5, 'B': 26.})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=1.5)
     assert b.contains_feature(sf2, mode='box')
     assert not b.contains_feature(sf2, mode='loc')
     
-    res_loc1d_c = ResLocGeoObject({'A': 19.5, 'B': 26.})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 3.5, 'B': 2.})
+    res_loc1d_c = ResLocGeoObject({'A': 17.5, 'B': 37.})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=3.5)
     assert b.contains_feature(sf3, mode='box')
     assert not b.contains_feature(sf3, mode='loc')
 
@@ -153,7 +153,7 @@ def test_box_contributing_feature():
     b = Box({'A': (7.0, 12.0), 'B': (25.0, 35.0)})
 
     res_loc1d_a = ResLocGeoObject({'A': 10., 'B': 27.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 3.5, 'B': 1.})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=3.5)
     assert not b.contributing_feature(sf1)
 
     sf1a = copy.deepcopy(sf1)
@@ -163,15 +163,15 @@ def test_box_contributing_feature():
         b.contributing_feature(sf1a)
 
     res_loc1d_b = ResLocGeoObject({'A': 7.5, 'B': 15.})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 3.5, 'B': 3.})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=3.5)
     assert not b.contributing_feature(sf2)
     
     res_loc1d_c = ResLocGeoObject({'A': 19.5, 'B': 26.})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 3.5, 'B': 2.})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=3.5)
     assert not b.contributing_feature(sf3)
 
-    res_loc1d_d = ResLocGeoObject({'A': 15.5, 'B': 24.})
-    sf4 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 3.5, 'B': 2.})
+    res_loc1d_d = ResLocGeoObject({'A': 15.5, 'B': 23.})
+    sf4 = SpectralFeature(location=res_loc1d_d, lineshape_parameter=3.5)
     assert b.contributing_feature(sf4)
 
 

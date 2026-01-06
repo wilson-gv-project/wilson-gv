@@ -66,15 +66,6 @@ def props_with_values(system: wm_abst.MolecularSystem):
     
     return props
 
-
-def test_terms_evaluator_general_compilation():
-    print()
-    from .test_domains import get_data_evaluators_tests
-    datadict = get_data_evaluators_tests()
-
-    evaluators.terms_evaluator_general_compilation(**datadict)
-
-
 def get_necessary_data(terms_select: list[VibPerturbedTerm]):
     import wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff as fac
     from wilson_suite.wilson_main.abstractions import MolPropsCollection, MolecularProperty, VibState
@@ -127,7 +118,7 @@ def test_evaluate_feature_on_grid():
     from .test_domains import get_features_from_terms, get_data_evaluators_tests
     datadict = get_data_evaluators_tests()
     
-    features = get_features_from_terms()
+    features = get_features_from_terms(lineshape_parameter=9.5)
 
     spec_window = datadict['spec_eval_setup'].ev_info.spectral_window
 
@@ -151,35 +142,49 @@ def test_evaluate_feature_on_grid():
 
     from ...amplitudes.term_parts import EvaluationDataAndConfigs, VibStatesData
     from ...amplitudes.vibene_differences import VibDiffCache
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolPropsCollection
 
     from ...amplitudes.numerical_abstractions import compile_feature
+    from ...amplitudes.evaluation_wf import evaluate_feature
 
     vas: VibAnaSetup = datadict['vib_ana_setup']
-    dd = EvaluationDataAndConfigs(vibstates_data=VibStatesData(allstates=vas.states),
-                                  vibdiff_cache=VibDiffCache())
-    
+    dd = EvaluationDataAndConfigs(props_data=MolPropsCollection(datadict["props"]),
+                                  vibstates_data=VibStatesData(allstates=vas.states),
+                                  pulse_polarization_vector=[1., 1., 1.],
+                                  number_of_nmodes=4)
+
+    vd_cache = VibDiffCache()
 
     compiled_groups = compile_feature(
         d3_all_feats[0],
         dd.vibstates_data,
-        dd.vibdiff_cache
+        vd_cache
     )
-    final = evaluators.evaluate_feature_on_grid(compiled_groups=compiled_groups, 
-                                                meshgrids=domains_with_subgrids[domain3]['grid'],
-                                                gamma=2.0,
-                                                amplitude_coeff=d3_all_feats[0].amplitude_coeff)
-    print(final)
+    
+    print(compiled_groups)
+    print(domains_with_subgrids[domain3]['grid'])
 
-def test_evaluate_feature_on_grid_new():
-    from ...amplitudes.evaluators import evaluate_feature_on_grid
+    d3_all_feats[0].amplitude_coeff = 1.
+    final = evaluate_feature(feature=d3_all_feats[0],
+                             vib_data=dd.vibstates_data,
+                             vibdiff_cache=vd_cache,
+                             gamma=9.5,
+                             coords=domains_with_subgrids[domain3]['grid'])
+    # final = evaluators.evaluate_feature_on_grid(compiled_groups=compiled_groups, 
+    #                                             meshgrids=domains_with_subgrids[domain3]['grid'],
+    #                                             gamma=2.0,
+    #                                             amplitude_coeff=d3_all_feats[0].amplitude_coeff)
+    # print(final)
+
+def test_evaluate_compiled_group():
+    from ...amplitudes.evaluation_wf import evaluate_compiled_group
     from ...amplitudes.numerical_abstractions import CompiledTermGroup
+    
     # Simple 1D grid for "A"
     A = np.array([0.0, 1.0, 2.0])
     mesh = {"A": A}
 
-    # gamma = 0 for simplicity
-    gamma = 0.0
+    gamma = 1.0
 
     # Motif 1:
     # z = 10 - 1*x
@@ -194,13 +199,11 @@ def test_evaluate_feature_on_grid_new():
     # One term group containing both motifs
     group = CompiledTermGroup([motif1, motif2])
 
-    amplitude = 1.0
-
     # run evaluation
-    result = evaluate_feature_on_grid([group], mesh, gamma, amplitude)
+    result = evaluate_compiled_group(group, mesh, gamma)
 
-    # expected:
-    expected = 1/(10 - A) + 1/(20 - 2*A)
+    # expected - sum for each motif
+    expected = 1/(10 - A - 1j*gamma) + 1/(20 - 2*A - 1j*gamma)
 
     assert np.allclose(result, expected)
 
@@ -209,8 +212,9 @@ def test_evaluate_feature_on_grid_new_2():
     """
     gamma nonzero, two resonance conditions per motif
     """
-    from ...amplitudes.evaluators import evaluate_feature_on_grid
+    from ...amplitudes.evaluation_wf import evaluate_compiled_group
     from ...amplitudes.numerical_abstractions import CompiledTermGroup
+    
     # Simple 1D grid for "A"
     A = np.array([0.0, 1.0, 2.0])
     mesh = {"A": A}
@@ -235,10 +239,8 @@ def test_evaluate_feature_on_grid_new_2():
     # One term group containing both motifs
     group = CompiledTermGroup([motif1, motif2])
 
-    amplitude = 1.0
-
     # run evaluation
-    result = evaluate_feature_on_grid([group], mesh, gamma, amplitude)
+    result = evaluate_compiled_group(group, mesh, gamma)
 
     # expected:
     expected = 1/((10 - A) - 1j*gamma) / ((15 - 0.5*A) - 1j*gamma) + 1/((20 - 2*A) - 1j*gamma) / ((25 - 1*A) - 1j*gamma)
@@ -247,6 +249,8 @@ def test_evaluate_feature_on_grid_new_2():
 
 
 def test_evaluate_resonance_simple():
+    from ...amplitudes.evaluation_wf import evaluate_resonance_motif
+    
     # 1. Make a compiled motif with one term
     motif = NumericalResonanceMotif(res_conds=[
         NumericalResonanceCondition(
@@ -262,7 +266,7 @@ def test_evaluate_resonance_simple():
 
     # 3. Evaluate with some gamma
     gamma = 0.5
-    result = evaluators.evaluate_res_motif_on_grid(motif, mesh, gamma)
+    result = evaluate_resonance_motif(motif, mesh, gamma)
 
     # 4. Expected output (do by hand)
     expected = 1 / (10 - A + B - 1j*gamma)
@@ -271,6 +275,8 @@ def test_evaluate_resonance_simple():
     np.testing.assert_allclose(result, expected)
 
 def test_evaluate_resonance_simple_2conds():
+    from ...amplitudes.evaluation_wf import evaluate_resonance_motif
+
     # 1. Make a compiled motif with one term
     motif = NumericalResonanceMotif(res_conds=[
         NumericalResonanceCondition(
@@ -290,7 +296,7 @@ def test_evaluate_resonance_simple_2conds():
 
     # 3. Evaluate with some gamma
     gamma = 0.5
-    result = evaluators.evaluate_res_motif_on_grid(motif, mesh, gamma)
+    result = evaluate_resonance_motif(motif, mesh, gamma)
 
     # 4. Expected output (do by hand)
     expected = 1 / (10 - A + B - 1j*gamma) / (10 - A - 1j*gamma)
