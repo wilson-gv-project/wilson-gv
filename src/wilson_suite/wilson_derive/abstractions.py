@@ -54,24 +54,24 @@ class HarmOscStateSymbolic:
     Symbol-described harmonic oscillator state class
     """
 
-    def __init__(self, q: list):
+    def __init__(self, q: list|tuple):
         """
-        q: list of normal mode index quanta
+        q: list (or tuple) of normal mode index quanta
         Ground state: q = []
         One-quantum b: q = ['b']
         Three-quantum a,a,b: q = ['a', 'a', 'b']
         """
 
-        if not isinstance(q, list):
-            raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
+        if not (isinstance(q, list) or isinstance(q, tuple)):
+            raise TypeError('Harmonic oscillator state quanta must be represented as a list or tuple of characters')
 
         for i in q:
 
             if not isinstance(i, str):
-                raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
+                raise TypeError('Harmonic oscillator state quanta must be represented as a list or tuple of characters')
 
             if not len(i) == 1:
-                raise TypeError('Harmonic oscillator state quanta must be represented as a list of characters')
+                raise TypeError('Harmonic oscillator state quanta must be represented as a list or tuple of characters')
 
         # Sort
         self.q = sorted(q)
@@ -224,13 +224,13 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list|tuple=[], id=None):
         """
         diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
               - Several methods will only work with the states in HarmOscStateSymbolic form
               - However, having states as VibStateSymbolic instances is relevant in earlier stages of the overall term
               derivation process
-        pf: Perturbing field frequency labels (their sum to be subtracted when evaluating)
+        pf: List or tuple: Perturbing field frequency labels (their sum to be subtracted when evaluating)
         id: Optional integer id term for potential later handling of grouped
         resonance conditions in lineshape evaluation
         """
@@ -241,11 +241,11 @@ class ResonanceCondition:
 
         self.diff = diff
 
-        if not isinstance(pf, list):
-            raise TypeError('Perturbing frequency labels must be list of strings or integers')
+        if not(isinstance(pf, list) or isinstance(pf, tuple)):
+            raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
         for i in pf:
             if not (isinstance(i, str) or isinstance(i, int)):
-                raise TypeError('Perturbing frequency labels must be list of strings or integers')
+                raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
 
         self.pf = pf
 
@@ -734,7 +734,7 @@ class PolProp:
         return False
 
     def __hash__(self):
-        return hash((tuple([i.h() for i in self.ops]), self.dord, tuple(self.inds)))
+        return hash((tuple([hash(i) for i in self.ops]), self.dord, tuple(self.inds)))
 
     def setDerivOrder(self, dord):
         """

@@ -257,7 +257,7 @@ class VibPerturbedTerm:
             self.sort(nm_inds)
 
         # Getting hashes of constituent parts
-        props_h = tuple([i.h() for i in self.props])
+        props_h = tuple([hash(i) for i in self.props])
         ft_h = tuple([i.h() for i in self.freqterms])
         res_h = tuple([i.h() for i in self.res])
 
@@ -291,9 +291,9 @@ class VibPerturbedTerm:
 
             prev_res = None
             for i in self.res:
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, prev_res=prev_res)):
+                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=prev_res)):
                     return False
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, prev_res=None)):
+                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=None)):
                     return False
                 prev_res = copy.deepcopy(i)
 

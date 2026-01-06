@@ -6,12 +6,16 @@ from .main_functions import find_props_and_max_state_lvl
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
 from ..wilson_derive.response_terms import VibPerturbedTerm
+from ..wilson_derive.term_var_translate import translate_terms_to_axis_variables
 from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
 
 import logging
+
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+
 logger = logging.getLogger("wilson")
 
 class WilsonSimulation:
@@ -66,6 +70,9 @@ class WilsonSimulation:
 
 			self.name=name
 
+			self.axis_choice = None
+			self.terms_in_axis_choice = None
+
 		else:
 
 			# TODO: Implement functionality to set up class instance from file
@@ -105,6 +112,15 @@ class WilsonSimulation:
 
 		else:
 			self.terms.extend(terms)
+
+	def setAxisChoiceAndTranslateTerms(self, axis_choice: SpectralAxisSet):
+		"""
+		SKETCH: To discuss, e.g. what about canonical axes/if choice was not made?
+		"""
+
+		self.axis_choice = axis_choice
+		self.terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+
 
 	def addVibAnaSetup(self, vib_ana_setup: VibAnaSetup):
 		"""
@@ -369,6 +385,10 @@ class WilsonSimulation:
 		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
 		if not self.vib_ana_setup.isAllSet:
 			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
+
+		# NOTE 260106: Could now use self.terms_in_axis_choice and self.axis_choice
+		# To discuss: Handling here (canonical axes plus translate) if no choice made already?
+
 
 		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 

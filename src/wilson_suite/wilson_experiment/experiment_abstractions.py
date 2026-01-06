@@ -472,6 +472,29 @@ class VibExperiment:
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
         self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
 
+    def is_axis_set_by_ref_valid(self, ref: dict):
+        """
+        TODO: Take a reference describing an axis set choice in terms of
+        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
+        and return True if it's a valid choice for this experiment (TODO: ...phase-matching combination, indep var choice?)
+        or False if it's not
+
+        Sketch: Similar to choose_axis_set_by_ref
+
+        """
+        pass
+
+    def choose_axis_set_by_ref(self, ref: dict):
+        """
+        TODO: Take a reference describing an axis set choice in terms of
+        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
+        and return the corresponding SpectralAxisSet instance
+
+        Sketch: Look through self.valid_axis_choices and find out if any of the registered valid choices
+        match: If yes, return that SpectralAxisSet instance - otherwise raise an error
+        """
+        pass
+
     def findDimensionality(self) -> int:
         """
         Using detector and scans information, determine the dimensionality of the spectral data

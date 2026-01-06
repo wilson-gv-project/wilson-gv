@@ -14,7 +14,7 @@ def test_evaluation_general_customdata_1elterm():
     from wilson_suite.wilson_main.wf import WilsonSimulation
     # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 
-    from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
+    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
@@ -105,7 +105,7 @@ def test_evaluation_general_customdata_1mechterm():
     from wilson_suite.wilson_main.wf import WilsonSimulation
     # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 
-    from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
+    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
@@ -189,7 +189,7 @@ def test_full_integration():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_experiment = evv_experiment()
-    terms = ws.derive.main.get_fully_enhanced_terms(experiment=evv_experiment)
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_experiment)
     axes_choice = evv_experiment.valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
 
@@ -265,7 +265,7 @@ def test_full_integration_H2O_molecule():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_experiment = evv_experiment()
-    terms = ws.derive.main.get_fully_enhanced_terms(experiment=evv_experiment)
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_experiment)
     axes_choice = evv_experiment.valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
 

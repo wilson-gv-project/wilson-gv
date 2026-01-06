@@ -3,8 +3,8 @@ from typing import Any, Callable
 from functools import wraps
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_experiment.abstractions import VibExperiment
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 from .spectrum_abstractions import SpecEvalSetup
 from .main_functions import find_props_and_max_state_lvl

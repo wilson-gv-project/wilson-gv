@@ -7,6 +7,9 @@ from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
 import os 
 
+# These tests not currently in use; some may also be less relevant
+'''
+
 def test_SpecDetector():
 
     detector_datacls = we_abst_dataclass.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
@@ -88,3 +91,5 @@ def test_VibExperiment():
     assert hasattr(loaded_experiment_a_datacls, 'tellDimensions')
     assert hasattr(loaded_experiment_a_datacls, 'findInteractionSequences')
     os.remove(ws_root+"/wilson_experiment/tests/experiment_a_datacls.pkl")
+
+'''

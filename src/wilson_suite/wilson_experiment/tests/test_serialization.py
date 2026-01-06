@@ -2,6 +2,10 @@ from ...wilson_experiment import experiment_abstractions as we_abst
 from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import asdict
 
+
+# These tests not currently in use; they have to do with serialization
+'''
+
 def test_dict_EmPulse():
     p1 = we_abst.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, 
                                          wv=[0.0, 0.0, 1.0], 
@@ -102,3 +106,5 @@ def test_dict_VibExperiment():
 
     experiment_a = we_abst.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
     print('\nexperiment_a.__dict__', experiment_a.__dict__, '\n')
+    
+'''

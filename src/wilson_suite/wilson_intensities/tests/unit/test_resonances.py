@@ -12,8 +12,8 @@ import wilson_suite.wilson_main.abstractions
 def test_solve_LSE_motif():
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import solve_LSE_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
@@ -39,7 +39,7 @@ def test_solve_LSE_motif():
 def test_generate_RHS_motif():
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
 
     # (res_cond1, res_cond2, res_cond3, ...)
     # (res_cond1, (wibdiff_mn, axes), ...)
@@ -47,7 +47,7 @@ def test_generate_RHS_motif():
     # (res_cond1, (((m1, m2, ...), (n1, n2, ...)), (ax1, ax2, ax3, ...)), ...)
 
     # vibdiff: (m_inds, n_inds) <=== ((m1, m2, ...), (n1, n2, ...))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import get_RHS_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
@@ -76,8 +76,8 @@ def test_generate_LHS_motif():
     print()
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import generate_LHS_motif
 
@@ -123,7 +123,7 @@ def generate_only_res_cond_evv_term_selection():
     ab_state = wa.HarmOscStateSymbolic(['a', 'b'])
     a_state = wa.HarmOscStateSymbolic(['a'])
     b_state = wa.HarmOscStateSymbolic(['b'])
-    zero_state = wa.HarmOscStateSymbolic([''])
+    zero_state = wa.HarmOscStateSymbolic([])
 
     vd_ab_a = wa.VibDiffTerm(sl = ab_state, sr = a_state)
     vd_0_a = wa.VibDiffTerm(sl=zero_state, sr=a_state)

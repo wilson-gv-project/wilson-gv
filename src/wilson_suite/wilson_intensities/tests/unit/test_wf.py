@@ -5,7 +5,7 @@ import numpy as np
 def test_workflow_run_with_keep_intermediates_real():
     """Test workflow.run(keep_intermediates) behavior"""
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
+    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
@@ -73,7 +73,7 @@ def test_workflow_run_with_keep_intermediates_real_wfsim():
     from wilson_suite.wilson_main.wf import WilsonSimulation
     # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 
-    from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
+    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     

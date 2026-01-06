@@ -819,6 +819,9 @@ def test_find_valid_axes():
     assert axes_cfgs[1].valid_axis_combs[3].axes[1].var_set.var_set[0].pulse_refs == (-2,)
     assert axes_cfgs[1].valid_axis_combs[3].axes[1].var_set.var_set[1].pulse_refs == (1,)
 
+    for i in axes_cfgs:
+        i.present_spectral_axis_choices(2)
+
     # NOTE: Can consider making more test cases here (e.g. more indep vars for one phase-matching condition)
 
 

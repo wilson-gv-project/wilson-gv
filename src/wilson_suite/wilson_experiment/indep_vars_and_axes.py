@@ -242,6 +242,37 @@ class SpectralAxisChoices:
                 if not isinstance(i, SpectralAxisSet):
                     raise TypeError('phasematch_cond must be a tuple of SpectralAxisSet instances')
 
+    def present_spectral_axis_choices(self, from_exp_index: int=None):
+        """
+        SKETCH: Present spectral axis choices
+
+        from_exp_index: Integer (default None): - If none, do not print extra addressing information
+                                                - If not None, assume that this is part of a request from VibExperiment
+                                                  and print extra addressing information
+        """
+
+
+        print('\nSpectral axis choice set presentation:\n')
+        print('Phase-matching condition', self.phasematch_cond.pulses.pulse_refs)
+        print('Independent variables', tuple([i.pulse_refs for i in self.ind_vars.var_set]), '\n')
+
+        print('For this configuration there are', len(self.valid_axis_combs), 'valid axis set choices:\n')
+
+        for i in range(len(self.valid_axis_combs)):
+            print('\nAxis set', i, '\n')
+
+            if from_exp_index is not None:
+                print('Access as experiment_instance_name.valid_axis_combs[' + str(from_exp_index) + '].valid_axis_combs[' + str(i) + ']\n')
+
+            for j in range(len(self.valid_axis_combs[i].axes)):
+                print('Axis', j)
+                print('Label:', self.valid_axis_combs[i].axes[j].label)
+                print('Independent variables', tuple([k.pulse_refs for k in self.valid_axis_combs[i].axes[j].var_set.var_set]))
+
+
+
+
+
 
 def find_subsets_making_orig(subsets: list, acc: list, orig: list, res: list):
     """

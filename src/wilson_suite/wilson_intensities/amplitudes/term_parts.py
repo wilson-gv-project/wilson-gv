@@ -179,6 +179,7 @@ class ResonanceMotif:
         """
         r_conditions = []
         for rc_tuple in tupleOfTuples:
+            print('rc tuple', rc_tuple)
             rc = ResonanceCondition(diff=VibDiffTerm(sl=HarmOscStateSymbolic(q=rc_tuple[0][0]),
                                                      sr=HarmOscStateSymbolic(q=rc_tuple[0][1])), pf=rc_tuple[1])
             r_conditions.append(rc)
