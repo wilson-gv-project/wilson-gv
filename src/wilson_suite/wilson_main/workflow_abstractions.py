@@ -223,23 +223,27 @@ class WilsonSimulation:
 
 		"""
 
-		for p in self.props:
-			p.addValues(data_dict.get(p.trivial_name))
+		# for p in self.props:
+		# 	p.addValues(data_dict.get(p.trivial_name))
+		from .main_functions import fill_props_results, fill_residual_vib_info_results
+		fill_props_results(self.props, data_dict)
 
-		for k in self.residual_vib_info:
-			if k in ['anharmonic_states', 'harmonic_states']:
-				states_list = []
-				states_dict: dict = data_dict.get(k)
+		fill_residual_vib_info_results(self.vib_ana_setup, self.residual_vib_info, data_dict)
 
-				for state, energy in states_dict.items():
-					states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+		# for k in self.residual_vib_info:
+		# 	if k in ['anharmonic_states', 'harmonic_states']:
+		# 		states_list = []
+		# 		states_dict: dict = data_dict.get(k)
 
-				self.vib_ana_setup.setStates(states=states_list)
-				self.residual_vib_info[k] = data_dict.get(k)
+		# 		for state, energy in states_dict.items():
+		# 			states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
 
-			else:
-				self.residual_vib_info[k] = data_dict.get(k)
-				setattr(self.vib_ana_setup, k, data_dict.get(k))
+		# 		self.vib_ana_setup.setStates(states=states_list)
+		# 		self.residual_vib_info[k] = data_dict.get(k)
+
+		# 	else:
+		# 		self.residual_vib_info[k] = data_dict.get(k)
+		# 		setattr(self.vib_ana_setup, k, data_dict.get(k))
 
 
 	def requestData(self) -> dict:
@@ -247,11 +251,15 @@ class WilsonSimulation:
 		data_dict: dict - {data_name: DataOriginInfo}
 		"""
 		data_dict = {}
-		for p in self.props:
-			data_dict[p.trivial_name] = p.calc_setup
+		from .main_functions import request_props, request_residual_vib_info
+		request_props(self.props, data_dict)
+		request_residual_vib_info(self.residual_vib_info, data_dict)
+
+		# for p in self.props:
+		# 	data_dict[p.trivial_name] = p.calc_setup
 		
-		for k, v in self.residual_vib_info.items():
-			data_dict[k] = v
+		# for k, v in self.residual_vib_info.items():
+		# 	data_dict[k] = v
 		
 		return data_dict
 	
@@ -315,9 +323,14 @@ class WilsonSimulation:
 	# 	return GridManager(self.spec_eval_setup.ev_info.spectral_window)
 
 	def evaluate(self):
+		"""
+		Evaluating method, using EvaluationWorkflow
+		"""
 		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
 
+		# prepare data for input to EvaluationWorkflow
 		eval_inputs = make_evaluation_inputs(simulation=self)
+
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
 		try:
@@ -339,6 +352,7 @@ class WilsonSimulation:
 		"""
 		Evaluate the spectrum
 
+		! unused now, there is no generalized evaluator function now; should be removed?
 		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
 		class: Must take a system, an experiment, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray

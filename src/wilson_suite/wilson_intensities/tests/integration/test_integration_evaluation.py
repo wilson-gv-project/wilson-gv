@@ -232,7 +232,7 @@ def test_full_integration():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
-
+    print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
     np.set_printoptions(linewidth=280, precision=1)
@@ -256,7 +256,7 @@ def test_full_integration():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    plt.show()
+    # plt.show()
 
 
 def test_full_integration_H2O_molecule():
@@ -331,4 +331,4 @@ def test_full_integration_H2O_molecule():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    plt.show()
+    # plt.show()

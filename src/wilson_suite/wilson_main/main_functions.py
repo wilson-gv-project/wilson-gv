@@ -244,3 +244,53 @@ def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm],
 	props.extend(props_ext)
 
 	return props, residual_vib_info, find_max_state_lvl(terms)
+
+def fill_props_results(props, data_dict: dict):
+	"""
+	loading data into self.props (and optionally to self.vib_ana_setup)
+	
+	data_dict: dict - {data_name: values}
+
+	"""
+
+	for p in props:
+		p.addValues(data_dict.get(p.trivial_name))
+
+def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: dict):
+	"""
+	loading data into self.props (and optionally to self.vib_ana_setup)
+	
+	data_dict: dict - {data_name: values}
+
+	"""
+	for k in residual_vib_info:
+		if k in ['anharmonic_states', 'harmonic_states']:
+			states_list = []
+			states_dict: dict = data_dict.get(k)
+
+			for state, energy in states_dict.items():
+				states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+
+			vib_ana_setup.setStates(states=states_list)
+			residual_vib_info[k] = data_dict.get(k)
+
+		else:
+			residual_vib_info[k] = data_dict.get(k)
+			setattr(vib_ana_setup, k, data_dict.get(k))
+
+def request_props(props, data_dict) -> dict:
+	"""
+	data_dict: dict - {data_name: DataOriginInfo}
+	"""
+	for p in props:
+		data_dict[p.trivial_name] = p.calc_setup
+	return data_dict
+
+def request_residual_vib_info(residual_vib_info, data_dict) -> dict:
+	"""
+	data_dict: dict - {data_name: DataOriginInfo}
+	"""
+	for k, v in residual_vib_info.items():
+		data_dict[k] = v
+	
+	return data_dict

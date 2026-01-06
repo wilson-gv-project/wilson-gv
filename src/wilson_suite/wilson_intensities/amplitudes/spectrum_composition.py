@@ -160,7 +160,8 @@ class Box:
         """Return boolean for whether SpectralFeature lies inside the window."""
         if mode=='box':
             if spec_feature.feat_box is not None:
-                return self.contains_box(spec_feature.feat_box)
+                return self.overlaps(spec_feature.feat_box)
+                # return self.contains_box(spec_feature.feat_box)
             raise ValueError('Need to add a box for this feature')
         if mode=='loc':
             spec_feature_ndim = len(spec_feature.location.values)
@@ -308,8 +309,12 @@ class SpectralFeature:
             if other.amplitude_coeff is None:
                 raise ValueError("Other SpectralFeature doesn't have `amplitude_coeff`")
 
+            t1 = tuple(self.term_contributions) if self.term_contributions is not None else ()
+            t2 = tuple(other.term_contributions) if other.term_contributions is not None else ()
+            term_contributions = t1 + t2
+
             return SpectralFeature(location=self.location,
-                                   term_contributions=self.term_contributions+other.term_contributions,
+                                   term_contributions=term_contributions,
                                    amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff)
         else:
             raise ValueError('Union is possible only when both location and lineshape_parameter are the same')

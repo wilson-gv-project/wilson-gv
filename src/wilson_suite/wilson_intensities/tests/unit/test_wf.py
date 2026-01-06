@@ -67,8 +67,6 @@ def test_workflow_run_with_keep_intermediates_real():
     
     np.set_printoptions(linewidth=280, precision=3)
 
-    print(info2.keys())
-
 
 def test_workflow_run_with_keep_intermediates_real_wfsim():
     """Test workflow.run(keep_intermediates) behavior"""

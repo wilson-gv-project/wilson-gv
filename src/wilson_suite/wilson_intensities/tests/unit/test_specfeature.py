@@ -4,11 +4,11 @@ import copy
 
 def test_union():
     res_loc1d_a = ResLocGeoObject({'A': 12.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 3.5})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=3.5)
     res_loc1d_b = ResLocGeoObject({'A': 9.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 4.5}, amplitude_coeff=2.5)
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=4.5, amplitude_coeff=2.5)
     res_loc1d_c = ResLocGeoObject({'A': 9.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 4.5}, amplitude_coeff=1.5)
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=4.5, amplitude_coeff=1.5)
 
     # equal because both have empty term_contributions
     assert sf2 == sf3
@@ -23,23 +23,23 @@ def test_union():
 
 def test_union_p2():
     res_loc1d_b = ResLocGeoObject({'A': 9.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 4.5}, amplitude_coeff=2.5, term_contributions=('smth',))
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=4.5, amplitude_coeff=2.5, term_contributions=('smth',))
     res_loc1d_c = ResLocGeoObject({'A': 9.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 4.5}, amplitude_coeff=1.5, term_contributions=('smth else',))
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=4.5, amplitude_coeff=1.5, term_contributions=('smth else',))
     sf2_U_sf3 = sf3.union(sf2)
     assert sf2_U_sf3.term_contributions == ('smth else', 'smth')
 
 def test_equality():
     print()
     res_loc1d_a = ResLocGeoObject({'A': 9.5})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 4.5}, amplitude_coeff=2.5, term_contributions=('smth',))
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=4.5, amplitude_coeff=2.5, term_contributions=('smth',))
 
     res_loc1d_b = ResLocGeoObject({'A': 9.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 4.5}, amplitude_coeff=2.5)
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=4.5, amplitude_coeff=2.5)
     res_loc1d_c = ResLocGeoObject({'A': 9.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 4.5}, amplitude_coeff=1.5)
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=4.5, amplitude_coeff=1.5)
     res_loc1d_d = ResLocGeoObject({'A': 1.5})
-    sf4 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 4.5}, amplitude_coeff=1.5)
+    sf4 = SpectralFeature(location=res_loc1d_d, lineshape_parameter=4.5, amplitude_coeff=1.5)
 
     # equal because both have empty term_contributions
     assert sf2 == sf3
@@ -53,11 +53,11 @@ def test_filter_to_spec_window():
     sw1d = SpectralWindow(box=Box({'A': (5., 10.)}))
 
     res_loc1d_a = ResLocGeoObject({'A': 12.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 2.5})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=2.5)
     res_loc1d_b = ResLocGeoObject({'A': 7.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 2.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=2.5)
     res_loc1d_c = ResLocGeoObject({'A': 3.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 2.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=2.5)
 
     sp = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3], sw1d)
 

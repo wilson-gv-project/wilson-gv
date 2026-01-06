@@ -109,64 +109,6 @@ def dict_to_proplist(props_data: dict[str, np.ndarray]):
 props = dict_to_proplist(props_data)
 
 
-def test_make_func_to_compute_avrg():
-    print()
-    from wilson_suite.fixtures import get_terms_from_json
-    terms_fuller_flat = get_terms_from_json()
-
-    t_inds = [0, 1, -2, -1]
-    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
-    
-    motifs_coll = []
-
-    for t in terms_select:
-        motifs_coll.append(term_abst.PropsCollection(props=t.props).get_averaged_props())
-    
-    for i in motifs_coll:
-        print(i)
-
-    # print('--------')
-    for i in motifs_coll[:2]:
-        # print(i)
-        # index_choices={'a': 1, 'b': 2}
-        f01 = avrgprops.make_func_to_compute_avrg(avrg_expression=i, polarization='ZZZZ')
-        # print('f01 res1', f01(index_choices={'a': 1, 'b': 2}, props_data=props_data))
-        # print('f01 res2', f01(index_choices={'a': 1, 'b': 0}, props_data=props_data))
-    
-    print('--------')
-    funcs3dtensors: list[Callable[[dict, 'MolPropsCollection'], float]] = []
-    for i in motifs_coll[2:]:
-        # print(i)
-        # index_choices={'a': 1, 'b': 0, 'c': 1}
-        f02: Callable[[dict, 'MolPropsCollection'], float] = avrgprops.make_func_to_compute_avrg(avrg_expression=i,
-                                             polarization='ZZZZ')
-        funcs3dtensors.append(f02)
-
-        # print('f02 res1', f02(index_choices={'a': 1, 'b': 0, 'c': 1}, props_data=props_data))
-        # print('f02 res2', f02(index_choices={'a': 3, 'b': 1, 'c': 1}, props_data=props_data))
-    
-    shortlist = motifs_coll[2:]
-    for i, f in enumerate(funcs3dtensors):
-        print('func', i, shortlist[i])
-        res_f = f(index_choices={'a': 3, 'b': 1, 'c': 1}, props_data=MolPropsCollection(props))
-        print("{'a': 3, 'b': 1, 'c': 1}", res_f)
-        res_f1 = f(index_choices={'a': 3, 'b': 0, 'c': 1}, props_data=MolPropsCollection(props))
-        print("{'a': 3, 'b': 0, 'c': 1}", res_f1)
-        res_f2 = f(index_choices={'a': 3, 'b': 0, 'c': 0}, props_data=MolPropsCollection(props))
-        print("{'a': 3, 'b': 0, 'c': 0}", res_f2)
-        res_f3 = f(index_choices={'a': 3, 'b': 0, 'c': 3}, props_data=MolPropsCollection(props))
-        print("{'a': 3, 'b': 0, 'c': 3}", res_f3)
-
-        res_f4 = f(index_choices={'a': 1, 'b': 0, 'c': 1}, props_data=MolPropsCollection(props))
-        print("{'a': 1, 'b': 0, 'c': 1}", res_f4)
-        res_f5 = f(index_choices={'a': 1, 'b': 0, 'c': 0}, props_data=MolPropsCollection(props))
-        print("{'a': 1, 'b': 0, 'c': 0}", res_f5)
-        res_f6 = f(index_choices={'a': 1, 'b': 0, 'c': 3}, props_data=MolPropsCollection(props))
-        print("{'a': 1, 'b': 0, 'c': 3}", res_f6)
-        res_f7 = f(index_choices={'a': 2, 'b': 0, 'c': 0}, props_data=MolPropsCollection(props))
-        print("{'a': 2, 'b': 0, 'c': 0}", res_f7)
-
-
 def test_make_gen_func_to_compute_avrg():
     print()
 
@@ -261,7 +203,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['c']
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
-    t3 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t3 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                         number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(t3)
 
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
@@ -272,7 +216,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['a']
 
     avrg_expr = term_abst.PropsCollection(props=[polhess, dipgrad1, dipgrad2])
-    t4 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t4 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                         number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(t4)
     print(np.allclose(t3, t4))
 
@@ -284,7 +230,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['a']
 
     avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                         number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(t5)
 
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
@@ -295,8 +243,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['a']
 
     avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', 
-                                            number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                            number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(t6)
 
     print(np.allclose(t5, t6))
@@ -309,7 +258,9 @@ def test_precalculate_avrg_tensor():
     dipgrad2.inds = ['a']
 
     avrg_expr = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, polarization='ZZZZ', number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                         number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(t7)
 
 def generate_props_data4modes():
@@ -338,8 +289,9 @@ def test_precalculate_avrg_tensor_focused():
     dipgrad2.inds = ['a']
 
     avrg_expr1 = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr1, polarization='ZZZZ', 
-                                            number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr1, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                            number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(avrg_expr1)
     print(np.transpose(np.nonzero(t5)))
 
@@ -351,8 +303,9 @@ def test_precalculate_avrg_tensor_focused():
     dipgrad2.inds = ['a']
 
     avrg_expr2 = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr2, polarization='ZZZZ', 
-                                            number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr2, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                            number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(avrg_expr2)
     print(np.transpose(np.nonzero(t6)))
 
@@ -371,8 +324,9 @@ def test_precalculate_avrg_tensor_focused():
     dipgrad2.inds = ['a']
 
     avrg_expr3 = term_abst.PropsCollection(props=[polgrad, dipgrad1, dipgrad2])
-    t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr3, polarization='ZZZZ', 
-                                            number_of_nmodes=4, props_data=MolPropsCollection(props))
+    t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr3, pulse_polarization_vector=[1.0, 1.0, 1.0], 
+                                            number_of_nmodes=4, props_data=MolPropsCollection(props),
+                                         nm_inds_choices=[0,1,2,3])
     print(avrg_expr3)
     print(np.transpose(np.nonzero(t7)))
 

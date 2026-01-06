@@ -7,14 +7,14 @@ import pytest
 def test_spectral_window():
     print()
 
-    sw1d = SpectralWindow(bounds=((5., 10.),))
+    sw1d = SpectralWindow(box=Box({'A': (5., 10.)}))
 
     res_loc1d_a = ResLocGeoObject({'A': 12.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 3.5})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=3.5)
     res_loc1d_b = ResLocGeoObject({'A': 7.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 3.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=3.5)
     res_loc1d_c = ResLocGeoObject({'A': 9.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 3.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=3.5)
 
 
 
@@ -24,11 +24,11 @@ def test_filter_to_spec_window():
     sw1d = SpectralWindow(box=Box({'A': (5., 10.)}))
 
     res_loc1d_a = ResLocGeoObject({'A': 12.})
-    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter={'A': 1.5})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=1.5)
     res_loc1d_b = ResLocGeoObject({'A': 7.5})
-    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter={'A': 1.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=1.5)
     res_loc1d_c = ResLocGeoObject({'A': 3.5})
-    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter={'A': 1.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=1.5)
 
     sp = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3], sw1d)
     print(sp)
@@ -48,15 +48,15 @@ def test_filter_to_spec_window_2():
     sw1d_a = SpectralWindow(box=Box({'A': (5., 30.)}))
 
     res_loc1d_d = ResLocGeoObject({'A': 15.})
-    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5}, term_contributions=())
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter=2.5, term_contributions=())
     res_loc1d_e = ResLocGeoObject({'A': 27.5})
-    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5}, term_contributions=())
+    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter=2.5, term_contributions=())
     res_loc1d_f = ResLocGeoObject({'A': 5.5})
-    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5}, term_contributions=())
+    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter=2.5, term_contributions=())
     res_loc1d_g = ResLocGeoObject({'A': 4.})
-    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5}, term_contributions=())
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter=2.5, term_contributions=())
     res_loc1d_h = ResLocGeoObject({'A': 36.})
-    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5}, term_contributions=())
+    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter=2.5, term_contributions=())
 
     spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3, sf4, sf5], sw1d_a)
     print('\n', spec_window1)
@@ -148,19 +148,22 @@ def test_filter_to_spec_window_2_2d():
     sw1d_a = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
 
     res_loc1d_d = ResLocGeoObject({'A': 15., 'B': 55.})
-    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=10.)
+    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter=2.5, term_contributions=(), amplitude_coeff=10.)
+    
     res_loc1d_e = ResLocGeoObject({'A': 27.5, 'B': 58.8})
-    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=20.)
+    sf2 = SpectralFeature(location=res_loc1d_e, lineshape_parameter=1.5, term_contributions=(), amplitude_coeff=20.)
+    
     res_loc1d_f = ResLocGeoObject({'A': 5.5, 'B': 47.2})
-    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=30.)
+    sf3 = SpectralFeature(location=res_loc1d_f, lineshape_parameter=1.5, term_contributions=(), amplitude_coeff=30.)
+    
     res_loc1d_g = ResLocGeoObject({'A': 4., 'B': 43.8})
-    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=40.)
+    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter=2.5, term_contributions=(), amplitude_coeff=40.)
+    
     res_loc1d_h = ResLocGeoObject({'A': 36., 'B': 46.2})
-    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=50.)
+    sf5 = SpectralFeature(location=res_loc1d_h, lineshape_parameter=1.5, term_contributions=(), amplitude_coeff=50.)
 
     spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3, sf4, sf5], sw1d_a)
     print('\nspec_window1', spec_window1)
-    exit()
 
     # print('\nfull_features', len(spec_window1.full_features), spec_window1.full_features)
     # print('\ncontrib_features', len(spec_window1.contrib_features), spec_window1.contrib_features)
@@ -189,70 +192,3 @@ def test_filter_to_spec_window_2_2d():
     # print('\n')
     # for d in formal_doms:
     #     print(d, '\n')
-
-
-    
-
-def test_evaluate_all_on_grids():
-    spec_window1 = SpectralWindow(box=Box({'A': (5., 30.), 'B': (45., 60.)}))
-
-    res_loc1d_d = ResLocGeoObject({'A': 15., 'B': 55.})
-    sf1 = SpectralFeature(location=res_loc1d_d, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=10.)
-    res_loc1d_g = ResLocGeoObject({'A': 4., 'B': 43.8})
-    sf4 = SpectralFeature(location=res_loc1d_g, lineshape_parameter={'A': 2.5, 'B': 1.5}, term_contributions=(), amplitude_coeff=40.)
-    spec_window1 = SpectralFeature.filter_to_spec_window([sf1, sf4], spec_window1)
-    
-    feat_all = spec_window1.full_features + spec_window1.contrib_features
-    doms = domains.features_to_clusters(features=feat_all)
-    formal_doms = [RectangularDomain(box=Box.union([f.feat_box for f in doms[d]]), full_features=doms[d]) for d in doms]
-
-    coords_vectors, spec_grid = spec_window1.sample_grid({'A': 10, 'B': 10})
-    subgrids = domains.cut_grid_to_domains_nd(spec_grid, coords_vectors, formal_doms)
-
-    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
-    from wilson_suite.wilson_intensities.amplitudes import evaluators
-    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-    from .test_evaluators import prep_vibanasetup_with_degen_states
-    vib_ana_setup = prep_vibanasetup_with_degen_states()
-    vib_data = VibStatesData(vib_ana_setup.states)
-    vibdiff_cache = VibDiffCache()
-
-    subgrids_with_results = evaluators.evaluate_all_on_grids(subgrids, vib_data=vib_data, vibdiff_cache=vibdiff_cache, gamma=2.0)
-    exit()
-
-    # print('\n')
-    # for d in subgrids_with_results:
-    #     print(d)
-    #     print(subgrids_with_results[d], '\n')
-
-    domains.insert_results_to_grid_nd(spec_grid, subgrids_with_results, result_key='result')
-    
-    print('\n\n', spec_grid['result'])
-
-
-def test_SpectralWindow_intersect():
-    print()
-    domain_a = SpectralWindow(bounds=((5., 30.),))
-    
-    sw1d_b = SpectralWindow(bounds=((1., 33.),))
-    print(domain_a.intersect(sw1d_b))
-
-    sw1d_c = SpectralWindow(bounds=((15., 20.),))
-    print(domain_a.intersect(sw1d_c))
-    
-    sw1d_d = SpectralWindow(bounds=((18., 20.),))
-    print(domain_a.intersect(sw1d_d))
-
-
-def test_SpectralWindow_intersect_2d():
-    print()
-    domain_a = SpectralWindow(bounds=((5., 30.), (45., 50.)))
-    
-    sw1d_b = SpectralWindow(bounds=((1., 33.),(55., 57.)))
-    assert domain_a.intersect(sw1d_b) is None 
-
-    sw1d_c = SpectralWindow(bounds=((15., 20.), (41., 57.)))
-    assert domain_a.intersect(sw1d_c).bounds == ((15.0, 20.0), (45.0, 50.0))
-    
-    sw1d_d = SpectralWindow(bounds=((33., 35.), (41., 47.)))
-    assert domain_a.intersect(sw1d_d) is None

@@ -328,8 +328,10 @@ class EvaluationWorkflow:
 
 
 def evaluate_regions(regions: list["GridRegion"], 
-                     vib_data, vibdiff_cache, gamma,
-                     verbose):
+                     vib_data: "VibStatesData", 
+                     vibdiff_cache: "VibDiffCache", 
+                     gamma: float,
+                     verbose: bool):
 
     # Step 2: Evaluate each region
     region_results = {}
@@ -346,7 +348,9 @@ def evaluate_regions(regions: list["GridRegion"],
     return region_results
 
 def evaluate_region(region: "GridRegion",
-                    vib_data, vibdiff_cache, gamma,
+                    vib_data: "VibStatesData", 
+                    vibdiff_cache: "VibDiffCache", 
+                    gamma: float,
                     verbose: bool = False) -> np.ndarray:
     """Evaluate all features in a single grid region."""
     # Initialize result array
@@ -365,7 +369,9 @@ def evaluate_region(region: "GridRegion",
     return result
 
 def evaluate_feature(feature: 'SpectralFeature', 
-                     vib_data, vibdiff_cache, gamma,
+                     vib_data: "VibStatesData", 
+                     vibdiff_cache: "VibDiffCache", 
+                     gamma: float,
                      coords: dict[str, np.ndarray],
                      verbose: bool = False) -> np.ndarray:
     """Evaluate a single feature on grid coordinates."""
