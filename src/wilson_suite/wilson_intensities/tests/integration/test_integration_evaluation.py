@@ -16,18 +16,11 @@ def test_evaluation_general_customdata_1elterm():
 
     from wilson_suite.wilson_derive.main import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
-    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
     terms = get_fully_enhanced_terms(experiment=evv_experiment())
     axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
 
-    mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
-    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
-                                                     lvl_theory='B3LYP', 
-                                                     basis_set='cc-pVQZ', 
-                                                     base_file_loc=CQCPARSE_ROOT+'/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
     bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     spectral_window = SpectralWindow(box=Box(bounds_dict))
@@ -37,14 +30,8 @@ def test_evaluation_general_customdata_1elterm():
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
     mock_sim.terms = evv_terms
-    mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
-    mock_sim.vib_ana_setup = vib_ana
     
-    mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
-    mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    mock_sim.dressPropsWithSetup()
-
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
     # use simple model data
@@ -65,8 +52,10 @@ def test_evaluation_general_customdata_1elterm():
 
     print(mock_sim.vib_ana_setup.max_state_lvl)
 
-    mock_sim.evaluate()
-    
+    r = mock_sim.evaluate()
+    print(mock_sim.spec)
+    exit()
+
     for f in mock_sim._workflow.artifacts.features:
         print(f.location, f.term_contributions[0].term_ids)
     
@@ -89,8 +78,8 @@ def test_evaluation_general_customdata_1elterm():
                                                             mock_sim._workflow.artifacts.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
-    assert np.allclose(r_res, ref_res)
     
+    assert np.allclose(r_res, ref_res)
     assert np.allclose(ref_res, mock_sim.spec['result'])
 
 def test_evaluation_general_customdata_1mechterm():
@@ -113,12 +102,6 @@ def test_evaluation_general_customdata_1mechterm():
     axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
 
-    mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
-    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
-    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
-                                                     lvl_theory='B3LYP', 
-                                                     basis_set='cc-pVQZ', 
-                                                     base_file_loc=CQCPARSE_ROOT+'/CQCParse/files_examples/dftGaussian/FORM/B3LYPcc_pVQZ/g16_inputFull_3q.out')
     bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     spectral_window = SpectralWindow(box=Box(bounds_dict))
@@ -128,13 +111,8 @@ def test_evaluation_general_customdata_1mechterm():
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
     mock_sim.terms = evv_terms
-    mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
-    mock_sim.vib_ana_setup = vib_ana
-    
-    mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
-    mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    mock_sim.dressPropsWithSetup()
+
 
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
@@ -178,8 +156,8 @@ def test_evaluation_general_customdata_1mechterm():
                                                             mock_sim._workflow.artifacts.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
-    assert np.allclose(r_res, ref_res)
     
+    assert np.allclose(r_res, ref_res)
     assert np.allclose(ref_res, mock_sim.spec['result'])
 
 
@@ -256,7 +234,7 @@ def test_full_integration():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    # plt.show()
+    plt.show()
 
 
 def test_full_integration_H2O_molecule():
@@ -331,4 +309,4 @@ def test_full_integration_H2O_molecule():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    # plt.show()
+    plt.show()
