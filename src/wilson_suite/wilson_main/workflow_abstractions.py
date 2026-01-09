@@ -115,10 +115,11 @@ class WilsonSimulation:
 
 	def setAxisChoiceAndTranslateTerms(self, axis_choice: SpectralAxisSet):
 		"""
-		SKETCH: To discuss, e.g. what about canonical axes/if choice was not made?
+		Set an axis choice and translate self.terms to be given in terms of this axis choice
 		"""
-
 		self.axis_choice = axis_choice
+		if self.terms is None:
+			raise ValueError('No terms to translate to axis choice were found')
 		self.terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
 
 
@@ -338,6 +339,18 @@ class WilsonSimulation:
 	# 	from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
 	# 	return GridManager(self.spec_eval_setup.ev_info.spectral_window)
 
+	def attempt_setup_fill_with_defaults(self):
+		"""
+		If possible, attempt to complete remaining pieces of setup with default choices
+
+		Here add handling for making canonical axis choice (and translating terms to same) if none selected
+		Can also have defaults for spectral window, resolution, damping and other related information
+		Can also add other "wrap-up" parts (e.g. translate terms if axes choice made but terms not translated yet)
+
+		"""
+
+		pass
+
 	def evaluate(self):
 		"""
 		Evaluating method, using EvaluationWorkflow
@@ -359,6 +372,13 @@ class WilsonSimulation:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
 
+	def evaluate_with_default_setup_fill(self):
+		"""
+		Attempt to fill remaining setup with default and if successful, evaluate spectrum
+		"""
+
+		self.attempt_setup_fill_with_defaults()
+		self.evaluate()
 
 	def evaluateSpectrum(self,
                          evaluator: Callable[[
