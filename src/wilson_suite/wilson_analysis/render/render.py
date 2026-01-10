@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 
 def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
                     system, experiment, name, 
-                    diagn, # isn't used yet
+                    diagn: dict, # isn't used yet
                     do_diagn) -> None:
     
     """
@@ -55,6 +55,7 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     fig, ax, contour, cbar = renderer.render(filename)
     
     if do_diagn:
+        diagn.update({'renderer': renderer})
         return tuple([fig, ax, contour, cbar]), diagn
     else:
         return tuple([fig, ax, contour, cbar]), {}
