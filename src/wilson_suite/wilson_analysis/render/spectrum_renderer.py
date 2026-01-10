@@ -28,7 +28,7 @@ from enum import Enum
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo
+    from ...wilson_main.spectrum_abstractions import SpectralGrid, EvaluationInfo, RenderingInfo
 
 
 import logging
@@ -156,7 +156,8 @@ class SpectrumRenderer(ABC):
     
     def __init__(self, 
                  spec_data: np.ndarray | dict,
-                 spec_grid: "SpectralGrid" = None,
+                #  spec_grid: "SpectralGrid" = None,
+                 spec_grid: dict = None,
                  ev_info: "EvaluationInfo" = None,
                  rnd_info: "RenderingInfo" = None, 
                  do_diagn: bool = False,
@@ -176,7 +177,7 @@ class SpectrumRenderer(ABC):
 
         self.Xdata = None
         self.Ydata = None
-
+        self.Zdata = None
 
     @abstractmethod
     def initialize_plot(self) -> Any:
@@ -225,22 +226,20 @@ class SpectrumRenderer(ABC):
                 self.intensities = self.spec_data
             else:
                 raise ValueError(f"Unsupported spec_data_operations: {spec_data_operations}")
+        
+        if self.spec_grid is None:
+            raise ValueError('This SpectrumRenderer.spec_grid is None')        
 
-        if self.spec_grid is not None:
-            # 'w1': mesh, 'w2': mesh; variables
-            freq_vars = self.ev_info.freq_variables
+        self.xyz_labels = {'x': None, 'y': None, 'z': None}
+        for i, o_k in enumerate(list(self.spec_grid.keys())):
+            self.xyz_labels[list(self.xyz_labels.keys())[i]] = o_k
+        
+        if len(self.spec_grid)==3:
+            self.Xdata, self.Ydata, self.Zdata = list(self.spec_grid.values())
+        elif len(self.spec_grid)==2:
+            self.Xdata, self.Ydata = list(self.spec_grid.values())
 
-            # 'x': meshsum, 'y': meshsum; plot_axes
-            xy_axes = {}
 
-            for i in self.spec_grid.axes:
-                xy_axes[i] = sum([freq_vars[k]*v for k,v in self.spec_grid.axes[i].freq_vars.items()])
-
-            self.Xdata = xy_axes.get('x', None)
-            self.Ydata = xy_axes.get('y', None)
-            self.Zdata = xy_axes.get('z', None) # 3D plot with 3 spectral axes
-
-    
     def render(self, filename: str) -> None:
         """Main rendering pipeline"""
 
@@ -250,7 +249,7 @@ class SpectrumRenderer(ABC):
         # Calculate levels with both original and normalized scales
         levels, labels, norm_positions, norm_labels = self.level_calc.compute_levels(
             np.max(self.intensities),
-            self.rnd_info.dynamic_range,
+            self.ev_info.dynamic_range,
             self.rnd_info.num_levels,
             ref_max=self.rnd_info.reference_max,
             colormap_spacing=self.config.colormap_spacing,

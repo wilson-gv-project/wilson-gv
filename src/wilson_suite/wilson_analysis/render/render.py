@@ -2,7 +2,7 @@ from .matplotlib_renderer import MatplotlibRenderer
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...wilson_main.abstractions import SpecEvalSetup
+    from ...wilson_main.spectrum_abstractions import SpecEvalSetup
 
 def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
                     system, experiment, name, 

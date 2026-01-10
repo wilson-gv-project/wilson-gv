@@ -271,6 +271,7 @@ class EvaluationInfo:
 	margins: dict = None
 	spectral_window: SpectralWindow = None
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
+	dynamic_range: float = 100
 
 	@property
 	def spec_window_bounds(self):
@@ -296,7 +297,6 @@ class RenderingInfo:
 	"""
 	projection: str = '2d'
 	reference_max: float = None
-	dynamic_range: float = 100
 	num_levels: int = 12
 	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
 	title: str = 'plot'
