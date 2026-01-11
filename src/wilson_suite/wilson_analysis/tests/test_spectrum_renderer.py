@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer
+from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, NormalizationType, PlotConfig
 import pytest
+import numpy as np
 
 # mock subclass that implements the abstract methods
 class ConcreteSpectrumRenderer(SpectrumRenderer):
@@ -54,10 +55,30 @@ def test_SpectrumRenderer():
     assert "Unsupported spec_data_operations" in str(excinfo.value)
 
 def test_LevelCalculator():
-    pass
+    dmax = 100.
+    dyn_range = 10
+    log10 = False
+    ref_max = 110.
+    cm_spacing = ''
+    cm_power = 0.1
+
+    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+                                                       dynamic_range=dyn_range,
+                                                       nlevels=5,
+                                                       log10=log10,
+                                                       ref_max=ref_max,
+                                                       colormap_spacing=cm_spacing,
+                                                       colormap_power=cm_power)
+    print('\n')
+
+    assert np.allclose(levels, np.array([ 10., 32.5,  55., 77.5, 100.]))
+    assert labels == ['$1.0e+01$', '$3.2e+01$', '$5.5e+01$', '$7.8e+01$', '$1.0e+02$']
+
 
 def test_NormalizationType():
+    print(NormalizationType)
     pass
 
 def test_PlotConfig():
+    PlotConfig()
     pass
