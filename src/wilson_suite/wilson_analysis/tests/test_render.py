@@ -60,7 +60,6 @@ def test_render_spectrum_simplecontour():
 
     # test6 - success
     r, diagn = render_spectrum(**context)
-    print(context['spec_data'].size)
 
     assert np.allclose(diagn['renderer'].levels, np.array([ 1.6 ,  7.68, 13.76, 19.84, 25.92, 32.  ]))
     assert diagn['renderer'].labels == ['$1.6e+00$', '$7.7e+00$', '$1.4e+01$', '$2.0e+01$', '$2.6e+01$', '$3.2e+01$']
