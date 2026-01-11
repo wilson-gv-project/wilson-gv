@@ -37,10 +37,10 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     
     """    
     if not isinstance(spec_data, np.ndarray):
-        raise ValueError("spec_data should be a np.ndarray")
+        raise TypeError("spec_data should be a np.ndarray")
     
     if not hasattr(spec_eval_setup, 'is_ready_render'):
-        raise ValueError('spec_eval_setup should be a SpecEvalSetup instance')
+        raise TypeError('spec_eval_setup should be a SpecEvalSetup instance')
     
     if not spec_eval_setup.is_ready_render:
         raise ValueError('spec_eval_setup does not have all rendering configs')

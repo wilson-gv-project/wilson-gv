@@ -27,12 +27,12 @@ def test_render_spectrum_simplecontour():
     assert not spec_eval_setup.is_ready_render
 
     # test1
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
         render_spectrum(**dict(spec_data='invalid', spec_eval_setup=None, do_diagn=None))
     assert str(excinfo.value) == 'spec_data should be a np.ndarray'
 
     # test2
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
         render_spectrum(**dict(spec_data=spec, spec_eval_setup='invalid', do_diagn=None))
     assert str(excinfo.value) == 'spec_eval_setup should be a SpecEvalSetup instance'
 
