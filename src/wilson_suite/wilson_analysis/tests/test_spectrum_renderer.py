@@ -69,14 +69,15 @@ def test_LevelCalculator():
                                                        ref_max=ref_max,
                                                        colormap_spacing=cm_spacing,
                                                        colormap_power=cm_power)
-    print('\n')
 
     assert np.allclose(levels, np.array([ 10., 32.5,  55., 77.5, 100.]))
     assert labels == ['$1.0e+01$', '$3.2e+01$', '$5.5e+01$', '$7.8e+01$', '$1.0e+02$']
 
 
 def test_NormalizationType():
-    print(NormalizationType)
+    print(NormalizationType.DECIBEL)
+    print(NormalizationType.LOG_SCALE)
+
     pass
 
 def test_PlotConfig():
