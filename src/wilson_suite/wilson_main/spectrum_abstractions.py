@@ -262,28 +262,14 @@ class EvaluationInfo:
 		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
 	"""
 	freq_variables: dict = None
-	Gamma: dict = None
+	Gamma: float = None
 	Gamma_unit: str = None
-	freq_condition: str = None
-	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
-	spec_result: np.ndarray | dict = None
 	margins: dict = None
 	spectral_window: SpectralWindow = None
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
 	dynamic_range: float = 100
 
-	@property
-	def spec_window_bounds(self):
-		"""
-		creating `bounds` dict for `check_if_in_window()`
-		"""
-		bounds = {}
-		for key in self.freq_variables:
-			bounds[key] = {'left': np.min(self.freq_variables[key]) + self.margins.get(key, 0.), 
-						'right': np.max(self.freq_variables[key]) + self.margins.get(key, 0.)}
-
-		return bounds
 
 @dataclass
 class RenderingInfo:
@@ -297,7 +283,7 @@ class RenderingInfo:
 	"""
 	projection: str = '2d'
 	reference_max: float = None
-	num_levels: int = 12
+	nlevels: int = 12
 	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
 	title: str = 'plot'
 	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
@@ -337,3 +323,30 @@ class SpecEvalSetup:
 			if not isinstance(self.grid, SpectralGrid):
 				raise TypeError("Values of axes dict should be SpectralAxis instances")
 
+	@property
+	def is_ready_evaluate(self):
+		"""
+		ev_info should have information to be able to do evaluation with this SpecEvalSetup
+		"""
+		einfo = self.ev_info
+		if einfo is not None:
+			necessary = [einfo.spectral_window, einfo.Gamma, einfo.Gamma_unit, einfo.grid_resolution, einfo.dynamic_range]
+			if all(part is not None for part in necessary):
+				return True
+		return False
+	
+	@property
+	def is_ready_render(self):
+		"""
+		ev_info should have information to be able to do evaluation with this SpecEvalSetup
+		"""
+		rndinfo = self.rnd_info
+		
+		if not hasattr(self.ev_info, 'dynamic_range'):
+			return False
+		if self.grid is None:
+			return False
+
+		if rndinfo is not None:
+			return True
+		return False

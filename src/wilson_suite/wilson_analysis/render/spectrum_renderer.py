@@ -97,53 +97,62 @@ class LevelCalculator:
     """
 
     @staticmethod
-    def compute_levels(d_max: float, dynamic_range: float, num_levels: int, 
+    def compute_levels(d_max: float, dynamic_range: float, nlevels: int, log10: bool = True,
                   ref_max: Optional[float] = None, 
                   colormap_spacing: str = None, 
                   colormap_power: float = 0.5) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
         d_min = d_max / dynamic_range
-        log_min = np.log10(d_min)
-        log_max = np.log10(d_max)
 
-        if colormap_spacing == "log":        
-            # Linear spacing in log scale
-            log_space = np.linspace(log_min, log_max, num_levels)
-            # back to linear scale
-            level_values = np.power(10, log_space)
+        if not log10:
 
-        elif colormap_spacing == "linear":
-            # Linear spacing in original scale
-            level_values = np.linspace(d_min, d_max, num_levels)
-            # calculate corresponding log space points
-            log_space = np.log10(level_values)
-    
-        elif colormap_spacing == "power":
-            # Power-law spacing for more uniform color distribution
-            power_space = np.power(np.linspace(0, 1, num_levels), colormap_power)
-            log_space = log_min + (log_max - log_min) * power_space
-            # back to linear scale
-            level_values = np.power(10, log_space)
-    
-        else:  # default to log spacing
-            log_space = np.linspace(log_min, log_max, num_levels)
-            level_values = np.power(10, log_space)
+            level_values = np.linspace(d_min, d_max, nlevels)
+            level_labels = [f"${val:.1e}$" for val in level_values]
 
-        # Format original value labels
-        level_labels = [f"${val:.1e}$" for val in level_values]
+            return level_values, level_labels, None, None
         
-        # Calculate normalized values in log space
-        if ref_max is None:
-            ref_max = d_max
-    
-        # Normalize in log space to preserve logarithmic spacing
-        norm_positions = (log_space - log_min) / (log_max - log_min)
-        norm_labels = [f"{val:.2f}" for val in norm_positions]
+        else:
+            log_min = np.log10(d_min)
+            log_max = np.log10(d_max)
+
+            if colormap_spacing == "log":        
+                # Linear spacing in log scale
+                log_space = np.linspace(log_min, log_max, nlevels)
+                # back to linear scale
+                level_values = np.power(10, log_space)
+
+            elif colormap_spacing == "linear":
+                # Linear spacing in original scale
+                level_values = np.linspace(d_min, d_max, nlevels)
+                # calculate corresponding log space points
+                log_space = np.log10(level_values)
         
-        logger.debug(f"Computed levels: {level_values}, labels: {level_labels}, "
-                     f"normalized positions: {norm_positions}, normalized labels: {norm_labels}")
+            elif colormap_spacing == "power":
+                # Power-law spacing for more uniform color distribution
+                power_space = np.power(np.linspace(0, 1, nlevels), colormap_power)
+                log_space = log_min + (log_max - log_min) * power_space
+                # back to linear scale
+                level_values = np.power(10, log_space)
         
-        return level_values, level_labels, norm_positions, norm_labels
+            else:  # default to log spacing
+                log_space = np.linspace(log_min, log_max, nlevels)
+                level_values = np.power(10, log_space)
+
+            # Format original value labels
+            level_labels = [f"${val:.1e}$" for val in level_values]
+            
+            # Calculate normalized values in log space
+            if ref_max is None:
+                ref_max = d_max
+        
+            # Normalize in log space to preserve logarithmic spacing
+            norm_positions = (log_space - log_min) / (log_max - log_min)
+            norm_labels = [f"{val:.2f}" for val in norm_positions]
+            
+            logger.debug(f"Computed levels: {level_values}, labels: {level_labels}, "
+                        f"normalized positions: {norm_positions}, normalized labels: {norm_labels}")
+            
+            return level_values, level_labels, norm_positions, norm_labels
 
 
 class SpectrumRenderer(ABC):
@@ -156,12 +165,10 @@ class SpectrumRenderer(ABC):
     
     def __init__(self, 
                  spec_data: np.ndarray | dict,
-                #  spec_grid: "SpectralGrid" = None,
-                 spec_grid: dict = None,
-                 ev_info: "EvaluationInfo" = None,
-                 rnd_info: "RenderingInfo" = None, 
-                 do_diagn: bool = False,
-                 config: PlotConfig = PlotConfig()):
+                 spec_grid: dict,
+                 ev_info: "EvaluationInfo",
+                 rnd_info: "RenderingInfo", 
+                 do_diagn: bool = False):
 
         self.spec_data = spec_data
         self.rnd_info = rnd_info
@@ -171,13 +178,21 @@ class SpectrumRenderer(ABC):
         # TODO not used currently
         self.do_diagn = do_diagn
         
-        self.config = self.rnd_info.style_config if rnd_info else config
+        self.config = self.rnd_info.style_config
         self.level_calc = LevelCalculator()
         self.intensities = None
 
         self.Xdata = None
         self.Ydata = None
         self.Zdata = None
+
+    def _validate_inputs(self):
+        """
+        data and settings should not contradict:
+        - appropriate number of axes
+        """
+
+        return
 
     @abstractmethod
     def initialize_plot(self) -> Any:
@@ -245,16 +260,19 @@ class SpectrumRenderer(ABC):
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
-
+        log10 = True if self.rnd_info.intensity_normalization_type is not None else False
         # Calculate levels with both original and normalized scales
-        levels, labels, norm_positions, norm_labels = self.level_calc.compute_levels(
-            np.max(self.intensities),
-            self.ev_info.dynamic_range,
-            self.rnd_info.num_levels,
+        levels, labels, _, _ = self.level_calc.compute_levels(
+            log10=log10,
+            d_max=np.max(self.intensities),
+            dynamic_range=self.ev_info.dynamic_range,
+            nlevels=self.rnd_info.nlevels,
             ref_max=self.rnd_info.reference_max,
             colormap_spacing=self.config.colormap_spacing,
             colormap_power=self.config.colormap_power
         )
+        self.levels = levels
+        self.labels = labels
 
         fig, ax = self.initialize_plot()
         fig, ax, contour = self.create_contour(plot_obj=(fig, ax), levels=levels, data=self.intensities)

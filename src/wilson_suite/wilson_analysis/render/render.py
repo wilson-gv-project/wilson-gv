@@ -5,8 +5,6 @@ if TYPE_CHECKING:
     from ...wilson_main.spectrum_abstractions import SpecEvalSetup
 
 def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
-                    system, experiment, name, 
-                    diagn: dict, # isn't used yet
                     do_diagn) -> None:
     
     """
@@ -45,18 +43,28 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     else:
         raise NotImplementedError('Only matplotlib backend is currently supported')
     
-    plot_config = spec_eval_setup.rnd_info.style_config
+    import numpy as np
+    if not isinstance(spec_data, np.ndarray):
+        raise ValueError("spec_data should be a np.ndarray")
+    
+    if not hasattr(spec_eval_setup, 'is_ready_render'):
+        raise ValueError('spec_eval_setup should be a SpecEvalSetup instance')
+    
+    if not spec_eval_setup.is_ready_render:
+        raise ValueError('spec_eval_setup does not have all rendering configs')
+    
+    if len(spec_data.shape) != 2:
+        raise NotImplementedError('only 2D contour plots can be made - input spectrum data is not 2D')
 
     renderer = renderer_class(spec_data=spec_data, 
                               spec_grid=spec_eval_setup.grid,
                               ev_info=spec_eval_setup.ev_info, 
-                              rnd_info=spec_eval_setup.rnd_info, 
-                              config=plot_config, do_diagn=do_diagn)
+                              rnd_info=spec_eval_setup.rnd_info,
+                              do_diagn=do_diagn)
     fig, ax, contour, cbar = renderer.render(filename)
     
     if do_diagn:
-        diagn.update({'renderer': renderer})
-        return tuple([fig, ax, contour, cbar]), diagn
+        return tuple([fig, ax, contour, cbar]), {'renderer': renderer}
     else:
         return tuple([fig, ax, contour, cbar]), {}
 

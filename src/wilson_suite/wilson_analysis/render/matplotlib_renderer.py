@@ -60,9 +60,12 @@ class MatplotlibRenderer(SpectrumRenderer):
                     levels=[0, 0.5, 1],
                     colors=[self.config.below_range_color])
         
-        # Create logarithmic normalization for color mapping
-        norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
-        
+        if self.rnd_info.intensity_normalization_type is not None:
+            # Create logarithmic normalization for color mapping
+            norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
+        else:
+            norm = None
+
         # Plot main data with normalized colors
         contour = ax.contourf(self.Xdata, self.Ydata, 
                            data,
@@ -199,12 +202,18 @@ class MatplotlibRenderer(SpectrumRenderer):
             norm_positions = (levels/levels[-1]) * 100
             norm_format = "{x:.1f}%"
             norm_label = "Relative Intensity (%)"
+        elif self.rnd_info.intensity_normalization_type is None:
+            norm_positions = levels
+            norm_format = "{x:.2f}"
+            norm_label = "Original"
+
         else:  # LOG_SCALE
             norm_positions = (np.log10(levels) - np.log10(levels[0]))/(np.log10(levels[-1]) - np.log10(levels[0]))
             norm_format = "{x:.2f}"
             norm_label = "Log-scale Normalized"
         
-        logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
+        if self.rnd_info.intensity_normalization_type is not None:
+            logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
         
         # Set up normalized axis limits and ticks
         ax2.set_ylim(min(norm_positions), max(norm_positions))
