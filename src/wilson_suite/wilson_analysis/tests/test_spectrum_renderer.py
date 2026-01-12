@@ -75,10 +75,20 @@ def test_LevelCalculator():
 
 
 def test_NormalizationType():
-    print(NormalizationType.DECIBEL)
-    print(NormalizationType.LOG_SCALE)
+    print('\nNormalizationType.LOG_SCALE', NormalizationType.LOG_SCALE, '\n')
+    for normtype in NormalizationType:
+        print(normtype)
 
-    pass
+    print('\n', list(NormalizationType))
+
+    # Convert string to Enum
+    method_name = "log_ratio"
+    method = NormalizationType(method_name)
+    print(method)
+
+    # method_name = "smth"
+    # method = NormalizationType(method_name)
+    # print(method)
 
 def test_PlotConfig():
     PlotConfig()
