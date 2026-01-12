@@ -64,7 +64,6 @@ def get_data_evaluators_tests() -> dict:
 
     # vib_ana_setup needs to have vibstates
     vibana = wm_abst.VibAnaSetup(system=system)
-    vibana.nc_sqrt_eigval
     vibana.setStates((
             wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
             wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),

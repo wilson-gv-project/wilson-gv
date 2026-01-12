@@ -140,20 +140,20 @@ def generate_only_res_cond_evv_term_selection():
     res_conds_d = [rc_0_a_w_B, rc_b_a_w_B]
     res_conds_e = [rc_0_a_w_B, rc_0_a_w_AmB]
 
-    term_a = wilson_suite.wilson_derive.response_terms.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
-                                                                        res = res_conds_a)
+    term_a = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+                                 res = res_conds_a)
 
-    term_b = wilson_suite.wilson_derive.response_terms.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
-                                                                        res = res_conds_b)
+    term_b = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+                                 res = res_conds_b)
 
-    term_c = wilson_suite.wilson_derive.response_terms.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
-                                                                        res = res_conds_c)
+    term_c = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+                                 res = res_conds_c)
 
-    term_d = wilson_suite.wilson_derive.response_terms.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
-                                                                        res = res_conds_d)
+    term_d = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+                                 res = res_conds_d)
 
-    term_e = wilson_suite.wilson_derive.response_terms.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
-                                                                        res = res_conds_e)
+    term_e = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+                                 res = res_conds_e)
 
     return [term_a, term_b, term_c, term_d, term_e]
 
@@ -295,7 +295,7 @@ def test_compute_res_condition():
         axis = SpectroscopicAxis(label=ax.label, indep_vars=tuple(curr_vars))
         axs.append(axis)
         print(axis, hash(axis))
-    
+
     spec_axes = SpectroscopicAxes(tuple(axs))
     print('\nspec_axes', spec_axes)
 

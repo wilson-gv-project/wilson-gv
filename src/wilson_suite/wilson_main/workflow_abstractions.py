@@ -99,7 +99,6 @@ class WilsonSimulation:
 
 	def addTerms(self, terms: dict, extend: bool=False):
 		"""
-		FIXME, not a list
 		Add terms
 
 		terms: List of VibPerturbedTerm instances: The terms to be added
@@ -299,7 +298,7 @@ class WilsonSimulation:
 	# 		need_to_precalc=identify_precalc_unique_coeff_parts(terms=terms_as_list),
 	# 		data_and_configs=data_and_configs
 	# 	))
-		
+
 	# 	return term_coeffs_per_index
 
 	# def getAllSpecFeatures(self, with_coeffs: bool = True):
@@ -320,8 +319,8 @@ class WilsonSimulation:
 	# 		term_coeffs_per_index = None
 
 	# 	all_features = get_features_to_draw(
-	# 		motif_res_loc=motif_res_loc, terms_for_motifs=terms_for_motifs, 
-	# 		term_coeffs_per_index=term_coeffs_per_index, 
+	# 		motif_res_loc=motif_res_loc, terms_for_motifs=terms_for_motifs,
+	# 		term_coeffs_per_index=term_coeffs_per_index,
 	# 		lineshape_parameter=self.spec_eval_setup.ev_info.Gamma
 	# 	)
 	# 	return all_features
@@ -329,7 +328,7 @@ class WilsonSimulation:
 	# def addFeaturesToSpecWindow(self, with_coeffs: bool = True):
 	# 	if self.spec_eval_setup.ev_info.spectral_window is None:
 	# 		raise ValueError("No spectral window is set in SpecEvalSetup")
-		
+
 	# 	from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
 
 	# 	spec_window_with_features = SpectralFeature.filter_to_spec_window(self.getAllSpecFeatures(with_coeffs), self.spec_eval_setup.ev_info.spectral_window)
@@ -367,7 +366,7 @@ class WilsonSimulation:
 		except Exception as e:
 			print(e)
 			raise type(e)() from e
-		
+
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
@@ -397,12 +396,12 @@ class WilsonSimulation:
 		# from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import SpectralEvaluator
 
 		# spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=self.spec_eval_setup.ev_info.Gamma) # FIXME gamma value type
-		# grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=self.spec_eval_setup.ev_info.spectral_window, 
-		# 														grid_resolution=self.spec_eval_setup.ev_info.grid_resolution, 
+		# grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=self.spec_eval_setup.ev_info.spectral_window,
+		# 														grid_resolution=self.spec_eval_setup.ev_info.grid_resolution,
 		# 														return_type='grid')
 
 
-		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
+		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis
 		if not self.vib_ana_setup.isAllSet:
 			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
 
