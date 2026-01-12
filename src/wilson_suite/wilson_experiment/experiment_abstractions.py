@@ -472,6 +472,11 @@ class VibExperiment:
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
         self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
 
+    def tell_axis_options(self):
+
+        for i in range(len(self.valid_axis_combs)):
+            self.valid_axis_combs[i].present_spectral_axis_choices(from_exp_index = i)
+
     def is_axis_set_by_ref_valid(self, ref: dict):
         """
         TODO: Take a reference describing an axis set choice in terms of

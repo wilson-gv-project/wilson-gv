@@ -9,9 +9,9 @@ def test_workflow_run_with_keep_intermediates_real():
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
-    terms = get_fully_enhanced_terms(experiment=evv_experiment())
-    axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
@@ -27,7 +27,7 @@ def test_workflow_run_with_keep_intermediates_real():
                                                           'Gamma': 4.7, 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 10, 'B': 10}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = evv_terms
+    mock_sim.terms = terms
     mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
     mock_sim.vib_ana_setup = vib_ana
@@ -35,6 +35,8 @@ def test_workflow_run_with_keep_intermediates_real():
     mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
     mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     mock_sim.dressPropsWithSetup()
+    mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
+
 
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
@@ -77,9 +79,9 @@ def test_workflow_run_with_keep_intermediates_real_wfsim():
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
-    terms = get_fully_enhanced_terms(experiment=evv_experiment())
-    axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
@@ -95,7 +97,7 @@ def test_workflow_run_with_keep_intermediates_real_wfsim():
                                                           'Gamma': 4.7, 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 10, 'B': 10}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = evv_terms
+    mock_sim.terms = terms
     mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
     mock_sim.vib_ana_setup = vib_ana
@@ -103,6 +105,7 @@ def test_workflow_run_with_keep_intermediates_real_wfsim():
     mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
     mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     mock_sim.dressPropsWithSetup()
+    mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 

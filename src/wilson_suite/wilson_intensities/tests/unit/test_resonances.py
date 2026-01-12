@@ -298,6 +298,9 @@ def test_compute_res_condition():
     
     spec_axes = SpectroscopicAxes(tuple(axs))
     print('\nspec_axes', spec_axes)
+
+    # NOTE: SpectroscopicAxes class marked as unused. Current from_axes_dict method not updated wrt. new axis choice abstraction
+    # Leaving this as failing now pending discussion
     spec_axes_from_dict = SpectroscopicAxes.from_axes_dict(chosen_axes)
     print('\nchosen_axes', chosen_axes)
     print('\nspec_axes_from_dict', spec_axes_from_dict)

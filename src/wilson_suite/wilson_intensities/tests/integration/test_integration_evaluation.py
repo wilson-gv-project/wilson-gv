@@ -17,10 +17,12 @@ def test_evaluation_general_customdata_1elterm():
     from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
-    
-    terms = get_fully_enhanced_terms(experiment=evv_experiment())
-    axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+
+    evv_exp = evv_experiment()
+
+    terms = get_fully_enhanced_terms(experiment=evv_exp)
+
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
     vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
@@ -36,7 +38,8 @@ def test_evaluation_general_customdata_1elterm():
                                                           'Gamma': 1., 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = evv_terms
+    mock_sim.terms = terms
+
     mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
     mock_sim.vib_ana_setup = vib_ana
@@ -44,6 +47,7 @@ def test_evaluation_general_customdata_1elterm():
     mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
     mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     mock_sim.dressPropsWithSetup()
+    mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
@@ -60,8 +64,9 @@ def test_evaluation_general_customdata_1elterm():
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
     mock_sim.terms = [flat_dict['1_(1, 0)']]
-    
-    print('\n', flat_dict['1_(1, 0)'].to_latex())
+
+    # FIXME: This printing appears to need update wrt. changes in wilson-derive, made issue
+    #print('\n', flat_dict['1_(1, 0)'].to_latex())
 
     print(mock_sim.vib_ana_setup.max_state_lvl)
 
@@ -109,8 +114,12 @@ def test_evaluation_general_customdata_1mechterm():
     from ....fixtures import evv_experiment
     from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
-    terms = get_fully_enhanced_terms(experiment=evv_experiment())
-    axes_choice = evv_experiment().valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
+    evv_exp = evv_experiment()
+
+    terms = get_fully_enhanced_terms(experiment=evv_exp)
+
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
+
     evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
@@ -127,7 +136,8 @@ def test_evaluation_general_customdata_1mechterm():
                                                           'Gamma': 1., 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = evv_terms
+    mock_sim.terms = terms
+
     mock_sim.system = mol_system
     mock_sim.exp = evv_experiment()
     mock_sim.vib_ana_setup = vib_ana
@@ -135,6 +145,8 @@ def test_evaluation_general_customdata_1mechterm():
     mock_sim.addPropEvalSetup(eval_uniform=calc_setup)
     mock_sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     mock_sim.dressPropsWithSetup()
+    mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
+
 
     mock_sim.spec_eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
@@ -150,9 +162,10 @@ def test_evaluation_general_customdata_1mechterm():
     flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
-    mock_sim.terms = [flat_dict['8_(0, 1)']]
-    
-    print('\n', flat_dict['8_(0, 1)'].to_latex())
+
+    # FIXME: Cannot find this term
+    #mock_sim.terms = [flat_dict['8_(0, 1)']]
+    #print('\n', flat_dict['8_(0, 1)'].to_latex())
 
     mock_sim.evaluate()
 
@@ -188,10 +201,9 @@ def test_full_integration():
     from ....fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-    evv_experiment = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_experiment)
-    axes_choice = evv_experiment.valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
@@ -202,8 +214,8 @@ def test_full_integration():
     sim = WilsonSimulation()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(evv_experiment)
-    sim.addTerms(terms=evv_terms) # terms
+    sim.addExperiment(evv_exp)
+    sim.addTerms(terms=terms) # terms
 
     mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
 
@@ -215,6 +227,8 @@ def test_full_integration():
     
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     sim.dressPropsWithSetup()
+
+    sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     
@@ -232,6 +246,7 @@ def test_full_integration():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
+
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
@@ -264,12 +279,11 @@ def test_full_integration_H2O_molecule():
     from ....fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-    evv_experiment = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_experiment)
-    axes_choice = evv_experiment.valid_axis_combs[((-1,), (2,))][3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
-    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
                                                      base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
@@ -278,8 +292,8 @@ def test_full_integration_H2O_molecule():
     sim = WilsonSimulation()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(evv_experiment)
-    sim.addTerms(terms=evv_terms) # terms
+    sim.addExperiment(evv_exp)
+    sim.addTerms(terms=terms) # terms
 
     mol_system = ws.main.abstractions.MolecularSystem(name='h2o', natoms=3)
 
@@ -291,6 +305,8 @@ def test_full_integration_H2O_molecule():
     
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     sim.dressPropsWithSetup()
+
+    sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     

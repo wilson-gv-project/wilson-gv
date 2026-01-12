@@ -520,6 +520,7 @@ class SpectroscopicAxes:
     """
     axes: tuple[SpectroscopicAxis]
 
+    # FIXME: This method is not up to date with the spectral axes generalization but is in a class marked as unused, don't know whether update is needed.
     @classmethod
     def from_axes_dict(cls, axes_dict: dict[str, list[tuple]]):
         axes = tuple([SpectroscopicAxis(label=k, indep_vars=tuple(v)) for k,v in axes_dict.items()])
