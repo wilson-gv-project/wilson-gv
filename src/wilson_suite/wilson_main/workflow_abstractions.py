@@ -238,28 +238,10 @@ class WilsonSimulation:
 		data_dict: dict - {data_name: values}
 
 		"""
-
-		# for p in self.props:
-		# 	p.addValues(data_dict.get(p.trivial_name))
 		from .main_functions import fill_props_results, fill_residual_vib_info_results
 		fill_props_results(self.props, data_dict)
 
 		fill_residual_vib_info_results(self.vib_ana_setup, self.residual_vib_info, data_dict)
-
-		# for k in self.residual_vib_info:
-		# 	if k in ['anharmonic_states', 'harmonic_states']:
-		# 		states_list = []
-		# 		states_dict: dict = data_dict.get(k)
-
-		# 		for state, energy in states_dict.items():
-		# 			states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
-
-		# 		self.vib_ana_setup.setStates(states=states_list)
-		# 		self.residual_vib_info[k] = data_dict.get(k)
-
-		# 	else:
-		# 		self.residual_vib_info[k] = data_dict.get(k)
-		# 		setattr(self.vib_ana_setup, k, data_dict.get(k))
 
 
 	def requestData(self) -> dict:
@@ -271,12 +253,6 @@ class WilsonSimulation:
 		request_props(self.props, data_dict)
 		request_residual_vib_info(self.residual_vib_info, data_dict)
 
-		# for p in self.props:
-		# 	data_dict[p.trivial_name] = p.calc_setup
-		
-		# for k, v in self.residual_vib_info.items():
-		# 	data_dict[k] = v
-		
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
@@ -288,55 +264,6 @@ class WilsonSimulation:
 		self.fillResults(data_dict=obtainer(self.requestData()))
 
 
-
-
-	# def _getCoeffsForFeatures(self, terms_as_list, motif_res_loc, data_and_configs):
-	# 	from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_terms, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
-
-	# 	term_coeffs_per_index = evaluate_terms(
-	# 		terms_as_list, motif_res_loc, precalculated=precalculate_unique_coeff_parts(
-	# 		need_to_precalc=identify_precalc_unique_coeff_parts(terms=terms_as_list),
-	# 		data_and_configs=data_and_configs
-	# 	))
-
-	# 	return term_coeffs_per_index
-
-	# def getAllSpecFeatures(self, with_coeffs: bool = True):
-	# 	"""
-	# 	"""
-	# 	from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw, process_resonance_motifs, prepDataForEval, prepTermsForEval
-
-	# 	terms_as_list = prepTermsForEval(self.terms)
-	# 	vibstates_data, vibdiff_cache, data_and_configs = prepDataForEval(self.system, self.exp, self.vib_ana_setup, self.props)
-
-	# 	motif_res_loc, terms_for_motifs = process_resonance_motifs(
-	# 		terms_as_list, vibstates_data, vibdiff_cache
-	# 	)
-
-	# 	if with_coeffs:
-	# 		term_coeffs_per_index = self._getCoeffsForFeatures(terms_as_list, motif_res_loc, data_and_configs)
-	# 	else:
-	# 		term_coeffs_per_index = None
-
-	# 	all_features = get_features_to_draw(
-	# 		motif_res_loc=motif_res_loc, terms_for_motifs=terms_for_motifs,
-	# 		term_coeffs_per_index=term_coeffs_per_index,
-	# 		lineshape_parameter=self.spec_eval_setup.ev_info.Gamma
-	# 	)
-	# 	return all_features
-
-	# def addFeaturesToSpecWindow(self, with_coeffs: bool = True):
-	# 	if self.spec_eval_setup.ev_info.spectral_window is None:
-	# 		raise ValueError("No spectral window is set in SpecEvalSetup")
-
-	# 	from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
-
-	# 	spec_window_with_features = SpectralFeature.filter_to_spec_window(self.getAllSpecFeatures(with_coeffs), self.spec_eval_setup.ev_info.spectral_window)
-	# 	self.spec_eval_setup.ev_info.spectral_window = spec_window_with_features
-
-	# def getGridManagerForSpecWindow(self):
-	# 	from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
-	# 	return GridManager(self.spec_eval_setup.ev_info.spectral_window)
 
 	def attempt_setup_fill_with_defaults(self):
 		"""
@@ -392,15 +319,6 @@ class WilsonSimulation:
 		class: Must take a system, an experiment, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-
-		# from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import SpectralEvaluator
-
-		# spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=self.spec_eval_setup.ev_info.Gamma) # FIXME gamma value type
-		# grid_values_all_domains = spec_evaluator.evaluate_spectrum(spec_window=self.spec_eval_setup.ev_info.spectral_window,
-		# 														grid_resolution=self.spec_eval_setup.ev_info.grid_resolution,
-		# 														return_type='grid')
-
-
 		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis
 		if not self.vib_ana_setup.isAllSet:
 			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
