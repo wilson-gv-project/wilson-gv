@@ -43,8 +43,6 @@ def test_evaluation_general_customdata_1elterm():
     mock_sim.vib_ana_setup = datadict['vib_ana_setup']
     mock_sim.vib_ana_setup.max_state_lvl = 3 # there is an issue for the underlying reason for this
 
-    print('\nmock_sim.is_ready', mock_sim.is_ready)
-
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
     flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
 
@@ -240,7 +238,7 @@ def test_full_integration():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    plt.show()
+    #plt.show()
 
 
 def test_full_integration_H2O_molecule():
@@ -316,4 +314,4 @@ def test_full_integration_H2O_molecule():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    plt.show()
+    #plt.show()

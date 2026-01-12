@@ -453,7 +453,7 @@ class ResonanceCondition:
             return False
 
     # FIXME: Functionality not general yet
-    def couldBeResonantWithFieldByConditions(self, magn_conditions: list, given_prev_res=None):
+    def couldBeResonantWithFieldByConditions(self, magn_conditions: list|tuple, given_prev_res=None):
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
@@ -467,7 +467,7 @@ class ResonanceCondition:
         Optionally, with the given_prev_res argument specified, determine the answer to the same question as above
         given that the resonance condition given by given_prev_res was satisfied.
 
-        magn_conditions: List [[A = signed freq i, B = signed freq j, ...],
+        magn_conditions: List/tuple (here list) [[A = signed freq i, B = signed freq j, ...],
                                [C = signed freq k, ...],
                                 ...], signifying that
                          A + B + ... > 0 (by a significant margin)
@@ -507,7 +507,7 @@ class ResonanceCondition:
         # Corresponding catch for magnitude conditions: A usable magnitude conditions set must be
         # a list of lists of (signed integer) pulse references; otherwise, return True (cannot rule out resonance)
         for i in magn_conditions:
-            if not isinstance(i, list):
+            if not (isinstance(i, list) or isinstance(i, tuple)):
                 return True
             for j in i:
                 if not isinstance(j, int):

@@ -190,7 +190,6 @@ def derived_terms_flat(derived_terms, tolistonly: bool=False):
                 else:
                     result_dict[f'{count}_{anharms_tuple}'] = term
                 count += 1
-    print('count in derived_terms_flat', count)
     if tolistonly:
         return result_list
     else:
