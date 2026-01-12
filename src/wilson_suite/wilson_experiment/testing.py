@@ -1,4 +1,4 @@
-from . import abstractions as abst
+from . import experiment_abstractions as abst
 
 pulse_ir_1 = abst.emPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
 pulse_ir_2 = abst.emPulse('ideal', 1.0e-5, tc = 150.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)

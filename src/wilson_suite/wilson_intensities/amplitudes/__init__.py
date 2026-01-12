@@ -14,5 +14,5 @@ Then all 6 parts are multiplied together into the result.
 
 """
 from .averaging import get_iso_f, get_AlphaBetaGammaDelta_indices
-from .termND import TermND, compute_vibdiff
-from .termsEvaluator import TermsEvaluator
+from . import spectrum_composition
+from . import evaluation_wf

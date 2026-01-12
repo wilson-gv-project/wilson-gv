@@ -6,7 +6,18 @@ from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 import numpy as np
 from wilson_suite.wilson_utils.printing import separatorprint
 
-def test_evv_tester_dataclasses():
+def test_evv_tester_prep_only():
+    """
+    simple run with no pickling
+    """
+    import evv_tester as evv_tester
+    evv_tester.TO_PICKLES = []
+    evv_tester.PREP_ONLY = True
+    wilsim = evv_tester.run()
+
+    assert hasattr(wilsim, 'spec')
+
+def test_evv_tester_full():
     """
     simple run with no pickling
     """
@@ -14,6 +25,28 @@ def test_evv_tester_dataclasses():
     evv_tester.TO_PICKLES = []
     evv_tester.PREP_ONLY = False
     wilsim = evv_tester.run()
+
+    assert hasattr(wilsim, 'spec')
+
+def test_evv_tester_general_prep_only():
+    """
+    simple run with no pickling
+    """
+    import evv_tester_general_evaluator as evv_tester_general
+    evv_tester_general.TO_PICKLES = []
+    evv_tester_general.PREP_ONLY = True
+    wilsim = evv_tester_general.run()
+
+    assert hasattr(wilsim, 'spec')
+
+def test_evv_tester_general_full():
+    """
+    simple run with no pickling
+    """
+    import evv_tester_general_evaluator as evv_tester_general
+    evv_tester_general.TO_PICKLES = []
+    evv_tester_general.PREP_ONLY = False
+    wilsim = evv_tester_general.run()
 
     assert hasattr(wilsim, 'spec')
 
@@ -46,7 +79,7 @@ def test_evv_tester_dataclasses_vibexp():
     assert load_vibexp.detector.detection_range == wilsim.exp.detector.detection_range
     assert load_vibexp.epochs == wilsim.exp.epochs
 
-    from wilson_suite.wilson_experiment.abstractions import EmPulse, ElectricField
+    from wilson_suite.wilson_experiment.experiment_abstractions import EmPulse, ElectricField
     # field_ref comes from print: print(wilsim.exp.field)
     field_ref = ElectricField(pulses=[EmPulse(env='ideal', maxstr=1e-05, tc=50.0, cf=0.0, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1), 
                                       EmPulse(env='impulsive', maxstr=1e-05, tc=100.0, cf=None, cf_uv=0.0, dev=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2), 

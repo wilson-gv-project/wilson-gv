@@ -1,4 +1,4 @@
-def prop_trivname(ord_geo: int=0, ord_el: int=0, ord_rot: int=0) -> str:
+def prop_trivname(*, ord_geo: int=0, ord_el: int=0, ord_rot: int=0) -> str:
 	"""
 	Generate an abbreviated trivial name for a molecular property based on orders of perturbation
 

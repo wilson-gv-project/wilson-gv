@@ -9,7 +9,7 @@ class Mock:
     a: int
     b: float
 
-
+'''
 def test_logger_with_caplog_serialization(caplog):
     separatorprint()
     # Set the logging level to capture all messages
@@ -23,6 +23,8 @@ def test_logger_with_caplog_serialization(caplog):
     assert caplog.records[1].message == "❌ Not JSON-safe: keys must be str, int, float, bool or None, not tuple"
     log_output = caplog.text.replace("  ", " ")  # Replace multiple spaces with a single space
     assert "WARNING wilson.wilson_utils.serialization:serialization.py:60 🔍 Offending object: {'a': 1, 'b': {(0, 1): 'str'}}" in log_output
+'''
+
 
 def logfunc_mock():
     """

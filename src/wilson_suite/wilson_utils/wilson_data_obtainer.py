@@ -7,7 +7,6 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     dict_with_data = {}
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
-    print('requested_data_dict _______________', requested_data_dict.keys())
 
     requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'], 
                                 'normal_modes': requested_data_dict['nc_sqrt_eigval']})
@@ -29,7 +28,6 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
             from dataclasses import asdict
 
             these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], **asdict(o))
-
             
             dict_with_data.update(these_results_dict)
 
@@ -45,7 +43,10 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
 
         else:
             raise AssertionError('Unsupported source type for data obtainer')
-    
+    # print('\nrequested', requested_data_dict.keys())
+    # print('\nanharmonic_states', requested_data_dict['anharmonic_states'])
+
+    # print('\ndict_with_data nanharmonic_states', dict_with_data['anharmonic_states'])
     return dict_with_data
 
 

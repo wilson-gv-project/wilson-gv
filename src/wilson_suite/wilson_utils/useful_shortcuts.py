@@ -5,13 +5,15 @@ import pickle
 import os.path
 from rich.pretty import pprint
 
+import wilson_suite.wilson_derive.response_terms
 from ..wilson_derive import abstractions as wd_abst
-from ..wilson_experiment import abstractions as we_abst
+from ..wilson_experiment import experiment_abstractions as we_abst
 
-from ..wilson_derive.main import get_fully_enhanced_terms
+from ..wilson_derive.derive import get_fully_enhanced_terms
 from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from wilson_suite.fixtures import evv_experiment, get_eval_ready_evv_terms
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -37,7 +39,7 @@ def get_EVV_derived_terms():
 
         pprint(flat_derived_terms)
 
-        pprint([i for i in dir(wd_abst.VibPerturbedTerm) if '__' not in i])
+        pprint([i for i in dir(wilson_suite.wilson_derive.response_terms.VibPerturbedTerm) if '__' not in i])
 
         pprint(flat_derived_terms[0].__dict__)
 
@@ -58,31 +60,9 @@ def evv_experiment() -> we_abst.VibExperiment:
     """
     Returns VibExperiment instance for EVV experiment
     """
-    pulse_ir_1 = we_abst.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
-    pulse_ir_2 = we_abst.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
-    pulse_uvvis_1 = we_abst.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
+    return wilson_suite.fixtures.evv_experiment()
 
-    pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
-
-    field_a = we_abst.ElectricField(pulses)
-    order = len(pulses)
-
-    field_a.findEpochs()
-
-    detector_a = we_abst.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
-                                                        detection_polarization=[0.0, 0.0, 1.0],
-                                                        detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                                        wv_filter=[{1: [-1], 2: [1], 3: [1]}])
-
-    # Push one carrier freq
-    scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
-    scan_range_a = [0.0001*i for i in range(101)]
-    scan_a = we_abst.SpecScan(scan_obj_a, scan_range_a)
-    # magn_conditions=[[-1, 2]] - condition that w2>w1
-    experiment_a = we_abst.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
-    return experiment_a
-
-def evv_terms() -> list[wd_abst.VibPerturbedTerm]:
+def evv_terms() -> list[wilson_suite.wilson_derive.response_terms.VibPerturbedTerm]:
     """
     Returns EVV terms derived with wilson_derive
     """
@@ -121,7 +101,7 @@ def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup",
             derived_terms = pickle.load(handle)
         sim.addTerms(terms=derived_terms)
     else:
-        sim.getTerms(deriver=get_fully_enhanced_terms)
+        sim.addTerms(terms=get_eval_ready_evv_terms())
         with open(terms_file_path, 'wb') as handle:
             pickle.dump(sim.terms, handle, protocol=pickle.HIGHEST_PROTOCOL)
     # -------------------------

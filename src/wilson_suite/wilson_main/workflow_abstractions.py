@@ -5,13 +5,17 @@ from .spectrum_abstractions import SpecEvalSetup
 from .main_functions import find_props_and_max_state_lvl
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_experiment.abstractions import VibExperiment
-from wilson_suite.wilson_utils.abstractions import VibState
+from ..wilson_derive.response_terms import VibPerturbedTerm
+from ..wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
+from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
 
 import logging
+
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+
 logger = logging.getLogger("wilson")
 
 class WilsonSimulation:
@@ -66,6 +70,9 @@ class WilsonSimulation:
 
 			self.name=name
 
+			self.axis_choice = None
+			self.terms_in_axis_choice = None
+
 		else:
 
 			# TODO: Implement functionality to set up class instance from file
@@ -90,7 +97,7 @@ class WilsonSimulation:
 
 		self.system = system
 
-	def addTerms(self, terms: list[VibPerturbedTerm], extend: bool=False):
+	def addTerms(self, terms: dict, extend: bool=False):
 		"""
 		Add terms
 
@@ -104,6 +111,16 @@ class WilsonSimulation:
 
 		else:
 			self.terms.extend(terms)
+
+	def setAxisChoiceAndTranslateTerms(self, axis_choice: SpectralAxisSet):
+		"""
+		Set an axis choice and translate self.terms to be given in terms of this axis choice
+		"""
+		self.axis_choice = axis_choice
+		if self.terms is None:
+			raise ValueError('No terms to translate to axis choice were found')
+		self.terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+
 
 	def addVibAnaSetup(self, vib_ana_setup: VibAnaSetup):
 		"""
@@ -221,48 +238,21 @@ class WilsonSimulation:
 		data_dict: dict - {data_name: values}
 
 		"""
-		print('\nin fillResults')
-		print(data_dict)
-		print('self.residual_vib_info start fill', self.residual_vib_info.keys())
+		from .main_functions import fill_props_results, fill_residual_vib_info_results
+		fill_props_results(self.props, data_dict)
 
-		for p in self.props:
-			p.addValues(data_dict.get(p.trivial_name))
+		fill_residual_vib_info_results(self.vib_ana_setup, self.residual_vib_info, data_dict)
 
-		for k in self.residual_vib_info:
-			if k in ['anharmonic_states', 'harmonic_states']:
-				states_list = []
-				states_dict: dict = data_dict.get(k)
-
-				for state, energy in states_dict.items():
-					states_list.append(VibState(s={state: 1.0}, e=energy))
-
-				self.vib_ana_setup.setStates(states=states_list)
-				self.residual_vib_info[k] = data_dict.get(k)
-
-			else:
-				self.residual_vib_info[k] = data_dict.get(k)
-				setattr(self.vib_ana_setup, k, data_dict.get(k))
-
-		print('self.residual_vib_info', self.residual_vib_info)
-		print('self.vib_ana_setup', self.vib_ana_setup)
 
 	def requestData(self) -> dict:
 		"""
 		data_dict: dict - {data_name: DataOriginInfo}
 		"""
 		data_dict = {}
-		for p in self.props:
-			data_dict[p.trivial_name] = p.calc_setup
-		
-		print('\nin request: self.residual_vib_info', self.residual_vib_info.keys())
+		from .main_functions import request_props, request_residual_vib_info
+		request_props(self.props, data_dict)
+		request_residual_vib_info(self.residual_vib_info, data_dict)
 
-		for k, v in self.residual_vib_info.items():
-			data_dict[k] = v
-		
-		print('\nin requestData')
-		print(data_dict)
-		print(data_dict.keys())
-		
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
@@ -274,24 +264,70 @@ class WilsonSimulation:
 		self.fillResults(data_dict=obtainer(self.requestData()))
 
 
-	def evaluateAsResponseFunction(self,
-								   evaluator: Callable[[
-								   MolecularSystem, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup, bool], tuple[np.ndarray, dict]],
-								   do_diagn: bool=False):
-		"""
-		Evaluate the spectrum "as a response function" (i.e. do not use/convolute over
-		experiment pulse strength information and without regard to further experiment information except terms)
 
+	def attempt_setup_fill_with_defaults(self):
+		"""
+		If possible, attempt to complete remaining pieces of setup with default choices
+
+		Here add handling for making canonical axis choice (and translating terms to same) if none selected
+		Can also have defaults for spectral window, resolution, damping and other related information
+		Can also add other "wrap-up" parts (e.g. translate terms if axes choice made but terms not translated yet)
+
+		"""
+
+		pass
+
+	def evaluate(self):
+		"""
+		Evaluating method, using EvaluationWorkflow
+		"""
+		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
+
+		# prepare data for input to EvaluationWorkflow
+		eval_inputs = make_evaluation_inputs(simulation=self)
+
+		workflow = EvaluationWorkflow(inputs=eval_inputs)
+		self._workflow = workflow
+		try:
+			self.spec = workflow.run()
+		except Exception as e:
+			print(e)
+			raise type(e)() from e
+
+		if self.diagn is None:
+			self.diagn = {}
+		self.diagn.update({'artifacts': workflow.artifacts})
+
+	def evaluate_with_default_setup_fill(self):
+		"""
+		Attempt to fill remaining setup with default and if successful, evaluate spectrum
+		"""
+
+		self.attempt_setup_fill_with_defaults()
+		self.evaluate()
+
+	def evaluateSpectrum(self,
+                         evaluator: Callable[[
+								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
+								   SpecEvalSetup, VibAnaSetup, bool], tuple[np.ndarray, dict]],
+                         do_diagn: bool=False):
+		"""
+		Evaluate the spectrum
+
+		! unused now, there is no generalized evaluator function now; should be removed?
 		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
-		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
+		class: Must take a system, an experiment, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
+		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis
 		if not self.vib_ana_setup.isAllSet:
-			raise AssertionError('VibAnaSetup is not ready for evaluateAsResponseFunction()')
+			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
 
-		context = dict(system=self.system, derived_terms=self.terms, props=self.props,
+		# NOTE 260106: Could now use self.terms_in_axis_choice and self.axis_choice
+		# To discuss: Handling here (canonical axes plus translate) if no choice made already?
+
+
+		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
 				 do_diagn=do_diagn)
 	
@@ -304,40 +340,8 @@ class WilsonSimulation:
 		else:
 			self.spec, _ = evaluator(**context)
 
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
-
-
-	def evaluateFull(self, evaluator: Callable[[
-								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup], tuple[np.ndarray, dict]],
-								   do_diagn: bool=False):
-		"""
-		Evaluate the spectrum including experiment context (e.g. convolute over pulse strength)
-
-		evaluator: Callable: A function to carry out the evaluation. Uses attributes described in __init__ of this
-		class: Must take a system, a list of terms, a collection of properties, an evaluation setup and a
-		vibrational analysis setup and return the spectral data as a numpy ndarray
-		"""
-		# TODO - checks and context dict like in VibAnaSetup.doAnharmonicAnalysis 
-
-		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
-				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 
-				 do_diagn=do_diagn)
-		
-		self.spec = evaluator(**context)
-
-		if do_diagn:
-			self.spec, diagn = evaluator(**context)
-			self.updDiagnostics(upd_dict=diagn)
-			
-			if not isinstance(self.diagn, dict):
-				raise AssertionError('Diagnostics result must be dictionary')
-		else:
-			self.spec, _ = evaluator(**context)
-
-		if not isinstance(self.spec, np.ndarray):
-			raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
+		# if not isinstance(self.spec, np.ndarray):
+		# 	raise AssertionError('Spectroscopic evaluator result must be numpy.ndarray')
 
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,

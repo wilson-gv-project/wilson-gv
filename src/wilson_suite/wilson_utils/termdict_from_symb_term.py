@@ -1,4 +1,4 @@
-from ..wilson_derive.abstractions import VibPerturbedTerm
+from ..wilson_derive.response_terms import VibPerturbedTerm
 from ..wilson_utils.prop_trivname import prop_trivname
 
 def state_list_to_str(stl: list):
@@ -62,14 +62,14 @@ def dict_from_term(term: VibPerturbedTerm, floats: bool=True):
 
 
             averaged_props.append((
-                prop_trivname(len(curr_diff_inds), len(curr_ops)),
+                prop_trivname(ord_geo=len(curr_diff_inds), ord_el=len(curr_ops)),
                 curr_diff_inds,
                 curr_ops))
 
         else:
 
             non_averaged_props.append((
-                prop_trivname(len(curr_diff_inds), len(curr_ops)),
+                prop_trivname(ord_geo=len(curr_diff_inds), ord_el=len(curr_ops)),
                 curr_diff_inds))
 
     result_dict['averaged_props'] = tuple(averaged_props)
@@ -169,6 +169,31 @@ def derived_terms_dict_to_dicts(derived_terms, tolistonly: bool=False):
 
     return result_list
 
+def derived_terms_flat(derived_terms, tolistonly: bool=False):
+    """
+    put data in a form for use on the evaluation step
+    """
+
+    # FIXME - make a function for a flat list
+    result_list = []
+    result_dict = {}
+    
+    count = 0
+
+    for key_num_anharms in derived_terms:
+        for anharms_tuple in derived_terms[key_num_anharms]:
+            for term in derived_terms[key_num_anharms][anharms_tuple]:
+                
+                if tolistonly:
+                    result_list.append(term)
+
+                else:
+                    result_dict[f'{count}_{anharms_tuple}'] = term
+                count += 1
+    if tolistonly:
+        return result_list
+    else:
+        return result_dict
 
 def flip_modes_indices(term_dict, upd_dict):
     """

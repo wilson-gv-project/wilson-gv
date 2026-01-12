@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 
 import logging
 logger = logging.getLogger("wilson")
@@ -40,10 +42,16 @@ class SpectralAxisAdvanced:
 
 		pass
 
+# Return all grid points as tuples
+#def yield_grid_points(grid_cfg: SpectralGridCfg):
+#    pass
+
+# Other yield methods? Discuss needs
+
 # Fixme: Have this be just SpectralGrid to replace
 # HACKATHON TASK: Settle all details related to this as to be used in intensities after refresher look at intensities
 @dataclass
-class SpectralGridMultires:
+class SpectralGridCfg:
 
     base_resolution: float
     base_axis_npoints: list
@@ -51,12 +59,6 @@ class SpectralGridMultires:
     increased_res_regions: list # One entry per region,
     # region def: [[axis starts], [n points wrt base resolution], detail level (integer or power or 2)]
 
-    # Return all grid points as tuples
-    def yield_all_grid_points(self):
-
-        pass
-
-    # Other yield methods? Discuss needs
 
 def is_axis_cfg_valid(axis_cfg, valid_cfgs):
 
@@ -65,7 +67,7 @@ def is_axis_cfg_valid(axis_cfg, valid_cfgs):
         return False
 
     return True
-
+'''
 # FIXME: RM for now
 # Holds an axis definer and a grid
 # Comment: "Frame" suggests 2D but not actually limited to that
@@ -84,7 +86,7 @@ class SpectralFrame:
 
         if not is_axis_cfg_valid(self.axes, valid_axes):
             raise AssertionError("Axis choice does not correspond to valid set")
-
+'''
 
 
 
@@ -260,14 +262,17 @@ class EvaluationInfo:
 	fixed_variables - a dict of values for the non-varied fixed variables 
 		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
 	"""
-	freq_variables: dict
-	Gamma: float
-	Gamma_unit: str
+	freq_variables: dict = None
+	Gamma: dict = None
+	Gamma_unit: str = None
 	freq_condition: str = None
 	fixed_variables: dict = field(default_factory=lambda: dict())
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 	spec_result: np.ndarray | dict = None
 	margins: dict = None
+	spectral_window: SpectralWindow = None
+	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
+	spectral_axes: SpectralAxisSet = None
 
 	@property
 	def spec_window_bounds(self):

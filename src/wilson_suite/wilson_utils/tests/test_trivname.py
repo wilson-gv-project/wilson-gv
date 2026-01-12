@@ -7,18 +7,18 @@ def test_trivname():
 
     import wilson_suite as ws
 
-    assert ws.utils.prop_trivname.prop_trivname(1, 0, 0) == 'grad'
-    assert ws.utils.prop_trivname.prop_trivname(1, 1, 0) == 'dipgrad'
-    assert ws.utils.prop_trivname.prop_trivname(0, 0, 1) == 'B'
-    assert ws.utils.prop_trivname.prop_trivname(3, 5, 0) == 'thypcff'
+    assert ws.utils.prop_trivname.prop_trivname(ord_geo=1, ord_el=0, ord_rot=0) == 'grad'
+    assert ws.utils.prop_trivname.prop_trivname(ord_geo=1, ord_el=1, ord_rot=0) == 'dipgrad'
+    assert ws.utils.prop_trivname.prop_trivname(ord_geo=0, ord_el=0, ord_rot=1) == 'B'
+    assert ws.utils.prop_trivname.prop_trivname(ord_geo=3, ord_el=5, ord_rot=0) == 'thypcff'
 
     with pytest.raises(AssertionError):
-        a = ws.utils.prop_trivname.prop_trivname(0, 3, 1)
+        a = ws.utils.prop_trivname.prop_trivname(ord_geo=0, ord_el=3, ord_rot=1)
     with pytest.raises(AssertionError):
-        a = ws.utils.prop_trivname.prop_trivname(3, 5, 1)
+        a = ws.utils.prop_trivname.prop_trivname(ord_geo=3, ord_el=5, ord_rot=1)
     with pytest.raises(AssertionError):
-        a = ws.utils.prop_trivname.prop_trivname(0, 7, 0)
+        a = ws.utils.prop_trivname.prop_trivname(ord_geo=0, ord_el=7, ord_rot=0)
     with pytest.raises(AssertionError):
-        a = ws.utils.prop_trivname.prop_trivname(0, 7, 4)
+        a = ws.utils.prop_trivname.prop_trivname(ord_geo=0, ord_el=7, ord_rot=4)
 
     return

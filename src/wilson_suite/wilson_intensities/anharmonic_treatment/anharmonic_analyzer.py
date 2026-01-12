@@ -2,7 +2,6 @@
 Anharmonic analyzer for wilson_main.VibAnaSetup.doAnharmonicAnalysis()
 
 """
-from ...wilson_utils import abstractions as wu_abst
 from ...wilson_main import abstractions as wm_abst
 from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
@@ -13,7 +12,7 @@ def anharm_analyzer_data(system:wm_abst.MolecularSystem = None,
                          props: list[wm_abst.MolecularProperty] = None, 
                     nc_sqrt_eigval: dict = None, 
                     regime: str = None, regime_subinfo: dict = None, 
-                    exclude_modes: list = None) -> tuple[list[wu_abst.VibState], dict]:
+                    exclude_modes: list = None) -> tuple[list[wm_abst.VibState], dict]:
     """
     Basically a wrapper for analyser; passes data to anharm_corr_energies where analysis happens...
         then puts into list[VibState] form.
@@ -72,7 +71,7 @@ def anharm_analyzer_data(system:wm_abst.MolecularSystem = None,
         # if len(st) <= max_state_lvl: # ?
         # TODO: Exclusion based on mode index or freq cutoff
         # FIXME: Change to integer indexing - in s dict?
-        vibstates.append(wu_abst.VibState(s={st: 1.0}, e=all_states_corr[st]))
+        vibstates.append(wm_abst.VibState(harm_quanta_coeffs={st: 1.0}, energy=all_states_corr[st]))
 
     logger.debug('GVPT2 anharm corrected:')
     logger.debug(f'vibstates: {vibstates}')

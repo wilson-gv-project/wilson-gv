@@ -1,4 +1,5 @@
-from ..wilson_experiment.abstractions import VibExperiment
+import wilson_suite.wilson_derive.response_terms
+from ..wilson_experiment.experiment_abstractions import VibExperiment
 from . import abstractions as abst
 from . import dbl_pert_expansion
 from . import hermaut
@@ -22,14 +23,13 @@ def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=
     mech_anharm_limit: integer: Limitation on mechanical order of anharmonicity (default = 1)
     """
 
-
     op_omega = abst.QOperator(wu_common.op_omega_label_int)
     ops_pert = tuple([abst.QOperator(wu_common.op_labels_int[i]) for i in range(experiment.order)])
 
     symbolic_vib_states = [abst.VibStateSymbolic(wu_common.ground_state_label, is_ground=True)]
     symbolic_vib_states.extend([abst.VibStateSymbolic(wu_common.state_labels[i]) for i in range(experiment.order)])
 
-    R_sos = vib_rsp_sos.get_vib_sos(op_omega, ops_pert, experiment.order, symbolic_vib_states, noncomb=True)
+    R_sos: list[wilson_suite.wilson_derive.response_terms.VibContribTerm] = vib_rsp_sos.get_vib_sos(experiment.order)
 
     R_sos_int = []
 

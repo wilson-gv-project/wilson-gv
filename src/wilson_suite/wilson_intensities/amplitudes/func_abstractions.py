@@ -9,12 +9,14 @@ result_grid
 
 """
 import numpy as np
-import itertools
-from typing import Iterable, Generator, ClassVar, Dict, Any, Self
-from dataclasses import dataclass, field
+from typing import ClassVar, Any, Self
+from dataclasses import dataclass
 from collections import Counter
+from wilson_suite.wilson_main.abstractions import VibState
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 from collections.abc import Mapping
+import copy
 
 class ParameterSet(Mapping):
     """
@@ -26,17 +28,26 @@ class ParameterSet(Mapping):
 
         if not isinstance(parameters, dict):
             raise TypeError("ParameterSet must be initialized with a dictionary.")
-
+        parameters = copy.deepcopy(parameters)
+        
+        if 'zero' not in parameters:
+            parameters['zero'] = 'zero'
         self._parameters = dict(parameters)
         self._hash = hash(frozenset(self._parameters.items()))
 
     def parameter_labels(self):
-        return list(self._parameters.keys())
+        labels = list(self._parameters.keys())
+        labels.remove("zero")
+        return labels
     
     def indices(self):
-        return list(self._parameters.values())
+        inds_all = list(self._parameters.values())
+        inds_all.remove("zero")
+        return inds_all
 
     def __getitem__(self, key):
+        if key=='':
+            key = 'zero'
         return self._parameters[key]
 
     def __iter__(self):
@@ -63,18 +74,22 @@ class ParameterSet(Mapping):
     def from_dict(cls, parameters):
         return cls(parameters)
 
-from wilson_suite.wilson_utils.abstractions import VibState
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
 
 @dataclass
 class VibStatesData:
     """
     Holds vib states data and can compute vib states energy differences
     """
-    allstates: tuple[VibState]    
+    allstates: tuple[VibState]
+    harmonic_osc_states_labels: tuple
 
     def __post_init__(self):
-        self.allstates_map = {i.state_label: i.e for i in self.allstates}
+        tmp_allstates = list(self.allstates)
+        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.))
+        self.allstates = tuple(tmp_allstates)
+        
+        self.allstates_map = {i.state_label: i.energy for i in self.allstates}
         self._storage = dict()
 
     def _fill_storage(self):

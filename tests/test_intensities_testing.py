@@ -14,7 +14,7 @@ def test_amplitude_mock_singlepoint_one_elterm():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -24,17 +24,17 @@ def test_amplitude_mock_singlepoint_one_elterm():
     del sim.terms[0]
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.)]
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500., state_label='0'),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700., state_label='1'),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300., state_label='2'),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950., state_label='0,0'),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150., state_label='0,1'),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985., state_label='0,2'),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380., state_label='1,1'),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996., state_label='1,2'),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650., state_label='2,2')]
     sim.vib_ana_setup.setStates(states)
-    sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
+    sim.vib_ana_setup.nc_sqrt_eigval = {('0',): 500., ('1',): 700., ('2',): 1300.}
 
     sim.setPropsAndMaxStateLvl()
 
@@ -45,10 +45,11 @@ def test_amplitude_mock_singlepoint_one_elterm():
 
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
     termsdicts = derived_terms_dict_to_dicts(sim.terms)
+    
     assert termsdicts[1] == {'averaged_props': (('polgrad', ('b',), ('A', 'D')), ('dipgrad', ('a',), ('B',)), ('diphess', ('a', 'b'), ('G',))), 
                              'non_averaged_props': None, 'termA_pref': 0.25, 'termB_pref': 1.0, 
                              'vibene_denom': ('a', 'b'), 'vibenediff': None, 
-                             'resonances': (('zero,a', (-1,)), ('a+b,a', (-1, 2))), 
+                             'resonances': (('zero,a', ('-A', 'B')), ('a+b,a', ('B',))), 
                              'lvl_anharm': 1, 'anharm_tuple': (1, 0)}
 
     gf[0,0] = 1.
@@ -61,23 +62,54 @@ def test_amplitude_mock_singlepoint_one_elterm():
     sim.props[2].addValues(gff)
     sim.props[3].addValues(ggf)
 
-    start = {'x': 500., 'y': 1150.}
-    end = {'x': 513., 'y': 1163.}
-    spacer = {'x': 10., 'y': 10.}
 
-    axis1 = SpectralAxis({'w1': 1})
-    axis2 = SpectralAxis({'w2': 1})
-
-    axes = {'x': axis1, 'y': axis2}
-    specevalsetup: SpecEvalSetup = makeSpecSetup2D(start, end, spacer, axes, configs={})
-    specevalsetup.ev_info.Gamma = 1.
+    """
+    - [ ] want to see the full grid before evaluation starts
+    - [ ] want to see the features locations and domains/regions before finishing all the evaluation steps
+    - [ ] 
+    """
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     
-    sim.addSpecEvalSetup(specevalsetup)
+    bounds_dict = {'A': (500., 513.), 'B': (1150., 1163.)}
+
+    spectral_window = SpectralWindow(box=Box(bounds_dict))
+
+    evi = wilson_suite.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
+                                                          'Gamma': 1.0, 'Gamma_unit': 'cm-1',
+                                                          'grid_resolution': {'A': 2, 'B': 2}})
+
+    eval_setup = wilson_suite.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
+
+    sim.addSpecEvalSetup(eval_setup)
+
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(1.))**2
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    # print('\n', sim.__dict__.keys(), '\n')
+    # print([k for k in sim.__dict__ if sim.__dict__[k] is not None], '\n')
+
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator_general_compilation, initialize_evaluation_data, get_features_to_draw
+    # from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
+    # grid_mgr = GridManager(sim.spec_eval_setup.ev_info.spectral_window)
+    # regions = grid_mgr.create_regions({'A': 10, 'B': 10})
+    # print(grid_mgr.full_grid)
+    # print(regions)
+
+    # from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import SpectralEvaluator, SpectralFeature
+    # vibstates_data, vibdiff_cache, data_and_configs = initialize_evaluation_data(
+    #     sim.system, sim.exp, sim.vib_ana_setup, sim.props
+    # )
+    # all_features = get_features_to_draw(
+    #     motif_res_loc, terms_for_motifs, term_coeffs_per_index, spec_eval_setup.ev_info.Gamma
+    # )
+    # spec_window_with_features = SpectralFeature.filter_to_spec_window(all_features, spec_window)
+
+    # # spec_evaluator = SpectralEvaluator(vibstates_data, vibdiff_cache, gamma=sim.spec_eval_setup.ev_info.Gamma)
+    # # print(spec_evaluator)
+    # # exit()
+
+    np.set_printoptions(linewidth=280, precision=3)
+    sim.evaluateSpectrum(evaluator=terms_evaluator_general_compilation, do_diagn=True)
     
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -88,7 +120,7 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -98,15 +130,15 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     del sim.terms[0]
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.)]
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.)]
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
@@ -152,8 +184,8 @@ def test_amplitude_mock_singlepoint_one_elterm_Gamma():
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     reference = -3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / (convNu2Ene(Gamma))**2
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -164,7 +196,7 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -191,25 +223,25 @@ def test_amplitude_mock_singlepoint_one_mechterm():
         print(t)
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.),
-              VibState(s={('0','0','0'): 1.}, e=1450.),
-              VibState(s={('0','0','1'): 1.}, e=1600.),
-              VibState(s={('0','0','2'): 1.}, e=2200.),
-              VibState(s={('0','1','1'): 1.}, e=1800.),
-              VibState(s={('0','1','2'): 1.}, e=2400.),
-              VibState(s={('0','2','2'): 1.}, e=3050.),
-              VibState(s={('1','1','1'): 1.}, e=2000.),
-              VibState(s={('1','1','2'): 1.}, e=2650.),
-              VibState(s={('1','2','2'): 1.}, e=3250.),
-              VibState(s={('2','2','2'): 1.}, e=3800.),
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('0','0','0'): 1.}, energy=1450.),
+              VibState(harm_quanta_coeffs={('0','0','1'): 1.}, energy=1600.),
+              VibState(harm_quanta_coeffs={('0','0','2'): 1.}, energy=2200.),
+              VibState(harm_quanta_coeffs={('0','1','1'): 1.}, energy=1800.),
+              VibState(harm_quanta_coeffs={('0','1','2'): 1.}, energy=2400.),
+              VibState(harm_quanta_coeffs={('0','2','2'): 1.}, energy=3050.),
+              VibState(harm_quanta_coeffs={('1','1','1'): 1.}, energy=2000.),
+              VibState(harm_quanta_coeffs={('1','1','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('1','2','2'): 1.}, energy=3250.),
+              VibState(harm_quanta_coeffs={('2','2','2'): 1.}, energy=3800.),
 
               ]
     sim.vib_ana_setup.setStates(states)
@@ -279,8 +311,8 @@ def test_amplitude_mock_singlepoint_one_mechterm():
     print('>>>>>> reference', reference)
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -292,7 +324,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -310,25 +342,25 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
         print(i, t)
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.),
-              VibState(s={('0','0','0'): 1.}, e=1450.),
-              VibState(s={('0','0','1'): 1.}, e=1600.),
-              VibState(s={('0','0','2'): 1.}, e=2200.),
-              VibState(s={('0','1','1'): 1.}, e=1800.),
-              VibState(s={('0','1','2'): 1.}, e=2400.),
-              VibState(s={('0','2','2'): 1.}, e=3050.),
-              VibState(s={('1','1','1'): 1.}, e=2000.),
-              VibState(s={('1','1','2'): 1.}, e=2650.),
-              VibState(s={('1','2','2'): 1.}, e=3250.),
-              VibState(s={('2','2','2'): 1.}, e=3800.),
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('0','0','0'): 1.}, energy=1450.),
+              VibState(harm_quanta_coeffs={('0','0','1'): 1.}, energy=1600.),
+              VibState(harm_quanta_coeffs={('0','0','2'): 1.}, energy=2200.),
+              VibState(harm_quanta_coeffs={('0','1','1'): 1.}, energy=1800.),
+              VibState(harm_quanta_coeffs={('0','1','2'): 1.}, energy=2400.),
+              VibState(harm_quanta_coeffs={('0','2','2'): 1.}, energy=3050.),
+              VibState(harm_quanta_coeffs={('1','1','1'): 1.}, energy=2000.),
+              VibState(harm_quanta_coeffs={('1','1','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('1','2','2'): 1.}, energy=3250.),
+              VibState(harm_quanta_coeffs={('2','2','2'): 1.}, energy=3800.),
 
               ]
     sim.vib_ana_setup.setStates(states)
@@ -404,8 +436,8 @@ def test_amplitude_mock_singlepoint_one_mechterm_ba():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
     
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator, do_diagn=True)
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
+    sim.evaluateSpectrum(evaluator=terms_evaluator, do_diagn=True)
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print(sim.diagn)
     print('ratio', reference/sim.spec[0,0])
@@ -421,7 +453,7 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -448,25 +480,25 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
         print(t)
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.),
-              VibState(s={('0','0','0'): 1.}, e=1450.),
-              VibState(s={('0','0','1'): 1.}, e=1600.),
-              VibState(s={('0','0','2'): 1.}, e=2200.),
-              VibState(s={('0','1','1'): 1.}, e=1800.),
-              VibState(s={('0','1','2'): 1.}, e=2400.),
-              VibState(s={('0','2','2'): 1.}, e=3050.),
-              VibState(s={('1','1','1'): 1.}, e=2000.),
-              VibState(s={('1','1','2'): 1.}, e=2650.),
-              VibState(s={('1','2','2'): 1.}, e=3250.),
-              VibState(s={('2','2','2'): 1.}, e=3800.),
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('0','0','0'): 1.}, energy=1450.),
+              VibState(harm_quanta_coeffs={('0','0','1'): 1.}, energy=1600.),
+              VibState(harm_quanta_coeffs={('0','0','2'): 1.}, energy=2200.),
+              VibState(harm_quanta_coeffs={('0','1','1'): 1.}, energy=1800.),
+              VibState(harm_quanta_coeffs={('0','1','2'): 1.}, energy=2400.),
+              VibState(harm_quanta_coeffs={('0','2','2'): 1.}, energy=3050.),
+              VibState(harm_quanta_coeffs={('1','1','1'): 1.}, energy=2000.),
+              VibState(harm_quanta_coeffs={('1','1','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('1','2','2'): 1.}, energy=3250.),
+              VibState(harm_quanta_coeffs={('2','2','2'): 1.}, energy=3800.),
 
               ]
     sim.vib_ana_setup.setStates(states)
@@ -536,8 +568,8 @@ def test_amplitude_mock_singlepoint_one_mechterm_Gamma():
     print('>>>>>> reference', reference)
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.3e}')
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
-    sim.evaluateAsResponseFunction(evaluator=terms_evaluator)
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
+    sim.evaluateSpectrum(evaluator=terms_evaluator)
 
     assert np.round(reference/sim.spec[0,0], 6) == 1.
 
@@ -548,7 +580,7 @@ def test_amplitude_mock_offresonance_one_elterm():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation    
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -558,15 +590,15 @@ def test_amplitude_mock_offresonance_one_elterm():
     del sim.terms[0]
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.)]
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.)]
     sim.vib_ana_setup.setStates(states)
     sim.vib_ana_setup.nc_sqrt_eigval = {0: 500., 1: 700., 2: 1300.}
 
@@ -615,11 +647,11 @@ def test_amplitude_mock_offresonance_one_elterm():
     reference = 3./15 * 0.25 / convNu2Ene(500.) / convNu2Ene(700.) / \
                 (convNu2Ene(-500. + w1) - 1j*convNu2Ene(Gamma)) / (convNu2Ene(1150.-500 + w1mw2) - 1j*convNu2Ene(Gamma))
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
     from functools import partial
     # eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
     eval_selected = partial(terms_evaluator, collect_all=True)
-    sim.evaluateAsResponseFunction(evaluator=eval_selected)
+    sim.evaluateSpectrum(evaluator=eval_selected)
     # sim.evaluateAsResponseFunctionWithDiagnostics(evaluator=terms_evaluator)
     print(sim.diagn)
     print(f'reference {reference:.5e}')
@@ -636,7 +668,7 @@ def test_amplitude_mock_offresonance_one_mechterm():
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, DataOriginInfo, MolecularSystem
     from wilson_suite.wilson_main.spectrum_abstractions import SpectralAxis, SpecEvalSetup
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation    
-    from wilson_suite.wilson_utils.abstractions import VibState
+    from wilson_suite.wilson_main.abstractions import VibState
     sim_conf_dict = {'vib_ana_setup': VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'), 
                      'eval_uniform': DataOriginInfo('cfour', 'lvl1', 'basis1'), 
                      'system': MolecularSystem('name', 3)}
@@ -663,25 +695,25 @@ def test_amplitude_mock_offresonance_one_mechterm():
         print(t)
 
     # props, vib_ana_setup
-    states = [VibState(s={('0',): 1.}, e=500.),
-              VibState(s={('1',): 1.}, e=700.),
-              VibState(s={('2',): 1.}, e=1300.),
-              VibState(s={('0','0'): 1.}, e=950.),
-              VibState(s={('0','1'): 1.}, e=1150.),
-              VibState(s={('0','2'): 1.}, e=1985.),
-              VibState(s={('1','1'): 1.}, e=1380.),
-              VibState(s={('1','2'): 1.}, e=1996.),
-              VibState(s={('2','2'): 1.}, e=2650.),
-              VibState(s={('0','0','0'): 1.}, e=1450.),
-              VibState(s={('0','0','1'): 1.}, e=1600.),
-              VibState(s={('0','0','2'): 1.}, e=2200.),
-              VibState(s={('0','1','1'): 1.}, e=1800.),
-              VibState(s={('0','1','2'): 1.}, e=2400.),
-              VibState(s={('0','2','2'): 1.}, e=3050.),
-              VibState(s={('1','1','1'): 1.}, e=2000.),
-              VibState(s={('1','1','2'): 1.}, e=2650.),
-              VibState(s={('1','2','2'): 1.}, e=3250.),
-              VibState(s={('2','2','2'): 1.}, e=3800.),
+    states = [VibState(harm_quanta_coeffs={('0',): 1.}, energy=500.),
+              VibState(harm_quanta_coeffs={('1',): 1.}, energy=700.),
+              VibState(harm_quanta_coeffs={('2',): 1.}, energy=1300.),
+              VibState(harm_quanta_coeffs={('0','0'): 1.}, energy=950.),
+              VibState(harm_quanta_coeffs={('0','1'): 1.}, energy=1150.),
+              VibState(harm_quanta_coeffs={('0','2'): 1.}, energy=1985.),
+              VibState(harm_quanta_coeffs={('1','1'): 1.}, energy=1380.),
+              VibState(harm_quanta_coeffs={('1','2'): 1.}, energy=1996.),
+              VibState(harm_quanta_coeffs={('2','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('0','0','0'): 1.}, energy=1450.),
+              VibState(harm_quanta_coeffs={('0','0','1'): 1.}, energy=1600.),
+              VibState(harm_quanta_coeffs={('0','0','2'): 1.}, energy=2200.),
+              VibState(harm_quanta_coeffs={('0','1','1'): 1.}, energy=1800.),
+              VibState(harm_quanta_coeffs={('0','1','2'): 1.}, energy=2400.),
+              VibState(harm_quanta_coeffs={('0','2','2'): 1.}, energy=3050.),
+              VibState(harm_quanta_coeffs={('1','1','1'): 1.}, energy=2000.),
+              VibState(harm_quanta_coeffs={('1','1','2'): 1.}, energy=2650.),
+              VibState(harm_quanta_coeffs={('1','2','2'): 1.}, energy=3250.),
+              VibState(harm_quanta_coeffs={('2','2','2'): 1.}, energy=3800.),
 
               ]
     sim.vib_ana_setup.setStates(states)
@@ -762,10 +794,10 @@ def test_amplitude_mock_offresonance_one_mechterm():
     print(f'>>>>>> ref res {1./(convNu2Ene(Gamma))**2:.5e}')
 
 
-    from wilson_suite.wilson_intensities.spectrum.evaluators import terms_evaluator
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
     from functools import partial
     eval_selected = partial(terms_evaluator, selected_combs=[(0,1)], collect_all=True)
-    sim.evaluateAsResponseFunction(evaluator=eval_selected)
+    sim.evaluateSpectrum(evaluator=eval_selected)
 
     print(f'sim.spec[0,0] {sim.spec[0,0]:.5e}')
     print('ratio', reference/sim.spec[0,0])

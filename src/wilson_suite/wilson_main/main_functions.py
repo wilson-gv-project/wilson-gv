@@ -1,7 +1,8 @@
+from .abstractions import VibState
 from .abstractions import (VibAnaSetup, MolecularProperty,
-						   MolecularSystem, VibState)
+						   MolecularSystem)
 
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from ..wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname
 from typing import Callable
 import copy
@@ -76,33 +77,33 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 def do_full_vib_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
 				   tuple[dict, dict, list[VibState], dict]]):
-		"""
-		Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
-		vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
-		self.nc_eigvec) and the (regime-specific) vibrational states
+	"""
+	Carry a vibrational analysis with the set-up regime: Determine and keep the (harmonic) fundamental
+	vibrational energy levels (stored in self.nc_sqrt_eigval), the associated eigenvectors (stored in
+	self.nc_eigvec) and the (regime-specific) vibrational states
 
-		props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
-		analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
-		__init__ for detailed argument specification: Must take as input a system, a set of properties,
-		a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
-		the associated eigenvectors and the vibrational states as VibState instances
-		system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
-		with self as self.system
-		"""
-		if vib_ana.nc_sqrt_eigval is not None or vib_ana.states is not None or vib_ana.nc_eigvec is not None:
-			raise AssertionError('Full analysis requested but some of the results are already present')
+	props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
+	analyzer: Callable: A reference to an analyzer function. See function definition and attribute explanation in
+	__init__ for detailed argument specification: Must take as input a system, a set of properties,
+	a choice of regime (and subinfo as relevant) and return fundamental harmonic energy levels,
+	the associated eigenvectors and the vibrational states as VibState instances
+	system: MolecularSystem instance: The system for which analysis is sought. May optionally already be stored
+	with self as self.system
+	"""
+	if vib_ana.nc_sqrt_eigval is not None or vib_ana.states is not None or vib_ana.nc_eigvec is not None:
+		raise AssertionError('Full analysis requested but some of the results are already present')
 
-		if vib_ana.regime is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
+	if vib_ana.regime is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having chosen an analysis regime')
 
-		if vib_ana.system is None:
-			raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
-		
-		context = {'system': vib_ana.system, 'props': props, 
-			 	   'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo}
-		
-		# To return: nc_sqrt_eigval, nc_eigvec, states, diagn
-		return analyzer(**context)
+	if vib_ana.system is None:
+		raise AssertionError('Vibrational analysis cannot be carried out without having set the system attribute')
+	
+	context = {'system': vib_ana.system, 'props': props, 
+				'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo}
+	
+	# To return: nc_sqrt_eigval, nc_eigvec, states, diagn
+	return analyzer(**context)
 	
 def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty], anharmonic_analyzer:
 						Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
@@ -154,7 +155,7 @@ def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 
 # WilsonSimulation related functions
 
-def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[MolecularProperty]:
+def find_props(terms, freqs: str='static') -> list[MolecularProperty]:
 
 	props = []
 	
@@ -243,3 +244,53 @@ def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm],
 	props.extend(props_ext)
 
 	return props, residual_vib_info, find_max_state_lvl(terms)
+
+def fill_props_results(props, data_dict: dict):
+	"""
+	loading data into self.props (and optionally to self.vib_ana_setup)
+	
+	data_dict: dict - {data_name: values}
+
+	"""
+
+	for p in props:
+		p.addValues(data_dict.get(p.trivial_name))
+
+def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: dict):
+	"""
+	loading data into self.props (and optionally to self.vib_ana_setup)
+	
+	data_dict: dict - {data_name: values}
+
+	"""
+	for k in residual_vib_info:
+		if k in ['anharmonic_states', 'harmonic_states']:
+			states_list = []
+			states_dict: dict = data_dict.get(k)
+
+			for state, energy in states_dict.items():
+				states_list.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+
+			vib_ana_setup.setStates(states=states_list)
+			residual_vib_info[k] = data_dict.get(k)
+
+		else:
+			residual_vib_info[k] = data_dict.get(k)
+			setattr(vib_ana_setup, k, data_dict.get(k))
+
+def request_props(props, data_dict) -> dict:
+	"""
+	data_dict: dict - {data_name: DataOriginInfo}
+	"""
+	for p in props:
+		data_dict[p.trivial_name] = p.calc_setup
+	return data_dict
+
+def request_residual_vib_info(residual_vib_info, data_dict) -> dict:
+	"""
+	data_dict: dict - {data_name: DataOriginInfo}
+	"""
+	for k, v in residual_vib_info.items():
+		data_dict[k] = v
+	
+	return data_dict
