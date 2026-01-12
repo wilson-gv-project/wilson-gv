@@ -118,6 +118,8 @@ def test_is_location_in_window():
 def generate_only_res_cond_evv_term_selection():
 
     import wilson_suite.wilson_derive.abstractions as wa
+    import wilson_suite.wilson_derive.response_terms as wr
+
     from fractions import Fraction
 
     ab_state = wa.HarmOscStateSymbolic(['a', 'b'])
@@ -140,19 +142,19 @@ def generate_only_res_cond_evv_term_selection():
     res_conds_d = [rc_0_a_w_B, rc_b_a_w_B]
     res_conds_e = [rc_0_a_w_B, rc_0_a_w_AmB]
 
-    term_a = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_a = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_a)
 
-    term_b = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_b = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_b)
 
-    term_c = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_c = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_c)
 
-    term_d = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_d = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_d)
 
-    term_e = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_e = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_e)
 
     return [term_a, term_b, term_c, term_d, term_e]
