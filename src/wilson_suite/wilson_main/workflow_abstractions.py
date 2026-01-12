@@ -263,7 +263,7 @@ class WilsonSimulation:
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
 		try:
-			self.spec = workflow.run()
+			wf_result = workflow.run()
 		except Exception as e:
 			print(e)
 			raise type(e)() from e
@@ -271,6 +271,10 @@ class WilsonSimulation:
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
+
+		# TODO: this is a temporary fix? can be organized better?
+		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
+		self.spec = wf_result['result']
 
 
 	def evaluateSpectrum(self,
