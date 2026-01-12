@@ -55,23 +55,40 @@ def test_SpectrumRenderer():
     assert "Unsupported spec_data_operations" in str(excinfo.value)
 
 def test_LevelCalculator():
-    dmax = 100.
+    dmax = 1000.
     dyn_range = 10
     log10 = False
-    ref_max = 110.
-    cm_spacing = ''
-    cm_power = 0.1
+
 
     levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
-                                                       dynamic_range=dyn_range,
-                                                       nlevels=5,
-                                                       log10=log10,
-                                                       ref_max=ref_max,
-                                                       colormap_spacing=cm_spacing,
-                                                       colormap_power=cm_power)
+                                                            dynamic_range=dyn_range,
+                                                            nlevels=5,
+                                                            log10=log10)
 
     assert np.allclose(levels, np.array([ 10., 32.5,  55., 77.5, 100.]))
     assert labels == ['$1.0e+01$', '$3.2e+01$', '$5.5e+01$', '$7.8e+01$', '$1.0e+02$']
+    
+    log10 = True
+    cm_spacing = 'linear'
+    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+                                                            dynamic_range=dyn_range,
+                                                            nlevels=5,
+                                                            log10=log10,
+                                                            colormap_spacing=cm_spacing)
+    print()
+    print(levels)
+    print(labels)
+
+    log10 = True
+    cm_spacing = 'power'
+    cm_power = 0.1
+    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+                                                            dynamic_range=dyn_range,
+                                                            nlevels=5,
+                                                            log10=log10,
+                                                            colormap_spacing=cm_spacing,
+                                                            colormap_power=cm_power)
+
 
 
 def test_NormalizationType():

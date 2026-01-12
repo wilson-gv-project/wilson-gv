@@ -98,7 +98,6 @@ class LevelCalculator:
 
     @staticmethod
     def compute_levels(d_max: float, dynamic_range: float, nlevels: int, log10: bool = True,
-                  ref_max: Optional[float] = None, 
                   colormap_spacing: str = None, 
                   colormap_power: float = 0.5) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
@@ -115,7 +114,7 @@ class LevelCalculator:
             log_min = np.log10(d_min)
             log_max = np.log10(d_max)
 
-            if colormap_spacing == "log":        
+            if colormap_spacing == "log":
                 # Linear spacing in log scale
                 log_space = np.linspace(log_min, log_max, nlevels)
                 # back to linear scale
@@ -140,11 +139,7 @@ class LevelCalculator:
 
             # Format original value labels
             level_labels = [f"${val:.1e}$" for val in level_values]
-            
-            # Calculate normalized values in log space
-            if ref_max is None:
-                ref_max = d_max
-        
+                    
             # Normalize in log space to preserve logarithmic spacing
             norm_positions = (log_space - log_min) / (log_max - log_min)
             norm_labels = [f"{val:.2f}" for val in norm_positions]
