@@ -27,10 +27,7 @@ op_labels_greek_latex = {'A': r'\alpha', 'B': r'\beta', 'G': r'\gamma',
                          'H': r'\eta', 'T': r'\theta', 'I': r'\iota'}
 
 # Capital alphabetical labels (primary use: Axis aliases)
-# cap_alpha_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-# limit on number of axes in this version - maximum 3 axes 
-# TODO: raise errors according to this where cap_alpha_labels is used
-cap_alpha_labels = ['A', 'B', 'C']
+cap_alpha_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 
 # numerical index of ordering for Capital alphabetical labels -- alpha label to index mapping
 num_cap_alpha_labels = dict(zip(cap_alpha_labels, range(len(cap_alpha_labels))))

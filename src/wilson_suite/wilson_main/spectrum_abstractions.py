@@ -3,6 +3,7 @@ from typing import Any
 import numpy as np
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 
 import logging
 logger = logging.getLogger("wilson")
@@ -269,6 +270,7 @@ class EvaluationInfo:
 	spectral_window: SpectralWindow = None
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
 	dynamic_range: float = 100
+	spectral_axes: SpectralAxisSet = None
 
 
 @dataclass

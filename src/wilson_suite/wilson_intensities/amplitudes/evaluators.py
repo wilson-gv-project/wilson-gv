@@ -14,8 +14,9 @@ from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDat
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
-
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
+    from ...wilson_derive.response_terms import VibPerturbedTerm
+    from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 
 import numpy as np
 
@@ -31,7 +32,7 @@ def prepTermsForEval(terms: dict | list) -> list:
             if not isinstance(t, VibPerturbedTerm):
                 raise ValueError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
         return terms
-    
+
     if isinstance(terms, type({})):
         for t_key in terms:
             if isinstance(terms[t_key], type({})):
@@ -125,7 +126,7 @@ def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
                                      vibdiff_cache: VibDiffCache,
                                      lineshape_parameter: float=None) -> list[SpectralFeature]:
     """
-    SpectralFeature: 
+    SpectralFeature:
         location
         term_contributions = None
         lineshape_parameter = None
@@ -134,10 +135,10 @@ def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
         feat_box: Box = None - post-init if lineshape_parameter
     """
     motif_res_loc, terms_for_motifs = process_resonance_motifs(derived_terms, vibstates_data, vibdiff_cache)
-    
+
     return get_features_to_draw(motif_res_loc, terms_for_motifs, lineshape_parameter=lineshape_parameter)
 
-def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]], 
+def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]],
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
                                                      dict[ParameterSet, float]]=None,
@@ -156,9 +157,9 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
 
             lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
             term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
-                                        states_parameters=lst_params, 
+                                        states_parameters=lst_params,
                                         term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
-            
+
             if term_coeffs_per_index is not None:
                 list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
                 amplitude_coeff = sum(list_to_sum)

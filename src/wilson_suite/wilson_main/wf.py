@@ -3,8 +3,11 @@ from typing import Any, Callable
 from functools import wraps
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_experiment.abstractions import VibExperiment
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
+from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+
 from wilson_suite.wilson_main.abstractions import VibState
 from .spectrum_abstractions import SpecEvalSetup
 from .main_functions import find_props_and_max_state_lvl
@@ -178,7 +181,16 @@ class WilsonSimulation:
         """
         self.eval_uniform = eval_uniform
         self.eval_by_prop_name = eval_by_prop_name
-    
+
+    def setAxisChoiceAndTranslateTerms(self, axis_choice: SpectralAxisSet):
+        """
+        Set an axis choice and translate self.terms to be given in terms of this axis choice
+        """
+        self.axis_choice = axis_choice
+        if self.terms is None:
+            raise ValueError('No terms to translate to axis choice were found')
+        self.terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+
     # ==================== Property Resolution ====================
     
     @needs('terms', 'vib_ana_setup')
@@ -326,6 +338,9 @@ class WilsonSimulation:
 
     def evaluate(self):
         from ..wilson_intensities.amplitudes.evaluation_wf import make_evaluation_inputs
+        if self.axis_choice is None:
+            self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
+
         eval_inputs = make_evaluation_inputs(simulation=self)
         workflow = EvaluationWorkflow(inputs=eval_inputs)
         self._workflow = workflow

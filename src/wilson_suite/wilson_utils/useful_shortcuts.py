@@ -5,10 +5,11 @@ import pickle
 import os.path
 from rich.pretty import pprint
 
+import wilson_suite.wilson_derive.response_terms
 from ..wilson_derive import abstractions as wd_abst
-from ..wilson_experiment import abstractions as we_abst
+from ..wilson_experiment import experiment_abstractions as we_abst
 
-from ..wilson_derive.main import get_fully_enhanced_terms
+from ..wilson_derive.derive import get_fully_enhanced_terms
 from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
 from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
@@ -38,7 +39,7 @@ def get_EVV_derived_terms():
 
         pprint(flat_derived_terms)
 
-        pprint([i for i in dir(wd_abst.VibPerturbedTerm) if '__' not in i])
+        pprint([i for i in dir(wilson_suite.wilson_derive.response_terms.VibPerturbedTerm) if '__' not in i])
 
         pprint(flat_derived_terms[0].__dict__)
 
@@ -54,6 +55,22 @@ def get_EVV_derived_terms():
     else:
         raise ValueError('No pkl terms file')
     
+
+def evv_experiment() -> we_abst.VibExperiment:
+    """
+    Returns VibExperiment instance for EVV experiment
+    """
+    return wilson_suite.fixtures.evv_experiment()
+
+def evv_terms() -> list[wilson_suite.wilson_derive.response_terms.VibPerturbedTerm]:
+    """
+    Returns EVV terms derived with wilson_derive
+    """
+    from ..wilson_main import workflow_abstractions as wf_abst
+    sim = wf_abst.WilsonSimulation()
+    sim.addExperiment(experiment=evv_experiment())
+    sim.getTerms(deriver=get_fully_enhanced_terms)
+    return sim.terms
 
 
 def bare_wsim_for_EVVpGVPT2(vib_ana_setup:"VibAnaSetup", 

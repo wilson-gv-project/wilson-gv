@@ -122,10 +122,11 @@ def make_evaluation_inputs(
             )
 
         # Extract and normalize from simulation
-        terms = simulation.terms
+        spec_eval_setup = simulation.spec_eval_setup 
+        # MR: Here assuming that spectral axes were set, so changed to use translated terms
+        terms = simulation.terms_in_axis_choice
         number_of_modes = simulation.system.Nnmodes
         props = simulation.props
-        spec_eval_setup = simulation.spec_eval_setup
         vib_ana_setup = simulation.vib_ana_setup
         pulse_polarization_vector = tuple(
             simulation.exp.polarization_avg_vector

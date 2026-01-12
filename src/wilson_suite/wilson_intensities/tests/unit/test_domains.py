@@ -46,14 +46,14 @@ def generate_props_data_Nmodes(N_modes):
 def get_data_evaluators_tests() -> dict:
     """
     dict(system=system,
-        vib_ana_setup=vibana, 
-        derived_terms=terms_select, 
+        vib_ana_setup=vibana,
+        derived_terms=terms_select,
         props=props,
         experiment=experiment,
         spec_eval_setup=spec_eval_setup,
         domain_distance_thresholds={'A': 12., 'B': 12.})
     """
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.fixtures import get_terms_from_json
     terms_fuller_flat = get_terms_from_json()
 
@@ -64,7 +64,6 @@ def get_data_evaluators_tests() -> dict:
 
     # vib_ana_setup needs to have vibstates
     vibana = wm_abst.VibAnaSetup(system=system)
-    vibana.nc_sqrt_eigval
     vibana.setStates((
             wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
             wm_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
@@ -132,10 +131,10 @@ def get_features_from_terms(lineshape_parameter:float = 9.5):
     datadict = get_data_evaluators_tests()
     include_list = tuple([int(v[0]) for v in list(datadict['vib_ana_setup'].nc_sqrt_eigval.keys()) if int(v[0]) not in datadict['vib_ana_setup'].exclude_modes])
 
-    vibstates_data = VibStatesData(allstates=tuple(datadict['vib_ana_setup'].states), 
+    vibstates_data = VibStatesData(allstates=tuple(datadict['vib_ana_setup'].states),
                                    harmonic_osc_states_labels=include_list)
     vibdiff_cache = VibDiffCache()
-    
+
     features = get_features_from_terms_for_eval(datadict['derived_terms'],
                                                 vibstates_data,
                                                 vibdiff_cache, lineshape_parameter)

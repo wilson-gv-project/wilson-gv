@@ -1,5 +1,6 @@
 import copy
-from .abstractions import HarmOscStateSymbolic, VibPerturbedTerm, VibDiffTerm, ResonanceCondition, VibContribTerm
+from .abstractions import HarmOscStateSymbolic, VibDiffTerm, ResonanceCondition
+from .response_terms import VibPerturbedTerm, VibContribTerm
 from fractions import Fraction
 
 # FIXME: The routines in this file need verification and harmonization with respect to theory manuscript

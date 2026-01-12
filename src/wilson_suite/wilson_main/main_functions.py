@@ -2,7 +2,7 @@ from .abstractions import VibState
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem)
 
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from ..wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname
 from typing import Callable
 import copy
