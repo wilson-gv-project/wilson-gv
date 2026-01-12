@@ -1,6 +1,7 @@
 import copy
 
-from .abstractions import VibPerturbedTerm
+from .response_terms import VibPerturbedTerm
+
 
 def terms_simplify(terms_in: list[VibPerturbedTerm], nm_inds: list):
     """

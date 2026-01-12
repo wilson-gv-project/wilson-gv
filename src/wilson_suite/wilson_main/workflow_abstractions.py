@@ -5,13 +5,17 @@ from .spectrum_abstractions import SpecEvalSetup
 from .main_functions import find_props_and_max_state_lvl
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
-from wilson_suite.wilson_experiment.abstractions import VibExperiment
+from ..wilson_derive.response_terms import VibPerturbedTerm
+from ..wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
 
 import logging
+
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+
 logger = logging.getLogger("wilson")
 
 class WilsonSimulation:
@@ -66,6 +70,9 @@ class WilsonSimulation:
 
 			self.name=name
 
+			self.axis_choice = None
+			self.terms_in_axis_choice = None
+
 		else:
 
 			# TODO: Implement functionality to set up class instance from file
@@ -92,7 +99,6 @@ class WilsonSimulation:
 
 	def addTerms(self, terms: dict, extend: bool=False):
 		"""
-		FIXME, not a list
 		Add terms
 
 		terms: List of VibPerturbedTerm instances: The terms to be added
@@ -105,6 +111,16 @@ class WilsonSimulation:
 
 		else:
 			self.terms.extend(terms)
+
+	def setAxisChoiceAndTranslateTerms(self, axis_choice: SpectralAxisSet):
+		"""
+		Set an axis choice and translate self.terms to be given in terms of this axis choice
+		"""
+		self.axis_choice = axis_choice
+		if self.terms is None:
+			raise ValueError('No terms to translate to axis choice were found')
+		self.terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+
 
 	def addVibAnaSetup(self, vib_ana_setup: VibAnaSetup):
 		"""
@@ -236,7 +252,7 @@ class WilsonSimulation:
 		from .main_functions import request_props, request_residual_vib_info
 		request_props(self.props, data_dict)
 		request_residual_vib_info(self.residual_vib_info, data_dict)
-		
+
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
@@ -247,6 +263,19 @@ class WilsonSimulation:
 		"""
 		self.fillResults(data_dict=obtainer(self.requestData()))
 
+
+
+	def attempt_setup_fill_with_defaults(self):
+		"""
+		If possible, attempt to complete remaining pieces of setup with default choices
+
+		Here add handling for making canonical axis choice (and translating terms to same) if none selected
+		Can also have defaults for spectral window, resolution, damping and other related information
+		Can also add other "wrap-up" parts (e.g. translate terms if axes choice made but terms not translated yet)
+
+		"""
+
+		pass
 
 	def evaluate(self):
 		"""
@@ -264,11 +293,18 @@ class WilsonSimulation:
 		except Exception as e:
 			print(e)
 			raise type(e)() from e
-		
+
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
 
+	def evaluate_with_default_setup_fill(self):
+		"""
+		Attempt to fill remaining setup with default and if successful, evaluate spectrum
+		"""
+
+		self.attempt_setup_fill_with_defaults()
+		self.evaluate()
 
 	def evaluateSpectrum(self,
                          evaluator: Callable[[
@@ -283,9 +319,13 @@ class WilsonSimulation:
 		class: Must take a system, an experiment, a list of terms, a collection of properties, an evaluation setup and a
 		vibrational analysis setup and return the spectral data as a numpy ndarray
 		"""
-		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis 
+		# TODO - checks like in VibAnaSetup.doAnharmonicAnalysis
 		if not self.vib_ana_setup.isAllSet:
 			raise AssertionError('VibAnaSetup is not ready for evaluateSpectrum()')
+
+		# NOTE 260106: Could now use self.terms_in_axis_choice and self.axis_choice
+		# To discuss: Handling here (canonical axes plus translate) if no choice made already?
+
 
 		context = dict(system=self.system, experiment=self.exp, derived_terms=self.terms, props=self.props,
 				 spec_eval_setup=self.spec_eval_setup, vib_ana_setup=self.vib_ana_setup, 

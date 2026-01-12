@@ -1,4 +1,6 @@
 import numpy as np
+
+import wilson_suite.wilson_derive.response_terms
 from wilson_suite.wilson_intensities.amplitudes import func_abstractions as f_abst
 import wilson_suite.wilson_intensities.amplitudes.resonances as res_funcs
 from ...amplitudes.spectrum_composition import SpectroscopicAxis
@@ -10,8 +12,8 @@ import wilson_suite.wilson_main.abstractions
 def test_solve_LSE_motif():
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import solve_LSE_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
@@ -37,7 +39,7 @@ def test_solve_LSE_motif():
 def test_generate_RHS_motif():
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
 
     # (res_cond1, res_cond2, res_cond3, ...)
     # (res_cond1, (wibdiff_mn, axes), ...)
@@ -45,7 +47,7 @@ def test_generate_RHS_motif():
     # (res_cond1, (((m1, m2, ...), (n1, n2, ...)), (ax1, ax2, ax3, ...)), ...)
 
     # vibdiff: (m_inds, n_inds) <=== ((m1, m2, ...), (n1, n2, ...))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import get_RHS_motif
     params = ParameterSet({'a': '1', 'b': '3', 'zero': 'zero'})
@@ -74,8 +76,8 @@ def test_generate_LHS_motif():
     print()
     motif1 = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))
     motif2 = (((('a', 'b'), ('a',)), ('A',)),)
-    motif3 = (((('',), ('a',)), ('B',)), ((('',), ('a',)), ('A', '-B')))
-    motif4 = (((('',), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+    motif3 = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
+    motif4 = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
 
     from ...amplitudes.resonances import generate_LHS_motif
 
@@ -116,12 +118,14 @@ def test_is_location_in_window():
 def generate_only_res_cond_evv_term_selection():
 
     import wilson_suite.wilson_derive.abstractions as wa
+    import wilson_suite.wilson_derive.response_terms as wr
+
     from fractions import Fraction
 
     ab_state = wa.HarmOscStateSymbolic(['a', 'b'])
     a_state = wa.HarmOscStateSymbolic(['a'])
     b_state = wa.HarmOscStateSymbolic(['b'])
-    zero_state = wa.HarmOscStateSymbolic([''])
+    zero_state = wa.HarmOscStateSymbolic([])
 
     vd_ab_a = wa.VibDiffTerm(sl = ab_state, sr = a_state)
     vd_0_a = wa.VibDiffTerm(sl=zero_state, sr=a_state)
@@ -138,19 +142,19 @@ def generate_only_res_cond_evv_term_selection():
     res_conds_d = [rc_0_a_w_B, rc_b_a_w_B]
     res_conds_e = [rc_0_a_w_B, rc_0_a_w_AmB]
 
-    term_a = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_a = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_a)
 
-    term_b = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_b = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_b)
 
-    term_c = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_c = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_c)
 
-    term_d = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_d = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_d)
 
-    term_e = wa.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
+    term_e = wr.VibPerturbedTerm(coeff = Fraction(1, 4), props = [], freqterms = [],
                                  res = res_conds_e)
 
     return [term_a, term_b, term_c, term_d, term_e]
@@ -256,21 +260,18 @@ def test_fixt():
 
     experiment = evv_experiment()
     valid_axis_combs = experiment.valid_axis_combs
-    for i in valid_axis_combs:
-        print('ind vars?', i)
-        for omg in valid_axis_combs[i]:
-            print('axes_choice', omg)
-    print('\nexperiment.canonical_axes', experiment.canonical_axes)
-    print('\nchosen', experiment.valid_axis_combs[((-1,), (2,))][3], '\n')
 
     from ...amplitudes.spectrum_composition import SpectroscopicAxes
-    chosen_axes = experiment.valid_axis_combs[((-1,), (2,))][3]
+    chosen_axes = experiment.valid_axis_combs[0].valid_axis_combs[3]
     axs = []
-    for ax in chosen_axes:
+    for ax in chosen_axes.axes:
         # SpectroscopicAxis({ax:chosen_axes[ax]})
-        axis = SpectroscopicAxis(label=ax, indep_vars=tuple(chosen_axes[ax]))
+        curr_vars = []
+        for var in ax.var_set.var_set:
+            curr_vars.append(var.pulse_refs)
+
+        axis = SpectroscopicAxis(label=ax.label, indep_vars=tuple(curr_vars))
         axs.append(axis)
         print(axis, hash(axis))
     spec_axes = SpectroscopicAxes(tuple(axs))
     print(spec_axes)
-

@@ -18,7 +18,6 @@ evaluator(self.system, self.exp, self.terms, self.props, self.spec_eval_setup, s
 """
 import wilson_suite as ws
 from wilson_suite.wilson_utils.serialization import pickle_this_to, unpickle_smth_from
-from wilson_suite.wilson_main.main_functions import do_anharmonic_analysis
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
 
@@ -39,34 +38,8 @@ PREP_ONLY = True
 def run():
     # ================================================
     # ---- EXPERIMENT
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 50.0, cf=0.0, cf_uv=0.0,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
-    pulse_ir_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
-    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
-    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
-
-    field_a = ws.experiment.abstractions.ElectricField(pulses)
-    order = len(pulses)
-
-
-    detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq', 
-                                                         detector_location=(0.0, 0.0, 1.0),
-                                                         detection_polarization=(1.0, 0.0, 0.0),
-                                                         detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                                         wv_filter=[{1: -1, 2: 1, 3: 1}])
-
-    # Push one carrier freq
-    scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
-    scan_range_a = [0.0001*i for i in range(101)]
-    scan_a = ws.experiment.abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
-
-    experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field_a, 
-                                                            detector=detector_a, 
-                                                            scans=[scan_a], 
-                                                            magn_conditions=[[-1, 2]])
+    experiment_a = ws.fixtures.evv_experiment()
     logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
     
     if 'VibExperiment' in TO_PICKLES:
@@ -77,7 +50,7 @@ def run():
 
     # ================================================
     # ---- TERMS (derived)
-    terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
 
     # ================================================
     # ---- DataOriginInfo setup

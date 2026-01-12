@@ -2,7 +2,7 @@ import wilson_suite.wilson_intensities.amplitudes.evaluators as evaluators #term
 from wilson_suite.wilson_intensities.amplitudes import domains as domfuncs
 from ...amplitudes.numerical_abstractions import NumericalResonanceCondition, NumericalResonanceMotif
 from ....wilson_main import abstractions as wm_abst
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+from ....wilson_derive.response_terms import VibPerturbedTerm
 import numpy as np
 
 def generate_props_data_Nmodes(N_modes):

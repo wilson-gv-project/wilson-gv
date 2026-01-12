@@ -5,7 +5,7 @@ RESONANCES in VibPerturbedTerm
 functions are either used or not (marked UNUSED)
 """
 import numpy as np
-from wilson_suite.wilson_derive.abstractions import  VibPerturbedTerm
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet, VibStatesData, ResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiff, VibDiffCache

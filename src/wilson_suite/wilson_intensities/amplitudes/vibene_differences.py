@@ -3,7 +3,8 @@ VIB DIFFERENCES in VibPerturbedTerm
 """
 import numpy as np
 import itertools
-from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm, VibDiffTerm
+from wilson_suite.wilson_derive.abstractions import VibDiffTerm
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_main.abstractions import VibState
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 from dataclasses import dataclass

@@ -1,5 +1,5 @@
 from . import wilson_derive as ws_derive
-from .wilson_derive.abstractions import VibPerturbedTerm
+from .wilson_derive.response_terms import VibPerturbedTerm
 from . import wilson_experiment as ws_experiment
 
 import logging
@@ -7,40 +7,111 @@ import logging
 logger = logging.getLogger("wilson.")
 
 
-def evv_experiment() -> ws_experiment.abstractions.VibExperiment:
+def evv_experiment() -> ws_experiment.experiment_abstractions.VibExperiment:
     """
     Returns VibExperiment instance for EVV experiment
     """
-    import wilson_suite as ws
+    import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 
-    pulse_ir_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 50.0, cf=0.0, cf_uv=0.0,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
-    pulse_ir_2 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 100.0, cf=0.0, cf_uv=0.0,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
-    pulse_uvvis_1 = ws.experiment.abstractions.EmPulse(env='impulsive', maxstr=1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072,
-                                                    wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+    pulse_ir_1 = wexp.make_impulsive_gaussian_pulse(tc=50.0, cf=0.0, cf_uv=0.0,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    pulse_ir_2 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
-    field_a = ws.experiment.abstractions.ElectricField(pulses)
-    order = len(pulses)
+    field_a = wexp.ElectricField(pulses)
 
-    detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
+    detector_a = wexp.SpecDetector(detection_method='freq',
                                                          detector_location=(0.0, 0.0, 1.0),
                                                          detection_polarization=(1.0, 0.0, 0.0),
                                                          detection_range=[0.003 + 0.0001 * i for i in range(101)],
                                                          wv_filter=[{1: -1, 2: 1, 3: 1}])
 
     # Push one carrier freq
-    scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
+    scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = wexp.ScanObject('detector', 'detection_range', id=0, coeff=1.0)
     scan_range_a = [0.0001 * i for i in range(101)]
-    scan_a = ws.experiment.abstractions.SpecScan(scan_objs=scan_obj_a, range=scan_range_a)
+    scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    experiment_a = ws.experiment.abstractions.VibExperiment(order=order, field=field_a,
-                                                            detector=detector_a,
-                                                            scans=[scan_a],
-                                                            magn_conditions=[[-1, 2]])
-    return experiment_a
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+
+def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstractions.VibExperiment:
+    """
+    Returns VibExperiment instance for an EVV experiment variant with pulse 1 and 2 coincident in time
+    """
+    import wilson_suite.wilson_experiment.experiment_abstractions as wexp
+
+    pulse_ir_1 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    pulse_ir_2 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
+
+    field_a = wexp.ElectricField(pulses)
+
+    detector_a = wexp.SpecDetector(detection_method='freq',
+                                   detector_location=(0.0, 0.0, 1.0),
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                   wv_filter=[{1: -1, 2: 1, 3: 1}])
+
+    # Push one carrier freq
+    scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = wexp.ScanObject('detector', 'detection_range', id=0, coeff=1.0)
+    scan_range_a = [0.0001 * i for i in range(101)]
+    scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+
+def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExperiment:
+    """
+    Returns VibExperiment instance for a CARS-like experiment where the (first) coherence is formed by a
+    hyper-Raman-like process and the emitted light further results from a Raman-like process
+    """
+    import wilson_suite.wilson_experiment.experiment_abstractions as wexp
+
+
+    pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(maxstr=1.0e-5, tc = 10.0, cf=0.0,
+                                                       cf_uv=0.072, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    pulse_uvvis_2 = wexp.make_impulsive_gaussian_pulse(maxstr=1.0e-5, tc = 10.0, cf=0.0,
+                                                       cf_uv=0.072, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_3 = wexp.make_impulsive_gaussian_pulse(maxstr=1.0e-5, tc = 10.0, cf=0.0,
+                                                       cf_uv=0.144, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulse_uvvis_4 = wexp.make_impulsive_gaussian_pulse(maxstr=1.0e-5, tc = 120.0, cf=0.0,
+                                                       cf_uv=0.072, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=4)
+
+
+    pulses = (pulse_uvvis_1, pulse_uvvis_2, pulse_uvvis_3, pulse_uvvis_4)
+
+    field_a = wexp.ElectricField(pulses)
+    order = len(pulses)
+
+    detector_a = wexp.SpecDetector(detection_method='freq',
+                                   detector_location=(0.0, 0.0, 1.0),
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                   wv_filter=[{1: 1, 2: 1, 3: -1, 4: 1}])
+
+    # Push one carrier freq
+    scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = wexp.ScanObject('detector', 'detection_range', id=0, coeff=1.0)
+    scan_range_a = [0.0001 * i for i in range(101)]
+    scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+
+    return wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
 def evv_terms() -> list[VibPerturbedTerm]:
     """
@@ -58,12 +129,14 @@ def get_eval_ready_evv_terms():
     import wilson_suite as ws
 
     experiment_a = evv_experiment()
-    terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
 
-    return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
+    print('valid ax combs', experiment_a.valid_axis_combs[0])
+    print('len valid ax combs', len(experiment_a.valid_axis_combs[0].valid_axis_combs))
+    return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[0].valid_axis_combs[3])
 
 def get_terms_from_json():
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
     return VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
 
