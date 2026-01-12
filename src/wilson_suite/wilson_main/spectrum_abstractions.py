@@ -272,9 +272,6 @@ class EvaluationInfo:
 	margins: dict = None
 	spectral_window: SpectralWindow = None
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
-	# Note (MR): spectral_axes is by itself probably more of a RenderingInfo attribute,
-	# but it seems better to have it here in EvaluationInfo since the spectral window
-	# (which is defined wrt. the axes) needs to be here
 	spectral_axes: SpectralAxisSet = None
 
 	@property

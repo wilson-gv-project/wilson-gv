@@ -19,8 +19,6 @@ def test_evaluation_general_customdata_1elterm():
 
     evv_exp = evv_experiment()
 
-    terms = get_fully_enhanced_terms(experiment=evv_exp)
-
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
@@ -31,9 +29,9 @@ def test_evaluation_general_customdata_1elterm():
                                                           'Gamma': 1., 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = terms
+    mock_sim.terms = get_fully_enhanced_terms(experiment=evv_exp)
 
-    mock_sim.exp = evv_experiment()
+    mock_sim.exp = evv_exp
 
     mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
@@ -106,8 +104,6 @@ def test_evaluation_general_customdata_1mechterm():
     terms = get_fully_enhanced_terms(experiment=evv_exp)
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
-    evv_terms =  ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axes_choice)
-
     bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     spectral_window = SpectralWindow(box=Box(bounds_dict))
@@ -118,7 +114,7 @@ def test_evaluation_general_customdata_1mechterm():
     mock_sim = WilsonSimulation()
     mock_sim.terms = terms
 
-    mock_sim.exp = evv_experiment()
+    mock_sim.exp = evv_exp
     mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
 
@@ -165,7 +161,6 @@ def test_evaluation_general_customdata_1mechterm():
                                                             mock_sim._workflow.artifacts.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
-
     assert np.allclose(r_res, ref_res)
     assert np.allclose(ref_res, mock_sim.spec['result'])
 

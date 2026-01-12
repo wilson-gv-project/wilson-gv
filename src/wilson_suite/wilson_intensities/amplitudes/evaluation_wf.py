@@ -122,7 +122,7 @@ def make_evaluation_inputs(
             )
 
         # Extract and normalize from simulation
-        spec_eval_setup = simulation.spec_eval_setup
+        spec_eval_setup = simulation.spec_eval_setup 
         # MR: Here assuming that spectral axes were set, so changed to use translated terms
         terms = simulation.terms_in_axis_choice
         number_of_modes = simulation.system.Nnmodes

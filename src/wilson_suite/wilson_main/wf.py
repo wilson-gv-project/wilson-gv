@@ -338,6 +338,9 @@ class WilsonSimulation:
 
     def evaluate(self):
         from ..wilson_intensities.amplitudes.evaluation_wf import make_evaluation_inputs
+        if self.axis_choice is None:
+            self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
+
         eval_inputs = make_evaluation_inputs(simulation=self)
         workflow = EvaluationWorkflow(inputs=eval_inputs)
         self._workflow = workflow
