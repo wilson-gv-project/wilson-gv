@@ -78,6 +78,45 @@ class WilsonSimulation:
 			# TODO: Implement functionality to set up class instance from file
 			pass
 
+	# ==================== Simple State Checks ====================
+
+	@property
+	def is_configured(self) -> bool:
+		"""Check if basic configuration is complete"""
+		return all([
+			self.exp is not None,
+			self.system is not None,
+			self.terms is not None,
+			self.vib_ana_setup is not None,
+			self.spec_eval_setup is not None
+		])
+
+	@property
+	def is_ready(self) -> bool:
+		"""Check if ready to evaluate (has properties with data)"""
+		# print(f'self.is_configured {self.is_configured}\nself.props is not None {self.props is not None}\nlen(self.props) > 0 {len(self.props) > 0}')
+		# print(f"for p in self.props: { {p.trivial_name: p.vals is not None for p in self.props} }") 
+		# print(f'self.vib_ana_setup.isAllSet {self.vib_ana_setup.isAllSet}')       
+		conds = {'not self.is_configured': self.is_configured , 
+				'not self.props is not None': self.props is not None , 
+				'not len(self.props) > 0': len(self.props) > 0 ,
+				f'p.trivial_name: p.vals is not None for p in self.props: {{p.trivial_name: p.vals is not None for p in self.props}}': all(p.vals is not None for p in self.props) ,
+				'not self.vib_ana_setup.isAllSet': self.vib_ana_setup.isAllSet}
+		final = True
+
+		for c in conds:
+			final &= conds[c]
+			if not conds[c]:
+				print(c)
+				return final
+
+		return final
+
+	@property
+	def has_spectrum(self) -> bool:
+		"""Check if spectrum has been evaluated"""
+		return self.spec is not None
+
 
 	def addExperiment(self, experiment: VibExperiment):
 		"""
@@ -282,6 +321,8 @@ class WilsonSimulation:
 		Evaluating method, using EvaluationWorkflow
 		"""
 		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
+		if self.axis_choice is None:
+			self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
 
 		# prepare data for input to EvaluationWorkflow
 		eval_inputs = make_evaluation_inputs(simulation=self)
