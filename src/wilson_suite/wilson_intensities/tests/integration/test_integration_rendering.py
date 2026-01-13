@@ -1,5 +1,6 @@
 import wilson_suite as ws
 import numpy as np
+np.set_printoptions(linewidth=280, precision=1)
 
 
 def test_full_integration():
@@ -9,8 +10,10 @@ def test_full_integration():
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # ?? why no other axes choice works?
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-
+    print()
+    evv_exp.valid_axis_combs[0].present_spectral_axis_choices()
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
@@ -35,13 +38,14 @@ def test_full_integration():
 
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     
-    bounds_dict = {'A': (0., 5000.), 'B': (0., 5000.)}
+    bounds_dict = {'A': (1000., 3100.), 'B': (-100., 2500.)}
 
     spectral_window = SpectralWindow(box=Box(bounds_dict))
 
     evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
-                                                          'Gamma': 4.7, 'Gamma_unit': 'cm-1',
-                                                          'grid_resolution': {'A': 7, 'B': 10}})
+                                                          'Gamma': 24.7, 'Gamma_unit': 'cm-1',
+                                                          'dynamic_range': 1000,
+                                                          'grid_resolution': {'A': 70, 'B': 100}})
     
     eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
@@ -57,9 +61,7 @@ def test_full_integration():
                                                       style_config=style_config)
     sim.spec_eval_setup.rnd_info = rnd
 
-    np.set_printoptions(linewidth=280, precision=1)
-
-    print(f"Mean: {np.mean(np.abs(sim.spec)**2):.3e}")
+    print(f"\nMean: {np.mean(np.abs(sim.spec)**2):.3e}")
     print(f"Standard Deviation: {np.std(np.abs(sim.spec)**2):.3e}")
     print(f"Minimum Value: {np.min(np.abs(sim.spec)**2):.3e}")
     print(f"Maximum Value: {np.max(np.abs(sim.spec)**2):.3e}")
@@ -122,9 +124,10 @@ def test_full_integration_H2O_molecule():
                                                       style_config=style_config)
     sim.spec_eval_setup.rnd_info = rnd
 
-    # feats_in_window = sim._workflow.artifacts.spec_window.full_features
-    # for i in [(f.feat_box, f.amplitude_coeff) for f in feats_in_window]:
-    #     print(i[0].bounds, i[1])
+    print(f"\nMean: {np.mean(np.abs(sim.spec)**2):.3e}")
+    print(f"Standard Deviation: {np.std(np.abs(sim.spec)**2):.3e}")
+    print(f"Minimum Value: {np.min(np.abs(sim.spec)**2):.3e}")
+    print(f"Maximum Value: {np.max(np.abs(sim.spec)**2):.3e}")
 
     sim.render(renderer=ws.analysis.render.render_spectrum)
 

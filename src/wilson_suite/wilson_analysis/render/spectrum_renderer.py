@@ -85,8 +85,7 @@ class PlotConfig:
     show_top_ticks: bool = False
     show_right_ticks: bool = False
     x_tick_rotation: float = 45  # Add this line for configurable rotation
-    colormap_spacing: str = None  # Options: "log", "power", "linear"
-    colormap_power: float = 0.5    # For power-law spacing; Adjust this value to change color distribution
+    colormap_spacing: str = "log"  # Options: "log", "linear"
 
 class LevelCalculator:
     """
@@ -97,57 +96,22 @@ class LevelCalculator:
     """
 
     @staticmethod
-    def compute_levels(d_max: float, dynamic_range: float, nlevels: int, log10: bool = True,
-                  colormap_spacing: str = None, 
-                  colormap_power: float = 0.5) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
+    def compute_levels(intensities: float, dynamic_range: float, 
+                       nlevels: int, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
+        d_max = np.max(intensities)
         d_min = d_max / dynamic_range
-
-        if not log10:
-
+        
+        if colormap_spacing == "log":
+            level_values = np.logspace(np.log10(d_min), np.log10(d_max), nlevels)
+        
+        elif colormap_spacing == "linear":
             level_values = np.linspace(d_min, d_max, nlevels)
-            level_labels = [f"${val:.1e}$" for val in level_values]
-
-            return level_values, level_labels, None, None
-        
         else:
-            log_min = np.log10(d_min)
-            log_max = np.log10(d_max)
+            raise ValueError('Choose log or linear colormap_spacing')
+        level_labels = [f"${val:.1e}$" for val in level_values]
 
-            if colormap_spacing == "log":
-                # Linear spacing in log scale
-                log_space = np.linspace(log_min, log_max, nlevels)
-                # back to linear scale
-                level_values = np.power(10, log_space)
-
-            elif colormap_spacing == "linear":
-                # Linear spacing in original scale
-                level_values = np.linspace(d_min, d_max, nlevels)
-                # calculate corresponding log space points
-                log_space = np.log10(level_values)
-        
-            elif colormap_spacing == "power":
-                # Power-law spacing for more uniform color distribution
-                power_space = np.power(np.linspace(0, 1, nlevels), colormap_power)
-                log_space = log_min + (log_max - log_min) * power_space
-                # back to linear scale
-                level_values = np.power(10, log_space)
-        
-            else:  # default to log spacing
-                log_space = np.linspace(log_min, log_max, nlevels)
-                level_values = np.power(10, log_space)
-
-            # Format original value labels
-            level_labels = [f"${val:.1e}$" for val in level_values]
-                    
-            # Normalize in log space to preserve logarithmic spacing
-            norm_positions = (log_space - log_min) / (log_max - log_min)
-            norm_labels = [f"{val:.2f}" for val in norm_positions]
-            
-            logger.debug(f"Computed levels: {level_values}, labels: {level_labels}, "
-                        f"normalized positions: {norm_positions}, normalized labels: {norm_labels}")
-            
-            return level_values, level_labels, norm_positions, norm_labels
+        return level_values, level_labels
 
 
 class SpectrumRenderer(ABC):
@@ -257,13 +221,11 @@ class SpectrumRenderer(ABC):
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
         log10 = True if self.rnd_info.intensity_normalization_type is not None else False
         # Calculate levels with both original and normalized scales
-        levels, labels, _, _ = self.level_calc.compute_levels(
-            log10=log10,
-            d_max=np.max(self.intensities),
+        levels, labels = self.level_calc.compute_levels(
+            intensities=self.intensities,
             dynamic_range=self.ev_info.dynamic_range,
             nlevels=self.rnd_info.nlevels,
-            colormap_spacing=self.config.colormap_spacing,
-            colormap_power=self.config.colormap_power
+            colormap_spacing=self.config.colormap_spacing
         )
         self.levels = levels
         self.labels = labels
