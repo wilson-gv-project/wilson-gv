@@ -168,7 +168,7 @@ def test_full_integration():
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
-    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
@@ -235,6 +235,10 @@ def test_full_integration():
     plt.colorbar(label='log intensity')
     #plt.show()
 
+def test_smth():
+    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
+    q = unpickle_smth_from('eval_wf.pkl')
+    print(q)
 
 def test_full_integration_H2O_molecule():
     print()

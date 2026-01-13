@@ -278,7 +278,9 @@ class EvaluationWorkflow:
                                                                   lineshape_parameter=gamma)
             with self.step("place_in_specwindow"):
                 self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
-            
+                if not self.artifacts.spec_window.full_features:
+                    raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
+                
             # self._save_checkpoint('Step3')  # Save checkpoint
 
             # Part 4: Grid management and region evaluation
@@ -288,6 +290,8 @@ class EvaluationWorkflow:
 
             with self.step("make_regions"):
                 self.artifacts.regions = self.artifacts.grid_manager.create_regions()
+                if not self.artifacts.regions:
+                    raise ValueError("No regions were created")
 
             with self.step("regions_results"):
                 if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
@@ -312,8 +316,12 @@ class EvaluationWorkflow:
             return self.artifacts.grid_manager.full_grid
             
         except Exception as e:
+            from wilson_suite.wilson_utils.serialization import pickle_this_to
+            filename_pkl = 'eval_wf.pkl'
+            pickle_this_to(self.__dict__, filename_pkl)
+            
             raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e}"
+                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
             ) from e
  
     def _save_checkpoint(self, name: str):
