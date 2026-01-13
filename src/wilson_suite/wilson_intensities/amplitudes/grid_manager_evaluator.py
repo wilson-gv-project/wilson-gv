@@ -77,7 +77,8 @@ class GridManager:
             List of GridRegion objects
         """
         formal_domains = self.spec_window.find_clusters_by_featboxes()
-        
+        if not formal_domains:
+            raise ValueError("spec_window.find_clusters_by_featboxes() returned an empty tuple")
         if self.full_grid is None:
             raise ValueError("full_grid is None in this GridManager")
         
@@ -122,7 +123,8 @@ class GridManager:
 
         if self.full_grid is None:
             raise ValueError("Must call create_regions() before place_results_into_grid()")
-        
+        if not results:
+            raise ValueError("No results to be placed in the grid")
         # Get shape from any axis array
         first_axis = next(iter(self.full_grid.values()))
         

@@ -349,6 +349,14 @@ class ParameterSet(Mapping[str, int]):
         repr_d = {k: v for k, v in self._parameters.items() if k != 'zero'}
         return f"{self.__class__.__name__}({repr_d})"
 
+    # --- Pickle support ---
+    def __getstate__(self):
+        # Return plain dict instead of mappingproxy
+        return {'_parameters': dict(self._parameters)}
+
+    def __setstate__(self, state):
+        object.__setattr__(self, "_parameters", MappingProxyType(state['_parameters']))
+
 @dataclass
 class VibStatesData:
     """

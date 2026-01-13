@@ -426,8 +426,6 @@ class SpectralWindow:
         from . import domains
         clusters = domains.features_to_clusters(features=all_features)
 
-        # validation (optional, see note below)
-
         return tuple(
             RectangularDomain.from_features(clusters[c])
             for c in clusters

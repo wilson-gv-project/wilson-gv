@@ -332,11 +332,7 @@ class WilsonSimulation:
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
-		try:
-			wf_result = workflow.run()
-		except Exception as e:
-			print(e)
-			raise type(e)() from e
+		wf_result = workflow.run()
 
 		if self.diagn is None:
 			self.diagn = {}
