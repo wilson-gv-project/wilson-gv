@@ -1,4 +1,5 @@
 import numpy as np
+from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 
 
 import logging

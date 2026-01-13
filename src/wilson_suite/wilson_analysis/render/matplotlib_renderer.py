@@ -95,8 +95,6 @@ class MatplotlibRenderer(SpectrumRenderer):
         # Set up axes labels
         label_fontsize = self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25
 
-        # xlabel_str = spectral_axis_to_label(self.spec_grid.get('x')[0]) if self.spec_grid else r'$default x /2\pi c, \text{cm}^{-1}$'
-        # ylabel_str = spectral_axis_to_label(self.spec_grid.get('y')[0]) if self.spec_grid else r'$default y /2\pi c, \text{cm}^{-1}$'
         xlabel_str = self.xyz_labels.get('x', r'$default x /2\pi c, \text{cm}^{-1}$')
         ylabel_str = self.xyz_labels.get('y', r'$default y /2\pi c, \text{cm}^{-1}$')
 
