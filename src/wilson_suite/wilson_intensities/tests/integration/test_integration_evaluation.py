@@ -11,8 +11,7 @@ def test_evaluation_general_customdata_1elterm():
     
     np.set_printoptions(linewidth=180, precision=3)
 
-    from wilson_suite.wilson_main.wf import WilsonSimulation
-    # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 
     from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
@@ -91,8 +90,7 @@ def test_evaluation_general_customdata_1mechterm():
     
     np.set_printoptions(linewidth=180, precision=3)
 
-    from wilson_suite.wilson_main.wf import WilsonSimulation
-    # from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
+    from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 
     from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
@@ -177,9 +175,6 @@ def test_full_integration():
                                                      basis_set='cc-pVQZ', 
                                                      base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
-    from wilson_suite.wilson_main.wf import WilsonSimulation
-    sim = WilsonSimulation()
-
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
     sim.addTerms(terms=terms) # terms
@@ -254,9 +249,6 @@ def test_full_integration_H2O_molecule():
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
                                                      base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
-
-    from wilson_suite.wilson_main.wf import WilsonSimulation
-    sim = WilsonSimulation()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
