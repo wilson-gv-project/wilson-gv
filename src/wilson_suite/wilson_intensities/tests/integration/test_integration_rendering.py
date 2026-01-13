@@ -81,9 +81,6 @@ def test_full_integration_H2O_molecule():
                                                      basis_set='STO-3G', 
                                                      base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
 
-    from wilson_suite.wilson_main.wf import WilsonSimulation
-    sim = WilsonSimulation()
-
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
     sim.addTerms(terms=terms) # terms
