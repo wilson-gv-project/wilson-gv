@@ -57,38 +57,55 @@ def test_SpectrumRenderer():
 def test_LevelCalculator():
     dmax = 1000.
     dyn_range = 10
-    log10 = False
+    log10 = False # original values, linear spacing
+    nlevels=5
 
-
-    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+    levels, labels, norm_positions, norm_labels = LevelCalculator().compute_levels(d_max=dmax,
                                                             dynamic_range=dyn_range,
-                                                            nlevels=5,
+                                                            nlevels=nlevels,
                                                             log10=log10)
-
-    assert np.allclose(levels, np.array([ 10., 32.5,  55., 77.5, 100.]))
-    assert labels == ['$1.0e+01$', '$3.2e+01$', '$5.5e+01$', '$7.8e+01$', '$1.0e+02$']
+    assert np.allclose(levels, np.array([ 100.,  325.,  550.,  775., 1000.]))
+    assert labels == ['$1.0e+02$', '$3.2e+02$', '$5.5e+02$', '$7.8e+02$', '$1.0e+03$']
+    assert norm_positions is None
+    assert norm_labels is None
     
-    log10 = True
-    cm_spacing = 'linear'
-    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+    log10 = True # log10 values
+    cm_spacing = 'linear' # linear spacing of original level vals
+    levels, labels, norm_positions, norm_labels = LevelCalculator().compute_levels(d_max=dmax,
                                                             dynamic_range=dyn_range,
-                                                            nlevels=5,
+                                                            nlevels=nlevels,
                                                             log10=log10,
                                                             colormap_spacing=cm_spacing)
-    print()
-    print(levels)
-    print(labels)
+    assert np.allclose(levels, np.array([ 100.,  325.,  550.,  775., 1000.]))
+    assert labels == ['$1.0e+02$', '$3.2e+02$', '$5.5e+02$', '$7.8e+02$', '$1.0e+03$']
 
+    ref_norm_log10_lin = (np.log10(levels) - np.log10(dmax/dyn_range)) / (np.log10(dmax) - np.log10(dmax/dyn_range))
+    assert np.allclose(ref_norm_log10_lin, np.array([0. , 0.51188336, 0.74036269, 0.8893017 , 1.]))
+    assert np.allclose(norm_positions, np.array([0. , 0.51188336, 0.74036269, 0.8893017 , 1.]))
+    assert np.allclose(ref_norm_log10_lin, norm_positions)
+    
+    
     log10 = True
-    cm_spacing = 'power'
-    cm_power = 0.1
-    levels, labels, _, _ = LevelCalculator().compute_levels(d_max=dmax,
+    cm_spacing = 'log' # Linear spacing in log scale with values back to linear scale
+    levels, labels, norm_positions, norm_labels = LevelCalculator().compute_levels(d_max=dmax,
                                                             dynamic_range=dyn_range,
-                                                            nlevels=5,
+                                                            nlevels=nlevels,
                                                             log10=log10,
-                                                            colormap_spacing=cm_spacing,
-                                                            colormap_power=cm_power)
-
+                                                            colormap_spacing=cm_spacing)
+    # linspace of powers of 10
+    lvls = np.linspace(np.log10(dmax/dyn_range), np.log10(dmax), nlevels)
+    assert np.allclose(lvls, np.array([2.,  2.25, 2.5,  2.75, 3. ]))
+    assert np.allclose(levels, np.power(10, lvls))
+    assert np.allclose(levels, np.array([ 100.,  177.827941, 316.22776602, 562.34132519, 1000. ]))
+    
+    ref_norm_log10_log = (np.log10(levels) - np.log10(dmax/dyn_range)) / (np.log10(dmax) - np.log10(dmax/dyn_range))
+    ref = (np.log10(levels) - np.log10(np.min(levels))) / (np.log10(np.max(levels)) - np.log10(np.min(levels)))
+    print(ref)
+    print(np.log10(levels))
+    print(np.log10(levels) - np.log10(np.min(levels)))
+    assert np.allclose(ref_norm_log10_log, np.array([0., 0.25, 0.5 , 0.75, 1. ]))
+    assert np.allclose(norm_positions, ref_norm_log10_log)
+    assert norm_labels == ['0.00', '0.25', '0.50', '0.75', '1.00']
 
 
 def test_NormalizationType():
@@ -103,9 +120,12 @@ def test_NormalizationType():
     method = NormalizationType(method_name)
     print(method)
 
-    # method_name = "smth"
-    # method = NormalizationType(method_name)
-    # print(method)
+    with pytest.raises(ValueError) as excinfo:
+        method_name = "smth"
+        method = NormalizationType(method_name)
+        print(method)
+    assert 'is not a valid NormalizationType' in str(excinfo.value)
+
 
 def test_PlotConfig():
     PlotConfig()

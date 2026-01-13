@@ -286,7 +286,7 @@ class RenderingInfo:
 	projection: str = '2d'
 	reference_max: float = None
 	nlevels: int = 12
-	intensity_normalization_type: str = 'log_scale'
+	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
 	title: str = 'plot'
 	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
 	metadata: dict = field(default_factory=lambda: dict())

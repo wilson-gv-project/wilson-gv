@@ -262,7 +262,6 @@ class SpectrumRenderer(ABC):
             d_max=np.max(self.intensities),
             dynamic_range=self.ev_info.dynamic_range,
             nlevels=self.rnd_info.nlevels,
-            ref_max=self.rnd_info.reference_max,
             colormap_spacing=self.config.colormap_spacing,
             colormap_power=self.config.colormap_power
         )
