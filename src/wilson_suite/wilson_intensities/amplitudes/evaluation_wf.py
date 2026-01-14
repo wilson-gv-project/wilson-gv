@@ -318,7 +318,7 @@ class EvaluationWorkflow:
         except Exception as e:
             from wilson_suite.wilson_utils.serialization import pickle_this_to
             filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self.__dict__, filename_pkl)
+            pickle_this_to(self, filename_pkl)
             
             raise type(e)(
                 f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
