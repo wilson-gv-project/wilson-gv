@@ -95,19 +95,23 @@ class PlotConfig:
         if self.tick_step < 0:
             raise ValueError("Negative tick_step was provided")
         
-        if not isinstance(float(self.x_min), float):
-            raise TypeError("x_min needs to be given a float")
-        self.x_min = float(self.x_min)
-        if not isinstance(float(self.y_min), float):
-            raise TypeError("y_min needs to be given a float")
-        self.y_min = float(self.y_min)
+        if self.x_min is not None:
+            if not isinstance(float(self.x_min), float):
+                raise TypeError("x_min needs to be given a float")
+            self.x_min = float(self.x_min)
+        if self.y_min is not None:
+            if not isinstance(float(self.y_min), float):
+                raise TypeError("y_min needs to be given a float")
+            self.y_min = float(self.y_min)
         
-        if not isinstance(float(self.x_max), float):
-            raise TypeError("x_max needs to be given a float")
-        self.x_max = float(self.x_max)
-        if not isinstance(float(self.y_max), float):
-            raise TypeError("y_max needs to be given a float")
-        self.y_max = float(self.y_max)
+        if self.x_max is not None:
+            if not isinstance(float(self.x_max), float):
+                raise TypeError("x_max needs to be given a float")
+            self.x_max = float(self.x_max)
+        if self.y_max is not None:
+            if not isinstance(float(self.y_max), float):
+                raise TypeError("y_max needs to be given a float")
+            self.y_max = float(self.y_max)
 
 
 class LevelCalculator:
@@ -143,6 +147,8 @@ class SpectrumRenderer(ABC):
     
     PlotConfig instance would normally be stored in the RenderingInfo instance
     but can be provided as config parameter
+
+    spec_data - amplitudes data from evaluation procedure
     """
     
     def __init__(self, 
@@ -236,12 +242,45 @@ class SpectrumRenderer(ABC):
         elif len(self.spec_grid)==2:
             self.Xdata, self.Ydata = list(self.spec_grid.values())
 
+    def validate_inputs(self):
+        if not isinstance(self.spec_data, np.ndarray):
+            raise TypeError("spec_data should be a np.ndarray")
+        if self.spec_data.size == 0:
+            raise ValueError("spec_data array should not be empty")
+        if not isinstance(self.spec_grid, dict):
+            raise TypeError("spec_grid should be a dictionary with X,Y,(Z) data")
+
+        for key, val in self.spec_grid.items():
+            if not isinstance(val, np.ndarray):
+                raise TypeError(f"spec_grid[{key!r}] is not a np.ndarray")
+            if val.size == 0:
+                raise ValueError(f"spec_grid[{key!r}] is an empty array")
+
+
+    def validate_data_2d(self):
+        if self.Xdata is None:
+            raise ValueError("Xdata was not set")
+        if self.Ydata is None:
+            raise ValueError("Ydata was not set")
+
+        if self.intensities.ndim != 2:
+            raise ValueError("intensities in renderer must be a 2D array")
+
+        if self.Xdata.shape != self.intensities.shape or self.Ydata.shape != self.intensities.shape:
+            raise ValueError("X,Y and intensities data do not match in shape:\n"
+                             f"  x.shape = {self.Xdata.shape}\n"
+                             f"  y.shape = {self.Ydata.shape}\n"
+                             f"  z.shape = {self.intensities.shape}\n"
+                             )
 
     def render(self, filename: str) -> None:
         """Main rendering pipeline"""
+        self.validate_inputs()
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+        self.validate_data_2d()
+
         log10 = True if self.rnd_info.intensity_normalization_type is not None else False
         # Calculate levels with both original and normalized scales
         levels, labels = self.level_calc.compute_levels(
