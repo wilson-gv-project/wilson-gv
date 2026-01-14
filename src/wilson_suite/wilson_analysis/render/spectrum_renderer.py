@@ -87,6 +87,29 @@ class PlotConfig:
     x_tick_rotation: float = 45  # Add this line for configurable rotation
     colormap_spacing: str = "log"  # Options: "log", "linear"
 
+    def __post_init__(self):
+        if not isinstance(self.figsize, tuple):
+            raise TypeError("figsize needs to be given as a tuple")
+        if any(i < 0 for i in self.figsize):
+            raise ValueError("Negative figsize was provided")
+        if self.tick_step < 0:
+            raise ValueError("Negative tick_step was provided")
+        
+        if not isinstance(float(self.x_min), float):
+            raise TypeError("x_min needs to be given a float")
+        self.x_min = float(self.x_min)
+        if not isinstance(float(self.y_min), float):
+            raise TypeError("y_min needs to be given a float")
+        self.y_min = float(self.y_min)
+        
+        if not isinstance(float(self.x_max), float):
+            raise TypeError("x_max needs to be given a float")
+        self.x_max = float(self.x_max)
+        if not isinstance(float(self.y_max), float):
+            raise TypeError("y_max needs to be given a float")
+        self.y_max = float(self.y_max)
+
+
 class LevelCalculator:
     """
     Handles calculation of contour levels and normalization
