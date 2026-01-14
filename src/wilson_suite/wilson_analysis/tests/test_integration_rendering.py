@@ -5,7 +5,7 @@ np.set_printoptions(linewidth=280, precision=1)
 
 def test_full_integration():
     print()
-    from ....fixtures import evv_experiment
+    from ...fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
@@ -70,7 +70,7 @@ def test_full_integration():
 
 def test_full_integration_other_axes_choice():
     print()
-    from ....fixtures import evv_experiment
+    from ...fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
@@ -130,7 +130,7 @@ def test_smth():
 
 def test_full_integration_H2O_molecule():
     print()
-    from ....fixtures import evv_experiment
+    from ...fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
