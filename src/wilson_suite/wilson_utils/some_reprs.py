@@ -57,7 +57,8 @@ def show_term_latex(term: VibPerturbedTerm, part_of_term: str = None, output=Fal
     
 def make_SpectralAxisSet(axes_set_dict: dict[str,list[tuple]]) -> SpectralAxisSet:
     """
-    axes_set_dict: {'A': [(-1,), (-1, 2)], 'B'}
+    axes_set_dict: {'A': [-1], 'B': [-1, 2]} - lists are sufficient here because each element of the list will be in a SignedPulseTuple
+
     """
     axes = tuple(SpectralAxis(label=label, var_set=make_IndependentVariableSet(vars)) for label, vars in axes_set_dict.items())
     return SpectralAxisSet(axes=axes)
