@@ -49,10 +49,25 @@ def test_SpectrumRenderer():
     assert "SpectrumRenderer.render() missing 1 required positional argument" in str(excinfo.value)
     
     # test5
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
         renderer = ConcreteSpectrumRenderer(spec_data='smth', spec_grid='smth', ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
         renderer.render('f')
-    assert "Unsupported spec_data_operations" in str(excinfo.value)
+    assert "spec_data should be a np.ndarray" in str(excinfo.value)
+    
+    with pytest.raises(ValueError) as excinfo:
+        renderer = ConcreteSpectrumRenderer(spec_data=np.array([]), spec_grid='smth', ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
+        renderer.render('f')
+    assert "spec_data array should not be empty" in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        renderer = ConcreteSpectrumRenderer(spec_data=np.array([2]), spec_grid='smth', ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
+        renderer.render('f')
+    assert "spec_grid should be a dictionary with X,Y,(Z) data" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        renderer = ConcreteSpectrumRenderer(spec_data=np.array([2]), spec_grid={}, ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
+        renderer.render('f')
+    assert "Unsupported spec_data_operations:" in str(excinfo.value)
 
 def test_LevelCalculator():
     dmax = 1000.

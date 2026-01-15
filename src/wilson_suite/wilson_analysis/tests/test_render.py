@@ -18,7 +18,6 @@ def test_render_spectrum_simplecontour():
     y_vals = np.linspace(start, stop, n_values)
     X, Y = np.meshgrid(x_vals, y_vals)
     spec = X**2 + Y**2
-    print('\n', spec)
 
     rndinfo = RenderingInfo(intensity_normalization_type=None, 
                             spec_data_operations='none', nlevels=6,
@@ -60,9 +59,8 @@ def test_render_spectrum_simplecontour():
 
     # test6 - success
     r, diagn = render_spectrum(**context)
-
-    assert np.allclose(diagn['renderer'].levels, np.array([ 1.6 ,  7.68, 13.76, 19.84, 25.92, 32.  ]))
-    assert diagn['renderer'].labels == ['$1.6e+00$', '$7.7e+00$', '$1.4e+01$', '$2.0e+01$', '$2.6e+01$', '$3.2e+01$']
+    assert np.allclose(diagn['renderer'].levels, np.array([ 1.6,  2.9129,  5.3031,  9.6547, 17.577 , 32.]))
+    assert diagn['renderer'].labels == ['$1.6e+00$', '$2.9e+00$', '$5.3e+00$', '$9.7e+00$', '$1.8e+01$', '$3.2e+01$']
 
     # test7
     cntx = copy.deepcopy(context)
@@ -83,7 +81,6 @@ def test_render_spectrum_simplecontour_sq():
     y_vals = np.linspace(start, stop, n_values)
     X, Y = np.meshgrid(x_vals, y_vals)
     spec = np.sqrt(X**2 + Y**2)
-    print('\n', spec)
 
     rndinfo = RenderingInfo(intensity_normalization_type=None, 
                             spec_data_operations='abs()**2', nlevels=6,
@@ -98,5 +95,5 @@ def test_render_spectrum_simplecontour_sq():
     # test - success
     r, diagn = render_spectrum(**context)
     
-    assert np.allclose(diagn['renderer'].levels, np.array([ 1.6 ,  7.68, 13.76, 19.84, 25.92, 32.  ]))
-    assert diagn['renderer'].labels == ['$1.6e+00$', '$7.7e+00$', '$1.4e+01$', '$2.0e+01$', '$2.6e+01$', '$3.2e+01$']
+    assert np.allclose(diagn['renderer'].levels, np.array([ 1.6,  2.9129,  5.3031,  9.6547, 17.577 , 32.]))
+    assert diagn['renderer'].labels == ['$1.6e+00$', '$2.9e+00$', '$5.3e+00$', '$9.7e+00$', '$1.8e+01$', '$3.2e+01$']
