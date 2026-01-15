@@ -127,8 +127,14 @@ class LevelCalculator:
                        nlevels: int, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
         d_max = np.max(intensities)
-        d_min = d_max / dynamic_range
+        if d_max <= 0:
+            raise ValueError(
+                "Logarithmic colormap requested, but data contains no positive values "
+                f"(max={d_max})."
+            )
         
+        d_min = d_max / dynamic_range
+
         if colormap_spacing == "log":
             level_values = np.logspace(np.log10(d_min), np.log10(d_max), nlevels)
         
@@ -138,9 +144,16 @@ class LevelCalculator:
             raise ValueError('Choose log or linear colormap_spacing')
         level_labels = [f"${val:.1e}$" for val in level_values]
 
+        LevelCalculator._validate_levels(level_values)
+
         return level_values, level_labels
 
-
+    @staticmethod
+    def _validate_levels(levels):
+        "copy from matplotlib"
+        if len(levels) > 1 and np.min(np.diff(levels)) <= 0.0:
+            raise ValueError("Contour levels must be increasing")
+        
 class SpectrumRenderer(ABC):
     """
     Abstract base class for spectrum rendering
@@ -242,7 +255,7 @@ class SpectrumRenderer(ABC):
         elif len(self.spec_grid)==2:
             self.Xdata, self.Ydata = list(self.spec_grid.values())
 
-    def validate_inputs(self):
+    def _validate_inputs(self):
         if not isinstance(self.spec_data, np.ndarray):
             raise TypeError("spec_data should be a np.ndarray")
         if self.spec_data.size == 0:
@@ -257,7 +270,7 @@ class SpectrumRenderer(ABC):
                 raise ValueError(f"spec_grid[{key!r}] is an empty array")
 
 
-    def validate_data_2d(self):
+    def _validate_data_2d(self):
         if self.Xdata is None:
             raise ValueError("Xdata was not set")
         if self.Ydata is None:
@@ -273,13 +286,13 @@ class SpectrumRenderer(ABC):
                              f"  z.shape = {self.intensities.shape}\n"
                              )
 
-    def render(self, filename: str) -> None:
+    def render(self, filename: str):
         """Main rendering pipeline"""
-        self.validate_inputs()
+        self._validate_inputs()
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
-        self.validate_data_2d()
+        self._validate_data_2d()
 
         log10 = True if self.rnd_info.intensity_normalization_type is not None else False
         # Calculate levels with both original and normalized scales
@@ -289,6 +302,7 @@ class SpectrumRenderer(ABC):
             nlevels=self.rnd_info.nlevels,
             colormap_spacing=self.config.colormap_spacing
         )
+        
         self.levels = levels
         self.labels = labels
 
