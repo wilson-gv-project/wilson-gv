@@ -291,8 +291,6 @@ class ResonanceCondition:
         # reversing sign
         upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in pf]
         pf_string = ''.join(upd_pf_sign)
-        if pf_string.startswith('+'):
-            pf_string = pf_string[1:]
         return rf'(\omega_{{{self.diff.to_latex()}}} {pf_string})'
 
     def h(self) -> int:
