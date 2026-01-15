@@ -2,6 +2,8 @@ import numpy as np
 from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 from wilson_suite.wilson_main.spectrum_abstractions import EvaluationInfo, RenderingInfo
 import pytest
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
+import os
 
 import logging
 logger = logging.getLogger(__name__)
@@ -91,9 +93,6 @@ def test_render_returns():
     rnd_info.spec_data_operations = 'abs()**2'
     ev_info = EvaluationInfo(dynamic_range=1000)
     
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    print(SUITE_ROOT)
-    
     fig, ax, contour, cbar = MatplotlibRenderer(spec_data=spec, 
                                                 spec_grid=spec_grid, 
                                                 ev_info=ev_info, rnd_info=rnd_info, 
@@ -130,3 +129,6 @@ def test_render_returns():
         tol=2.0  # allow small numerical differences
     )
     assert diff is None, diff # if diff is not None, show diff as the error message
+    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
+    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref_svg.png')
