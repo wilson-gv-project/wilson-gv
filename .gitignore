@@ -1,10 +1,12 @@
 *.svg
+*.png
 *.npy
 *.pkl
 *.json
 *.log
 
 !terms_fuller_flat.json
+!src/wilson_suite/wilson_analysis/tests/f_ref.svg
 
 .VSCodeCounter/
 

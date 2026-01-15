@@ -58,11 +58,75 @@ def tests_MatplotlibRenderer():
                         do_diagn=True).render('f0.svg')
     assert "X,Y and intensities data do not match in shape:" in str(error.value)
     
-    x,y = np.array([1, 2, 3, 4, 5]), np.array([4, 5, 6, 8, 9])
-    X,Y = np.meshgrid(x,y,indexing='xy')
+    start, stop, n_values = -4, 4, 9
+    x_vals = np.linspace(start, stop, n_values)
+    y_vals = np.linspace(start, stop, n_values)
+    X, Y = np.meshgrid(x_vals, y_vals,indexing='xy')
+    spec = -(X**2 + Y**2)
+
 
     spec_grid = {'x': X, 'y': Y}
-    MatplotlibRenderer(spec_data=spec_data, 
-                spec_grid=spec_grid, 
-                ev_info=ev_info, rnd_info=rnd_info, 
-                do_diagn=True).render('f0.svg')
+    rnd_info = RenderingInfo(intensity_normalization_type=None, 
+                             spec_data_operations='none')
+    rnd_info.style_config.colormap_spacing = 'linear'
+
+    with pytest.raises(ValueError) as error:
+        MatplotlibRenderer(spec_data=spec, 
+                    spec_grid=spec_grid, 
+                    ev_info=ev_info, rnd_info=rnd_info, 
+                    do_diagn=True).render('f0.svg')
+    assert "Logarithmic colormap requested, but data contains no positive values" in str(error.value)
+
+
+def test_render_returns():
+    start, stop, n_values = -4, 4, 9
+    x_vals = np.linspace(start, stop, n_values)
+    y_vals = np.linspace(start, stop, n_values)
+    X, Y = np.meshgrid(x_vals, y_vals,indexing='xy')
+    spec = -(X**2 + Y**2)
+
+    spec_grid = {'xlabel': X, 'y_lbl': Y}
+    rnd_info = RenderingInfo(intensity_normalization_type=None, 
+                             spec_data_operations='none')
+    rnd_info.spec_data_operations = 'abs()**2'
+    ev_info = EvaluationInfo(dynamic_range=1000)
+    
+    from wilson_suite.wilson_utils.paths import SUITE_ROOT
+    print(SUITE_ROOT)
+    
+    fig, ax, contour, cbar = MatplotlibRenderer(spec_data=spec, 
+                                                spec_grid=spec_grid, 
+                                                ev_info=ev_info, rnd_info=rnd_info, 
+                                                do_diagn=True).render(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
+    import matplotlib
+    assert isinstance(fig, matplotlib.figure.Figure)
+    assert isinstance(ax, matplotlib.axes.Axes)
+
+    # contourf returns QuadContourSet
+    assert isinstance(contour, matplotlib.contour.QuadContourSet)
+
+    # colorbar
+    assert isinstance(cbar, matplotlib.colorbar.Colorbar)
+
+    assert ax.figure is fig
+    assert ax in fig.axes
+
+    assert ax.get_xlabel() == "xlabel"
+    assert ax.get_ylabel() == "y_lbl"
+
+    xmin, xmax = ax.get_xlim()
+    assert xmin < xmax
+    
+    assert contour.levels is not None
+    assert len(contour.levels) == 12
+    assert np.all(np.diff(contour.levels) > 0) # ascending order
+
+    from matplotlib.testing.compare import compare_images
+    # returns None when images are considered the same (within tolerance)
+    # returns a dict when images differ too much
+    diff = compare_images(
+        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg',
+        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref.svg',
+        tol=2.0  # allow small numerical differences
+    )
+    assert diff is None, diff
