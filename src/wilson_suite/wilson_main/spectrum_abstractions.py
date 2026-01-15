@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
-from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_analysis.render.render_utils import PlotConfig, NormalizationType
 from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 

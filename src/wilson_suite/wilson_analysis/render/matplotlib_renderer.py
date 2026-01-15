@@ -3,7 +3,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib
 
-from .spectrum_renderer import SpectrumRenderer, NormalizationType
+from .spectrum_renderer import SpectrumRenderer 
+from .render_utils import NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -16,16 +17,14 @@ class MatplotlibRenderer(SpectrumRenderer):
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
         
-        # Apply font settings
         matplotlib.rc('font', **self.config.font_dict)
         
-        # Create figure and axes with more appropriate margins
         fig = plt.figure(figsize=self.config.figsize)
         # Add axes with specific margins to ensure content fits
         ax = fig.add_axes([0.15, 0.15, 0.7, 0.75])  # [left, bottom, width, height]
         
         return fig, ax
-    
+
 
     def create_contour(self, 
                        plot_obj: Tuple[plt.Figure, plt.Axes], 
@@ -40,9 +39,7 @@ class MatplotlibRenderer(SpectrumRenderer):
         fig, ax = plot_obj
         
         # Create masked arrays
-        no_data_mask = np.isnan(data)
-        d_min = np.max(data) / self.ev_info.dynamic_range
-        below_range_mask = (~no_data_mask) & (data < d_min)
+        no_data_mask, below_range_mask = self._create_data_masks(data)
         
         # Setup base colormap
         cmap = plt.get_cmap(self.config.colormap).copy()

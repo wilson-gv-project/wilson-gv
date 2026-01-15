@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, NormalizationType, PlotConfig
+from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, compute_masks
+from wilson_suite.wilson_analysis.render.render_utils import NormalizationType, PlotConfig
 import pytest
 import numpy as np
 
@@ -37,11 +38,16 @@ def test_SpectrumRenderer():
         IncompleteRenderer()
     assert "without an implementation for abstract methods" in str(excinfo.value)
     
-    # test3
-    with pytest.raises(TypeError) as excinfo:
-        ConcreteSpectrumRenderer()
-    assert "SpectrumRenderer.__init__() missing 4 required positional arguments" in str(excinfo.value)
+    # test3 - No arguments provided
+    try:
+        renderer = ConcreteSpectrumRenderer()
+        assert renderer.spec_data is None
+        assert renderer.spec_grid is None
+        assert renderer.ev_info is None
+        assert renderer.rnd_info is None
 
+    except Exception as e:
+        pytest.fail(f"Unexpected exception raised: {e}")
     # test4
     with pytest.raises(TypeError) as excinfo:
         renderer = ConcreteSpectrumRenderer(spec_data='smth', spec_grid='smth', ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
@@ -64,10 +70,19 @@ def test_SpectrumRenderer():
         renderer.render('f')
     assert "spec_grid should be a dictionary with X,Y,(Z) data" in str(excinfo.value)
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
         renderer = ConcreteSpectrumRenderer(spec_data=np.array([2]), spec_grid={}, ev_info='smth', rnd_info=MockRndInfo(), do_diagn='smth')
         renderer.render('f')
-    assert "Unsupported spec_data_operations:" in str(excinfo.value)
+    assert "ev_info should be an instance of a class EvaluationInfo" in str(excinfo.value)
+
+    with pytest.raises(ValueError) as excinfo:
+        import wilson_suite.wilson_main.spectrum_abstractions as specabst
+        renderer = ConcreteSpectrumRenderer(spec_data=np.array([2]), spec_grid={}, 
+                                            ev_info=specabst.EvaluationInfo(), 
+                                            rnd_info=MockRndInfo(), 
+                                            do_diagn='smth')
+        renderer.render('f')
+    assert "Unsupported spec_data_operations" in str(excinfo.value)
 
 def test_LevelCalculator():
     dmax = 1000.
@@ -147,3 +162,14 @@ def test_PlotConfig():
                                       show_right_ticks=False,
                                       x_tick_rotation=45,
                                       colormap_spacing='log')
+
+def test_below_range_mask_logic():
+    data = np.array([
+        [0.0, 0.5],
+        [10.0, np.nan],
+    ])
+    no_data, below = compute_masks(data, dynamic_range=10)
+
+    assert no_data[1, 1]
+    assert below[0, 0]
+    assert not below[1, 0]
