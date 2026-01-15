@@ -285,8 +285,13 @@ class ResonanceCondition:
         print('----')
 
     def to_latex(self):
-        upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in self.pf]
-        return rf'(\omega_{{{self.diff.to_latex()}}} {''.join(upd_pf_sign)})'
+        pf = self.pf
+        if all(isinstance(i, int) for i in self.pf):
+            pf = [str(i) for i in self.pf]
+        # reversing sign
+        upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in pf]
+        pf_string = ''.join(upd_pf_sign)
+        return rf'(\omega_{{{self.diff.to_latex()}}} {pf_string})'
 
     def h(self) -> int:
         """
