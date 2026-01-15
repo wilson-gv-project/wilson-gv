@@ -129,4 +129,4 @@ def test_render_returns():
         SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref.svg',
         tol=2.0  # allow small numerical differences
     )
-    assert diff is None, diff
+    assert diff is None, diff # if diff is not None, show diff as the error message
