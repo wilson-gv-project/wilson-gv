@@ -99,6 +99,21 @@ def test_getting_data():
     unpkl_compl_data = ws.utils.serialization.unpickle_smth_from(filepath)
     assert_equal(unpkl_compl_data, compl_data)
 
+    # ---- workflow getResults
+    sim.addPropEvalSetup(eval_uniform=calc_setup)
+    sim.setPropsAndMaxStateLvl()
+    sim.dressPropsWithSetup()
+
+    filepath_wf = SUITE_ROOT+'/wilson_suite/wilson_utils/tests'+ 'myfile.pkl'
+    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename=filepath_wf)
+
+    # for requestData to have reset values for props and residual_vib_info
+    sim.dressPropsWithSetup()
+    
+    compl_data_wf = wilson_data_obtainer(sim.requestData())
+    unpkl_compl_data_wf = ws.utils.serialization.unpickle_smth_from(filepath_wf)
+    assert_equal(unpkl_compl_data_wf, compl_data_wf)
+
 
 def assert_equal(a, b):
     """
