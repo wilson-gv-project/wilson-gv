@@ -7,6 +7,14 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
 
 
     """
+    if isinstance(requested_data_dict, dict):
+        for k, v in requested_data_dict.items():
+            if isinstance(v, DataOriginInfo):
+                continue
+            else:
+                raise TypeError("requested_data_dict should be dict[str,DataOriginInfo]")
+    else:
+        raise TypeError("requested_data_dict should be dict[str,DataOriginInfo]")
     dict_with_data = {}
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
@@ -65,11 +73,11 @@ def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtai
     
     if '.' not in filename:
         filename += '.' + format
+    
     if format == 'json':
-        
-        save_datadict_json(dict_with_data, filename+'.json')
+        save_datadict_json(dict_with_data, filename)
     elif format == 'pkl':
-        save_datadict_pkl(dict_with_data, filename+'.pkl')
+        save_datadict_pkl(dict_with_data, filename)
 
 
 def save_datadict_json(dict_with_data: dict, filename: str):
