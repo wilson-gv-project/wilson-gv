@@ -47,14 +47,34 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
             #     c) Header info plus locator for values in formats a) or b)
 
         else:
-            raise AssertionError('Unsupported source type for data obtainer')
-    # print('\nrequested', requested_data_dict.keys())
-    # print('\nanharmonic_states', requested_data_dict['anharmonic_states'])
+            raise ValueError('Unsupported source type for data obtainer')
 
-    # print('\ndict_with_data nanharmonic_states', dict_with_data['anharmonic_states'])
     return dict_with_data
 
 
-def test_do():
-    dict_with_data = {'cff': DataOriginInfo(lvl_theory='B3LYP'), 
-                      'qff': DataOriginInfo(lvl_theory='CCSD')}
+def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtained_data_dict'):
+    """
+    Saving data wrapper function
+    
+    :param dict_with_data: return dict from wilson_data_obtainer
+    :param format: options are json or pkl
+    :param filename: filename with or without extention; if no extention - will be added as `.format` value
+    """
+    if format not in ['json', 'pkl']:
+        raise NotImplementedError("Cannot save this file format")
+    
+    if '.' not in filename:
+        filename += '.' + format
+    if format == 'json':
+        
+        save_datadict_json(dict_with_data, filename+'.json')
+    elif format == 'pkl':
+        save_datadict_pkl(dict_with_data, filename+'.pkl')
+
+
+def save_datadict_json(dict_with_data: dict, filename: str):
+    raise NotImplementedError("Need to be able to handle non-serializable dicts, and that's not implemented")
+
+def save_datadict_pkl(dict_with_data: dict, filename: str):
+    from wilson_suite.wilson_utils.serialization import pickle_this_to
+    pickle_this_to(dict_with_data, filename)

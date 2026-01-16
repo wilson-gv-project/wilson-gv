@@ -1,5 +1,6 @@
 import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
+import numpy as np
 
 def test_getting_data():
     """
@@ -88,3 +89,40 @@ def test_getting_data():
     assert sorted(list(compl_data.keys())) == sorted(complete_info_keys+['harmonic_states'])
     assert all(v is not None for v in compl_data.values())
 
+    # pickling data dict - testing save_obtained_data
+    from wilson_suite.wilson_utils.paths import SUITE_ROOT
+    filename = '/test_compl_data.pkl'
+    filepath = SUITE_ROOT+'/wilson_suite/wilson_utils/tests'+ filename
+
+    ws.utils.save_obtained_data(compl_data, format='pkl', filename=filepath)
+
+    unpkl_compl_data = ws.utils.serialization.unpickle_smth_from(filepath)
+    assert_equal(unpkl_compl_data, compl_data)
+
+
+def assert_equal(a, b):
+    """
+    assert equality of complete obtained data arrays
+
+    some values are np.ndarrays, others are dicts with float values
+    """
+
+    assert type(a) is type(b)
+
+    if isinstance(a, dict):
+        assert a.keys() == b.keys()
+        for k in a:
+            assert_equal(a[k], b[k])
+
+    elif isinstance(a, np.ndarray):
+        assert np.array_equal(a, b)
+
+    # elif isinstance(a, (list, tuple)):
+    #     print('a, (list, tuple)', a)
+    #     assert len(a) == len(b)
+    #     for x, y in zip(a, b):
+    #         assert_equal(x, y)
+
+    else:
+        # float comparison
+        assert a == b
