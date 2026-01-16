@@ -338,7 +338,7 @@ class VibAnaSetup:
 		if self.nc_sqrt_eigval is not None and self.has_all_states:
 			return True
 		print('\nself.nc_sqrt_eigval is not None', self.nc_sqrt_eigval is not None)
-		print('self.has_all_states', self.has_all_states)
+		print('self.has_all_states', self.has_all_states, '\n')
 		return False
 	
 	def setStates(self, states: list[VibState]):
