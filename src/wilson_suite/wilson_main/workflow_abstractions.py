@@ -341,7 +341,7 @@ class WilsonSimulation:
 
 		pass
 
-	def evaluate(self):
+	def evaluate(self, save_evalinputs_pkl: str = None):
 		"""
 		Evaluating method, using EvaluationWorkflow
 		"""
@@ -351,6 +351,11 @@ class WilsonSimulation:
 
 		# prepare data for input to EvaluationWorkflow
 		eval_inputs = make_evaluation_inputs(simulation=self)
+		
+		# save EvaluationInputs data optionally to a pickle file
+		if save_evalinputs_pkl is not None:
+			from wilson_suite.wilson_utils.serialization import pickle_this_to
+			pickle_this_to(eval_inputs, filenamepkl='EvaluationInputs.pkl')
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
@@ -546,6 +551,15 @@ class WilsonSimulation:
 		logger.info(f'WilsonSimulation instance is saved to file {filename}')
 
 	# TODO: status_report() method
+
+	def save_to_pkl(self, configs_only: bool = False):
+		"""
+		Docstring for save_to_pkl
+		
+		:param self: Description
+		:param configs_only: Description
+		"""
+		pass
 
 
 # simply copying old sketch for now
