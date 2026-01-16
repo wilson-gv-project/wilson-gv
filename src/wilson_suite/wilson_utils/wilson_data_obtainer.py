@@ -1,15 +1,20 @@
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 
-def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
+def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo], 
+                         get_geometry=False, get_displacements=False):
     """
     1. group by origin
+
+
     """
     dict_with_data = {}
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
 
-    requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'], 
-                                'normal_modes': requested_data_dict['nc_sqrt_eigval']})
+    if get_geometry:
+        requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval']})
+    if get_displacements:
+        requested_data_dict.update({'normal_modes': requested_data_dict['nc_sqrt_eigval']})
 
     for k, v in requested_data_dict.items():
         
