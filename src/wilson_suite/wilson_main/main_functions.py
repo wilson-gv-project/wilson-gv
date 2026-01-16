@@ -278,7 +278,7 @@ def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: 
 			residual_vib_info[k] = data_dict.get(k)
 			setattr(vib_ana_setup, k, data_dict.get(k))
 
-def request_props(props, data_dict) -> dict:
+def request_props(props: list[MolecularProperty], data_dict: dict) -> dict:
 	"""
 	data_dict: dict - {data_name: DataOriginInfo}
 	"""
@@ -286,7 +286,7 @@ def request_props(props, data_dict) -> dict:
 		data_dict[p.trivial_name] = p.calc_setup
 	return data_dict
 
-def request_residual_vib_info(residual_vib_info, data_dict) -> dict:
+def request_residual_vib_info(residual_vib_info: dict, data_dict: dict) -> dict:
 	"""
 	data_dict: dict - {data_name: DataOriginInfo}
 	"""
