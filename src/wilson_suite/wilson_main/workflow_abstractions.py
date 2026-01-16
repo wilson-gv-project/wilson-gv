@@ -224,6 +224,8 @@ class WilsonSimulation:
 		"""
 		Dress my self.properties with computational setups according to how they are specified in
 		self.eval_uniform or self.eval_by_prop_name
+
+		Run to reset values of residual_vib_info data - replace values with calc_setup
 		"""
 		if not self.props:
 			logger.warning('There are no properties to be dressed')
@@ -292,18 +294,38 @@ class WilsonSimulation:
 		"""
 		data_dict = {}
 		from .main_functions import request_props, request_residual_vib_info
+
+		if not all(isinstance(p.calc_setup, DataOriginInfo) for p in self.props):
+			raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset props values")
 		request_props(self.props, data_dict)
+
+		if not all(isinstance(i, DataOriginInfo) for i in self.residual_vib_info.values()):
+			raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset residual_vib_info values")
 		request_residual_vib_info(self.residual_vib_info, data_dict)
 
 		return data_dict
 	
-	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
+	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict],
+					save_to_filename: str = None):
 		"""
 		obtainer must return : a dictionary:
 		 	keys: trivial_name for properties or residual_vib_info keys
 			values: values
+		
+		# todo: default obtainer??
 		"""
-		self.fillResults(data_dict=obtainer(self.requestData()))
+		data_dict = obtainer(self.requestData())
+		
+		# FIXME should it be a separate function with saving option??
+		if save_to_filename is not None:
+			if '.' not in save_to_filename:
+				raise ValueError("Provide save_to_filename with file extention specified")
+			format = save_to_filename.split('.')[1]
+
+			from wilson_suite.wilson_utils import save_obtained_data
+			save_obtained_data(data_dict, format=format, filename=save_to_filename)
+
+		self.fillResults(data_dict=data_dict)
 
 
 
