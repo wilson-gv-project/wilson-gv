@@ -554,12 +554,40 @@ class WilsonSimulation:
 
 	def save_to_pkl(self, configs_only: bool = False):
 		"""
-		Docstring for save_to_pkl
 		
 		:param self: Description
 		:param configs_only: Description
 		"""
-		pass
+		if not hasattr(self, '_run_dir'):
+			raise ValueError("Project directory for saving files was not initialized")
+			# self.make_proj_dir()
+		
+		if not configs_only:
+			from wilson_suite.wilson_utils.serialization import pickle_this_to
+			pickle_this_to(self, 'WilsonSimulation_instance.pkl', self._run_dir)
+
+
+	from pathlib import Path
+	def make_proj_dir(self, base_dir: Path = None) -> Path:
+		"""
+		base_dir = Path("workflows")
+		run_dir = sim.make_proj_dir(base_dir)
+		data_dir = run_dir / "data"
+
+		:param base_dir: optional
+		:return: Description
+		"""
+		if base_dir is None:
+			from wilson_suite.wilson_utils.paths import WORKFLOW_BASE_DIR
+			base_dir = WORKFLOW_BASE_DIR
+
+		base_dir.mkdir(parents=True, exist_ok=True)
+		from datetime import datetime
+		
+		timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+		self._run_dir = WORKFLOW_BASE_DIR / f"run_{timestamp}"
+		self._run_dir.mkdir()
+		(self._run_dir / "figures").mkdir()
 
 
 # simply copying old sketch for now
