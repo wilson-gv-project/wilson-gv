@@ -558,7 +558,7 @@ class WilsonSimulation:
 
 	# TODO: status_report() method
 
-	def save_to_pkl(self, configs_only: bool = False):
+	def save_to_pkl(self, configs_only: bool = False, filename: str = 'WilsonSimulation_instance.pkl'):
 		"""
 		
 		:param self: Description
@@ -570,7 +570,7 @@ class WilsonSimulation:
 		
 		if not configs_only:
 			from wilson_suite.wilson_utils.serialization import pickle_this_to
-			pickle_this_to(self, 'WilsonSimulation_instance.pkl', self._run_dir)
+			pickle_this_to(self, filename, self._run_dir)
 
 
 	from pathlib import Path
