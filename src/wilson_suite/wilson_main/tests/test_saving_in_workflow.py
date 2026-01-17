@@ -115,7 +115,9 @@ def test_save_wilsonsim():
     from wilson_suite.wilson_utils.paths import WORKFLOW_BASE_DIR
     print(WORKFLOW_BASE_DIR, type(WORKFLOW_BASE_DIR))
 
+    # initialize WORKFLOW_BASE_DIR, if not there; initialize this sim workflow run directory
     sim.make_proj_dir()
+    # save this sim to pickle in the sim workflow run directory
     sim.save_to_pkl()
 
     sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
@@ -135,5 +137,7 @@ def test_save_wilsonsim():
     eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
     sim.addSpecEvalSetup(eval_setup)
+    
+    # save EvaluationInputs for evaluation workflow
     sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
 
