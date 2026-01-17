@@ -571,6 +571,8 @@ class WilsonSimulation:
 		if not configs_only:
 			from wilson_suite.wilson_utils.serialization import pickle_this_to
 			pickle_this_to(self, filename, self._run_dir)
+		else:
+			self.save_configs(filename)
 
 
 	from pathlib import Path
@@ -594,6 +596,19 @@ class WilsonSimulation:
 		self._run_dir = WORKFLOW_BASE_DIR / f"run_{timestamp}"
 		self._run_dir.mkdir()
 		(self._run_dir / "figures").mkdir()
+
+	def get_configs(self) -> dict:
+		"""
+		TODO: have those objects pruned (exp, vib_ana_setup) to only settings(setup) info
+		"""
+		return {'system': self.system,
+		  		'experiment': self.exp,
+				'spec_eval_setup': self.spec_eval_setup, 
+		  		'vib_ana_setup': self.vib_ana_setup}
+
+	def save_configs(self, filename: str = 'WilsonSimulation_configs.pkl'):
+		from wilson_suite.wilson_utils.serialization import pickle_this_to
+		pickle_this_to(self.get_configs(), filename, self._run_dir)
 
 
 # simply copying old sketch for now
