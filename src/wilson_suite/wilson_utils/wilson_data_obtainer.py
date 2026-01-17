@@ -60,7 +60,7 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
     return dict_with_data
 
 
-def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtained_data_dict'):
+def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtained_data_dict', save_to_dir=None):
     """
     Saving data wrapper function
     
@@ -75,14 +75,14 @@ def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtai
         filename += '.' + format
     
     if format == 'json':
-        save_datadict_json(dict_with_data, filename)
+        save_datadict_json(dict_with_data, filename, save_to_dir)
     elif format == 'pkl':
-        save_datadict_pkl(dict_with_data, filename)
+        save_datadict_pkl(dict_with_data, filename, save_to_dir)
 
 
-def save_datadict_json(dict_with_data: dict, filename: str):
+def save_datadict_json(dict_with_data: dict, filename: str, save_to_dir):
     raise NotImplementedError("Need to be able to handle non-serializable dicts, and that's not implemented")
 
-def save_datadict_pkl(dict_with_data: dict, filename: str):
+def save_datadict_pkl(dict_with_data: dict, filename: str, save_to_dir):
     from wilson_suite.wilson_utils.serialization import pickle_this_to
-    pickle_this_to(dict_with_data, filename)
+    pickle_this_to(dict_with_data, filename, save_to=save_to_dir)

@@ -113,9 +113,27 @@ def test_save_wilsonsim():
     sim.dressPropsWithSetup()
 
     from wilson_suite.wilson_utils.paths import WORKFLOW_BASE_DIR
-    print(WORKFLOW_BASE_DIR)
+    print(WORKFLOW_BASE_DIR, type(WORKFLOW_BASE_DIR))
 
     sim.make_proj_dir()
     sim.save_to_pkl()
 
-    # sim.getResults(obtainer=wilson_data_obtainer, save_to_filename=filepath_wf)
+    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
+    
+    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    axes_choice = make_SpectralAxisSet({'A': [2], 'B': [-1, 2]})
+    sim.setAxisChoiceAndTranslateTerms(axes_choice)
+
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
+    bounds_dict = {'A': (1000., 3100.), 'B': (-100., 2500.)}
+    spectral_window = SpectralWindow(box=Box(bounds_dict))
+
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
+                                                          'Gamma': 24.7, 'Gamma_unit': 'cm-1',
+                                                          'dynamic_range': 1000,
+                                                          'grid_resolution': {'A': 70, 'B': 100}})
+    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
+
+    sim.addSpecEvalSetup(eval_setup)
+    sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
+
