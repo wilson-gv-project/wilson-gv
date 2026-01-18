@@ -137,6 +137,69 @@ def test_anharm_analyzer_vibana():
     for k,v in vib_ana.nc_sqrt_eigval.items():
         print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
 
+
+
+def test_anharm_analyzer_vibana_excludemodes():
+    """
+    Anharmonic analyzer (using vpt2.py module) integration test
+
+    to put back in future:
+    import logging
+    from ....wilson_utils.logger import setup_logger
+    setup_logger("wilson_suite.", level=logging.DEBUG)
+    logging.getLogger('wilson_suite.').setLevel(logging.DEBUG)
+    """
+    separatorprint()
+
+    from ....wilson_utils.paths import SUITE_ROOT
+    from .... import wilson_main as ws_main
+
+    # ---- prep VibAnaSetup for anharm analysis
+    vib_ana = ws_main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm', 
+                                               exclude_modes=[1,])
+    # ---- set up props for vibana
+    props, resvib = ws_main.main_functions.find_residual_vib_info(vib_ana=vib_ana)
+
+    # ---- prepare to get props for vibana
+    reqst_data_all = {}
+    reqst_data_all = ws_main.main_functions.request_props(props=props, data_dict=reqst_data_all)
+    reqst_data_all = ws_main.main_functions.request_residual_vib_info(residual_vib_info=resvib, data_dict=reqst_data_all)
+
+    calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
+                                                     lvl_theory='HF', 
+                                                     basis_set='STO-3G', 
+                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+    reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
+
+    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    
+    calc_data = wilson_data_obtainer(reqst_data_all)
+
+    # ---- get props for vibana
+    ws_main.main_functions.fill_props_results(props=props, data_dict=calc_data)
+    ws_main.main_functions.fill_residual_vib_info_results(vib_ana_setup=vib_ana, residual_vib_info=resvib, 
+                                                          data_dict=calc_data)
+    
+    print('\n')
+    printtest(f'nc_sqrt_eigval: {vib_ana.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
+    print('\n')
+
+    # ---- do analysis
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                             regime=vib_ana.regime,
+                                                                             exclude_modes=vib_ana.exclude_modes)
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    assert vib_ana.nc_sqrt_eigval != nc_sqrt_eigval_corrected
+
+    for k,v in st_dict.items():
+        print(k.ljust(10), v)
+    print(diagn)
+    
+    print('\n1 quantum levels')
+    for k,v in vib_ana.nc_sqrt_eigval.items():
+        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
+
 '''
 def test_anharm_analyzer_vibana():
     """
