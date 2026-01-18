@@ -92,16 +92,12 @@ def test_anharm_analyzer_vibana():
     from ....wilson_utils.paths import SUITE_ROOT
     from .... import wilson_main as ws_main
 
-    mol_system = ws_main.abstractions.MolecularSystem(name='h2o', natoms=3)
-    vib_ana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='anharm')
+    # ---- prep VibAnaSetup for anharm analysis
+    vib_ana = ws_main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm')
+    # ---- set up props for vibana
+    props, resvib = ws_main.main_functions.find_residual_vib_info(vib_ana=vib_ana)
 
-    printtest(f'vibana.vibana_own_analysis: {vib_ana.vibana_own_analysis}')
-    experiment_a = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
-    
-    props, resvib, maxlvl = ws_main.main_functions.find_props_and_max_state_lvl(terms=terms, vib_ana=vib_ana)
-    vib_ana.max_state_lvl = maxlvl
-
+    # ---- prepare to get props for vibana
     reqst_data_all = {}
     reqst_data_all = ws_main.main_functions.request_props(props=props, data_dict=reqst_data_all)
     reqst_data_all = ws_main.main_functions.request_residual_vib_info(residual_vib_info=resvib, data_dict=reqst_data_all)
@@ -115,6 +111,7 @@ def test_anharm_analyzer_vibana():
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    
     calc_data = wilson_data_obtainer(reqst_data_all)
 
+    # ---- get props for vibana
     ws_main.main_functions.fill_props_results(props=props, data_dict=calc_data)
     ws_main.main_functions.fill_residual_vib_info_results(vib_ana_setup=vib_ana, residual_vib_info=resvib, 
                                                           data_dict=calc_data)
@@ -123,17 +120,22 @@ def test_anharm_analyzer_vibana():
     printtest(f'nc_sqrt_eigval: {vib_ana.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
     print('\n')
 
+    # ---- do analysis
     states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
                                                                              nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                              regime=vib_ana.regime,
-                                                                             regime_subinfo=vib_ana.regime_subinfo,
                                                                              exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    assert vib_ana.nc_sqrt_eigval != nc_sqrt_eigval_corrected
+
     for k,v in st_dict.items():
         print(k.ljust(10), v)
     print(diagn)
     
-
+    print('\n1 quantum levels')
+    for k,v in vib_ana.nc_sqrt_eigval.items():
+        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
 
 '''
 def test_anharm_analyzer_vibana():
