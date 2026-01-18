@@ -34,6 +34,7 @@ def test_anharm_analyzer():
     sim.addVibAnaSetup(vib_ana_setup=vib_ana)
     sim.addPropEvalSetup(eval_uniform=calc_setup)
 
+
     # should be careful with props, because props are needed for vib analyzer
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     printtest(f'[i.triv_name for i in sim.props] {[i.trivial_name for i in sim.props]}')    
@@ -44,20 +45,23 @@ def test_anharm_analyzer():
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
     
+    print('\n')
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
-    printtest(sim.props)
-    for p in sim.props:
-        if p.trivial_name == 'cff':
-            printtest(p.vals)
+    print('\n')
+    
+    # for p in sim.props:
+    #     if p.trivial_name == 'cff':
+    #         printtest(p.vals)
 
-    # ws.main.main_functions.do_anharmonic_analysis()
     states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(system=sim.system,
                                                                              props=sim.props,
                                                                              nc_sqrt_eigval=sim.vib_ana_setup.nc_sqrt_eigval,
                                                                              regime=sim.vib_ana_setup.regime,
                                                                              regime_subinfo=sim.vib_ana_setup.regime_subinfo,
                                                                              exclude_modes=None)
-    print(states)
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    for k,v in st_dict.items():
+        print(k.ljust(10), v)
     print(diagn)
     
 
