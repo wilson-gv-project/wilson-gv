@@ -238,7 +238,9 @@ def find_residual_vib_info(vib_ana: VibAnaSetup) -> tuple[list[MolecularProperty
 
 def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm], 
 								 vib_ana: VibAnaSetup, freqs: str='static') -> tuple[list[MolecularProperty], dict, int]:
-
+	"""
+	Returns: props, residual_vib_info, find_max_state_lvl(terms) - list[MolecularProperty], dict, int
+	"""
 	props = find_props(terms, freqs)
 	props_ext, residual_vib_info = find_residual_vib_info(vib_ana)
 	
