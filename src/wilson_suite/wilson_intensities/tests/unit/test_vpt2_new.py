@@ -6,17 +6,20 @@ def test_excluded_mode_has_zeros():
     list2exclude = [1]
 
     harmonic_energies = {0: 13., 1: 25., 2: 32.}
-    cubic_forcefield = np.linspace(1, 28, 27).reshape(3,3,3)
-    quartic_forcefield = np.linspace(11, 92, 81).reshape(3,3,3,3)
+    original_len_ene = len(harmonic_energies)
+
+    harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
+
+    cubic_forcefield = np.linspace(1, 27, 27).reshape(3,3,3)
+    quartic_forcefield = np.linspace(11, 91, 81).reshape(3,3,3,3)
     rot_const = []
 
-    original_len_ene = len(harmonic_energies)
 
     X, X_cubic, X_quartic, _ = get_X(
         harmonic_energies,
         cubic_forcefield,
         quartic_forcefield,
-        rot_const, None, False, [], original_len_ene, list2exclude
+        rot_const, None, False, [], original_len_ene
     )
 
     assert X[1, 1] == 0.0
@@ -36,7 +39,28 @@ def test_excluded_mode_has_zeros():
     print(X_quartic)
 
 def test_anharm_corr_energies_results():
-    pass
+    from ...anharmonic_treatment.vpt2 import anharm_corr_energies
+    harmonic_energies = {0: 13., 1: 25., 2: 32.}
+    cubic_forcefield = np.linspace(1, 28, 27).reshape(3,3,3)
+    quartic_forcefield = np.linspace(11, 92, 81).reshape(3,3,3,3)
+    rot_const = []
+
+    anharm_corr_energies(harmonic_energies=harmonic_energies,
+                         cubic_forcefield=cubic_forcefield,
+                         quartic_forcefield=quartic_forcefield,
+                         rotational_constant=rot_const,
+                         coriolis_constant=None,
+                         anharmonic_type='GVPT2',
+                         list2exclude=[])
+
+    anharm_corr_energies(harmonic_energies=harmonic_energies,
+                         cubic_forcefield=cubic_forcefield,
+                         quartic_forcefield=quartic_forcefield,
+                         rotational_constant=rot_const,
+                         coriolis_constant=None,
+                         anharmonic_type='GVPT2',
+                         list2exclude=[1])
+
 
 def test_anharm_corr_energies_emptyinput():
     pass

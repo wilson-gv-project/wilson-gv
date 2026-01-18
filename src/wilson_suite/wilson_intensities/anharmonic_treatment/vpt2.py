@@ -45,15 +45,18 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
     over3q = np.zeros((original_len_ene))
     combo3q = np.zeros((original_len_ene, original_len_ene, original_len_ene))
 
+    # filter with list2exclude
+    harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in list2exclude}
+
     fermi_resonance = identify_fermi(harmonic_energies, cubic_forcefield, do_resonance_checks)
+    if fermi_resonance: # if not an empty list
+        logger.debug(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}')
+
     # selecting resonances fermi_resonance = [fermi_resonance[0]]
     X, X_cubic, X_quartic, X_coriolis = get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
                                               rotational_constant, coriolis_constant, do_resonance_checks,
-                                              fermi_resonance, original_len_ene, list2exclude)
+                                              fermi_resonance, original_len_ene)
 
-
-    if fermi_resonance: # if not an empty list
-        logger.debug(f'Fermi resonances identified - {len(fermi_resonance)}: {fermi_resonance}')
 
     funds_corrections = np.zeros((original_len_ene))
     # for i in range(len(harmonic_energies)):
@@ -183,15 +186,11 @@ def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
 def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance,
-          original_len_ene, excluded_indices):
+          original_len_ene):
     """
     UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
 
     """
-    if excluded_indices is None:
-        excluded_indices = []
-    else:
-        harmonic_energies = {k: v for k, v in harmonic_energies.items() if k not in excluded_indices}
 
     X = np.zeros((original_len_ene, original_len_ene))
     X_cubic = np.zeros((original_len_ene, original_len_ene))
