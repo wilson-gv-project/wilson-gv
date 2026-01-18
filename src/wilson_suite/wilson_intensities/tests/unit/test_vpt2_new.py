@@ -39,6 +39,12 @@ def test_excluded_mode_has_zeros():
     print(X_quartic)
 
 def test_anharm_corr_energies_results():
+    pass
+
+def test_anharm_corr_energies_emptyinput():
+    pass
+
+def test_anharm_corr_energies_excludedmodes():
     from ...anharmonic_treatment.vpt2 import anharm_corr_energies
     harmonic_energies = {0: 13., 1: 25., 2: 32.}
     cubic_forcefield = np.linspace(1, 28, 27).reshape(3,3,3)
@@ -60,13 +66,6 @@ def test_anharm_corr_energies_results():
                          coriolis_constant=None,
                          anharmonic_type='GVPT2',
                          list2exclude=[1])
-
-
-def test_anharm_corr_energies_emptyinput():
-    pass
-
-def test_anharm_corr_energies_excludedmodes():
-    pass
 
 def test_anharm_corr_energies_FR():
     pass
