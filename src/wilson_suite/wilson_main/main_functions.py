@@ -241,7 +241,9 @@ def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm],
 
 	props = find_props(terms, freqs)
 	props_ext, residual_vib_info = find_residual_vib_info(vib_ana)
-	props.extend(props_ext)
+	
+	existing_hashes = {prop.h(1) for prop in props}
+	props.extend(prop for prop in props_ext if prop.h(1) not in existing_hashes)
 
 	return props, residual_vib_info, find_max_state_lvl(terms)
 
