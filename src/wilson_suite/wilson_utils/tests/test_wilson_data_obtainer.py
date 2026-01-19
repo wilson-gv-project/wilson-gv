@@ -1,6 +1,5 @@
 import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
-import numpy as np
 
 def test_getting_data():
     """
@@ -99,5 +98,5 @@ def test_getting_data():
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     compl_data = wilson_data_obtainer(complete_rq)
 
-    assert sorted(list(compl_data.keys())) == sorted(complete_info_keys+['harmonic_states'])
+    assert sorted(list(compl_data.keys())) == sorted(complete_info_keys+['harmonic_states', 'cff_rc', 'qff_rc'])
     assert all(v is not None for v in compl_data.values())
