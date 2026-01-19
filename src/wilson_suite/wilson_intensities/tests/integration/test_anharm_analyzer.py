@@ -45,22 +45,14 @@ def test_anharm_analyzer_wilsonsim():
     
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
-    
-    calc_data = wilson_data_obtainer(sim.requestData())
-    
+        
     print('\n')
     printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
     print('\n')
-    
-    # for p in sim.props:
-    #     if p.trivial_name == 'cff':
-    #         printtest(p.vals)
 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(system=sim.system,
-                                                                             props=sim.props,
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=sim.props,
                                                                              nc_sqrt_eigval=sim.vib_ana_setup.nc_sqrt_eigval,
                                                                              regime=sim.vib_ana_setup.regime,
-                                                                             regime_subinfo=sim.vib_ana_setup.regime_subinfo,
                                                                              exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     for k,v in st_dict.items():
