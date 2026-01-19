@@ -20,73 +20,18 @@ Steps:
 . Save figure (where, filename)
 """
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Tuple, List, Any
 import numpy as np
-from enum import Enum
-
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...wilson_main.abstractions import SpectralGrid, EvaluationInfo, RenderingInfo
+    from ...wilson_main.spectrum_abstractions import EvaluationInfo, RenderingInfo
 
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-class NormalizationType(Enum):
-    """
-    # LOG_RATIO: log10(x)/log10(max)
-    # Shows relative order of magnitude
-    # Example: 0.5 means halfway between min and max in log scale
 
-    # DECIBEL: 10 * log10(x/max)
-    # Standard intensity scale in spectroscopy
-    # 0 dB = max, -20 dB = 1/100 of max
-    https://www.montana.edu/rmaher/eele417_fl14/decibel_scale_eele417.pdf
-    https://en.wikipedia.org/wiki/Decibel
-    https://www.animations.physics.unsw.edu.au/jw/dB.htm
-    
-    # PERCENTAGE: (x/max) * 100
-    # Linear scale percentage
-    # Direct proportion to maximum
-
-    # LOG_SCALE: (log10(x) - log10(min))/(log10(max) - log10(min))
-    # Normalized position in log space
-    # 0 = minimum, 1 = maximum
-    """
-    LOG_RATIO = "log_ratio"
-    DECIBEL = "db"
-    PERCENTAGE = "percent"
-    LOG_SCALE = "log_scale"
-
-@dataclass
-class PlotConfig:
-    """Configuration for plot styling"""
-    figsize: Tuple[int, int] = (35, 45)
-    label_fontsize: int = 25
-    font_dict: Dict[str, Any] = field(default_factory=lambda: {'size': 20})
-    colormap: str = 'magma'  # Better contrast colormap
-    saturation_color: str = '#FF00FF'
-    dpi: int = 250
-    tick_step: float = 200.0  # Step size for both axes ticks
-    equal_aspect: bool = True  # Force equal aspect ratio for axes
-    other_colors: bool = True
-    no_data_color: str = '#E0E0E0'  # Light gray
-    below_range_color: str = '#F8F8F8'  # Very light gray
-    data_edge_color: str = 'black'
-    data_edge_width: float = 0.75
-    x_min: Optional[float] = None
-    x_max: Optional[float] = None
-    y_min: Optional[float] = None
-    y_max: Optional[float] = None
-    colorbar_main_label: str = "Intensity"
-    colorbar_padding: float = 0.01  # Padding between colorbar and plot
-    show_top_ticks: bool = False
-    show_right_ticks: bool = False
-    x_tick_rotation: float = 45  # Add this line for configurable rotation
-    colormap_spacing: str = None  # Options: "log", "power", "linear"
-    colormap_power: float = 0.5    # For power-law spacing; Adjust this value to change color distribution
 
 class LevelCalculator:
     """
@@ -97,70 +42,53 @@ class LevelCalculator:
     """
 
     @staticmethod
-    def compute_levels(d_max: float, dynamic_range: float, num_levels: int, 
-                  ref_max: Optional[float] = None, 
-                  colormap_spacing: str = None, 
-                  colormap_power: float = 0.5) -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
+    def compute_levels(intensities: float, dynamic_range: float, 
+                       nlevels: int, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str]]:
         """Calculate levels for contours and colorbar ticks"""
+        d_max = np.max(intensities)
+        if d_max <= 0:
+            raise ValueError(
+                "Logarithmic colormap requested, but data contains no positive values "
+                f"(max={d_max})."
+            )
+        
         d_min = d_max / dynamic_range
-        log_min = np.log10(d_min)
-        log_max = np.log10(d_max)
 
-        if colormap_spacing == "log":        
-            # Linear spacing in log scale
-            log_space = np.linspace(log_min, log_max, num_levels)
-            # back to linear scale
-            level_values = np.power(10, log_space)
-
+        if colormap_spacing == "log":
+            level_values = np.logspace(np.log10(d_min), np.log10(d_max), nlevels)
+        
         elif colormap_spacing == "linear":
-            # Linear spacing in original scale
-            level_values = np.linspace(d_min, d_max, num_levels)
-            # calculate corresponding log space points
-            log_space = np.log10(level_values)
-    
-        elif colormap_spacing == "power":
-            # Power-law spacing for more uniform color distribution
-            power_space = np.power(np.linspace(0, 1, num_levels), colormap_power)
-            log_space = log_min + (log_max - log_min) * power_space
-            # back to linear scale
-            level_values = np.power(10, log_space)
-    
-        else:  # default to log spacing
-            log_space = np.linspace(log_min, log_max, num_levels)
-            level_values = np.power(10, log_space)
-
-        # Format original value labels
+            level_values = np.linspace(d_min, d_max, nlevels)
+        else:
+            raise ValueError('Choose log or linear colormap_spacing')
         level_labels = [f"${val:.1e}$" for val in level_values]
-        
-        # Calculate normalized values in log space
-        if ref_max is None:
-            ref_max = d_max
-    
-        # Normalize in log space to preserve logarithmic spacing
-        norm_positions = (log_space - log_min) / (log_max - log_min)
-        norm_labels = [f"{val:.2f}" for val in norm_positions]
-        
-        logger.debug(f"Computed levels: {level_values}, labels: {level_labels}, "
-                     f"normalized positions: {norm_positions}, normalized labels: {norm_labels}")
-        
-        return level_values, level_labels, norm_positions, norm_labels
 
+        LevelCalculator._validate_levels(level_values)
 
+        return level_values, level_labels
+
+    @staticmethod
+    def _validate_levels(levels):
+        "copy from matplotlib"
+        if len(levels) > 1 and np.min(np.diff(levels)) <= 0.0:
+            raise ValueError("Contour levels must be increasing")
+        
 class SpectrumRenderer(ABC):
     """
     Abstract base class for spectrum rendering
     
     PlotConfig instance would normally be stored in the RenderingInfo instance
     but can be provided as config parameter
+
+    spec_data - amplitudes data from evaluation procedure
     """
     
     def __init__(self, 
-                 spec_data: np.ndarray | dict,
-                 spec_grid: "SpectralGrid" = None,
+                 spec_data: np.ndarray | dict = None,
+                 spec_grid: dict = None,
                  ev_info: "EvaluationInfo" = None,
                  rnd_info: "RenderingInfo" = None, 
-                 do_diagn: bool = False,
-                 config: PlotConfig = PlotConfig()):
+                 do_diagn: bool = False):
 
         self.spec_data = spec_data
         self.rnd_info = rnd_info
@@ -170,19 +98,20 @@ class SpectrumRenderer(ABC):
         # TODO not used currently
         self.do_diagn = do_diagn
         
-        self.config = self.rnd_info.style_config if rnd_info else config
+        # self.config = self.rnd_info.style_config
         self.level_calc = LevelCalculator()
         self.intensities = None
 
         self.Xdata = None
         self.Ydata = None
+        self.Zdata = None
 
 
     @abstractmethod
     def initialize_plot(self) -> Any:
         """Initialize plotting surface"""
         pass
-    
+
     @abstractmethod
     def create_contour(self, plot_obj: Any, levels: np.ndarray, data: np.ndarray) -> Any:
         """Create contour plot"""
@@ -207,6 +136,11 @@ class SpectrumRenderer(ABC):
     def save_plot(self, plot_obj: Any, filename: str) -> None:
         """Save plot to file"""
         pass
+    
+    def _create_data_masks(self, data: np.ndarray) -> Any:
+        """
+        """
+        return compute_masks(data=data, dynamic_range=self.ev_info.dynamic_range)
 
     def prep_data(self, spec_data_operations: str) -> np.ndarray:
         """
@@ -225,37 +159,82 @@ class SpectrumRenderer(ABC):
                 self.intensities = self.spec_data
             else:
                 raise ValueError(f"Unsupported spec_data_operations: {spec_data_operations}")
+        
+        if self.spec_grid is None:
+            raise ValueError('This SpectrumRenderer.spec_grid is None')        
 
-        if self.spec_grid is not None:
-            # 'w1': mesh, 'w2': mesh; variables
-            freq_vars = self.ev_info.freq_variables
+        self.xyz_labels = {'x': None, 'y': None, 'z': None}
+        for i, o_k in enumerate(list(self.spec_grid.keys())):
+            self.xyz_labels[list(self.xyz_labels.keys())[i]] = o_k
+        
+        if len(self.spec_grid)==3:
+            self.Xdata, self.Ydata, self.Zdata = list(self.spec_grid.values())
+        elif len(self.spec_grid)==2:
+            self.Xdata, self.Ydata = list(self.spec_grid.values())
 
-            # 'x': meshsum, 'y': meshsum; plot_axes
-            xy_axes = {}
+    def _validate_inputs(self):
+        """
+        data and settings should not contradict:
+        - appropriate number of axes
+        """
+        if not isinstance(self.spec_data, np.ndarray):
+            raise TypeError("spec_data should be a np.ndarray")
+        if self.spec_data.size == 0:
+            raise ValueError("spec_data array should not be empty")
+        if not isinstance(self.spec_grid, dict):
+            raise TypeError("spec_grid should be a dictionary with X,Y,(Z) data")
 
-            for i in self.spec_grid.axes:
-                xy_axes[i] = sum([freq_vars[k]*v for k,v in self.spec_grid.axes[i].freq_vars.items()])
+        for key, val in self.spec_grid.items():
+            if not isinstance(val, np.ndarray):
+                raise TypeError(f"spec_grid[{key!r}] is not a np.ndarray")
+            if val.size == 0:
+                raise ValueError(f"spec_grid[{key!r}] is an empty array")
+        
+        from ...wilson_main.spectrum_abstractions import EvaluationInfo, RenderingInfo
+        if isinstance(self.rnd_info, RenderingInfo):
+            self.config = self.rnd_info.style_config
+        if not isinstance(self.ev_info, EvaluationInfo):
+            raise TypeError("ev_info should be an instance of a class EvaluationInfo")
+        if self.ev_info.dynamic_range <= 0:
+            raise ValueError("ev_info.dynamic_range must be positive")
 
-            self.Xdata = xy_axes.get('x', None)
-            self.Ydata = xy_axes.get('y', None)
-            self.Zdata = xy_axes.get('z', None) # 3D plot with 3 spectral axes
 
-    
-    def render(self, filename: str) -> None:
+    def _validate_data_2d(self):
+        if self.Xdata is None:
+            raise ValueError("Xdata was not set")
+        if self.Ydata is None:
+            raise ValueError("Ydata was not set")
+
+        if self.intensities.ndim != 2:
+            raise ValueError("intensities in renderer must be a 2D array")
+
+        if self.Xdata.shape != self.intensities.shape or self.Ydata.shape != self.intensities.shape:
+            raise ValueError("X,Y and intensities data do not match in shape:\n"
+                             f"  x.shape = {self.Xdata.shape}\n"
+                             f"  y.shape = {self.Ydata.shape}\n"
+                             f"  z.shape = {self.intensities.shape}\n"
+                             )
+
+    def render(self, filename: str):
         """Main rendering pipeline"""
+        self._validate_inputs()
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+        self._validate_data_2d()
 
+        # log10 = True if self.rnd_info.intensity_normalization_type is not None else False
+        
         # Calculate levels with both original and normalized scales
-        levels, labels, norm_positions, norm_labels = self.level_calc.compute_levels(
-            np.max(self.intensities),
-            self.rnd_info.dynamic_range,
-            self.rnd_info.num_levels,
-            ref_max=self.rnd_info.reference_max,
-            colormap_spacing=self.config.colormap_spacing,
-            colormap_power=self.config.colormap_power
+        levels, labels = self.level_calc.compute_levels(
+            intensities=self.intensities,
+            dynamic_range=self.ev_info.dynamic_range,
+            nlevels=self.rnd_info.nlevels,
+            colormap_spacing=self.config.colormap_spacing
         )
+        
+        self.levels = levels
+        self.labels = labels
 
         fig, ax = self.initialize_plot()
         fig, ax, contour = self.create_contour(plot_obj=(fig, ax), levels=levels, data=self.intensities)
@@ -266,4 +245,19 @@ class SpectrumRenderer(ABC):
         self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
 
         return fig, ax, contour, cbar
+
+def compute_masks(data, dynamic_range):
+    """
+    Intensities should be > 0, not negative
+    """
+    no_data = np.isnan(data)
+    d_max = np.nanmax(data)
+
+    if not np.isfinite(d_max) or d_max <= 0:
+        below = np.zeros_like(data, dtype=bool)
+    else:
+        d_min = d_max / dynamic_range
+        below = (~no_data) & (data < d_min)
+
+    return no_data, below
 

@@ -1,7 +1,10 @@
 from typing import Any, Callable
 from dataclasses import dataclass, field, asdict, is_dataclass
+from typing import TYPE_CHECKING
 
-from .spectrum_abstractions import SpecEvalSetup
+if TYPE_CHECKING:
+	from .spectrum_abstractions import SpecEvalSetup
+
 from .main_functions import find_props_and_max_state_lvl
 from .abstractions import (VibAnaSetup, MolecularProperty,
 						   MolecularSystem, DataOriginInfo)
@@ -25,7 +28,7 @@ class WilsonSimulation:
 	"""
 
 	def __init__(self, exp: VibExperiment=None, terms: list[VibPerturbedTerm]=[], vib_ana_setup: VibAnaSetup=None,
-				 spec_eval_setup: SpecEvalSetup=None, system: MolecularSystem=None,
+				 spec_eval_setup: 'SpecEvalSetup'=None, system: MolecularSystem=None,
 				 props: list[MolecularProperty]=None, residual_vib_info: list=None,
 				 spec: Any=None, diagn: dict=None, rendering: Any=None, import_from: str=None, name: str=None):
 		"""
@@ -184,7 +187,7 @@ class WilsonSimulation:
 		self.eval_uniform = eval_uniform
 		self.eval_by_prop_name = eval_by_prop_name
 
-	def addSpecEvalSetup(self, spec_eval_setup: SpecEvalSetup):
+	def addSpecEvalSetup(self, spec_eval_setup: 'SpecEvalSetup'):
 		"""
 		Add a spectral evaluation/rendering setup
 
@@ -329,11 +332,15 @@ class WilsonSimulation:
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
-		self.spec = workflow.run()
+		wf_result = workflow.run()
 
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
+
+		# TODO: this is a temporary fix? can be organized better?
+		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
+		self.spec = wf_result['result']
 
 	def evaluate_with_default_setup_fill(self):
 		"""
@@ -346,7 +353,7 @@ class WilsonSimulation:
 	def evaluateSpectrum(self,
                          evaluator: Callable[[
 								   MolecularSystem, VibExperiment, list[VibPerturbedTerm], list[MolecularProperty],
-								   SpecEvalSetup, VibAnaSetup, bool], tuple[np.ndarray, dict]],
+								   'SpecEvalSetup', VibAnaSetup, bool], tuple[np.ndarray, dict]],
                          do_diagn: bool=False):
 		"""
 		Evaluate the spectrum
@@ -382,7 +389,7 @@ class WilsonSimulation:
 
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
-														dict, str, SpecEvalSetup], tuple[Any, dict]],
+														dict, str, 'SpecEvalSetup'], tuple[Any, dict]],
 														do_diagn: bool=False):
 		"""
 		Render the spectral data
@@ -399,9 +406,9 @@ class WilsonSimulation:
 		# TODO also - self.system, self.exp, self.name
 		# generate self.name?
 		
-		context = dict(spec_data=self.spec, system=self.system, experiment=self.exp,
-					   diagn=self.diagn, name=self.name, 
-					   spec_eval_setup=self.spec_eval_setup, do_diagn=do_diagn)
+		context = dict(spec_data=self.spec,
+					   spec_eval_setup=self.spec_eval_setup, 
+					   do_diagn=do_diagn)
 		
 		logger.debug('context')
 		logger.debug(context)
@@ -416,6 +423,29 @@ class WilsonSimulation:
 		else:
 			self.rendering, _ = renderer(**context)
 
+	def render_spectrum(self, do_diagn: bool):
+		"""
+		
+		"""
+		if self.spec is None:
+			raise ValueError("No spectrum data to render")
+		
+		from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
+		
+		filename = self.spec_eval_setup.rnd_info.filename
+		backend = self.spec_eval_setup.rnd_info.backend
+
+		if backend == 'matplotlib':
+			renderer_class=MatplotlibRenderer
+		else:
+			raise NotImplementedError('Only matplotlib backend is currently supported')
+		
+		renderer = renderer_class(spec_data=self.spec, 
+							spec_grid=self.spec_eval_setup.grid,
+							ev_info=self.spec_eval_setup.ev_info, 
+							rnd_info=self.spec_eval_setup.rnd_info,
+							do_diagn=do_diagn)
+		fig, ax, contour, cbar = renderer.render(filename)
 
 	def to_dict(self):
 		"""

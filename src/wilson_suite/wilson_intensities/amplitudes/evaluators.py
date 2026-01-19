@@ -10,12 +10,12 @@ from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from wilson_suite.wilson_intensities.amplitudes.term_parts import (EvaluationDataAndConfigs, ParameterSet,
                                                                    TermParametersChoice, PrecalculatedData)
+from ...wilson_derive.response_terms import VibPerturbedTerm
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
     from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
-    from ...wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 
 import numpy as np

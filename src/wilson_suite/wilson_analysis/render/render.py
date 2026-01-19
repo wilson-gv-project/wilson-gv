@@ -1,12 +1,11 @@
 from .matplotlib_renderer import MatplotlibRenderer
+import numpy as np
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from ...wilson_main.abstractions import SpecEvalSetup
+    from ...wilson_main.spectrum_abstractions import SpecEvalSetup
 
 def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
-                    system, experiment, name, 
-                    diagn, # isn't used yet
                     do_diagn) -> None:
     
     """
@@ -36,7 +35,22 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     - 3D spectrum: 3D IR/Raman spectrum - 1) 2D slice of a 3D spectrum - 2D contour/scatter plot or 3D surface plot; 2) 3D surface plot with color as intensity
     - nD spectrum: nD IR/Raman spectrum - lower D slices as above
     
-    """
+    """    
+    if not isinstance(spec_data, np.ndarray):
+        raise TypeError("spec_data should be a np.ndarray")
+    
+    if not hasattr(spec_eval_setup, 'is_ready_render'):
+        raise TypeError('spec_eval_setup should be a SpecEvalSetup instance')
+    
+    if not spec_eval_setup.is_ready_render:
+        raise ValueError('spec_eval_setup does not have all rendering configs')
+    
+    if spec_data.size == 0:
+        raise ValueError('Empty spec_data array')
+    
+    if len(spec_data.shape) != 2:
+        raise NotImplementedError('only 2D contour plots can be made - input spectrum data is not 2D')
+
     filename = spec_eval_setup.rnd_info.filename
     backend = spec_eval_setup.rnd_info.backend
 
@@ -44,18 +58,16 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
         renderer_class=MatplotlibRenderer
     else:
         raise NotImplementedError('Only matplotlib backend is currently supported')
-    
-    plot_config = spec_eval_setup.rnd_info.style_config
 
     renderer = renderer_class(spec_data=spec_data, 
                               spec_grid=spec_eval_setup.grid,
                               ev_info=spec_eval_setup.ev_info, 
-                              rnd_info=spec_eval_setup.rnd_info, 
-                              config=plot_config, do_diagn=do_diagn)
+                              rnd_info=spec_eval_setup.rnd_info,
+                              do_diagn=do_diagn)
     fig, ax, contour, cbar = renderer.render(filename)
     
     if do_diagn:
-        return tuple([fig, ax, contour, cbar]), diagn
+        return tuple([fig, ax, contour, cbar]), {'renderer': renderer}
     else:
         return tuple([fig, ax, contour, cbar]), {}
 

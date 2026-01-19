@@ -79,7 +79,7 @@ def test_evaluation_general_customdata_1elterm():
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
 
     assert np.allclose(r_res, ref_res)
-    assert np.allclose(ref_res, mock_sim.spec['result'])
+    assert np.allclose(ref_res, mock_sim.spec)
 
 def test_evaluation_general_customdata_1mechterm():
     print()
@@ -94,7 +94,6 @@ def test_evaluation_general_customdata_1mechterm():
 
     from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from ....fixtures import evv_experiment
-    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
     
     evv_exp = evv_experiment()
     terms = get_fully_enhanced_terms(experiment=evv_exp)
@@ -158,7 +157,7 @@ def test_evaluation_general_customdata_1mechterm():
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
     assert np.allclose(r_res, ref_res)
-    assert np.allclose(ref_res, mock_sim.spec['result'])
+    assert np.allclose(ref_res, mock_sim.spec)
 
 
 def test_full_integration():
@@ -214,16 +213,11 @@ def test_full_integration():
 
     np.set_printoptions(linewidth=280, precision=1)
 
-
-    print(sim.spec['A'])
-    print(sim.spec['B'])
-    print(sim.spec['result'])
-
     import matplotlib.pyplot as plt
 
-    Z = np.log(np.abs(sim.spec['result'])**2)
-    x = np.unique(sim.spec['A'])
-    y = np.unique(sim.spec['B'])
+    Z = np.log(np.abs(sim.spec)**2)
+    x = np.unique(sim.spec_eval_setup.grid['A'])
+    y = np.unique(sim.spec_eval_setup.grid['B'])
 
     # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
     # matplotlib expects [y, x] ordering for images
@@ -356,15 +350,11 @@ def test_full_integration_H2O_molecule():
 
     np.set_printoptions(linewidth=280, precision=1)
 
-    print(sim.spec['A'])
-    print(sim.spec['B'])
-    print(sim.spec['result'])
-
     import matplotlib.pyplot as plt
 
-    Z = np.log(np.abs(sim.spec['result'])**2)
-    x = np.unique(sim.spec['A'])
-    y = np.unique(sim.spec['B'])
+    Z = np.log(np.abs(sim.spec)**2)
+    x = np.unique(sim.spec_eval_setup.grid['A'])
+    y = np.unique(sim.spec_eval_setup.grid['B'])
 
     # if Z.shape == (len(y), len(x)) -> no transpose; if Z.shape == (len(x), len(y)) -> transpose
     # matplotlib expects [y, x] ordering for images

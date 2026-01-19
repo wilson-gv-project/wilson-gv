@@ -3,7 +3,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib
 
-from .spectrum_renderer import SpectrumRenderer, NormalizationType
+from .spectrum_renderer import SpectrumRenderer 
+from .render_utils import NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -16,16 +17,14 @@ class MatplotlibRenderer(SpectrumRenderer):
         plt.rcParams['path.simplify'] = True
         plt.rcParams['agg.path.chunksize'] = 10000
         
-        # Apply font settings
         matplotlib.rc('font', **self.config.font_dict)
         
-        # Create figure and axes with more appropriate margins
         fig = plt.figure(figsize=self.config.figsize)
         # Add axes with specific margins to ensure content fits
         ax = fig.add_axes([0.15, 0.15, 0.7, 0.75])  # [left, bottom, width, height]
         
         return fig, ax
-    
+
 
     def create_contour(self, 
                        plot_obj: Tuple[plt.Figure, plt.Axes], 
@@ -40,9 +39,7 @@ class MatplotlibRenderer(SpectrumRenderer):
         fig, ax = plot_obj
         
         # Create masked arrays
-        no_data_mask = np.isnan(data)
-        d_min = np.max(data) / self.rnd_info.dynamic_range
-        below_range_mask = (~no_data_mask) & (data < d_min)
+        no_data_mask, below_range_mask = self._create_data_masks(data)
         
         # Setup base colormap
         cmap = plt.get_cmap(self.config.colormap).copy()
@@ -60,9 +57,12 @@ class MatplotlibRenderer(SpectrumRenderer):
                     levels=[0, 0.5, 1],
                     colors=[self.config.below_range_color])
         
-        # Create logarithmic normalization for color mapping
-        norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
-        
+        if self.rnd_info.intensity_normalization_type is not None:
+            # Create logarithmic normalization for color mapping
+            norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
+        else:
+            norm = None
+
         # Plot main data with normalized colors
         contour = ax.contourf(self.Xdata, self.Ydata, 
                            data,
@@ -92,8 +92,8 @@ class MatplotlibRenderer(SpectrumRenderer):
         # Set up axes labels
         label_fontsize = self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25
 
-        xlabel_str = spectral_axis_to_label(self.spec_grid.axes.get('x').freq_vars) if self.spec_grid else r'$default x /2\pi c, \text{cm}^{-1}$'
-        ylabel_str = spectral_axis_to_label(self.spec_grid.axes.get('y').freq_vars) if self.spec_grid else r'$default y /2\pi c, \text{cm}^{-1}$'
+        xlabel_str = self.xyz_labels.get('x', r'$default x /2\pi c, \text{cm}^{-1}$')
+        ylabel_str = self.xyz_labels.get('y', r'$default y /2\pi c, \text{cm}^{-1}$')
 
         # labelpad - distance from axis to label
         ax.set_xlabel(xlabel_str, fontsize=label_fontsize, labelpad=65.) 
@@ -197,12 +197,18 @@ class MatplotlibRenderer(SpectrumRenderer):
             norm_positions = (levels/levels[-1]) * 100
             norm_format = "{x:.1f}%"
             norm_label = "Relative Intensity (%)"
+        elif self.rnd_info.intensity_normalization_type is None:
+            norm_positions = levels
+            norm_format = "{x:.2f}"
+            norm_label = "Original"
+
         else:  # LOG_SCALE
             norm_positions = (np.log10(levels) - np.log10(levels[0]))/(np.log10(levels[-1]) - np.log10(levels[0]))
             norm_format = "{x:.2f}"
             norm_label = "Log-scale Normalized"
         
-        logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
+        if self.rnd_info.intensity_normalization_type is not None:
+            logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
         
         # Set up normalized axis limits and ticks
         ax2.set_ylim(min(norm_positions), max(norm_positions))
