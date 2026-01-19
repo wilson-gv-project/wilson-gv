@@ -1,44 +1,91 @@
 """
-anharm_analyzer/anharm_analyzer_data are pure functions
-Need to test:
-    -[] Expected output
-    -[] Edge cases
-    -[] Properties or invariants
-    -[] Reference comparison
-
 """
-from ....wilson_utils.printing import printtest, separatorprint
-from ....wilson_main import abstractions as wm_abst
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.serialization import unpickle_smth_from
+import wilson_suite as ws
 
+pickles_dir = SUITE_ROOT+'/wilson_suite/wilson_intensities/tests/datafiles'
 
-# INCOMPLETE NOW
-
-# def test_anharm_analyzer_vibana():
-#     """
-#     Trying to isolate anharm_analyzer_data function
-#     and test it
-
-#     TODO: not passing now because unfinished
-#     """
-#     separatorprint()
-#     import logging
-#     from ....wilson_utils.logger import setup_logger
-#     setup_logger("wilson", level=logging.DEBUG)
-#     logging.getLogger('wilson.wilson.spectrum.vpt2').setLevel(logging.INFO)
-
-#     from CQCParse.logger import setup_logger as set_loggerCQCP
-#     set_loggerCQCP('CQCParse', level=logging.ERROR)
-
-#     from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
-
-#     context = {'system': wm_abst.MolecularSystem(name='FORM', natoms=4, geo=None, geo_extra=None, linear=False), 
-#                'props': [wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='cff'), 
-#                          wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'g', 'g'), 'freq': (0.0, 0.0, 0.0, 0.0)}, trivial_name='qff'), 
-#                          wm_abst.MolecularProperty(prop_spec={'ops': ('r',), 'freq': 0.0}, trivial_name='B'), 
-#                          wm_abst.MolecularProperty(prop_spec={'ops': ('g', 'g', 'r'), 'freq': (0.0, 0.0, 0.0)}, trivial_name='coriolis')],
-#                          'regime': 'GVPT2', 'regime_subinfo': None,
-#                          'nc_sqrt_eigval': {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}, 
-#                          'exclude_modes': []}
+def test_form_vpt2():
+    file = 'HF_STO_3G_VPT2.pkl'
+    vib_ana, props = unpickle_smth_from(filenamepkl=file, load_from=pickles_dir)
+    # save anharmonic corrected from g16 output
+    states_g16 = vib_ana.states
     
-#     # how it's used in VibAnaSetup().doAnharmonicAnalysis
-#     anharm_analyzer_data(**context)
+    print()
+    print([state.energy for state in vib_ana.states if ',' not in state.state_label])
+    # ---- do analysis - 
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                            regime="VPT2", #vib_ana.regime
+                                                                            exclude_modes=None)        
+    # ---- check results
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    
+    print(nc_sqrt_eigval_corrected)
+
+    for k in st_dict_g16:
+        print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
+    
+    for k in st_dict_g16:
+        # not sure how to estimate the agreement
+        assert abs(st_dict_g16[k] - round(st_dict[k], 4)) <= 0.003001
+
+def test_form_gvpt2():
+    file = 'HF_STO_3G_GVPT2.pkl'
+    vib_ana, props = unpickle_smth_from(filenamepkl=file, load_from=pickles_dir)
+    # save anharmonic corrected from g16 output
+    states_g16 = vib_ana.states
+    
+    print()
+    print([state.energy for state in vib_ana.states if ',' not in state.state_label])
+    # ---- do analysis - 
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                            regime="GVPT2", #vib_ana.regime
+                                                                            exclude_modes=None)        
+    # ---- check results
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    
+    print(nc_sqrt_eigval_corrected)
+
+    for k in st_dict_g16:
+        print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
+    
+    for k in st_dict_g16:
+        # not sure how to estimate the agreement
+        assert abs(st_dict_g16[k] - round(st_dict[k], 4)) <= 0.0014
+
+
+def test_form_dvpt2():
+    file = 'HF_STO_3G_DVPT2.pkl'
+    vib_ana, props = unpickle_smth_from(filenamepkl=file, load_from=pickles_dir)
+    # save anharmonic corrected from g16 output
+    states_g16 = vib_ana.states
+    
+    print()
+    print([state.energy for state in vib_ana.states if ',' not in state.state_label])
+    # ---- do analysis - 
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                            regime="DVPT2", #vib_ana.regime
+                                                                            exclude_modes=None)        
+    # ---- check results
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    
+    print(nc_sqrt_eigval_corrected)
+
+    for k in st_dict_g16:
+        print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
+    
+    for k in st_dict_g16:
+        # not sure how to estimate the agreement
+        assert abs(st_dict_g16[k] - round(st_dict[k], 4)) <= 0.0014
+
+

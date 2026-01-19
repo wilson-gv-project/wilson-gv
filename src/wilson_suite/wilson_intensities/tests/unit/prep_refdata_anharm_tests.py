@@ -50,7 +50,7 @@ def analyze_from_pkl():
         # ---- do analysis
         states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
                                                                                 nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                                regime="VPT2", #vib_ana.regime
+                                                                                regime="GVPT2", #vib_ana.regime
                                                                                 exclude_modes=None)        
         # ---- check results
         # st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
@@ -67,7 +67,7 @@ def analyze_from_pkl():
         print('g16 nc_sqrt_eigval -- wilson corrm -- g16 corr')
         for k,v in vib_ana.nc_sqrt_eigval.items():
             print(k, '--', v, '--', nc_sqrt_eigval_corrected[k], '--', st_dict_g16[str(k)])
-            # assert nc_sqrt_eigval_corrected[k] == st_dict_g16[str(k)]
+            print('g16==wilson?', round(nc_sqrt_eigval_corrected[k], 3) == st_dict_g16[str(k)])
 
 
 if __name__ == '__main__':
