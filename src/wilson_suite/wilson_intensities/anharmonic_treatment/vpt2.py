@@ -184,6 +184,66 @@ def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
     return fermi_resonance
 
+
+def diag_quartic(i, quartic):
+    return quartic[i][i][i][i] / 16.0
+def diag_cubic(i, freq, cubic, fermi_resonance, do_resonance_checks):
+    vi = freq[i]
+    rhs = 0.0
+
+    for k, vk in freq.items():
+        kiik = cubic[i][i][k]
+
+        tmp1 = 4.0 / vk
+        tmp2 = 1.0 / (2.0 * vi + vk)
+
+        if [k, i, i, True] in fermi_resonance and do_resonance_checks:
+            tmp3 = 0.0
+        else:
+            tmp3 = 1.0 / (2.0 * vi - vk)
+
+        rhs += (kiik ** 2 / 32.0) * (tmp1 + tmp2 - tmp3)
+
+    return -rhs
+def cubic_A(i, j, freq, cubic):
+    return sum(
+        cubic[i][i][k] * cubic[j][j][k] / (4.0 * freq[k])
+        for k in freq
+    )
+def cubic_B(i, j, freq, cubic, fermi_resonance, do_resonance_checks):
+    vi, vj = freq[i], freq[j]
+    B = 0.0
+
+    for k, vk in freq.items():
+        kijk = cubic[i][j][k]
+
+        tmp1 = 1.0 / (vi + vj + vk)
+
+        if [i, *sorted([j, k]), k == j] in fermi_resonance and do_resonance_checks:
+            tmp2 = 0.0
+        else:
+            tmp2 = 1.0 / (-vi + vj + vk)
+
+        if [j, *sorted([k, i]), k == i] in fermi_resonance and do_resonance_checks:
+            tmp3 = 0.0
+        else:
+            tmp3 = 1.0 / (vi - vj + vk)
+
+        if [k, *sorted([i, j]), i == j] in fermi_resonance and do_resonance_checks:
+            tmp4 = 0.0
+        else:
+            tmp4 = 1.0 / (vi + vj - vk)
+
+        B += kijk**2 / 8.0 * (tmp1 + tmp2 + tmp3 - tmp4)
+
+    return B
+def coriolis_term(i, j, freq, rotational_constant, coriolis_constant):
+    vi, vj = freq[i], freq[j]
+
+    return sum(
+        float(rotational_constant[k]) * coriolis_constant[k][i][j] ** 2 * (vi / vj + vj / vi)
+        for k in range(len(rotational_constant))
+    )
 def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance,
           original_len_ene):
@@ -191,94 +251,44 @@ def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
     UPD! harmonic_energies is a dictionary - parserObj.fundamentals_harmonic_int
 
     """
+    modes = sorted(harmonic_energies.keys())
+    freq = harmonic_energies
 
     X = np.zeros((original_len_ene, original_len_ene))
-    X_cubic = np.zeros((original_len_ene, original_len_ene))
-    X_quartic = np.zeros((original_len_ene, original_len_ene))
-    X_coriolis = np.zeros((original_len_ene, original_len_ene))
+    X_cubic = np.zeros_like(X)
+    X_quartic = np.zeros_like(X)
+    X_coriolis = np.zeros_like(X)
 
-    # for i in range(len(harmonic_energies)):
-    for i in harmonic_energies:
-        vi = harmonic_energies[i]
-        X[i][i] = quartic_forcefield[i][i][i][i]/16.0
-        X_quartic[i][i] = quartic_forcefield[i][i][i][i]/16.0
+    for i in modes:
+        X_quartic[i, i] = diag_quartic(i, quartic_forcefield)
+        X_cubic[i, i] = diag_cubic(i, freq, cubic_forcefield,
+                                   fermi_resonance, do_resonance_checks)
+        X[i, i] = X_quartic[i, i] + X_cubic[i, i]
 
-        rhs = 0
+        for j in modes:
+            if j >= i:
+                continue
 
-        # for k in range(len(harmonic_energies)):
-        for k in harmonic_energies:
-            vk = harmonic_energies[k]
-            kiik = cubic_forcefield[i][i][k]
+            X_quartic[i, j] = quartic_forcefield[i][i][j][j] / 4.0
 
-            tmp1 = 4.0/vk
-            tmp2 = 1/(2.0*vi + vk)
+            A = cubic_A(i, j, freq, cubic_forcefield)
+            B = cubic_B(i, j, freq, cubic_forcefield,
+                         fermi_resonance, do_resonance_checks)
+            C = coriolis_term(i, j, freq,
+                               rotational_constant, coriolis_constant)
 
-            if [k, i, i, True] in fermi_resonance and do_resonance_checks:
-                tmp3 = 0.0
-            else:
-                tmp3 = 1 / (2.0 * vi - vk)
+            X_cubic[i, j] = -A - B
+            X_coriolis[i, j] = C
 
-            rhs += (kiik**2/32.0)*(tmp1 + tmp2 - tmp3)
+            X[i, j] = X_quartic[i, j] + X_cubic[i, j] + C
+            X[j, i] = X[i, j]
 
-        X[i][i] += - rhs
-        X_cubic[i][i] = - rhs
-
-        # attention
-        for j in range(i):
-            if j in harmonic_energies:
-
-                vj = harmonic_energies[j]
-                X[i][j] = quartic_forcefield[i][i][j][j]/4.0
-                X_quartic[i][j] = quartic_forcefield[i][i][j][j]/4.0
-
-                A = 0
-                # for k in range(len(harmonic_energies)):
-                for k in harmonic_energies:
-                    A += cubic_forcefield[i][i][k]*cubic_forcefield[j][j][k]/(4.0*harmonic_energies[k])
-
-                B = 0
-                # for k in range(len(harmonic_energies)):
-                for k in harmonic_energies:
-                    vk = harmonic_energies[k]
-                    kijk = cubic_forcefield[i][j][k]
-
-                    tmp1 = 1/(vi + vj + vk)
-
-                    if [i, *sorted([j, k]), k == j] in fermi_resonance and do_resonance_checks:
-                        tmp2 = 0.0
-                    else:
-                        tmp2 = 1/(-vi + vj + vk)
-
-                    if [j, *sorted([k, i]), k == i] in fermi_resonance and do_resonance_checks:
-                        tmp3 = 0.0
-                    else:
-                        tmp3 = 1 / (vi - vj + vk)
-
-                    if [k, *sorted([i, j]), i == j] in fermi_resonance and do_resonance_checks:
-                        tmp4 = 0.0
-                    else:
-                        tmp4 = 1/(vi + vj - vk)
-
-                    B += kijk**2/8.0*(tmp1 + tmp2 + tmp3 - tmp4)
-
-                C = 0
-
-                for k in range(len(rotational_constant)):
-                    logger.debug(f'rotational_constant[k]: {rotational_constant[k]}')
-                    logger.debug(f'float(rotational_constant[k]): {float(rotational_constant[k])}')
-                    C += float(rotational_constant[k])*coriolis_constant[k][i][j]**2*\
-                        (harmonic_energies[i]/harmonic_energies[j] +
-                         harmonic_energies[j]/harmonic_energies[i])
-
-                X[i][j] = X[i][j] - A - B + C
-                X[j][i] = np.copy(X[i][j])
-
-                X_coriolis[i][j] = C
-                X_coriolis[j][i] = np.copy(X_coriolis[i][j])
-                X_cubic[i][j] = - A - B
-                X_cubic[j][i] = np.copy(X_cubic[i][j])
+            X_cubic[j, i] = X_cubic[i, j]
+            X_quartic[j, i] = X_quartic[i, j]
+            X_coriolis[j, i] = C
 
     return X, X_cubic, X_quartic, X_coriolis
+
 
 fermi_threshold  = 200.0
 martin_threshold = 1.0
