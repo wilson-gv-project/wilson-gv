@@ -60,7 +60,7 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
     return dict_with_data
 
 
-def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtained_data_dict', save_to_dir=None):
+def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtained_data_dict', save_to_dir=''):
     """
     Saving data wrapper function
     

@@ -42,7 +42,7 @@ def test_saving_obtained_data():
     # pickling data dict - testing save_obtained_data
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
     filepath = SUITE_ROOT+'/wilson_suite/wilson_main/tests/test_compl_data.pkl'
-
+    print(filepath, type(filepath))
     ws.utils.save_obtained_data(request_dict, format='pkl', filename=filepath)
 
     unpkl_compl_data = ws.utils.serialization.unpickle_smth_from(filepath)
