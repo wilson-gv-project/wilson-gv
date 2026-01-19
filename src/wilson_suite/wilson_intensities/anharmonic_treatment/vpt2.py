@@ -187,6 +187,7 @@ def identify_fermi_c4(harmonic_energies, cubic_forcefield, do_resonance_checks):
 
 def diag_quartic(i, quartic):
     return quartic[i][i][i][i] / 16.0
+
 def diag_cubic(i, freq, cubic, fermi_resonance, do_resonance_checks):
     vi = freq[i]
     rhs = 0.0
@@ -205,11 +206,13 @@ def diag_cubic(i, freq, cubic, fermi_resonance, do_resonance_checks):
         rhs += (kiik ** 2 / 32.0) * (tmp1 + tmp2 - tmp3)
 
     return -rhs
+
 def cubic_A(i, j, freq, cubic):
     return sum(
         cubic[i][i][k] * cubic[j][j][k] / (4.0 * freq[k])
         for k in freq
     )
+
 def cubic_B(i, j, freq, cubic, fermi_resonance, do_resonance_checks):
     vi, vj = freq[i], freq[j]
     B = 0.0
@@ -237,13 +240,20 @@ def cubic_B(i, j, freq, cubic, fermi_resonance, do_resonance_checks):
         B += kijk**2 / 8.0 * (tmp1 + tmp2 + tmp3 - tmp4)
 
     return B
+
 def coriolis_term(i, j, freq, rotational_constant, coriolis_constant):
+    if len(rotational_constant)==0:
+        return 0.
+    if len(rotational_constant)!=3:
+        raise ValueError('Rotational constant should have x,y,z components')
+    
     vi, vj = freq[i], freq[j]
 
     return sum(
         float(rotational_constant[k]) * coriolis_constant[k][i][j] ** 2 * (vi / vj + vj / vi)
         for k in range(len(rotational_constant))
     )
+
 def get_X(harmonic_energies, cubic_forcefield, quartic_forcefield,
           rotational_constant, coriolis_constant, do_resonance_checks, fermi_resonance,
           original_len_ene):

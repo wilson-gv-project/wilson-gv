@@ -101,7 +101,135 @@ def test_getX_refactor_equivalence():
     assert_allclose(Xcor_new, Xcor_old)
 '''
 
+def test_diag_quartic_zero():
+    from ...anharmonic_treatment.vpt2 import diag_quartic
+    q = np.zeros((2,2,2,2))
+    assert diag_quartic(0, q) == 0.0
 
+def test_diag_quartic_scaling():
+    from ...anharmonic_treatment.vpt2 import diag_quartic
+    q = np.zeros((2,2,2,2))
+    q[0,0,0,0] = 3.5
+
+    assert diag_quartic(0, 2*q) == 2*diag_quartic(0, q)
+
+def test_diag_cubic_zero():
+    from ...anharmonic_treatment.vpt2 import diag_cubic
+    freq = {0: 1000.0}
+    cubic = np.zeros((1,1,1))
+
+    val = diag_cubic(0, freq, cubic, [], True)
+    assert val == 0.0
+
+def test_diag_cubic_scaling():
+    from ...anharmonic_treatment.vpt2 import diag_cubic
+    freq = {0: 1000.0}
+    cubic = np.random.default_rng(0).normal(size=(1,1,1))
+
+    v1 = diag_cubic(0, freq, cubic, [], False)
+    v2 = diag_cubic(0, freq, 2*cubic, [], False)
+
+    assert np.allclose(v2, 4*v1)
+
+def test_diag_cubic_resonance_flag():
+    from ...anharmonic_treatment.vpt2 import diag_cubic
+    freq = {0: 1000.0}
+    cubic = np.ones((1,1,1))
+
+    v1 = diag_cubic(0, freq, cubic, [], False)
+    v2 = diag_cubic(0, freq, cubic, [[0,0,0,True]], True)
+    assert v2 < v1
+
+def test_cubic_A_symmetry():
+    from ...anharmonic_treatment.vpt2 import cubic_A
+    freq = {0: 1000.0, 1: 1200.0}
+    cubic = np.random.default_rng(0).normal(size=(2,2,2))
+
+    assert np.allclose(
+        cubic_A(0, 1, freq, cubic),
+        cubic_A(1, 0, freq, cubic)
+    )
+
+def test_cubic_A_zero():
+    from ...anharmonic_treatment.vpt2 import cubic_A
+    freq = {0: 1000.0, 1: 1200.0}
+    cubic = np.zeros((2,2,2))
+
+    assert cubic_A(0, 1, freq, cubic) == 0.0
+
+def test_cubic_B_zero():
+    from ...anharmonic_treatment.vpt2 import cubic_B
+    freq = {0: 1000.0, 1: 1200.0}
+    cubic = np.zeros((2,2,2))
+
+    assert cubic_B(0, 1, freq, cubic, [], True) == 0.0
+
+def test_cubic_B_scaling():
+    from ...anharmonic_treatment.vpt2 import cubic_B
+    freq = {0: 1000.0, 1: 1200.0}
+    cubic = np.random.default_rng(1).normal(size=(2,2,2))
+
+    v1 = cubic_B(0, 1, freq, cubic, [], False)
+    v2 = cubic_B(0, 1, freq, 2*cubic, [], False)
+
+    assert np.allclose(v2, 4*v1)
+
+def test_cubic_B_resonance_flag():
+    from ...anharmonic_treatment.vpt2 import cubic_B
+    freq = {0: 1000.0, 1: 1200.0}
+    cubic = np.ones((2,2,2))
+
+    v1 = cubic_B(0, 1, freq, cubic, [], False)
+    v2 = cubic_B(0, 1, freq, cubic, [[0,1,1,True]], True)
+    print()
+    print(v1)
+    print(v2)
+    assert np.isfinite(v2)
+
+
+def test_coriolis_zero():
+    from ...anharmonic_treatment.vpt2 import coriolis_term
+    freq = {0: 1000.0, 1: 1200.0}
+    rot = np.zeros(3)
+    cor = np.zeros((3,2,2))
+
+    assert coriolis_term(0, 1, freq, rot, cor) == 0.0
+
+def test_coriolis_zero2():
+    from ...anharmonic_treatment.vpt2 import coriolis_term
+    freq = {0: 1000.0, 1: 1200.0}
+    rot = []
+    cor = np.zeros((3,2,2))
+
+    assert coriolis_term(0, 1, freq, rot, cor) == 0.0
+
+def test_coriolis_scaling():
+    from ...anharmonic_treatment.vpt2 import coriolis_term
+    freq = {0: 1000.0, 1: 1200.0}
+    rot = np.array([1.0, 2.0, 0.])
+    cor = np.ones((3,2,2))
+
+    v1 = coriolis_term(0, 1, freq, rot, cor)
+    v2 = coriolis_term(0, 1, freq, 2*rot, cor)
+
+    assert np.allclose(v2, 2*v1)
+
+def test_coriolis():
+    from ...anharmonic_treatment.vpt2 import coriolis_term
+    freq = {0: 600.0, 1: 1200.0}
+    rot = np.array([0., 0., 1.])
+    cor = np.ones((3,2,2))
+
+    v1 = coriolis_term(0, 1, freq, rot, cor)
+    v2 = coriolis_term(0, 0, freq, 2*rot, cor)
+    v3 = coriolis_term(0, 0, freq, rot, cor)
+    
+    assert v1 == 0.5 + 2 # (vi / vj + vj / vi)
+    assert v2 == 2. + 2. # (vi / vj + vj / vi)
+    assert v3 == 1. + 1. # (vi / vj + vj / vi)
+
+
+'''
 def test_anharm_corr_energies_results():
     pass
 
@@ -123,3 +251,4 @@ def test_identify_fermi_c4():
 def test_identify_fermi_c4_noFR():
     pass
 
+'''
