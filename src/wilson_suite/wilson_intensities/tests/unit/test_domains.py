@@ -86,7 +86,7 @@ def get_data_evaluators_tests() -> dict:
             wm_abst.VibState(harm_quanta_coeffs={(1, 1, 2):1.}, state_label='1,1,2', energy=3594., harmonic_WF=False),
             wm_abst.VibState(harm_quanta_coeffs={(1, 2, 2):1.}, state_label='1,2,2', energy=3642., harmonic_WF=False),
         ))
-    vibana.nc_sqrt_eigval = {('0',): 964, ('1',): 1234., ('2',): 1234.}
+    vibana.nc_sqrt_eigval = {0: 964, 1: 1234., 2: 1234.}
 
     props_data = generate_props_data_Nmodes(system.Nnmodes)
     # cart axes (0, 1, 1, 0) - 0 1 2 3
@@ -129,7 +129,7 @@ def get_features_from_terms(lineshape_parameter:float = 9.5):
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 
     datadict = get_data_evaluators_tests()
-    include_list = tuple([int(v[0]) for v in list(datadict['vib_ana_setup'].nc_sqrt_eigval.keys()) if int(v[0]) not in datadict['vib_ana_setup'].exclude_modes])
+    include_list = tuple([v for v in list(datadict['vib_ana_setup'].nc_sqrt_eigval.keys()) if v not in datadict['vib_ana_setup'].exclude_modes])
 
     vibstates_data = VibStatesData(allstates=tuple(datadict['vib_ana_setup'].states),
                                    harmonic_osc_states_labels=include_list)

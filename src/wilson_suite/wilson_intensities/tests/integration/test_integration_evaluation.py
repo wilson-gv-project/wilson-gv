@@ -291,7 +291,7 @@ def test_full_integration_other_axes_choice():
     assert eval_wf.inputs.vib_ana_setup == sim.vib_ana_setup
     assert eval_wf.artifacts.spec_window == sim.spec_eval_setup.ev_info.spectral_window
     assert eval_wf.artifacts.regions is None
-    assert eval_wf.artifacts.terms == 14
+    assert len(eval_wf.artifacts.terms) == 14
     assert eval_wf.artifacts.grid_manager is None
 
     import os

@@ -224,6 +224,8 @@ class WilsonSimulation:
 		"""
 		Dress my self.properties with computational setups according to how they are specified in
 		self.eval_uniform or self.eval_by_prop_name
+
+		Run to reset values of residual_vib_info data - replace values with calc_setup
 		"""
 		if not self.props:
 			logger.warning('There are no properties to be dressed')
@@ -292,18 +294,46 @@ class WilsonSimulation:
 		"""
 		data_dict = {}
 		from .main_functions import request_props, request_residual_vib_info
+
+		if not all(isinstance(p.calc_setup, DataOriginInfo) for p in self.props):
+			raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset props values")
 		request_props(self.props, data_dict)
+
+		if not all(isinstance(i, DataOriginInfo) for i in self.residual_vib_info.values()):
+			raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset residual_vib_info values")
 		request_residual_vib_info(self.residual_vib_info, data_dict)
 
 		return data_dict
 	
-	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict]):
+	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict],
+					save_to_filename: str = None, save_to_dir: str = None):
 		"""
 		obtainer must return : a dictionary:
 		 	keys: trivial_name for properties or residual_vib_info keys
 			values: values
+		
+		# todo: default obtainer??
 		"""
-		self.fillResults(data_dict=obtainer(self.requestData()))
+		data_dict = obtainer(self.requestData())
+		
+		# FIXME should it be a separate function with saving option??
+		if save_to_filename is not None:
+			if save_to_dir is None:
+				save_to_dir = ''
+				# if not hasattr(self, '_run_dir'):
+				# 	raise ValueError("No directory for save_to_dir was specified and the project directory for saving files was not initialized")
+				# save_to_dir = self._run_dir
+			if '.' not in save_to_filename:
+				raise ValueError("Provide save_to_filename with file extension specified")
+			
+			if '.' not in save_to_filename:
+				raise ValueError("Provide save_to_filename with file extention specified")
+			format = save_to_filename.split('.')[1]
+
+			from wilson_suite.wilson_utils import save_obtained_data
+			save_obtained_data(data_dict, format=format, filename=save_to_filename, save_to_dir=save_to_dir)
+
+		self.fillResults(data_dict=data_dict)
 
 
 
@@ -319,7 +349,7 @@ class WilsonSimulation:
 
 		pass
 
-	def evaluate(self):
+	def evaluate(self, save_evalinputs_pkl: str = None):
 		"""
 		Evaluating method, using EvaluationWorkflow
 		"""
@@ -329,6 +359,14 @@ class WilsonSimulation:
 
 		# prepare data for input to EvaluationWorkflow
 		eval_inputs = make_evaluation_inputs(simulation=self)
+		
+		# save EvaluationInputs data optionally to a pickle file
+		if save_evalinputs_pkl is not None:
+			if not hasattr(self, '_run_dir'):
+				raise ValueError("Project directory for saving files was not initialized")
+			
+			from wilson_suite.wilson_utils.serialization import pickle_this_to
+			pickle_this_to(eval_inputs, filenamepkl='EvaluationInputs.pkl', save_to=self._run_dir)
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
@@ -524,6 +562,58 @@ class WilsonSimulation:
 		logger.info(f'WilsonSimulation instance is saved to file {filename}')
 
 	# TODO: status_report() method
+
+	def save_to_pkl(self, configs_only: bool = False, filename: str = 'WilsonSimulation_instance.pkl'):
+		"""
+		
+		:param self: Description
+		:param configs_only: Description
+		"""
+		if not hasattr(self, '_run_dir'):
+			raise ValueError("Project directory for saving files was not initialized")
+			# self.make_proj_dir()
+		
+		if not configs_only:
+			from wilson_suite.wilson_utils.serialization import pickle_this_to
+			pickle_this_to(self, filename, self._run_dir)
+		else:
+			self.save_configs(filename)
+
+
+	from pathlib import Path
+	def make_proj_dir(self, base_dir: Path = None) -> Path:
+		"""
+		base_dir = Path("workflows")
+		run_dir = sim.make_proj_dir(base_dir)
+		data_dir = run_dir / "data"
+
+		:param base_dir: optional
+		:return: Description
+		"""
+		if base_dir is None:
+			from wilson_suite.wilson_utils.paths import WORKFLOW_BASE_DIR
+			base_dir = WORKFLOW_BASE_DIR
+
+		base_dir.mkdir(parents=True, exist_ok=True)
+		from datetime import datetime
+		
+		timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+		self._run_dir = WORKFLOW_BASE_DIR / f"run_{timestamp}"
+		self._run_dir.mkdir()
+		(self._run_dir / "figures").mkdir()
+
+	def get_configs(self) -> dict:
+		"""
+		TODO: have those objects pruned (exp, vib_ana_setup) to only settings(setup) info
+		"""
+		return {'system': self.system,
+		  		'experiment': self.exp,
+				'spec_eval_setup': self.spec_eval_setup, 
+		  		'vib_ana_setup': self.vib_ana_setup}
+
+	def save_configs(self, filename: str = 'WilsonSimulation_configs.pkl'):
+		from wilson_suite.wilson_utils.serialization import pickle_this_to
+		pickle_this_to(self.get_configs(), filename, self._run_dir)
 
 
 # simply copying old sketch for now
