@@ -7,6 +7,10 @@ from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname
 from typing import Callable
 import copy
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+	from .abstractions import DataOriginInfo
+
 import logging
 logger = logging.getLogger("wilson")
 
@@ -298,3 +302,32 @@ def request_residual_vib_info(residual_vib_info: dict, data_dict: dict) -> dict:
 		data_dict[k] = v
 	
 	return data_dict
+
+
+def get_data_for_vibanalysers(vib_ana: VibAnaSetup, calc_setup: 'DataOriginInfo', obtainer: Callable):
+	"""
+	returns vib_ana, props, residual_vib_info that can be used by anharmonic/harmonic analyser
+	"""
+    # ---- set up props for vibana
+	props, resvib = find_residual_vib_info(vib_ana=vib_ana)
+
+	# ---- prepare to get props for vibana
+	reqst_data_all = {}
+	reqst_data_all = request_props(props=props, data_dict=reqst_data_all)
+	reqst_data_all = request_residual_vib_info(residual_vib_info=resvib, data_dict=reqst_data_all)
+
+	if not isinstance(calc_setup, dict):
+		reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
+	else:
+		for k in reqst_data_all:
+			if k not in calc_setup:
+				raise ValueError(f"Missing calc_setup for {k}")
+			reqst_data_all[k] = calc_setup[k]
+
+	calc_data = obtainer(reqst_data_all)
+
+	# ---- get props for vibana
+	fill_props_results(props=props, data_dict=calc_data)
+	fill_residual_vib_info_results(vib_ana_setup=vib_ana, residual_vib_info=resvib, 
+															data_dict=calc_data)
+	return vib_ana, props, resvib
