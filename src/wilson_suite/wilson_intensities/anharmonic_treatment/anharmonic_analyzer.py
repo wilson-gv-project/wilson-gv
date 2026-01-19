@@ -31,10 +31,15 @@ def anharm_analyzer_data(props: list[wm_abst.MolecularProperty] = None,
     
     # prop_dict = {i.trivial_name: i.serial_vals for i in props}
     prop_dict = {i.trivial_name: i.vals for i in props}
+    for i in props: 
+        if i.trivial_name in ['cff', 'qff']:
+            prop_dict[i.trivial_name] = i.extra_data
     logger.debug(f'prop_dict {prop_dict.keys()}')
     logger.debug(prop_dict)
 
     # FIXME: Convertors from au to rec cm of cff, qff, (MR: B, coriolis)
+    # from wilson_suite.wilson_utils.unit_convertor import 
+
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
     corrected_levels, fermi_resonances = anharm_corr_energies(harmonic_energies=nc_sqrt_eigval,
                                                              cubic_forcefield=prop_dict['cff'], 

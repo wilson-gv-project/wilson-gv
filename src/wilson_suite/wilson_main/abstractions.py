@@ -112,6 +112,7 @@ class MolecularProperty:
 	trivial_name: str=None
 	vals: InitVar[Any] = field(default=None, repr=False)
 	calc_setup: DataOriginInfo = None
+	extra_data: dict = None
 
 	def to_dict(self):
 		return {
