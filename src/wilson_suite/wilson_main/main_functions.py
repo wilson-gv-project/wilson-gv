@@ -306,7 +306,7 @@ def request_residual_vib_info(residual_vib_info: dict, data_dict: dict) -> dict:
 
 def get_data_for_vibanalysers(vib_ana: VibAnaSetup, calc_setup: 'DataOriginInfo', obtainer: Callable):
 	"""
-	returns vib_ana, props, residual_vib_info that can be used by anharmonic/harmonic analyser
+	returns vib_ana, props that can be used by anharmonic/harmonic analyser
 	"""
     # ---- set up props for vibana
 	props, resvib = find_residual_vib_info(vib_ana=vib_ana)
@@ -330,4 +330,4 @@ def get_data_for_vibanalysers(vib_ana: VibAnaSetup, calc_setup: 'DataOriginInfo'
 	fill_props_results(props=props, data_dict=calc_data)
 	fill_residual_vib_info_results(vib_ana_setup=vib_ana, residual_vib_info=resvib, 
 															data_dict=calc_data)
-	return vib_ana, props, resvib
+	return vib_ana, props
