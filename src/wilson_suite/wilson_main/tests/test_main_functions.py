@@ -43,6 +43,20 @@ def test_get_data_for_vibanalysers():
                                                      base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
     
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
-    ws.main.main_functions.get_data_for_vibanalysers(vib_ana=vib_ana, 
+    vib_ana, props, resid_vib_info = ws.main.main_functions.get_data_for_vibanalysers(vib_ana=vib_ana, 
                                                      calc_setup=calc_setup, 
                                                      obtainer=wilson_data_obtainer)
+    
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                             regime=vib_ana.regime,
+                                                                             exclude_modes=None)
+    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
+    for k,v in st_dict.items():
+        print(k.ljust(10), v)
+    print(diagn)
+
+    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    print('\n1 quantum levels')
+    for k,v in vib_ana.nc_sqrt_eigval.items():
+        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
