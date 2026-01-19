@@ -306,7 +306,7 @@ class WilsonSimulation:
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict],
-					save_to_filename: str = None):
+					save_to_filename: str = None, save_to_dir: str = None):
 		"""
 		obtainer must return : a dictionary:
 		 	keys: trivial_name for properties or residual_vib_info keys
@@ -318,15 +318,20 @@ class WilsonSimulation:
 		
 		# FIXME should it be a separate function with saving option??
 		if save_to_filename is not None:
-			if not hasattr(self, '_run_dir'):
-				raise ValueError("Project directory for saving files was not initialized")
+			if save_to_dir is None:
+				save_to_dir = ''
+				# if not hasattr(self, '_run_dir'):
+				# 	raise ValueError("No directory for save_to_dir was specified and the project directory for saving files was not initialized")
+				# save_to_dir = self._run_dir
+			if '.' not in save_to_filename:
+				raise ValueError("Provide save_to_filename with file extension specified")
 			
 			if '.' not in save_to_filename:
 				raise ValueError("Provide save_to_filename with file extention specified")
 			format = save_to_filename.split('.')[1]
 
 			from wilson_suite.wilson_utils import save_obtained_data
-			save_obtained_data(data_dict, format=format, filename=save_to_filename, save_to_dir=self._run_dir)
+			save_obtained_data(data_dict, format=format, filename=save_to_filename, save_to_dir=save_to_dir)
 
 		self.fillResults(data_dict=data_dict)
 
