@@ -12,6 +12,25 @@ Single EVV spectrum workflow.
 
 EVV_EXPERIMENT.magn_conditions -- w2 > w1
 
+
+core_paper1_setup = ''
+
+-- fixed
+experiment: EVV + phasematching (-1, 2, 3) + magn_condition 'w2>w1'
+vib_analysis: anharmonic GVPT2
+axes_choice: based on experiment but here either (w1,w2) or (w1,w2-w1)
+SpecEvalSetup fixed: 
+    PlotConfig
+    RenderingInfo[all except reference max]
+    EvaluationInfo[all except Gamma and dynamic range?]
+
+-- variables:
+system
+calc_setup - DataOriginInfo
+SpecEvalSetup variables: 
+    RenderingInfo[reference max]
+    EvaluationInfo[Gamma and dynamic range]
+
 """
 import wilson_suite as ws
 from wilson_suite.fixtures import evv_experiment
@@ -72,7 +91,7 @@ calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
 # ---------- WilsonSimulation
 sim = ws.main.workflow_abstractions.WilsonSimulation()
 
-# setting attributes
+# -- setting attributes
 sim.addExperiment(experiment=EVV_EXPERIMENT)
 sim.addTerms(terms=DERIVED_EVV_TERMS)
 sim.addSystem(system=molecular_system)
