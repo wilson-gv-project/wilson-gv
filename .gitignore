@@ -5,6 +5,8 @@
 *.json
 *.log
 
+src/wilson_suite/wilson_intensities/tests/unit/prep_refdata_anharm_tests.py
+
 !terms_fuller_flat.json
 !src/wilson_suite/wilson_analysis/tests/f_ref.svg
 !src/wilson_suite/wilson_analysis/tests/f_h2o_ref.svg
