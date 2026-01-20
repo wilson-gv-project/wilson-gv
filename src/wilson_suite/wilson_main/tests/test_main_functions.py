@@ -56,7 +56,7 @@ def test_get_data_for_vibanalysers():
         print(k.ljust(10), v)
     print(diagn)
 
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     print('\n1 quantum levels')
     for k,v in vib_ana.nc_sqrt_eigval.items():
-        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
+        print(k, '--', v, '--', states_1quantum_corrected[k])

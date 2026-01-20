@@ -22,9 +22,9 @@ def test_form_vpt2():
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     
-    print(nc_sqrt_eigval_corrected)
+    print(states_1quantum_corrected)
 
     for k in st_dict_g16:
         print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
@@ -50,9 +50,9 @@ def test_form_gvpt2():
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     
-    print(nc_sqrt_eigval_corrected)
+    print(states_1quantum_corrected)
 
     for k in st_dict_g16:
         print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
@@ -82,9 +82,9 @@ def test_form_gvpt2_nocoriolis():
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     
-    print(nc_sqrt_eigval_corrected)
+    print(states_1quantum_corrected)
 
     for k in st_dict_g16:
         print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
@@ -110,9 +110,9 @@ def test_form_dvpt2():
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states_g16 if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     
-    print(nc_sqrt_eigval_corrected)
+    print(states_1quantum_corrected)
 
     for k in st_dict_g16:
         print(k, '--', st_dict_g16[k], '--', round(st_dict[k], 4))
