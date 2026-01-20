@@ -118,8 +118,8 @@ def test_anharm_analyzer_vibana():
                                                                              regime=vib_ana.regime,
                                                                              exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
-    assert vib_ana.nc_sqrt_eigval != nc_sqrt_eigval_corrected
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    assert vib_ana.nc_sqrt_eigval != states_1quantum_corrected
 
     for k,v in st_dict.items():
         print(k.ljust(10), v)
@@ -127,7 +127,7 @@ def test_anharm_analyzer_vibana():
     
     print('\n1 quantum levels')
     for k,v in vib_ana.nc_sqrt_eigval.items():
-        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
+        print(k, '--', v, '--', states_1quantum_corrected[k])
 
 
 
@@ -181,8 +181,8 @@ def test_anharm_analyzer_vibana_excludemodes():
                                                                              regime=vib_ana.regime,
                                                                              exclude_modes=vib_ana.exclude_modes)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
-    nc_sqrt_eigval_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
-    assert vib_ana.nc_sqrt_eigval != nc_sqrt_eigval_corrected
+    states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
+    assert vib_ana.nc_sqrt_eigval != states_1quantum_corrected
 
     for k,v in st_dict.items():
         print(k.ljust(10), v)
@@ -190,7 +190,7 @@ def test_anharm_analyzer_vibana_excludemodes():
     
     print('\n1 quantum levels')
     for k,v in vib_ana.nc_sqrt_eigval.items():
-        print(k, '--', v, '--', nc_sqrt_eigval_corrected[k])
+        print(k, '--', v, '--', states_1quantum_corrected[k])
 
 '''
 def test_anharm_analyzer_vibana():
