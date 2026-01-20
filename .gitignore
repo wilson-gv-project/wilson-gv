@@ -10,6 +10,8 @@
 !src/wilson_suite/wilson_analysis/tests/f_h2o_ref.svg
 !src/wilson_suite/wilson_analysis/tests/f_hcoh_ref.svg
 
+!src/wilson_suite/wilson_intensities/tests/datafiles/*.pkl
+
 .VSCodeCounter/
 
 # Byte-compiled / optimized / DLL files

@@ -7,6 +7,10 @@ from wilson_suite.wilson_utils.termdict_from_symb_term import prop_trivname
 from typing import Callable
 import copy
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+	from .abstractions import DataOriginInfo
+
 import logging
 logger = logging.getLogger("wilson")
 
@@ -27,9 +31,9 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 			return needed_props
 		else:
 			needed_props.append({'nc_sqrt_eigval': None})
-			if vib_ana.regime == 'harmonic':
+			if vib_ana.regime == 'harmonic' or vib_ana.regime == 'compare':
 				needed_props.append({'harmonic_states': None})
-			elif 'PT2' in vib_ana.regime:
+			if 'PT2' in vib_ana.regime or vib_ana.regime == 'compare':
 				needed_props.append({'anharmonic_states': None})
 	
 	if (vib_ana.vibana_own_analysis == 'full'):
@@ -43,9 +47,9 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 		)
 
 	# For now, don't use regime subinfo
-	if 'PT2' in vib_ana.regime:
+	if 'PT2' in vib_ana.regime or vib_ana.regime == 'compare':
 
-		if (vib_ana.vibana_own_analysis == 'anharm') or (vib_ana.vibana_own_analysis == 'full'):
+		if (vib_ana.vibana_own_analysis == 'anharm') or (vib_ana.vibana_own_analysis == 'full') or (vib_ana.vibana_own_analysis == 'none' and vib_ana.regime == 'compare'):
 
 			needed_props.append(MolecularProperty(
 				{'ops': tuple(['g', 'g', 'g']), 'freq': (0.0, 0.0, 0.0)},
@@ -70,7 +74,8 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 		
 		if vib_ana.vibana_own_analysis == 'anharm':
 			needed_props.append({'nc_sqrt_eigval': None})
-		
+		if vib_ana.vibana_own_analysis == 'full' and vib_ana.regime == 'compare':
+			needed_props.append({'nc_sqrt_eigval': None})
 	return needed_props
 
 
@@ -238,10 +243,14 @@ def find_residual_vib_info(vib_ana: VibAnaSetup) -> tuple[list[MolecularProperty
 
 def find_props_and_max_state_lvl(terms: list[VibPerturbedTerm], 
 								 vib_ana: VibAnaSetup, freqs: str='static') -> tuple[list[MolecularProperty], dict, int]:
-
+	"""
+	Returns: props, residual_vib_info, find_max_state_lvl(terms) - list[MolecularProperty], dict, int
+	"""
 	props = find_props(terms, freqs)
 	props_ext, residual_vib_info = find_residual_vib_info(vib_ana)
-	props.extend(props_ext)
+	
+	existing_hashes = {prop.h(1) for prop in props}
+	props.extend(prop for prop in props_ext if prop.h(1) not in existing_hashes)
 
 	return props, residual_vib_info, find_max_state_lvl(terms)
 
@@ -252,9 +261,14 @@ def fill_props_results(props, data_dict: dict):
 	data_dict: dict - {data_name: values}
 
 	"""
-
 	for p in props:
 		p.addValues(data_dict.get(p.trivial_name))
+		if p.trivial_name == 'cff':
+			if 'cff_rc' in data_dict:
+				p.extra_data = data_dict['cff_rc']
+		if p.trivial_name == 'qff':
+			if 'qff_rc' in data_dict:
+				p.extra_data = data_dict['qff_rc']
 
 def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: dict):
 	"""
@@ -264,6 +278,7 @@ def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: 
 
 	"""
 	for k in residual_vib_info:
+		
 		if k in ['anharmonic_states', 'harmonic_states']:
 			states_list = []
 			states_dict: dict = data_dict.get(k)
@@ -277,7 +292,23 @@ def fill_residual_vib_info_results(vib_ana_setup, residual_vib_info, data_dict: 
 		else:
 			residual_vib_info[k] = data_dict.get(k)
 			setattr(vib_ana_setup, k, data_dict.get(k))
+	
+	if 'anharmonic_states' in residual_vib_info and 'harmonic_states' in residual_vib_info:
+		vib_ana_setup._harm_states = []
+		states_dict: dict = data_dict.get('harmonic_states')
 
+		for state, energy in states_dict.items():
+			vib_ana_setup._harm_states.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+
+		vib_ana_setup._anharm_states = []
+		states_dict: dict = data_dict.get('anharmonic_states')
+
+		for state, energy in states_dict.items():
+			vib_ana_setup._anharm_states.append(VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+		
+		vib_ana_setup.setStates(states=vib_ana_setup._anharm_states)
+		residual_vib_info['anharmonic_states'] = data_dict.get('anharmonic_states')
+	
 def request_props(props: list[MolecularProperty], data_dict: dict) -> dict:
 	"""
 	data_dict: dict - {data_name: DataOriginInfo}
@@ -294,3 +325,33 @@ def request_residual_vib_info(residual_vib_info: dict, data_dict: dict) -> dict:
 		data_dict[k] = v
 	
 	return data_dict
+
+
+def get_data_for_vibanalysers(vib_ana: VibAnaSetup, calc_setup: 'DataOriginInfo', obtainer: Callable):
+	"""
+	returns vib_ana, props that can be used by anharmonic/harmonic analyser
+	"""
+    # ---- set up props for vibana
+	props, resvib = find_residual_vib_info(vib_ana=vib_ana)
+	print('resvib', resvib)
+
+	# ---- prepare to get props for vibana
+	reqst_data_all = {}
+	reqst_data_all = request_props(props=props, data_dict=reqst_data_all)
+	reqst_data_all = request_residual_vib_info(residual_vib_info=resvib, data_dict=reqst_data_all)
+
+	if not isinstance(calc_setup, dict):
+		reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
+	else:
+		for k in reqst_data_all:
+			if k not in calc_setup:
+				raise ValueError(f"Missing calc_setup for {k}")
+			reqst_data_all[k] = calc_setup[k]
+
+	calc_data = obtainer(reqst_data_all)
+
+	# ---- get props for vibana
+	fill_props_results(props=props, data_dict=calc_data)
+	fill_residual_vib_info_results(vib_ana_setup=vib_ana, residual_vib_info=resvib, 
+															data_dict=calc_data)
+	return vib_ana, props
