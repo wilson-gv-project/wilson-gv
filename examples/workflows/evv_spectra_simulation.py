@@ -91,7 +91,7 @@ sim.setAxisChoiceAndTranslateTerms(axes_choice) # set axes and prepare terms for
 # ---- chng of state
 sim.getResults(obtainer=wilson_data_obtainer)
 
-# ---- chng of state
+# ---- chng of state? or just setting attributes?
 sim.evaluate()
 
 fig_file = '.svg'
@@ -100,5 +100,5 @@ rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=fig_file, style_confi
 
 sim.spec_eval_setup.rnd_info = rnd # add RenderingInfo to SpecEvalSetup
 
-# ---- 
+# ---- just setting attributes?
 sim.render(renderer=ws.analysis.render.render_spectrum)
