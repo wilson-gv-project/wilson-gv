@@ -22,7 +22,7 @@ axes_choice: based on experiment but here either (w1,w2) or (w1,w2-w1)
 SpecEvalSetup fixed: 
     PlotConfig
     RenderingInfo[all except reference max]
-    EvaluationInfo[all except Gamma and dynamic range?]
+    EvaluationInfo[all except Gamma, dynamic range, grid_resolution?]
 
 -- variables:
 system
@@ -36,6 +36,7 @@ import wilson_suite as ws
 from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
 from wilson_suite.wilson_experiment.indep_vars_and_axes import PhaseMatchingCondition, SignedPulseTuple
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, SpectralWindow
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 # ---------- PREPARE PARTS FOR WilsonSimulation
@@ -60,33 +61,67 @@ axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSe
 DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
 # next step is to translate terms wrt axes_choice
 
-# would always be a user input - ?
-molecular_system = ws.main.abstractions.MolecularSystem(name='h2o', natoms=3)
+
+def system_calculation_setup(system_name: str, base_filepath, lvl_theory, basis_set):
+    """
+
+    """
+    # would always be a user input - ?
+    molecular_system = ws.main.abstractions.MolecularSystem(name=system_name, natoms=3)
+
+    # DataOriginInfo - to get data from QC program outputs
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
+                                                        lvl_theory=lvl_theory, 
+                                                        basis_set=basis_set, 
+                                                        base_file_loc=base_filepath)
+    return molecular_system, calc_setup
+
+
+molecular_system, calc_setup = system_calculation_setup()
 
 # user configs
 vib_ana = ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm')
 # doesn't have to have a molecular system
 
-# set up SpectralWindow -- should be flexible/changable in wilsonsim object
-bounds_dict = {'A': (1000., 3100.), 'B': (-100., 2500.)}
-spec_box = ws.intensities.amplitudes.spectrum_composition.Box(bounds=bounds_dict)
-spectral_window = ws.intensities.amplitudes.spectrum_composition.SpectralWindow(box=spec_box)
 
-# set up EvaluationInfo
-evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
-                                                        'Gamma': 24.7, 'Gamma_unit': 'cm-1',
-                                                        'dynamic_range': 1000,
-                                                        'grid_resolution': {'A': 70, 'B': 100}})
+def evv_SpecEvalSetup_paper1(*, reference_max: float,
+                                Gamma_rc: float, 
+                                dynamic_range: float,
+                                window_bounds_dict: dict[str,tuple[float,float]],
+                                grid_resolution: dict[str,int],
+                                fig_file: str):
+    """
+    SpecEvalSetup vars:
+        reference_max
+        Gamma_rc
+        dynamic_range
+        window_bounds_dict
+        grid_resolution
+    
+    window_bounds_dict = {'A': (1000., 3100.), 'B': (-100., 2500.)} - example
+    grid_resolution = {'A': 70, 'B': 100} - example
+    fig_file = '.svg'
 
-# put configs together in SpecEvalSetup
-eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
+    """
+    # set up SpectralWindow -- should be flexible/changable in wilsonsim object
+    spectral_window = SpectralWindow(box=Box(bounds=window_bounds_dict))
 
-# DataOriginInfo - to get data from QC program outputs
-base_filepath = ''
-calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
-                                                    lvl_theory='B3LYP', 
-                                                    basis_set='cc-pVQZ', 
-                                                    base_file_loc=base_filepath)
+    # set up EvaluationInfo
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
+                                                            'Gamma': Gamma_rc, 'Gamma_unit': 'cm-1',
+                                                            'dynamic_range': dynamic_range,
+                                                            'grid_resolution': grid_resolution})
+
+    # set up RenderingInfo
+    style_config = ws.main.spectrum_abstractions.PlotConfig(tick_step=50.)
+    rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=fig_file, 
+                                                      reference_max=reference_max,
+                                                      style_config=style_config)
+
+    # put configs together in SpecEvalSetup
+    return ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi, rnd_info=rnd)
+
+eval_setup = evv_SpecEvalSetup_paper1()
 
 # ---------- WilsonSimulation
 sim = ws.main.workflow_abstractions.WilsonSimulation()
@@ -112,12 +147,6 @@ sim.getResults(obtainer=wilson_data_obtainer)
 
 # ---- chng of state? or just setting attributes?
 sim.evaluate()
-
-fig_file = '.svg'
-style_config = ws.main.spectrum_abstractions.PlotConfig(tick_step=50.)
-rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=fig_file, style_config=style_config)
-
-sim.spec_eval_setup.rnd_info = rnd # add RenderingInfo to SpecEvalSetup
 
 # ---- just setting attributes?
 sim.render(renderer=ws.analysis.render.render_spectrum)
