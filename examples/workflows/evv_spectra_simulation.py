@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Single EVV spectrum workflow.
 
@@ -32,6 +33,8 @@ SpecEvalSetup variables:
     EvaluationInfo[Gamma and dynamic range]
 
 """
+import argparse
+
 import wilson_suite as ws
 from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
@@ -39,6 +42,29 @@ from wilson_suite.wilson_experiment.indep_vars_and_axes import PhaseMatchingCond
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, SpectralWindow
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
+# --- Vault stuff
+from CQCParse.relay import DataVault
+
+
+# (mol_name, conformer, method, basis)  mol_tuple
+
+# d1: dict[str, str] = vault.make_data_input_dict('cfour', ('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ'))
+# d: dict[str, str] = vault.make_data_input_dict('gaussian', ('FORM', 'conf1', 'B3LYP', 'cc-pVQZ'))
+
+
+def get_basedir(vault, source, mol_tuple):
+    if source == 'cfour':
+        return vault.make_data_input_dict('cfour', mol_tuple)['files']['out'][:-3]
+    elif source == 'gaussian':
+        return '/'.join(vault.make_data_input_dict('gaussian', mol_tuple)['files']['log'].split('/')[:-1])+'/'
+
+# print(get_basedir(vault=vault, source='cfour', mol_tuple=('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ')))
+# assert get_basedir(vault=vault, source='cfour', mol_tuple=('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ')) == '/'.join(d1['files']['out'].split('/')[:-1])+'/'
+
+# print(get_basedir(vault=vault, source='gaussian', mol_tuple=('FORM', 'conf1', 'B3LYP', 'cc-pVQZ')))
+# assert get_basedir(vault=vault, source='gaussian', mol_tuple=('FORM', 'conf1', 'B3LYP', 'cc-pVQZ')) == '/'.join(d['files']['log'].split('/')[:-1])+'/'
+
+'''
 # ---------- PREPARE PARTS FOR WilsonSimulation
 # assuming this function will set up and return a correct EVV experiment
 EVV_EXPERIMENT = evv_experiment()
@@ -77,7 +103,7 @@ def system_calculation_setup(system_name: str, base_filepath, lvl_theory, basis_
     return molecular_system, calc_setup
 
 
-molecular_system, calc_setup = system_calculation_setup()
+molecular_system, calc_setup = system_calculation_setup(system_name='FORM', base_filepath='')
 
 # user configs
 vib_ana = ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm')
@@ -150,3 +176,63 @@ sim.evaluate()
 
 # ---- just setting attributes?
 sim.render(renderer=ws.analysis.render.render_spectrum)
+
+'''
+
+def main():
+    '''
+
+    parser = argparse.ArgumentParser(
+        description="A script to demonstrate CLI functionality and print initial information."
+    )
+
+    parser.add_argument(
+        "--example", 
+        action="store_true", 
+        help="An example flag for demonstration."
+    )
+
+    args = parser.parse_args()
+
+    '''
+    csvfile = '/home/vlev/sprint/calculations/calculations.csv'
+    vault = DataVault(csvfile)
+    db = vault.read_csv_DB()
+    
+    print("\n------    WilsonSimulation evaluate and render script!\n")
+    print("There are entries with different Calc_Types:", db["Calc_Type"].unique(), '\n\n')
+
+    filter_db = db[db["Calc_Type"] == 'full']
+    result = filter_db[["Full_Name", "Conformer_ID", "Name", "Method", "Basis"]]
+    print(result)
+
+    calc_choice = None
+
+    filtered_ids = filter_db.index.tolist()
+    
+    calc_choice = None
+    while calc_choice is None or int(calc_choice) not in filtered_ids:
+        calc_choice = input('\n\nSelect a number from the table: ')
+        
+        try:
+            calc_choice = int(calc_choice)  # Convert input to integer
+            if calc_choice not in filtered_ids:
+                print(f"Invalid choice. Please select a valid number from: {filtered_ids}")
+                calc_choice = None  # Reset calc_choice to stay in the loop
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
+            calc_choice = None  # Reset calc_choice to stay in the loop
+
+    selected_row = db.iloc[int(calc_choice)]
+    print("\nYour selection:")
+    print(f"{selected_row['Full_Name']}, {selected_row['Name']}, {selected_row['Method']}, {selected_row['Basis']}\n")
+    q = vault.make_data_input_by_index(db, int(calc_choice))
+    print(q)
+    
+    # ['Basis', 'Calc_Type', 'Conformer_Description', 'Conformer_ID',
+    #    'Full_Name', 'Method', 'Name', 'Status', 'cff', 'dipolex', 'dipoley',
+    #    'dipolez', 'file_location', 'file_location_pathtype', 'molden', 'out',
+    #    'polar_pkl', 'qff']
+
+if __name__ == "__main__":
+    main()
