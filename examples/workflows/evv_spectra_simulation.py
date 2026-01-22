@@ -65,16 +65,24 @@ EVV_EXPERIMENT = evv_experiment()
 EVV_PHASEMATCH_COND = PhaseMatchingCondition(pulses=SignedPulseTuple(pulse_refs=(-1, 2, 3)), id=0)
 assert EVV_EXPERIMENT.relevant_phasematch[0] == EVV_PHASEMATCH_COND
 
+print('EVV_EXPERIMENT.canonical_axes', EVV_EXPERIMENT.canonical_axes)
+
 # BTW: valid_axis_combs[0] is unclear API from the POV of the user
 # EVV_EXPERIMENT.valid_axis_combs[0].present_spectral_axis_choices()
 
 # setting up a SpectralAxisSet - axes based on possible combination of independent variables
-axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [1, -2]})
+axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [-1], 'B': [2]})
 # now would be useful to check wheather constructed SpectralAxisSet makes sense here - is it in valid_axis_combs?
 
 
 # original derived terms with independent variables - needed for the manuscript
 DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
+from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+flat_terms_dict = derived_terms_flat(DERIVED_EVV_TERMS)
+for id, term in flat_terms_dict.items():
+    # print()
+    print('&'+term.to_latex(part='res') + r' \\')
+
 # next step is to translate terms wrt axes_choice
 
 def system_calculation_setup(calc_choice):
