@@ -55,7 +55,6 @@ def prepDataForEval(number_of_nmodes: int,
     """
     put data in a form for use on the evaluation step
     """
-    print('list(vib_ana_setup.nc_sqrt_eigval.keys())', list(vib_ana_setup.nc_sqrt_eigval.keys()))
     include_list = tuple([v for v in list(vib_ana_setup.nc_sqrt_eigval.keys()) if v not in vib_ana_setup.exclude_modes])
     if include_list == tuple():
         raise ValueError("include_list of included normal modes labels is empty")
