@@ -324,7 +324,7 @@ class VibAnaSetup:
 		"""
 		if self.states is None:
 			return False
-		states_lvls = [len(st.state_label.split(',')) for st in self.states]
+		states_lvls = [len(next(iter(st.harm_quanta_coeffs))) for st in self.states]
 		if self.max_state_lvl in states_lvls:
 			return True
 		print('states_lvls', states_lvls)
