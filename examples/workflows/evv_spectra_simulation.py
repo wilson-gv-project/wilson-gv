@@ -45,26 +45,15 @@ from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 # --- Vault stuff
 from CQCParse.relay import DataVault
 
+csvfile = '/home/vlev/sprint/calculations/calculations.csv'
+vault = DataVault(csvfile)
+db = vault.read_csv_DB()
+# ['Basis', 'Calc_Type', 'Conformer_Description', 'Conformer_ID',
+#    'Full_Name', 'Method', 'Name', 'Status', 'cff', 'dipolex', 'dipoley',
+#    'dipolez', 'file_location', 'file_location_pathtype', 'molden', 'out',
+#    'polar_pkl', 'qff']
 
-# (mol_name, conformer, method, basis)  mol_tuple
 
-# d1: dict[str, str] = vault.make_data_input_dict('cfour', ('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ'))
-# d: dict[str, str] = vault.make_data_input_dict('gaussian', ('FORM', 'conf1', 'B3LYP', 'cc-pVQZ'))
-
-
-def get_basedir(vault, source, mol_tuple):
-    if source == 'cfour':
-        return vault.make_data_input_dict('cfour', mol_tuple)['files']['out'][:-3]
-    elif source == 'gaussian':
-        return '/'.join(vault.make_data_input_dict('gaussian', mol_tuple)['files']['log'].split('/')[:-1])+'/'
-
-# print(get_basedir(vault=vault, source='cfour', mol_tuple=('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ')))
-# assert get_basedir(vault=vault, source='cfour', mol_tuple=('FORM', 'conf1', 'CCSD(T)', 'cc-pVQZ')) == '/'.join(d1['files']['out'].split('/')[:-1])+'/'
-
-# print(get_basedir(vault=vault, source='gaussian', mol_tuple=('FORM', 'conf1', 'B3LYP', 'cc-pVQZ')))
-# assert get_basedir(vault=vault, source='gaussian', mol_tuple=('FORM', 'conf1', 'B3LYP', 'cc-pVQZ')) == '/'.join(d['files']['log'].split('/')[:-1])+'/'
-
-'''
 # ---------- PREPARE PARTS FOR WilsonSimulation
 # assuming this function will set up and return a correct EVV experiment
 EVV_EXPERIMENT = evv_experiment()
@@ -87,27 +76,31 @@ axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSe
 DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
 # next step is to translate terms wrt axes_choice
 
-
-def system_calculation_setup(system_name: str, base_filepath, lvl_theory, basis_set):
+def system_calculation_setup(calc_choice):
     """
-
+    preparing MolecularSystem and DataOriginInfo for the choice of data [molecule+calc_setup]
     """
+    vault_df_row = db.iloc[int(calc_choice)]
+
+    print("\nYour selection:")
+    print(f"{vault_df_row['Full_Name']} [{vault_df_row['Name']}] - {vault_df_row['Method']}/{vault_df_row['Basis']}\n")
+
+    base_filepath = vault.make_data_input_by_index(db, int(calc_choice))  
+
     # would always be a user input - ?
-    molecular_system = ws.main.abstractions.MolecularSystem(name=system_name, natoms=3)
+    molecular_system = ws.main.abstractions.MolecularSystem(name=vault_df_row['Name'], natoms=vault_df_row["N_atoms"])
+
+    if isinstance(base_filepath, dict):
+        source_type = 'cfour'
+    elif isinstance(base_filepath, str):
+        source_type = 'gaussian'
 
     # DataOriginInfo - to get data from QC program outputs
-    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
-                                                        lvl_theory=lvl_theory, 
-                                                        basis_set=basis_set, 
-                                                        base_file_loc=base_filepath)
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type=source_type, 
+                                                     lvl_theory=vault_df_row['Method'], 
+                                                     basis_set=vault_df_row['Basis'], 
+                                                     base_file_loc=base_filepath)
     return molecular_system, calc_setup
-
-
-molecular_system, calc_setup = system_calculation_setup(system_name='FORM', base_filepath='')
-
-# user configs
-vib_ana = ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='anharm')
-# doesn't have to have a molecular system
 
 
 def evv_SpecEvalSetup_paper1(*, reference_max: float,
@@ -147,37 +140,7 @@ def evv_SpecEvalSetup_paper1(*, reference_max: float,
     # put configs together in SpecEvalSetup
     return ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi, rnd_info=rnd)
 
-eval_setup = evv_SpecEvalSetup_paper1()
 
-# ---------- WilsonSimulation
-sim = ws.main.workflow_abstractions.WilsonSimulation()
-
-# -- setting attributes
-sim.addExperiment(experiment=EVV_EXPERIMENT)
-sim.addTerms(terms=DERIVED_EVV_TERMS)
-sim.addSystem(system=molecular_system)
-sim.addVibAnaSetup(vib_ana)
-sim.addPropEvalSetup(eval_uniform=calc_setup)
-sim.addSpecEvalSetup(eval_setup)
-
-
-# ---- chng of state
-sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-# ---- chng of state
-sim.dressPropsWithSetup()
-# ---- chng of state
-sim.setAxisChoiceAndTranslateTerms(axes_choice) # set axes and prepare terms for evaluation 
-
-# ---- chng of state
-sim.getResults(obtainer=wilson_data_obtainer)
-
-# ---- chng of state? or just setting attributes?
-sim.evaluate()
-
-# ---- just setting attributes?
-sim.render(renderer=ws.analysis.render.render_spectrum)
-
-'''
 
 def main():
     '''
@@ -195,9 +158,6 @@ def main():
     args = parser.parse_args()
 
     '''
-    csvfile = '/home/vlev/sprint/calculations/calculations.csv'
-    vault = DataVault(csvfile)
-    db = vault.read_csv_DB()
     
     print("\n------    WilsonSimulation evaluate and render script!\n")
     print("There are entries with different Calc_Types:", db["Calc_Type"].unique(), '\n\n')
@@ -206,10 +166,8 @@ def main():
     result = filter_db[["Full_Name", "Conformer_ID", "Name", "Method", "Basis"]]
     print(result)
 
-    calc_choice = None
 
     filtered_ids = filter_db.index.tolist()
-    
     calc_choice = None
     while calc_choice is None or int(calc_choice) not in filtered_ids:
         calc_choice = input('\n\nSelect a number from the table: ')
@@ -223,16 +181,51 @@ def main():
             print("Invalid input. Please enter a valid number.")
             calc_choice = None  # Reset calc_choice to stay in the loop
 
-    selected_row = db.iloc[int(calc_choice)]
-    print("\nYour selection:")
-    print(f"{selected_row['Full_Name']}, {selected_row['Name']}, {selected_row['Method']}, {selected_row['Basis']}\n")
-    q = vault.make_data_input_by_index(db, int(calc_choice))
-    print(q)
     
-    # ['Basis', 'Calc_Type', 'Conformer_Description', 'Conformer_ID',
-    #    'Full_Name', 'Method', 'Name', 'Status', 'cff', 'dipolex', 'dipoley',
-    #    'dipolez', 'file_location', 'file_location_pathtype', 'molden', 'out',
-    #    'polar_pkl', 'qff']
+    # would always be a user input - ?
+    molecular_system, calc_setup = system_calculation_setup(calc_choice=calc_choice)
+
+    # user configs
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=molecular_system, regime='GVPT2', vibana_own_analysis='anharm')
+    # doesn't have to have a molecular system
+
+    eval_setup = evv_SpecEvalSetup_paper1() 
+    '''
+    reference_max: float,
+    Gamma_rc: float, 
+    dynamic_range: float,
+    window_bounds_dict: dict[str,tuple[float,float]],
+    grid_resolution: dict[str,int],
+    fig_file: str
+    '''
+
+    # ---------- WilsonSimulation
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
+
+    # -- setting attributes
+    sim.addExperiment(experiment=EVV_EXPERIMENT)
+    sim.addTerms(terms=DERIVED_EVV_TERMS)
+    sim.addSystem(system=molecular_system)
+    sim.addVibAnaSetup(vib_ana)
+    sim.addPropEvalSetup(eval_uniform=calc_setup)
+    sim.addSpecEvalSetup(eval_setup)
+
+
+    # ---- chng of state
+    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
+    # ---- chng of state
+    sim.dressPropsWithSetup()
+    # ---- chng of state
+    sim.setAxisChoiceAndTranslateTerms(axes_choice) # set axes and prepare terms for evaluation 
+
+    # ---- chng of state
+    sim.getResults(obtainer=wilson_data_obtainer)
+
+    # ---- chng of state? or just setting attributes?
+    sim.evaluate()
+
+    # ---- just setting attributes?
+    sim.render(renderer=ws.analysis.render.render_spectrum)
 
 if __name__ == "__main__":
     main()
