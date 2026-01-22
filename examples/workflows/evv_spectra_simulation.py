@@ -41,6 +41,7 @@ from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
 from wilson_suite.wilson_experiment.indep_vars_and_axes import PhaseMatchingCondition, SignedPulseTuple
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, SpectralWindow
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_intensities.anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
 
 # --- Vault stuff
 from CQCParse.relay import DataVault
@@ -68,7 +69,7 @@ assert EVV_EXPERIMENT.relevant_phasematch[0] == EVV_PHASEMATCH_COND
 # EVV_EXPERIMENT.valid_axis_combs[0].present_spectral_axis_choices()
 
 # setting up a SpectralAxisSet - axes based on possible combination of independent variables
-axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [-1], 'B': [-1, 2]})
+axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [1, -2]})
 # now would be useful to check wheather constructed SpectralAxisSet makes sense here - is it in valid_axis_combs?
 
 
@@ -189,7 +190,18 @@ def main():
     vib_ana = ws.main.abstractions.VibAnaSetup(system=molecular_system, regime='GVPT2', vibana_own_analysis='anharm')
     # doesn't have to have a molecular system
 
-    eval_setup = evv_SpecEvalSetup_paper1() 
+    import json
+    with open("/home/vlev/monorepo/examples/workflows/config.json", "r") as file:
+        params = json.load(file)
+
+    
+    if params['reference_max'] == 'None':
+        params['reference_max'] = None
+    params['window_bounds_dict'] = {k: tuple(v) for k,v in params['window_bounds_dict'].items()}
+    print(params)
+
+    eval_setup = evv_SpecEvalSetup_paper1(**params)
+
     '''
     reference_max: float,
     Gamma_rc: float, 
@@ -215,17 +227,29 @@ def main():
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
     # ---- chng of state
     sim.dressPropsWithSetup()
+
+
     # ---- chng of state
     sim.setAxisChoiceAndTranslateTerms(axes_choice) # set axes and prepare terms for evaluation 
 
     # ---- chng of state
     sim.getResults(obtainer=wilson_data_obtainer)
 
+    ws.main.main_functions.do_anharmonic_analysis(vib_ana=sim.vib_ana_setup, 
+                                                  props=sim.props, anharmonic_analyzer=anharm_analyzer_data)
+
+    print('sim.vib_ana_setup.isAllSet', sim.vib_ana_setup)
+    
+    print('\nsim.vib_ana_setup.states\n')
+    print(sim.vib_ana_setup.states[:3], '\n\n')
+
     # ---- chng of state? or just setting attributes?
     sim.evaluate()
+    sim.save_to_pkl(filename='/home/vlev/monorepo/examples/workflows/wsim_after_eval.pkl')
 
     # ---- just setting attributes?
     sim.render(renderer=ws.analysis.render.render_spectrum)
+
 
 if __name__ == "__main__":
     main()
