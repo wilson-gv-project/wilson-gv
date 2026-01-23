@@ -565,7 +565,7 @@ class WilsonSimulation:
 
 	def save_to_pkl(self, configs_only: bool = False, filename: str = 'WilsonSimulation_instance.pkl'):
 		"""
-		
+		TODO: fix this function, because it's weird right now; should there be a functionality for making project/simulation directory where to save files?
 		:param self: Description
 		:param configs_only: Description
 		"""
