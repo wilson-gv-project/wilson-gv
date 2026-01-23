@@ -47,12 +47,21 @@ if last_key == 'spec_window':
         print(feat.location)
 
 # ======
+print('\nflat_terms_dict of eval_wf.inputs.terms')
 flat_terms_dict: dict[str, VibPerturbedTerm] = derived_terms_flat(eval_wf.inputs.terms)
 for id, term in flat_terms_dict.items():
     # print()
     print('&'+term.to_latex(part='res') + r' \\')
 
+print()
+
 wsim_eval_success: WilsonSimulation = unpickle_smth_from('/home/vlev/monorepo/examples/workflows/wsim_after_eval.pkl')
+
+print('\nflat_terms_dict_in_axis_choice')
+flat_terms_dict_in_axis_choice = derived_terms_flat(wsim_eval_success.terms_in_axis_choice)
+for id, term in flat_terms_dict_in_axis_choice.items():
+    # print()
+    print('&'+term.to_latex(part='res') + r' \\')
 
 features = wsim_eval_success._workflow.artifacts.features
 

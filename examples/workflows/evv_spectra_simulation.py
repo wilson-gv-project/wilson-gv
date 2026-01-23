@@ -71,16 +71,21 @@ print('EVV_EXPERIMENT.canonical_axes', EVV_EXPERIMENT.canonical_axes)
 # EVV_EXPERIMENT.valid_axis_combs[0].present_spectral_axis_choices()
 
 # setting up a SpectralAxisSet - axes based on possible combination of independent variables
-axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [-1], 'B': [2]})
+axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # this makes A and B > 0
+# axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = EVV_EXPERIMENT.canonical_axes
+
 # now would be useful to check wheather constructed SpectralAxisSet makes sense here - is it in valid_axis_combs?
 
 
 # original derived terms with independent variables - needed for the manuscript
 DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
+
+
 from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+print()
+print('DERIVED_EVV_TERMS')
 flat_terms_dict = derived_terms_flat(DERIVED_EVV_TERMS)
 for id, term in flat_terms_dict.items():
-    # print()
     print('&'+term.to_latex(part='res') + r' \\')
 
 # next step is to translate terms wrt axes_choice
@@ -117,7 +122,8 @@ def evv_SpecEvalSetup_paper1(*, reference_max: float,
                                 dynamic_range: float,
                                 window_bounds_dict: dict[str,tuple[float,float]],
                                 grid_resolution: dict[str,int],
-                                fig_file: str):
+                                fig_file: str,
+                                axes_labels: dict):
     """
     SpecEvalSetup vars:
         reference_max
@@ -144,7 +150,8 @@ def evv_SpecEvalSetup_paper1(*, reference_max: float,
     style_config = ws.main.spectrum_abstractions.PlotConfig(tick_step=50.)
     rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=fig_file, 
                                                       reference_max=reference_max,
-                                                      style_config=style_config)
+                                                      style_config=style_config,
+                                                      axes_labels=axes_labels)
 
     # put configs together in SpecEvalSetup
     return ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi, rnd_info=rnd)
@@ -240,6 +247,12 @@ def main():
     # ---- chng of state
     sim.setAxisChoiceAndTranslateTerms(axes_choice) # set axes and prepare terms for evaluation 
 
+    print()
+    print('sim.terms_in_axis_choice')
+    flat_terms_in_axis_choice = derived_terms_flat(sim.terms_in_axis_choice)
+    for id, term in flat_terms_in_axis_choice.items():
+        print('&'+term.to_latex(part='res') + r' \\')
+
     # ---- chng of state
     sim.getResults(obtainer=wilson_data_obtainer)
 
@@ -251,12 +264,44 @@ def main():
     print('\nsim.vib_ana_setup.states\n')
     print(sim.vib_ana_setup.states[:3], '\n\n')
 
+
+    print()
+    print('sim.terms')
+    flat_terms_dict = derived_terms_flat(sim.terms)
+    for id, term in flat_terms_dict.items():
+        print('&'+term.to_latex(part='res') + r' \\')
+
+    print()
+    print(sim.axis_choice)
+    print()
+
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+    vibdata = VibStatesData(allstates=sim.vib_ana_setup.states, 
+                            harmonic_osc_states_labels=tuple(sim.vib_ana_setup.nc_sqrt_eigval.keys()))
+    cache = VibDiffCache()
+    from wilson_suite.wilson_intensities.amplitudes.resonances import identify_unique_resmotifs, find_resonance_locations_wrt_index_choices
+    print('\nidentify_unique_resmotifs(sim.terms_in_axis_choice)')
+    res_motifs: set = identify_unique_resmotifs(list(flat_terms_in_axis_choice.values()))
+    for i in res_motifs:
+        print(i)
+        d_res_locs = find_resonance_locations_wrt_index_choices(i, vibstates_data=vibdata, vibdiff_cache=cache)
+        points_only = list(list(d_res_locs.values())[0].keys())
+        for q in points_only:
+            if q.values[0]>0 and q.values[1]==0:
+                print(q)
+    print('----')
+
+    print()
+    
+    print()
     # ---- chng of state? or just setting attributes?
     sim.evaluate()
     sim.save_to_pkl(filename='/home/vlev/monorepo/examples/workflows/wsim_after_eval.pkl')
 
     # ---- just setting attributes?
     sim.render(renderer=ws.analysis.render.render_spectrum)
+
 
 
 if __name__ == "__main__":
