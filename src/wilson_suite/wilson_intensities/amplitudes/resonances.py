@@ -117,6 +117,10 @@ def solve_LSE_motif(motif: ResonanceMotif,
     A = np.array(coeff_matrix)
     b = np.array(constants)
 
+    # print('motif', motif)
+    # print('coeff_matrix\n', A)
+    # print('constants\n', b)
+
     try:
         solution = np.linalg.solve(A, b)
         from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
