@@ -150,8 +150,9 @@ def calculate_vibenedenom_tensor(vibenedenom_inds: tuple,
     # 'i,j,k->ijk'
     letters = ['i', 'j', 'k', 'l', 'n', 'n', 'o', 'p']
     einsum_str = ','.join(letters[:len(vibenedenom_inds)])+'->'+''.join(letters[:len(vibenedenom_inds)])
-
-    return 1. / np.einsum(einsum_str, *(vector,) * len(vibenedenom_inds))
+    denominator = np.einsum(einsum_str, *(vector,) * len(vibenedenom_inds))
+    
+    return np.where(denominator != 0, 1. / denominator, 0)
 
 
 def calculate_vibenedenoms(unique_vibenedenoms: list[set], 
