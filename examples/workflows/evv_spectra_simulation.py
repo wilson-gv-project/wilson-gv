@@ -202,7 +202,8 @@ def main():
     molecular_system, calc_setup = system_calculation_setup(calc_choice=calc_choice)
 
     # user configs
-    vib_ana = ws.main.abstractions.VibAnaSetup(system=molecular_system, regime='GVPT2', vibana_own_analysis='anharm')
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=molecular_system, 
+                                               regime='GVPT2', vibana_own_analysis='anharm')
     # doesn't have to have a molecular system
 
     import json
@@ -255,9 +256,16 @@ def main():
 
     # ---- chng of state
     sim.getResults(obtainer=wilson_data_obtainer)
+    
+    print('\nsim.vib_ana_setup.nc_sqrt_eigval', sim.vib_ana_setup.nc_sqrt_eigval)
+
 
     ws.main.main_functions.do_anharmonic_analysis(vib_ana=sim.vib_ana_setup, 
                                                   props=sim.props, anharmonic_analyzer=anharm_analyzer_data)
+    exclude_modes = input("\nWhich modes to exclude: ")
+    sim.vib_ana_setup.exclude_modes = [int(i) for i in exclude_modes.strip().split(',')]
+
+    sim.vib_ana_setup.set_include_modes_list()
 
     print('sim.vib_ana_setup.isAllSet', sim.vib_ana_setup)
     
