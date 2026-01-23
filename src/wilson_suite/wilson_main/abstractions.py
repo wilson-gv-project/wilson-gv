@@ -297,7 +297,11 @@ class VibAnaSetup:
 		else:
 			if self.system is None:
 				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
-
+		
+		self.include_list = tuple([v for v in list(self.nc_sqrt_eigval.keys()) if v not in self.exclude_modes])
+		if self.include_list == tuple():
+			raise ValueError("include_list of included normal modes labels is empty")
+	
 	@property
 	def modes_indices(self):
 		"""
