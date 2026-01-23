@@ -72,7 +72,7 @@ print('EVV_EXPERIMENT.canonical_axes', EVV_EXPERIMENT.canonical_axes)
 
 # setting up a SpectralAxisSet - axes based on possible combination of independent variables
 axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # this makes A and B > 0
-# axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = EVV_EXPERIMENT.canonical_axes
+# axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [-1], 'B': [-1,2]}) # this makes A and B > 0
 
 # now would be useful to check wheather constructed SpectralAxisSet makes sense here - is it in valid_axis_combs?
 
