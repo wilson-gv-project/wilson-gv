@@ -42,11 +42,12 @@ from wilson_suite.wilson_experiment.indep_vars_and_axes import PhaseMatchingCond
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box, SpectralWindow
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 from wilson_suite.wilson_intensities.anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 # --- Vault stuff
 from CQCParse.relay import DataVault
 
-csvfile = '/home/vlev/sprint/calculations/calculations.csv'
+csvfile = SUITE_ROOT+'/../examples/workflows/calculations.csv'
 vault = DataVault(csvfile)
 db = vault.read_csv_DB()
 # ['Basis', 'Calc_Type', 'Conformer_Description', 'Conformer_ID',
@@ -207,13 +208,14 @@ def main():
     # doesn't have to have a molecular system
 
     import json
-    with open("/home/vlev/monorepo/examples/workflows/config.json", "r") as file:
+    with open(SUITE_ROOT+"/../examples/workflows/config.json", "r") as file:
         params = json.load(file)
 
     
     if params['reference_max'] == 'None':
         params['reference_max'] = None
     params['window_bounds_dict'] = {k: tuple(v) for k,v in params['window_bounds_dict'].items()}
+    params['fig_file'] = SUITE_ROOT+params['fig_file']
     print(params)
 
     eval_setup = evv_SpecEvalSetup_paper1(**params)
@@ -305,7 +307,7 @@ def main():
     print()
     # ---- chng of state? or just setting attributes?
     sim.evaluate()
-    sim.save_to_pkl(filename='/home/vlev/monorepo/examples/workflows/wsim_after_eval.pkl')
+    sim.save_to_pkl(filename=SUITE_ROOT+'/../examples/workflows/wsim_after_eval.pkl')
 
     # ---- just setting attributes?
     sim.render(renderer=ws.analysis.render.render_spectrum)
