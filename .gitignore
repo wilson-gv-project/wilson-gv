@@ -5,7 +5,7 @@
 *.json
 *.log
 
-!examples/workflows/config.json
+!examples/workflows/config_example.json
 
 !terms_fuller_flat.json
 !src/wilson_suite/wilson_analysis/tests/f_ref.svg

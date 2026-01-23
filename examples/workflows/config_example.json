@@ -10,7 +10,7 @@
         "A": 100,
         "B": 400
     },
-    "fig_file": "/home/vlev/monorepo/examples/workflows/output_figure.png",
+    "fig_file": "output_figure.png",
     "axes_labels": {
         "x": "w1",
         "y": "w2-w1"
