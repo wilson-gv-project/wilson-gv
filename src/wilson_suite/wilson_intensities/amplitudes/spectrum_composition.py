@@ -259,7 +259,7 @@ class ResLocGeoObject:
             Plane(A=all, B=all, C=1200.0)
         """
         type_name = "Point" if self.is_point() else "Line" if self.is_line() else "Plane" if self.is_plane() else "Object"
-        coords = ", ".join(f"{k}={v}" for k, v in self.coordinates)
+        coords = ", ".join(f"{k}={v:.2f}" for k, v in self.coordinates)
         return f"{type_name}({coords})"
 
 
