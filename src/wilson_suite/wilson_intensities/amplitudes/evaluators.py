@@ -55,12 +55,11 @@ def prepDataForEval(number_of_nmodes: int,
     """
     put data in a form for use on the evaluation step
     """
-    print('list(vib_ana_setup.nc_sqrt_eigval.keys())', list(vib_ana_setup.nc_sqrt_eigval.keys()))
-    include_list = tuple([v for v in list(vib_ana_setup.nc_sqrt_eigval.keys()) if v not in vib_ana_setup.exclude_modes])
-    if include_list == tuple():
-        raise ValueError("include_list of included normal modes labels is empty")
     
-    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=include_list)
+    
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), 
+                                   harmonic_osc_states_labels=vib_ana_setup.include_list,
+                                   number_of_nmodes=number_of_nmodes)
     
     vibdiff_cache = VibDiffCache()
     props = MolPropsCollection(properties=props)
@@ -68,7 +67,7 @@ def prepDataForEval(number_of_nmodes: int,
     data_and_configs = EvaluationDataAndConfigs(props_data=props,
                                                 vibstates_data=vibstates_data,
                                                 number_of_nmodes=number_of_nmodes,
-                                                nm_inds_choices=include_list,
+                                                nm_inds_choices=vib_ana_setup.include_list,
                                                 pulse_polarization_vector=pulse_polarization_vector)
 
     return vibstates_data, vibdiff_cache, data_and_configs

@@ -347,6 +347,7 @@ class VibPerturbedTerm:
 
     def to_latex(self, part=None):
         """
+        part options: res, coeff, props, freqterms
         """
         res_conditions_denom = ''.join([rc.to_latex() for rc in self.res])
         if res_conditions_denom == '':

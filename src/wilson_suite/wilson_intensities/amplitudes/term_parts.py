@@ -364,6 +364,7 @@ class VibStatesData:
     """
     allstates: tuple[VibState]
     harmonic_osc_states_labels: tuple[int] = None
+    number_of_nmodes: int = None
 
     def __post_init__(self):
         tmp_allstates = list(self.allstates)

@@ -281,7 +281,7 @@ class RenderingInfo:
 
 	projection: '1d', '2d' or '3d'
 	reference_max: normalizing to this reference_max value
-
+	axes_labels: for needed xyz axes of plot provide a string  - {'x': 'x_label', 'y': 'y_label', 'z': None}
 	"""
 	projection: str = '2d'
 	reference_max: float = None
@@ -295,7 +295,7 @@ class RenderingInfo:
 	backend: str = 'matplotlib'
 	# style configurations - currently will work/be used for matplotlib renderer
 	style_config: PlotConfig = field(default_factory=lambda: PlotConfig())
-
+	axes_labels: dict = None
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
 #

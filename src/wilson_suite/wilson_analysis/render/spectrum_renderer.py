@@ -164,9 +164,12 @@ class SpectrumRenderer(ABC):
             raise ValueError('This SpectrumRenderer.spec_grid is None')        
 
         self.xyz_labels = {'x': None, 'y': None, 'z': None}
-        for i, o_k in enumerate(list(self.spec_grid.keys())):
-            self.xyz_labels[list(self.xyz_labels.keys())[i]] = o_k
-        
+        if self.rnd_info.axes_labels is None:
+            for i, o_k in enumerate(list(self.spec_grid.keys())):
+                self.xyz_labels[list(self.xyz_labels.keys())[i]] = o_k
+        else:
+            self.xyz_labels = self.rnd_info.axes_labels
+
         if len(self.spec_grid)==3:
             self.Xdata, self.Ydata, self.Zdata = list(self.spec_grid.values())
         elif len(self.spec_grid)==2:

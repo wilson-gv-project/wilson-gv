@@ -1,0 +1,18 @@
+{
+    "reference_max": "None",
+    "Gamma_rc": 31.5,
+    "dynamic_range": 500.0,
+    "window_bounds_dict": {
+        "A": [500.0, 3600.0],
+        "B": [-200.0, 300.0]
+    },
+    "grid_resolution": {
+        "A": 100,
+        "B": 400
+    },
+    "fig_file": "output_figure.png",
+    "axes_labels": {
+        "x": "w1",
+        "y": "w2-w1"
+    }
+}
