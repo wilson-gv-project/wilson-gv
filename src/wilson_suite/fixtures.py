@@ -120,7 +120,7 @@ def evv_terms() -> list[VibPerturbedTerm]:
     """
     import wilson_suite as ws
 
-    return ws.derive.main.get_fully_enhanced_terms(experiment=evv_experiment())
+    return ws.derive.derive.get_fully_enhanced_terms(experiment=evv_experiment())
 
 def get_eval_ready_evv_terms():
     """
