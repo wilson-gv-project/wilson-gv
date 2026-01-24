@@ -1,17 +1,21 @@
 #!/usr/bin/env python
+"""
+Unpickling saved files from evv_spectra_simulation.py script runs for diagnostics
+
+"""
 
 from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-eval_wf_file = '/home/vlev/monorepo/examples/workflows/eval_wf.pkl'
-
+# pickle file produced when EvaluationWorkflow raises an error during run()
+eval_wf_file = SUITE_ROOT+'/../examples/workflows/eval_wf.pkl'
 eval_wf: EvaluationWorkflow = unpickle_smth_from(eval_wf_file)
 
-print(eval_wf.artifacts.__dict__.keys())
-print()
+print('\neval_wf.artifacts.__dict__.keys()', eval_wf.artifacts.__dict__.keys(), '\n')
 
 print('eval_wf.artifacts.data_configs.number_of_nmodes', eval_wf.artifacts.data_configs.number_of_nmodes)
 print('eval_wf.inputs.number_of_modes', eval_wf.inputs.number_of_modes)
@@ -28,10 +32,8 @@ for k,v in eval_wf.artifacts.__dict__.items():
         last = v
         last_key = k
 
-print("\n     Last step was:", last_key)
-print()
+print("\n     Last step was:", last_key, "\n\n")
 
-print()
 
 if isinstance(last, dict):
     for k,v in last.items():
@@ -46,35 +48,21 @@ if last_key == 'spec_window':
     for feat in eval_wf.artifacts.features:
         print(feat.location)
 
-# ======
 print('\nflat_terms_dict of eval_wf.inputs.terms')
 flat_terms_dict: dict[str, VibPerturbedTerm] = derived_terms_flat(eval_wf.inputs.terms)
 for id, term in flat_terms_dict.items():
-    # print()
     print('&'+term.to_latex(part='res') + r' \\')
 
 print()
 
-wsim_eval_success: WilsonSimulation = unpickle_smth_from('/home/vlev/monorepo/examples/workflows/wsim_after_eval.pkl')
+# ====== here checking successful WilsonSimulation run saved after evaluation, before rendering (see evv_spectra_simulation.py)
+wsim_eval_success: WilsonSimulation = unpickle_smth_from(SUITE_ROOT+'/../examples/workflows/wsim_after_eval.pkl')
 
 print('\nflat_terms_dict_in_axis_choice')
 flat_terms_dict_in_axis_choice = derived_terms_flat(wsim_eval_success.terms_in_axis_choice)
 for id, term in flat_terms_dict_in_axis_choice.items():
-    # print()
     print('&'+term.to_latex(part='res') + r' \\')
 
 features = wsim_eval_success._workflow.artifacts.features
 
-count = 0
-count_other = 0
 
-for f in features:
-    if f.location['A'] < f.location['B']:
-        count += 1
-    else:
-        count_other += 1
-
-    # if all([i[1]>0 for i in f.location.coordinates]):
-    #     print(f.location.coordinates)
-print(count)
-print(count_other)
