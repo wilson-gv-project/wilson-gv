@@ -285,12 +285,18 @@ class VibAnaSetup:
 	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
+	
+	number_of_modes: int = None
 
 	# TODO: MODE EXCLUSION, REGISTERING OF FERMI RESONANCES (TO BE PASSED TO EVALUATOR)
 	exclude_modes: list = None
 	diagn: dict = None
 
 	def __post_init__(self):
+		if self.number_of_modes is None:
+			if self.system is not None:
+				self.number_of_modes = self.system.Nnmodes
+
 		if self.exclude_modes is None:
 			if self.system is not None:
 				self.exclude_modes = []
@@ -310,7 +316,7 @@ class VibAnaSetup:
 
 		import numpy as np
 		return [int(i) for i in np.arange(self.system.Nnmodes) if i not in self.exclude_modes]
-	
+
 	# FIXME: Possibly return to this later
 	@property
 	def serial_states(self):
