@@ -12,13 +12,14 @@ from ..wilson_experiment import experiment_abstractions as we_abst
 from ..wilson_derive.derive import get_fully_enhanced_terms
 from ..wilson_utils.termdict_from_symb_term import derived_terms_dict_to_dicts
 
-from ..wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from ..wilson_analysis.render.render_utils import PlotConfig, NormalizationType
 from wilson_suite.fixtures import evv_experiment, get_eval_ready_evv_terms
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..wilson_main.abstractions import (VibAnaSetup, DataOriginInfo, MolecularSystem)
     from ..wilson_main.spectrum_abstractions import SpecEvalSetup
+    from wilson_suite.wilson_main.abstractions import VibAnaSetup
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -219,3 +220,14 @@ def make_plot_config(**overrides) -> PlotConfig:
     params = {**_CUSTOM_PlotConfig, **overrides}
     return PlotConfig(**params)
 
+
+def make_VibStatesData(vib_ana_setup: 'VibAnaSetup', save_to_pkl: str = None):
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+    from wilson_suite.wilson_utils.serialization import pickle_this_to
+    
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), 
+                                    harmonic_osc_states_labels=vib_ana_setup.include_list,
+                                    number_of_nmodes=vib_ana_setup.number_of_modes)
+    if save_to_pkl is not None:
+        pickle_this_to(vibstates_data, filenamepkl=save_to_pkl)
+    return vibstates_data
