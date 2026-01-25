@@ -281,7 +281,9 @@ class VibAnaSetup:
 
 	max_state_lvl: int=None
 	states: list[VibState]=field(default=None, repr=False)
-
+	
+	number_of_modes: int = None
+	
 	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
@@ -291,6 +293,10 @@ class VibAnaSetup:
 	diagn: dict = None
 
 	def __post_init__(self):
+		if self.number_of_modes is None:
+			if self.system is not None:
+				self.number_of_modes = self.system.Nnmodes
+		
 		if self.exclude_modes is None:
 			if self.system is not None:
 				self.exclude_modes = []
