@@ -186,8 +186,8 @@ def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, 
     right_state_symb = vibdiff_term.sr.q
 
 
-    left_state_label = ','.join(sorted([str(index_dict[i]) for i in left_state_symb]))
-    right_state_label = ','.join(sorted([str(index_dict[i]) for i in right_state_symb]))
+    left_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in left_state_symb])])
+    right_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in right_state_symb])])
     
     if left_state_label == '':
         left_state_label = 'zero'
