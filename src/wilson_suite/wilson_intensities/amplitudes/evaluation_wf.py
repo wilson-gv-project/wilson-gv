@@ -239,10 +239,12 @@ class EvaluationWorkflow:
                 self.artifacts.terms = prepTermsForEval(self.inputs.terms)
 
             with self.step("prep_data"): # could be in data inputs
-                self.artifacts.vib_data, self.artifacts.vibdiff_cache, self.artifacts.data_configs = prepDataForEval(self.inputs.number_of_modes, 
-                                                                 self.inputs.pulse_polarization_vector, 
-                                                                 self.inputs.vib_ana_setup, 
-                                                                 self.inputs.props)
+                _data, _cache, _configs = prepDataForEval(self.inputs.pulse_polarization_vector, 
+                                                          self.inputs.vib_ana_setup, 
+                                                          self.inputs.props)
+                self.artifacts.vib_data = _data
+                self.artifacts.vibdiff_cache = _cache
+                self.artifacts.data_configs = _configs
 
             # self._save_checkpoint('Step1')  # Save checkpoint
 
