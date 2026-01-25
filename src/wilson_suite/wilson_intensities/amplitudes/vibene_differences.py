@@ -142,13 +142,19 @@ def calculate_vibenedenom_tensor(vibenedenom_inds: tuple,
     should be using harmonic uncorrected vib ene levels!!!
     """
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-    vector = convNu2Ene(np.array(list(vibstates_data.get_harmonic_osc_states().values())))
+    
+    vector = np.zeros((vibstates_data.number_of_nmodes,))
+    for i in vibstates_data.harmonic_osc_states_labels:
+        vector[i] = convNu2Ene(vibstates_data.get_harmonic_osc_states()[i])
     
     # 'i,j,k->ijk'
     letters = ['i', 'j', 'k', 'l', 'n', 'n', 'o', 'p']
     einsum_str = ','.join(letters[:len(vibenedenom_inds)])+'->'+''.join(letters[:len(vibenedenom_inds)])
 
-    return 1. / np.einsum(einsum_str, *(vector,) * len(vibenedenom_inds))
+    denominator = np.einsum(einsum_str, *(vector,) * len(vibenedenom_inds))
+
+    # to not have RuntimeWarning: divide by zero encountered in divide
+    return np.divide(1., denominator, where=denominator != 0)
 
 
 def calculate_vibenedenoms(unique_vibenedenoms: list[set], 
