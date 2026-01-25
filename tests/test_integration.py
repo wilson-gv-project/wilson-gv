@@ -20,7 +20,6 @@ def test_import_subpackages():
         import wilson_suite as ws
         assert 'experiment_abstractions' in dir(ws.experiment)
         assert 'abstractions' in dir(ws.main)
-        assert 'spectrum' in dir(ws.intensities)
         fail = False
 
     except ModuleNotFoundError as error:

@@ -87,7 +87,8 @@ def get_data_evaluators_tests() -> dict:
             wm_abst.VibState(harm_quanta_coeffs={(1, 2, 2):1.}, state_label='1,2,2', energy=3642., harmonic_WF=False),
         ))
     vibana.nc_sqrt_eigval = {0: 964, 1: 1234., 2: 1234.}
-
+    vibana.set_include_modes_list()
+    
     props_data = generate_props_data_Nmodes(system.Nnmodes)
     # cart axes (0, 1, 1, 0) - 0 1 2 3
     props_data['dipgrad'][0, 1] = 0.45

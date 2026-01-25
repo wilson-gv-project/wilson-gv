@@ -121,6 +121,8 @@ def test_save_wilsonsim():
     sim.save_to_pkl(filename='sim0.pkl')
 
     sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
+
+    vib_ana.set_include_modes_list()
     
     from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
     axes_choice = make_SpectralAxisSet({'A': [2], 'B': [-1, 2]})
