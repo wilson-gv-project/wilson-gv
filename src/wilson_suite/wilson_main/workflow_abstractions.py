@@ -565,17 +565,23 @@ class WilsonSimulation:
 
 	def save_to_pkl(self, configs_only: bool = False, filename: str = 'WilsonSimulation_instance.pkl'):
 		"""
-		
+		TODO: fix this function, because it's weird right now; should there be a functionality for making project/simulation directory where to save files?
 		:param self: Description
 		:param configs_only: Description
 		"""
-		if not hasattr(self, '_run_dir'):
-			raise ValueError("Project directory for saving files was not initialized")
-			# self.make_proj_dir()
+		if filename == 'WilsonSimulation_instance.pkl':
+			if not hasattr(self, '_run_dir'):
+				raise ValueError("Project directory for saving files was not initialized")
 		
 		if not configs_only:
 			from wilson_suite.wilson_utils.serialization import pickle_this_to
-			pickle_this_to(self, filename, self._run_dir)
+			import os.path
+			if os.path.isabs(filename):
+				dir = ''
+			else:
+				dir = self._run_dir
+
+			pickle_this_to(self, filename, dir)
 		else:
 			self.save_configs(filename)
 
