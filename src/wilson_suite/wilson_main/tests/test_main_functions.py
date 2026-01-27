@@ -11,7 +11,9 @@ def test_find_props():
 
 def test_find_residual_vib_info():
 
-    vib_ana = ws.main.abstractions.VibAnaSetup(system='', regime='GVPT2', vibana_own_analysis='anharm')
+    vib_ana = ws.main.abstractions.VibAnaSetup(system='', 
+                                               regime='GVPT2', 
+                                               vibana_own_analysis='anharm', number_of_modes=3)
     props = ws.main.main_functions.find_residual_vib_info(vib_ana=vib_ana)
 
     for p in props:
@@ -19,7 +21,9 @@ def test_find_residual_vib_info():
 
 def test_find_props_and_max_state_lvl():
     print()
-    vib_ana = ws.main.abstractions.VibAnaSetup(system='', regime='GVPT2', vibana_own_analysis='anharm')
+    vib_ana = ws.main.abstractions.VibAnaSetup(system='', 
+                                               regime='GVPT2', 
+                                               vibana_own_analysis='anharm', number_of_modes=3)
     
     experiment_a = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
@@ -34,7 +38,10 @@ def test_find_props_and_max_state_lvl():
 
 def test_get_data_for_vibanalysers():
     print()
-    vib_ana = ws.main.abstractions.VibAnaSetup(system='', regime='GVPT2', vibana_own_analysis='anharm')
+    vib_ana = ws.main.abstractions.VibAnaSetup(system='', 
+                                               regime='GVPT2', 
+                                               vibana_own_analysis='anharm',
+                                               number_of_modes=3)
 
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',

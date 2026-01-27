@@ -48,8 +48,7 @@ def prepTermsForEval(terms: dict | list) -> list:
                     raise ValueError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
                 return list(terms.values())
 
-def prepDataForEval(number_of_nmodes: int,
-                    pulse_polarization_vector: np.ndarray,
+def prepDataForEval(pulse_polarization_vector: np.ndarray,
                     vib_ana_setup: 'VibAnaSetup',
                     props: list['MolecularProperty']) -> tuple[VibStatesData, VibDiffCache, EvaluationDataAndConfigs]:
     """
@@ -60,14 +59,16 @@ def prepDataForEval(number_of_nmodes: int,
     if include_list == tuple():
         raise ValueError("include_list of included normal modes labels is empty")
     
-    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), harmonic_osc_states_labels=include_list)
-    
+
+    vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), 
+                                   harmonic_osc_states_labels=vib_ana_setup.include_list,
+                                   number_of_nmodes=vib_ana_setup.number_of_modes)
     vibdiff_cache = VibDiffCache()
     props = MolPropsCollection(properties=props)
     
     data_and_configs = EvaluationDataAndConfigs(props_data=props,
                                                 vibstates_data=vibstates_data,
-                                                number_of_nmodes=number_of_nmodes,
+                                                number_of_nmodes=vib_ana_setup.number_of_modes,
                                                 nm_inds_choices=include_list,
                                                 pulse_polarization_vector=pulse_polarization_vector)
 

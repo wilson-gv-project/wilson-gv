@@ -281,7 +281,9 @@ class VibAnaSetup:
 
 	max_state_lvl: int=None
 	states: list[VibState]=field(default=None, repr=False)
-
+	
+	number_of_modes: int = None
+	
 	# Dictionary: {nm index: w}
 	nc_sqrt_eigval: dict=None
 	nc_eigvec: dict=None
@@ -291,6 +293,10 @@ class VibAnaSetup:
 	diagn: dict = None
 
 	def __post_init__(self):
+		if self.number_of_modes is None:
+			if self.system is not None:
+				self.number_of_modes = self.system.Nnmodes
+		
 		if self.exclude_modes is None:
 			if self.system is not None:
 				self.exclude_modes = []
@@ -324,7 +330,7 @@ class VibAnaSetup:
 		"""
 		if self.states is None:
 			return False
-		states_lvls = [len(st.state_label.split(',')) for st in self.states]
+		states_lvls = [len(next(iter(st.harm_quanta_coeffs))) for st in self.states] # takes first key in harm_quanta_coeffs dict
 		if self.max_state_lvl in states_lvls:
 			return True
 		print('states_lvls', states_lvls)
@@ -364,3 +370,10 @@ class VibAnaSetup:
 				logger.warning('VibAnaSetup().exclude_modes attribute is not meaningfull without having set the VibAnaSetup().system attribute')
 
 
+	def set_include_modes_list(self):
+		if self.nc_sqrt_eigval is None:
+			raise ValueError("Check nc_sqrt_eigval before setting up a modes inclusion list (nc_sqrt_eigval needs to be set).")
+
+		self.include_list = tuple([v for v in list(self.nc_sqrt_eigval.keys()) if v not in self.exclude_modes])
+		if self.include_list == tuple():
+			raise ValueError("include_list of included normal modes labels is empty")

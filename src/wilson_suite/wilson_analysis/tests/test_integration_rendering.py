@@ -54,6 +54,7 @@ def test_full_integration():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
+    sim.vib_ana_setup.set_include_modes_list()
 
     sim.evaluate()
 
@@ -131,6 +132,8 @@ def test_full_integration_other_axes_choice():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
+    sim.vib_ana_setup.set_include_modes_list()
+
     import pytest
     with pytest.raises(ValueError) as error:
         sim.evaluate()
@@ -190,6 +193,7 @@ def test_full_integration_H2O_molecule():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
+    sim.vib_ana_setup.set_include_modes_list()
 
     sim.evaluate()
 

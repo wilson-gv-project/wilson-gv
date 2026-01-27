@@ -233,61 +233,6 @@ class ResonanceMotif:
         return set([label for cond in self.resonance_conditions for i in cond.diff for label in i.q])
 
 
-# class ParameterSet(Mapping):
-#     """
-#     Dict-like holder of "parameter label -> index value" mapping
-#     Normal mode indices
-
-#     index value should be in VibState label space, so it's a string likely
-#     """
-#     def __init__(self, parameters):
-
-#         if not isinstance(parameters, dict):
-#             raise TypeError("ParameterSet must be initialized with a dictionary.")
-#         parameters = copy.deepcopy(parameters)
-        
-#         if 'zero' not in parameters:
-#             parameters['zero'] = 'zero'
-#         self._parameters = dict(parameters)
-#         self._hash = hash(frozenset(self._parameters.items()))
-
-#     def parameter_labels(self):
-#         return [i for i in list(self._parameters.keys()) if i!='zero']
-    
-#     def indices(self):
-#         return [i for i in list(self._parameters.values()) if i!='zero']
-
-#     def __getitem__(self, key):
-#         if key=='':
-#             key = 'zero'
-#         return self._parameters[key]
-
-#     def __iter__(self):
-#         return iter(self._parameters)
-
-#     def __len__(self):
-#         return len(self._parameters)
-
-#     def __hash__(self):
-#         return self._hash
-
-#     def __repr__(self):
-#         repr_d = {k:v for k,v in self._parameters.items() if k!='zero'}
-#         return f"{self.__class__.__name__}({repr_d})"
-
-#     def __eq__(self, other):
-#         if isinstance(other, ParameterSet):
-#             return self._parameters == other._parameters
-#         return False
-    
-#     def to_dict(self):
-#         return self._parameters
-
-#     @classmethod
-#     def from_dict(cls, parameters):
-#         return cls(parameters)
-
-
 @dataclass(frozen=True)
 class ParameterSet(Mapping[str, int]):
     """
@@ -364,7 +309,8 @@ class VibStatesData:
     """
     allstates: tuple[VibState]
     harmonic_osc_states_labels: tuple[int] = None
-
+    number_of_nmodes: int = None
+    
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
         tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.))

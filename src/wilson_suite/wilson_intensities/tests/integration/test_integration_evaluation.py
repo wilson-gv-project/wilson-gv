@@ -52,7 +52,7 @@ def test_evaluation_general_customdata_1elterm():
     #print('\n', flat_dict['1_(1, 0)'].to_latex())
 
     print(mock_sim.vib_ana_setup.max_state_lvl)
-
+    
     mock_sim.evaluate()
     
     for f in mock_sim._workflow.artifacts.features:
@@ -208,6 +208,8 @@ def test_full_integration():
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
 
+    sim.vib_ana_setup.set_include_modes_list()
+
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
@@ -277,7 +279,8 @@ def test_full_integration_other_axes_choice():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
-    
+    sim.vib_ana_setup.set_include_modes_list()
+
     import pytest
     with pytest.raises(ValueError) as error:
         sim.evaluate()
@@ -345,6 +348,7 @@ def test_full_integration_H2O_molecule():
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
+    sim.vib_ana_setup.set_include_modes_list()
 
     sim.evaluate()
 

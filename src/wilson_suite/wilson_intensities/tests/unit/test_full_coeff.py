@@ -58,7 +58,7 @@ def test_precalculate_unique_coeff_parts():
     vibdata = VibStatesData(allstates=(VibState(harm_quanta_coeffs={'0':1.}, state_label='0', energy=964.),
                                        VibState(harm_quanta_coeffs={'1':1.}, state_label='1', energy=1234.),
                                        VibState(harm_quanta_coeffs={'2':1.}, state_label='2', energy=3644.)),
-                                   harmonic_osc_states_labels=(0, 1, 2))
+                                   harmonic_osc_states_labels=(0, 1, 2), number_of_nmodes=3)
     
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
 
@@ -104,7 +104,7 @@ def test_evaluate_term_coeffs():
                                        VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True),
                                        VibState(harm_quanta_coeffs={(0, 1, 1):1.}, state_label='0,1,1', energy=3318., harmonic_WF=False),
                                        ),
-                                   harmonic_osc_states_labels=(0, 1, 2))
+                                   harmonic_osc_states_labels=(0, 1, 2), number_of_nmodes=3)
 
     need_to_precalc = fac.identify_precalc_unique_coeff_parts(terms_select)
 

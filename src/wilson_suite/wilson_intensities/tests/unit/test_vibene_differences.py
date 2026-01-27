@@ -33,7 +33,7 @@ def test_calculate_vibenedenom_tensor():
     vibdata = VibStatesData(allstates=(f_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=964., harmonic_WF=True),
                                        f_abst.VibState(harm_quanta_coeffs={(1,):1.}, state_label='1', energy=1234., harmonic_WF=True),
                                        f_abst.VibState(harm_quanta_coeffs={(2,):1.}, state_label='2', energy=3644., harmonic_WF=True)),
-                                   harmonic_osc_states_labels=(0, 1, 2))
+                                   harmonic_osc_states_labels=(0, 1, 2), number_of_nmodes=3)
 
     id_vibenedenom = sorted(list(vediff.identify_vibenedenoms(terms_select)))
     print('id_vibenedenom', id_vibenedenom)
