@@ -114,7 +114,7 @@ def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 						Callable[[MolecularSystem, list[MolecularProperty], str, str, dict, dict],
 						tuple[list[VibState], dict]]):
 	"""
-	Carry out anharmonic vibrational analysis as set up
+	Carry out anharmonic vibrational analysis as set up -- updates vib_ana (adds obtained states)
 
 	props: list of MolecularProperty instances: Molecular properties containing those needed in the analysis
 	analyzer: Callable: A reference to an anharmonic analyzer function. See function definition and attribute 
@@ -147,15 +147,26 @@ def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 		if i.trivial_name in ['cff', 'qff', 'B', 'coriolis']:
 			assert i.vals is not None, f'Missing values for {i.trivial_name}, cannot proceed with anharmonic analysis'
 
-	context = {'system': vib_ana.system, 'props': props, 
-				'regime': vib_ana.regime, 'regime_subinfo': vib_ana.regime_subinfo, 
-				'nc_sqrt_eigval': vib_ana.nc_sqrt_eigval, 
-				'exclude_modes': vib_ana.exclude_modes}
+
+
+	context = {'props': props, 
+			   'regime': vib_ana.regime,  
+			   'nc_sqrt_eigval': vib_ana.nc_sqrt_eigval, 
+			   'exclude_modes': vib_ana.exclude_modes}
+	"""
+	props: list[wm_abst.MolecularProperty] = None, 
+	nc_sqrt_eigval: dict = None, 
+	regime: str = None,
+	exclude_modes: list = None
+	"""
 	
 	logger.debug(repr(context))
 
-	# To return: states, diagn
-	return anharmonic_analyzer(**context)
+	states, diagn = anharmonic_analyzer(**context)
+	for state in states:
+		first_key = next(iter(state.serial_harm_quanta_coeffs))
+		state.state_label = first_key
+	vib_ana.setStates(states)
 
 
 # WilsonSimulation related functions
