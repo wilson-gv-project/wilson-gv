@@ -291,6 +291,15 @@ class EvaluationWorkflow:
                 self.artifacts.grid_manager.make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
 
             with self.step("make_regions"):
+                '''
+                in create_regions:
+                    - formal_domains = self.spec_window.find_clusters_by_featboxes():  --- wilson_intensities/amplitudes/grid_manager_evaluator.py
+                        - clusters = domains.features_to_clusters(features=all_features) --- wilson_intensities/amplitudes/spectrum_composition.py
+                        - features: list = clusters[c]
+                        - tuple(RectangularDomain.from_features(features) for c in clusters) -- this returns (clusters are turned into RectangularDomains)
+                
+                [clusters are grouped features based on overalps of feature boxes here; so input features should be dressed with boxes]
+                '''
                 self.artifacts.regions = self.artifacts.grid_manager.create_regions()
                 if not self.artifacts.regions:
                     raise ValueError("No regions were created")
