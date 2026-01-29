@@ -84,4 +84,110 @@ def test_feature_get_res_motifs():
     for refmotif in res_motifs_feat0:
         for recond in refmotif:
             print(recond)
+
+def test_dress_these_with_boxes_1d():
+    print()
+
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=2.5, amplitude_coeff=120.)
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=2.5, amplitude_coeff=170.)
+    res_loc1d_c = ResLocGeoObject({'A': 3.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=2.5, amplitude_coeff=30.)
+
+    print([sf1, sf2, sf3])
+    print()
+    max_intensity=abs(110.)**2 
+    min_intensity=abs(18.)**2
+    print('min_intensity', min_intensity)
+
+    feats = SpectralFeature.dress_these_with_boxes(features=[sf1, sf2, sf3], 
+                                                   max_intensity=max_intensity, 
+                                                   min_intensity=min_intensity)
     
+    print(feats)
+    print(len(feats))
+    assert len(feats) == 2
+    f1, f2 = feats
+
+    import numpy as np
+    np.testing.assert_allclose(
+        f1.feat_box.bounds["A"],
+        (11.354502775632097, 12.645497224367903),
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+
+    np.testing.assert_allclose(
+        f2.feat_box.bounds["A"],
+        (5.712699117539398, 9.2873008824606),
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+def test_dress_these_with_boxes_2d():
+    print()
+
+    # --- define 2D locations ---
+    res_loc2d_a = ResLocGeoObject({'A': 12., 'B': 5.0})
+    sf1 = SpectralFeature(
+        location=res_loc2d_a,
+        lineshape_parameter=2.5,
+        amplitude_coeff=120.,
+    )
+
+    res_loc2d_b = ResLocGeoObject({'A': 7.5, 'B': 2.0})
+    sf2 = SpectralFeature(
+        location=res_loc2d_b,
+        lineshape_parameter=2.5,
+        amplitude_coeff=170.,
+    )
+
+    res_loc2d_c = ResLocGeoObject({'A': 3.5, 'B': 8.0})
+    sf3 = SpectralFeature(
+        location=res_loc2d_c,
+        lineshape_parameter=2.5,
+        amplitude_coeff=30.,
+    )
+
+    print([sf1, sf2, sf3])
+    print()
+
+    max_intensity = abs(110.)**2
+    min_intensity = abs(18.)**2
+    print('min_intensity', min_intensity)
+
+    feats = SpectralFeature.dress_these_with_boxes(
+        features=[sf1, sf2, sf3],
+        max_intensity=max_intensity,
+        min_intensity=min_intensity,
+    )
+
+    print(feats)
+    print(len(feats))
+
+    assert len(feats) == 2
+    f1, f2 = feats
+
+    assert set(f1.feat_box.bounds.keys()) == {'A', 'B'}
+    assert set(f2.feat_box.bounds.keys()) == {'A', 'B'}
+
+    import numpy as np
+    np.testing.assert_allclose(
+        f1.feat_box.bounds["A"],
+        (11.354502775632097, 12.645497224367903),
+    )
+    np.testing.assert_allclose(
+        f1.feat_box.bounds["B"],
+        (4.354502775632097, 5.645497224367903),
+    )
+    
+    np.testing.assert_allclose(
+        f2.feat_box.bounds["A"],
+        (5.712699117539398, 9.2873008824606),
+    )
+    np.testing.assert_allclose(
+        f2.feat_box.bounds["B"],
+        (0.21269911753939863, 3.7873008824606016),
+    )
