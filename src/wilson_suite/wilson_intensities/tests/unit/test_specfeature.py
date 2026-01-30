@@ -269,14 +269,12 @@ def test_dress_with_featboxes_SpecWindow():
                           lineshape_parameter=2.5, amplitude_coeff=30.)
 
     sp = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3], sw1d)
-    print(sp.contrib_features)
-    print(sp.full_features)
 
-    max_intensity = abs(110.)**2
-    min_intensity = abs(18.)**2
-    dynrange = max_intensity/min_intensity
-    print(dynrange)
+    assert len(sp.contrib_features) == 2
+    assert len(sp.full_features) == 1
+
     new_specwindow = sp.dress_with_featboxes(10.)
-    print()
-    print(new_specwindow.contrib_features)
-    print(new_specwindow.full_features)
+
+    assert sp.bounds == new_specwindow.bounds
+    assert len(new_specwindow.contrib_features) == 1
+    assert len(new_specwindow.full_features) == 1
