@@ -113,7 +113,7 @@ def test_dress_these_with_boxes_1d():
     import numpy as np
     np.testing.assert_allclose(
         f1.feat_box.bounds["A"],
-        (11.354502775632097, 12.645497224367903),
+        (5.819834594086948, 18.18016540591305),
         rtol=1e-12,
         atol=0.0,
     )
@@ -121,7 +121,7 @@ def test_dress_these_with_boxes_1d():
 
     np.testing.assert_allclose(
         f2.feat_box.bounds["A"],
-        (5.712699117539398, 9.2873008824606),
+        (-1.6075535059750017, 16.607553505975),
         rtol=1e-12,
         atol=0.0,
     )
@@ -129,7 +129,7 @@ def test_dress_these_with_boxes_1d():
 def test_dress_these_with_boxes_2d():
     print()
 
-    # --- define 2D locations ---
+    # --- 2D locations ---
     res_loc2d_a = ResLocGeoObject({'A': 12., 'B': 5.0})
     sf1 = SpectralFeature(
         location=res_loc2d_a,
@@ -191,3 +191,92 @@ def test_dress_these_with_boxes_2d():
         f2.feat_box.bounds["B"],
         (0.21269911753939863, 3.7873008824606016),
     )
+
+
+def test_get_intensity_SpecFeature():
+    print()
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1_1d = SpectralFeature(location=res_loc1d_a, lineshape_parameter=2.5, amplitude_coeff=120.)
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2_1d = SpectralFeature(location=res_loc1d_b, lineshape_parameter=2.5, amplitude_coeff=170.)
+
+    res_loc2d_a = ResLocGeoObject({'A': 12., 'B': 5.0})
+    sf1_2d = SpectralFeature(
+        location=res_loc2d_a,
+        lineshape_parameter=2.5,
+        amplitude_coeff=120.,
+    )
+
+    res_loc2d_b = ResLocGeoObject({'A': 7.5, 'B': 2.0})
+    sf2_2d = SpectralFeature(
+        location=res_loc2d_b,
+        lineshape_parameter=2.5,
+        amplitude_coeff=170.,
+    )
+    
+    assert sf1_1d.get_intensity() == abs(sf1_1d.amplitude_coeff/(-1j*sf1_1d.lineshape_parameter))**2
+    assert sf2_1d.get_intensity() == abs(sf2_1d.amplitude_coeff/(-1j*sf2_1d.lineshape_parameter))**2
+
+    assert sf1_2d.get_intensity() == abs(sf1_2d.amplitude_coeff/(-1j*sf1_2d.lineshape_parameter)/(-1j*sf1_2d.lineshape_parameter))**2
+    assert sf2_2d.get_intensity() == abs(sf2_2d.amplitude_coeff/(-1j*sf2_2d.lineshape_parameter)/(-1j*sf2_2d.lineshape_parameter))**2
+
+
+def test_get_max_intensity_feat_SpecFeature():
+    print()
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1 = SpectralFeature(location=res_loc1d_a, lineshape_parameter=2.5, amplitude_coeff=120.)
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, lineshape_parameter=2.5, amplitude_coeff=170.)
+    res_loc1d_c = ResLocGeoObject({'A': 3.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=2.5, amplitude_coeff=30.)
+
+    assert SpectralFeature.get_max_intensity_feat([sf1, sf2, sf3]) == sf2
+
+    res_loc2d_a = ResLocGeoObject({'A': 12., 'B': 5.0})
+    sf1_2d = SpectralFeature(
+        location=res_loc2d_a,
+        lineshape_parameter=2.5,
+        amplitude_coeff=120.,
+    )
+    res_loc2d_b = ResLocGeoObject({'A': 7.5, 'B': 2.0})
+    sf2_2d = SpectralFeature(
+        location=res_loc2d_b,
+        lineshape_parameter=2.5,
+        amplitude_coeff=170.,
+    )
+    res_loc2d_c = ResLocGeoObject({'A': 3.5, 'B': 8.0})
+    sf3_2d = SpectralFeature(
+        location=res_loc2d_c,
+        lineshape_parameter=2.5,
+        amplitude_coeff=30.,
+    )
+    assert SpectralFeature.get_max_intensity_feat([sf1_2d, sf2_2d, sf3_2d]) == sf2_2d
+
+
+def test_dress_with_featboxes_SpecWindow():
+    print()
+
+    sw1d = SpectralWindow(box=Box({'A': (5., 10.)}))
+
+    res_loc1d_a = ResLocGeoObject({'A': 12.})
+    sf1 = SpectralFeature(location=res_loc1d_a, 
+                          lineshape_parameter=2.5, amplitude_coeff=120.)
+    res_loc1d_b = ResLocGeoObject({'A': 7.5})
+    sf2 = SpectralFeature(location=res_loc1d_b, 
+                          lineshape_parameter=2.5, amplitude_coeff=170.)
+    res_loc1d_c = ResLocGeoObject({'A': 3.5})
+    sf3 = SpectralFeature(location=res_loc1d_c, 
+                          lineshape_parameter=2.5, amplitude_coeff=30.)
+
+    sp = SpectralFeature.filter_to_spec_window([sf1, sf2, sf3], sw1d)
+    print(sp.contrib_features)
+    print(sp.full_features)
+
+    max_intensity = abs(110.)**2
+    min_intensity = abs(18.)**2
+    dynrange = max_intensity/min_intensity
+    print(dynrange)
+    new_specwindow = sp.dress_with_featboxes(10.)
+    print()
+    print(new_specwindow.contrib_features)
+    print(new_specwindow.full_features)

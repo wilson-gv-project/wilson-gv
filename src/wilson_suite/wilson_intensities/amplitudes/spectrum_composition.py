@@ -386,7 +386,8 @@ class SpectralFeature:
         ! Assumption: lineshape_parameter is homogeneous/ universal over spectral dimensions
         """
         if intensity_expr == 'abs()**2':
-            return abs(self.amplitude_coeff / self.lineshape_parameter**2)**2
+           N = len(self.location.dims)
+           return abs(self.amplitude_coeff / (-1j*self.lineshape_parameter)**N)**2
         else:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
@@ -413,6 +414,24 @@ class SpectralFeature:
         | C |**2 / (deltaA - i*G)**4 >= f_min
         | C |**2 / (deltaA**2 + G**2)**2 >= f_min
 
+        | C |**2 / (deltaA - i*G)**4 >= f_min
+        (deltaA - i*G)**4 <= | C |**2 / f_min
+
+
+        [YES, NOW IT ONLY WORKS FOR 2 RESONANCE CONDITIONS]
+
+        generally: 
+        | C / (deltaA - i*G)**N |**2 >= f_min
+        | C |**2 / (deltaA - i*G)**2*N >= f_min
+        (deltaA - i*G)**2*N <= | C |**2 / f_min
+        |deltaA - i*G| <= (| C |**2 / f_min) ** 1/(2*N)
+
+        
+        for N = 1:
+        | C / (deltaA - i*G) |**2 >= f_min
+        | C |**2 / (deltaA - i*G)**2 >= f_min
+        (deltaA - i*G)**2 <= | C |**2 / f_min
+        
         """
         import copy
         features = copy.deepcopy(features)
@@ -432,12 +451,17 @@ class SpectralFeature:
                     feat.lineshape_parameter = lineshape_parameter
                 
                 # will make a square box, so lineshape_parameter is assumed to be the same for all dimensions
-                D = abs(feat.amplitude_coeff) / np.sqrt(min_intensity)
-                delta_m = np.sqrt(D - feat.lineshape_parameter**2)
-                # print('delta_m', delta_m)
+                N = len(feat.location.dims)
+                D_gen = (abs(feat.amplitude_coeff)**2 / min_intensity) ** (1/N)
+                if D_gen < feat.lineshape_parameter**2:
+                    print("Warning: ", feat.get_intensity(), min_intensity, max_intensity)
 
-                feat.feat_box = Box({k: (v-delta_m, v+delta_m) for k,v in feat.location._coord_dict.items()})
-        
+                delta_a_general = np.sqrt(D_gen - feat.lineshape_parameter**2)
+                print('D_gen - feat.lineshape_parameter**2', D_gen - feat.lineshape_parameter**2)
+                print('delta_a_general', delta_a_general)
+                feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
+                print(feat.feat_box)
+
         return features
 
 
