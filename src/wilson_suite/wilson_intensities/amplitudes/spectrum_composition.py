@@ -454,13 +454,11 @@ class SpectralFeature:
                 N = len(feat.location.dims)
                 D_gen = (abs(feat.amplitude_coeff)**2 / min_intensity) ** (1/N)
                 if D_gen < feat.lineshape_parameter**2:
+                    # not sure if this will be reached if condition feat.get_intensity() < min_intensity is satisfied
                     print("Warning: ", feat.get_intensity(), min_intensity, max_intensity)
 
                 delta_a_general = np.sqrt(D_gen - feat.lineshape_parameter**2)
-                print('D_gen - feat.lineshape_parameter**2', D_gen - feat.lineshape_parameter**2)
-                print('delta_a_general', delta_a_general)
                 feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
-                print(feat.feat_box)
 
         return features
 
