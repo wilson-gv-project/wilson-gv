@@ -369,3 +369,12 @@ def test_full_integration_H2O_molecule():
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
     #plt.show()
+
+
+def test_debugging():
+    print()
+    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
+    wf = unpickle_smth_from('/home/vlev/monorepo/eval_wf.pkl')
+    print(type(wf))
+    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
+    SpectralFeature.print_list_features(wf.artifacts.features)

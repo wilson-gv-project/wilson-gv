@@ -214,11 +214,12 @@ def test_get_intensity_SpecFeature():
         amplitude_coeff=170.,
     )
     
-    assert sf1_1d.get_intensity() == abs(sf1_1d.amplitude_coeff/(-1j*sf1_1d.lineshape_parameter))**2
-    assert sf2_1d.get_intensity() == abs(sf2_1d.amplitude_coeff/(-1j*sf2_1d.lineshape_parameter))**2
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    assert sf1_1d.get_intensity() == abs(sf1_1d.amplitude_coeff/(-1j*convNu2Ene(sf1_1d.lineshape_parameter)))**2
+    assert sf2_1d.get_intensity() == abs(sf2_1d.amplitude_coeff/(-1j*convNu2Ene(sf2_1d.lineshape_parameter)))**2
 
-    assert sf1_2d.get_intensity() == abs(sf1_2d.amplitude_coeff/(-1j*sf1_2d.lineshape_parameter)/(-1j*sf1_2d.lineshape_parameter))**2
-    assert sf2_2d.get_intensity() == abs(sf2_2d.amplitude_coeff/(-1j*sf2_2d.lineshape_parameter)/(-1j*sf2_2d.lineshape_parameter))**2
+    assert sf1_2d.get_intensity() == abs(sf1_2d.amplitude_coeff/(-1j*convNu2Ene(sf1_2d.lineshape_parameter))/(-1j*convNu2Ene(sf1_2d.lineshape_parameter)))**2
+    assert sf2_2d.get_intensity() == abs(sf2_2d.amplitude_coeff/(-1j*convNu2Ene(sf2_2d.lineshape_parameter))/(-1j*convNu2Ene(sf2_2d.lineshape_parameter)))**2
 
 
 def test_get_max_intensity_feat_SpecFeature():
