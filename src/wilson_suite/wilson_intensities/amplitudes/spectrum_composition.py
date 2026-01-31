@@ -267,7 +267,7 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
-    lineshape_parameter: dict = None
+    lineshape_parameter: float = None # will be by the time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
@@ -275,6 +275,7 @@ class SpectralFeature:
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
+            print('-- self.lineshape_parameter for feature box:', self.lineshape_parameter)
             bounds = points_to_bounds(points=[self.location._coord_dict],
                                     halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
@@ -384,10 +385,18 @@ class SpectralFeature:
     def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
         """
         ! Assumption: lineshape_parameter is homogeneous/ universal over spectral dimensions
+        intensity will be returned in au
         """
+        
+        from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
+        
         if intensity_expr == 'abs()**2':
            N = len(self.location.dims)
-           return abs(self.amplitude_coeff / (-1j*self.lineshape_parameter)**N)**2
+
+           if linewidth_cm_or_au(self.lineshape_parameter) == 'au':
+                return abs(self.amplitude_coeff / (-1j*self.lineshape_parameter)**N)**2
+           elif linewidth_cm_or_au(self.lineshape_parameter) == 'cm-1':
+                return abs(self.amplitude_coeff / (-1j*convNu2Ene(self.lineshape_parameter))**N)**2
         else:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
@@ -436,6 +445,9 @@ class SpectralFeature:
         import copy
         features = copy.deepcopy(features)
 
+        # sort out units of lineshape_parameter
+        # should be in unit of the grid - cm-1 normally
+
         for feat in features[:]:  # Iterate over a copy of the list
             
             if feat.get_intensity() < min_intensity:
@@ -453,15 +465,33 @@ class SpectralFeature:
                 # will make a square box, so lineshape_parameter is assumed to be the same for all dimensions
                 N = len(feat.location.dims)
                 D_gen = (abs(feat.amplitude_coeff)**2 / min_intensity) ** (1/N)
-                if D_gen < feat.lineshape_parameter**2:
+                print('feat.amplitude_coeff', feat.amplitude_coeff)
+                print(f'(abs(feat.amplitude_coeff)**2 / min_intensity) {(abs(feat.amplitude_coeff)**2 / min_intensity)}')
+                # lineshape_parameter should be in unit of the grid? - cm-1 normally
+                from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
+                
+                if linewidth_cm_or_au(feat.lineshape_parameter) == 'cm-1':
+                    lineshape_parameter = convNu2Ene(feat.lineshape_parameter)
+                elif linewidth_cm_or_au(feat.lineshape_parameter) == 'au':
+                    lineshape_parameter = feat.lineshape_parameter
+                
+                if D_gen < lineshape_parameter**2:
+                    print(f'D_gen {D_gen}')
+                    print(f'lineshape_parameter {lineshape_parameter:.3f}')
                     # not sure if this will be reached if condition feat.get_intensity() < min_intensity is satisfied
-                    print("Warning: ", feat.get_intensity(), min_intensity, max_intensity)
-
-                delta_a_general = np.sqrt(D_gen - feat.lineshape_parameter**2)
-                feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
-
+                    print(f"Warning: {feat.get_intensity(): .2e}, min {min_intensity:.2e} max {max_intensity: .2e}")
+                    features.remove(feat)
+                else:
+                    delta_a_general = np.sqrt(D_gen - lineshape_parameter**2)
+                    print(f'delta_a_general {delta_a_general}')
+                    feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
+                    print('feat.feat_box', feat.feat_box)
         return features
 
+    @classmethod
+    def print_list_features(cls, features: list['SpectralFeature']):
+        for feat in features:
+            print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box)
 
 @dataclass
 class SpectralWindow:
@@ -531,8 +561,11 @@ class SpectralWindow:
 
     def dress_with_featboxes(self, dynrange):
         """
+
         making SpectralFeature.feat_box attribute value
             as a concequence, can rm features that are outside of the range 
+        
+        !warning: it is posssibly late to do this for a window when it has identified full_features and contrib_features
         """
         feat = SpectralFeature.get_max_intensity_feat(self.full_features)
         max_intensity_in_window = feat.get_intensity()
