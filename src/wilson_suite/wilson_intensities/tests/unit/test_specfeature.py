@@ -96,24 +96,25 @@ def test_dress_these_with_boxes_1d():
     sf3 = SpectralFeature(location=res_loc1d_c, lineshape_parameter=2.5, amplitude_coeff=30.)
 
     print([sf1, sf2, sf3])
+    print(f"{sf1.get_intensity():.3e}", f"{sf2.get_intensity():.3e}", f"{sf3.get_intensity():.3e}")
     print()
-    max_intensity=abs(110.)**2 
-    min_intensity=abs(18.)**2
-    print('min_intensity', min_intensity)
-
+    max_intensity=2.3e14
+    min_intensity=1.2e13
+    print(sf2.get_intensity()<max_intensity)
+    print(f"{sf2.get_intensity():.3e}", f"{max_intensity:.3e}")
     feats = SpectralFeature.dress_these_with_boxes(features=[sf1, sf2, sf3], 
                                                    max_intensity=max_intensity, 
                                                    min_intensity=min_intensity)
     
-    print(feats)
-    print(len(feats))
+    SpectralFeature.print_list_features(feats)
+    
     assert len(feats) == 2
     f1, f2 = feats
 
     import numpy as np
     np.testing.assert_allclose(
         f1.feat_box.bounds["A"],
-        (5.819834594086948, 18.18016540591305),
+        (4.8199626341930495, 19.18003736580695),
         rtol=1e-12,
         atol=0.0,
     )
@@ -121,7 +122,7 @@ def test_dress_these_with_boxes_1d():
 
     np.testing.assert_allclose(
         f2.feat_box.bounds["A"],
-        (-1.6075535059750017, 16.607553505975),
+        (-3.270667687307265, 18.270667687307267),
         rtol=1e-12,
         atol=0.0,
     )
@@ -152,11 +153,11 @@ def test_dress_these_with_boxes_2d():
     )
 
     print([sf1, sf2, sf3])
+    print(f"{sf1.get_intensity():.3e}", f"{sf2.get_intensity():.3e}", f"{sf3.get_intensity():.3e}")
     print()
 
-    max_intensity = abs(110.)**2
-    min_intensity = abs(18.)**2
-    print('min_intensity', min_intensity)
+    max_intensity = 1.8e24
+    min_intensity = 1.9e23
 
     feats = SpectralFeature.dress_these_with_boxes(
         features=[sf1, sf2, sf3],
@@ -164,8 +165,7 @@ def test_dress_these_with_boxes_2d():
         min_intensity=min_intensity,
     )
 
-    print(feats)
-    print(len(feats))
+    SpectralFeature.print_list_features(feats)
 
     assert len(feats) == 2
     f1, f2 = feats
@@ -176,20 +176,20 @@ def test_dress_these_with_boxes_2d():
     import numpy as np
     np.testing.assert_allclose(
         f1.feat_box.bounds["A"],
-        (11.354502775632097, 12.645497224367903),
+        (9.352188995776729, 14.647811004223271),
     )
     np.testing.assert_allclose(
         f1.feat_box.bounds["B"],
-        (4.354502775632097, 5.645497224367903),
+        (2.3521889957767295, 7.6478110042232705),
     )
     
     np.testing.assert_allclose(
         f2.feat_box.bounds["A"],
-        (5.712699117539398, 9.2873008824606),
+        (3.1656858199373845, 11.834314180062616),
     )
     np.testing.assert_allclose(
         f2.feat_box.bounds["B"],
-        (0.21269911753939863, 3.7873008824606016),
+        (-2.3343141800626155, 6.3343141800626155),
     )
 
 
