@@ -465,8 +465,6 @@ class SpectralFeature:
                 # will make a square box, so lineshape_parameter is assumed to be the same for all dimensions
                 N = len(feat.location.dims)
                 D_gen = (abs(feat.amplitude_coeff)**2 / min_intensity) ** (1/N)
-                print('feat.amplitude_coeff', feat.amplitude_coeff)
-                print(f'(abs(feat.amplitude_coeff)**2 / min_intensity) {(abs(feat.amplitude_coeff)**2 / min_intensity)}')
                 # lineshape_parameter should be in unit of the grid? - cm-1 normally
                 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
                 
@@ -476,16 +474,14 @@ class SpectralFeature:
                     lineshape_parameter = feat.lineshape_parameter
                 
                 if D_gen < lineshape_parameter**2:
-                    print(f'D_gen {D_gen}')
-                    print(f'lineshape_parameter {lineshape_parameter:.3f}')
                     # not sure if this will be reached if condition feat.get_intensity() < min_intensity is satisfied
                     print(f"Warning: {feat.get_intensity(): .2e}, min {min_intensity:.2e} max {max_intensity: .2e}")
                     features.remove(feat)
                 else:
                     delta_a_general = np.sqrt(D_gen - lineshape_parameter**2)
-                    print(f'delta_a_general {delta_a_general}')
+                    # convert au to cm-1 for deltaA for box bounds
+                    delta_a_general = convNu2Ene(delta_a_general, reverse=True)
                     feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
-                    print('feat.feat_box', feat.feat_box)
         return features
 
     @classmethod
