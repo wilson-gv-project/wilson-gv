@@ -147,6 +147,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
     """
 
     lineshape_parameter - uniform lineshape parameters (for all axes) for each feature for now
+    lineshape_parameter unit -- will be au - follows from the workflow in step("all_features")
     """
     # a SpectralFeature instanse holds a res_location and list of states parameters that give this res_location; 
     #       the amplitude coefficient is a value in the dict
