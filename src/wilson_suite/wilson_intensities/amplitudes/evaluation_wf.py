@@ -267,17 +267,33 @@ class EvaluationWorkflow:
 
             # Part 3: Extract features and place them in the spectral window
             with self.step("all_features"):
+                
+                # maybe should check unit by the value here as well? or somewhere before taking unit flag
                 if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
                     gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
                 elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
                     gamma = self.inputs.spec_eval_setup.ev_info.Gamma
                 else:
                     raise ValueError('Gamma cannot be converted from the given unit to au')
+                
                 # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
                 self.artifacts.features = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
                                                                   lineshape_parameter=gamma)
+                from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
+                SpectralFeature.print_list_features(self.artifacts.features)
+
+            with self.step("dress_with_featboxes"):
+                max_intensity_in_window = SpectralFeature.get_max_intensity_feat(self.artifacts.features).get_intensity()
+                min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
+
+                print(f'max_intensity_in_window {max_intensity_in_window:.2e}')
+                print(f'min_intensity_in_window {min_intensity_in_window:.2e}')
+                self.artifacts.features = SpectralFeature.dress_these_with_boxes(self.artifacts.features, 
+                                                                                 max_intensity_in_window, 
+                                                                                 min_intensity_in_window)
+
             with self.step("place_in_specwindow"):
                 self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
                 if not self.artifacts.spec_window.full_features:
@@ -299,6 +315,10 @@ class EvaluationWorkflow:
                         - tuple(RectangularDomain.from_features(features) for c in clusters) -- this returns (clusters are turned into RectangularDomains)
                 
                 [clusters are grouped features based on overalps of feature boxes here; so input features should be dressed with boxes]
+
+                featured with default boxes from postinit are created in GridManager.spec_window.find_clusters_by_featboxes, 
+                    but actaully features are initialized before - in get_features_to_draw(), in "all_features" step, 
+                    and spectral window holds them.
                 '''
                 self.artifacts.regions = self.artifacts.grid_manager.create_regions()
                 if not self.artifacts.regions:
