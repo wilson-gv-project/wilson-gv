@@ -229,7 +229,7 @@ def test_full_integration():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    #plt.show()
+    # plt.show()
 
 
 def test_full_integration_other_axes_choice():
@@ -370,7 +370,7 @@ def test_full_integration_H2O_molecule():
     plt.colorbar(label='log intensity')
     #plt.show()
 
-
+'''
 def test_debugging():
     print()
     from wilson_suite.wilson_utils.serialization import unpickle_smth_from
@@ -378,3 +378,4 @@ def test_debugging():
     print(type(wf))
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
     SpectralFeature.print_list_features(wf.artifacts.features)
+'''
