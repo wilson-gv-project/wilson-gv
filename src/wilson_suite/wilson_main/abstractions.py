@@ -77,7 +77,9 @@ class DataOriginInfo:
 
 
 	def __hash__(self):
-		return hash((self.source_type, self.lvl_theory, self.basis_set, self.base_file_loc))
+		def to_tuple(x):
+			return tuple(sorted(x.items())) if isinstance(x, dict) else x
+		return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
 
 	def __eq__(self, other):
 		if not isinstance(other, DataOriginInfo):
