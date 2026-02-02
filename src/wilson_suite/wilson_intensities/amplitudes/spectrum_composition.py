@@ -267,7 +267,7 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
-    lineshape_parameter: float = None # will be by the time of init in the unit of cm-1
+    lineshape_parameter: float = None # will be by this time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
@@ -275,7 +275,6 @@ class SpectralFeature:
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
-            # print('-- self.lineshape_parameter for feature box:', self.lineshape_parameter)
             bounds = points_to_bounds(points=[self.location._coord_dict],
                                     halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
