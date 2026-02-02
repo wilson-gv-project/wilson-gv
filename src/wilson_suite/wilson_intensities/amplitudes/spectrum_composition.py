@@ -275,7 +275,7 @@ class SpectralFeature:
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
-            print('-- self.lineshape_parameter for feature box:', self.lineshape_parameter)
+            # print('-- self.lineshape_parameter for feature box:', self.lineshape_parameter)
             bounds = points_to_bounds(points=[self.location._coord_dict],
                                     halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
