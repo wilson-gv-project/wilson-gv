@@ -191,6 +191,9 @@ def test_full_integration():
 
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
+    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    sim.getResults(obtainer=wilson_data_obtainer)
+
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
     
     bounds_dict = {'A': (0., 5000.), 'B': (0., 5000.)}
@@ -204,9 +207,6 @@ def test_full_integration():
     eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
     sim.addSpecEvalSetup(eval_setup)
-
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
-    sim.getResults(obtainer=wilson_data_obtainer)
 
     sim.vib_ana_setup.set_include_modes_list()
 
