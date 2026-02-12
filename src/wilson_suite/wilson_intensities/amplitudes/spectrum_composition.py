@@ -400,88 +400,83 @@ class SpectralFeature:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
     @classmethod
-    def dress_these_with_boxes(cls, features: list['SpectralFeature'], 
+    def dress_these_with_boxes(cls, features: list['SpectralFeature'],
                                max_intensity, min_intensity,
-                               lineshape_parameter=None) -> list['SpectralFeature']:
+                               lineshape_parameter=None, box_range_safety_margin: float=0.1,
+                               scale_wrt_max_intensity: bool=False) -> list['SpectralFeature']:
         """
-        but features should have lineshape_parameter before doing this 
-            or it will be set to be the same here from input
+        box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
+            lorentzian_distance_to_dynrange_weaker_than_max?
+            default: 0.1 (ten percent margin). Note: Accounting for the larger boxes that may be warranted by constructive
+            interference between features whose lineshapes overlap might be feasible to handle in a somewhat crude manner
+            by adjusting this parameter.
 
-        In this function there is also a calculation of the box halfwidth, based on the solution of the equation:
+        scale_wrt_max_intensity (default False): When determining box sizes for a given feature, should the box size be
+        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes)
 
-        | C / (wa - A - i*G) / (wb - B - i*G) |**2 >= f_min
-        where C is amplitude coeff, f_min is the minimum intensity for this dynamic range.
-            Gamma is the same for both resonance conditions 
-            and the box will have equal sides (halfwidths in all dimensions will be the same)
+        Assumptions: Feature locations and lineshape parameters given in the same units
 
-        wa - A = deltaA - 0 at the resonance, otherwise represent distance from the resonance
-        wb - B = deltaB - 0 at the resonance, otherwise represent distance from the resonance
-
-        assuming the same distances in all dimensions:
-        | C / (deltaA - i*G)**2 |**2 >= f_min
-        | C |**2 / (deltaA - i*G)**4 >= f_min
-        | C |**2 / (deltaA**2 + G**2)**2 >= f_min
-
-        | C |**2 / (deltaA - i*G)**4 >= f_min
-        (deltaA - i*G)**4 <= | C |**2 / f_min
-
-
-        [YES, NOW IT ONLY WORKS FOR 2 RESONANCE CONDITIONS]
-
-        generally: 
-        | C / (deltaA - i*G)**N |**2 >= f_min
-        | C |**2 / (deltaA - i*G)**2*N >= f_min
-        (deltaA - i*G)**2*N <= | C |**2 / f_min
-        |deltaA - i*G| <= (| C |**2 / f_min) ** 1/(2*N)
-
-        
-        for N = 1:
-        | C / (deltaA - i*G) |**2 >= f_min
-        | C |**2 / (deltaA - i*G)**2 >= f_min
-        (deltaA - i*G)**2 <= | C |**2 / f_min
-        
         """
+
+
+        def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
+            """
+            Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
+            L(w) = | A / ((w - w_0) - i*Gamma) |^2
+            after applying absolute square for intensity,
+            at which radius (units same as gamma) must an n-dimensional sphere be drawn around the
+            resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
+            maximum's intensity everywhere outside the sphere?
+            """
+            return ((gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange)) ** 0.5
+
         import copy
-        features = copy.deepcopy(features)
 
-        # sort out units of lineshape_parameter
-        # should be in unit of the grid - cm-1 normally
+        # HERE: Write unit conversions if locations/lineshape parameter unit assumption (cm^-1) may be broken
 
-        for feat in features[:]:  # Iterate over a copy of the list
-            
-            if feat.get_intensity() < min_intensity:
-                features.remove(feat)
+        # Defining here an implied dynamic range based on the max/min intensity ratio
+        implied_dynrange = max_intensity/min_intensity
+
+        # Return data initialization
+        res_features = copy.deepcopy(features)
+
+        for feat in res_features[:]:
+
+            feat_intensity = feat.get_intensity()
+
+            # NOTE: Need to consider what happens if some features which by themselves are weak like this occur
+            # e.g. close to each other on the shoulder of a stronger feature: It might then be too strict to disregard them like this
+            if feat_intensity < min_intensity:
+                print('Feature was removed for intensity', feat_intensity, 'less than', min_intensity )
+                res_features.remove(feat)
             else:
 
                 feat.feat_box = None
-                
-                if feat.get_intensity() > max_intensity:
+
+                if feat_intensity > max_intensity:
                     raise ValueError(f"The feature {feat} will have higher intensity than max_intensity ({max_intensity})")
-                
+
                 if lineshape_parameter is not None:
                     feat.lineshape_parameter = lineshape_parameter
-                
-                # will make a square box, so lineshape_parameter is assumed to be the same for all dimensions
-                N = len(feat.location.dims)
-                D_gen = (abs(feat.amplitude_coeff)**2 / min_intensity) ** (1/N)
-                # lineshape_parameter should be in unit of the grid? - cm-1 normally
-                from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
-                
-                if linewidth_cm_or_au(feat.lineshape_parameter) == 'cm-1':
-                    lineshape_parameter = convNu2Ene(feat.lineshape_parameter)
-                elif linewidth_cm_or_au(feat.lineshape_parameter) == 'au':
-                    lineshape_parameter = feat.lineshape_parameter
-                
-                if D_gen < lineshape_parameter**2:
-                    # not sure if this will be reached if condition feat.get_intensity() < min_intensity is satisfied
-                    print(f"Warning: {feat.get_intensity(): .2e}, min {min_intensity:.2e} max {max_intensity: .2e}")
-                    features.remove(feat)
+
+
+                # Note: Boxes can potentially be made smaller by considering global maximum (should be a simple scaling of the implied
+                # dynamic range for features weaker than the global max)
+
+                if scale_wrt_max_intensity:
+
+                    feat_intensity_wrt_max = feat_intensity/max_intensity
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange*feat_intensity_wrt_max)
+
                 else:
-                    delta_a_general = np.sqrt(D_gen - lineshape_parameter**2)
-                    # convert au to cm-1 for deltaA for box bounds
-                    delta_a_general = convNu2Ene(delta_a_general, reverse=True)
-                    feat.feat_box = Box({k: (v-delta_a_general, v+delta_a_general) for k,v in feat.location._coord_dict.items()})
-        return features
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
+
+
+                feat.feat_box = Box({k: (v - delta_a_general*(1.0 + box_range_safety_margin),
+                                         v + delta_a_general*(1.0 + box_range_safety_margin) )
+                                     for k,v in feat.location._coord_dict.items()})
+
+        return res_features
 
     @classmethod
     def print_list_features(cls, features: list['SpectralFeature']):

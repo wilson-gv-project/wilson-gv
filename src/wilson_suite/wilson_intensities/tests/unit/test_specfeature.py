@@ -127,6 +127,7 @@ def test_dress_these_with_boxes_1d():
         atol=0.0,
     )
 
+
 def test_dress_these_with_boxes_2d():
     print()
 
@@ -182,7 +183,7 @@ def test_dress_these_with_boxes_2d():
         f1.feat_box.bounds["B"],
         (2.3521889957767295, 7.6478110042232705),
     )
-    
+
     np.testing.assert_allclose(
         f2.feat_box.bounds["A"],
         (3.1656858199373845, 11.834314180062616),
@@ -191,6 +192,127 @@ def test_dress_these_with_boxes_2d():
         f2.feat_box.bounds["B"],
         (-2.3343141800626155, 6.3343141800626155),
     )
+
+def test_dress_these_with_boxes_2d_b():
+    print()
+
+    import numpy as np
+
+    # --- 2D locations ---
+    res_loc2d_a = ResLocGeoObject({'A': 1000., 'B': 500.})
+    sf1 = SpectralFeature(
+        location=res_loc2d_a,
+        lineshape_parameter=4.5,
+        amplitude_coeff=120.,
+    )
+
+    res_loc2d_b = ResLocGeoObject({'A': 1015., 'B': 500.})
+    sf2 = SpectralFeature(
+        location=res_loc2d_b,
+        lineshape_parameter=10.5,
+        amplitude_coeff=170.,
+    )
+
+    res_loc2d_c = ResLocGeoObject({'A': 1250., 'B': 600.})
+    sf3 = SpectralFeature(
+        location=res_loc2d_c,
+        lineshape_parameter=4.5,
+        amplitude_coeff=30.,
+    )
+
+    res_loc2d_d = ResLocGeoObject({'A': 350., 'B': 1000.})
+    sf4 = SpectralFeature(
+        location=res_loc2d_d,
+        lineshape_parameter=5.,
+        amplitude_coeff=80.,
+    )
+
+    res_loc2d_e = ResLocGeoObject({'A': 350., 'B': 1000.})
+    sf5 = SpectralFeature(
+        location=res_loc2d_e,
+        lineshape_parameter=2.5,
+        amplitude_coeff=50.,
+    )
+
+    res_loc2d_f = ResLocGeoObject({'A': 350., 'B': 1400.})
+    sf6 = SpectralFeature(
+        location=res_loc2d_f,
+        lineshape_parameter=12.5,
+        amplitude_coeff=55.,
+    )
+
+    res_loc2d_g = ResLocGeoObject({'A': 550., 'B': 550.})
+    sf7 = SpectralFeature(
+        location=res_loc2d_g,
+        lineshape_parameter=3.5,
+        amplitude_coeff=230.,
+    )
+
+    res_loc2d_h = ResLocGeoObject({'A': 800., 'B': 800.})
+    sf8 = SpectralFeature(
+        location=res_loc2d_h,
+        lineshape_parameter=2.5,
+        amplitude_coeff=30.,
+    )
+
+    sfs = [sf1, sf2, sf3, sf4, sf5, sf6, sf7, sf8]
+
+    max_int = np.max([i.get_intensity() for i in sfs])
+    min_int = np.min([i.get_intensity() for i in sfs])
+
+    print('max min', max_int, min_int)
+
+    for i in sfs:
+        print(i)
+        print(i.get_intensity())
+
+    #print([sf1, sf2, sf3])
+    #print(f"{sf1.get_intensity():.3e}", f"{sf2.get_intensity():.3e}", f"{sf3.get_intensity():.3e}")
+    print()
+
+    max_intensity = max_int
+    min_intensity = min_int * 2.0
+
+    feats = SpectralFeature.dress_these_with_boxes(
+        features=sfs,
+        max_intensity=max_intensity,
+        min_intensity=max_intensity/200,
+        scale_wrt_max_intensity=True
+    )
+
+    for i in feats:
+        print('Feature with location', i.location, 'lineshape parameter', i.lineshape_parameter, 'and point intensity', i.get_intensity())
+        print('A bounds:', i.feat_box.bounds["A"], 'B bounds', i.feat_box.bounds["B"])
+        print('\n')
+
+    #SpectralFeature.print_list_features(feats)
+
+    #print(feats)
+
+    #assert len(feats) == 2
+    #f1, f2 = feats
+
+    #assert set(f1.feat_box.bounds.keys()) == {'A', 'B'}
+    #assert set(f2.feat_box.bounds.keys()) == {'A', 'B'}
+
+    import numpy as np
+    #np.testing.assert_allclose(
+    #    f1.feat_box.bounds["A"],
+    #    (9.352188995776729, 14.647811004223271),
+    #)
+    #np.testing.assert_allclose(
+    #    f1.feat_box.bounds["B"],
+    #    (2.3521889957767295, 7.6478110042232705),
+    #)
+    #
+    #np.testing.assert_allclose(
+    #    f2.feat_box.bounds["A"],
+    #    (3.1656858199373845, 11.834314180062616),
+    #)
+    #np.testing.assert_allclose(
+    #    f2.feat_box.bounds["B"],
+    #    (-2.3343141800626155, 6.3343141800626155),
+    #)
 
 
 def test_get_intensity_SpecFeature():
