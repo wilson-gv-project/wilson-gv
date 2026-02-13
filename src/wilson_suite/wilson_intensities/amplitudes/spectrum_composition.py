@@ -267,7 +267,7 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
-    lineshape_parameter: dict = None
+    lineshape_parameter: float = None # will be by this time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
@@ -364,6 +364,138 @@ class SpectralFeature:
     def get_res_motifs(self) -> list[ResonanceMotif]:
         return [i.res_motif for i in self.term_contributions]
 
+    @classmethod
+    def get_max_intensity_feat(cls, features: list['SpectralFeature'],
+                          intensity_expr: str = 'abs()**2') -> 'SpectralFeature':
+        """
+        amplitude of a feature is given by: amplitude_coeff / lineshape_parameter**2
+        """
+        result = None
+        intensity_result = 0
+
+        for feat in features:
+            
+            if feat.get_intensity(intensity_expr) > intensity_result:
+                result = feat
+                intensity_result = feat.get_intensity(intensity_expr)
+        
+        return result
+
+    def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
+        """
+        ! Assumption: lineshape_parameter is homogeneous/ universal over spectral dimensions
+        intensity will be returned in au
+        """
+        
+        from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
+        
+        if intensity_expr == 'abs()**2':
+           N = len(self.location.dims)
+
+           if linewidth_cm_or_au(self.lineshape_parameter) == 'au':
+                return abs(self.amplitude_coeff / (-1j*self.lineshape_parameter)**N)**2
+           elif linewidth_cm_or_au(self.lineshape_parameter) == 'cm-1':
+                return abs(self.amplitude_coeff / (-1j*convNu2Ene(self.lineshape_parameter))**N)**2
+        else:
+            raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
+    
+    @classmethod
+    def dress_these_with_boxes(cls, features: list['SpectralFeature'],
+                               max_intensity, min_intensity,
+                               lineshape_parameter=None, box_range_safety_margin: float=0.1,
+                               scale_wrt_max_intensity: bool=False,
+                               minimum_box_padding: float=0.) -> list['SpectralFeature']:
+        """
+        box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
+            lorentzian_distance_to_dynrange_weaker_than_max?
+            default: 0.1 (ten percent margin). Note: Accounting for the larger boxes that may be warranted by constructive
+            interference between features whose lineshapes overlap might be feasible to handle in a somewhat crude manner
+            by adjusting this parameter.
+
+        scale_wrt_max_intensity (default False): When determining box sizes for a given feature, should the box size be
+        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes")
+
+        minimum_box_padding (default 0.0): Apply a minimum size box around each feature, where the value of this parameter
+        is the minimum distance to the box surface centerpoints along each positive/negative Cartesian direction, i.e.
+        boxes may be larger than this minumum, but not smaller. If applied, then is unchanged by box_range_safety_margin.
+        If set to 0.0, features with point intensity < min_intensity will be removed, potentially removing effects
+        that should have been included if e.g. these features were close to each other on the shoulder of a stronger feature
+
+        Assumptions: Feature locations, lineshape parameters (and minimum box padding if used) given in the same units
+
+        Recommended use unless performance is critical:
+            - box_range_safety margin at default or other judiciously chosen nonzero value
+            - scale_wrt_max_intensity: True (recommended as long as the collection of features includes the spectrum's strongest feature)
+            - minimum_box_padding: Low but positive number (2-10 * lineshape parameter)
+
+        Note that well-functioning of this routine should be reviewed after usage experience
+        """
+
+
+        def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
+            """
+            Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
+            L(w) = | A / ((w - w_0) - i*Gamma) |^2
+            after applying absolute square for intensity,
+            at which radius (units same as gamma) must an n-dimensional sphere be drawn around the
+            resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
+            maximum's intensity everywhere outside the sphere?
+            """
+
+            # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
+            # to a negative box size (and the default formula will return NaN) - therefore return 0.0 instead
+            if dynrange < 1.0:
+                return 0.0
+
+            else:
+                return ( (gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange) ) ** 0.5
+
+        import copy
+
+        # Defining here an implied dynamic range based on the max/min specified intensity ratio
+        implied_dynrange = max_intensity/min_intensity
+
+        # Return data initialization
+        res_features = copy.deepcopy(features)
+
+        for feat in res_features[:]:
+
+            feat_intensity = feat.get_intensity()
+
+            # Warning: If features removed by this were e.g. close to each other and/or on the shoulder of a stronger feature,
+            # this removal may be too strict. Can be mitigated by choosing nonzero minimum_box_padding.
+            if (feat_intensity < min_intensity) and (minimum_box_padding == 0.0):
+                res_features.remove(feat)
+            else:
+
+                feat.feat_box = None
+
+                if feat_intensity > max_intensity:
+                    raise ValueError(f"The feature {feat} will have higher intensity than max_intensity ({max_intensity})")
+
+                if lineshape_parameter is not None:
+                    feat.lineshape_parameter = lineshape_parameter
+
+                if scale_wrt_max_intensity:
+
+                    feat_intensity_wrt_max = feat_intensity/max_intensity
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange*feat_intensity_wrt_max)
+
+                else:
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
+
+                box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
+
+                feat.feat_box = Box({k: (v - box_extent,
+                                         v + box_extent)
+                                     for k,v in feat.location._coord_dict.items()})
+
+        return res_features
+
+    @classmethod
+    def print_list_features(cls, features: list['SpectralFeature']):
+        for feat in features:
+            print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box)
 
 @dataclass
 class SpectralWindow:
@@ -430,6 +562,26 @@ class SpectralWindow:
             RectangularDomain.from_features(clusters[c])
             for c in clusters
         )
+
+    def dress_with_featboxes(self, dynrange):
+        """
+
+        making SpectralFeature.feat_box attribute value
+            as a concequence, can rm features that are outside of the range 
+        
+        !warning: it is posssibly late to do this for a window when it has identified full_features and contrib_features
+        """
+        feat = SpectralFeature.get_max_intensity_feat(self.full_features)
+        max_intensity_in_window = feat.get_intensity()
+        min_intensity_in_window = max_intensity_in_window / dynrange
+
+        new_full_features = SpectralFeature.dress_these_with_boxes(self.full_features, max_intensity_in_window, min_intensity_in_window)
+        new_contrib_features = SpectralFeature.dress_these_with_boxes(self.contrib_features, max_intensity_in_window, min_intensity_in_window)
+
+        return SpectralWindow(box=self.box, 
+                              full_features=new_full_features, 
+                              contrib_features=new_contrib_features)
+
 
 
 @dataclass

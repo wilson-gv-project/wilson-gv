@@ -98,3 +98,31 @@ def convertor(system,
             raise ValueError(f'Units conversion from {in_units} to {target_units} not implemented')
 
     return vals
+
+
+def recip_cm_or_au(energy):
+    """
+    Distinguish between cm-1 and atomic units based on magnitude.
+    Uses the fact that 1 hartree ≈ 219,475 cm-1
+    
+    Threshold logic:
+    - Values > 0.5 are likely cm-1 (even weak transitions are >100 cm-1)
+    - Values < 0.5 are likely au (even strong transitions are <1 hartree)
+    """
+    if energy > 0.5:
+        return 'cm-1'
+    elif energy > 0:
+        return 'au'
+    else:
+        raise ValueError(f"Energy must be positive, got {energy}")
+
+
+def linewidth_cm_or_au(width):
+    """
+    Distinguish between cm-1 and atomic units based on magnitude.
+    For linewidths/broadening parameters
+    """
+    if width > 1e-5:
+        return 'cm-1'
+    else:
+        return 'au'
