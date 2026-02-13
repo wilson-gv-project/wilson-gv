@@ -403,7 +403,8 @@ class SpectralFeature:
     def dress_these_with_boxes(cls, features: list['SpectralFeature'],
                                max_intensity, min_intensity,
                                lineshape_parameter=None, box_range_safety_margin: float=0.1,
-                               scale_wrt_max_intensity: bool=False) -> list['SpectralFeature']:
+                               scale_wrt_max_intensity: bool=False,
+                               minimum_box_padding: float=0.) -> list['SpectralFeature']:
         """
         box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
             lorentzian_distance_to_dynrange_weaker_than_max?
@@ -412,10 +413,22 @@ class SpectralFeature:
             by adjusting this parameter.
 
         scale_wrt_max_intensity (default False): When determining box sizes for a given feature, should the box size be
-        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes)
+        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes")
 
-        Assumptions: Feature locations and lineshape parameters given in the same units
+        minimum_box_padding (default 0.0): Apply a minimum size box around each feature, where the value of this parameter
+        is the minimum distance to the box surface centerpoints along each positive/negative Cartesian direction, i.e.
+        boxes may be larger than this minumum, but not smaller. If applied, then is unchanged by box_range_safety_margin.
+        If set to 0.0, features with point intensity < min_intensity will be removed, potentially removing effects
+        that should have been included if e.g. these features were close to each other on the shoulder of a stronger feature
 
+        Assumptions: Feature locations, lineshape parameters (and minimum box padding if used) given in the same units
+
+        Recommended use unless performance is critical:
+            - box_range_safety margin at default or other judiciously chosen nonzero value
+            - scale_wrt_max_intensity: True (recommended as long as the collection of features includes the spectrum's strongest feature)
+            - minimum_box_padding: Low but positive number (2-10 * lineshape parameter)
+
+        Note that well-functioning of this routine should be reviewed after usage experience
         """
 
 
@@ -428,13 +441,18 @@ class SpectralFeature:
             resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
             maximum's intensity everywhere outside the sphere?
             """
-            return ((gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange)) ** 0.5
+
+            # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
+            # to a negative box size (and the default formula will return NaN) - therefore return 0.0 instead
+            if dynrange < 1.0:
+                return 0.0
+
+            else:
+                return ( (gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange) ) ** 0.5
 
         import copy
 
-        # HERE: Write unit conversions if locations/lineshape parameter unit assumption (cm^-1) may be broken
-
-        # Defining here an implied dynamic range based on the max/min intensity ratio
+        # Defining here an implied dynamic range based on the max/min specified intensity ratio
         implied_dynrange = max_intensity/min_intensity
 
         # Return data initialization
@@ -444,10 +462,9 @@ class SpectralFeature:
 
             feat_intensity = feat.get_intensity()
 
-            # NOTE: Need to consider what happens if some features which by themselves are weak like this occur
-            # e.g. close to each other on the shoulder of a stronger feature: It might then be too strict to disregard them like this
-            if feat_intensity < min_intensity:
-                print('Feature was removed for intensity', feat_intensity, 'less than', min_intensity )
+            # Warning: If features removed by this were e.g. close to each other and/or on the shoulder of a stronger feature,
+            # this removal may be too strict. Can be mitigated by choosing nonzero minimum_box_padding.
+            if (feat_intensity < min_intensity) and (minimum_box_padding == 0.0):
                 res_features.remove(feat)
             else:
 
@@ -459,10 +476,6 @@ class SpectralFeature:
                 if lineshape_parameter is not None:
                     feat.lineshape_parameter = lineshape_parameter
 
-
-                # Note: Boxes can potentially be made smaller by considering global maximum (should be a simple scaling of the implied
-                # dynamic range for features weaker than the global max)
-
                 if scale_wrt_max_intensity:
 
                     feat_intensity_wrt_max = feat_intensity/max_intensity
@@ -471,9 +484,10 @@ class SpectralFeature:
                 else:
                     delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
 
+                box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
 
-                feat.feat_box = Box({k: (v - delta_a_general*(1.0 + box_range_safety_margin),
-                                         v + delta_a_general*(1.0 + box_range_safety_margin) )
+                feat.feat_box = Box({k: (v - box_extent,
+                                         v + box_extent)
                                      for k,v in feat.location._coord_dict.items()})
 
         return res_features
