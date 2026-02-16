@@ -406,6 +406,38 @@ class SpectralFeature:
                                scale_wrt_max_intensity: bool=False,
                                minimum_box_padding: float=0.) -> list['SpectralFeature']:
         """
+        Assumptions: Feature locations, lineshape parameters (and minimum box padding if used) given in the same units
+
+        Limitations: This method is currently for m == n for m-D features in n-D spectra. May need further work for
+                     m != n.
+
+        Note that well-functioning of this routine should be reviewed after usage experience.
+
+        Dressing features with boxes: Uses a helper function describing at which radius from a Lorentzian's centerpoint
+        that the intensity is "dynamic range times smaller" than at the centerpoint, and then constructs an n-dimensional
+        (currently "n-dimensional cubic") box of that distance from the centerpoint along the given axes:
+          - the distance provided by the helper function gives distances along the axes under the "worst case" assumption
+            that each axis is parallel to the resonance condition direction
+            - the rest of the term is then taken as constant and the distance can be determined in each direction separately
+            - otherwise (if not each axis and resonance condition parallel), walking along one axis means gaining
+              distance to more than one resonance condition, which means that the intensity will be even smaller than
+              dictated by a single Lorentzian
+            - if so (not parallel), the box would become somewhat larger than needed but I think at most sqrt(N),
+              where N is the spectrum dimensionality, for a given direction
+                - for instance in the 2D case, if one resonance condition runs along axis A and the other along A + B,
+                then the lineshapes will be at a 45 degree angle to each other on a plot over the (A, B) space. The box
+                could have then been sqrt(2) shorter along the B direction.
+                - This can likely be accomplished by inspecting each resonance condition more closely for which
+                  combination of axes they run along and accounting for this angle in the box scaling via trigonometry
+
+        For m != n (feature--spectrum dimensionality): One typical example is a line feature (e.g. CARS) in a 2D spectrum).
+        This feature decreases along one direction in the spectrum and stays constant along the other, and the present
+        algorithm will then likely need adjustment to make an appropriate box for this (if sticking to rectangular boxes,
+        will probably need to return a box covering the full region of the spectral window spanned by such a feature to
+        a given tolerance).
+
+        lineshape_parameter: If specified, overrides each feature's inherent lineshape parameter.
+
         box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
             lorentzian_distance_to_dynrange_weaker_than_max?
             default: 0.1 (ten percent margin). Note: Accounting for the larger boxes that may be warranted by constructive
@@ -413,7 +445,8 @@ class SpectralFeature:
             by adjusting this parameter.
 
         scale_wrt_max_intensity (default False): When determining box sizes for a given feature, should the box size be
-        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes")
+        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes so I decrease the
+        desired dynamic range for weaker features (compared to their centerpoint value)")
 
         minimum_box_padding (default 0.0): Apply a minimum size box around each feature, where the value of this parameter
         is the minimum distance to the box surface centerpoints along each positive/negative Cartesian direction, i.e.
@@ -421,25 +454,25 @@ class SpectralFeature:
         If set to 0.0, features with point intensity < min_intensity will be removed, potentially removing effects
         that should have been included if e.g. these features were close to each other on the shoulder of a stronger feature
 
-        Assumptions: Feature locations, lineshape parameters (and minimum box padding if used) given in the same units
-
         Recommended use unless performance is critical:
             - box_range_safety margin at default or other judiciously chosen nonzero value
             - scale_wrt_max_intensity: True (recommended as long as the collection of features includes the spectrum's strongest feature)
             - minimum_box_padding: Low but positive number (2-10 * lineshape parameter)
 
-        Note that well-functioning of this routine should be reviewed after usage experience
         """
 
 
         def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
             """
             Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
-            L(w) = | A / ((w - w_0) - i*Gamma) |^2
+            L(w) = | A / ((w - w_0) - i*gamma) |^2
             after applying absolute square for intensity,
             at which radius (units same as gamma) must an n-dimensional sphere be drawn around the
             resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
             maximum's intensity everywhere outside the sphere?
+
+            Found by evaluating L(x - x_0)/L(x_0) = k, with L from the above expression, and solving for the x that
+            gives the desired k (where k = 1/dynrange)
             """
 
             # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
