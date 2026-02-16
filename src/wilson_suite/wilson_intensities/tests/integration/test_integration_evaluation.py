@@ -310,6 +310,18 @@ def test_integration_evv_experiment_until_after_evaluation():
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
 
+    # TASKS:
+    # - Set up plotting framework DONE
+    # - Compare terms to paper 1 form
+    # - Verify orientational averaging (for "VVVV")
+    # - Do main sweep of theory verification in paper
+    # - Set up reasonable model system
+    # - Make spectrum appearance tests
+    # - Make numerical tests for a broad selection of values
+    # - Do remaining sweep of theory verification in paper
+    # - Fix axis finder for more useful axis choices
+
+
     print(axes_choice)
 
     evv_exp.tell_axis_options()
@@ -346,7 +358,7 @@ def test_integration_evv_experiment_until_after_evaluation():
 
     evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
                                                           'Gamma': 4.7, 'Gamma_unit': 'cm-1',
-                                                          'grid_resolution': {'A': 400, 'B': 400},
+                                                          'grid_resolution': {'A': 360, 'B': 600},
                                                           'dynamic_range': 10**dynrange_log10,
                                                           'box_range_safety_margin': 0.1,
                                                           'scale_wrt_max_intensity': True,
@@ -365,17 +377,12 @@ def test_integration_evv_experiment_until_after_evaluation():
 
     sim.evaluate()
 
-    np.set_printoptions(linewidth=280, precision=1)
-
     import matplotlib.pyplot as plt
 
 
     Z = np.log(np.abs(sim.spec)**2)
 
     zmax = np.amax(Z)
-
-
-    print('Z', Z)
 
     for i in range(Z.shape[0]):
         for j in range(Z.shape[1]):
