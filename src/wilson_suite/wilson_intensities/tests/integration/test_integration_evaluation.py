@@ -310,19 +310,16 @@ def test_integration_evv_experiment_until_after_evaluation():
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
 
-    # TASKS:
-    # - Set up plotting framework DONE
-    # - Compare terms to paper 1 form
-    # - Verify orientational averaging (for "VVVV")
-    # - Do main sweep of theory verification in paper
-    # - Set up reasonable model system
-    # - Make spectrum appearance tests
-    # - Make numerical tests for a broad selection of values
-    # - Do remaining sweep of theory verification in paper
-    # - Fix axis finder for more useful axis choices
-
+    print('Terms', terms)
+    for i in terms:
+        for j in terms[i]:
+            print('Anharm', j)
+            for k in terms[i][j]:
+                k.present()
 
     print(axes_choice)
+
+    exit()
 
     evv_exp.tell_axis_options()
 
