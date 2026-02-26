@@ -1,5 +1,6 @@
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature, ResLocGeoObject, SpectralWindow
 from wilson_suite.wilson_intensities.amplitudes.term_parts import TermParametersChoice, ResonanceMotif, ResonanceCondition, ParameterSet
+import wilson_suite as ws
 
 class MakeObjects:
     
@@ -184,3 +185,54 @@ class MakeObjects:
             )
 
         return states
+
+    @staticmethod
+    def mk_vibstates_data():
+        return 
+    
+def fillStatesData(data_dict):
+    from wilson_suite.wilson_main import abstractions as wm_abst
+
+    states_list: list[wm_abst.VibState] = []
+    states_dict: dict = data_dict.get('anharmonic_states')
+
+    for state, energy in states_dict.items():
+        states_list.append(wm_abst.VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)))
+
+    return states_list
+
+def get_from_pkl_features(pkl_file, lineshape_parameter):
+    """
+    pkld_file -- 'data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl'
+    """
+    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
+    unpickled = unpickle_smth_from(pkl_file)
+    
+    list_vibsstates = fillStatesData(unpickled)
+
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+
+    include_list = tuple([0, 1, 2])
+    vibstates_data = VibStatesData(allstates=tuple(list_vibsstates),
+                                   harmonic_osc_states_labels=include_list)
+    vibdiff_cache = VibDiffCache()
+
+    from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_from_terms_for_eval
+    from wilson_suite.fixtures import evv_experiment
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+
+    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # this makes A and B > 0
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
+    sim.addTerms(terms)
+    sim.setAxisChoiceAndTranslateTerms(axes_choice)
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+    terms_list = derived_terms_flat(sim.terms_in_axis_choice, tolistonly=True)
+
+    features = get_features_from_terms_for_eval(derived_terms=terms_list,
+                                                vibstates_data=vibstates_data,
+                                                vibdiff_cache=vibdiff_cache, 
+                                                lineshape_parameter=lineshape_parameter)
+    return features
