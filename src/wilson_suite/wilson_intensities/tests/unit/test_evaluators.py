@@ -190,6 +190,7 @@ def test_evaluate_compiled_group():
     # z = 10 - 1*x
     rc1 = NumericalResonanceCondition({"A": 1.0}, vib_energy_diff=10.0)
     motif1 = NumericalResonanceMotif([rc1])
+    print(motif1)
 
     # Motif 2:
     # z = 20 - 2*x
@@ -207,6 +208,28 @@ def test_evaluate_compiled_group():
 
     assert np.allclose(result, expected)
 
+
+    # Motif 1:
+    # z = 10 + 1*x
+    rc1 = NumericalResonanceCondition({"A": -1.0}, vib_energy_diff=10.0)
+    motif1 = NumericalResonanceMotif([rc1])
+    print(motif1)
+    
+    # Motif 2:
+    # z = 20 + 2*x
+    rc2 = NumericalResonanceCondition({"A": -2.0}, vib_energy_diff=20.0)
+    motif2 = NumericalResonanceMotif([rc2])
+
+    # One term group containing both motifs
+    group = CompiledTermGroup([motif1, motif2])
+
+    # run evaluation
+    result = evaluate_compiled_group(group, mesh, gamma)
+
+    # expected - sum for each motif
+    expected = 1/(10 + A - 1j*gamma) + 1/(20 + 2*A - 1j*gamma)
+
+    assert np.allclose(result, expected)
 
 def test_evaluate_feature_on_grid_new_2():
     """
