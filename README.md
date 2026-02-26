@@ -2,6 +2,8 @@
 
 ## For developers
 
+### About branch 
+
  Branch `dft_vs_cc` would contain the release version for paper1 (DFT vs CC simulations).
 
  History so far (when branch mentioned - it's a merge from it to this branch):
