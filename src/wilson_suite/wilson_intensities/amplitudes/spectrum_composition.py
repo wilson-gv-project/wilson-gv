@@ -529,6 +529,7 @@ class SpectralFeature:
     def print_list_features(cls, features: list['SpectralFeature']):
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box)
+            print('term_contributions', feat.term_contributions)
 
 @dataclass
 class SpectralWindow:
