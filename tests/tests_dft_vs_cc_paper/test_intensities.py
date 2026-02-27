@@ -1,15 +1,12 @@
 """
-- [ ] single feature intensities (at resonance)
-    - [ ] several terms contribution (they would always share the same resonance motif):
-        - [ ] 2 mech terms
-        - [ ] mech and el term?? - idk if possible
 - [x] 1. 5x5 grid around feature centrepoint with single term contribution
-- [x] 2. composite grid including 5x5 grid around feature centrepoints for 2 non-overlapping features | this isn't much different from single feature but still different because grids are generated here
-- [x] 3. composite grid including 5x5 grid around feature centrepoints for 2 overlapping features (2 cases: 1) same sign coeff, 2) diff sign coeff)
+- [x] 2. composite grid including 5x5 grid around feature centrepoints for 2 non-overlapping features  with single term contribution| this isn't much different from single feature but still different because grids are generated here
+- [x] 3. composite grid including 5x5 grid around feature centrepoints for 2 overlapping features  with single term contribution (2 cases: i) same sign coeff, ii) diff sign coeff)
+- [x] 3 above should be also with multi-term contributions! -- for intensity calculation though nothing will change actually. It matters for the amplitude coefficient calculation (it will be a sum of contributions from all terms) -- one test is enough, should pass without any changes if coppied
 - [ ] gamma = 0 case
 - [ ] feature located exactly on a grid boundary
 - [ ] negative tests - ensure there is no silent errors
-- [ ]
+- [ ] 
 """
 from .testutils import MakeObjects
 import wilson_suite as ws
@@ -34,7 +31,7 @@ def test_single_feat_5by5grid_as_evaluate_regions():
         and evaluation is done simply over the whole SpectralWindow (5x5 - this given by custom here grid)
     """
     
-    feature = MakeObjects.mk_feature_single()
+    feature = MakeObjects.mk_feature_single_onetermid()
     # just confirming here and for the information
     assert feature.amplitude_coeff == -1.12e-06
     assert feature.location == ws.intensities.amplitudes.spectrum_composition.ResLocGeoObject({'A': 1119.5, 'B': 2921.})
@@ -119,6 +116,102 @@ def test_single_feat_5by5grid_as_evaluate_regions():
     ref_res = feature.amplitude_coeff * resonance_part
     
     assert np.allclose(ref_res, feat_eval)
+
+
+def test_single_feat_5by5grid_as_evaluate_regions_multiterm_contrib():
+    """
+    Common situation - a feature has several terms contributions with the same resonance motif.
+
+
+    """
+    print()
+    
+    feature = MakeObjects.mk_feature_single_multitermids()
+    # just confirming here and for the information
+    assert feature.amplitude_coeff == -1.12e-06
+    assert feature.location == ws.intensities.amplitudes.spectrum_composition.ResLocGeoObject({'A': 1119.5, 'B': 2921.})
+    
+    term_contrib = feature.term_contributions[0]
+    # just confirming here and for the information
+    assert term_contrib.states_parameters[0] == ws.intensities.amplitudes.term_parts.ParameterSet({'a': 0, 'b': 1})
+    
+    # '-A' so that with (vibdiff - pf = 0), and (-pf > 0) ==> -(-A) and then 'A' can be a positive value (as set now in ResLocGeoObject)
+    # in EVV axis A in this case would be (1,) and not (-1) --- there should be no issue with such interpretation 
+    #                                                           because it has nothing to do with the pulse direction or sign, 
+    #                                                           it is purely mathematical transformation
+    assert set(i.pf for i in term_contrib.res_motif) == set([('-A',), ('B',)])
+
+    rcs = [ws.intensities.amplitudes.term_parts.ResonanceCondition.make_from_tuples(left_state=(), right_state=('a',), pert_freqs=('-A',)).h(),
+           ws.intensities.amplitudes.term_parts.ResonanceCondition.make_from_tuples(left_state=('a', 'b'), right_state=('b',), pert_freqs=('B',)).h()]
+    assert sorted(rcs) == sorted([i.h() for i in term_contrib.res_motif])
+
+
+    spec_wind_box = ws.intensities.amplitudes.spectrum_composition.Box({'A': (998.5, 1240.5), 
+                                                                        'B': (2800., 3022.)})
+
+    # step is 60.5
+    grid_coords = {'A': np.array([[998.5 , 998.5 , 998.5 , 998.5 , 998.5],
+                                  [1059.0, 1059.0, 1059.0, 1059.0, 1059.0],
+                                  [1119.5, 1119.5, 1119.5, 1119.5, 1119.5],
+                                  [1180.0, 1180.0, 1180.0, 1180.0, 1180.0],
+                                  [1240.5, 1240.5, 1240.5, 1240.5, 1240.5]]), 
+                   'B': np.array([[2800., 2860.5, 2921.0, 2961.5, 3022.], 
+                                  [2800., 2860.5, 2921.0, 2961.5, 3022.],
+                                  [2800., 2860.5, 2921.0, 2961.5, 3022.],
+                                  [2800., 2860.5, 2921.0, 2961.5, 3022.],
+                                  [2800., 2860.5, 2921.0, 2961.5, 3022.]])}
+    
+    spec_window = ws.intensities.amplitudes.spectrum_composition.SpectralWindow(box=spec_wind_box)
+    spec_window.full_features = [feature]
+
+    grid_region = MakeObjects.mk_gridregion_for_specwindow(spec_window, grid_coords)
+    assert grid_region.domain.full_features == spec_window.full_features
+    
+    from wilson_suite.wilson_intensities.tests.unit.test_domains import get_data_evaluators_tests
+    vbana = get_data_evaluators_tests()['vib_ana_setup']
+
+    vibstates_data = ws.intensities.amplitudes.term_parts.VibStatesData(allstates=MakeObjects.mk_vibstates_states(), 
+                                                                        harmonic_osc_states_labels=vbana.include_list,
+                                                                        number_of_nmodes=vbana.number_of_modes)
+    assert vibstates_data.get_state_by_label('0').energy == 1119.5
+    assert vibstates_data.get_state_by_label('0,1').energy == 3885.
+
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+    vibdiff_cache = VibDiffCache()
+    
+    # regions evaluation - here a single region that matches the whole SpectralWindow in this case
+    # at this point all units should be au in evaluations (including gamma and coordinates of the spec grids)
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    res = ws.intensities.amplitudes.evaluation_wf.evaluate_regions(regions=[grid_region], # holds grid coordinates
+                                                                   vib_data=vibstates_data, 
+                                                                   vibdiff_cache=vibdiff_cache, 
+                                                                   gamma=convNu2Ene(feature.lineshape_parameter),
+                                                                   verbose=True)
+    regions_eval = list(res.values())[0]
+    assert np.count_nonzero(np.isreal(regions_eval)) == 1 # only centrepoint is at resonance - imaginary part is zero
+    # centrepoint intensity vs refference
+    assert regions_eval[2,2] == feature.amplitude_coeff/(-1j*convNu2Ene(feature.lineshape_parameter))**2
+
+    # now down to the feature evaluation
+    grid_coords_au = {k: convNu2Ene(v) for k,v in grid_coords.items()}
+    feat_eval = ws.intensities.amplitudes.evaluation_wf.evaluate_feature(feature=feature,
+                                                                         vib_data=vibstates_data,
+                                                                         vibdiff_cache=vibdiff_cache,  # won't be empty now but it's fine
+                                                                         gamma=convNu2Ene(feature.lineshape_parameter),
+                                                                         coords=grid_coords_au, # extra wrt evaluate_regions because features should be evaluated on regions/grids
+                                                                         verbose=True)
+    assert np.count_nonzero(np.isreal(feat_eval)) == 1 # only centrepoint is at resonance - imaginary part is zero
+
+    assert np.allclose(feat_eval, regions_eval)
+
+    # reference value construction 
+    # amplitude = feat_coeff  / (w_0,a + A) / (w_a+b,b - B) with a=0,b=1
+    assert vibdiff_cache._cache == {('zero', '0'): -1119.5, ('0,1', '1'): 2921.0}
+    resonance_part = 1. / (convNu2Ene(-1119.5) + grid_coords_au['A'] - 1j* convNu2Ene(feature.lineshape_parameter)) / (convNu2Ene(2921.0) - grid_coords_au['B'] - 1j* convNu2Ene(feature.lineshape_parameter))
+    ref_res = feature.amplitude_coeff * resonance_part
+    
+    assert np.allclose(ref_res, feat_eval)
+
 
 
 def test_2_nonoverl_feat_5by5grid_as_evaluate_regions():
