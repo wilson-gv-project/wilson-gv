@@ -230,9 +230,11 @@ def get_from_pkl_features(pkl_file, lineshape_parameter):
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
     terms_list = derived_terms_flat(sim.terms_in_axis_choice, tolistonly=True)
+    
+    hashmap = {t.h(): t for t in terms_list}
 
     features = get_features_from_terms_for_eval(derived_terms=terms_list,
                                                 vibstates_data=vibstates_data,
                                                 vibdiff_cache=vibdiff_cache, 
                                                 lineshape_parameter=lineshape_parameter)
-    return features
+    return features, hashmap
