@@ -344,7 +344,6 @@ def get_data_for_vibanalysers(vib_ana: VibAnaSetup, calc_setup: 'DataOriginInfo'
 	"""
     # ---- set up props for vibana
 	props, resvib = find_residual_vib_info(vib_ana=vib_ana)
-	print('resvib', resvib)
 
 	# ---- prepare to get props for vibana
 	reqst_data_all = {}
