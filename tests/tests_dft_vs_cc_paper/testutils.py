@@ -5,11 +5,10 @@ import wilson_suite as ws
 class MakeObjects:
     
     @staticmethod
-    def mk_feature_single() -> SpectralFeature:
+    def mk_feature_single_onetermid() -> SpectralFeature:
         """
-        with random term_contributions for now
+        with one random term_contributions for now
         """
-        # if 
         rcs = [ResonanceCondition.make_from_tuples(left_state=(), right_state=('a',), pert_freqs=('-A',)),
                ResonanceCondition.make_from_tuples(left_state=('a', 'b'), right_state=('b',), pert_freqs=('B',))]
         res_motif = ResonanceMotif(rcs)
@@ -32,7 +31,37 @@ class MakeObjects:
                                                           minimum_box_padding=30.0,
                                                           )
         return features[0]
-    
+
+    @staticmethod
+    def mk_feature_single_multitermids() -> SpectralFeature:
+        """
+        with random 1 term_contributions with several term_ids with same res_motif (that is how features are).
+        Number of term_contributions is usually one (they differ by res motif and parameters choices).
+
+        """
+        rcs = [ResonanceCondition.make_from_tuples(left_state=(), right_state=('a',), pert_freqs=('-A',)),
+               ResonanceCondition.make_from_tuples(left_state=('a', 'b'), right_state=('b',), pert_freqs=('B',))]
+        res_motif = ResonanceMotif(rcs)
+        
+        param_set = ParameterSet({'a': 0, 'b': 1})
+
+        term_contrib = TermParametersChoice(res_motif=res_motif,
+                                            states_parameters=(param_set,),
+                                            term_ids=tuple([111, 112, 113, 114]))
+        
+        feat = SpectralFeature(location=ResLocGeoObject({'A': 1119.5, 'B': 2921.}), 
+                               lineshape_parameter=4.5, 
+                               amplitude_coeff=-1.12e-06, 
+                               term_contributions=(term_contrib,))
+        features = SpectralFeature.dress_these_with_boxes([feat],
+                                                          max_intensity=feat.get_intensity()+1., 
+                                                          min_intensity=feat.get_intensity()-1.0e3,
+                                                          box_range_safety_margin=0.1,
+                                                          scale_wrt_max_intensity=True,
+                                                          minimum_box_padding=30.0,
+                                                          )
+        return features[0]
+
     @staticmethod
     def mk_features_non_ovrl() -> list[SpectralFeature]:
 

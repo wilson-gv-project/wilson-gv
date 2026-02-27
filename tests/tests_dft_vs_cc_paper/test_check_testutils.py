@@ -3,7 +3,7 @@ import wilson_suite as ws
 
 def test_feat_boxX():
     print()
-    f = MakeObjects.mk_feature_single()
+    f = MakeObjects.mk_feature_single_onetermid()
     print(f)
     print('\n-----------\n')
     f = MakeObjects.mk_features_non_ovrl()
@@ -21,7 +21,6 @@ def test_pkl_data():
     print()
 
     for k,v in hashmap_terms.items():
-        # print(k, v.to_latex(), '\n')
         print(k, v.anharmonicity, '\n')
 
 """
