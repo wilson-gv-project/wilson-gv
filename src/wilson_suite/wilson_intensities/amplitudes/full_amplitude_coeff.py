@@ -271,6 +271,13 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
         return 0.0
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
+
+    print('\nindex_dict', index_dict)
+    print('NON_AVRG', NON_AVRG)
+    print('AVRG', AVRG)
+    print('VIBDIFF_TERMS', VIBDIFF_TERMS)
+    print('VIBENE_DENOM', VIBENE_DENOM, '\n')
+
     return float(term.coeff) * float(product_all)
 
 # TODO: error handling for missing or invalid data for all functions below
