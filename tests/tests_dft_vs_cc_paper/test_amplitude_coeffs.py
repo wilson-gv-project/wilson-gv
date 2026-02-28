@@ -5,6 +5,9 @@ SpectralFeature.amplitude_coeff evaluation tests
 - [ ] mech term coeff
 - [ ] 2 mech terms coeff
 - [ ] mech and el terms in one feat coeff
+
+- [ ] evaluate_single_index_dict() -- in src/wilson_suite/wilson_intensities/amplitudes/full_amplitude_coeff.py
+- [ ] eval_avrg_per_indexdict() -- in src/wilson_suite/wilson_intensities/amplitudes/full_amplitude_coeff.py
 """
 from .testutils import MakeObjects
 import wilson_suite as ws
@@ -18,6 +21,12 @@ def test_ampl_coeff_one_el_term():
     [ ] computed per term coefficient for mech terms has also a sum over index 'c'
     [ ] computed per term coefficient for el terms is a product of orient.avrg and vibene denominator
 
+    
+    there are tests in src/wilson_suite/wilson_intensities/tests/unit/test_full_coeff.py::test_evaluate_term_coeffs:
+    - products of components
+    - vibene denom calculation
+
+    need more tests for orient. avrg tensors - evaluation and use
     """
     print()
     
