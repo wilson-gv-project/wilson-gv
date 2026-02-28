@@ -14,7 +14,7 @@ def test_feat_boxX():
     print(f)
 
 
-def test_pkl_data():
+def test_pkl_data_features():
     print()
     feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
     ws.intensities.amplitudes.spectrum_composition.SpectralFeature.print_list_features(feats)
@@ -23,15 +23,23 @@ def test_pkl_data():
     for k,v in hashmap_terms.items():
         print(k, v.anharmonicity, '\n')
 
-"""
 def test_pkl_data():
     print()
     from wilson_suite.wilson_utils.serialization import unpickle_smth_from
     unpickled = unpickle_smth_from('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl')
-    print(unpickled)
+    # print(unpickled)
     print(type(unpickled))
     print(list(unpickled.keys()))
-    print(unpickled['anharmonic_states'])
+    # print(unpickled['anharmonic_states'])
+
+    print(unpickled['dipgrad'])
+    print(unpickled['dipgrad'].shape)
+    print(unpickled['polgrad'].shape)
+    print(unpickled['diphess'].shape)
+
+
+
+"""
     
     list_vibsstates = fillStatesData(unpickled)
 
