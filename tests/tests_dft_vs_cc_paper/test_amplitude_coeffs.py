@@ -22,9 +22,10 @@ def test_ampl_coeff_one_el_term():
     [ ] computed per term coefficient for el terms is a product of orient.avrg and vibene denominator
 
     
-    there are tests in src/wilson_suite/wilson_intensities/tests/unit/test_full_coeff.py::test_evaluate_term_coeffs:
+    there are tests in src/wilson_suite/wilson_intensities/tests/unit/test_full_coeff.py::test_evaluate_term_coeffs_single_c_ind_contrib:
     - products of components
     - vibene denom calculation
+    - single contribution in the sum over index 'c'
 
     need more tests for orient. avrg tensors - evaluation and use
     """
