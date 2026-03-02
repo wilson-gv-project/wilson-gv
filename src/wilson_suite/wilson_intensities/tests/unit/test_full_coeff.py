@@ -249,7 +249,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
 
 def test_evaluate_term_coeffs_multi_c_ind_contrib():
     """
-    testing coefficient evaluation for terms - with single contribution of sum over 'c' index in mech terms
+    testing coefficient evaluation for terms - with 2 contribution of sum over 'c' index in mech terms
 
     but need to investigate orient avrg tensors and how values are computed and used
     """
