@@ -349,6 +349,42 @@ class WilsonSimulation:
 
 		pass
 
+	def apply_exp_magn_conditions(self, where: str):
+		"""
+		Use VibExperiment.magn_conditions in calculation(?) and rendering
+
+		should apply limits for axes - where there will be no data because it is a "forbidden" region.
+		
+		where:
+			rendering: 
+				[ ] use different color for the "forbidden" region
+			evaluation: 
+				[ ] filter out features that fall into the "forbidden" region
+		"""
+		if self.exp is None:
+			raise ValueError("exp is None")
+		
+		if self.exp.magn_conditions is None:
+			raise ValueError("exp.magn_conditions is None")
+		
+		if self.spec_eval_setup is None:
+			raise ValueError("spec_eval_setup is None")
+		if self.spec_eval_setup.ev_info is None:
+			raise ValueError("spec_eval_setup.ev_info is None")
+
+		from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
+		translated_magn_cond = translate_magn_conditions_to_axisvars(self.exp.magn_conditions, self.axis_choice)
+		
+		if where in ['evaluation', 'eval', 'evl']:
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval = True
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
+			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
+		
+		if where in ['rendering', 'render', 'rnd']:
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
+			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
+
+
 	def evaluate(self, save_evalinputs_pkl: str = None):
 		"""
 		Evaluating method, using EvaluationWorkflow
