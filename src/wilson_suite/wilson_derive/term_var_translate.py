@@ -149,3 +149,31 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis
                 translated_terms[i][j].append(translate_one_term_to_axis_variables(k, id_tuples_in_axis_vars))
 
     return translated_terms
+
+def translate_magn_conditions_to_axisvars():
+    """
+    magn_conditions attribute of VibExperiment object is given in terms of signed pulse references.
+
+    EVV paper 1 axes_choice:
+
+    SpectralAxisSet(axes=(SpectralAxis(label='A', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(1,)),))), 
+                        SpectralAxis(label='B', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(-1,)), SignedPulseTuple(pulse_refs=(2,)))))))
+
+    Or: A = w1; B = w2 - w1
+    Here, to keep -w1 + w2 is always significantly > 0 ==> B > significantly > 0.
+
+    If axes are: A = w1; B = w2 ==> (w2>w1) ==> B > A.
+
+    -----
+    From VibExperiment docs:
+        magn_conditions: Tuple of tuples: Magnitude conditions for use in identifying terms that will not become
+        fully resononant in this experiment. Format: Outer tuple collects magnitude conditions. Each inner tuple is
+        a magnitude condition and consists of signed pulse references (NOTE: Currently not using the SignedPulseTuple class)
+        where the sum of the associated frequencies are understood to be significantly > 0, where "significantly > 0" means
+        "never close to zero".
+        Example: ( (-1, 2), (2, 3, -4) ) denotes two magnitude conditions:
+            a) -w1 + w2 is always significantly > 0,
+            b) w2 + w3 - w4 is always significantly > 0
+    """
+    return
+
