@@ -140,7 +140,17 @@ class SpectrumRenderer(ABC):
     def _create_data_masks(self, data: np.ndarray) -> Any:
         """
         """
-        return compute_masks(data=data, dynamic_range=self.ev_info.dynamic_range)
+        
+        if self.ev_info.apply_exp_magn_conditions_render:
+            magn_conditions = self.ev_info.exp_magn_conditions
+        else:
+            magn_conditions = None
+        
+        return compute_masks(data=data, 
+                             grid=self.spec_grid,
+                             dynamic_range=self.ev_info.dynamic_range,
+                             magn_conditions=magn_conditions, 
+                             non_zero_margin=self.ev_info.magn_conditions_margin)
 
     def prep_data(self, spec_data_operations: str) -> np.ndarray:
         """
@@ -249,11 +259,27 @@ class SpectrumRenderer(ABC):
 
         return fig, ax, contour, cbar
 
-def compute_masks(data, dynamic_range):
+def compute_masks(data: np.ndarray, 
+                  grid: dict,
+                  dynamic_range: float, 
+                  magn_conditions: tuple[tuple]=None,
+                  non_zero_margin: float=80.):
     """
     Intensities should be > 0, not negative
+
+    data: intensities array
+    non_zero_margin: added to 0, which is the boundary in magn_conditions
     """
-    no_data = np.isnan(data)
+
+    # ONLY EVV w2>w1 for paper 1 now
+    if magn_conditions==(('B',),):
+        no_data = grid['B'] < (0 + non_zero_margin)
+    elif magn_conditions==(('-A', 'B',),):
+        no_data = grid['B'] - grid['A'] < (0 + non_zero_margin)
+    else:
+        no_data = np.isnan(data)
+
+
     d_max = np.nanmax(data)
 
     if not np.isfinite(d_max) or d_max <= 0:
