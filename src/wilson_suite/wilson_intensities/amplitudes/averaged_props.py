@@ -42,14 +42,6 @@ def make_gen_func_to_compute_avrg(*,
         """
         index_choices: dict, props_data: 'MolPropsCollection'
         """
-        # if not isinstance(props_data, MolPropsCollection):
-        #     if isinstance(props_data, list):
-        #         if isinstance(props_data[0], MolPropsCollection):
-        #             props_data = MolPropsCollection(props_data)
-        #         else:
-        #             raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
-        #     else:
-        #         raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
 
         if not isinstance(props_data, MolPropsCollection):
             raise TypeError(
@@ -64,7 +56,6 @@ def make_gen_func_to_compute_avrg(*,
                 f"index_choices is missing required mode indices: {missing}"
             )
 
-        # from ..utils.spectrum_utils import greek_list, num_Greek
         from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
         total = 0.
@@ -73,7 +64,6 @@ def make_gen_func_to_compute_avrg(*,
 
             # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
             # couldn't think of any but want to discuss and double check for safety
-            # greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
 
             product = 1.
 
@@ -82,9 +72,7 @@ def make_gen_func_to_compute_avrg(*,
                 prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
 
                 nm_inds = tuple([index_choices[i] for i in prop.inds])
-                # cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
                 cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
-                # assert cart_inds == cart_inds1
                 all_inds = (*nm_inds, *cart_inds)
 
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
@@ -130,7 +118,6 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
 
 def group_PropsColls_by_repetition_pattern(avrg_expressions: list[PropsCollection]):
     """
-    [x] DONE
     For a list of averaged properties expressions already grouped by numerator motifs
 
     """
@@ -274,5 +261,5 @@ def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, i
         # walk through all expr_inds labels, there are repeated labels
         return tuple(index_dict[sym] for sym in expr_inds)
     else:
-        # this generally should not be possible
+        # this should not be possible in the worflow
         raise ValueError('This base_expr cannot be a base expression for this expr')
