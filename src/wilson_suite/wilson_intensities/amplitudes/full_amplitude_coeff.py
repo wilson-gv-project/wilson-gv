@@ -276,11 +276,11 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
-    print('\nindex_dict', index_dict)
-    print('NON_AVRG', NON_AVRG)
-    print('AVRG', AVRG)
-    print('VIBDIFF_TERMS', VIBDIFF_TERMS)
-    print('VIBENE_DENOM', VIBENE_DENOM, '\n')
+    # print('\nindex_dict', index_dict)
+    # print('NON_AVRG', NON_AVRG)
+    # print('AVRG', AVRG)
+    # print('VIBDIFF_TERMS', VIBDIFF_TERMS)
+    # print('VIBENE_DENOM', VIBENE_DENOM, '\n')
 
     return float(term.coeff) * float(product_all)
 
