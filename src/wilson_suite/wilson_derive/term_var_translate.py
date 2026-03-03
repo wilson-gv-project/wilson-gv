@@ -150,7 +150,7 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis
 
     return translated_terms
 
-def translate_magn_conditions_to_axisvars():
+def translate_magn_conditions_to_axisvars(magn_conditions: tuple[tuple], axis_choice: SpectralAxisSet):
     """
     magn_conditions attribute of VibExperiment object is given in terms of signed pulse references.
 
@@ -160,10 +160,13 @@ def translate_magn_conditions_to_axisvars():
                         SpectralAxis(label='B', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(-1,)), SignedPulseTuple(pulse_refs=(2,)))))))
 
     Or: A = w1; B = w2 - w1
-    Here, to keep -w1 + w2 is always significantly > 0 ==> B > significantly > 0.
+    Here, to keep -w1 + w2 is always significantly > 0 ==> B > significantly > 0 
+    This means that the border line for the "forbidden" region is a line B = 0 (line parallel to axis A).
 
     If axes are: A = w1; B = w2 ==> (w2>w1) ==> B > A.
+    This means that the border line for the "forbidden" region is a line A = B (diagonal line).
 
+    example: magn_conditions=((-1, 2),)
     -----
     From VibExperiment docs:
         magn_conditions: Tuple of tuples: Magnitude conditions for use in identifying terms that will not become
@@ -175,5 +178,17 @@ def translate_magn_conditions_to_axisvars():
             a) -w1 + w2 is always significantly > 0,
             b) w2 + w3 - w4 is always significantly > 0
     """
-    return
+    axes_to_ind_vars = {}
+    for ax in axis_choice.axes:
+        axes_to_ind_vars[ax.label] = list(pulse_tuple.pulse_refs for pulse_tuple in ax.var_set.var_set)
 
+    ## FIXME: this part is implemented only for paper1 EVV experiment
+    if magn_conditions != ((-1, 2),):
+        raise NotImplementedError('translate_magn_conditions_to_axisvars is only implemented for EVV w2>w1')
+    
+    if axes_to_ind_vars == {'A': [(1,)], 'B': [(-1,), (2,)]}:
+        return (('B',),)
+    elif axes_to_ind_vars == {'A': [(1,)], 'B': [(2,)]}:
+        return (('-A', 'B',),)
+    else:
+        raise NotImplementedError('translate_magn_conditions_to_axisvars is only implemented for EVV w2>w1')
