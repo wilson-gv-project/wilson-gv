@@ -256,18 +256,22 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     # Evaluate NON_AVRG
     NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, data_and_configs, zero_tol)
     if NON_AVRG == 0.0:
+        # print('\nNON_AVRG zero - ', non_avrg_expr, index_dict, '\n\n')
         return 0.0
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
+        # print('\nAVRG zero - ', avrg_expr, index_dict, '\n\n')
         return 0.0
     # Evaluate VIBDIFF_TERMS
     VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, data_and_configs)
     if VIBDIFF_TERMS == 0.0:
+        # print('\nVIBDIFF_TERMS zero - ', extra_freqterms, index_dict, '\n\n')
         return 0.0
     # Evaluate VIBENE_DENOM
     VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
     if VIBENE_DENOM == 0.0:
+        # print('\nVIBENE_DENOM zero - ', freqterms, index_dict, '\n\n')
         return 0.0
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
@@ -287,6 +291,9 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: avrgprops.PropsCollection,
                                 zero_tol: float = 1e-18):
     """
     non_avrg_expr - extracted part of VibPerturbed term 
+
+    order of indices generally: a,b,c,... 
+    E.g. in CFF tensor index tuple is (a,b,c)
     """
     product_all = 1.
     
