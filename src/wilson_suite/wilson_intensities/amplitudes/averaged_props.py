@@ -29,7 +29,6 @@ def make_gen_func_to_compute_avrg(*,
                               avrg_expression: 'PropsCollection',
                               pulse_polarization_vector: list) -> Callable[[dict, 'MolPropsCollection'], float]:
     """
-    [x] DONE
     for an expression with properties data values,
     compute average with given polarization setup for a choice of normal mode indices
     """
@@ -43,16 +42,29 @@ def make_gen_func_to_compute_avrg(*,
         """
         index_choices: dict, props_data: 'MolPropsCollection'
         """
+        # if not isinstance(props_data, MolPropsCollection):
+        #     if isinstance(props_data, list):
+        #         if isinstance(props_data[0], MolPropsCollection):
+        #             props_data = MolPropsCollection(props_data)
+        #         else:
+        #             raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
+        #     else:
+        #         raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
+
         if not isinstance(props_data, MolPropsCollection):
-            if isinstance(props_data, list):
-                if isinstance(props_data[0], MolPropsCollection):
-                    props_data = MolPropsCollection(props_data)
-                else:
-                    raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
-            else:
-                raise TypeError(f'props_data is not an instance of MolPropsCollection: {type(props_data)} - {props_data}')
-        
-        from ..utils.spectrum_utils import greek_list, num_Greek
+            raise TypeError(
+                f"props_data must be a MolPropsCollection, got {type(props_data).__name__}"
+            )
+
+        # Validate index_choices has all required keys
+        required_inds = {i for prop in avrg_expression for i in prop.inds}
+        missing = required_inds - index_choices.keys()
+        if missing:
+            raise KeyError(
+                f"index_choices is missing required mode indices: {missing}"
+            )
+
+        # from ..utils.spectrum_utils import greek_list, num_Greek
         from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
         total = 0.
@@ -61,7 +73,7 @@ def make_gen_func_to_compute_avrg(*,
 
             # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
             # couldn't think of any but want to discuss and double check for safety
-            greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
+            # greek_dict = {L: n for L, n in zip(greek_list[:len(cart_axes)], cart_axes)}
 
             product = 1.
 
@@ -70,7 +82,9 @@ def make_gen_func_to_compute_avrg(*,
                 prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
 
                 nm_inds = tuple([index_choices[i] for i in prop.inds])
-                cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
+                # cart_inds = tuple([greek_dict[num_Greek[i.o]] for i in prop.ops])
+                cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
+                # assert cart_inds == cart_inds1
                 all_inds = (*nm_inds, *cart_inds)
 
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
@@ -92,15 +106,14 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
                           number_of_nmodes: int,
                           nm_inds_choices: list[int]):
     """
-    [x] DONE
-
     Precalculating the full tensor for given avrg_expression
 
     nm_inds_choices - could be generated with for all normal modes with:
         nm_inds_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
 
     """
-    mode_inds = set(avrg_expression.get_mode_indices())
+    # so indices are in alphabetical order in full_tensor below
+    mode_inds = sorted(set(avrg_expression.get_mode_indices()))  # list, deterministic order
     ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
 
     # Indicating generalized version for updating
@@ -109,7 +122,8 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
     for idx in ind_choices:
-        full_tensor[tuple(dict(sorted(idx.items())).values())] = func_general(idx, props_data)
+        # so indices are in alphabetical order
+        full_tensor[tuple(idx[k] for k in mode_inds)] = func_general(idx, props_data)
 
     return full_tensor
 

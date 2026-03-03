@@ -77,6 +77,8 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     """
     testing coefficient evaluation for terms - with single contribution of sum over 'c' index in mech terms
 
+    [x] computed per term coefficient for mech terms has also a sum over index 'c'
+    [x] computed per term coefficient for el terms is a product of orient.avrg and vibene denominator
     but need to investigate orient avrg tensors and how values are computed and used
     """
     print()
@@ -250,7 +252,9 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
 def test_evaluate_term_coeffs_multi_c_ind_contrib():
     """
     testing coefficient evaluation for terms - with 2 contribution of sum over 'c' index in mech terms
-
+    
+    [x] computed per term coefficient for mech terms has also a sum over index 'c'
+    [x] computed per term coefficient for el terms is a product of orient.avrg and vibene denominator
     but need to investigate orient avrg tensors and how values are computed and used
     """
     print()

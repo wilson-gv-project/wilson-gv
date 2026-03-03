@@ -8,7 +8,7 @@ import numpy as np
 
 import logging
 from ....wilson_utils.logger import setup_logger
-setup_logger("wilson", level=logging.DEBUG)
+setup_logger("wilson", level=logging.INFO)
 
 def get_expressions():
     from wilson_suite.fixtures import get_terms_from_json
@@ -25,12 +25,14 @@ def test_expr1():
     for prop in expression:
         print(prop)
     nm_indices_symb = sorted(set(expression.get_mode_indices()))
-    
+    print(nm_indices_symb)
     from ...amplitudes.utils import generate_index_choices_general
     idxs = generate_index_choices_general(indlabels_in_motif=nm_indices_symb, labels=['1', '2', '3'])
     print()
     for i in idxs:
         print(i)
+    print()
+    print(idxs)
 
 
 
@@ -175,6 +177,12 @@ def test_make_gen_func_to_compute_avrg():
         print("{'a': 2, 'b': 0, 'c': 0}", res_f7)
 
 def test_precalculate_avrg_tensor():
+    """
+    
+    """
+    setup_logger("wilson", level=logging.INFO)
+    print()
+
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
     polhess.inds = ['a', 'b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -206,6 +214,7 @@ def test_precalculate_avrg_tensor():
     t3 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolhess ab, dipgrad1 a, dipgrad2 c\n')
     print(t3)
 
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
@@ -219,6 +228,7 @@ def test_precalculate_avrg_tensor():
     t4 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolhess ab, dipgrad1 c, dipgrad2 a\n')
     print(t4)
     print(np.allclose(t3, t4))
 
@@ -233,6 +243,7 @@ def test_precalculate_avrg_tensor():
     t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad b, dipgrad1 c, dipgrad2 a\n')
     print(t5)
 
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
@@ -246,6 +257,7 @@ def test_precalculate_avrg_tensor():
     t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                             number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad c, dipgrad1 b, dipgrad2 a\n')
     print(t6)
 
     print(np.allclose(t5, t6))
@@ -261,6 +273,7 @@ def test_precalculate_avrg_tensor():
     t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad b, dipgrad1 a, dipgrad2 a\n')
     print(t7)
 
 def generate_props_data4modes():
