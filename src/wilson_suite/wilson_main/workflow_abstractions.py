@@ -357,9 +357,9 @@ class WilsonSimulation:
 		
 		where:
 			rendering: 
-				[ ] use different color for the "forbidden" region
+				[x] use different color for the "forbidden" region
 			evaluation: 
-				[ ] filter out features that fall into the "forbidden" region
+				[x] filter out features that fall into the "forbidden" region
 		"""
 		if self.exp is None:
 			raise ValueError("exp is None")
@@ -380,9 +380,12 @@ class WilsonSimulation:
 			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
 			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
 		
-		if where in ['rendering', 'render', 'rnd']:
+		elif where in ['rendering', 'render', 'rnd']:
 			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
 			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
+
+		else:
+			raise ValueError(f"unknown where flag: {where}")
 
 
 	def evaluate(self, save_evalinputs_pkl: str = None):
