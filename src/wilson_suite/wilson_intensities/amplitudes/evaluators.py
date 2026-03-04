@@ -121,6 +121,29 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
     
     return term_coeffs_per_index
 
+def evaluate_coeff_for_feat(feature: SpectralFeature, 
+                            terms_hash_map: dict[int, 'VibPerturbedTerm'],
+                            data_and_configs: EvaluationDataAndConfigs,
+                            precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
+    """
+    Using feature information to evaluate its coefficient.
+
+    A wrapper around evaluate_terms_coeffs()
+    """
+    derived_terms = [terms_hash_map[id] for id in feature.term_contributions[0].term_ids]
+    assert feature.term_contributions[0].res_motif == ResonanceMotif(derived_terms[0].res)
+
+    motif_res_loc = {feature.term_contributions[0].res_motif: 
+                     {feature.location: [dict(p._parameters) for p in feature.term_contributions[0].states_parameters]}}
+
+    term_coeffs_per_index = evaluate_terms_coeffs(derived_terms=derived_terms,
+                                                  motif_res_loc=motif_res_loc,
+                                                  data_and_configs=data_and_configs,
+                                                  precalculated=precalculated)
+
+    return term_coeffs_per_index
+
+
 def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
                                      vibstates_data: VibStatesData,
                                      vibdiff_cache: VibDiffCache,

@@ -8,7 +8,7 @@ import numpy as np
 
 import logging
 from ....wilson_utils.logger import setup_logger
-setup_logger("wilson", level=logging.DEBUG)
+setup_logger("wilson", level=logging.INFO)
 
 def get_expressions():
     from wilson_suite.fixtures import get_terms_from_json
@@ -25,12 +25,14 @@ def test_expr1():
     for prop in expression:
         print(prop)
     nm_indices_symb = sorted(set(expression.get_mode_indices()))
-    
+    print(nm_indices_symb)
     from ...amplitudes.utils import generate_index_choices_general
     idxs = generate_index_choices_general(indlabels_in_motif=nm_indices_symb, labels=['1', '2', '3'])
     print()
     for i in idxs:
         print(i)
+    print()
+    print(idxs)
 
 
 
@@ -175,6 +177,12 @@ def test_make_gen_func_to_compute_avrg():
         print("{'a': 2, 'b': 0, 'c': 0}", res_f7)
 
 def test_precalculate_avrg_tensor():
+    """
+    
+    """
+    setup_logger("wilson", level=logging.INFO)
+    print()
+
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
     polhess.inds = ['a', 'b']
     dipgrad1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
@@ -206,6 +214,7 @@ def test_precalculate_avrg_tensor():
     t3 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolhess ab, dipgrad1 a, dipgrad2 c\n')
     print(t3)
 
     polhess = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
@@ -219,6 +228,7 @@ def test_precalculate_avrg_tensor():
     t4 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolhess ab, dipgrad1 c, dipgrad2 a\n')
     print(t4)
     print(np.allclose(t3, t4))
 
@@ -233,6 +243,7 @@ def test_precalculate_avrg_tensor():
     t5 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad b, dipgrad1 c, dipgrad2 a\n')
     print(t5)
 
     polgrad = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=1)
@@ -246,6 +257,7 @@ def test_precalculate_avrg_tensor():
     t6 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                             number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad c, dipgrad1 b, dipgrad2 a\n')
     print(t6)
 
     print(np.allclose(t5, t6))
@@ -261,6 +273,7 @@ def test_precalculate_avrg_tensor():
     t7 = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expr, pulse_polarization_vector=[1.0, 1.0, 1.0], 
                                          number_of_nmodes=4, props_data=MolPropsCollection(props),
                                          nm_inds_choices=[0,1,2,3])
+    print('\n---\npolgrad b, dipgrad1 a, dipgrad2 a\n')
     print(t7)
 
 def generate_props_data4modes():
@@ -891,3 +904,273 @@ def test_get_avrg_motif_relation():
 
     g = avrgprops.get_ind_tuple_from_base(expr=ae311, base_expr=ae311, index_dict={'a': 2, 'b': 7, 'c': 4, 'd': 5})
     print(g, '---------\n')
+
+
+####################
+
+def reference_avrg_tensor_bruteforce(props_arrays, props_cart_op_indices, 
+                                      props_mode_inds, pol_linear_comb,
+                                      n_modes):
+    """
+    Brute-force reference implementation. No shared code with calculate_avrg_tensor.
+    
+    props_arrays: list of numpy arrays, one per property in expression
+        each array has shape (n_modes,)*dord + (3,)*n_cart_ops
+    props_cart_op_indices: list of lists of operator indices (the .o values)
+        e.g. [[0, 3], [1], [2]] for polhess(o=0,o=3) * dipgrad(o=1) * dipgrad(o=2)
+    props_mode_inds: list of lists of mode index labels
+        e.g. [['a','b'], ['a'], ['c']]
+    pol_linear_comb: dict from getGeneralPolarizationAveragingExpression
+    n_modes: number of normal modes
+
+    Claude Opus 4.6 extended
+    """
+    import itertools
+
+    all_mode_labels = sorted(set(q for inds in props_mode_inds for q in inds))
+    n_unique_modes = len(all_mode_labels)
+    result = np.zeros((n_modes,) * n_unique_modes)
+
+    for mode_combo in itertools.product(range(n_modes), repeat=n_unique_modes):
+        mode_assignment = dict(zip(all_mode_labels, mode_combo))
+
+        total = 0.0
+        for cart_axes, coeff in pol_linear_comb.items():
+            product = 1.0
+            for arr, cart_ops, m_inds in zip(props_arrays, props_cart_op_indices, props_mode_inds):
+                nm_idx = tuple(mode_assignment[q] for q in m_inds)
+                cart_idx = tuple(cart_axes[o] for o in cart_ops)
+                product *= arr[(*nm_idx, *cart_idx)]
+            total += product * coeff
+
+        result[mode_combo] = total
+
+    return result
+
+
+
+def reference_rank4_vvvv_general(props_arrays, props_cart_op_indices, 
+                                  props_mode_inds, n_modes):
+    """
+    Independent reference using isotropic tensor identity directly.
+    For VVVV: (1/15)(d_01 d_23 + d_02 d_13 + d_03 d_12)
+    where d_ij means Kronecker delta pairing operator positions i and j.
+
+    Claude Opus 4.6 extended
+
+    """
+    import itertools
+
+    all_mode_labels = sorted(set(q for inds in props_mode_inds for q in inds))
+    n_unique = len(all_mode_labels)
+    result = np.zeros((n_modes,) * n_unique)
+
+    # 3 Kronecker delta pairings for rank-4 isotropic tensor
+    # pairs refer to operator positions 0, 1, 2, 3
+    delta_pairings = [
+        [(0, 1), (2, 3)],
+        [(0, 2), (1, 3)],
+        [(0, 3), (1, 2)],
+    ]
+
+    for mode_combo in itertools.product(range(n_modes), repeat=n_unique):
+        mode_assignment = dict(zip(all_mode_labels, mode_combo))
+
+        total = 0.0
+        for pairing in delta_pairings:
+            val = 0.0
+            # Each pairing has two delta pairs, each summed over cartesian indices 0, 1, 2
+            for alpha in range(3):
+                for gamma in range(3):
+                    # Assign cartesian index to each of the 4 operator positions
+                    cart_assignment = [0] * 4
+                    cart_assignment[pairing[0][0]] = alpha
+                    cart_assignment[pairing[0][1]] = alpha
+                    cart_assignment[pairing[1][0]] = gamma
+                    cart_assignment[pairing[1][1]] = gamma
+
+                    product = 1.0
+                    for p_idx, (arr, m_inds) in enumerate(
+                            zip(props_arrays, props_mode_inds)):
+                        nm_idx = tuple(mode_assignment[q] for q in m_inds)
+                        cart_idx = tuple(
+                            cart_assignment[props_cart_op_indices[p_idx][k]]
+                            for k in range(len(props_cart_op_indices[p_idx]))
+                        )
+                        product *= arr[(*nm_idx, *cart_idx)]
+
+                    val += product
+            total += val
+
+        result[mode_combo] = total / 15.0
+
+    return result
+
+# ====== TEST 1: 4 dipole gradients, VVVV ======
+
+def test_calculate_avrg_tensor_4dipgrads_vvvv():
+    """
+    
+    Claude Opus 4.6 extended
+    """
+    from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+    rng = np.random.default_rng(42)
+    n_modes = 3
+    dipgrad_data = rng.standard_normal((n_modes, 3))
+
+    # Build expression
+    p0 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0)], dord=1)
+    p0.inds = ['a']
+    p1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    p1.inds = ['b']
+    p2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    p2.inds = ['c']
+    p3 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=3)], dord=1)
+    p3.inds = ['d']
+    avrg_expr = term_abst.PropsCollection(props=[p0, p1, p2, p3])
+
+    # Build data
+    trname = prop_trivname(ord_el=1, ord_geo=1)
+    mol_props = MolPropsCollection(dict_to_proplist({trname: dipgrad_data}))
+    pol_vec = [1.0, 1.0, 1.0]
+
+    # Code under test
+    result = avrgprops.calculate_avrg_tensor(
+        avrg_expression=avrg_expr,
+        pulse_polarization_vector=pol_vec,
+        props_data=mol_props,
+        number_of_nmodes=n_modes,
+        nm_inds_choices=list(range(n_modes))
+    )
+
+
+    expected = reference_rank4_vvvv_general(
+        props_arrays=[dipgrad_data, dipgrad_data, dipgrad_data, dipgrad_data],
+        props_cart_op_indices=[[0], [1], [2], [3]],
+        props_mode_inds=[['a'], ['b'], ['c'], ['d']],
+        n_modes=n_modes
+    )
+    np.testing.assert_allclose(result, expected, atol=1e-12)
+
+    # Also check against einsum reference
+    def einsum_ref(p1, p2, p3, p4):
+        d12 = np.einsum('ia,ja->ij', p1, p2)
+        d34 = np.einsum('ia,ja->ij', p3, p4)
+        d13 = np.einsum('ia,ja->ij', p1, p3)
+        d24 = np.einsum('ia,ja->ij', p2, p4)
+        d14 = np.einsum('ia,ja->ij', p1, p4)
+        d23 = np.einsum('ia,ja->ij', p2, p3)
+        return (1.0/15.0) * (
+            np.einsum('ab,cd->abcd', d12, d34) +
+            np.einsum('ac,bd->abcd', d13, d24) +
+            np.einsum('ad,bc->abcd', d14, d23)
+        )
+
+    expected_einsum = einsum_ref(dipgrad_data, dipgrad_data, 
+                                  dipgrad_data, dipgrad_data)
+    np.testing.assert_allclose(result, expected_einsum, atol=1e-12)
+
+
+# ====== TEST 2: polhess + 2 dipgrads (mixed properties) ======
+
+def test_calculate_avrg_tensor_polhess_2dipgrads():
+    """
+    
+    Claude Opus 4.6 extended
+    """
+    from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+    rng = np.random.default_rng(123)
+    n_modes = 3
+
+    # polhess: shape (n_modes, n_modes, 3, 3) — 2 mode indices, 2 cart indices
+    polhess_data = rng.standard_normal((n_modes, n_modes, 3, 3))
+    # dipgrad: shape (n_modes, 3)
+    dipgrad_data = rng.standard_normal((n_modes, 3))
+
+    # Expression: polhess[a,b](o=0,o=3) * dipgrad[a](o=1) * dipgrad[c](o=2)
+    ph = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
+    ph.inds = ['a', 'b']
+    d1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    d1.inds = ['a']
+    d2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    d2.inds = ['c']
+    avrg_expr = term_abst.PropsCollection(props=[ph, d1, d2])
+
+    # Build data — need both property types
+    trname_polhess = prop_trivname(ord_el=2, ord_geo=2)
+    trname_dipgrad = prop_trivname(ord_el=1, ord_geo=1)
+    mol_props = MolPropsCollection(dict_to_proplist({
+        trname_polhess: polhess_data,
+        trname_dipgrad: dipgrad_data
+    }))
+    pol_vec = [1.0, 1.0, 1.0]
+
+    # Code under test
+    result = avrgprops.calculate_avrg_tensor(
+        avrg_expression=avrg_expr,
+        pulse_polarization_vector=pol_vec,
+        props_data=mol_props,
+        number_of_nmodes=n_modes,
+        nm_inds_choices=list(range(n_modes))
+    )
+
+    # unique mode indices: a, b, c -> result shape (3, 3, 3)
+    assert result.shape == (n_modes, n_modes, n_modes)
+
+    expected = reference_rank4_vvvv_general(
+        props_arrays=[polhess_data, dipgrad_data, dipgrad_data],
+        props_cart_op_indices=[[0, 3], [1], [2]],
+        props_mode_inds=[['a', 'b'], ['a'], ['c']],
+        n_modes=n_modes
+    )
+    np.testing.assert_allclose(result, expected, atol=1e-12)
+
+
+# ====== TEST 3: repeated mode index (a,a,b,c) ======
+
+def test_calculate_avrg_tensor_repeated_index():
+    """
+    
+    Claude Opus 4.6 extended
+    """
+    from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+    rng = np.random.default_rng(99)
+    n_modes = 3
+    dipgrad_data = rng.standard_normal((n_modes, 3))
+
+    p0 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0)], dord=1)
+    p0.inds = ['a']
+    p1 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=1)], dord=1)
+    p1.inds = ['a']
+    p2 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=2)], dord=1)
+    p2.inds = ['b']
+    p3 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=3)], dord=1)
+    p3.inds = ['c']
+    avrg_expr = term_abst.PropsCollection(props=[p0, p1, p2, p3])
+
+    trname = prop_trivname(ord_el=1, ord_geo=1)
+    mol_props = MolPropsCollection(dict_to_proplist({trname: dipgrad_data}))
+    pol_vec = [1.0, 1.0, 1.0]
+
+    result = avrgprops.calculate_avrg_tensor(
+        avrg_expression=avrg_expr,
+        pulse_polarization_vector=pol_vec,
+        props_data=mol_props,
+        number_of_nmodes=n_modes,
+        nm_inds_choices=list(range(n_modes))
+    )
+
+    # unique indices: a, b, c -> shape (3, 3, 3)
+    assert result.shape == (n_modes, n_modes, n_modes)
+
+    expected = reference_rank4_vvvv_general(
+        props_arrays=[dipgrad_data, dipgrad_data, dipgrad_data, dipgrad_data],
+        props_cart_op_indices=[[0], [1], [2], [3]],
+        props_mode_inds=[['a'], ['a'], ['b'], ['c']],
+        n_modes=n_modes
+    )
+    np.testing.assert_allclose(result, expected, atol=1e-12)
+

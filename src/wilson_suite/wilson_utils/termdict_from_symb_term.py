@@ -184,6 +184,7 @@ def derived_terms_flat(derived_terms, tolistonly: bool=False):
         for anharms_tuple in derived_terms[key_num_anharms]:
             for term in derived_terms[key_num_anharms][anharms_tuple]:
                 
+                term.anharmonicity = anharms_tuple
                 if tolistonly:
                     result_list.append(term)
 
