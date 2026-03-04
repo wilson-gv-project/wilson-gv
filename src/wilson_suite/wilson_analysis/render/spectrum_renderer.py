@@ -42,10 +42,20 @@ class LevelCalculator:
     """
 
     @staticmethod
-    def compute_levels(intensities: float, dynamic_range: float, 
-                       nlevels: int, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str]]:
-        """Calculate levels for contours and colorbar ticks"""
-        d_max = np.max(intensities)
+    def compute_levels(intensities: float, dynamic_range: float,
+                    nlevels: int, colormap_spacing: str = None,
+                    reference_max: float = None) -> Tuple[np.ndarray, List[str]]:
+        """Calculate levels for contours and colorbar ticks.
+        
+        If reference_max is provided, levels are computed relative to it
+        instead of the data's own maximum.
+        """
+        if reference_max is not None:
+            d_max = reference_max
+            print(f'Scaling wrt reference_max: {reference_max:.2e}/{np.max(intensities):.2e}={reference_max/np.max(intensities):.2e}')
+        else:
+            d_max = np.max(intensities)
+        
         if d_max <= 0:
             raise ValueError(
                 "Logarithmic colormap requested, but data contains no positive values "
@@ -185,6 +195,19 @@ class SpectrumRenderer(ABC):
         elif len(self.spec_grid)==2:
             self.Xdata, self.Ydata = list(self.spec_grid.values())
 
+    def normalize_to_reference_max(self, reference_max: float=None):
+        """
+        not used right now
+        """
+        if reference_max is None:
+
+            if self.rnd_info.reference_max is not None:
+                reference_max = self.rnd_info.reference_max
+            else:
+                raise ValueError("Provide reference maximum value to normalize")
+
+            self.intensities = self.intensities/reference_max
+
     def _validate_inputs(self):
         """
         data and settings should not contradict:
@@ -243,7 +266,8 @@ class SpectrumRenderer(ABC):
             intensities=self.intensities,
             dynamic_range=self.ev_info.dynamic_range,
             nlevels=self.rnd_info.nlevels,
-            colormap_spacing=self.config.colormap_spacing
+            colormap_spacing=self.config.colormap_spacing,
+            reference_max=self.rnd_info.reference_max
         )
         
         self.levels = levels
