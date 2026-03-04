@@ -1,6 +1,6 @@
 from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
-from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables, translate_magn_conditions_to_axisvars
 from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet, IndependentVariableSet, SignedPulseTuple, SpectralAxis
 
 def test_find_pulse_id_tuples_as_axis_vars():
@@ -162,3 +162,38 @@ def test_translate_terms_to_axis_variables():
     assert tt.res[1].diff.sl.q == ['a', 'b']
     assert tt.res[1].diff.sr.q == ['a']
     assert tt.res[1].pf == ['B']
+
+def test_translate_magn_conditions_to_axisvars():
+    custom_axis_choice = SpectralAxisSet(
+        axes=(SpectralAxis(label='A', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(1,)),))),
+              SpectralAxis(label='B', var_set=IndependentVariableSet(
+                           var_set=(SignedPulseTuple(pulse_refs=(-1,)), SignedPulseTuple(pulse_refs=(2,)))))))
+
+    evv_exp = evv_experiment()
+
+    ax_mang_cond = translate_magn_conditions_to_axisvars(magn_conditions=evv_exp.magn_conditions, 
+                                                         axis_choice=custom_axis_choice)
+    assert ax_mang_cond == (('B',),)
+
+    custom_axis_choice = SpectralAxisSet(
+        axes=(SpectralAxis(label='A', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(1,)),))),
+              SpectralAxis(label='B', var_set=IndependentVariableSet(
+                           var_set=(SignedPulseTuple(pulse_refs=(2,)),)))))
+    ax_mang_cond = translate_magn_conditions_to_axisvars(magn_conditions=evv_exp.magn_conditions, 
+                                                         axis_choice=custom_axis_choice)
+    assert ax_mang_cond == (('-A', 'B'),)
+
+    import pytest
+
+    with pytest.raises(NotImplementedError):
+        custom_axis_choice_wrong = SpectralAxisSet(
+            axes=(SpectralAxis(label='A', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(-1,)),))),
+                SpectralAxis(label='B', var_set=IndependentVariableSet(
+                            var_set=(SignedPulseTuple(pulse_refs=(2,)),)))))
+        ax_mang_cond = translate_magn_conditions_to_axisvars(magn_conditions=evv_exp.magn_conditions, 
+                                                         axis_choice=custom_axis_choice_wrong)
+
+    with pytest.raises(NotImplementedError):
+        evv_exp.magn_conditions = ((1,-2),)
+        ax_mang_cond = translate_magn_conditions_to_axisvars(magn_conditions=evv_exp.magn_conditions, 
+                                                         axis_choice=custom_axis_choice)

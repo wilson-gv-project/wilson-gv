@@ -281,10 +281,12 @@ class EvaluationWorkflow:
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
                                                                   lineshape_parameter=gamma)
+                print('\nall_features step')
+                print(f' There are {len(self.artifacts.features)} features')
+                SpectralFeature.print_list_features(self.artifacts.features)
 
 
             with self.step("dress_with_featboxes"):
-                from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
                 max_intensity_in_window = SpectralFeature.get_max_intensity_feat(self.artifacts.features).get_intensity()
                 min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
 
@@ -298,7 +300,18 @@ class EvaluationWorkflow:
                                                                                  minimum_box_padding=
                                                                                  self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
                                                                                  )
+                print('\ndress_with_featboxes step')
+                print(f' There are {len(self.artifacts.features)} features')
                 SpectralFeature.print_list_features(self.artifacts.features)
+
+            if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
+                with self.step("filter_magn_conds"):
+                    self.artifacts.features = SpectralFeature.apply_magn_cond_filter(self.artifacts.features,
+                                                                                    magn_conditions=self.inputs.spec_eval_setup.ev_info.exp_magn_conditions,
+                                                                                    magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
+                    print('\nfilter_magn_conds step')
+                    print(f' There are {len(self.artifacts.features)} features')
+                    SpectralFeature.print_list_features(self.artifacts.features)
 
             with self.step("place_in_specwindow"):
                 self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
@@ -477,3 +490,4 @@ def evaluate_compiled_group(group: 'CompiledTermGroup',
         result += evaluate_resonance_motif(motif, coords, gamma)
         
     return result
+

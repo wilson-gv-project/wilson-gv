@@ -274,7 +274,12 @@ class EvaluationInfo:
 	box_range_safety_margin: float = 0.1
 	scale_wrt_max_intensity: bool = False
 	minimum_box_padding: float = 0.0
-
+			
+	# not filtering by default
+	apply_exp_magn_conditions_eval: bool = False
+	apply_exp_magn_conditions_render: bool = False
+	exp_magn_conditions: tuple = None
+	magn_conditions_margin: tuple = 80.
 
 @dataclass
 class RenderingInfo:

@@ -40,23 +40,18 @@ class MatplotlibRenderer(SpectrumRenderer):
         
         # Create masked arrays
         no_data_mask, below_range_mask = self._create_data_masks(data)
-        
-        # Setup base colormap
-        cmap = plt.get_cmap(self.config.colormap).copy()
-        cmap.set_over(self.config.saturation_color)
-        
+
         if self.config.other_colors:
-            # Fill no-data and below-range regions
-            ax.contourf(self.Xdata, self.Ydata,
-                    no_data_mask,
-                    levels=[0, 0.5, 1],
-                    colors=[self.config.no_data_color])
-            
+            # Fill below-range regions
             ax.contourf(self.Xdata, self.Ydata,
                     below_range_mask,
                     levels=[0, 0.5, 1],
                     colors=[self.config.below_range_color])
-        
+
+        # Setup base colormap
+        cmap = plt.get_cmap(self.config.colormap).copy()
+        cmap.set_over(self.config.saturation_color)
+                
         if self.rnd_info.intensity_normalization_type is not None:
             # Create logarithmic normalization for color mapping
             norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
@@ -70,18 +65,26 @@ class MatplotlibRenderer(SpectrumRenderer):
                            norm=norm,  # Add normalization
                            cmap=cmap,
                            extend='max')
-        
+
+        # Replace contourf with pcolormesh for the mask
+        # Use a masked array so that 'False' values are completely transparent
+        masked_no_data = np.ma.masked_where(~no_data_mask, no_data_mask)
+        ax.contourf(self.Xdata, self.Ydata,
+                masked_no_data,
+                levels=[0, 0.5, 1],
+                colors=[self.config.no_data_color])
+
         # Hide contour linestroke on pyplot.contourf to get only fills
         # https://stackoverflow.com/questions/8263769/hide-contour-linestroke-on-pyplot-contourf-to-get-only-fills
         contour.set_edgecolor("face")
 
-        if self.config.other_colors:   
-            # Single clean edge line
-            ax.contour(self.Xdata, self.Ydata,
-                    ~no_data_mask,
-                    levels=[0.5],
-                    colors=[self.config.data_edge_color],
-                    linewidths=[self.config.data_edge_width])
+        # if self.config.other_colors:   
+        #     # Single clean edge line
+        #     ax.contour(self.Xdata, self.Ydata,
+        #             ~no_data_mask,
+        #             levels=[0.5],
+        #             colors=[self.config.data_edge_color],
+        #             linewidths=[self.config.data_edge_width])
 
         return fig, ax, contour
 
