@@ -20,7 +20,8 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
     origin_to_req_data: dict[DataOriginInfo, list] = {}
 
     if get_geometry:
-        requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval']})
+        requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval'],
+                                    'equilibrium_geometry': requested_data_dict['nc_sqrt_eigval']})
     if get_displacements:
         requested_data_dict.update({'normal_modes': requested_data_dict['nc_sqrt_eigval']})
 
