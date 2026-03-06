@@ -11,6 +11,7 @@
 !src/wilson_suite/wilson_analysis/tests/f_hcoh_ref.svg
 
 !src/wilson_suite/wilson_intensities/tests/datafiles/*.pkl
+!data_for_tests/*.pkl
 
 .VSCodeCounter/
 
