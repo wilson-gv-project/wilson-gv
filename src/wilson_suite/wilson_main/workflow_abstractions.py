@@ -306,7 +306,8 @@ class WilsonSimulation:
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict],
-					save_to_filename: str = None, save_to_dir: str = None):
+				get_geometry: bool = False, get_displacements: bool = False,
+				save_to_filename: str = None, save_to_dir: str = None):
 		"""
 		obtainer must return : a dictionary:
 		 	keys: trivial_name for properties or residual_vib_info keys
@@ -314,7 +315,8 @@ class WilsonSimulation:
 		
 		# todo: default obtainer??
 		"""
-		data_dict = obtainer(self.requestData())
+		data_dict = obtainer(self.requestData(), 
+					   get_geometry=get_geometry, get_displacements=get_displacements)
 		
 		# FIXME should it be a separate function with saving option??
 		if save_to_filename is not None:
