@@ -34,7 +34,7 @@ def show_mode(choice: int, elements: list, coords: np.ndarray, normal_mode_dict:
     else:
         f = 1.
     normal_mode = make_normal_mode_str(elements, coords * f, normal_mode_dict[choice])
-    view = p3d.view(viewergrid=(1, 1), width=600, height=300)
+    view = p3d.view(viewergrid=(1, 1), width=400, height=200)
     view.addModel(normal_mode, "xyz", {'vibrate': {'frames': 10, 'amplitude': 0.75}})
 
     view.setViewStyle({"style": "outline", "width": 0.05})
