@@ -28,6 +28,9 @@ def show_mode(choice: int, elements: list, coords: np.ndarray, normal_mode_dict:
     """
     show_mode(9, gParser)
     show_mode(7, c4Parser, True)
+    
+    NOTE!: normal_mode_dict has numbering of modes 
+        that corresponds to H numberring in gaussian16 or cfour numbering
     """
     if toA:
         f = physical_constants['Bohr radius'][0] / 10 ** (-10)
