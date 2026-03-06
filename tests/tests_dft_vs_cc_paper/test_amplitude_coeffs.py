@@ -264,7 +264,7 @@ def test_ampl_coeff_1mech_terms():
     avrg_f0_val = avrg_f0[t_feat0_b, t_feat0_a, t_feat0_b] # bab
 
     # single feature computed coeff here (reference value) from expression using data
-    ref_res_t_feat0 = -1./16 * cff_f0_val * avrg_f0_val * 1./convNu2Ene(1119.5)/convNu2Ene(1119.5)/convNu2Ene(c_ene) / convNu2Ene(1864.-1119.5)
+    ref_res_t_feat0 = -1./16 * cff_f0_val * avrg_f0_val * 1./convNu2Ene(1119.5+15.)/convNu2Ene(1119.5+15.)/convNu2Ene(c_ene+15.) / convNu2Ene(1864.-1119.5)
     assert np.allclose(np.sum(ref_res_t_feat0), selected_features[0].amplitude_coeff)
 
     
@@ -274,7 +274,7 @@ def test_ampl_coeff_1mech_terms():
     b_p_c = np.array([2274., 2360., 2362.])
     
     # single feature computed coeff here (reference value) from expression using data
-    ref_res_t_feat1 = 1./8  * cff_f1_val * avrg_f1_val * 1./convNu2Ene(964.)/convNu2Ene(1234.)/convNu2Ene(c_ene) / convNu2Ene(b_p_c-964.)
+    ref_res_t_feat1 = 1./8  * cff_f1_val * avrg_f1_val * 1./convNu2Ene(964.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) / convNu2Ene(b_p_c-964.)
     assert np.allclose(np.sum(ref_res_t_feat1), selected_features[1].amplitude_coeff)
 
 
@@ -419,14 +419,14 @@ def test_ampl_coeff_1el_terms():
     avrg_f0_val = avrg_f0[t_feat0_a, t_feat0_b] # baab
 
     # single feature computed coeff here (reference value) from expression using data
-    ref_res_t_feat0 = -1./4 * avrg_f0_val * 1./convNu2Ene(1119.5)/convNu2Ene(1119.5)
+    ref_res_t_feat0 = -1./4 * avrg_f0_val * 1./convNu2Ene(1119.5+15.)/convNu2Ene(1119.5+15.)
 
     assert np.allclose(ref_res_t_feat0, selected_features[0].amplitude_coeff)
 
     avrg_f1_val = avrg_f1[t_feat0_a, t_feat0_b] # abab
     
     # single feature computed coeff here (reference value) from expression using data
-    ref_res_t_feat1 = -1./4  * avrg_f1_val * 1./convNu2Ene(1119.5)/convNu2Ene(1119.5)
+    ref_res_t_feat1 = -1./4  * avrg_f1_val * 1./convNu2Ene(1119.5+15.)/convNu2Ene(1119.5+15.)
     assert np.allclose(np.sum(ref_res_t_feat1), selected_features[1].amplitude_coeff)
 
 

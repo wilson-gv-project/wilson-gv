@@ -168,7 +168,7 @@ def test_below_range_mask_logic():
         [0.0, 0.5],
         [10.0, np.nan],
     ])
-    no_data, below = compute_masks(data, dynamic_range=10)
+    no_data, below = compute_masks(data=data, dynamic_range=10)
 
     assert no_data[1, 1]
     assert below[0, 0]
