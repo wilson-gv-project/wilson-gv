@@ -1,11 +1,12 @@
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 
 def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo], 
-                         get_geometry=False, get_displacements=False):
+                         get_geometry=False, get_displacements=False,
+                         reindex_modes=False):
     """
     1. group by origin
 
-
+    reindex_modes -- to switch nodes numbering for comparisons where it is not the same
     """
     if isinstance(requested_data_dict, dict):
         for k, v in requested_data_dict.items():
@@ -41,7 +42,8 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
             from CQCParse.parsing import parse_from_source
             from dataclasses import asdict
 
-            these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], **asdict(o))
+            these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], 
+                                                   reindex_modes=reindex_modes,  **asdict(o))
             
             dict_with_data.update(these_results_dict)
 
