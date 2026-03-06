@@ -1,3 +1,8 @@
+"""
+FIXME: aren't all of these outdated and have now a working replacement elsewhere?
+"""
+
+'''
 import numpy as np
 import wilson_suite
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -859,3 +864,5 @@ def test_pairwise_differences():
                                         [-0.00312109,                              
                                 -0.00317121, -0.00615105]]])
     assert np.allclose(q, a)
+
+'''

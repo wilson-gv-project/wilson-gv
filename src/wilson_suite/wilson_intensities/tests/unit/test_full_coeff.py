@@ -66,7 +66,8 @@ def test_precalculate_unique_coeff_parts():
                                         vibstates_data=vibdata,
                                         pulse_polarization_vector=[1., 1., 1.],
                                         number_of_nmodes=4, 
-                                        nm_inds_choices=[0, 1, 2, 3])
+                                        nm_inds_choices=[0, 1, 2, 3],
+                                        nc_sqrt_eigval={0: 964.+15., 1: 1234.+15., 2: 3644.+15.})
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
     print(results)
@@ -125,7 +126,8 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
                                         vibstates_data=vibdata,
                                         pulse_polarization_vector=[1., 1., 1.],
                                         number_of_nmodes=3, 
-                                        nm_inds_choices=[0, 1, 2])
+                                        nm_inds_choices=[0, 1, 2],
+                                        nc_sqrt_eigval={0: 964.+15., 1: 1234.+15., 2: 3644.+15.})
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
@@ -147,7 +149,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     
     
     # based on data above - frac * vibene denom * orient avrg
-    ref_term0_coeff = -1./4 * 1./convNu2Ene(964.)/convNu2Ene(964.) * t0_avrg_tensor[0, 0]
+    ref_term0_coeff = -1./4 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.) * t0_avrg_tensor[0, 0]
     term0_coeff = list(term0_coeff_dict.values())[0] # list with single element
 
     assert term0_coeff == ref_term0_coeff
@@ -163,7 +165,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     assert avrg_expressions_t1 != avrg_expressions_t0
     
     # based on data above - frac * vibene denom * orient avrg
-    ref_term1_coeff = -1./4 * 1./convNu2Ene(964.)/convNu2Ene(964.) * t1_avrg_tensor[0, 0]
+    ref_term1_coeff = -1./4 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.) * t1_avrg_tensor[0, 0]
     term1_coeff = list(term1_coeff_dict.values())[0] # list with single element
     assert term1_coeff == ref_term1_coeff
     
@@ -189,7 +191,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
 
     # based on data above - frac * vibene denom * orient avrg * CFF 
     # avrg_expressions_t2 ---- polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['c'][2]_d1
-    ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.)/convNu2Ene(1234.)/convNu2Ene(c_ene) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
+    ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
 
     term2_coeff = list(term2_coeff_dict.values())[0] # list with single element
     assert np.isclose(term2_coeff, np.sum(ref_term2_coeff))
@@ -218,7 +220,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     # avrg_expressions_t3 ---- polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['b'][2]_d1
     # CFF --- acc
     # t3_avrg_tensor[1, 0, 1] because it goes b,a,c
-    ref_term3_coeff = 1./16 * 1./convNu2Ene(964.)/convNu2Ene(1234.)/convNu2Ene(c_ene) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
+    ref_term3_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
 
     term3_coeff = list(term3_coeff_dict.values())[0] # list with single element
     assert np.isclose(term3_coeff, np.sum(ref_term3_coeff))
@@ -243,7 +245,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     assert t4_avrg_tensor[0, 0, 0] != 0
 
     # based on data above - frac * vibene denom * orient avrg * CFF 
-    ref_term4_coeff = 1./16 * 1./convNu2Ene(964.)/convNu2Ene(964.)/convNu2Ene(c_ene) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
+    ref_term4_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.)/convNu2Ene(c_ene+15.) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term4_coeff = list(term4_coeff_dict.values())[0] # list with single element
     assert np.isclose(term4_coeff, np.sum(ref_term4_coeff))
 
@@ -305,7 +307,8 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
                                         vibstates_data=vibdata,
                                         pulse_polarization_vector=[1., 1., 1.],
                                         number_of_nmodes=3, 
-                                        nm_inds_choices=[0, 1, 2])
+                                        nm_inds_choices=[0, 1, 2],
+                                        nc_sqrt_eigval={0: 964.+15., 1: 1234.+15., 2: 3644.+15.})
 
     results = fac.precalculate_unique_coeff_parts(need_to_precalc=need_to_precalc,
                                                   data_and_configs=settings)
@@ -340,7 +343,7 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     # based on data above - frac * vibene denom * orient avrg * CFF 
     # avrg_expressions_t2 ---- polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['c'][2]_d1 --- bac
     # CFF ---- abc
-    ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.)/convNu2Ene(1234.)/convNu2Ene(c_ene) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
+    ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
 
     term2_coeff = list(term2_coeff_dict.values())[0] # list with single element
     assert np.isclose(term2_coeff, np.sum(ref_term2_coeff))
@@ -381,7 +384,7 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     # avrg_expressions_t3 ---- polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * dipgrad['b'][2]_d1   -- bab
     # CFF --- acc
     # t3_avrg_tensor[1, 0, 1] because it goes b,a,c in general expression
-    ref_term3_coeff = 1./16 * 1./convNu2Ene(964.)/convNu2Ene(1234.)/convNu2Ene(c_ene) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
+    ref_term3_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term3_coeff = list(term3_coeff_dict.values())[0] # list with single element
 
     assert np.isclose(term3_coeff, np.sum(ref_term3_coeff))
@@ -410,7 +413,7 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     assert t4_avrg_tensor[0, 0, 0] != 0
 
     # based on data above - frac * vibene denom * orient avrg * CFF 
-    ref_term4_coeff = 1./16 * 1./convNu2Ene(964.)/convNu2Ene(964.)/convNu2Ene(c_ene) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
+    ref_term4_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.)/convNu2Ene(c_ene+15.) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term4_coeff = list(term4_coeff_dict.values())[0] # list with single element
 
     assert np.isclose(term4_coeff, np.sum(ref_term4_coeff))

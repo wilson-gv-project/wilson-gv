@@ -357,6 +357,7 @@ class EvaluationDataAndConfigs:
     number_of_nmodes: int = None
     nm_inds_choices: list[int] = None
     pulse_polarization_vector: list = None
+    nc_sqrt_eigval: dict = None
 
 
 @dataclass()

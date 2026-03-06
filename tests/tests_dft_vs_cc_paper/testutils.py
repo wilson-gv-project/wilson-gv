@@ -1,6 +1,7 @@
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature, ResLocGeoObject, SpectralWindow
 from wilson_suite.wilson_intensities.amplitudes.term_parts import TermParametersChoice, ResonanceMotif, ResonanceCondition, ParameterSet
 import wilson_suite as ws
+from wilson_suite.wilson_main import abstractions as wm_abst
 
 class MakeObjects:
     
@@ -182,7 +183,6 @@ class MakeObjects:
         1119.5 = a 0
         2921 = 0,1-1
         """
-        from wilson_suite.wilson_main import abstractions as wm_abst
         if not closer:
             states = (
                 wm_abst.VibState(harm_quanta_coeffs={(0,):1.}, state_label='0', energy=1119.5, harmonic_WF=True),
@@ -220,7 +220,7 @@ class MakeObjects:
         return 
     
     @staticmethod
-    def mk_data_for_eval(list_of_states, 
+    def mk_data_for_eval(list_of_states: list[wm_abst.VibState], 
                          include_states_list,
                          list_of_props, 
                          pulse_polarization_vector):
@@ -266,6 +266,7 @@ class MakeObjects:
         vib_ana_setup.states = list_of_states
         vib_ana_setup.include_list = include_states_list
         vib_ana_setup.number_of_modes = 3
+        vib_ana_setup.nc_sqrt_eigval = {int(i.state_label): i.energy+15.  for i in list_of_states if len(i.state_label.split(','))==1}
 
         from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData, EvaluationDataAndConfigs
         vibstates_data = VibStatesData(allstates=tuple(vib_ana_setup.states), 
@@ -282,7 +283,8 @@ class MakeObjects:
                                                     vibstates_data=vibstates_data,
                                                     number_of_nmodes=vib_ana_setup.number_of_modes,
                                                     nm_inds_choices=include_states_list,
-                                                    pulse_polarization_vector=pulse_polarization_vector)
+                                                    pulse_polarization_vector=pulse_polarization_vector,
+                                                    nc_sqrt_eigval=vib_ana_setup.nc_sqrt_eigval)
 
         return data_and_configs
 

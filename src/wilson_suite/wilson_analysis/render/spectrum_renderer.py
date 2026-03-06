@@ -157,8 +157,8 @@ class SpectrumRenderer(ABC):
             magn_conditions = None
         
         return compute_masks(data=data, 
-                             grid=self.spec_grid,
                              dynamic_range=self.ev_info.dynamic_range,
+                             grid=self.spec_grid,
                              magn_conditions=magn_conditions, 
                              non_zero_margin=self.ev_info.magn_conditions_margin)
 
@@ -284,8 +284,8 @@ class SpectrumRenderer(ABC):
         return fig, ax, contour, cbar
 
 def compute_masks(data: np.ndarray, 
-                  grid: dict,
                   dynamic_range: float, 
+                  grid: dict=None,
                   magn_conditions: tuple[tuple]=None,
                   non_zero_margin: float=80.):
     """
@@ -297,8 +297,12 @@ def compute_masks(data: np.ndarray,
 
     # ONLY EVV w2>w1 for paper 1 now
     if magn_conditions==(('B',),):
+        if grid is None:
+            raise ValueError("in compute_masks() grid is None")
         no_data = grid['B'] < (0 + non_zero_margin)
     elif magn_conditions==(('-A', 'B',),):
+        if grid is None:
+            raise ValueError("in compute_masks() grid is None")
         no_data = grid['B'] - grid['A'] < (0 + non_zero_margin)
     else:
         no_data = np.isnan(data)

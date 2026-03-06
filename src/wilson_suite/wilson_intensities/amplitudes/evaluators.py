@@ -2,7 +2,7 @@
 Evaluator functions for WilsonSimulation
 """
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject, SpectralFeature
-from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
+from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
@@ -69,7 +69,8 @@ def prepDataForEval(pulse_polarization_vector: np.ndarray,
                                                 vibstates_data=vibstates_data,
                                                 number_of_nmodes=vib_ana_setup.number_of_modes,
                                                 nm_inds_choices=include_list,
-                                                pulse_polarization_vector=pulse_polarization_vector)
+                                                pulse_polarization_vector=pulse_polarization_vector,
+                                                nc_sqrt_eigval=vib_ana_setup.nc_sqrt_eigval)
 
     return vibstates_data, vibdiff_cache, data_and_configs
 
