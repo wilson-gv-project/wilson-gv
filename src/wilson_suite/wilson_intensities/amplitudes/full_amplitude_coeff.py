@@ -70,7 +70,7 @@ def precalculate_unique_coeff_parts(need_to_precalc: dict,
     vibenedenoms_tensors = {}
     for ve_denom in need_to_precalc['vibenedenoms_tensors']:
         vibenedenoms_tensors[ve_denom] = vediff.calculate_vibenedenom_tensor(vibenedenom_inds=ve_denom, 
-                                                                                  vibstates_data=data_and_configs.vibstates_data)
+                                                                             nc_sqrt_eigval=data_and_configs.nc_sqrt_eigval)
     
     return PrecalculatedData(vibdiff_cache=vediff.VibDiffCache(),
                              avrg_tensors=avrg_tensors, 

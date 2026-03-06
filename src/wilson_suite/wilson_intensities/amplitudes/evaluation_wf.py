@@ -24,10 +24,9 @@ from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import Gr
 from wilson_suite.wilson_intensities.amplitudes.evaluators import prepTermsForEval
 from wilson_suite.wilson_intensities.amplitudes.evaluators import prepDataForEval
 from wilson_suite.wilson_intensities.amplitudes.evaluators import process_resonance_motifs
-from wilson_suite.wilson_intensities.amplitudes.evaluators import (
-    evaluate_terms_coeffs, precalculate_unique_coeff_parts, 
-    identify_precalc_unique_coeff_parts
-)
+from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_terms_coeffs
+from wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff import (precalculate_unique_coeff_parts, 
+                                                                             identify_precalc_unique_coeff_parts)
 from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw
 
 from contextlib import contextmanager
