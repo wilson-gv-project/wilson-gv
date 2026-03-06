@@ -13,3 +13,10 @@
  3. `tests_intensities` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/54
  4. `magn_conditions` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/55
  5. `dress_these_with_boxes_minimum_box_padding` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/56
+ 6. `reference_max_render` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/57 --- need to also add reference to own max
+ 7. `match_modes` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/58
+ 8. `vibenedenom_tensor` branch https://github.com/wilson-gv-project/wilson-suite-mono/pull/59
+ 9. `` branch
+ 10. `` branch
+ 11. `` branch
+ 12. `` branch
