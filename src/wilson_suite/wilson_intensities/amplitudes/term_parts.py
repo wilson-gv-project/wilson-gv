@@ -279,6 +279,16 @@ class ParameterSet(Mapping[str, int]):
         # Order-independent, value-based hash
         return hash(frozenset(self._parameters.items()))
 
+    def __lt__(self, other):
+        if not isinstance(other, ParameterSet):
+            return NotImplemented
+        # Sort keys to ensure we compare 'a', then 'b', then 'c' 
+        # regardless of insertion order.
+        self_values = tuple(self[k] for k in sorted(self.keys()))
+        other_values = tuple(other[k] for k in sorted(other.keys()))
+        
+        return self_values < other_values
+            
     # --- Convenience ---
 
     def parameter_labels(self):
