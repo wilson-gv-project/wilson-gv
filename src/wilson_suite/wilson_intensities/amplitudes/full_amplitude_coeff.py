@@ -192,7 +192,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
     idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
     term_idx_all = sorted(idx_summ + idx_nonsumm)
     
-    def hierarchical_sum(index_dict: Dict, remaining_indices: List[str]) -> float:
+    def hierarchical_sum(index_dict: Dict, remaining_indices: List[str], dict_of_sum: dict) -> float:
         """
         Perform hierarchical summation over the remaining indices.
         Parameters:
@@ -202,10 +202,18 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
                 The list of indices that still need to be summed over.
         Returns:
             float: The result of the summation for the given index dictionary.
+            
+            dict_of_sum: top level: 
+                    {ParameterSet(index_dict): {}}
         """
         # Base case: no remaining indices to sum over
         if not remaining_indices:
-            return evaluate_single_index_dict(term, index_dict, avrg_expr, non_avrg_expr, extra_freqterms, freqterms, data_and_configs, precalculated_data, zero_tol)
+            # print('dict_of_sum', dict_of_sum)
+            value, contribs = evaluate_single_index_dict(term, index_dict, avrg_expr, non_avrg_expr, extra_freqterms, freqterms, data_and_configs, precalculated_data, zero_tol)
+            dict_of_sum[ParameterSet(index_dict)] = contribs
+            # returns coef and dict with param contribs
+
+            return value, dict_of_sum
         
         # Get the next index to sum over
         current_index = remaining_indices[0]
@@ -214,23 +222,33 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
         # Perform summation over all possible values for the current index
         n_modes = data_and_configs.number_of_nmodes
         total_sum = 0.0
+
         for value in range(n_modes):
             # Update the index dictionary with the current value
             new_index_dict = index_dict.copy()
             new_index_dict[current_index] = value
             
+            parent_key = ParameterSet(index_dict)
+            child_key = ParameterSet(new_index_dict)
+            # if parent_key not in dict_of_sum:
+            #     dict_of_sum[parent_key] = {}
+            # dict_of_sum[parent_key][child_key] = {}
+            
             # Recursively compute the sum for the remaining indices
-            total_sum += hierarchical_sum(new_index_dict, remaining)
+            recurse_res = hierarchical_sum(new_index_dict, remaining, dict_of_sum[ParameterSet(index_dict)])
+            total_sum += recurse_res[0]
         
-        return total_sum
+        return total_sum, dict_of_sum
     
-    # Iterate over the relevant indices
+    # Iterate over the relevant indices -- 
     for index_dict in relevant_indices:
         # Identify missing indices
         missing_indices = [index for index in term_idx_all if index not in index_dict]
         
+        dict_of_sum = {ParameterSet(index_dict): {}}
+        
         # Perform hierarchical summation for the current index_dict
-        result = hierarchical_sum(index_dict, missing_indices)
+        result = hierarchical_sum(index_dict, missing_indices, dict_of_sum)
         results[ParameterSet(index_dict)] = result
     
     return results
@@ -244,7 +262,7 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
                                freqterms, 
                                data_and_configs, 
                                precalculated_data, 
-                               zero_tol: float) -> float:
+                               zero_tol: float) -> tuple[float, dict]:
     """
     Evaluate the term for a single index dictionary.
     Parameters:
@@ -257,22 +275,22 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, data_and_configs, zero_tol)
     if NON_AVRG == 0.0:
         # print('\nNON_AVRG zero - ', non_avrg_expr, index_dict, '\n\n')
-        return 0.0
+        return 0.0, {'NON_AVRG': NON_AVRG}
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
         # print('\nAVRG zero - ', avrg_expr, index_dict, '\n\n')
-        return 0.0
+        return 0.0, {'AVRG': AVRG}
     # Evaluate VIBDIFF_TERMS
     VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, data_and_configs)
     if VIBDIFF_TERMS == 0.0:
         # print('\nVIBDIFF_TERMS zero - ', extra_freqterms, index_dict, '\n\n')
-        return 0.0
+        return 0.0, {'VIBDIFF_TERMS': VIBDIFF_TERMS}
     # Evaluate VIBENE_DENOM
     VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
     if VIBENE_DENOM == 0.0:
         # print('\nVIBENE_DENOM zero - ', freqterms, index_dict, '\n\n')
-        return 0.0
+        return 0.0, {'VIBENE_DENOM': VIBENE_DENOM}
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
@@ -282,7 +300,9 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     # print('VIBDIFF_TERMS', VIBDIFF_TERMS)
     # print('VIBENE_DENOM', VIBENE_DENOM, '\n')
 
-    return float(term.coeff) * float(product_all)
+    dict_contribs = {'NON_AVRG': NON_AVRG, 'AVRG': AVRG, 'VIBDIFF_TERMS': VIBDIFF_TERMS, 'VIBENE_DENOM': VIBENE_DENOM}
+
+    return float(term.coeff) * float(product_all), dict_contribs
 
 # TODO: error handling for missing or invalid data for all functions below
 def eval_non_avrg_per_indexdict(non_avrg_expr: avrgprops.PropsCollection, 

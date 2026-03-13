@@ -267,6 +267,7 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
+    term_contrib_by_id: dict = None
     lineshape_parameter: float = None # will be by this time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
@@ -289,6 +290,11 @@ class SpectralFeature:
         return (self.location == other.location 
                 and self.lineshape_parameter == other.lineshape_parameter 
                 and self.term_contributions == other.term_contributions)
+
+    def __lt__(self, other: 'SpectralFeature') -> bool:
+        if not isinstance(other, SpectralFeature):
+            return NotImplemented
+        return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
 
     # UNUSED
     @classmethod
@@ -553,6 +559,7 @@ class SpectralFeature:
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
             print('term_contributions', feat.term_contributions)
+            print('term_contrib_by_id', feat.term_contrib_by_id)
 
 @dataclass
 class SpectralWindow:

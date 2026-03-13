@@ -110,6 +110,8 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
                   precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
     """
     Evaluate coefficients for all terms.
+
+    terms to dict with (params to coeff)
     """
     term_coeffs_per_index = {}
     for vibterm in derived_terms:
@@ -165,7 +167,7 @@ def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
 def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]],
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
-                                                     dict[ParameterSet, float]]=None,
+                                                     dict[ParameterSet, tuple[float, dict]]]=None,
                          lineshape_parameter: float=None) -> list[SpectralFeature]:
     """
 
@@ -186,7 +188,8 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
                                         term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
 
             if term_coeffs_per_index is not None:
-                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)][0] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                dict_of_contribs = {term.h(): term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts}
                 amplitude_coeff = sum(list_to_sum)
             else:
                 amplitude_coeff = None
@@ -195,6 +198,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             if amplitude_coeff != 0.:
                 spec_feature = SpectralFeature(location=res_geo_obj, 
                                             term_contributions=term_contributions,
+                                            term_contrib_by_id = dict_of_contribs,
                                             lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
                                             amplitude_coeff=amplitude_coeff)
                 if spec_feature not in features_to_draw:
