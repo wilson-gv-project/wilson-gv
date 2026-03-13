@@ -168,7 +168,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
                                                      dict[ParameterSet, tuple[float, dict]]]=None,
-                         lineshape_parameter: float=None) -> list[SpectralFeature]:
+                         lineshape_parameter: float=None) -> tuple[list[SpectralFeature], list[SpectralFeature]]:
     """
 
     lineshape_parameter - uniform lineshape parameters (for all axes) for each feature for now
@@ -177,6 +177,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
     # a SpectralFeature instanse holds a res_location and list of states parameters that give this res_location; 
     #       the amplitude coefficient is a value in the dict
     features_to_draw: list[SpectralFeature] = []
+    zero_coeff_feats: list[SpectralFeature] = []
 
     for res_motif in motif_res_loc:
 
@@ -195,17 +196,20 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
                 amplitude_coeff = None
             
             # disregard locations where coefficient is zero
+            spec_feature = SpectralFeature(location=res_geo_obj, 
+                                        term_contributions=term_contributions,
+                                        term_contrib_by_id = dict_of_contribs,
+                                        lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
+                                        amplitude_coeff=amplitude_coeff)
             if amplitude_coeff != 0.:
-                spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=term_contributions,
-                                            term_contrib_by_id = dict_of_contribs,
-                                            lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
-                                            amplitude_coeff=amplitude_coeff)
+
                 if spec_feature not in features_to_draw:
                     features_to_draw.append(spec_feature)
                 else:
                     new_specfeat = spec_feature.union(features_to_draw[res_geo_obj][1])
                     features_to_draw.append(new_specfeat)
+            else:
+                zero_coeff_feats.append(spec_feature)
 
-    return features_to_draw
+    return features_to_draw, zero_coeff_feats
 

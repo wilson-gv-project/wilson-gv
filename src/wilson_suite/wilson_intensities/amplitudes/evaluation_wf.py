@@ -87,6 +87,7 @@ class EvaluationArtifacts:
     precalculated: 'PrecalculatedData' = None
     coefficients: dict['VibPerturbedTerm', dict['ParameterSet', float]] = None
     features: list[SpectralFeature] = None
+    zero_feats: list[SpectralFeature] = None
     spec_window: 'SpectralWindow' = None
     grid_manager: GridManager = None
     regions: list['GridRegion'] = None
@@ -281,7 +282,7 @@ class EvaluationWorkflow:
                     raise ValueError('Gamma cannot be converted from the given unit to au')
                 
                 # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
-                self.artifacts.features = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
+                self.artifacts.features, self.artifacts.zero_feats = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
                                                                   lineshape_parameter=gamma)
@@ -327,7 +328,7 @@ class EvaluationWorkflow:
                                                                                  )
                 print('\ndress_with_featboxes step')
                 print(f' There are {len(self.artifacts.features)} features')
-                SpectralFeature.print_list_features(self.artifacts.features)
+                # SpectralFeature.print_list_features(self.artifacts.features)
 
             if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
                 with self.step("filter_magn_conds"):
@@ -336,7 +337,7 @@ class EvaluationWorkflow:
                                                                                     magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
                     print('\nfilter_magn_conds step')
                     print(f' There are {len(self.artifacts.features)} features')
-                    SpectralFeature.print_list_features(self.artifacts.features)
+                    # SpectralFeature.print_list_features(self.artifacts.features)
 
             with self.step("place_in_specwindow"):
                 self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
@@ -403,7 +404,7 @@ class EvaluationWorkflow:
                     raise ValueError('Gamma cannot be converted from the given unit to au')
                 
                 # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
-                self.artifacts.features = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
+                self.artifacts.features, self.artifacts.zero_feats = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
                                                                   lineshape_parameter=gamma)
