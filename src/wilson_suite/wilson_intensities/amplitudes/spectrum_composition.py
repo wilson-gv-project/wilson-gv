@@ -296,6 +296,18 @@ class SpectralFeature:
             return NotImplemented
         return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
 
+    @classmethod
+    def sort_by_params(cls, features: list['SpectralFeature']):
+        params_lens = [len(i.term_contributions) for i in features]
+        assert len(params_lens) == sum(params_lens)
+        params = [i.term_contributions[0] for i in features]
+        print(len(set(params)), len(features))
+        print(params)
+        # assert set(params) 
+
+
+
+
     # UNUSED
     @classmethod
     def share_location(cls, features: list['SpectralFeature']):
