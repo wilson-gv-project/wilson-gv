@@ -275,7 +275,8 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, data_and_configs, zero_tol)
     if NON_AVRG == 0.0:
         # print('\nNON_AVRG zero - ', non_avrg_expr, index_dict, '\n\n')
-        return 0.0, {'NON_AVRG': NON_AVRG}
+        AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
+        return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
