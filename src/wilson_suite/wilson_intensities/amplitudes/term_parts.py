@@ -279,16 +279,30 @@ class ParameterSet(Mapping[str, int]):
         # Order-independent, value-based hash
         return hash(frozenset(self._parameters.items()))
 
+    # def __lt__(self, other):
+    #     if not isinstance(other, ParameterSet):
+    #         return NotImplemented
+    #     # Sort keys to ensure we compare 'a', then 'b', then 'c' 
+    #     # regardless of insertion order.
+    #     self_values = tuple(self[k] for k in sorted(self.keys()))
+    #     other_values = tuple(other[k] for k in sorted(other.keys()))
+        
+    #     return self_values < other_values
+
     def __lt__(self, other):
         if not isinstance(other, ParameterSet):
             return NotImplemented
+        
+        sort_keys = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
+        relevant_keys = [k for k in sort_keys if k in self or k in other]
+
         # Sort keys to ensure we compare 'a', then 'b', then 'c' 
         # regardless of insertion order.
-        self_values = tuple(self[k] for k in sorted(self.keys()))
-        other_values = tuple(other[k] for k in sorted(other.keys()))
+        self_vals = tuple(self.get(k, 0) for k in relevant_keys)
+        other_vals = tuple(other.get(k, 0) for k in relevant_keys)
         
-        return self_values < other_values
-            
+        return self_vals < other_vals
+
     # --- Convenience ---
 
     def parameter_labels(self):
@@ -389,6 +403,19 @@ class TermParametersChoice:
     states_parameters: Tuple["ParameterSet"]
     term_ids: Tuple[int] = field(default_factory=tuple)
 
+    def sort_parameters(self) -> "TermParametersChoice":
+        """
+        Returns a new TermParametersChoice where the states_parameters 
+        are sorted according to the ParameterSet comparison logic.
+        """
+        new_params = tuple(sorted(self.states_parameters))
+        
+        # Replace the current tuple with the sorted one
+        # Using dataclasses.replace for frozen instances
+        from dataclasses import replace
+        return replace(self, states_parameters=new_params)
+
+
     def __hash__(self):
         return hash((self.term_ids, self.states_parameters))
 
@@ -399,6 +426,28 @@ class TermParametersChoice:
             and self.states_parameters == other.states_parameters
         )
 
+    # def __lt__(self, other):
+    #     if len(self.term_ids) != len(other.term_ids):
+    #         return len(self.term_ids) < len(other.term_ids)
+    #     else:
+    #         self.states_parameters
+    #     return
+
+    def __lt__(self, other):
+        if not isinstance(other, TermParametersChoice):
+            return NotImplemented
+        
+        # 1. Compare lengths of term_ids
+        if len(self.term_ids) != len(other.term_ids):
+            return len(self.term_ids) < len(other.term_ids)
+        
+        # 2. Compare term_ids values (lexicographical)
+        if self.term_ids != other.term_ids:
+            return self.term_ids < other.term_ids
+            
+        # 3. Compare the sequences of ParameterSets
+        # Python will compare self.states_parameters[0] < other.states_parameters[0], etc.
+        return self.states_parameters < other.states_parameters
 # -------------------------------------------------------
 
 
