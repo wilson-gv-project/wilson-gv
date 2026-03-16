@@ -186,11 +186,11 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
             term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
                                         states_parameters=lst_params,
-                                        term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
+                                        term_ids=tuple([t.to_str() for t in terms_for_motifs[res_motif]]) )])
 
             if term_coeffs_per_index is not None:
                 list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)][0] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
-                dict_of_contribs = {term.h(): term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts}
+                dict_of_contribs = {term.to_str(): term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts}
                 amplitude_coeff = sum(list_to_sum)
             else:
                 amplitude_coeff = None

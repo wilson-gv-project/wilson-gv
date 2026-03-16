@@ -281,8 +281,8 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        # return hash((self.location, self.term_contributions))
-        return hash(self.location)
+        return hash((self.location, self.term_contributions[0].term_ids))
+        # return hash(self.location)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SpectralFeature):
@@ -300,13 +300,18 @@ class SpectralFeature:
     def sort_by_params(cls, features: list['SpectralFeature']):
         params_lens = [len(i.term_contributions) for i in features]
         assert len(params_lens) == sum(params_lens)
-        params = [i.term_contributions[0] for i in features]
-        print(len(set(params)), len(features))
-        print(params)
-        # assert set(params) 
 
+        return sorted(
+                features, 
+                key=lambda f: f.term_contributions[0]
+            )
 
-
+    @classmethod
+    def sort_by_el_or_mech(cls, features: list['SpectralFeature']):
+        sorted_dict = {}
+        for f in features:
+            terms = f.term_contrib_by_id
+        return sorted_dict
 
     # UNUSED
     @classmethod
