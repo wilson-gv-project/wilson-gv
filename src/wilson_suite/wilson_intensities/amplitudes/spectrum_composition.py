@@ -308,10 +308,33 @@ class SpectralFeature:
 
     @classmethod
     def sort_by_el_or_mech(cls, features: list['SpectralFeature']):
+        """
+        unfinished
+        """
+        raise NotImplementedError()
         sorted_dict = {}
         for f in features:
             terms = f.term_contrib_by_id
         return sorted_dict
+
+    @classmethod
+    def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float = None):
+        """
+        returns a new list
+
+        external_max - can take external input for max , instead of finding max of the given list
+        """
+        if external_max is None:
+            max_feat_coeff = cls.get_max_intensity_feat(features, intensity_expr=None).amplitude_coeff
+        else:
+            max_feat_coeff = external_max
+
+        return_feats = copy.deepcopy(features)
+
+        for f in return_feats:
+            f.amplitude_coeff = f.amplitude_coeff/abs(max_feat_coeff)
+        return return_feats
+
 
     # UNUSED
     @classmethod
@@ -394,13 +417,21 @@ class SpectralFeature:
         amplitude of a feature is given by: amplitude_coeff / lineshape_parameter**2
         """
         result = None
-        intensity_result = 0
+        num_result = 0
 
         for feat in features:
             
-            if feat.get_intensity(intensity_expr) > intensity_result:
-                result = feat
-                intensity_result = feat.get_intensity(intensity_expr)
+            if intensity_expr is not None:
+
+                if feat.get_intensity(intensity_expr) > num_result:
+                    result = feat
+                    num_result = feat.get_intensity(intensity_expr)
+            
+            else:
+
+                if abs(feat.amplitude_coeff) > num_result:
+                    result = feat
+                    num_result = abs(feat.amplitude_coeff)
         
         return result
 
