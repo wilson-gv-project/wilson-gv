@@ -425,7 +425,7 @@ class VibPerturbedTerm:
 
         freqterms = [f"<{ft.sl.q},{ft.sr.q}>" for ft in self.freqterms]
 
-        res = [f'(<{r.diff.sl.q}{r.diff.sr.q}> - {r.pf}) -iG' for r in self.res]
+        res = [f'(<{r.diff.sl.q}{r.diff.sr.q}> - {r.pf} -iG)' for r in self.res]
 
         return coeff + ' * ' + ' * '.join(props) + ' / ' + ' / '.join(freqterms) + ' / ' + ' / '.join(res)
 
