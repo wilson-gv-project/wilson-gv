@@ -281,7 +281,7 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        return hash((self.location, self.term_contributions[0].term_ids))
+        return hash((self.term_contributions[0].term_ids, self.term_contributions[0].states_parameters))
         # return hash(self.location)
 
     def __eq__(self, other) -> bool:
@@ -335,6 +335,18 @@ class SpectralFeature:
             f.amplitude_coeff = f.amplitude_coeff/abs(max_feat_coeff)
         return return_feats
 
+    @classmethod
+    def get_feats_with_params(cls, features: list['SpectralFeature'], params: dict):
+        """
+        e.g.:
+            params = {'a': 0, 'b': 1}
+        """
+        from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet
+        res = []
+        for f in features:
+            if ParameterSet(params) in f.term_contributions[0].states_parameters:
+                res.append(f)
+        return res
 
     # UNUSED
     @classmethod
