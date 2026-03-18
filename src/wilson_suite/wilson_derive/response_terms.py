@@ -52,6 +52,8 @@ class VibPerturbedTerm:
         # to have info about the term in it
         self.anharmonicity = None
 
+        self.note = None
+
     def __repr__(self):
         return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
