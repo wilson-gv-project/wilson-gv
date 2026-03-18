@@ -168,6 +168,22 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    def to_str(self):
+        """
+        EVV / paper1 spectific here
+        """
+        strings = []
+        for cond in self.resonance_conditions:
+            if 'B' in cond.pf[0]:
+                state = []
+                for i in [cond.diff.sl.q, cond.diff.sr.q]:
+                    if len(i)!=0:
+                        state.append('+'.join(i))
+                    else:
+                        state.append('.')
+                strings.append(f'{','.join(state)}')
+        return ' x '.join(strings)
+
     # UNUSED?
     @classmethod
     def from_tuples(cls, tupleOfTuples):
