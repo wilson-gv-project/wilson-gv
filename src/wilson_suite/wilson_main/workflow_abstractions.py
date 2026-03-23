@@ -469,6 +469,7 @@ class WilsonSimulation:
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
 														dict, str, 'SpecEvalSetup'], tuple[Any, dict]],
+														features=None,
 														do_diagn: bool=False):
 		"""
 		Render the spectral data
@@ -487,7 +488,8 @@ class WilsonSimulation:
 		
 		context = dict(spec_data=self.spec,
 					   spec_eval_setup=self.spec_eval_setup, 
-					   do_diagn=do_diagn)
+					   do_diagn=do_diagn,
+					   features=features)
 		
 		logger.debug('context')
 		logger.debug(context)

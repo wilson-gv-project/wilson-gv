@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from ...wilson_main.spectrum_abstractions import SpecEvalSetup
 
 def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup', 
-                    do_diagn) -> None:
+                    do_diagn, features=None) -> None:
     
     """
     High-level function to render spectrum with specified backend
@@ -65,7 +65,47 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
                               rnd_info=spec_eval_setup.rnd_info,
                               do_diagn=do_diagn)
     fig, ax, contour, cbar = renderer.render(filename)
+
     
+    # # overlay contribution points if provided
+    # if df_contributions is not None:
+    #     colors = {'a+b,a': 'cyan', 'b,a': 'orange'}
+    #     for _, row in df_contributions.iterrows():
+    #         color = colors.get(row['res_type'], 'white')
+    #         ax.scatter(row[f'A_{lvl_theory}'], row[f'B_{lvl_theory}'],
+    #                    color=color, s=abs(row[f'amp_{lvl_theory}'])*200,
+    #                    alpha=1.0, edgecolors='white', linewidths=1.5, zorder=5)
+    #         ax.annotate(f"({int(row['mode_a'])},{int(row['mode_b'])})",
+    #                     (row[f'A_{lvl_theory}'], row[f'B_{lvl_theory}']),
+    #                     fontsize=7, color='white',
+    #                     xytext=(5, 5), textcoords='offset points',
+    #                     bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.5))
+    #     # resave with overlaid points
+    #     fig.savefig(filename.replace('.', '_sticks.'), bbox_inches='tight', 
+    #                 dpi=spec_eval_setup.rnd_info.style_config.dpi)
+
+
+    if features is not None:
+        colors = {'a+b,a': 'cyan', 'b,a': 'orange'}
+        print('hello')
+        for f in features:
+            a = f.term_contributions[0].states_parameters[0]['a']
+            b = f.term_contributions[0].states_parameters[0]['b']
+            res_type = f.term_contributions[0].res_motif.to_str()
+            color = colors.get(res_type, 'white')
+            A = f.location['A']
+            B = f.location['B']
+            amp = f.amplitude_coeff
+            ax.scatter(A, B, color=color, s=abs(amp)*200,
+                    alpha=1.0, edgecolors='white', linewidths=1.5, zorder=5)
+            ax.annotate(f"({a},{b})", (A, B),
+                        fontsize=7, color='white',
+                        xytext=(5, 5), textcoords='offset points',
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.5))
+        # resave with overlaid points
+        fig.savefig(filename.replace('.', '_sticks.'), bbox_inches='tight', 
+                    dpi=spec_eval_setup.rnd_info.style_config.dpi)
+        
     if do_diagn:
         return tuple([fig, ax, contour, cbar]), {'renderer': renderer}
     else:
