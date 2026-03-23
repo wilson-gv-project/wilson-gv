@@ -286,8 +286,8 @@ class EvaluationWorkflow:
                                                                   terms_for_motifs=self.artifacts.terms_for_motifs,
                                                                   term_coeffs_per_index=self.artifacts.coefficients,
                                                                   lineshape_parameter=gamma)
-                print('\nall_features step')
-                print(f' There are {len(self.artifacts.features)} features')
+                # print('\nall_features step')
+                # print(f' There are {len(self.artifacts.features)} features')
 
         except Exception as e:
             from wilson_suite.wilson_utils.serialization import pickle_this_to
@@ -326,8 +326,8 @@ class EvaluationWorkflow:
                                                                                  minimum_box_padding=
                                                                                  self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
                                                                                  )
-                print('\ndress_with_featboxes step')
-                print(f' There are {len(self.artifacts.features)} features')
+                # print('\ndress_with_featboxes step')
+                # print(f' There are {len(self.artifacts.features)} features')
                 # SpectralFeature.print_list_features(self.artifacts.features)
 
             if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
@@ -335,8 +335,8 @@ class EvaluationWorkflow:
                     self.artifacts.features = SpectralFeature.apply_magn_cond_filter(self.artifacts.features,
                                                                                     magn_conditions=self.inputs.spec_eval_setup.ev_info.exp_magn_conditions,
                                                                                     magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
-                    print('\nfilter_magn_conds step')
-                    print(f' There are {len(self.artifacts.features)} features')
+                    # print('\nfilter_magn_conds step')
+                    # print(f' There are {len(self.artifacts.features)} features')
                     # SpectralFeature.print_list_features(self.artifacts.features)
 
             with self.step("place_in_specwindow"):
@@ -354,7 +354,7 @@ class EvaluationWorkflow:
             ) from e
     
 
-    def run(self):
+    def run(self, custom_grid=None):
         """
         Run evaluation, return dict with axes and results grid
         """
@@ -540,10 +540,9 @@ def evaluate_region(region: "GridRegion",
                     verbose: bool = False) -> np.ndarray:
     """Evaluate all features in a single grid region."""
     # Initialize result array
-    result = np.zeros_like(
-        next(iter(region.coords.values())), 
-        dtype=complex
-    )
+    target_shape = np.broadcast(*(arr for arr in region.coords.values())).shape
+    # result = np.zeros_like(next(iter(region.coords.values())), dtype=complex)
+    result = np.zeros(target_shape, dtype=complex)
     
     # Sum contributions from all features
     for feature in region.features:
@@ -570,10 +569,10 @@ def evaluate_feature(feature: 'SpectralFeature',
         logger.info(f"    Compiled into {len(compiled_groups)} term groups")
     
     # Sum all compiled groups
-    feature_sum = np.zeros_like(
-        next(iter(coords.values())),
-        dtype=complex
-    )
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    # feature_sum = np.zeros_like(next(iter(coords.values())), dtype=complex)
+    feature_sum = np.zeros(target_shape, dtype=complex)
+
     
     for group in compiled_groups:
         feature_sum += evaluate_compiled_group(group, coords, gamma)
@@ -595,7 +594,9 @@ def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
     Returns:
         Complex array with resonance contributions
     """
-    total = np.ones_like(next(iter(coords.values())), dtype=complex)
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    total = np.ones(target_shape, dtype=complex)
+    # total = np.ones_like(next(iter(coords.values())), dtype=complex)
     
     for res_cond in motif.res_conds:
         # Calculate photon frequency: sum over axes
@@ -603,6 +604,7 @@ def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
                     for ax in res_cond.pf_dict)
         # Resonance denominator
         z = res_cond.vib_energy_diff - pfreq - 1j * gamma
+        # print(z)
         total *= 1.0 / z
         
     return total
@@ -611,10 +613,12 @@ def evaluate_compiled_group(group: 'CompiledTermGroup',
                             coords: Dict[str, np.ndarray],
                             gamma: float) -> np.ndarray:
     """Sum all resonance motifs in a compiled group."""
-    result = np.zeros_like(next(iter(coords.values())), dtype=complex)
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    result = np.zeros(target_shape, dtype=complex)
+    # result = np.zeros_like(next(iter(coords.values())), dtype=complex)
     
     for motif in group.resonance_motifs:
         result += evaluate_resonance_motif(motif, coords, gamma)
-        
+    # print('evaluate_compiled_group', result)
     return result
 
