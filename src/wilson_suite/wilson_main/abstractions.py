@@ -251,6 +251,11 @@ class VibState:
 			return NotImplemented
 		return self.state_label < other.state_label
 	
+	@classmethod
+	def get_1q_states(cls, states: list['VibState']):
+		return [s for s in states if len(s.state_label.split(','))==1]
+
+
 # FIXMEs: Improved handling of mode exclusion; possibly methods changes
 @dataclass
 class VibAnaSetup:
