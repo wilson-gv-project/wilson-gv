@@ -55,6 +55,7 @@ class PlotConfig:
     show_right_ticks: bool = False
     x_tick_rotation: float = 45  # Add this line for configurable rotation
     colormap_spacing: str = "log"  # Options: "log", "linear"
+    axes_limits: dict = None
 
     def __post_init__(self):
         if not isinstance(self.figsize, tuple):

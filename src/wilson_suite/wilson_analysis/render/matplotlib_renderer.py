@@ -258,6 +258,10 @@ class MatplotlibRenderer(SpectrumRenderer):
         # Get the main axis position (where the actual plot is)
         ax_pos = ax.get_position()
 
+        if self.rnd_info.style_config.axes_limits is not None:
+            ax.set_xlim(*self.rnd_info.style_config.axes_limits['x'])
+            ax.set_ylim(*self.rnd_info.style_config.axes_limits['y'])
+
         # Example: shrink or stretch colorbar to match ax height
         cbar_pos = cbar.ax.get_position()
         cbar.ax.set_position([
