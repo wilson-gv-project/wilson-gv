@@ -281,7 +281,7 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        return hash((self.term_contributions[0].term_ids, self.term_contributions[0].states_parameters))
+        return hash((self.term_contributions[0].res_motif, self.term_contributions[0].states_parameters))
         # return hash(self.location)
 
     def __eq__(self, other) -> bool:
