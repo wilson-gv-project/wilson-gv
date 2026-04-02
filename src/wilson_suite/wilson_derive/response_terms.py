@@ -52,6 +52,8 @@ class VibPerturbedTerm:
         # to have info about the term in it
         self.anharmonicity = None
 
+        self.note = None
+
     def __repr__(self):
         return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
@@ -408,6 +410,27 @@ class VibPerturbedTerm:
             ],
             "was_sorted": self.was_sorted
         }
+
+    
+    def to_str(self, nm_inds_for_sort=None):
+        """
+        Make a string identifyer - insteead of hash()
+
+        """
+        if not self.was_sorted:
+            self.sort(nm_inds_for_sort)
+
+        coeff = f'{self.coeff.numerator}/{self.coeff.denominator}'
+        
+        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+        props = [f'{prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)}_({','.join(prop.inds)})' for prop in self.props]
+
+        freqterms = [f"<{ft.sl.q},{ft.sr.q}>" for ft in self.freqterms]
+
+        res = [f'(<{r.diff.sl.q}{r.diff.sr.q}> - {r.pf} -iG)' for r in self.res]
+
+        return coeff + ' * ' + ' * '.join(props) + ' / ' + ' / '.join(freqterms) + ' / ' + ' / '.join(res)
+
 
     @classmethod
     def from_dict(cls, data: dict) -> 'VibPerturbedTerm':

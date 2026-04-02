@@ -267,6 +267,7 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
+    term_contrib_by_id: dict = None
     lineshape_parameter: float = None # will be by this time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
@@ -280,8 +281,8 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        # return hash((self.location, self.term_contributions))
-        return hash(self.location)
+        return hash((self.term_contributions[0].term_ids, self.term_contributions[0].states_parameters))
+        # return hash(self.location)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SpectralFeature):
@@ -289,6 +290,63 @@ class SpectralFeature:
         return (self.location == other.location 
                 and self.lineshape_parameter == other.lineshape_parameter 
                 and self.term_contributions == other.term_contributions)
+
+    def __lt__(self, other: 'SpectralFeature') -> bool:
+        if not isinstance(other, SpectralFeature):
+            return NotImplemented
+        return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
+
+    @classmethod
+    def sort_by_params(cls, features: list['SpectralFeature']):
+        params_lens = [len(i.term_contributions) for i in features]
+        assert len(params_lens) == sum(params_lens)
+
+        return sorted(
+                features, 
+                key=lambda f: f.term_contributions[0]
+            )
+
+    @classmethod
+    def sort_by_el_or_mech(cls, features: list['SpectralFeature']):
+        """
+        unfinished
+        """
+        raise NotImplementedError()
+        sorted_dict = {}
+        for f in features:
+            terms = f.term_contrib_by_id
+        return sorted_dict
+
+    @classmethod
+    def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float = None):
+        """
+        returns a new list
+
+        external_max - can take external input for max , instead of finding max of the given list
+        """
+        if external_max is None:
+            max_feat_coeff = cls.get_max_intensity_feat(features, intensity_expr=None).amplitude_coeff
+        else:
+            max_feat_coeff = external_max
+
+        return_feats = copy.deepcopy(features)
+
+        for f in return_feats:
+            f.amplitude_coeff = f.amplitude_coeff/abs(max_feat_coeff)
+        return return_feats
+
+    @classmethod
+    def get_feats_with_params(cls, features: list['SpectralFeature'], params: dict):
+        """
+        e.g.:
+            params = {'a': 0, 'b': 1}
+        """
+        from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet
+        res = []
+        for f in features:
+            if ParameterSet(params) in f.term_contributions[0].states_parameters:
+                res.append(f)
+        return res
 
     # UNUSED
     @classmethod
@@ -371,13 +429,21 @@ class SpectralFeature:
         amplitude of a feature is given by: amplitude_coeff / lineshape_parameter**2
         """
         result = None
-        intensity_result = 0
+        num_result = 0
 
         for feat in features:
             
-            if feat.get_intensity(intensity_expr) > intensity_result:
-                result = feat
-                intensity_result = feat.get_intensity(intensity_expr)
+            if intensity_expr is not None:
+
+                if feat.get_intensity(intensity_expr) > num_result:
+                    result = feat
+                    num_result = feat.get_intensity(intensity_expr)
+            
+            else:
+
+                if abs(feat.amplitude_coeff) > num_result:
+                    result = feat
+                    num_result = abs(feat.amplitude_coeff)
         
         return result
 
@@ -553,6 +619,7 @@ class SpectralFeature:
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
             print('term_contributions', feat.term_contributions)
+            print('term_contrib_by_id', feat.term_contrib_by_id)
 
 @dataclass
 class SpectralWindow:

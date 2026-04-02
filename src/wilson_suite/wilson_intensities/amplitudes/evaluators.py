@@ -110,6 +110,8 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
                   precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
     """
     Evaluate coefficients for all terms.
+
+    terms to dict with (params to coeff)
     """
     term_coeffs_per_index = {}
     for vibterm in derived_terms:
@@ -165,8 +167,8 @@ def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
 def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]],
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
-                                                     dict[ParameterSet, float]]=None,
-                         lineshape_parameter: float=None) -> list[SpectralFeature]:
+                                                     dict[ParameterSet, tuple[float, dict]]]=None,
+                         lineshape_parameter: float=None) -> tuple[list[SpectralFeature], list[SpectralFeature]]:
     """
 
     lineshape_parameter - uniform lineshape parameters (for all axes) for each feature for now
@@ -175,6 +177,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
     # a SpectralFeature instanse holds a res_location and list of states parameters that give this res_location; 
     #       the amplitude coefficient is a value in the dict
     features_to_draw: list[SpectralFeature] = []
+    zero_coeff_feats: list[SpectralFeature] = []
 
     for res_motif in motif_res_loc:
 
@@ -183,25 +186,30 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
             term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
                                         states_parameters=lst_params,
-                                        term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
+                                        term_ids=tuple([t.to_str() for t in terms_for_motifs[res_motif]]) )])
 
             if term_coeffs_per_index is not None:
-                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)][0] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                dict_of_contribs = {term.to_str(): term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts}
                 amplitude_coeff = sum(list_to_sum)
             else:
                 amplitude_coeff = None
             
             # disregard locations where coefficient is zero
+            spec_feature = SpectralFeature(location=res_geo_obj, 
+                                        term_contributions=term_contributions,
+                                        term_contrib_by_id = dict_of_contribs,
+                                        lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
+                                        amplitude_coeff=amplitude_coeff)
             if amplitude_coeff != 0.:
-                spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=term_contributions,
-                                            lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
-                                            amplitude_coeff=amplitude_coeff)
+
                 if spec_feature not in features_to_draw:
                     features_to_draw.append(spec_feature)
                 else:
                     new_specfeat = spec_feature.union(features_to_draw[res_geo_obj][1])
                     features_to_draw.append(new_specfeat)
+            else:
+                zero_coeff_feats.append(spec_feature)
 
-    return features_to_draw
+    return features_to_draw, zero_coeff_feats
 
