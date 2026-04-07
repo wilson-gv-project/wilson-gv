@@ -75,6 +75,39 @@ class EvaluationInputs:
     vib_ana_setup: 'VibAnaSetup'
     pulse_polarization_vector: tuple[float, float, float]
 
+@dataclass(frozen=True)
+class EvaluationInputsExtended:
+    """
+        # .ev_info.Gamma, .ev_info.Gamma_unit, 
+		# .ev_info.dynamic_range, .ev_info.box_range_safety_margin, 
+		# .ev_info.scale_wrt_max_intensity, .ev_info.minimum_box_padding, 
+		# .ev_info.exp_magn_conditions, .ev_info.magn_conditions_margin, 
+		# .ev_info.spectral_window, .ev_info.grid_resolution, 
+		# vib_ana_setup.states, vib_ana_setup.include_list,
+		# vib_ana_setup.number_of_modes, vib_ana_setup.nc_sqrt_eigval
+		# experiment.polarization_avg_vector
+		# system.Nnmodes
+    """
+    terms: Any
+    number_of_modes: int
+    props: list["MolecularProperty"]
+    Gamma: float
+    Gamma_unit: str
+    dynamic_range: int
+    box_range_safety_margin: float
+    scale_wrt_max_intensity: bool
+    minimum_box_padding: float
+    exp_magn_conditions: bool
+    magn_conditions_margin: float
+    spectral_window: None
+    grid_resolution: None
+    states: list
+    include_list: list
+    number_of_modes: int
+    nc_sqrt_eigval: dict
+    pulse_polarization_vector: tuple[float, float, float]
+
+
 @dataclass
 class EvaluationArtifacts:
     terms: list = None
