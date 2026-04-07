@@ -103,7 +103,8 @@ def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_ax
 
 # FIXME: Currently translating only for resonance conditions: If later using non-static pol props, then may
 # need extra handling for UV parts of that? Not sure
-def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis_set: SpectralAxisSet) -> list[VibPerturbedTerm]:
+def translate_terms_to_axis_variables(terms: dict[int, dict[tuple, VibPerturbedTerm]], 
+                                      chosen_axis_set: SpectralAxisSet) -> dict[int, dict[tuple, VibPerturbedTerm]]:
     """
     Translate terms represented in terms of pulse IDs to be represented in terms of chosen axes
 

@@ -210,7 +210,7 @@ def find_props(terms, freqs: str='static') -> list[MolecularProperty]:
 	return props
 
 
-def find_max_state_lvl(terms: list[VibPerturbedTerm]) -> int:
+def find_max_state_lvl(terms: dict[int, dict[tuple, VibPerturbedTerm]]) -> int:
 
 	for i in terms:
 
