@@ -188,7 +188,10 @@ class VibDiffTerm:
         elif isinstance(self.sl, HarmOscStateSymbolic):
             bra = self.sl.q
             ket = self.sr.q
-
+        
+        # to distinguish harmonic factors from other vibdiff denominators
+        if (ket is None or ket == []) and not self.is_pert_wf_diff:
+            return f"{'+'.join(bra)}"
         return ','.join([f"{'+'.join(bra)}",f"{'+'.join(ket)}"])
 
     def present(self):
