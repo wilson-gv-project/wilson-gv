@@ -25,6 +25,29 @@ Wilson Suite is a Python package for computing response functions for vibrationa
 
 ## Quick start
 
+### Derived EVV terms
+
+```python
+import wilson_suite as ws
+from wilson_suite.fixtures import evv_experiment
+
+EVV_EXPERIMENT = evv_experiment()
+DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
+```
+
+### Independent variables and possible axes choices
+
+```python
+
+```
+
+### What data is needed for evaluation
+
+```python
+
+```
+
+
 
 ## Documentation
 
