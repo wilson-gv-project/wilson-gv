@@ -22,6 +22,18 @@ Wilson Suite is a Python package for computing response functions for vibrationa
 
 ## Installation
 
+### From source
+1. Get source code
+2. Prepare the environment
+3. Install
+
+```
+git clone git@github.com:wilson-gv-project/wilson-suite-mono.git
+cd wilson-suite-mono
+<make env>
+pip install .
+```
+
 
 ## Quick start
 
