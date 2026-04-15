@@ -23,9 +23,10 @@ Wilson Suite is a Python package for computing response functions for vibrationa
 ## Installation
 
 
+## Quick start
+
 
 ## Documentation
 
 readthedocs.io?
 
-## Contributors
