@@ -66,24 +66,12 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
                               do_diagn=do_diagn)
     fig, ax, contour, cbar = renderer.render(filename)
 
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    textstr = f'max(intensity) {np.max(np.abs(spec_data)**2):.3e}'
+    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
     
-    # # overlay contribution points if provided
-    # if df_contributions is not None:
-    #     colors = {'a+b,a': 'cyan', 'b,a': 'orange'}
-    #     for _, row in df_contributions.iterrows():
-    #         color = colors.get(row['res_type'], 'white')
-    #         ax.scatter(row[f'A_{lvl_theory}'], row[f'B_{lvl_theory}'],
-    #                    color=color, s=abs(row[f'amp_{lvl_theory}'])*200,
-    #                    alpha=1.0, edgecolors='white', linewidths=1.5, zorder=5)
-    #         ax.annotate(f"({int(row['mode_a'])},{int(row['mode_b'])})",
-    #                     (row[f'A_{lvl_theory}'], row[f'B_{lvl_theory}']),
-    #                     fontsize=7, color='white',
-    #                     xytext=(5, 5), textcoords='offset points',
-    #                     bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.5))
-    #     # resave with overlaid points
-    #     fig.savefig(filename.replace('.', '_sticks.'), bbox_inches='tight', 
-    #                 dpi=spec_eval_setup.rnd_info.style_config.dpi)
-
+    renderer.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
 
     if features is not None:
         colors = {'a+b,a': 'cyan', 'b,a': 'orange'}
@@ -102,6 +90,7 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
                         fontsize=7, color='white',
                         xytext=(5, 5), textcoords='offset points',
                         bbox=dict(boxstyle='round,pad=0.2', facecolor='black', alpha=0.5))
+
         # resave with overlaid points
         fig.savefig(filename.replace('.', '_sticks.'), bbox_inches='tight', 
                     dpi=spec_eval_setup.rnd_info.style_config.dpi)
