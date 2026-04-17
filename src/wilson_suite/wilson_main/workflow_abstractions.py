@@ -390,7 +390,7 @@ class WilsonSimulation:
 			raise ValueError(f"unknown where flag: {where}")
 
 
-	def evaluate(self, save_evalinputs_pkl: str = None):
+	def evaluate(self, save_evalinputs_pkl: str = None, verbose: bool = False):
 		"""
 		Evaluating method, using EvaluationWorkflow
 		"""
@@ -411,7 +411,7 @@ class WilsonSimulation:
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
-		wf_result = workflow.run()
+		wf_result = workflow.run(verbose=verbose)
 
 		if self.diagn is None:
 			self.diagn = {}

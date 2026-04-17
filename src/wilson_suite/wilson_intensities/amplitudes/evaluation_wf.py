@@ -387,7 +387,7 @@ class EvaluationWorkflow:
             ) from e
     
 
-    def run(self, custom_grid=None):
+    def run(self, custom_grid=None, verbose=False):
         """
         Run evaluation, return dict with axes and results grid
         """
@@ -443,7 +443,8 @@ class EvaluationWorkflow:
                                                                   lineshape_parameter=gamma)
                 print('\nall_features step')
                 print(f' There are {len(self.artifacts.features)} features')
-                SpectralFeature.print_list_features(self.artifacts.features)
+                if verbose:
+                    SpectralFeature.print_list_features(self.artifacts.features)
 
 
             with self.step("dress_with_featboxes"):
@@ -462,7 +463,8 @@ class EvaluationWorkflow:
                                                                                  )
                 print('\ndress_with_featboxes step')
                 print(f' There are {len(self.artifacts.features)} features')
-                SpectralFeature.print_list_features(self.artifacts.features)
+                if verbose:
+                    SpectralFeature.print_list_features(self.artifacts.features)
 
             if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
                 with self.step("filter_magn_conds"):
@@ -471,7 +473,8 @@ class EvaluationWorkflow:
                                                                                     magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
                     print('\nfilter_magn_conds step')
                     print(f' There are {len(self.artifacts.features)} features')
-                    SpectralFeature.print_list_features(self.artifacts.features)
+                    if verbose:
+                        SpectralFeature.print_list_features(self.artifacts.features)
 
             with self.step("place_in_specwindow"):
                 self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
