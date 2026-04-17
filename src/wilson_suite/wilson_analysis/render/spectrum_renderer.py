@@ -257,6 +257,7 @@ class SpectrumRenderer(ABC):
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+        self.normalize_to_reference_max(self.rnd_info.reference_max)
         self._validate_data_2d()
 
         # log10 = True if self.rnd_info.intensity_normalization_type is not None else False
@@ -279,7 +280,7 @@ class SpectrumRenderer(ABC):
         fig, ax, cbar = self.add_colorbar(plot_obj=(fig, ax, contour), levels=levels, labels=labels)
         
         self.finalize(plot_obj=(fig, ax, cbar))
-        self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
+        # self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
 
         return fig, ax, contour, cbar
 
