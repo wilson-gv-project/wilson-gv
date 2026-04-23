@@ -6,230 +6,470 @@
 5. get DataResults
 
 """
+import copy
+from pathlib import Path
 from typing import Any, Callable
-from dataclasses import dataclass, field, asdict, is_dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
 	from .spectrum_abstractions import SpecEvalSetup
-	from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationInputsExtended
+	from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer
+	from .abstractions import VibAnaSetup
 
 from .main_functions import find_props_and_max_state_lvl
-from .abstractions import (VibAnaSetup, MolecularProperty,
-						   MolecularSystem, DataOriginInfo)
-from ..wilson_derive.response_terms import VibPerturbedTerm
-from ..wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from .abstractions import MolPropsCollection
+from .abstractions import MolecularSystem, DataOriginInfo
+from ..wilson_derive.response_terms import VibPerturbedTerm, VibPertTermsCollection
 from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
-from wilson_suite.wilson_main.abstractions import VibState
-
+from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRendererGV
+from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
 import numpy as np
 
 import logging
-
-from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
-
 logger = logging.getLogger("wilson")
 
 
+@dataclass
+class SimulationSetup:
+    experiment: VibExperiment
+    system: MolecularSystem
+    terms: list[VibPerturbedTerm]
+    vib_ana: 'VibAnaSetup'
+    spec_eval: 'SpecEvalSetup'
+    axis_choice: SpectralAxisSet | None = None
+    eval_uniform: DataOriginInfo | None = None
+    eval_by_prop: dict[str, DataOriginInfo] | None = None
 
+# derived from setup + terms
+@dataclass
+class PropertyOrder:             
+    # props: list[MolecularProperty]
+    props_coll: MolPropsCollection
+    residual_vib_info: dict
+    max_state_lvl: int
 
-class ConfiguredSimulation:
-	"""
-	Class to hold up to a full set of information for a Wilson run and carry out operations related to the run
-	workflow.
-	"""
+@dataclass
+class SimulationResult:
+    spec: np.ndarray | None = None
+    grid: dict | None = None
+    rendering: Any = None
+    diagnostics: dict = field(default_factory=dict)
 
-	def __init__(self, 
-			  	 experiment: VibExperiment,
-				 terms: dict[int, dict[tuple, VibPerturbedTerm]],
-				 system: MolecularSystem,
-				 eval_setup: 'SpecEvalSetup',
-				 render_setup,
-				 ):
-		"""
-		experiment: VibExperiment instance: The experiment to which this simulation pertains
-		terms: list of VibPerturbedTerm instances: The terms (working expressions) to be evaluated over the spectral range in this simulation ---??? so the terms must follow the spectral range setting??
+class RunDirectory:
+	def __init__(self, base_dir: Path):
+		self.base_dir = base_dir
 
-		spec_eval_setup: SpecEvalSetup instance: Setup information for evaluation and rendering
-		system: MolecularSystem instance: The system under consideration in this simulation
+	def save_pickle(self, obj, name: str):
+		pass
 
-		import_from: string: File reference from which to import attributes of the present instance of this class
-
-		====
-
-        # .ev_info.Gamma, .ev_info.Gamma_unit, 
-		# .ev_info.dynamic_range, .ev_info.box_range_safety_margin, 
-		# .ev_info.scale_wrt_max_intensity, .ev_info.minimum_box_padding, 
-		# .ev_info.exp_magn_conditions, .ev_info.magn_conditions_margin, 
-		# .ev_info.spectral_window, .ev_info.grid_resolution, 
-		# vib_ana_setup.states, vib_ana_setup.include_list,
-		# vib_ana_setup.number_of_modes, vib_ana_setup.nc_sqrt_eigval
-		# experiment.polarization_avg_vector
-		# system.Nnmodes
-
-		spec_eval_setup = simulation.spec_eval_setup  
-        
-		# MR: Here assuming that spectral axes were set, so changed to use translated terms
-        terms = simulation.terms_in_axis_choice
-        number_of_modes = simulation.system.Nnmodes
-        props = simulation.props
-        vib_ana_setup = simulation.vib_ana_setup
-        pulse_polarization_vector = tuple(simulation.exp.polarization_avg_vector)
-		"""
-
-		self.experiment = experiment
-		self.terms = terms
-
-		self.system = system
-		
-		self.eval_setup = eval_setup
-		self.render_setup = render_setup
-
-
+	def save_json(self, obj, name: str):
+		pass
+	
 	@property
-	def terms_collection(self):
-		from wilson_suite.wilson_derive.response_terms import VibPertTermsCollection
-		return VibPertTermsCollection(self.terms, self.experiment)
-	
+	def figures(self) -> Path:
+		pass
 
-	def request_data(self) -> dict[str, None]:
-		"""
-		returns dictionary of trivial names and empty values, also max_st_lvl value 
-		"""
-		max_state_lvl, props = self.terms_collection.required_data()
-		req_data = {'max_state_lvl': max_state_lvl}
 
-		for p in props:
-			req_data[p.trivial_name] = None
-		
-		return req_data
+@dataclass(frozen=True)
+class SealedSetup:
+    """Phase A output, Phase B input. Immutable by construction."""
+    experiment: VibExperiment
+    system: MolecularSystem
+    terms_in_axes: VibPertTermsCollection # list[VibPerturbedTerm]
+    axis_choice: SpectralAxisSet
+    vib_ana: 'VibAnaSetup'
+    spec_eval: 'SpecEvalSetup'
+    prop_order: PropertyOrder
 
-	
-	def prep_eval_data(self, requested_data_in):
-		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationInputsExtended, EvaluationWorkflow
-		# prepare data for input to EvaluationWorkflow
-		# eval_inputs = make_evaluation_inputs(simulation=self)
-		
-		return EvaluationInputsExtended(
-										terms=self.terms, # terms_in_axis_choice
-										number_of_modes=self.system.Nnmodes,
-										props=requested_data_in['props'],
-										Gamma=self.eval_setup.Gamma,
-										Gamma_unit=self.eval_setup.Gamma_unit,
-										dynamic_range=self.render_setup.dynamic_range,
-										box_range_safety_margin=self.eval_setup.box_range_safety_margin,
-										scale_wrt_max_intensity=self.eval_setup.scale_wrt_max_intensity,
-										minimum_box_padding=self.eval_setup.minimum_box_padding,
-										exp_magn_conditions=self.eval_setup.exp_magn_conditions,
-										magn_conditions_margin=self.eval_setup.magn_conditions_margin,
-										spectral_window=self.eval_setup.spectral_window,
-										grid_resolution=self.eval_setup.grid_resolution,
-										states=requested_data_in['states'],
-										include_list=self.eval_setup.include_list,
-										nc_sqrt_eigval=requested_data_in['nc_sqrt_eigval'],
-										pulse_polarization_vector=tuple(self.experiment.polarization_avg_vector),
-										)
-
-	def evaluate(self, eval_inputs: 'EvaluationInputsExtended'):
-		"""
-		returning evaluation results object for further analysis or rendering
-		"""
-		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
-		# prepare data for input to EvaluationWorkflow
-		
-		workflow = EvaluationWorkflow(inputs=eval_inputs)
-		self._workflow = workflow
-		wf_result = workflow.run()
-
-		# TODO: this is a temporary fix? can be organized better?
-		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
-		self.spec = wf_result['result']
-
-		return EvaluatedResult()
+    @property
+    def is_dressed(self) -> bool:
+        return self.prop_order.is_dressed
 
 
 class SimulationBuilder:
 	"""
-	sim = (
-    SimulationBuilder(EVV_EXPERIMENT)
-    .with_terms(DERIVED_EVV_TERMS)
-    .with_system(molecular_system)
-    .with_eval_setup(calc_setup)
-    .with_render_setup(render_setup)
-    .build()
-	)
+	Part 1 - prepare setup and configs.
 
-	# only now does execution begin
-	data = sim.request_data()
-	results = sim.evaluate(data)
-	results.render()
-	
+	The builder takes ownership of all inputs via deep copy. 
+	Modifications to the caller's objects after setting will not affect the builder.
+
+	experiment - defines derived terms and possible axes choices
+
+
 	"""
-	def __init__(self, experiment: VibExperiment):
-		self._experiment = experiment
-		self._terms = None
-		self._system = None
-		self._eval_setup = None
-		self._render_setup = None
+	def __init__(self, 
+			  		experiment: VibExperiment = None, 
+					system: MolecularSystem = None,
+					vib_ana: 'VibAnaSetup' = None,
+					spec_eval: 'SpecEvalSetup' = None,
+					eval_uniform: DataOriginInfo = None,
+					eval_by_prop: dict[str, DataOriginInfo] = None):
+		
+		self._experiment = copy.deepcopy(experiment)
 
-	def with_terms(self, terms):
-		self._terms = terms
-		return self  # enables chaining
+		self._explicit_axes = None
+		self._terms_dct = None
 
-	def with_system(self, system):
-		self._system = system
-		return self
+		self._explicit_terms: dict | None = None   # user-supplied via set_terms
+		self._cached_derived_terms: dict | None = None   # cache of self._experiment.derive_terms()
 
-	def with_eval_setup(self, setup):
-		self._eval_setup = setup
-		return self
+		self._system = copy.deepcopy(system)
+		self._vib_ana = copy.deepcopy(vib_ana)
+		self._spec_eval = copy.deepcopy(spec_eval)
+		self._eval_uniform = copy.deepcopy(eval_uniform)
+		self._eval_by_prop = copy.deepcopy(eval_by_prop)
 
-	def with_render_setup(self, setup):
-		self._render_setup = setup
-		return self
+		self._prop_order: PropertyOrder | None = None
+		self._dressed: bool = False
 
-	def build(self) -> ConfiguredSimulation:
-		# validation happens here, once, before anything executes
-		if self._terms is None:
-			raise ValueError("terms required")
-		if self._system is None:
-			raise ValueError("system required")
-		if self._eval_setup is None:
-			raise ValueError("eval setup required")
+	@property
+	def terms(self) -> dict:
+		if self._explicit_terms is not None:
+			return self._explicit_terms
+		if self._cached_derived_terms is None:
+			if self._experiment is None:
+				raise RuntimeError(
+					"Terms not set and no experiment to derive from. "
+					"Provide terms directly via set_terms() or set an experiment."
+				)
+			self._cached_derived_terms = self._experiment.derive_terms()
+		return self._cached_derived_terms
 
-		return ConfiguredSimulation(
-			experiment=self._experiment,
-			terms=self._terms,
-			system=self._system,
-			eval_setup=self._eval_setup,
-			render_setup=self._render_setup,
+	@property
+	def prop_order(self) -> PropertyOrder:
+		"""
+		Resolved property order. Cached after first access.
+		freqs='static' only now
+		"""
+		if self._prop_order is None:
+			self._require('_vib_ana')
+			props, resid, max_lvl = find_props_and_max_state_lvl(
+				self.terms, self._vib_ana, freqs='static'
+			)
+			self._prop_order = PropertyOrder(
+				props_coll=MolPropsCollection(props), 
+				residual_vib_info=resid, 
+				max_state_lvl=max_lvl
+			)
+		return self._prop_order
+
+	@property
+	def axis_choice(self) -> SpectralAxisSet:
+		"""Resolved axis choice: explicit > spec_eval.ev_info > experiment.canonical_axes."""
+		if self._explicit_axes is not None:
+			return self._explicit_axes
+		if self._spec_eval and self._spec_eval.ev_info.spectral_axes is not None:
+			return self._spec_eval.ev_info.spectral_axes
+		if self._experiment is not None:
+			return self._experiment.canonical_axes
+		raise RuntimeError("No axis_choice set and no defaults available")
+
+	# --- setters ---
+	def set_experiment(self, experiment: VibExperiment): 
+		"""
+		Setting an experiment will remove terms, prop_order if previously set, 
+		also _explicit_axes choice could not be appropriate for new experiment
+		"""
+		self._experiment = copy.deepcopy(experiment)
+
+		self._explicit_axes = None
+		self._terms_dct = None
+		self._prop_order = None
+		self._dressed = False
+
+	def set_system(self, system: MolecularSystem):
+		# FIXME - how cheap is it to copy MolecularSystem
+		# FIXME - upd so system initiates with natoms and linear or not - for Nnmodes
+		self._system = copy.deepcopy(system)
+
+	def set_terms(self, terms: dict[int, dict[tuple, VibPerturbedTerm]]):
+		self._explicit_terms = copy.deepcopy(terms)
+
+	def set_axis_choice(self, axes: SpectralAxisSet):
+		"""
+		updated axes choice for builder but not in spec eval
+		"""
+		# TODO: validate axes against experiment - as what are possible axes
+		self._explicit_axes = copy.deepcopy(axes)
+
+	def set_vib_ana(self, vib_ana: 'VibAnaSetup'):
+		"""
+		making a copy of va.
+
+		Setting a VibAnaSetup will remove prop_order if previously set
+		"""
+		# FIXME - how cheap is it to copy VibAnaSetup
+		self._vib_ana = copy.deepcopy(vib_ana)
+
+		self._prop_order = None
+		self._dressed = False
+
+	def set_spec_eval(self, spec_eval: 'SpecEvalSetup'):
+		"""
+		making a copy of se
+		"""
+		self._spec_eval = copy.deepcopy(spec_eval)
+
+	def set_eval_uniform(self, origin: DataOriginInfo): 
+		"""
+		self will be set as undressed, assuming this is a new DataOriginInfo
+		"""
+		self._eval_uniform = copy.deepcopy(origin)
+		self._dressed = False
+
+	def set_eval_by_prop(self, mapping: dict[str, DataOriginInfo]):
+		"""
+		self will be set as undressed, assuming this is a new DataOriginInfo mapping
+		"""
+		self._eval_by_prop = copy.deepcopy(mapping)
+		self._dressed = False
+
+
+	@property
+	def _terms_collection(self) -> VibPertTermsCollection:
+		"""Fresh wrapper around _terms_dct; built on each access."""
+		return VibPertTermsCollection(
+			term_dict=self.terms, experiment=self._experiment
 		)
+
+	def _dress_residual(self, uniform, by_name):
+		for key in self.prop_order.residual_vib_info:
+			if by_name and key in by_name:
+				self.prop_order.residual_vib_info[key] = by_name[key]
+			elif uniform is not None:
+				self.prop_order.residual_vib_info[key] = uniform
+			else:
+				raise ValueError(f"No setup for residual vib info item {key!r}")
 	
-	def build_from(self):
-		raise NotImplementedError('cannot build from files yet')
+	def _dress_props(self, uniform, by_name):
+		self.prop_order.props_coll.dress(
+			uniform=uniform, 
+			by_name=by_name
+		)
+
+	def dress_prop_order(self):
+		"""
+		TODO: check this
+		"""
+		if self._eval_uniform is None and self._eval_by_prop is None:
+			raise RuntimeError("Provide eval_uniform or eval_by_prop first.")
+
+		self._dress_props(
+			uniform=self._eval_uniform, 
+			by_name=self._eval_by_prop
+		)
+
+		self._dress_residual(
+			uniform=self._eval_uniform, 
+			by_name=self._eval_by_prop
+		)
+		
+		self._dressed = True
+
+	def fill_defaults(self):
+		"""Explicit soft defaults. Call before seal()"""
+		# TODO: spectral window, resolution, damping defaults go here
+		pass
 
 
-@dataclass(frozen=True)
+	@property
+	def missing(self) -> list[str]:
+		required = ['_experiment', '_system',
+					'_vib_ana', '_spec_eval']
+		return [name[1:] for name in required if getattr(self, name) is None]
+
+	def _build_sealed(self):
+
+		axes = self.axis_choice
+		
+		experiment=copy.deepcopy(self._experiment)
+    	
+		magn_conditions_translated = None
+		if experiment is not None and experiment.magn_conditions is not None:
+			magn_conditions_translated = translate_magn_conditions_to_axisvars(
+				experiment.magn_conditions, axes
+			)
+		terms_in_axes = self._terms_collection.translate_to_ax_choice(axes, magn_conditions_translated)
+		
+		return SealedSetup(
+			experiment=experiment,
+			system=copy.deepcopy(self._system),
+			terms_in_axes=terms_in_axes,
+			axis_choice=copy.deepcopy(axes),
+			vib_ana=copy.deepcopy(self._vib_ana),
+			spec_eval=copy.deepcopy(self._spec_eval),
+			prop_order=copy.deepcopy(self.prop_order),
+		)
+
+	def seal(self) -> SealedSetup:
+		"""
+		returns full setup ready to be passed to evaluation step.
+		"""
+		if self.missing:
+			raise RuntimeError(f"Cannot seal: missing {self.missing}")		
+		
+		if not self._dressed:
+			raise RuntimeError("Cannot seal: call dress_prop_order() first")
+		
+		return self._build_sealed()
+
+	@property
+	def missing_for_dry_run(self) -> list[str]:
+		"""What's needed to produce a dry-run seal."""
+		required = ['_experiment', '_vib_ana']  # subset
+		return [n[1:] for n in required if getattr(self, n) is None]
+
+	def seal_dry_run(self) -> SealedSetup:
+		"""Seal without dressing properties — useful for inspecting the shopping list
+		before committing to calc setups. The resulting SealedSetup has is_dressed=False
+		and cannot be executed by SimulationRun."""
+		if self.missing_for_dry_run:
+			raise RuntimeError(f"Cannot dry-run seal: missing {self.missing_for_dry_run}")
+		
+		return self._build_sealed()
+
+
+	def _require(self, *attrs):
+		absent = [a for a in attrs if getattr(self, a) is None]
+		if absent:
+			raise RuntimeError(f"Need to set: {absent}")
+
+
+@dataclass
 class EvaluatedResult:
-	spec: np.ndarray
-	grid: dict
-	spec_eval_setup: SpecEvalSetup
+    spec: np.ndarray
+    grid: dict
+    artifacts: dict
 
-	def render_spectrum(self, do_diagn: bool = False):
-		from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 
-		filename = self.spec_eval_setup.rnd_info.filename
-		backend = self.spec_eval_setup.rnd_info.backend
+def default_renderer_factory(result: EvaluatedResult, 
+							 sealed: SealedSetup) -> 'SpectrumRenderer':
+	"""Default renderer: matplotlib, using whatever rnd_info the sealed setup specifies."""
+    
+	pass
+	backend = sealed.spec_eval.rnd_info.backend
+	if backend == 'matplotlib':
+		return MatplotlibRendererGV(result, sealed)
+	else:
+		raise NotImplementedError(f"Backend {backend!r} not supported")
 
-		if backend == 'matplotlib':
-			renderer_class=MatplotlibRenderer
-		else:
-			raise NotImplementedError('Only matplotlib backend is currently supported')
 
-		renderer = renderer_class(spec_data=self.spec, 
-							spec_grid=self.spec_eval_setup.grid,
-							ev_info=self.spec_eval_setup.ev_info, 
-							rnd_info=self.spec_eval_setup.rnd_info,
-							do_diagn=do_diagn)
-		fig, ax, contour, cbar = renderer.render(filename)
+def default_evaluator(sealed: SealedSetup, run_dir: RunDirectory,
+			 save_evalinputs_pkl: str = None, verbose: bool = False) -> EvaluatedResult:
+	"""
+	Evaluating method, using EvaluationWorkflow
+	"""
+	from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow_NEW
+	
+	# save EvaluationInputs data optionally to a pickle file
+	if save_evalinputs_pkl is not None:
+		
+		from wilson_suite.wilson_utils.serialization import pickle_this_to
+		pickle_this_to(sealed, filenamepkl='EvaluationInputs.pkl', save_to=run_dir)
+	
+	# sealed.spec_eval doesn't need to have rnd_info
+	workflow = EvaluationWorkflow_NEW(setup_inputs=sealed)
+	wf_result = workflow.run(verbose=verbose)
+	
+	result = EvaluatedResult(spec=wf_result['result'], 
+						  	 grid={k:v for k,v in wf_result.items() if k!='result'},
+							 artifacts=workflow.artifacts)
+	return result
+
+class SimulationRun:
+	"""Phase B: execute a sealed setup."""
+	def __init__(self, 
+					sealed: SealedSetup, 
+					obtainer: Callable = wilson_data_obtainer, 
+					evaluator: Callable = default_evaluator,
+					renderer_factory: Callable = default_renderer_factory, 
+					run_dir: RunDirectory | None = None):
+		"""
+		obtainer=wilson_data_obtainer -- dafault obtainer function
+		renderer_factory=default_renderer_factory, 
+
+		"""
+		self._sealed = sealed
+		self._obtainer = obtainer
+		self._evaluator = evaluator
+		self._renderer_factory = renderer_factory
+		self._run_dir = run_dir
+		self._result: EvaluatedResult | None = None
+
+		self._data_filled = False
+	
+
+	def _build_request_dict(self) -> dict:
+	
+		req = self._sealed.prop_order.props_coll.build_request_dict()
+		req.update(self._sealed.prop_order.residual_vib_info)
+		return req
+
+	def _fill_results(self, data_dict: dict):
+		"""
+		loading data into self.props (and optionally to self.vib_ana_setup)
+		
+		data_dict: dict - {data_name: values}
+
+		"""
+		from .main_functions import fill_residual_vib_info_results
+		self._sealed.prop_order.props_coll.fill_from(data_dict)
+		fill_residual_vib_info_results(self._sealed.vib_ana, self._sealed.prop_order.residual_vib_info, data_dict)
+
+	def obtain_data(self, exclude_modes: tuple = tuple()):
+		"""Request data via obtainer, fill into prop_order."""
+		request = self._build_request_dict() 
+		data_dict = self._obtainer(request)
+		self._fill_results(data_dict)
+
+		if exclude_modes:
+			self._sealed.vib_ana.exclude_modes = exclude_modes
+		self._sealed.vib_ana.set_include_modes_list()
+
+		self._data_filled = True
+
+	def evaluate(self):
+		if not self._data_filled:
+			raise RuntimeError("Data not obtained yet. Call obtain_data() first.")
+		self._result = self._evaluator(self._sealed, self._run_dir)
+
+
+	def get_renderer(self):
+		"""For interactive use: get a renderer object and call its methods directly."""
+		if self._result is None:
+			raise RuntimeError("No result to render. Call evaluate() or run() first.")
+		return self._renderer_factory(self._result, self._sealed)
+
+	def render(self, mode='contour', **kwargs):
+		renderer = self.get_renderer()
+		if not hasattr(renderer, mode):
+			available = [m for m in dir(renderer) if not m.startswith('_')]
+			raise ValueError(f"Unknown render mode {mode!r}. Available: {available}")
+		return getattr(renderer, mode)(**kwargs)
+
+	@property
+	def result(self) -> EvaluatedResult:
+		"""
+		exposing result without possibility to write directly
+		"""
+		if self._result is None:
+			raise RuntimeError("No result yet. Call evaluate() or run() first.")
+		return self._result
+
+	def execute(self) -> EvaluatedResult:
+		if not self.is_data_filled:
+			self.obtain_data()
+		self.evaluate()
+		return self._result
+
+	@property
+	def is_data_filled(self) -> bool:
+		return self._data_filled
+
+	@property
+	def has_result(self) -> bool:
+		return self._result is not None
 

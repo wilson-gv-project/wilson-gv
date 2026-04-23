@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
     from wilson_suite.wilson_main.abstractions import MolecularProperty
+    from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
 
 class VibPerturbedTerm:
     """
@@ -625,21 +626,23 @@ class VibContribTerm:
 @dataclass
 class VibPertTermsCollection:
     """
-    term_dict -- as orriginally derived terms - from ws.derive.derive.get_fully_enhanced_terms()
+    term_dict -- as orriginally derived terms - from ws.derive.derive.get_fully_enhanced_terms() or a list already
     experiment -- provenance of these terms
     axes_choice -- tracking if translated to axes choice, and which ones
     """
     term_dict: dict[int, dict[tuple, VibPerturbedTerm]]
     experiment: 'VibExperiment'
-    axes_choice = None
-
+    axes_choice: 'SpectralAxisSet' = None
+    magn_conditions: tuple = None
 
     def show_as(self, format: str='latex', part: str = None):
         """
         format - latex, str
         """
-        
-        flat_terms_dict = self.make_flat(self.term_dict)
+        if isinstance(self.term_dict, dict):
+            flat_terms_dict = self.make_flat(self.term_dict)
+        elif isinstance(self.term_dict, list):
+            flat_terms_dict = self.term_dict
 
         if format=='latex':
 
@@ -661,7 +664,7 @@ class VibPertTermsCollection:
         """
         from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
         return derived_terms_flat(self.term_dict, as_list)
-    
+
 
     def required_data(self, freqs: str='static') -> tuple[int, list['MolecularProperty']]:
         """
@@ -676,7 +679,7 @@ class VibPertTermsCollection:
         self.experiment.tell_axis_options()
 
     
-    def translate_to_ax_choice(self, axes_choice) -> 'VibPertTermsCollection':
+    def translate_to_ax_choice(self, axes_choice, magn_conditions_translated=None) -> 'VibPertTermsCollection':
         """
         returns a new VibPertTermsCollection object
 
@@ -686,4 +689,5 @@ class VibPertTermsCollection:
         from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
         return VibPertTermsCollection(translate_terms_to_axis_variables(self.term_dict, axes_choice), 
                                       experiment=self.experiment,
-                                      axes_choice=axes_choice)
+                                      axes_choice=axes_choice,
+                                      magn_conditions=magn_conditions_translated)
