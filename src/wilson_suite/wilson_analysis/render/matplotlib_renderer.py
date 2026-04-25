@@ -464,23 +464,24 @@ class MatplotlibRendererGV:
             cmap: str = 'viridis', levels: int = 20,
 
         1. prep Z data
-        2. make levels
+        2. set up fig and ax?
+        3. make levels
+        4. cmap in contourf
+        5. norm in contourf
+        6. make colorbar
+        7. ticks and axes customization
         """
-
+        # 1. prep Z data
         data_2d = self._reduce_to_2d(slice_spec)
         data_2d = np.abs(data_2d)**2
 
+        # 2. set up fig and ax?
         if ax is None:
             fig, ax = plt.subplots(figsize=self.config.figsize)
         else:
             fig = ax.figure
 
-        # fig = plt.figure(figsize=self.config.figsize)
-        # # Add axes with specific margins to ensure content fits
-        # ax = fig.add_axes([0.15, 0.15, 0.7, 0.75])  # [left, bottom, width, height]
-
-        ax = ax or plt.subplots()[1]
-
+        # 3. make levels
         from .spectrum_renderer import LevelCalculator
         levels, labels = LevelCalculator().compute_levels(
             intensities=data_2d,
@@ -490,9 +491,11 @@ class MatplotlibRendererGV:
             reference_max=self.setup_inputs.spec_eval.rnd_info.reference_max
         )
         
+        # 4. cmap in contourf
         cmap = plt.get_cmap(self.config.colormap).copy()
         cmap.set_over(self.config.saturation_color)
 
+        # 5. norm in contourf
         if self.setup_inputs.spec_eval.rnd_info.intensity_normalization_type is not None:
             # Create logarithmic normalization for color mapping
             norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
@@ -512,9 +515,13 @@ class MatplotlibRendererGV:
         # https://stackoverflow.com/questions/8263769/hide-contour-linestroke-on-pyplot-contourf-to-get-only-fills
         contour.set_edgecolor("face")
 
-        add_colorbar((fig, ax, contour), 
-                     self.setup_inputs.spec_eval.rnd_info,
-                     self.config, levels, labels)
+        # 6. make colorbar
+        fig, ax, cbar = add_colorbar((fig, ax, contour), 
+                                     self.setup_inputs.spec_eval.rnd_info,
+                                     self.config, levels, labels)
+        ax_tick_fs = getattr(self.config, 'tick_label_fontsize', 25)
+        ax.tick_params(axis='x', labelsize=ax_tick_fs)
+        ax.tick_params(axis='y', labelsize=ax_tick_fs)
 
         return ax
 
@@ -555,82 +562,183 @@ class MatplotlibRendererGV:
         return self.eval_result.spec
 
 
+# def add_colorbar(plot_obj: Tuple[plt.Figure, plt.Axes, Any],
+#                  rnd_info, config,
+#                  levels: np.ndarray, labels: List[str]) -> Tuple[plt.Figure, plt.Axes, Any]:
+#     """
+#     https://pythonmatplotlibtips.blogspot.com/2019/07/draw-two-axis-to-one-colorbar.html
+#     """
+#     fig, ax, contour = plot_obj
+
+#     # Create colorbar and manually align it to the plot's height
+#     cbar = fig.colorbar(contour, ax=ax)
+
+#     ax1 = cbar.ax
+#     ax1.set_aspect('auto')
+
+#     fig.canvas.draw()  # Ensure layout is updated
+#     pos = cbar.ax.get_position()
+
+#     # Create and set up normalized (left) axis
+#     ax2 = ax1.twinx()
+    
+#     # Calculate normalized positions based on selected normalization type
+#     if rnd_info.intensity_normalization_type == NormalizationType.LOG_RATIO:
+#         norm_positions = np.log10(levels)/np.log10(levels[-1])
+#         norm_format = "{x:.3f}"
+#         norm_label = "Log Ratio"
+#     elif rnd_info.intensity_normalization_type == NormalizationType.DECIBEL:
+#         norm_positions = 10 * np.log10(levels/levels[-1])
+#         norm_format = "{x:.1f} dB"
+#         norm_label = "Intensity (dB)"
+#     elif rnd_info.intensity_normalization_type == NormalizationType.PERCENTAGE:
+#         norm_positions = (levels/levels[-1]) * 100
+#         norm_format = "{x:.1f}%"
+#         norm_label = "Relative Intensity (%)"
+#     elif rnd_info.intensity_normalization_type is None:
+#         norm_positions = levels
+#         norm_format = "{x:.2f}"
+#         norm_label = "Original"
+
+#     else:  # LOG_SCALE
+#         norm_positions = (np.log10(levels) - np.log10(levels[0]))/(np.log10(levels[-1]) - np.log10(levels[0]))
+#         norm_format = "{x:.2f}"
+#         norm_label = "Log-scale Normalized"
+    
+#     if rnd_info.intensity_normalization_type is not None:
+#         logger.debug(f"Normalized positions ({rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
+    
+#     # Set up normalized axis limits and ticks
+#     ax2.set_ylim(min(norm_positions), max(norm_positions))
+#     ax2.set_yticks(norm_positions)
+#     ax2.set_yticklabels([norm_format.format(x=x) for x in norm_positions])
+#     ax2.yaxis.set_ticks_position('left')
+#     ax2.yaxis.set_label_position('left')
+    
+#     # Move colorbar position slightly to the right
+#     pos.x0 += 0.06
+#     pos.x1 += 0.06
+    
+#     # Set up main (right) axis
+#     ax2.set_position(pos)
+#     ax1.set_position(pos)
+#     ax1.yaxis.set_ticks_position('right')
+#     ax1.yaxis.set_label_position('right')
+#     ax1.set_yticks(levels)
+#     ax1.set_yticklabels(labels)
+#     ax1.set_ylabel(config.colorbar_main_label,
+#                     rotation=90,
+#                     labelpad=48, # distance from axis to label
+#                     fontsize=config.label_fontsize if hasattr(config, 'label_fontsize') else 25)
+    
+#     # Set normalized axis label
+#     ax2.set_ylabel(norm_label,
+#                     rotation=90,
+#                     labelpad=48, # distance from axis to label
+#                     fontsize=config.label_fontsize if hasattr(config, 'label_fontsize') else 25)
+    
+#     # Adjust spacing between axes
+#     cbar.ax.spines['right'].set_position(('outward', 0))
+#     ax2.spines['left'].set_position(('outward', 0))
+
+
+#     ax_pos = ax.get_position()
+#     if rnd_info.style_config.axes_limits is not None:
+#         ax.set_xlim(*rnd_info.style_config.axes_limits['x'])
+#         ax.set_ylim(*rnd_info.style_config.axes_limits['y'])
+
+#     cbar_pos = cbar.ax.get_position()
+
+#     cbar.ax.set_position([
+#         cbar_pos.x0+config.colorbar_padding,       # x-position (keep same or adjust)
+#         ax_pos.y0,         # align bottom of colorbar to ax
+#         cbar_pos.width,    # keep same width
+#         ax_pos.height      # match ax height
+#     ])
+
+
+#     final_rect = [
+#         cbar_pos.x0 + config.colorbar_padding,
+#         ax_pos.y0,
+#         cbar_pos.width,
+#         ax_pos.height,
+#     ]
+#     cbar.ax.set_position(final_rect)
+#     ax2.set_position(final_rect)
+    
+#     return fig, ax, cbar
+
+
+
+from matplotlib.ticker import FixedLocator, FixedFormatter
+
 def add_colorbar(plot_obj: Tuple[plt.Figure, plt.Axes, Any],
                  rnd_info, config,
                  levels: np.ndarray, labels: List[str]) -> Tuple[plt.Figure, plt.Axes, Any]:
     """
-    https://pythonmatplotlibtips.blogspot.com/2019/07/draw-two-axis-to-one-colorbar.html
+    Colorbar with real level values on the right and normalized values on the
+    left. Left axis is locked to the right via secondary_yaxis, so alignment
+    is guaranteed regardless of the cbar's internal norm.
     """
     fig, ax, contour = plot_obj
+    assert np.all(np.diff(levels) > 0), "levels must be strictly increasing"
 
-    # Create colorbar and manually align it to the plot's height
+    ref = levels[-1]
+    log_lo, log_hi = np.log10(levels[0]), np.log10(ref)
+    EPS = 1e-300
+
+    # (forward, inverse, format, label) per normalization type
+    NT = NormalizationType
+    norm_specs = {
+        NT.LOG_RATIO:  (lambda y: np.log10(np.maximum(y, EPS)) / log_hi,
+                        lambda y: 10.0 ** (y * log_hi),
+                        "{x:.3f}",   "Log Ratio"),
+        NT.DECIBEL:    (lambda y: 10 * np.log10(np.maximum(y, EPS) / ref),
+                        lambda y: ref * 10.0 ** (y / 10),
+                        "{x:.1f} dB", "Intensity (dB)"),
+        NT.PERCENTAGE: (lambda y: 100 * y / ref,
+                        lambda y: y * ref / 100,
+                        "{x:.1f}%",  "Relative Intensity (%)"),
+        NT.LOG_SCALE:  (lambda y: (np.log10(np.maximum(y, EPS)) - log_lo) / (log_hi - log_lo),
+                        lambda y: 10.0 ** (log_lo + y * (log_hi - log_lo)),
+                        "{x:.2f}",   "Log-scale Normalized"),
+        None:          (lambda y: y, lambda y: y, "{x:.2f}", "Original"),
+    }
+    forward, inverse, norm_fmt, norm_label = norm_specs[rnd_info.intensity_normalization_type]
+    norm_positions = forward(levels)
+
+    # --- Colorbar ---
     cbar = fig.colorbar(contour, ax=ax)
-
     ax1 = cbar.ax
     ax1.set_aspect('auto')
 
-    fig.canvas.draw()  # Ensure layout is updated
-    pos = cbar.ax.get_position()
+    if rnd_info.style_config.axes_limits is not None:
+        ax.set_xlim(*rnd_info.style_config.axes_limits['x'])
+        ax.set_ylim(*rnd_info.style_config.axes_limits['y'])
+    fig.canvas.draw()
 
-    # Create and set up normalized (left) axis
-    ax2 = ax1.twinx()
-    ax2.set_position(pos)
-    
-    # Calculate normalized positions based on selected normalization type
-    if rnd_info.intensity_normalization_type == NormalizationType.LOG_RATIO:
-        norm_positions = np.log10(levels)/np.log10(levels[-1])
-        norm_format = "{x:.3f}"
-        norm_label = "Log Ratio"
-    elif rnd_info.intensity_normalization_type == NormalizationType.DECIBEL:
-        norm_positions = 10 * np.log10(levels/levels[-1])
-        norm_format = "{x:.1f} dB"
-        norm_label = "Intensity (dB)"
-    elif rnd_info.intensity_normalization_type == NormalizationType.PERCENTAGE:
-        norm_positions = (levels/levels[-1]) * 100
-        norm_format = "{x:.1f}%"
-        norm_label = "Relative Intensity (%)"
-    elif rnd_info.intensity_normalization_type is None:
-        norm_positions = levels
-        norm_format = "{x:.2f}"
-        norm_label = "Original"
+    # Pin cbar to main-axes height
+    ax_pos, cbar_pos = ax.get_position(), ax1.get_position()
+    ax1.set_position([cbar_pos.x0 + 0.06 + config.colorbar_padding,
+                      ax_pos.y0, cbar_pos.width, ax_pos.height])
 
-    else:  # LOG_SCALE
-        norm_positions = (np.log10(levels) - np.log10(levels[0]))/(np.log10(levels[-1]) - np.log10(levels[0]))
-        norm_format = "{x:.2f}"
-        norm_label = "Log-scale Normalized"
-    
-    if rnd_info.intensity_normalization_type is not None:
-        logger.debug(f"Normalized positions ({rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
-    
-    # Set up normalized axis limits and ticks
-    ax2.set_ylim(min(norm_positions), max(norm_positions))
-    ax2.set_yticks(norm_positions)
-    ax2.set_yticklabels([norm_format.format(x=x) for x in norm_positions])
-    ax2.yaxis.set_ticks_position('left')
-    ax2.yaxis.set_label_position('left')
-    
-    # Move colorbar position slightly to the right
-    pos.x0 += 0.06
-    pos.x1 += 0.06
-    
-    # Set up main (right) axis
-    ax1.set_position(pos)
-    ax1.yaxis.set_ticks_position('right')
-    ax1.yaxis.set_label_position('right')
-    ax1.set_yticks(levels)
-    ax1.set_yticklabels(labels)
-    ax1.set_ylabel(config.colorbar_main_label,
-                    rotation=90,
-                    labelpad=48, # distance from axis to label
-                    fontsize=config.label_fontsize if hasattr(config, 'label_fontsize') else 25)
-    
-    # Set normalized axis label
-    ax2.set_ylabel(norm_label,
-                    rotation=90,
-                    labelpad=48, # distance from axis to label
-                    fontsize=config.label_fontsize if hasattr(config, 'label_fontsize') else 25)
-    
-    # Adjust spacing between axes
-    cbar.ax.spines['right'].set_position(('outward', 0))
-    ax2.spines['left'].set_position(('outward', 0))
+    label_fs = getattr(config, 'label_fontsize', 25)
+    tick_fs  = getattr(config, 'cb_tick_label_fontsize', 14)
+
+    # Right axis: real level values
+    cbar.set_ticks(levels)
+    cbar.set_ticklabels(labels)
+    ax1.tick_params(axis='y', labelsize=tick_fs)
+    ax1.set_ylabel(config.colorbar_main_label, rotation=90, labelpad=48, fontsize=label_fs)
+
+    # Left axis: normalized values, auto-aligned
+    ax2 = ax1.secondary_yaxis('left', functions=(forward, inverse))
+    ax2.yaxis.set_major_locator(FixedLocator(norm_positions))
+    ax2.yaxis.set_major_formatter(
+        FixedFormatter([norm_fmt.format(x=x) for x in norm_positions])
+    )
+    ax2.tick_params(axis='y', labelsize=tick_fs)
+    ax2.set_ylabel(norm_label, rotation=90, labelpad=48, fontsize=label_fs)
+
     return fig, ax, cbar
+
