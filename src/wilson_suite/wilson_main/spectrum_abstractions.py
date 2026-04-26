@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
+from pathlib import Path
+
 from ..wilson_analysis.render.render_utils import PlotConfig, NormalizationType
 from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
@@ -262,7 +264,6 @@ class EvaluationInfo:
 	fixed_variables - a dict of values for the non-varied fixed variables 
 		(e.g., when having a 2D slice of a 3D spectrum at fixed 3rd)
 	"""
-	freq_variables: dict = None
 	Gamma: float = None
 	Gamma_unit: str = None
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
@@ -305,6 +306,37 @@ class RenderingInfo:
 	# style configurations - currently will work/be used for matplotlib renderer
 	style_config: PlotConfig = field(default_factory=lambda: PlotConfig())
 	axes_labels: dict = None
+
+
+	def update_filename(self, new_filename: str):
+		"""
+		updating filename attribute
+		"""
+		current_path = Path(self.filename)
+		if current_path.is_absolute():
+			self.filename = str(current_path.parent / new_filename)
+		else:
+			self.filename = new_filename
+
+	def add_filename_tag(self, tag: str, side: str = "suffix"):
+		"""
+		Adds a tag like '_normalized' or 'scaled_' to the existing filename 
+		without losing the extension or directory path.
+		"""
+		current_path = Path(self.filename)
+		stem = current_path.stem  # the 'spectrum' part of 'spectrum.svg'
+		suffix = current_path.suffix  # the '.svg' part
+		
+		if side == "prefix":
+			new_name = f"{tag}{stem}{suffix}"
+		else:
+			new_name = f"{stem}{tag}{suffix}"
+			
+		if current_path.is_absolute():
+			self.filename = str(current_path.parent / new_name)
+		else:
+			self.filename = new_name
+
 
 # An evaluation setup contains various visualization configuration information
 # and information about other relevant evaluation-related choices for a wilsonSimulation instance
@@ -355,8 +387,6 @@ class SpecEvalSetup:
 		rndinfo = self.rnd_info
 		
 		if not hasattr(self.ev_info, 'dynamic_range'):
-			return False
-		if self.grid is None:
 			return False
 
 		if rndinfo is not None:
