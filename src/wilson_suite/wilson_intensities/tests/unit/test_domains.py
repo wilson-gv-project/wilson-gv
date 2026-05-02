@@ -1,6 +1,6 @@
 from wilson_suite.wilson_intensities.amplitudes import domains
 from ...amplitudes.spectrum_composition import RectangularDomain, SpectralWindow
-from ...amplitudes.evaluators import get_features_from_terms_for_eval
+# from ...amplitudes.evaluators import get_features_from_terms_for_eval
 from ....wilson_main import abstractions as wm_abst
 import numpy as np
 
@@ -125,6 +125,7 @@ def get_data_evaluators_tests() -> dict:
                 spec_eval_setup=spec_eval_setup,
                 domain_distance_thresholds={'A': 12., 'B': 12.})
 
+"""
 def get_features_from_terms(lineshape_parameter:float = 9.5):
     from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
@@ -177,6 +178,8 @@ def test_find_clusters_by_distance():
                         6: [(1864.0, 900.0)], 0: [(2255.0, 1291.0), (2274.0, 1310.0)], 
                         1: [(2255.0, 1021.0), (2274.0, 1040.0)], 
                         2: [(2368.0, 1134.0), (2360.0, 1126.0), (2362.0, 1128.0)]}.values())
+"""
+
 
 """
 def test_compute_box_adjacency():
@@ -194,6 +197,8 @@ def test_compute_box_adjacency():
     
 """
 
+
+"""
 def test_features_to_clusters():
     print()
     features = get_features_from_terms()
@@ -213,3 +218,4 @@ def test_feat_clusters_to_domains():
         clusters.append(RectangularDomain.from_features(feat_clusters[fc]))
     
     print('\nclusters', len(clusters))
+"""

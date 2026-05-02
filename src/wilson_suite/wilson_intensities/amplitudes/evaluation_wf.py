@@ -1,627 +1,439 @@
-import time
 import numpy as np
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.workflow_abstractions import WilsonSimulation
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
-    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
+    from wilson_suite.wilson_main.spectrum_abstractions import EvaluationInfo
     from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
-    from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
     from wilson_suite.wilson_intensities.amplitudes.term_parts import PrecalculatedData, VibStatesData
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
     from wilson_suite.wilson_intensities.amplitudes.term_parts import EvaluationDataAndConfigs, ParameterSet, ResonanceMotif
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, ResLocGeoObject
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
 
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
 from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
 
-from wilson_suite.wilson_intensities.amplitudes.evaluators import prepTermsForEval
 from wilson_suite.wilson_intensities.amplitudes.evaluators import prepDataForEval
-from wilson_suite.wilson_intensities.amplitudes.evaluators import process_resonance_motifs
 from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_terms_coeffs
 from wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff import (precalculate_unique_coeff_parts, 
                                                                              identify_precalc_unique_coeff_parts)
 from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw
+from wilson_suite.wilson_intensities.amplitudes.evaluators import _compute_motif_locs, _get_terms_for_motifs
 
-from contextlib import contextmanager
+from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_regions
 
 import logging
 logger = logging.getLogger("wilson")
 
 
-class WorkflowError(Exception):
-    """Base class for workflow errors."""
-    pass
-class InputValidationError(WorkflowError):
-    """Raised when input validation fails."""
-    pass
-class StepExecutionError(WorkflowError):
-    """Raised when a specific step fails."""
-    def __init__(self, step_name, original_exception):
-        super().__init__(f"Step '{step_name}' failed: {original_exception}")
-        self.step_name = step_name
-        self.original_exception = original_exception
+###############################################################
 
-@dataclass
-class EvaluationContext:
-    """
-    Execution metadata for a single EvaluationWorkflow run.
-    This class is intentionally non-scientific.
-    """
-    verbose: bool = False
+@dataclass(frozen=True)
+class ExperimentContext:
+    """Pulse-indexed, axis-invariant. Determined by the experiment alone."""
+    raw_terms: list['VibPerturbedTerm']
+    pulse_polarization_vector: tuple
+    magn_conditions: tuple
+    # avrg_tensors, avrg_expr_tensor_mapping, vibenedenoms_tensors, vibdiff_motifs
+    need_precalc: dict[str, Any]
 
-    # name -> elapsed seconds
-    timing: dict[str, float] = field(default_factory=dict)
+@dataclass(frozen=True)
+class AxisContext:
+    """Axis choice applied to ExperimentContext."""
+    experiment_ctx: ExperimentContext
+    axes: 'SpectralAxisSet'
+    terms: list['VibPerturbedTerm']
+    terms_for_motifs: dict['ResonanceMotif', list['VibPerturbedTerm']]
+    magn_conditions: tuple
 
-    # name of the step currently executing / last failed
-    failed_at: str = None
+@dataclass(frozen=True)
+class QCDataContext:
+    vib_data: 'VibStatesData'
+    vibdiff_cache: 'VibDiffCache'
+    data_configs: 'EvaluationDataAndConfigs'
 
-    # optional: step name -> arbitrary object
-    intermediates: dict[str, Any] = field(default_factory=dict)
+@dataclass(frozen=True)
+class PrecalcContext:
+    """QC + precalc spec. Heavy compute. Survives axis changes."""
+    experiment: ExperimentContext        # parent ref
+    qc: QCDataContext                    # parent ref
+    precalculated: 'PrecalculatedData'
+
+@dataclass(frozen=True)
+class BoundMotifs:
+    """AxisContext x QCDataContext x PrecalcContext binding.
+    Rebuilds on axis change."""
+    axes: AxisContext             # parent ref
+    precalc: PrecalcContext       # parent ref (covers experiment + qc)
+    motif_locs: dict['ResonanceMotif', dict['ResLocGeoObject', list]]
+    coefficients: dict['VibPerturbedTerm', dict['ParameterSet', float]]
 
 
 @dataclass(frozen=True)
-class EvaluationInputs:
-    terms: Any
-    number_of_modes: int
-    props: list["MolecularProperty"]
-    spec_eval_setup: 'SpecEvalSetup'
-    vib_ana_setup: 'VibAnaSetup'
-    pulse_polarization_vector: tuple[float, float, float]
+class GridContext:
+    spec_window: 'SpectralWindow'
+    grid_manager: 'GridManager'
+    grid_resolution: dict
 
-@dataclass
-class EvaluationArtifacts:
-    terms: list = None
-    vib_data: 'VibStatesData' = None
-    vibdiff_cache: 'VibDiffCache' = None
-    data_configs: 'EvaluationDataAndConfigs' = None
-    motif_locs: dict['ResonanceMotif', 'ResLocGeoObject'] = None
-    terms_for_motifs: dict['ResonanceMotif', list['VibPerturbedTerm']] = None
-    need_precalc: dict[str, Any] = None
-    precalculated: 'PrecalculatedData' = None
-    coefficients: dict['VibPerturbedTerm', dict['ParameterSet', float]] = None
-    features: list[SpectralFeature] = None
-    zero_feats: list[SpectralFeature] = None
-    spec_window: 'SpectralWindow' = None
-    grid_manager: GridManager = None
-    regions: list['GridRegion'] = None
-    regions_results: Dict[str, np.ndarray] = None
+@dataclass(frozen=True)
+class FeatureResult:
+    features: list[SpectralFeature]
+    zero_feats: list[SpectralFeature]
 
 
-def make_evaluation_inputs(
-                            *,
-                            simulation: "WilsonSimulation" = None,
-                            terms=None,
-                            number_of_modes: int = None,
-                            props: list["MolecularProperty"] = None,
-                            spec_eval_setup: 'SpecEvalSetup' = None,
-                            vib_ana_setup: 'VibAnaSetup' = None,
-                            pulse_polarization_vector=None,
-                        ) -> EvaluationInputs:
+@dataclass(frozen=True)
+class RegionEvaluation:
+    """Per-region evaluation outputs. Intermediate."""
+    regions: list['GridRegion']
+    regions_results: dict[str, np.ndarray]
+
+@dataclass(frozen=True)
+class EvaluatedSpectrum:
     """
-    Create EvaluationInputs either from a WilsonSimulation
-    or from explicitly provided components.
-
-    Exactly one source of truth must be used.
+    The assembled spectrum on the grid.
+        axes: {'A': ..., 'B': ...}
     """
+    axes: dict[str, np.ndarray]
+    result: np.ndarray
 
-    if simulation is not None:
-        if any(x is not None for x in (
-            terms, number_of_modes, props,
-            spec_eval_setup, vib_ana_setup,
-            pulse_polarization_vector,
-        )):
-            raise ValueError(
-                "Provide either simulation OR explicit inputs, not both"
-            )
+@dataclass(frozen=True)
+class RenderSettings:
+    """Settings applied during region evaluation (post-feature)."""
+    box_range_safety_margin: float
+    scale_wrt_max_intensity: bool
+    minimum_box_padding: float
+    apply_magn_cond_filter: bool = False
+    exp_magn_conditions: tuple = ()
+    magn_conditions_margin: dict = None
+    dynamic_range: float = None
 
-        # Extract and normalize from simulation
-        spec_eval_setup = simulation.spec_eval_setup 
-        # MR: Here assuming that spectral axes were set, so changed to use translated terms
-        terms = simulation.terms_in_axis_choice
-        number_of_modes = simulation.system.Nnmodes
-        props = simulation.props
-        vib_ana_setup = simulation.vib_ana_setup
-        pulse_polarization_vector = tuple(
-            simulation.exp.polarization_avg_vector
-        )
 
-    # ---- validation of completeness ----
+def build_experiment_context(simulation: 'WilsonSimulation') -> ExperimentContext:
+    flat_terms = derived_terms_flat(simulation.terms, tolistonly=True)
+    return ExperimentContext(
+        raw_terms=flat_terms,
+        pulse_polarization_vector=tuple(simulation.exp.polarization_avg_vector),
+        magn_conditions=tuple(simulation.exp.magn_conditions),
+        need_precalc=identify_precalc_unique_coeff_parts(flat_terms),
+    )
 
-    missing = [
-        name for name, value in {
-            "terms": terms,
-            "number_of_modes": number_of_modes,
-            "props": props,
-            "spec_eval_setup": spec_eval_setup,
-            "vib_ana_setup": vib_ana_setup,
-            "pulse_polarization_vector": pulse_polarization_vector,
-        }.items()
-        if value is None
-    ]
+def build_qc_context(simulation: 'WilsonSimulation') -> QCDataContext:
+    vib_data, vibdiff_cache, data_configs = prepDataForEval(
+        simulation.exp.polarization_avg_vector,
+        simulation.vib_ana_setup, 
+        simulation.props,
+    )
+    return QCDataContext(
+        vib_data=vib_data,
+        vibdiff_cache=vibdiff_cache,
+        data_configs=data_configs,
+    )
 
-    if missing:
-        raise ValueError(
-            f"Missing required inputs: {', '.join(missing)}"
-        )
-
-    # ---- light normalization / sanity checks ----
-
-    if len(pulse_polarization_vector) != 3:
-        raise ValueError(
-            "pulse_polarization_vector must be length 3"
-        )
-
-    return EvaluationInputs(
-        terms=terms,
-        number_of_modes=number_of_modes,
-        props=props,
-        spec_eval_setup=spec_eval_setup,
-        vib_ana_setup=vib_ana_setup,
-        pulse_polarization_vector=tuple(pulse_polarization_vector),
+def build_precalc_context(
+    experiment: ExperimentContext,
+    qc: QCDataContext,
+) -> PrecalcContext:
+    precalculated = precalculate_unique_coeff_parts(
+        need_to_precalc=experiment.need_precalc,
+        data_and_configs=qc.data_configs,
+    )
+    return PrecalcContext(
+        experiment=experiment,
+        qc=qc,
+        precalculated=precalculated,
     )
 
 
-class EvaluationWorkflow:
-    """
-    A workflow that tracks steps and captures intermediates on error
+def build_axis_context(
+    experiment_ctx: ExperimentContext,
+    simulation: 'WilsonSimulation',
+) -> AxisContext:
+    if simulation.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
+        from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
+        translated_magn_conditions = translate_magn_conditions_to_axisvars(experiment_ctx.magn_conditions, simulation.axis_choice)
+    else:
+        translated_magn_conditions = None
+    translated_terms = derived_terms_flat(simulation.terms_in_axis_choice, tolistonly=True)
+
+    return AxisContext(
+        experiment_ctx=experiment_ctx,
+        axes=simulation.spec_eval_setup.ev_info.spectral_axes,
+        terms=translated_terms,
+        terms_for_motifs=_get_terms_for_motifs(translated_terms),
+        magn_conditions=translated_magn_conditions,
+    )
+
+
+def bind_motifs(
+    axis_ctx: AxisContext,
+    precalc: PrecalcContext,
+) -> BoundMotifs:
+    motif_locs = _compute_motif_locs(axis_ctx, precalc.qc)
+    coefficients = evaluate_terms_coeffs(
+        derived_terms=axis_ctx.terms,
+        motif_res_loc=motif_locs,
+        data_and_configs=precalc.qc.data_configs,
+        precalculated=precalc.precalculated,
+    )
+    return BoundMotifs(
+        axes=axis_ctx,
+        precalc=precalc,
+        motif_locs=motif_locs,
+        coefficients=coefficients,
+    )
+
+def compute_features(
+    bound: BoundMotifs,
+    gamma: float,
+) -> FeatureResult:
+    features, zero_feats = get_features_to_draw(
+        motif_res_loc=bound.motif_locs,
+        terms_for_motifs=bound.axes.terms_for_motifs,
+        term_coeffs_per_index=bound.coefficients,
+        lineshape_parameter=gamma,
+    )
+    return FeatureResult(features=features, zero_feats=zero_feats)
+
+
+def build_grid_context(
+    spec_window: 'SpectralWindow',
+    grid_resolution: dict,
+) -> GridContext:
+    grid_manager = GridManager(spec_window)
+    grid_manager.make_fullgrid(grid_resolution)
+    return GridContext(
+        spec_window=spec_window,
+        grid_manager=grid_manager,
+        grid_resolution=grid_resolution
+    )
+
+
+def _settings_from_ev_info(ev_info: 'EvaluationInfo') -> RenderSettings:
+    return RenderSettings(
+        box_range_safety_margin=ev_info.box_range_safety_margin,
+        scale_wrt_max_intensity=ev_info.scale_wrt_max_intensity,
+        minimum_box_padding=ev_info.minimum_box_padding,
+        apply_magn_cond_filter=ev_info.apply_exp_magn_conditions_eval,
+        exp_magn_conditions=ev_info.exp_magn_conditions,
+        magn_conditions_margin=ev_info.magn_conditions_margin,
+        dynamic_range=ev_info.dynamic_range
+    )
+
+def filter_features_to_window(
+    features: FeatureResult,
+    spec_window: 'SpectralWindow',
+) -> 'SpectralWindow':
+    window = SpectralFeature.filter_to_spec_window(features.features, spec_window)
+    if not (window.full_features + window.contrib_features):
+        raise ValueError("No features in this spec window")
+    return window
+
+
+def apply_magn_cond_filter(
+    window: 'SpectralWindow',
+    settings: RenderSettings,
+    verbose: bool = False,
+) -> 'SpectralWindow':
+    """Filter features by magnetic conditions, if enabled in settings."""
+    if not settings.apply_magn_cond_filter:
+        return window
     
-    Can work with a WilsonSimulation in a prepared state (READY) or stanalone with provided necessary inputs.
-    
-    """
-    def __init__(self, inputs: EvaluationInputs, parallel=None, verbose: bool = False):
-        """
-        ctx = EvaluationContext which would hold timing, failures, intermediates(?) saved during the run
-        artifacts = EvaluationArtifacts holds the intermediate artifacts of the run which are used at other points of the run
-
-        Parameters:
-            inputs: EvaluationInputs - has ( terms, number_of_modes, props(with vals), 
-                                             spec_eval_setup, vib_ana_setup, 
-                                             pulse_polarization_vector(for orientational avrg) )
-
-        run() method - a sequence of executed steps; intermediate results are needed for further steps and are saved in self.artifacts
-        """
-        self.ctx = EvaluationContext(verbose=verbose)
-        self.artifacts = EvaluationArtifacts()
-
-        self.inputs = inputs
-        self.parallel = parallel
-
-
-    def _validate_inputs(self):
-        """
-        WilsonSimulation at this point should have necessary data.
-
-        """
-        if not self.inputs.terms:
-            raise ValueError("Non-empty 'terms' should be provided")
-        if not self.inputs.number_of_modes:
-            raise ValueError("'number_of_modes' should be provided")
-        if not self.inputs.props:
-            raise ValueError("Non-empty 'props'  should be provided")
-        else:
-            for p in self.inputs.props:
-                if p.vals is None:
-                    raise ValueError(f"Property {p.trivial_name} has vals=None")
-
-        if not self.inputs.vib_ana_setup.isAllSet:
-            raise ValueError("'vib_ana_setup' should be all set (vib_ana_setup.isAllSet)")
-        # validate spec_eval_setup, pulse_polarization_vector, number_of_modes(?)
-
-        if not self.inputs.pulse_polarization_vector or len(self.inputs.pulse_polarization_vector) != 3:
-            raise ValueError("'pulse_polarization_vector' should be a length 3 vector") # -- is it true?
-
-    @contextmanager
-    def step(self, name):
-        self.ctx.failed_at = name
-        start = time.time()
-        try:
-            yield
-        finally:
-            self.ctx.timing[name] = time.time() - start
-
-
-    def run_get_feats(self):
-        """
-        Workflow with these steps:
-            prep_terms
-            prep_data
-            process_resonances
-            term_coefficients
-            all_features -- this? should be accessible on top of list of feats
-        """
-        self._validate_inputs()
-        
-        try:
-            # Part 1: Preparation
-            with self.step("prep_terms"):
-                self.artifacts.terms = prepTermsForEval(self.inputs.terms)
-
-            with self.step("prep_data"): # could be in data inputs
-                _data, _cache, _configs = prepDataForEval(self.inputs.pulse_polarization_vector, 
-                                                          self.inputs.vib_ana_setup, 
-                                                          self.inputs.props)
-                self.artifacts.vib_data = _data
-                self.artifacts.vibdiff_cache = _cache
-                self.artifacts.data_configs = _configs
-
-            # self._save_checkpoint('Step1')  # Save checkpoint
-
-            # Part 2: Process resonances and calculate coefficients
-            # get resonances locations for all terms
-            with self.step("process_resonances"):
-                self.artifacts.motif_locs, self.artifacts.terms_for_motifs = process_resonance_motifs(self.artifacts.terms,
-                                                                                                            self.artifacts.vib_data,
-                                                                                                            self.artifacts.vibdiff_cache)
-            with self.step("term_coefficients"):
-                self.artifacts.need_precalc = identify_precalc_unique_coeff_parts(terms=self.artifacts.terms)
-                self.artifacts.precalculated = precalculate_unique_coeff_parts(
-                    need_to_precalc=self.artifacts.need_precalc, data_and_configs=self.artifacts.data_configs)
-                self.artifacts.coefficients = evaluate_terms_coeffs(self.artifacts.terms,
-                                                                       self.artifacts.motif_locs,
-                                                                       self.artifacts.data_configs,
-                                                                       self.artifacts.precalculated)
-
-            # self._save_checkpoint('Step2')  # Save checkpoint
-
-            # Part 3: Extract features and place them in the spectral window
-            with self.step("all_features"):
-                
-                # maybe should check unit by the value here as well? or somewhere before taking unit flag
-                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
-                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
-                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
-                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
-                else:
-                    raise ValueError('Gamma cannot be converted from the given unit to au')
-                
-                # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
-                self.artifacts.features, self.artifacts.zero_feats = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
-                                                                  terms_for_motifs=self.artifacts.terms_for_motifs,
-                                                                  term_coeffs_per_index=self.artifacts.coefficients,
-                                                                  lineshape_parameter=gamma)
-                # print('\nall_features step')
-                # print(f' There are {len(self.artifacts.features)} features')
-
-        except Exception as e:
-            from wilson_suite.wilson_utils.serialization import pickle_this_to
-            filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self, filename_pkl)
-            
-            raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-            ) from e
-
-
-    def run_specwindow_feats(self, features=None):
-        """
-        
-        """
-        # features_to_use will be used only in first step - further steps are chained
-        if self.artifacts.features is None:
-            if features is None:
-                raise ValueError("This workflow does not have self.artifacts.features values nor input features!")
-            features_to_use = features
-        else:
-            features_to_use = self.artifacts.features
-        
-        try:
-            with self.step("dress_with_featboxes"):
-                max_intensity_in_window = SpectralFeature.get_max_intensity_feat(features_to_use).get_intensity()
-                min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
-
-                self.artifacts.features = SpectralFeature.dress_these_with_boxes(features_to_use,
-                                                                                 max_intensity_in_window, 
-                                                                                 min_intensity_in_window,
-                                                                                 box_range_safety_margin=
-                                                                                 self.inputs.spec_eval_setup.ev_info.box_range_safety_margin,
-                                                                                 scale_wrt_max_intensity=
-                                                                                 self.inputs.spec_eval_setup.ev_info.scale_wrt_max_intensity,
-                                                                                 minimum_box_padding=
-                                                                                 self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
-                                                                                 )
-                # print('\ndress_with_featboxes step')
-                # print(f' There are {len(self.artifacts.features)} features')
-                # SpectralFeature.print_list_features(self.artifacts.features)
-
-            if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
-                with self.step("filter_magn_conds"):
-                    self.artifacts.features = SpectralFeature.apply_magn_cond_filter(self.artifacts.features,
-                                                                                    magn_conditions=self.inputs.spec_eval_setup.ev_info.exp_magn_conditions,
-                                                                                    magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
-                    # print('\nfilter_magn_conds step')
-                    # print(f' There are {len(self.artifacts.features)} features')
-                    # SpectralFeature.print_list_features(self.artifacts.features)
-
-            with self.step("place_in_specwindow"):
-                self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
-                if not self.artifacts.spec_window.full_features:
-                    raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
-
-        except Exception as e:
-            from wilson_suite.wilson_utils.serialization import pickle_this_to
-            filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self, filename_pkl)
-            
-            raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-            ) from e
-    
-
-    def run(self, custom_grid=None, verbose=False):
-        """
-        Run evaluation, return dict with axes and results grid
-        """
-        self._validate_inputs()
-        
-        try:
-            # Part 1: Preparation
-            with self.step("prep_terms"):
-                self.artifacts.terms = prepTermsForEval(self.inputs.terms)
-
-            with self.step("prep_data"): # could be in data inputs
-                _data, _cache, _configs = prepDataForEval(self.inputs.pulse_polarization_vector, 
-                                                          self.inputs.vib_ana_setup, 
-                                                          self.inputs.props)
-                self.artifacts.vib_data = _data
-                self.artifacts.vibdiff_cache = _cache
-                self.artifacts.data_configs = _configs
-
-            # self._save_checkpoint('Step1')  # Save checkpoint
-
-            # Part 2: Process resonances and calculate coefficients
-            # get resonances locations for all terms
-            with self.step("process_resonances"):
-                self.artifacts.motif_locs, self.artifacts.terms_for_motifs = process_resonance_motifs(self.artifacts.terms,
-                                                                                                            self.artifacts.vib_data,
-                                                                                                            self.artifacts.vibdiff_cache)
-            with self.step("term_coefficients"):
-                self.artifacts.need_precalc = identify_precalc_unique_coeff_parts(terms=self.artifacts.terms)
-                self.artifacts.precalculated = precalculate_unique_coeff_parts(
-                    need_to_precalc=self.artifacts.need_precalc, data_and_configs=self.artifacts.data_configs)
-                self.artifacts.coefficients = evaluate_terms_coeffs(self.artifacts.terms,
-                                                                       self.artifacts.motif_locs,
-                                                                       self.artifacts.data_configs,
-                                                                       self.artifacts.precalculated)
-
-            # self._save_checkpoint('Step2')  # Save checkpoint
-
-            # Part 3: Extract features and place them in the spectral window
-            with self.step("all_features"):
-                
-                # maybe should check unit by the value here as well? or somewhere before taking unit flag
-                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
-                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
-                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
-                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
-                else:
-                    raise ValueError('Gamma cannot be converted from the given unit to au')
-                
-                # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
-                self.artifacts.features, self.artifacts.zero_feats = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
-                                                                  terms_for_motifs=self.artifacts.terms_for_motifs,
-                                                                  term_coeffs_per_index=self.artifacts.coefficients,
-                                                                  lineshape_parameter=gamma)
-                print('\nall_features step')
-                print(f' There are {len(self.artifacts.features)} features')
-                if verbose:
-                    SpectralFeature.print_list_features(self.artifacts.features)
-
-
-            with self.step("dress_with_featboxes"):
-                max_intensity_in_window = SpectralFeature.get_max_intensity_feat(self.artifacts.features).get_intensity()
-                min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
-
-                self.artifacts.features = SpectralFeature.dress_these_with_boxes(self.artifacts.features,
-                                                                                 max_intensity_in_window, 
-                                                                                 min_intensity_in_window,
-                                                                                 box_range_safety_margin=
-                                                                                 self.inputs.spec_eval_setup.ev_info.box_range_safety_margin,
-                                                                                 scale_wrt_max_intensity=
-                                                                                 self.inputs.spec_eval_setup.ev_info.scale_wrt_max_intensity,
-                                                                                 minimum_box_padding=
-                                                                                 self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
-                                                                                 )
-                print('\ndress_with_featboxes step')
-                print(f' There are {len(self.artifacts.features)} features')
-                if verbose:
-                    SpectralFeature.print_list_features(self.artifacts.features)
-
-            if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
-                with self.step("filter_magn_conds"):
-                    self.artifacts.features = SpectralFeature.apply_magn_cond_filter(self.artifacts.features,
-                                                                                    magn_conditions=self.inputs.spec_eval_setup.ev_info.exp_magn_conditions,
-                                                                                    magn_conditions_margin=self.inputs.spec_eval_setup.ev_info.magn_conditions_margin)
-                    print('\nfilter_magn_conds step')
-                    print(f' There are {len(self.artifacts.features)} features')
-                    if verbose:
-                        SpectralFeature.print_list_features(self.artifacts.features)
-
-            with self.step("place_in_specwindow"):
-                self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
-                if not self.artifacts.spec_window.full_features:
-                    raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
-                
-            # self._save_checkpoint('Step3')  # Save checkpoint
-
-            # Part 4: Grid management and region evaluation
-            with self.step("make_grid_manager"):
-                self.artifacts.grid_manager = GridManager(self.artifacts.spec_window)
-                self.artifacts.grid_manager.make_fullgrid(self.inputs.spec_eval_setup.ev_info.grid_resolution)
-
-            with self.step("make_regions"):
-                '''
-                in create_regions:
-                    - formal_domains = self.spec_window.find_clusters_by_featboxes():  --- wilson_intensities/amplitudes/grid_manager_evaluator.py
-                        - clusters = domains.features_to_clusters(features=all_features) --- wilson_intensities/amplitudes/spectrum_composition.py
-                        - features: list = clusters[c]
-                        - tuple(RectangularDomain.from_features(features) for c in clusters) -- this returns (clusters are turned into RectangularDomains)
-                
-                [clusters are grouped features based on overalps of feature boxes here; so input features should be dressed with boxes]
-
-                featured with default boxes from postinit are created in GridManager.spec_window.find_clusters_by_featboxes, 
-                    but actaully features are initialized before - in get_features_to_draw(), in "all_features" step, 
-                    and spectral window holds them.
-                '''
-                self.artifacts.regions = self.artifacts.grid_manager.create_regions()
-                if not self.artifacts.regions:
-                    raise ValueError("No regions were created")
-
-            with self.step("regions_results"):
-                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
-                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma)
-                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
-                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
-                else:
-                    raise ValueError('Gamma cannot be converted from the given unit to au')
-                self.artifacts.regions_results = evaluate_regions(self.artifacts.regions, 
-                                                                     self.artifacts.vib_data, 
-                                                                     self.artifacts.vibdiff_cache,
-                                                                     gamma,
-                                                                     self.ctx.verbose)
-
-            # self._save_checkpoint('Step4')  # Save checkpoint
-
-            # Part 5: Assemble the full grid
-            with self.step("place_results"):
-                self.artifacts.grid_manager.place_results_into_grid(self.artifacts.regions_results)
-
-            # Return results
-            return self.artifacts.grid_manager.full_grid
-            
-        except Exception as e:
-            from wilson_suite.wilson_utils.serialization import pickle_this_to
-            filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self, filename_pkl)
-            
-            raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-            ) from e
- 
-    def _save_checkpoint(self, name: str):
-        """
-        FIXME: self.results are not serializable yet
-        """
-        raise NotImplementedError('_save_checkpoint')
-        import json
-
-        # Save intermediate results to a file or log them
-        with open(f'checkpoint_{name}.json', 'w') as f:
-            json.dump(self.results, f)
-
-
-def evaluate_regions(regions: list["GridRegion"], 
-                     vib_data: "VibStatesData", 
-                     vibdiff_cache: "VibDiffCache", 
-                     gamma: float,
-                     verbose: bool):
-
-    # Step 2: Evaluate each region
-    region_results = {}
-    for region in regions:
-        if verbose:
-            logger.info(f"\nEvaluating region with {len(region.features)} features")
-        
-        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, gamma, verbose)
-        
-        if verbose:
-            intensity = region_results[region]
-            logger.info(f"  Region shape: {intensity.shape}")
-            logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
-    return region_results
-
-def evaluate_region(region: "GridRegion",
-                    vib_data: "VibStatesData", 
-                    vibdiff_cache: "VibDiffCache", 
-                    gamma: float,
-                    verbose: bool = False) -> np.ndarray:
-    """Evaluate all features in a single grid region."""
-    # Initialize result array
-    target_shape = np.broadcast(*(arr for arr in region.coords.values())).shape
-    # result = np.zeros_like(next(iter(region.coords.values())), dtype=complex)
-    result = np.zeros(target_shape, dtype=complex)
-    
-    # Sum contributions from all features
-    for feature in region.features:
-        if verbose:
-            logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
-        
-        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords_au, verbose)
-        
-    return result
-
-def evaluate_feature(feature: 'SpectralFeature', 
-                     vib_data: "VibStatesData", 
-                     vibdiff_cache: "VibDiffCache", 
-                     gamma: float,
-                     coords: dict[str, np.ndarray],
-                     verbose: bool = False) -> np.ndarray:
-    """Evaluate a single feature on grid coordinates."""
-    # Compile feature to numerical form
-    from .numerical_abstractions import compile_feature
-    compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
-
-    
+    surviving = SpectralFeature.apply_magn_cond_filter(
+        window.full_features + window.contrib_features,
+        magn_conditions=settings.exp_magn_conditions,
+        magn_conditions_margin=settings.magn_conditions_margin,
+    )
+    if not surviving:
+        raise ValueError("Magn-condition filter left 0 features")
     if verbose:
-        logger.info(f"    Compiled into {len(compiled_groups)} term groups")
-    
-    # Sum all compiled groups
-    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
-    # feature_sum = np.zeros_like(next(iter(coords.values())), dtype=complex)
-    feature_sum = np.zeros(target_shape, dtype=complex)
+        print(f" After magn-cond filter: {len(surviving)} features")
+    return window.with_features(surviving)
 
+def _get_intensity_bounds(window: 'SpectralWindow'):
+    feats = window.full_features
+    max_intensity_in_window = SpectralFeature.get_max_intensity_feat(feats).get_intensity()
+    min_intensity_in_window = 0.
+    return max_intensity_in_window, min_intensity_in_window
+
+def dress_features_with_boxes(
+    window: 'SpectralWindow',
+    settings: RenderSettings,
+) -> 'SpectralWindow':
+    """Add bounding boxes around features for region creation."""
+    max_int, _ = _get_intensity_bounds(window)
+    min_int = max_int / settings.dynamic_range
     
-    for group in compiled_groups:
-        feature_sum += evaluate_compiled_group(group, coords, gamma)
-    
-    # Apply amplitude coefficient
-    return feature.amplitude_coeff * feature_sum
+    window.full_features = SpectralFeature.dress_these_with_boxes(
+        window.full_features,
+        max_int, min_int,
+        box_range_safety_margin=settings.box_range_safety_margin,
+        scale_wrt_max_intensity=settings.scale_wrt_max_intensity,
+        minimum_box_padding=settings.minimum_box_padding,
+    )
+    window.contrib_features = SpectralFeature.dress_these_with_boxes(
+        window.contrib_features,
+        max_int, min_int,
+        box_range_safety_margin=settings.box_range_safety_margin,
+        scale_wrt_max_intensity=settings.scale_wrt_max_intensity,
+        minimum_box_padding=settings.minimum_box_padding,
+    )
+
+    return window
 
 
-def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
-                             coords: Dict[str, np.ndarray],
-                             gamma: float) -> np.ndarray:
-    """
-    Calculate resonance motif contribution at grid points.
+def prepare_features_for_evaluation(
+    features: FeatureResult,
+    spec_window: 'SpectralWindow',
+    settings: RenderSettings,
+    verbose: bool = False,
+) -> 'SpectralWindow':
+    window = filter_features_to_window(features, spec_window)
+    window = apply_magn_cond_filter(window, settings, verbose)
+    window = dress_features_with_boxes(window, settings)
+    return window
+
+
+def evaluate_regions_on_grid(
+    prepared_window: 'SpectralWindow',
+    grid_resolution: dict,
+    qc: QCDataContext,
+    gamma_au: float,
+    verbose: bool = False,
+) -> tuple[RegionEvaluation, GridContext]:
+    eval_grid = build_grid_context(prepared_window, grid_resolution)
+    regions = eval_grid.grid_manager.create_regions()
+    if not regions:
+        raise ValueError("No regions were created")
+    regions_results = evaluate_regions(
+        regions, qc.vib_data, qc.vibdiff_cache, gamma_au, verbose
+    )
+    return RegionEvaluation(regions=regions, regions_results=regions_results), eval_grid
+
+
+def assemble_spectrum(region_eval: RegionEvaluation, grid: GridContext) -> EvaluatedSpectrum:
+    full_grid = grid.grid_manager.place_results_into_grid(region_eval.regions_results)
+    result = full_grid.pop('result')
+    return EvaluatedSpectrum(axes=full_grid, result=result)
+
+
+def _get_gamma_au(ev_info: 'EvaluationInfo') -> float:
+
+    if ev_info.Gamma_unit == 'cm-1':
+        return convNu2Ene(ev_info.Gamma)
+    elif ev_info.Gamma_unit == 'au':
+        return ev_info.Gamma
+    raise ValueError(f"Gamma cannot be converted from unit {ev_info.Gamma_unit!r} to au")
+
+def _get_gamma_cm(ev_info: 'EvaluationInfo') -> float:
+
+    if ev_info.Gamma_unit == 'au':
+        return convNu2Ene(ev_info.Gamma, reverse=True)
+    elif ev_info.Gamma_unit == 'cm-1':
+        return ev_info.Gamma
+    raise ValueError(f"Gamma cannot be converted from unit {ev_info.Gamma_unit!r} to cm-1")
+
+
+## -------------------------------------
+class EvaluationWorkflow:
+    def __init__(self, simulation: 'WilsonSimulation'):
+        self.simulation = simulation
+        # Cache for lazy builds
+        self._experiment_ctx = None
+        self._qcdata_ctx = None
+        self._axis_ctx = None
+        self._precalc_ctx = None
+        self._bound_motifs_ctx = None
     
-    Args:
-        motif: Compiled resonance motif with conditions
-        coords: Dict of axis_label -> meshgrid array
+        self.feat_result = None
+        self.region_eval = None
+
+    @property
+    def experiment_ctx(self):
+        if self._experiment_ctx is None:
+            self._experiment_ctx = build_experiment_context(self.simulation)
+        return self._experiment_ctx
+    
+    @property
+    def qcdata_ctx(self):
+        if self._qcdata_ctx is None:
+            self._qcdata_ctx = build_qc_context(self.simulation)
+        return self._qcdata_ctx
+    
+    @property
+    def axis_ctx(self):
+        if self._axis_ctx is None:
+            self._axis_ctx = build_axis_context(
+                self.experiment_ctx,
+                self.simulation,
+            )
+        return self._axis_ctx
+    
+    @property
+    def precalc_ctx(self):
+        if self._precalc_ctx is None:
+            self._precalc_ctx = build_precalc_context(self.experiment_ctx, self.qcdata_ctx)
+        return self._precalc_ctx
+    
+    @property
+    def bound_motifs_ctx(self):
+        if self._bound_motifs_ctx is None:
+            self._bound_motifs_ctx = bind_motifs(self.axis_ctx, self.precalc_ctx)
+        return self._bound_motifs_ctx
+    
+    
+    def prepare(self) -> "EvaluationWorkflow":
+        """
+        Build all shared contexts now. 
+        Returns self for chaining.
         
-    Returns:
-        Complex array with resonance contributions
-    """
-    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
-    total = np.ones(target_shape, dtype=complex)
-    # total = np.ones_like(next(iter(coords.values())), dtype=complex)
+        triggers a chain of builders
+        """
+        _ = self.bound_motifs_ctx
+        return self
     
-    for res_cond in motif.res_conds:
-        # Calculate photon frequency: sum over axes
-        pfreq = sum(coords[ax] * res_cond.pf_dict[ax] 
-                    for ax in res_cond.pf_dict)
-        # Resonance denominator
-        z = res_cond.vib_energy_diff - pfreq - 1j * gamma
-        # print(z)
-        total *= 1.0 / z
+    
+    def evaluate(self, *, gamma_cm=None, 
+                 spec_window=None, grid_resolution=None, 
+                 settings=None, verbose=False) -> EvaluatedSpectrum:
+        ev_info = self.simulation.spec_eval_setup.ev_info
+        spec_window = spec_window if spec_window is not None else ev_info.spectral_window
+        grid_resolution = grid_resolution if grid_resolution is not None else ev_info.grid_resolution
+        settings = settings if settings is not None else _settings_from_ev_info(ev_info)
+        gamma_cm = gamma_cm if gamma_cm is not None else ev_info.Gamma
+        gamma_au = convNu2Ene(gamma_cm)
         
-    return total
+        features = compute_features(self.bound_motifs_ctx, gamma_cm)
+        prepared_window = prepare_features_for_evaluation(features, spec_window, settings, verbose)
+        
+        region_eval, render_grid = evaluate_regions_on_grid(
+            prepared_window, grid_resolution, self.qcdata_ctx, gamma_au, verbose
+        )
+        spectrum = assemble_spectrum(region_eval, render_grid)
+        
+        self.feat_result = features
+        self.region_eval = region_eval
+        return spectrum
 
-def evaluate_compiled_group(group: 'CompiledTermGroup',
-                            coords: Dict[str, np.ndarray],
-                            gamma: float) -> np.ndarray:
-    """Sum all resonance motifs in a compiled group."""
-    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
-    result = np.zeros(target_shape, dtype=complex)
-    # result = np.zeros_like(next(iter(coords.values())), dtype=complex)
+    # ---- Sweeps ----
     
-    for motif in group.resonance_motifs:
-        result += evaluate_resonance_motif(motif, coords, gamma)
-    # print('evaluate_compiled_group', result)
-    return result
+    def sweep_gamma(self, gammas_cm: list[float]) -> dict[float, EvaluatedSpectrum]:
+        return {g: self.evaluate(gamma_cm=g) for g in gammas_cm}
+    
+    def sweep_grid(self, grid_specs: list[tuple['SpectralWindow', dict]]) -> dict[tuple, EvaluatedSpectrum]:
+        return {(w, r): self.evaluate(spec_window=w, grid_resolution=r) for w, r in grid_specs}
+    
+    def sweep_gamma_x_grid(self, gammas_cm, grid_specs) -> dict[tuple[float, tuple], EvaluatedSpectrum]:
+        return {
+            (g, (w, r)): self.evaluate(gamma_cm=g, spec_window=w, grid_resolution=r)
+            for g in gammas_cm for (w, r) in grid_specs
+        }
+    
 
+###########################

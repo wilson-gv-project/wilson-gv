@@ -14,10 +14,12 @@ from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
+from pathlib import Path
 
 import logging
 
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 
 logger = logging.getLogger("wilson")
 
@@ -390,6 +392,7 @@ class WilsonSimulation:
 			raise ValueError(f"unknown where flag: {where}")
 
 
+	'''	
 	def evaluate(self, save_evalinputs_pkl: str = None, verbose: bool = False):
 		"""
 		Evaluating method, using EvaluationWorkflow
@@ -416,10 +419,27 @@ class WilsonSimulation:
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
-
 		# TODO: this is a temporary fix? can be organized better?
 		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
 		self.spec = wf_result['result']
+		'''
+
+	def evaluate(self, *, verbose: bool = False, save_dir: Path = None):
+		"""Run evaluation. Stores result on self.spec; stashes workflow for inspection."""
+		if self.axis_choice is None:
+			self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
+		
+		workflow = EvaluationWorkflow(self)
+		self._workflow = workflow
+		
+		evaluated = workflow.evaluate()
+		
+		if save_dir is not None:
+			workflow.save_to(save_dir)
+		
+		self.spec = evaluated.result
+		self.spec_eval_setup.grid = evaluated.axes
+		return evaluated
 
 	def evaluate_with_default_setup_fill(self):
 		"""
