@@ -3,32 +3,6 @@ from typing import Optional, Tuple, Dict, Any
 from dataclasses import dataclass, field
 
 
-class NormalizationType(Enum):
-    """
-    # LOG_RATIO: log10(x)/log10(max)
-    # Shows relative order of magnitude
-    # Example: 0.5 means halfway between min and max in log scale
-
-    # DECIBEL: 10 * log10(x/max)
-    # Standard intensity scale in spectroscopy
-    # 0 dB = max, -20 dB = 1/100 of max
-    https://www.montana.edu/rmaher/eele417_fl14/decibel_scale_eele417.pdf
-    https://en.wikipedia.org/wiki/Decibel
-    https://www.animations.physics.unsw.edu.au/jw/dB.htm
-    
-    # PERCENTAGE: (x/max) * 100
-    # Linear scale percentage
-    # Direct proportion to maximum
-
-    # LOG_SCALE: (log10(x) - log10(min))/(log10(max) - log10(min))
-    # Normalized position in log space
-    # 0 = minimum, 1 = maximum
-    """
-    LOG_RATIO = "log_ratio"
-    DECIBEL = "db"
-    PERCENTAGE = "percent"
-    LOG_SCALE = "log_scale"
-
 @dataclass
 class PlotConfig:
     """Configuration for plot styling"""

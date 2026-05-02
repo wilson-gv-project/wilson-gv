@@ -40,7 +40,7 @@ class LevelCalculator:
     organizes the logic for computing levels and labels
     based on dynamic range, number of levels, and normalization type.
     """
-
+    '''
     @staticmethod
     def compute_levels(intensities: float, dynamic_range: float,
                     nlevels: int, colormap_spacing: str = None,
@@ -51,8 +51,8 @@ class LevelCalculator:
         instead of the data's own maximum.
         """
         if reference_max is not None:
-            d_max = reference_max
-            print(f'Scaling wrt reference_max: {reference_max:.2e}/{np.max(intensities):.2e}={reference_max/np.max(intensities):.2e}')
+            d_max = 1.
+            # print(f'Scaling wrt reference_max: {reference_max:.2e}/{np.max(intensities):.2e}={reference_max/np.max(intensities):.2e}')
         else:
             d_max = np.max(intensities)
         
@@ -75,6 +75,38 @@ class LevelCalculator:
 
         LevelCalculator._validate_levels(level_values)
 
+        return level_values, level_labels
+    '''
+
+    @staticmethod
+    def compute_levels(intensities, dynamic_range, nlevels,
+                    colormap_spacing=None, is_normalized=False):
+        """Calculate contour levels matching the data scale.
+
+        If is_normalized=True, the data has already been divided by a
+        reference value, so d_max is fixed at 1.0 (giving a shared scale
+        across spectra normalized to the same reference). Otherwise d_max
+        comes from the data itself.
+        """
+        d_max = 1.0 if is_normalized else np.max(intensities)
+
+        if d_max <= 0:
+            raise ValueError(
+                "Logarithmic colormap requested, but data contains no positive "
+                f"values (max={d_max})."
+            )
+
+        d_min = d_max / dynamic_range
+
+        if colormap_spacing == "log":
+            level_values = np.logspace(np.log10(d_min), np.log10(d_max), nlevels)
+        elif colormap_spacing == "linear":
+            level_values = np.linspace(d_min, d_max, nlevels)
+        else:
+            raise ValueError('Choose log or linear colormap_spacing')
+
+        level_labels = [f"${val:.1e}$" for val in level_values]
+        LevelCalculator._validate_levels(level_values)
         return level_values, level_labels
 
     @staticmethod
@@ -169,6 +201,7 @@ class SpectrumRenderer(ABC):
         if self.intensities is None:
             if spec_data_operations == 'abs()**2':
                 self.intensities = np.abs(self.spec_data) ** 2
+                print('intensities')
             elif spec_data_operations == 'abs':
                 self.intensities = np.abs(self.spec_data)
             elif spec_data_operations == 'real':
@@ -195,18 +228,12 @@ class SpectrumRenderer(ABC):
         elif len(self.spec_grid)==2:
             self.Xdata, self.Ydata = list(self.spec_grid.values())
 
-    def normalize_to_reference_max(self, reference_max: float=None):
-        """
-        not used right now
-        """
+    def normalize_to_reference_max(self, reference_max=None):
+        """Divide intensities by reference_max for cross-spectrum comparison."""
         if reference_max is None:
-
-            if self.rnd_info.reference_max is not None:
-                reference_max = self.rnd_info.reference_max
-            else:
-                raise ValueError("Provide reference maximum value to normalize")
-
-            self.intensities = self.intensities/reference_max
+            reference_max = self.rnd_info.reference_max
+        if reference_max is not None:
+            self.intensities = self.intensities / reference_max
 
     def _validate_inputs(self):
         """
@@ -250,7 +277,7 @@ class SpectrumRenderer(ABC):
                              f"  y.shape = {self.Ydata.shape}\n"
                              f"  z.shape = {self.intensities.shape}\n"
                              )
-
+    '''
     def render(self, filename: str):
         """Main rendering pipeline"""
         self._validate_inputs()
@@ -261,7 +288,7 @@ class SpectrumRenderer(ABC):
         self._validate_data_2d()
 
         # log10 = True if self.rnd_info.intensity_normalization_type is not None else False
-        
+
         # Calculate levels with both original and normalized scales
         levels, labels = self.level_calc.compute_levels(
             intensities=self.intensities,
@@ -283,6 +310,33 @@ class SpectrumRenderer(ABC):
         # self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
 
         return fig, ax, contour, cbar
+
+    '''
+    
+    def render(self, filename: str):
+        self._validate_inputs()
+        self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+
+        is_normalized = self.rnd_info.reference_max is not None
+        self.normalize_to_reference_max(self.rnd_info.reference_max)
+        self._validate_data_2d()
+
+        levels, labels = self.level_calc.compute_levels(
+            intensities=self.intensities,
+            dynamic_range=self.ev_info.dynamic_range,
+            nlevels=self.rnd_info.nlevels,
+            colormap_spacing=self.config.colormap_spacing,
+            is_normalized=is_normalized,
+        )
+        self.levels, self.labels = levels, labels
+
+        fig, ax = self.initialize_plot()
+        fig, ax, contour = self.create_contour(plot_obj=(fig, ax), levels=levels, data=self.intensities)
+        fig, ax = self.setup_axes(plot_obj=(fig, ax))
+        fig, ax, cbar = self.add_colorbar(plot_obj=(fig, ax, contour), levels=levels, labels=labels)
+        self.finalize(plot_obj=(fig, ax, cbar))
+        return fig, ax, contour, cbar
+
 
 def compute_masks(data: np.ndarray, 
                   dynamic_range: float, 

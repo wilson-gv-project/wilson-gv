@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 from pathlib import Path
 
-from ..wilson_analysis.render.render_utils import PlotConfig, NormalizationType
+from ..wilson_analysis.render.render_utils import PlotConfig
 from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 
@@ -275,7 +275,7 @@ class EvaluationInfo:
 	box_range_safety_margin: float = 0.1
 	scale_wrt_max_intensity: bool = False
 	minimum_box_padding: float = 0.0
-			
+
 	# not filtering by default
 	apply_exp_magn_conditions_eval: bool = False
 	apply_exp_magn_conditions_render: bool = False
@@ -296,7 +296,6 @@ class RenderingInfo:
 	projection: str = '2d'
 	reference_max: float = None
 	nlevels: int = 12
-	intensity_normalization_type: NormalizationType = NormalizationType.LOG_SCALE
 	title: str = 'plot'
 	spec_data_operations: str = 'abs()**2'  # 'abs', 'real', 'imag', 'abs()**2'
 	metadata: dict = field(default_factory=lambda: dict())

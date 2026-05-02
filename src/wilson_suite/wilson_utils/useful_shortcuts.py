@@ -172,8 +172,7 @@ def makeSpecSetup2D(start, end, spacer, axes: dict, configs: dict) -> "SpecEvalS
     evi = spc_abst.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                  'Gamma': 4.7, 'Gamma_unit': 'cm-1',
                                                  'margins': {'w1': 10., 'w2': 10.}})
-    rndi = spc_abst.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_SCALE,
-                                                 'dynamic_range': configs.get('dynamic_range', None),
+    rndi = spc_abst.RenderingInfo(**{'dynamic_range': configs.get('dynamic_range', None),
                                                  'num_levels': 15, 
                                                  'reference_max': None,
                                                  'spec_data_operations': 'abs()**2',

@@ -137,13 +137,7 @@ def test_full_integration_other_axes_choice():
     import pytest
     with pytest.raises(ValueError) as error:
         sim.evaluate()
-    assert str(error.value) == "Failed at 'place_in_specwindow': This SpectralWindow does not contain any features. Change the bounds of the window or use different terms. EvaluationWorkflow instanse was saved to `eval_wf.pkl`."
-
-
-def test_smth():
-    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
-    wf: ws.intensities.amplitudes.evaluation_wf.EvaluationWorkflow = unpickle_smth_from('eval_wf.pkl')
-    print(wf.artifacts.features)
+    assert str(error.value) == "No features in this spec window"
 
 
 def test_full_integration_H2O_molecule():

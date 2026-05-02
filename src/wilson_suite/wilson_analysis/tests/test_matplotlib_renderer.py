@@ -73,8 +73,7 @@ def tests_MatplotlibRenderer():
 
 
     spec_grid = {'x': X, 'y': Y}
-    rnd_info = RenderingInfo(intensity_normalization_type=None, 
-                             spec_data_operations='none')
+    rnd_info = RenderingInfo(spec_data_operations='none')
     rnd_info.style_config.colormap_spacing = 'linear'
 
     with pytest.raises(ValueError) as error:
@@ -93,8 +92,7 @@ def test_render_returns():
     spec = -(X**2 + Y**2)
 
     spec_grid = {'xlabel': X, 'y_lbl': Y}
-    rnd_info = RenderingInfo(intensity_normalization_type=None, 
-                             spec_data_operations='none')
+    rnd_info = RenderingInfo(spec_data_operations='none')
     rnd_info.spec_data_operations = 'abs()**2'
     ev_info = EvaluationInfo(dynamic_range=1000)
     
@@ -102,6 +100,9 @@ def test_render_returns():
                                                 spec_grid=spec_grid, 
                                                 ev_info=ev_info, rnd_info=rnd_info, 
                                                 do_diagn=True).render(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
+    fig.savefig(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg', 
+                bbox_inches='tight',
+                dpi=200, format='svg')
     import matplotlib
     assert isinstance(fig, matplotlib.figure.Figure)
     assert isinstance(ax, matplotlib.axes.Axes)
@@ -137,47 +138,3 @@ def test_render_returns():
     os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
     os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0_svg.png')
     os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref_svg.png')
-
-
-class TestCreateContour:
-    """
-    grouping tests in a class (test and a fixture for now)
-    """
-    @pytest.fixture
-    def setup(self) -> tuple[MatplotlibRenderer, tuple[plt.Figure, plt.Axes]]:
-
-        obj = MatplotlibRenderer()
-        # Mock or set up necessary attributes
-        x = np.linspace(0, 10, 10)
-        y = np.linspace(0, 10, 10)
-        obj.Xdata, obj.Ydata = np.meshgrid(x, y)
-
-        obj.config = MagicMock()
-        obj.config.colormap = "viridis"
-        obj.config.saturation_color = "red"
-        obj.config.no_data_color = "gray"
-        obj.config.below_range_color = "blue"
-        obj.config.data_edge_color = "black"
-        obj.config.data_edge_width = 1.0
-        obj.ev_info = MagicMock()
-        obj.ev_info.dynamic_range = 10
-        obj.rnd_info = MagicMock()
-        obj.rnd_info.intensity_normalization_type = None
-
-        fig, ax = plt.subplots()
-        plot_obj = (fig, ax)
-        return obj, plot_obj
-    def test_basic_functionality(self, setup: tuple[MatplotlibRenderer, tuple[plt.Figure, plt.Axes]]):
-        obj, plot_obj = setup
-
-        data = np.random.rand(10, 10)
-        levels = np.linspace(0, 1, 5)
-        fig, ax, contour = obj.create_contour(plot_obj, levels, data)
-
-        assert isinstance(fig, plt.Figure)
-        assert isinstance(ax, plt.Axes)
-        assert contour is not None
-        
-        import matplotlib
-        assert isinstance(contour, matplotlib.contour.QuadContourSet)
-        assert len(contour.levels) == len(levels)

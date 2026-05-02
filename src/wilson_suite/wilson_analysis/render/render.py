@@ -72,11 +72,16 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
             verticalalignment='top', bbox=props)
     
     renderer.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
+    lowest_value = cbar.norm.vmin
+
+
+    print("\nCBAR MIN:", lowest_value, '\n')
 
     if features is not None:
         colors = {'a+b,a': 'cyan', 'b,a': 'orange'}
         print('hello')
         for f in features:
+            
             a = f.term_contributions[0].states_parameters[0]['a']
             b = f.term_contributions[0].states_parameters[0]['b']
             res_type = f.term_contributions[0].res_motif.to_str()

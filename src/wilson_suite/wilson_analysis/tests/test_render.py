@@ -19,8 +19,7 @@ def test_render_spectrum_simplecontour():
     X, Y = np.meshgrid(x_vals, y_vals)
     spec = X**2 + Y**2
 
-    rndinfo = RenderingInfo(intensity_normalization_type=None, 
-                            spec_data_operations='none', nlevels=6,
+    rndinfo = RenderingInfo(spec_data_operations='none', nlevels=6,
                             filename='simple_contour.svg')
     spec_eval_setup = SpecEvalSetup(rnd_info=rndinfo)
     assert not spec_eval_setup.is_ready_render
@@ -82,8 +81,7 @@ def test_render_spectrum_simplecontour_sq():
     X, Y = np.meshgrid(x_vals, y_vals)
     spec = np.sqrt(X**2 + Y**2)
 
-    rndinfo = RenderingInfo(intensity_normalization_type=None, 
-                            spec_data_operations='abs()**2', nlevels=6,
+    rndinfo = RenderingInfo(spec_data_operations='abs()**2', nlevels=6,
                             filename='simple_contour_sq.svg')
     spec_eval_setup = SpecEvalSetup(rnd_info=rndinfo)
     assert not spec_eval_setup.is_ready_render

@@ -4,7 +4,6 @@ from matplotlib import pyplot as plt
 import matplotlib
 
 from .spectrum_renderer import SpectrumRenderer 
-from .render_utils import NormalizationType
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
@@ -52,11 +51,8 @@ class MatplotlibRenderer(SpectrumRenderer):
         cmap = plt.get_cmap(self.config.colormap).copy()
         cmap.set_over(self.config.saturation_color)
                 
-        if self.rnd_info.intensity_normalization_type is not None:
-            # Create logarithmic normalization for color mapping
-            norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
-        else:
-            norm = None
+        # Create logarithmic normalization for color mapping
+        norm = matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1])
 
         # Plot main data with normalized colors
         contour = ax.contourf(self.Xdata, self.Ydata, 
@@ -166,85 +162,68 @@ class MatplotlibRenderer(SpectrumRenderer):
         # https://stackoverflow.com/questions/2969867/how-do-i-add-space-between-the-ticklabels-and-the-axes
         
         return fig, ax
-    
-    def add_colorbar(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any], 
-                    levels: np.ndarray, labels: List[str]) -> Tuple[plt.Figure, plt.Axes, Any]:
-        """
-        https://pythonmatplotlibtips.blogspot.com/2019/07/draw-two-axis-to-one-colorbar.html
-        """
-        fig, ax, contour = plot_obj
 
-        # Create colorbar and manually align it to the plot's height
+    def add_colorbar(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any], 
+                     levels: np.ndarray, labels: List[str]):
+        fig, ax, contour = plot_obj
         cbar = fig.colorbar(contour, ax=ax)
 
+        # right axis — absolute intensity (positions handled by colorbar)
         ax1 = cbar.ax
         ax1.set_aspect('auto')
-
-        fig.canvas.draw()  # Ensure layout is updated
+        fig.canvas.draw()
         pos = cbar.ax.get_position()
 
-        # Create and set up normalized (left) axis
+        # left axis — fractional, positioned via log-stretch
         ax2 = ax1.twinx()
         ax2.set_position(pos)
-        
-        # Calculate normalized positions based on selected normalization type
-        if self.rnd_info.intensity_normalization_type == NormalizationType.LOG_RATIO:
-            norm_positions = np.log10(levels)/np.log10(levels[-1])
-            norm_format = "{x:.3f}"
-            norm_label = "Log Ratio"
-        elif self.rnd_info.intensity_normalization_type == NormalizationType.DECIBEL:
-            norm_positions = 10 * np.log10(levels/levels[-1])
-            norm_format = "{x:.1f} dB"
-            norm_label = "Intensity (dB)"
-        elif self.rnd_info.intensity_normalization_type == NormalizationType.PERCENTAGE:
-            norm_positions = (levels/levels[-1]) * 100
-            norm_format = "{x:.1f}%"
-            norm_label = "Relative Intensity (%)"
-        elif self.rnd_info.intensity_normalization_type is None:
-            norm_positions = levels
-            norm_format = "{x:.2f}"
-            norm_label = "Original"
 
-        else:  # LOG_SCALE
-            norm_positions = (np.log10(levels) - np.log10(levels[0]))/(np.log10(levels[-1]) - np.log10(levels[0]))
-            norm_format = "{x:.2f}"
-            norm_label = "Log-scale Normalized"
-        
-        if self.rnd_info.intensity_normalization_type is not None:
-            logger.debug(f"Normalized positions ({self.rnd_info.intensity_normalization_type.value}): {norm_positions}") #z
-        
-        # Set up normalized axis limits and ticks
-        ax2.set_ylim(min(norm_positions), max(norm_positions))
-        ax2.set_yticks(norm_positions)
-        ax2.set_yticklabels([norm_format.format(x=x) for x in norm_positions])
+        is_normalized = self.rnd_info.reference_max is not None
+
+        # Right axis: always absolute intensity.
+        if is_normalized:
+            ref = self.rnd_info.reference_max
+            right_labels = [f"${val * ref:.1e}$" for val in levels]
+        else:
+            right_labels = labels  # already absolute, formatted in compute_levels
+        right_ticks = levels
+        right_label_text = self.config.colorbar_main_label
+
+        # Left axis: uniformly-spaced positions (log-stretched to [0, 1]) so ticks
+        # align visually with the right axis. Labels differ by mode.
+        left_ticks = (np.log10(levels) - np.log10(levels[0])) / \
+                    (np.log10(levels[-1]) - np.log10(levels[0]))
+        if is_normalized:
+            left_labels = [f"{val:.3f}" for val in levels]
+            left_label_text = "Normalized (a.u.)"
+        else:
+            left_labels = [f"{val / levels[-1]:.3f}" for val in levels]
+            left_label_text = "Normalized to self (a.u.)"
+
+        # Left axis (ax2)
+        ax2.set_ylim(min(left_ticks), max(left_ticks))
+        ax2.set_yticks(left_ticks)
+        ax2.set_yticklabels(left_labels)
         ax2.yaxis.set_ticks_position('left')
         ax2.yaxis.set_label_position('left')
-        
-        # Move colorbar position slightly to the right
+        ax2.set_ylabel(left_label_text, rotation=90, labelpad=48,
+                    fontsize=getattr(self.config, 'label_fontsize', 25))
+
+        # Right axis (ax1) — shift slightly to make room
         pos.x0 += 0.06
         pos.x1 += 0.06
-        
-        # Set up main (right) axis
         ax1.set_position(pos)
         ax1.yaxis.set_ticks_position('right')
         ax1.yaxis.set_label_position('right')
-        ax1.set_yticks(levels)
-        ax1.set_yticklabels(labels)
-        ax1.set_ylabel(self.config.colorbar_main_label,
-                       rotation=90,
-                       labelpad=48, # distance from axis to label
-                       fontsize=self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25)
-        
-        # Set normalized axis label
-        ax2.set_ylabel(norm_label,
-                       rotation=90,
-                       labelpad=48, # distance from axis to label
-                       fontsize=self.config.label_fontsize if hasattr(self.config, 'label_fontsize') else 25)
-        
-        # Adjust spacing between axes
+        ax1.set_yticks(right_ticks)
+        ax1.set_yticklabels(right_labels)
+        ax1.set_ylabel(right_label_text, rotation=90, labelpad=48,
+                    fontsize=getattr(self.config, 'label_fontsize', 25))
+
         cbar.ax.spines['right'].set_position(('outward', 0))
         ax2.spines['left'].set_position(('outward', 0))
         return fig, ax, cbar
+
 
     def finalize(self, plot_obj: Tuple[plt.Figure, plt.Axes, Any]) -> None:
         """
