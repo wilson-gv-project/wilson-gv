@@ -237,7 +237,7 @@ eval_vars_meshgrids = {}
 for i, key in enumerate(eval_vars.keys()):
     eval_vars_meshgrids[key] = meshgrids[i]
 
-from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from wilson_suite.analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 style_config = PlotConfig(
     figsize=(35, 45),

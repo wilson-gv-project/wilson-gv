@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, compute_masks
-from wilson_suite.wilson_analysis.render.render_utils import PlotConfig
+from wilson_suite.analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, compute_masks
+from wilson_suite.analysis.render.render_utils import PlotConfig
 import pytest
 import numpy as np
 

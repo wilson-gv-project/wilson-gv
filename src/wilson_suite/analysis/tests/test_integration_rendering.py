@@ -59,7 +59,7 @@ def test_full_integration():
     sim.evaluate()
 
     style_config = ws.main.spectrum_abstractions.PlotConfig(tick_step=100.)
-    rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh.svg', 
+    rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh.svg', 
                                                       style_config=style_config)
     sim.spec_eval_setup.rnd_info = rnd
 
@@ -74,15 +74,15 @@ def test_full_integration():
     # returns None when images are considered the same (within tolerance)
     # returns a dict when images differ too much
     diff = compare_images(
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh.svg',
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh_ref.svg',
+        SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh.svg',
+        SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh_ref.svg',
         tol=2.0  # allow small numerical differences
     )
     assert diff is None, diff # if diff is not None, show diff as the error message
     
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh.svg')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh_svg.png')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_hcoh_ref_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh.svg')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_hcoh_ref_svg.png')
 
 def test_full_integration_other_axes_choice():
     print()
@@ -192,7 +192,7 @@ def test_full_integration_H2O_molecule():
     sim.evaluate()
 
     style_config = ws.main.spectrum_abstractions.PlotConfig(tick_step=50.)
-    rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o.svg', 
+    rnd = ws.main.spectrum_abstractions.RenderingInfo(filename=SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o.svg', 
                                                       style_config=style_config)
     sim.spec_eval_setup.rnd_info = rnd
 
@@ -207,12 +207,12 @@ def test_full_integration_H2O_molecule():
     # returns None when images are considered the same (within tolerance)
     # returns a dict when images differ too much
     diff = compare_images(
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o.svg',
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o_ref.svg',
+        SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o.svg',
+        SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o_ref.svg',
         tol=2.0  # allow small numerical differences
     )
     assert diff is None, diff # if diff is not None, show diff as the error message
     
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o.svg')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o_svg.png')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_h2o_ref_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o.svg')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_h2o_ref_svg.png')

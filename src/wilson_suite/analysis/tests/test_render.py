@@ -1,7 +1,7 @@
 """
 
 """
-from wilson_suite.wilson_analysis.render.render import render_spectrum
+from wilson_suite.analysis.render.render import render_spectrum
 from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup, RenderingInfo, EvaluationInfo
 import os
 import numpy as np

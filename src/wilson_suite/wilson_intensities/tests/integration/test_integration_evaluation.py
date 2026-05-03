@@ -630,7 +630,7 @@ def test_integration_evv_experiment_until_after_evaluation():
     plt.xlabel('A')
     plt.ylabel('B')
     plt.colorbar(label='log intensity')
-    plt.show()
+    # plt.show()
 
 def test_full_integration_H2O_molecule():
     print()
