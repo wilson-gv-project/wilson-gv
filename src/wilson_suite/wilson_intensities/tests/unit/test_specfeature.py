@@ -65,26 +65,6 @@ def test_filter_to_spec_window():
     assert sf3 in sp.contrib_features
     assert sf2 in sp.full_features
 
-def test_feature_get_res_motifs():
-    print('\n')
-
-    from .test_domains import get_features_from_terms
-    features = get_features_from_terms()
-
-    from wilson_suite.fixtures import get_terms_from_json
-    terms_fuller_flat = get_terms_from_json()
-    t_inds = [0, 1,-1, -2, -3]
-    terms_select = [terms_fuller_flat[tID] for tID in t_inds]
-    terms_hashes = {t.h(): t for t in terms_select}
-    # print(terms_hashes)
-    
-    res_motifs_feat0 = features[0].get_res_motifs()
-    
-    print(res_motifs_feat0)
-    for refmotif in res_motifs_feat0:
-        for recond in refmotif:
-            print(recond)
-
 def test_dress_these_with_boxes_1d():
     print()
 

@@ -160,7 +160,10 @@ def build_axis_context(
         translated_magn_conditions = translate_magn_conditions_to_axisvars(experiment_ctx.magn_conditions, simulation.axis_choice)
     else:
         translated_magn_conditions = None
-    translated_terms = derived_terms_flat(simulation.terms_in_axis_choice, tolistonly=True)
+    if isinstance(simulation.terms_in_axis_choice, dict):
+        translated_terms = derived_terms_flat(simulation.terms_in_axis_choice, tolistonly=True)
+    else:
+        translated_terms = simulation.terms_in_axis_choice
 
     return AxisContext(
         experiment_ctx=experiment_ctx,
@@ -241,20 +244,28 @@ def apply_magn_cond_filter(
     settings: RenderSettings,
     verbose: bool = False,
 ) -> 'SpectralWindow':
-    """Filter features by magnetic conditions, if enabled in settings."""
+    """Filter features by magnitude conditions, if enabled in settings."""
     if not settings.apply_magn_cond_filter:
         return window
     
-    surviving = SpectralFeature.apply_magn_cond_filter(
-        window.full_features + window.contrib_features,
+    surviving_full = SpectralFeature.apply_magn_cond_filter(
+        window.full_features,
         magn_conditions=settings.exp_magn_conditions,
         magn_conditions_margin=settings.magn_conditions_margin,
     )
-    if not surviving:
+    '''    
+    surviving_contrib = SpectralFeature.apply_magn_cond_filter(
+        window.contrib_features,
+        magn_conditions=settings.exp_magn_conditions,
+        magn_conditions_margin=settings.magn_conditions_margin,
+    )
+    '''
+    if not surviving_full:
         raise ValueError("Magn-condition filter left 0 features")
     if verbose:
-        print(f" After magn-cond filter: {len(surviving)} features")
-    return window.with_features(surviving)
+        print(f" After magn-cond filter: {len(surviving_full)} features")
+    window.full_features = surviving_full
+    return window
 
 def _get_intensity_bounds(window: 'SpectralWindow'):
     feats = window.full_features

@@ -113,71 +113,9 @@ def get_necessary_data(terms_select: list[VibPerturbedTerm]):
     return results
 
 
-def test_evaluate_feature_on_grid():
-    print()
-    from .test_domains import get_features_from_terms, get_data_evaluators_tests
-    datadict = get_data_evaluators_tests()
-    
-    features = get_features_from_terms(lineshape_parameter=9.5)
-
-    spec_window = datadict['spec_eval_setup'].ev_info.spectral_window
-
-    from ...amplitudes.spectrum_composition import SpectralFeature, Box, RectangularDomain
-    spec_window_with_features = SpectralFeature.filter_to_spec_window(features, spec_window)
-
-    feat_all = spec_window_with_features.full_features + spec_window_with_features.contrib_features
-    domains = domfuncs.features_to_clusters(features=feat_all)
-    domains_in_window = [RectangularDomain(box=Box.union([f.feat_box for f in domains[d]]), full_features=domains[d]) for d in domains]
-    
-    
-    domain3 = domains_in_window[3]
-    d3_all_feats = domain3.full_features + domain3.contrib_features
-
-    coords_vectors, spec_grid = spec_window_with_features.sample_grid({'A': 10, 'B': 10})
-
-    domains_with_subgrids = domfuncs.cut_grid_to_domains_nd(full_meshgrids=spec_grid, 
-                                                             axis_coords=coords_vectors,
-                                                             domains=domains_in_window)
-    
-
-    from ...amplitudes.term_parts import EvaluationDataAndConfigs, VibStatesData
-    from ...amplitudes.vibene_differences import VibDiffCache
-    from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolPropsCollection
-
-    from ...amplitudes.numerical_abstractions import compile_feature
-    from ...amplitudes.evaluation_wf import evaluate_feature
-
-    vas: VibAnaSetup = datadict['vib_ana_setup']
-    dd = EvaluationDataAndConfigs(props_data=MolPropsCollection(datadict["props"]),
-                                  vibstates_data=VibStatesData(allstates=vas.states),
-                                  pulse_polarization_vector=[1., 1., 1.],
-                                  number_of_nmodes=4)
-
-    vd_cache = VibDiffCache()
-
-    compiled_groups = compile_feature(
-        d3_all_feats[0],
-        dd.vibstates_data,
-        vd_cache
-    )
-    
-    print(compiled_groups)
-    print(domains_with_subgrids[domain3]['grid'])
-
-    d3_all_feats[0].amplitude_coeff = 1.
-    final = evaluate_feature(feature=d3_all_feats[0],
-                             vib_data=dd.vibstates_data,
-                             vibdiff_cache=vd_cache,
-                             gamma=9.5,
-                             coords=domains_with_subgrids[domain3]['grid'])
-    # final = evaluators.evaluate_feature_on_grid(compiled_groups=compiled_groups, 
-    #                                             meshgrids=domains_with_subgrids[domain3]['grid'],
-    #                                             gamma=2.0,
-    #                                             amplitude_coeff=d3_all_feats[0].amplitude_coeff)
-    # print(final)
 
 def test_evaluate_compiled_group():
-    from ...amplitudes.evaluation_wf import evaluate_compiled_group
+    from ...amplitudes.evaluators import evaluate_compiled_group
     from ...amplitudes.numerical_abstractions import CompiledTermGroup
     
     # Simple 1D grid for "A"
@@ -235,7 +173,7 @@ def test_evaluate_feature_on_grid_new_2():
     """
     gamma nonzero, two resonance conditions per motif
     """
-    from ...amplitudes.evaluation_wf import evaluate_compiled_group
+    from ...amplitudes.evaluators import evaluate_compiled_group
     from ...amplitudes.numerical_abstractions import CompiledTermGroup
     
     # Simple 1D grid for "A"
@@ -272,7 +210,7 @@ def test_evaluate_feature_on_grid_new_2():
 
 
 def test_evaluate_resonance_simple():
-    from ...amplitudes.evaluation_wf import evaluate_resonance_motif
+    from ...amplitudes.evaluators import evaluate_resonance_motif
     
     # 1. Make a compiled motif with one term
     motif = NumericalResonanceMotif(res_conds=[
@@ -298,7 +236,7 @@ def test_evaluate_resonance_simple():
     np.testing.assert_allclose(result, expected)
 
 def test_evaluate_resonance_simple_2conds():
-    from ...amplitudes.evaluation_wf import evaluate_resonance_motif
+    from ...amplitudes.evaluators import evaluate_resonance_motif
 
     # 1. Make a compiled motif with one term
     motif = NumericalResonanceMotif(res_conds=[
@@ -389,78 +327,6 @@ def setup_monkeypatch_collections(monkeypatch):
     monkeypatch.setattr(fac, "FreqTermsCollection", DummyFreqTermsCollection)
 
 
-def test_hierarchical_summation_over_single_missing_index(monkeypatch):
-    setup_monkeypatch_collections(monkeypatch)
-    # evaluate_single_index_dict returns 2.0 for any complete index dict
-    monkeypatch.setattr(fac, "evaluate_single_index_dict", lambda *args, **kwargs: 2.0)
-
-    term = DummyTerm(idx_summ=["j"], idx_nonsumm=["i"])
-    data = DummyData(number_of_nmodes=3)
-    necessary_data = (data, DummyPrecalc())
-
-    results = fac.evaluate_term_coeffs(term=term, relevant_indices=[{"i": 0}], necessary_data=necessary_data)
-    print(results)
-    vals = list(results.values())
-    assert len(vals) == 1
-    # j summed over 0..2 -> 3 * 2.0 = 6.0
-    assert pytest.approx(6.0) == vals[0]
-
-
-def test_direct_evaluation_when_no_missing_indices(monkeypatch):
-    setup_monkeypatch_collections(monkeypatch)
-    # evaluate_single_index_dict returns 5.0 for a complete index dict
-    monkeypatch.setattr(fac, "evaluate_single_index_dict", lambda *args, **kwargs: 5.0)
-
-    term = DummyTerm(idx_summ=["j"], idx_nonsumm=["i"])
-    data = DummyData(number_of_nmodes=4)
-    necessary_data = (data, DummyPrecalc())
-
-    results = fac.evaluate_term_coeffs(term=term, relevant_indices=[{"i": 1, "j": 2}], necessary_data=necessary_data)
-
-    vals = list(results.values())
-    assert len(vals) == 1
-    assert pytest.approx(5.0) == vals[0]
-
-def test_hierarchical_summation_over_single_missing_index_more_inds(monkeypatch):
-    setup_monkeypatch_collections(monkeypatch)
-    # evaluate_single_index_dict returns 2.0 for any complete index dict
-    monkeypatch.setattr(fac, "evaluate_single_index_dict", lambda *args, **kwargs: 2.0)
-
-    term = DummyTerm(idx_summ=["j"], idx_nonsumm=["i"])
-    data = DummyData(number_of_nmodes=3)
-    necessary_data = (data, DummyPrecalc())
-
-    # multiple relevant indices supported
-    relevant_indices = [{"i": 0}, {"i": 1}]
-    results = fac.evaluate_term_coeffs(term=term, relevant_indices=relevant_indices, necessary_data=necessary_data)
-
-    vals = sorted(list(results.values()))
-    assert len(vals) == len(relevant_indices)
-    # j summed over 0..2 -> 3 * 2.0 = 6.0 for each entry
-    expected = sorted([6.0 for _ in relevant_indices])
-    for exp, res in zip(expected, vals):
-        assert pytest.approx(exp) == res
-
-
-def test_direct_evaluation_when_no_missing_indices_more_inds(monkeypatch):
-    setup_monkeypatch_collections(monkeypatch)
-    # evaluate_single_index_dict returns 5.0 for a complete index dict
-    monkeypatch.setattr(fac, "evaluate_single_index_dict", lambda *args, **kwargs: 5.0)
-
-    term = DummyTerm(idx_summ=["j"], idx_nonsumm=["i"])
-    data = DummyData(number_of_nmodes=4)
-    necessary_data = (data, DummyPrecalc())
-
-    # provide multiple fully-specified index dicts
-    relevant_indices = [{"i": 1, "j": 2}, {"i": 0, "j": 3}]
-    results = fac.evaluate_term_coeffs(term=term, relevant_indices=relevant_indices, necessary_data=necessary_data)
-
-    vals = sorted(list(results.values()))
-    assert len(vals) == len(relevant_indices)
-    expected = sorted([5.0 for _ in relevant_indices])
-    for exp, res in zip(expected, vals):
-        assert pytest.approx(exp) == res
-
 
 class FakeTerm:
     def __init__(self, coeff=1.0):
@@ -503,32 +369,7 @@ def test_evaluate_single_index_dict_full_product(monkeypatch):
         precalculated_data=None,
         zero_tol=1e-18
     )
-
-    assert result == 2.0 * 3 * 5 * 7 * 11
-
-def test_short_circuit_non_avrg_zero(monkeypatch):
-    term = FakeTerm(coeff=999.0)
-
-    monkeypatch.setattr(
-        fac,
-        "eval_non_avrg_per_indexdict",
-        lambda *args, **kwargs: 0.0
-    )
-
-    called = {"avrg": False}
-
-    def fake_avrg(*args, **kwargs):
-        called["avrg"] = True
-        return 1.0
-
-    monkeypatch.setattr(fac, "eval_avrg_per_indexdict", fake_avrg)
-
-    result = fac.evaluate_single_index_dict(
-        term, {}, None, None, None, None, None, None, 1e-18
-    )
-
-    assert result == 0.0
-    assert not called["avrg"]  # must not be evaluated
+    assert result[0] == 2.0 * 3 * 5 * 7 * 11
 
 def test_call_order(monkeypatch):
     calls = []

@@ -34,16 +34,17 @@ def test_ampl_coeff_sum_3_terms():
 
     need more tests for orient. avrg tensors - evaluation and use
     """
-    from .testutils import get_from_pkl_features
-    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (process_resonance_motifs, 
-                                                                          evaluate_terms_coeffs, 
+    from .testutils import get_hashmap_terms
+    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (evaluate_terms_coeffs, 
                                                                           precalculate_unique_coeff_parts, 
                                                                           identify_precalc_unique_coeff_parts,
                                                                           get_features_to_draw)
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
+    # from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
+    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (_compute_motif_locs, _get_terms_for_motifs,
+                                                                          QCDataContext, AxisContext)
 
     # getting all propper terms here and realistic combinations of contributing terms
-    feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
+    hashmap_terms = get_hashmap_terms()
     terms = list(hashmap_terms.values())
 
     # selecting some terms - all (2) el and 4 mech [2 of each resmotif]
@@ -52,7 +53,7 @@ def test_ampl_coeff_sum_3_terms():
     terms = [terms[s] for s in terms_selection]
     
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    terms_json = VibPerturbedTerm.load_many_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
+    terms_json = VibPerturbedTerm.load_terms_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
     assert sorted([t.h() for t in terms]) == sorted([t.h() for t in terms_json])
 
     p_names = ['dipgrad', 'diphess', 'polgrad', 'polhess', 'cff']
@@ -73,9 +74,12 @@ def test_ampl_coeff_sum_3_terms():
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
     vibdiff_cache = VibDiffCache()
 
-    motif_locs, terms_for_motifs = process_resonance_motifs(terms,
-                                             data_configs.vibstates_data,
-                                             vibdiff_cache)
+    terms_for_motifs = _get_terms_for_motifs(terms)
+    qc_ctx = QCDataContext(vib_data=data_configs.vibstates_data, vibdiff_cache=vibdiff_cache, data_configs=data_configs)
+    axis_ctx = AxisContext(terms=terms, experiment_ctx=None, 
+                           terms_for_motifs=terms_for_motifs, 
+                           axes=None, magn_conditions=None)
+    motif_locs = _compute_motif_locs(axis_ctx, qc_ctx)
 
     need_precalc = identify_precalc_unique_coeff_parts(terms=terms)
     precalculated = precalculate_unique_coeff_parts(need_precalc, 
@@ -87,7 +91,7 @@ def test_ampl_coeff_sum_3_terms():
 
     gamma = 10.2
     # these feature will now also have coefficients computed above
-    features_to_draw = get_features_to_draw(motif_res_loc=motif_locs, 
+    features_to_draw, _ = get_features_to_draw(motif_res_loc=motif_locs, 
                                             terms_for_motifs=terms_for_motifs,
                                             term_coeffs_per_index=coefficients,
                                             lineshape_parameter=gamma) # in cm-1 in features
@@ -99,6 +103,7 @@ def test_ampl_coeff_sum_3_terms():
                          if f.location == ResLocGeoObject({'A':1119.5, 'B': 744.5}) 
                          or f.location == ResLocGeoObject({'A':964., 'B': 270.})]
     ws.intensities.amplitudes.spectrum_composition.SpectralFeature.print_list_features(selected_features)
+
 
     # evaluating features coefficients based on features (a wrapper function that is using evaluate_terms_coeffs func)
     # feature 0
@@ -145,7 +150,7 @@ def test_ampl_coeff_1mech_terms():
     terms = [terms[s] for s in terms_selection]
     
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    terms_json = VibPerturbedTerm.load_many_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
+    terms_json = VibPerturbedTerm.load_terms_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
 
     p_names = ['dipgrad', 'diphess', 'polgrad', 'polhess', 'cff']
     props = [MakeObjects.mk_prop_with_vals(pr_name) for pr_name in p_names]
@@ -301,7 +306,7 @@ def test_ampl_coeff_1el_terms():
     terms = [terms[s] for s in terms_selection]
     
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    terms_json = VibPerturbedTerm.load_many_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
+    terms_json = VibPerturbedTerm.load_terms_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
 
     p_names = ['dipgrad', 'diphess', 'polgrad', 'polhess', 'cff']
     props = [MakeObjects.mk_prop_with_vals(pr_name) for pr_name in p_names]

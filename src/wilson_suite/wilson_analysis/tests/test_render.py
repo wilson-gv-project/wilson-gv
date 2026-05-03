@@ -3,7 +3,7 @@
 """
 from wilson_suite.wilson_analysis.render.render import render_spectrum
 from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup, RenderingInfo, EvaluationInfo
-
+import os
 import numpy as np
 import pytest
 import copy
@@ -68,8 +68,7 @@ def test_render_spectrum_simplecontour():
     with pytest.raises(ValueError) as excinfo:
         r, diagn = render_spectrum(**cntx)
     assert str(excinfo.value) == 'Empty spec_data array'
-
-    # check error propagation
+    os.remove('simple_contour.svg')
 
 def test_render_spectrum_simplecontour_sq():
 
@@ -95,3 +94,4 @@ def test_render_spectrum_simplecontour_sq():
     
     assert np.allclose(diagn['renderer'].levels, np.array([ 1.6,  2.9129,  5.3031,  9.6547, 17.577 , 32.]))
     assert diagn['renderer'].labels == ['$1.6e+00$', '$2.9e+00$', '$5.3e+00$', '$9.7e+00$', '$1.8e+01$', '$3.2e+01$']
+    os.remove('simple_contour_sq.svg')

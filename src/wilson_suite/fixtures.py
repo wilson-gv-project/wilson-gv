@@ -1,4 +1,3 @@
-from . import wilson_derive as ws_derive
 from .wilson_derive.response_terms import VibPerturbedTerm
 from . import wilson_experiment as ws_experiment
 
@@ -138,39 +137,8 @@ def get_eval_ready_evv_terms():
 def get_terms_from_json():
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    return VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
+    return VibPerturbedTerm.load_terms_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
 
-# # QC calculations/vibana parameters
-# mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)
-
-
-# # spectrum eval/render parameters
-
-# def spectral_grid():
-#     axis1 = abst_main.SpectralAxis({1: 1})
-#     axis2 = abst_main.SpectralAxis({1: 1, 2: -1})
-#     start = {1: 250, 2: 100}
-#     end = {1: 3850, 2: 7550}
-#     spacer = {1: 230.8, 2: 230.8}
-#     return abst_main.SpectralGrid({1: axis1, 2: axis2}, range_style='uniform',
-#                                   start=start, end=end, spacer=spacer)
-
-# def spec_eval_setup(spec_grid):
-#     evi = {'dynrange': 500, 'Gamma': 4.7, 'diag_margin': 5., 'maxmax': None}
-#     rndi = {'num_level_ticks': 15}
-#     return abst_main.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
-
-
-# def makeWilsonSimInstance(experiment, mol_system, vibanasetup, calc_setup, eval_prop_specify: dict, 
-#                   spec_eval_setup: abst_main.SpecEvalSetup = None):
-#     """
-#     Should create an instance of a WilsonSimulation 
-#     with a certain state based on the needs
-    
-#     """
-#     # sim = abst_main.WilsonSimulation()
-
-#     raise NotImplementedError('This fixture-making function is not yet implemented.')
 
 # """
 # 1. Ready for evaluation, WilsonSimulation instance should have:

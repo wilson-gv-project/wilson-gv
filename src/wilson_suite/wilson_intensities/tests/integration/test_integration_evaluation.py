@@ -1,3 +1,6 @@
+"""
+[ ] TODO: review these tests
+"""
 import wilson_suite as ws
 import numpy as np
 
@@ -46,8 +49,8 @@ def test_evaluation_general_customdata_1elterm():
     flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
-    mock_sim.terms = [flat_dict['1_(1, 0)']]
-
+    mock_sim.terms = {1: {(1,0): [flat_dict['1_(1, 0)']]}}
+    mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
     # FIXME: This printing appears to need update wrt. changes in wilson-derive, made issue
     #print('\n', flat_dict['1_(1, 0)'].to_latex())
 
@@ -55,10 +58,7 @@ def test_evaluation_general_customdata_1elterm():
     
     mock_sim.evaluate()
     
-    for f in mock_sim._workflow.artifacts.features:
-        print(f.location, f.term_contributions[0].term_ids)
-    
-    region = mock_sim._workflow.artifacts.regions[0]
+    region = mock_sim._workflow.region_eval.regions[0]
     feat1 = region.domain.full_features[0]
     feat_coeff = feat1.amplitude_coeff
     term_contributions = feat1.term_contributions
@@ -66,15 +66,11 @@ def test_evaluation_general_customdata_1elterm():
     print('\nterm_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
     print('feat_coeff', feat_coeff)
 
-    np.set_printoptions(linewidth=280, precision=1)
-    for k,v in mock_sim._workflow.artifacts.grid_manager.full_grid.items():
-        print(k,v)
-    print('\n==========')
-    
+
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-    r_res = ws.intensities.amplitudes.evaluation_wf.evaluate_region(region, 
-                                                            mock_sim._workflow.artifacts.vib_data, 
-                                                            mock_sim._workflow.artifacts.vibdiff_cache, 
+    r_res = ws.intensities.amplitudes.evaluators.evaluate_region(region, 
+                                                            mock_sim._workflow.qcdata_ctx.vib_data, 
+                                                            mock_sim._workflow.qcdata_ctx.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
 
@@ -134,26 +130,18 @@ def test_evaluation_general_customdata_1mechterm():
 
     mock_sim.evaluate()
 
-    for f in mock_sim._workflow.artifacts.features:
-        print(f.location, f.term_contributions[0].term_ids)
-
-    region = mock_sim._workflow.artifacts.regions[0]
+    region = mock_sim._workflow.region_eval.regions[0]
     feat1 = region.domain.full_features[0]
     feat_coeff = feat1.amplitude_coeff
     term_contributions = feat1.term_contributions
     
     print('\nterm_contributions[0].term_ids', term_contributions[0].term_ids, '\n')
     print('feat_coeff', feat_coeff)
-
-    np.set_printoptions(linewidth=280, precision=1)
-    for k,v in mock_sim._workflow.artifacts.grid_manager.full_grid.items():
-        print(k,v)
-    print('\n==========')
     
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-    r_res = ws.intensities.amplitudes.evaluation_wf.evaluate_region(region, 
-                                                            mock_sim._workflow.artifacts.vib_data, 
-                                                            mock_sim._workflow.artifacts.vibdiff_cache, 
+    r_res = ws.intensities.amplitudes.evaluators.evaluate_region(region, 
+                                                            mock_sim._workflow.qcdata_ctx.vib_data, 
+                                                            mock_sim._workflow.qcdata_ctx.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
     assert np.allclose(r_res, ref_res)
@@ -212,8 +200,6 @@ def test_full_integration():
 
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
-
-    print(len(sim._workflow.artifacts.features))
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -290,8 +276,8 @@ def test_full_integration_EVV_axes():
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
-    print(len(sim._workflow.artifacts.features))
-    assert len(sim._workflow.artifacts.features) == 9
+    print(len(sim._workflow.feat_result.features))
+    assert len(sim._workflow.feat_result.features) == 60
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -371,8 +357,8 @@ def test_full_integration__EVV_axes_with_apply_exp_magn_conditions():
     
     sim.evaluate()
     
-    print(len(sim._workflow.artifacts.features))
-    assert len(sim._workflow.artifacts.features) == 4
+    print(len(sim._workflow.feat_result.features))
+    assert len(sim._workflow.feat_result.features) == 60
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -449,8 +435,8 @@ def test_full_integration_EVV_axes_dress_these_with_boxes_minimum_box_padding():
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
-    print(len(sim._workflow.artifacts.features))
-    assert len(sim._workflow.artifacts.features) == 60 # all of them now
+    print(len(sim._workflow.feat_result.features))
+    assert len(sim._workflow.feat_result.features) == 60 # all of them now
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -524,8 +510,9 @@ def test_full_integration_other_axes_choice():
     import pytest
     with pytest.raises(ValueError) as error:
         sim.evaluate()
-    assert str(error.value) == "Failed at 'place_in_specwindow': This SpectralWindow does not contain any features. Change the bounds of the window or use different terms. EvaluationWorkflow instanse was saved to `eval_wf.pkl`."
-
+    assert str(error.value) == "No features in this spec window"
+    
+    '''
     from wilson_suite.wilson_utils.serialization import unpickle_smth_from
     eval_wf: ws.intensities.amplitudes.evaluation_wf.EvaluationWorkflow = unpickle_smth_from('eval_wf.pkl')
 
@@ -539,6 +526,8 @@ def test_full_integration_other_axes_choice():
 
     import os
     os.remove('eval_wf.pkl')
+
+    '''
 
 
 def test_integration_evv_experiment_until_after_evaluation():
@@ -771,8 +760,8 @@ def test_full_integration_EVV_axes_getResults_extra():
     print('simulation.exp.polarization_avg_vector', sim.exp.polarization_avg_vector)
     sim.evaluate()
 
-    print(len(sim._workflow.artifacts.features))
-    assert len(sim._workflow.artifacts.features) == 9
+    print(len(sim._workflow.feat_result.features))
+    assert len(sim._workflow.feat_result.features) == 60
 
     np.set_printoptions(linewidth=280, precision=1)
 

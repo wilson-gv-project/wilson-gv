@@ -1,3 +1,2 @@
-from ..utils import *
-from .tagger import tag, TAG_REGISTRY
+from .utils import *
 from .spectrum_utils import *

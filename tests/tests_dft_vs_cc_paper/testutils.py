@@ -472,27 +472,12 @@ def fillPropsData(data_dict):
     return final_props
 
 
-
-def get_from_pkl_features(pkl_file, lineshape_parameter):
+def get_hashmap_terms():
     """
     pkld_file -- 'data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl'
 
     returns list of features and dict of terms (hash to term)
     """
-    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
-    unpickled = unpickle_smth_from(pkl_file)
-    
-    list_vibsstates = fillStatesData(unpickled)
-
-    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
-    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
-
-    include_list = tuple([0, 1, 2])
-    vibstates_data = VibStatesData(allstates=tuple(list_vibsstates),
-                                   harmonic_osc_states_labels=include_list)
-    vibdiff_cache = VibDiffCache()
-
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_from_terms_for_eval
     from wilson_suite.fixtures import evv_experiment
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -500,6 +485,48 @@ def get_from_pkl_features(pkl_file, lineshape_parameter):
     from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
     axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # this makes A and B > 0
     sim = ws.main.workflow_abstractions.WilsonSimulation()
+    sim.addExperiment(evv_exp)
+    sim.addTerms(terms)
+    sim.setAxisChoiceAndTranslateTerms(axes_choice)
+    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+    terms_list = derived_terms_flat(sim.terms_in_axis_choice, tolistonly=True)
+    
+    hashmap = {t.h(): t for t in terms_list}
+    return hashmap
+
+def get_from_pkl_features(pkl_file, lineshape_parameter):
+    """
+    pkld_file -- 'data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl'
+
+    returns list of features and dict of terms (hash to term)
+    """
+    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (bind_motifs, compute_features,
+                                                                          build_axis_context, build_precalc_context,
+                                                                          build_experiment_context,
+                                                                          _get_terms_for_motifs,
+                                                                          AxisContext, QCDataContext)
+    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
+    unpickled = unpickle_smth_from(pkl_file)
+    
+    list_vibsstates = fillStatesData(unpickled)
+
+    from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData, EvaluationDataAndConfigs
+    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+
+    include_list = tuple([0, 1, 2])
+    vibstates_data = VibStatesData(allstates=tuple(list_vibsstates),
+                                   harmonic_osc_states_labels=include_list)
+    vibdiff_cache = VibDiffCache()
+
+    # from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_from_terms_for_eval
+    from wilson_suite.fixtures import evv_experiment
+    evv_exp = evv_experiment()
+    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+
+    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # this makes A and B > 0
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
+    sim.addExperiment(evv_exp)
     sim.addTerms(terms)
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
@@ -507,8 +534,31 @@ def get_from_pkl_features(pkl_file, lineshape_parameter):
     
     hashmap = {t.h(): t for t in terms_list}
 
-    features = get_features_from_terms_for_eval(derived_terms=terms_list,
-                                                vibstates_data=vibstates_data,
-                                                vibdiff_cache=vibdiff_cache, 
-                                                lineshape_parameter=lineshape_parameter)
+    data_and_configs = EvaluationDataAndConfigs(pulse_polarization_vector=[1., 1., 1.],
+                                                number_of_nmodes=3,
+                                                nm_inds_choices=include_list)
+    # data_configs = MakeObjects.mk_data_for_eval(list_of_states=vibstates_data,
+    #                                             include_states_list=include_list,
+    #                                             list_of_props=props,
+    #                                             pulse_polarization_vector=[1., 1., 1.])
+
+    # features = get_features_from_terms_for_eval(derived_terms=terms_list,
+    #                                             vibstates_data=vibstates_data,
+    #                                             vibdiff_cache=vibdiff_cache, 
+    #                                             lineshape_parameter=lineshape_parameter)
+    exp_ctx = build_experiment_context(sim)
+    qc_ctx = QCDataContext(vib_data=vibstates_data, 
+                           vibdiff_cache=vibdiff_cache, 
+                           data_configs=data_and_configs)
+    axis_ctx = AxisContext(
+        experiment_ctx=exp_ctx,
+        axes=axes_choice,
+        terms=terms_list,
+        terms_for_motifs=_get_terms_for_motifs(terms_list),
+        magn_conditions=None,
+    )
+    precalc_ctx = build_precalc_context(exp_ctx, qc_ctx)
+    bound_motifs_ctx = bind_motifs(axis_ctx, precalc_ctx)
+    features = compute_features(bound_motifs_ctx, lineshape_parameter)
+    
     return features, hashmap

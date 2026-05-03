@@ -492,7 +492,7 @@ class VibPerturbedTerm:
             json.dump(terms_data, f, indent=2)
 
     @classmethod
-    def load_many_from_json(cls, filepath: str) -> list['VibPerturbedTerm']:
+    def load_terms_from_json(cls, filepath: str) -> list['VibPerturbedTerm']:
         """Load multiple terms from a JSON file"""
         with open(filepath) as f:
             terms_data = json.load(f)

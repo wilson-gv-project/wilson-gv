@@ -142,7 +142,8 @@ def test_save_wilsonsim():
     sim.save_to_pkl(filename='sim1.pkl')
 
     # save EvaluationInputs for evaluation workflow
-    sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
+    sim.evaluate()
+    # sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
 
     sim.save_to_pkl(filename='configs.pkl', configs_only=True)
 

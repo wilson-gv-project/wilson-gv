@@ -151,8 +151,8 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     # based on data above - frac * vibene denom * orient avrg
     ref_term0_coeff = -1./4 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.) * t0_avrg_tensor[0, 0]
     term0_coeff = list(term0_coeff_dict.values())[0] # list with single element
-
-    assert term0_coeff == ref_term0_coeff
+    print(term0_coeff, ref_term0_coeff)
+    assert term0_coeff[0] == ref_term0_coeff
 
     ### term 1 -- el
     term1_coeff_dict = fac.evaluate_term_coeffs(term=terms_select[1], 
@@ -167,7 +167,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     # based on data above - frac * vibene denom * orient avrg
     ref_term1_coeff = -1./4 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.) * t1_avrg_tensor[0, 0]
     term1_coeff = list(term1_coeff_dict.values())[0] # list with single element
-    assert term1_coeff == ref_term1_coeff
+    assert term1_coeff[0] == ref_term1_coeff
     
     ### term 2 -- mech
     term2_coeff_dict = fac.evaluate_term_coeffs(term=terms_select[2], 
@@ -194,7 +194,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
 
     term2_coeff = list(term2_coeff_dict.values())[0] # list with single element
-    assert np.isclose(term2_coeff, np.sum(ref_term2_coeff))
+    assert np.isclose(term2_coeff[0], np.sum(ref_term2_coeff))
 
     ### term 3 -- mech
     term3_coeff_dict = fac.evaluate_term_coeffs(term=terms_select[3], 
@@ -223,7 +223,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     ref_term3_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
 
     term3_coeff = list(term3_coeff_dict.values())[0] # list with single element
-    assert np.isclose(term3_coeff, np.sum(ref_term3_coeff))
+    assert np.isclose(term3_coeff[0], np.sum(ref_term3_coeff))
 
     ### term 4 -- mech
     term4_coeff_dict = fac.evaluate_term_coeffs(term=terms_select[4], 
@@ -247,7 +247,7 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     # based on data above - frac * vibene denom * orient avrg * CFF 
     ref_term4_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.)/convNu2Ene(c_ene+15.) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term4_coeff = list(term4_coeff_dict.values())[0] # list with single element
-    assert np.isclose(term4_coeff, np.sum(ref_term4_coeff))
+    assert np.isclose(term4_coeff[0], np.sum(ref_term4_coeff))
 
 
 
@@ -346,7 +346,7 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     ref_term2_coeff = 1./8 * 1./convNu2Ene(1234.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t2_avrg_tensor[1, 1, :] * props_data['cff'][1, 1, :3] / convNu2Ene(c_vibdiff)
 
     term2_coeff = list(term2_coeff_dict.values())[0] # list with single element
-    assert np.isclose(term2_coeff, np.sum(ref_term2_coeff))
+    assert np.isclose(term2_coeff[0], np.sum(ref_term2_coeff))
 
 
     ### term 3 -- mech
@@ -387,7 +387,7 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     ref_term3_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(1234.+15.)/convNu2Ene(c_ene+15.) * t3_avrg_tensor[1, 0, 1] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term3_coeff = list(term3_coeff_dict.values())[0] # list with single element
 
-    assert np.isclose(term3_coeff, np.sum(ref_term3_coeff))
+    assert np.isclose(term3_coeff[0], np.sum(ref_term3_coeff))
 
 
 
@@ -416,6 +416,6 @@ def test_evaluate_term_coeffs_multi_c_ind_contrib():
     ref_term4_coeff = 1./16 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.)/convNu2Ene(c_ene+15.) * t4_avrg_tensor[0, 0, 0] * props_data['cff'][0, :3, :3] / convNu2Ene(964.)
     term4_coeff = list(term4_coeff_dict.values())[0] # list with single element
 
-    assert np.isclose(term4_coeff, np.sum(ref_term4_coeff))
+    assert np.isclose(term4_coeff[0], np.sum(ref_term4_coeff))
 
 
