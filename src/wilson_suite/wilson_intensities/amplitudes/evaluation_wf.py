@@ -218,6 +218,30 @@ def build_grid_context(
     )
 
 
+def build_machinery(experiment, axes_choice):
+    derived_terms = experiment
+    derived_flat_terms = derived_terms_flat(derived_terms, tolistonly=True)
+    exp_context = ExperimentContext(
+            raw_terms=derived_flat_terms,
+            pulse_polarization_vector=tuple(experiment.polarization_avg_vector),
+            magn_conditions=tuple(experiment.magn_conditions),
+            need_precalc=identify_precalc_unique_coeff_parts(derived_flat_terms),
+        )
+    
+    terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+    
+    translated_terms = derived_terms_flat(terms_in_axis_choice, tolistonly=True)
+    axes_contenxt = AxisContext(
+            experiment_ctx=exp_context,
+            axes=axes_choice,
+            terms=translated_terms,
+            terms_for_motifs=_get_terms_for_motifs(translated_terms),
+            magn_conditions=translated_magn_conditions,
+        )
+    
+    return
+
+
 def _settings_from_ev_info(ev_info: 'EvaluationInfo') -> RenderSettings:
     return RenderSettings(
         box_range_safety_margin=ev_info.box_range_safety_margin,
