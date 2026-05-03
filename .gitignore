@@ -5,13 +5,13 @@
 *.json
 *.log
 
-!terms_fuller_flat.json
 !src/wilson_suite/wilson_analysis/tests/f_ref.svg
 !src/wilson_suite/wilson_analysis/tests/f_h2o_ref.svg
 !src/wilson_suite/wilson_analysis/tests/f_hcoh_ref.svg
 
 !src/wilson_suite/wilson_intensities/tests/datafiles/*.pkl
 !data_for_tests/*.pkl
+!data_for_tests/*.json
 
 .VSCodeCounter/
 

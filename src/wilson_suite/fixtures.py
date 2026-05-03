@@ -137,7 +137,7 @@ def get_eval_ready_evv_terms():
 def get_terms_from_json():
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    return VibPerturbedTerm.load_terms_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
+    return VibPerturbedTerm.load_terms_from_json(SUITE_ROOT+'/../data_for_tests/terms_fuller_flat.json')
 
 
 # """
