@@ -120,7 +120,7 @@ def test_save_wilsonsim():
     # save this sim to pickle in the sim workflow run directory
     sim.save_to_pkl(filename='sim0.pkl')
 
-    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
+    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_for_tests/data_file.pkl')
 
     vib_ana.set_include_modes_list()
     

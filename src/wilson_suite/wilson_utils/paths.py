@@ -6,7 +6,6 @@ SUITE_ROOT = os.path.abspath(os.path.join(UTILS_ROOT, '..'))
 
 
 WORKFLOW_BASE_DIR = Path(os.environ.get("WORKFLOW_BASE_DIR", "../workflows")).expanduser().resolve()
-# Path("~/workflows").expanduser() --  /home/vanda/workflows
 # .resolve() -- converts the path to an absolute path; normalizes . and ..
 
 def update_filename(old_name, new_filename: str):

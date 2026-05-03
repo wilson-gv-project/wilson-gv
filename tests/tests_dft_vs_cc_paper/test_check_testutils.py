@@ -14,14 +14,6 @@ def test_feat_boxX():
     print(f)
 
 
-def test_pkl_data_features():
-    print()
-    feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
-    ws.intensities.amplitudes.spectrum_composition.SpectralFeature.print_list_features(feats)
-    print()
-
-    for k,v in hashmap_terms.items():
-        print(k, v.anharmonicity, '\n')
 
 def test_pkl_data():
     print()

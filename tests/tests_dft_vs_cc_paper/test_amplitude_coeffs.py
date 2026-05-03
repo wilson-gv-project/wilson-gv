@@ -15,6 +15,20 @@ averaging tests:
 """
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
+from .testutils import get_hashmap_terms
+from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (evaluate_terms_coeffs, 
+                                                                        precalculate_unique_coeff_parts, 
+                                                                        identify_precalc_unique_coeff_parts,
+                                                                        get_features_to_draw)
+from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
+from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (_compute_motif_locs, _get_terms_for_motifs,
+                                                                        QCDataContext, AxisContext)
+
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject
+from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_term_coeffs
+
 from .testutils import MakeObjects
 import wilson_suite as ws
 import numpy as np
@@ -34,14 +48,6 @@ def test_ampl_coeff_sum_3_terms():
 
     need more tests for orient. avrg tensors - evaluation and use
     """
-    from .testutils import get_hashmap_terms
-    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (evaluate_terms_coeffs, 
-                                                                          precalculate_unique_coeff_parts, 
-                                                                          identify_precalc_unique_coeff_parts,
-                                                                          get_features_to_draw)
-    # from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
-    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (_compute_motif_locs, _get_terms_for_motifs,
-                                                                          QCDataContext, AxisContext)
 
     # getting all propper terms here and realistic combinations of contributing terms
     hashmap_terms = get_hashmap_terms()
@@ -52,7 +58,6 @@ def test_ampl_coeff_sum_3_terms():
     terms_selection = [0, 1, 3, 5, 8, 9]
     terms = [terms[s] for s in terms_selection]
     
-    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     terms_json = VibPerturbedTerm.load_terms_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
     assert sorted([t.h() for t in terms]) == sorted([t.h() for t in terms_json])
 
@@ -71,7 +76,6 @@ def test_ampl_coeff_sum_3_terms():
     # terms + data => coefficients
     # data could be orginized as prepared with a function...
     
-    from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
     vibdiff_cache = VibDiffCache()
 
     terms_for_motifs = _get_terms_for_motifs(terms)
@@ -98,7 +102,6 @@ def test_ampl_coeff_sum_3_terms():
 
     # taking 2 features for testing
     # It is in a list that has no fixed order of features, so the same index in different run might refer to different feature
-    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject
     selected_features = [f for f in features_to_draw 
                          if f.location == ResLocGeoObject({'A':1119.5, 'B': 744.5}) 
                          or f.location == ResLocGeoObject({'A':964., 'B': 270.})]
@@ -108,23 +111,23 @@ def test_ampl_coeff_sum_3_terms():
     # evaluating features coefficients based on features (a wrapper function that is using evaluate_terms_coeffs func)
     # feature 0
     feat0_coeff = evaluate_coeff_for_feat(selected_features[0],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat0_coeff = {k.h(): v for k,v in feat0_coeff.items()}
+    result_feat0_coeff = {k.to_str(): v for k,v in feat0_coeff.items()}
 
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[0].amplitude_coeff == sum([c for i in result_feat0_coeff.values() for c in i.values()])
+    assert selected_features[0].amplitude_coeff == sum([c[0] for i in result_feat0_coeff.values() for c in i.values()])
 
     # feature 1
     feat1_coeff = evaluate_coeff_for_feat(selected_features[1],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat1_coeff = {k.h(): v for k,v in feat1_coeff.items()}
+    result_feat1_coeff = {k.to_str(): v for k,v in feat1_coeff.items()}
 
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[1].amplitude_coeff == sum([c for i in result_feat1_coeff.values() for c in i.values()])
+    assert selected_features[1].amplitude_coeff == sum([c[0] for i in result_feat1_coeff.values() for c in i.values()])
 
 
 
@@ -138,7 +141,6 @@ def test_ampl_coeff_1mech_terms():
                                                                           precalculate_unique_coeff_parts, 
                                                                           identify_precalc_unique_coeff_parts,
                                                                           get_features_to_draw)
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
 
     # getting all propper terms here and realistic combinations of contributing terms
     feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
@@ -216,7 +218,6 @@ def test_ampl_coeff_1mech_terms():
     # testing that feature coefficient is the sum of computed coeffs per term
     assert selected_features[0].amplitude_coeff == sum([c for i in result_feat0_coeff.values() for c in i.values()])
 
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_term_coeffs
     # only single term contrib - mech term
     t_feat0 = hashmap_terms[selected_features[0].term_contributions[0].term_ids[0]]
 
@@ -372,7 +373,6 @@ def test_ampl_coeff_1el_terms():
     # testing that feature coefficient is the sum of computed coeffs per term
     assert selected_features[0].amplitude_coeff == sum([c for i in result_feat0_coeff.values() for c in i.values()])
 
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_term_coeffs
     # only single term contrib - mech term
     t_feat0 = hashmap_terms[selected_features[0].term_contributions[0].term_ids[0]]
 

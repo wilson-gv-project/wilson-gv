@@ -1,210 +1,135 @@
 import wilson_suite as ws
-import logging
-logger = logging.getLogger("wilson")
-
-"""
-
-"""
-SOURCE_TYPE = 'vault'
+import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 
 
-pulse_ir_1 = ws.experiment.experiment_abstractions.EmPulse('ideal', 1.0e-5, tc = 50.0, cf=0.00, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=1)
-pulse_ir_2 = ws.experiment.experiment_abstractions.EmPulse('impulsive', 1.0e-5, tc = 100.0, cf=None, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=2)
-pulse_uvvis_1 = ws.experiment.experiment_abstractions.EmPulse('ideal', 1.0e-5, tc = 120.0, cf=0.0, cf_uv=0.072, wv=[0.0, 0.0, 1.0], pol=[0.0, 0.0, 1.0], id=3)
-
-pulses = [pulse_ir_1, pulse_ir_2, pulse_uvvis_1]
-
-field_a = ws.experiment.abstractions.ElectricField(pulses)
-order = len(pulses)
-
-field_a.findEpochs()
-
-detector_a = ws.experiment.experiment_abstractions.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
-                                                    detection_polarization=[0.0, 0.0, 1.0],
-                                                    detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                                    wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
-
-# Push one carrier freq
-scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
-scan_range_a = [0.0001*i for i in range(101)]
-scan_a = ws.experiment.experiment_abstractions.SpecScan(scan_obj_a, scan_range_a)
-
-experiment_a = ws.experiment.experiment_abstractions.VibExperiment(order, field_a, detector_a, [scan_a], magn_conditions=[[-1, 2]])
-logger.info(f'Dimensionality of the experiment is : {experiment_a.dim}')
+vib_regime = 'GVPT2'
+vibana_own_analysis = 'anharm'
+dynamic_range = 1000
 
 
-calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', lvl_theory='B3LYP', basis_set='cc-pVQZ')
+def run():
 
-"""
-
-"""
-sim = ws.main.workflow_abstractions.WilsonSimulation()
-
-sim.addExperiment(experiment_a)
-sim.getTerms(ws.derive.main.get_fully_enhanced_terms) # here terms are derived
-
-logger.info(' >>>> sim.terms')
-logger.info(sim.terms)
-
-mol_system = ws.main.abstractions.MolecularSystem(name='FORM', natoms=4)
-sim.addSystem(mol_system)
-sim.addVibAnaSetup(ws.main.abstractions.VibAnaSetup(regime='GVPT2', vibana_own_analysis='none'))
-sim.addPropEvalSetup(eval_uniform=calc_setup)
-
-# more clear definitions with str keys of dicts
-# so, dicionaries of SpectralAxis instances refer to independent variables, frequencies ranges/lists of vals
-# this means that there should be independent_vars data in addition to axes - that's where evaluation will be, in those ranges
-# smth like ws.main.abstractions.EvaluationVariables({'w1': data1, 'w2': data2}) ?
-# could follow from derived terms, as pfs from ResonanceCondictions - but needs to be collected from the whole collection of terms for evaluation?
-
-axis1 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1})
-axis2 = ws.main.spectrum_abstractions.SpectralAxis({'w1': 1, 'w2': -1})
-# axis2 = ws.main.abstractions.SpectralAxis({'w2': 1})
-
-# SpectralGrid - is also a source of data for the evaluation function
-# now here, keys are refereing to spectrum plot axes
-# SpectralGrid.axes dict keys should be the same as start, end, spacer keys
-start = {'x': 250, 'y': 100}
-end = {'x': 3850, 'y': 7550}
-spacer = {'x': 3.8, 'y': 3.8}
-
-spec_grid = ws.main.spectrum_abstractions.SpectralGrid({'x': axis1, 'y': axis2}, range_style='uniform',
-                                            start=start, end=end, spacer=spacer)
-
-eval_vars = {'w1': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=250., end=3850, spacer=3.8).range,
-                'w2': ws.main.spectrum_abstractions.EvaluationVariable(range_style='uniform', start=100., end=7550, spacer=3.8).range}
-import numpy as np
-meshgrids = np.meshgrid(*eval_vars.values(), indexing='ij')
-
-eval_vars_meshgrids = {}
-for i, key in enumerate(eval_vars.keys()):
-    eval_vars_meshgrids[key] = meshgrids[i]
-
-from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
-
-style_config = PlotConfig(
-    figsize=(35, 45),
-    label_fontsize=30,
-    font_dict={'size': 24},
-    colormap='hot_r',  # Better contrast colormap
-    saturation_color='#FF00FF',
-    dpi=350,
-    tick_step=200.0,  # Step size for both axes ticks
-    equal_aspect=True,  # Force equal aspect ratio for axes
-    no_data_color='#E0E0E0',  # Light gray
-    below_range_color='#F8F8F8',  # Very light gray
-    data_edge_color='black',
-    data_edge_width=0.75,
-    y_min=0,
-    y_max=4500,
-    colorbar_main_label="Intensity",
-    colorbar_padding=0.02,
-    show_top_ticks=True,
-    show_right_ticks=True,
-    x_tick_rotation=45,
-    colormap_spacing='log',
-    colormap_power=0.5,
-)
-
-evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
-                                                'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
-rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
-                                                'dynamic_range': 500, 
-                                                'num_levels': 15, 
-                                                'reference_max': None,
-                                                'spec_data_operations': 'abs()**2',
-                                                'projection': '2d', 
-                                                'filename': 'smth.svg',
-                                                'backend': 'matplotlib',
-                                                'to_save': True,
-                                                'style_config': style_config})
-
-eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(grid=spec_grid, ev_info=evi, rnd_info=rndi)
-
-sim.addSpecEvalSetup(eval_setup)
-
-sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-logger.debug(f'\nafter findPropsAndMaxStateLvl {sim.props}\n')
-
-sim.dressPropsWithSetup()
-
-# FIXME do data prep outside of this workflow
-# data prep:
-#  - 1. collect paths for output files
-#  - 2. parse data with CQCParse
-#  - 3. collect data into CalculatedDataFromOutput - wrapper func for this, to not expose CQCParse to wilson
-#  - 4. 
-if SOURCE_TYPE == 'vault':
-    # --- this is a clean vault use example
-    # vault setup outside of wilsonsim
-    from CQCParse.relay import DataVault
-    from CQCParse.utils import PKG_ROOT as CQCPARSE_ROOT
-    csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
-    vault = DataVault(csvfile)
-
-    from CQCParse.parsing.parse_wilson_obtainer import parse_from_source
-    sim.getResults(obtainer)
+    molecular_system = ws.main.abstractions.MolecularSystem(name='formaldehyde', natoms=4)
+    calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
+                                                     base_file_loc='data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
     
-elif SOURCE_TYPE == 'outfiles':
-    # should simply provide list of files? 
-    # that would be simple for gaussian but not so much for cfour
-    sim.getResultsFromCalculationBatches(source_type='outfiles')
+    """
+    identifier = (molecular_system.name + '_' + 
+                molecular_system.conformer + '_' + 
+                calc_setup.lvl_theory.replace('-', '_') + '_' + 
+                calc_setup.basis_set.replace('-', '_') + f"_{vib_regime}" + 
+                f'_dr{str(dynamic_range).replace('.', 'p')}')
+    """
     
-logger.debug(f'\nafter getResultsFromCalculationBatches {sim.props}\n')
+    # ---------  VibExperiment setup 
+    pulse_ir_1 = wexp.make_impulsive_gaussian_pulse(tc=50.0, cf=0.0, cf_uv=0.0,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+    pulse_ir_2 = wexp.make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+                                                           maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
+
+    field_a = wexp.ElectricField(pulses)
+
+    detector_a = wexp.SpecDetector(detection_method='freq',
+                                   detector_location=(0.0, 0.0, 1.0),
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                   wv_filter=[{1: -1, 2: 1, 3: 1}])
+
+    # Push one carrier freq
+    scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_obj_b = wexp.ScanObject('detector', 'detection_range', id=0, coeff=1.0)
+    scan_range_a = [0.0001 * i for i in range(101)]
+    scan_a = wexp.SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+
+    experiment = wexp.VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
 
-import numpy as np
-np.set_printoptions(precision=4)
+    # ---------  SpecEvalSetup 
+    window_bounds = {
+                        "A": (50.0, 3850.0),
+                        "B": (0.0, 3850.0)
+                    }
+    spec_box = ws.intensities.amplitudes.spectrum_composition.Box(bounds=window_bounds)
+    spec_window = ws.intensities.amplitudes.spectrum_composition.SpectralWindow(box=spec_box)
 
-if 'WilsonSimulation_mid' in TO_PICKLES:
-    pickle_this_to(obj=sim, filenamepkl='sim_mid.pkl', save_to=SUITE_ROOT+'/../tests/')
+    # SpectralAxisSet convenient builder - new axes labels to collection of independent vars, 
+    #                                                      here - laser pulses with chosen signs
+    spec_axes = ws.utils.some_reprs.make_SpectralAxisSet({"A": [1], "B": [-1, 2]})
 
-    sim = unpickle_smth_from(filenamepkl='sim_mid.pkl', load_from=SUITE_ROOT+'/../tests/')
-    PKL_FILES['WilsonSimulation_mid'] = 'sim_mid.pkl'
+    eval_info = ws.main.spectrum_abstractions.EvaluationInfo(Gamma=10.0, Gamma_unit='cm-1', 
+                                                            margins={'diag_margin': 5.0}, 
+                                                            spectral_window=spec_window, 
+                                                            grid_resolution={'A': 20, 'B': 20}, dynamic_range=1000, 
+                                                            spectral_axes=spec_axes, box_range_safety_margin=0.1, 
+                                                            scale_wrt_max_intensity=False, minimum_box_padding=30.0, 
+                                                            apply_exp_magn_conditions_eval=True, 
+                                                            apply_exp_magn_conditions_render=False, 
+                                                            exp_magn_conditions=None, magn_conditions_margin=0.1)
 
-logger.debug('sim.spec_eval_setup')
-logger.debug(sim.spec_eval_setup)
+    mgn_conds = None
+    if eval_info.apply_exp_magn_conditions_eval and eval_info.apply_exp_magn_conditions_render:
+        mgn_conds = 'render'
+    if eval_info.apply_exp_magn_conditions_eval and not eval_info.apply_exp_magn_conditions_render:
+        mgn_conds = 'eval'
 
-if not PREP_ONLY:
-    from wilson_suite.wilson_intensities.amplitudes.evaluators import terms_evaluator
-    logger.info('  >>> Going to evaluate now...\n')
-    sim.evaluateSpectrum(evaluator=terms_evaluator)
-    intensities_spec = np.abs(sim.spec)**2
-    logger.info(f'np.max(np.abs(sim.spec)**2) {np.max(np.abs(sim.spec)**2)}')
+    rnd_info = ws.main.spectrum_abstractions.RenderingInfo()
 
-    hist, bin_edges = np.histogram(intensities_spec, bins=10)
-    logger.debug(f"Histogram counts: {hist}")
-    logger.debug(f"Bin edges: {bin_edges}\n")
-    logger.debug(f'np.max(intensities): {np.max(intensities_spec):.4e}')
-
-    logger.debug('\n=====================================================')
-    logger.info('\n  >>> And now rendering...\n')
-
-    sim.render(renderer=ws.analysis.render.render_spectrum)
-
-    logger.info('  >>> Saving to files now...\n')
+    eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=eval_info, rnd_info=rnd_info)
 
 
-    # TODO: fix this later; not working now
-    # from wilson_utils.serialization import check_if_jsonsafe
-    # check_if_jsonsafe(sim.to_dict())
+    # ---------  VibAnaSetup 
+    vib_ana = ws.main.abstractions.VibAnaSetup(system=molecular_system, 
+                                                regime=vib_regime, 
+                                                vibana_own_analysis=vibana_own_analysis)
 
-    # writing JSON file
-    # sim.writeToJsonFile(ws_root+'/tests/WilsonSimulation.json')
+    # ---------- WilsonSimulation
+    sim = ws.main.workflow_abstractions.WilsonSimulation()
 
-    # pickling
-    import pickle
-    with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "wb") as f:
-        pickle.dump(sim, f)
 
-    with open(SUITE_ROOT+"/../tests/wilsonsim0.pkl", "rb") as f:
-        loaded_wilsonsim0 = pickle.load(f)
-    
-    if 'WilsonSimulation_final' in TO_PICKLES:
-        pickle_this_to(obj=sim, filenamepkl='sim_final.pkl', save_to=SUITE_ROOT+'/../tests/')
+    # -- setting attributes
+    sim.addExperiment(experiment=experiment)
 
-        sim = unpickle_smth_from(filenamepkl='sim_final.pkl', load_from=SUITE_ROOT+'/../tests/')
-        PKL_FILES['WilsonSimulation_final'] = 'sim_final.pkl'
-    
-    # apparently numpy can't compare complex numbers
-    assert np.allclose(np.abs(sim.spec), np.abs(loaded_wilsonsim0.spec))
+    DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
+    sim.addTerms(terms=DERIVED_EVV_TERMS)
+    sim.addSystem(system=molecular_system)
+    sim.addVibAnaSetup(vib_ana)
+    sim.addPropEvalSetup(eval_uniform=calc_setup)
+    sim.addSpecEvalSetup(eval_setup)
+
+    sim.setPropsAndMaxStateLvl()
+    sim.dressPropsWithSetup()
+    sim.setAxisChoiceAndTranslateTerms(eval_setup.ev_info.spectral_axes)
+
+    #### ---- GETTING CALC DATA FROM QC OUTPUTS
+    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    sim.getResults(obtainer=wilson_data_obtainer)
+
+    # ------- preparing states
+    sim.vib_ana_setup.exclude_modes = []
+    sim.vib_ana_setup.set_include_modes_list()
+
+
+    ws.main.main_functions.do_anharmonic_analysis(vib_ana=sim.vib_ana_setup, 
+                                                props=sim.props, 
+                                                anharmonic_analyzer=ws.intensities.anharmonic_treatment.anharmonic_analyzer.anharm_analyzer_data)
+
+    ## -- pre-evaluation config
+    if mgn_conds is not None:
+        sim.apply_exp_magn_conditions(where=mgn_conds) # options: eval, render
+
+    ## -- evaluation
+    sim.evaluate()
+
+    ## -- further analysis
+
+    return sim
+
+if __name__ == '__main__':
+    sim = run()
+    print(sim.spec)

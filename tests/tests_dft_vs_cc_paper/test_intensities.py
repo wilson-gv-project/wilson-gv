@@ -19,7 +19,7 @@ def test_single_feat_5by5grid_as_evaluate_regions():
     Testing intensity evaluation for a single feature.
     Ultimately, evaluation is done with `evaluate_regions()` function: needs a list[GridRegion].
     
-    This test was constracted with SpectralFeature centrepoint being the staring point:
+    This test was constructed with SpectralFeature centrepoint being the staring point:
         - assumes a spectrum with axes A and B (both A > 0 and B > 0)
         - vib states data and resonance motif was adjusted to the resonance location and these axes
 
@@ -99,7 +99,7 @@ def test_single_feat_5by5grid_as_evaluate_regions():
 
     # now down to the feature evaluation
     grid_coords_au = {k: convNu2Ene(v) for k,v in grid_coords.items()}
-    feat_eval = ws.intensities.amplitudes.evaluation_wf.evaluate_feature(feature=feature,
+    feat_eval = ws.intensities.amplitudes.evaluators.evaluate_feature(feature=feature,
                                                                          vib_data=vibstates_data,
                                                                          vibdiff_cache=vibdiff_cache,  # won't be empty now but it's fine
                                                                          gamma=convNu2Ene(feature.lineshape_parameter),
@@ -194,7 +194,7 @@ def test_single_feat_5by5grid_as_evaluate_regions_multiterm_contrib():
 
     # now down to the feature evaluation
     grid_coords_au = {k: convNu2Ene(v) for k,v in grid_coords.items()}
-    feat_eval = ws.intensities.amplitudes.evaluation_wf.evaluate_feature(feature=feature,
+    feat_eval = ws.intensities.amplitudes.evaluators.evaluate_feature(feature=feature,
                                                                          vib_data=vibstates_data,
                                                                          vibdiff_cache=vibdiff_cache,  # won't be empty now but it's fine
                                                                          gamma=convNu2Ene(feature.lineshape_parameter),
