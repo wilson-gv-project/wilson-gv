@@ -31,7 +31,7 @@ def test_evaluation_general_customdata_1elterm():
                                                           'Gamma': 1., 'Gamma_unit': 'cm-1',
                                                           'grid_resolution': {'A': 1, 'B': 1}})
     mock_sim = WilsonSimulation()
-    mock_sim.terms = get_fully_enhanced_terms(experiment=evv_exp)
+    mock_sim.terms = evv_exp.derive_terms()
 
     mock_sim.exp = evv_exp
 
@@ -46,10 +46,11 @@ def test_evaluation_general_customdata_1elterm():
     mock_sim.vib_ana_setup.max_state_lvl = 3 # there is an issue for the underlying reason for this
 
     from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
-    flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
+    flat_dict = derived_terms_flat(get_fully_enhanced_terms(experiment=evv_exp), tolist=False)
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
-    mock_sim.terms = {1: {(1,0): [flat_dict['1_(1, 0)']]}}
+    # mock_sim.terms = {1: {(1,0): [flat_dict['1_(1, 0)']]}}
+    mock_sim.terms = [flat_dict['1_(1, 0)']]
     mock_sim.setAxisChoiceAndTranslateTerms(axes_choice)
     # FIXME: This printing appears to need update wrt. changes in wilson-derive, made issue
     #print('\n', flat_dict['1_(1, 0)'].to_latex())
@@ -69,7 +70,7 @@ def test_evaluation_general_customdata_1elterm():
 
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     r_res = ws.intensities.amplitudes.evaluators.evaluate_region(region, 
-                                                            mock_sim._workflow.qcdata_ctx.vib_data, 
+                                                            mock_sim._workflow.qcdata_ctx.vibstates_data, 
                                                             mock_sim._workflow.qcdata_ctx.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
@@ -92,7 +93,8 @@ def test_evaluation_general_customdata_1mechterm():
     from ....fixtures import evv_experiment
     
     evv_exp = evv_experiment()
-    terms = get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     bounds_dict = {'B': (900., 900.), 'A': (1864., 1864.)}
@@ -119,8 +121,6 @@ def test_evaluation_general_customdata_1mechterm():
 
     print('\nmock_sim.is_ready', mock_sim.is_ready)
 
-    from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
-    flat_dict = derived_terms_flat(mock_sim.terms, tolistonly=False)
 
     # TODO: how to update the terms for evaluation? how to make a selection of them after derivation?
 
@@ -140,7 +140,7 @@ def test_evaluation_general_customdata_1mechterm():
     
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     r_res = ws.intensities.amplitudes.evaluators.evaluate_region(region, 
-                                                            mock_sim._workflow.qcdata_ctx.vib_data, 
+                                                            mock_sim._workflow.qcdata_ctx.vibstates_data, 
                                                             mock_sim._workflow.qcdata_ctx.vibdiff_cache, 
                                                             convNu2Ene(mock_sim.spec_eval_setup.ev_info.Gamma))
     ref_res = np.array([1/(-1j*convNu2Ene(1.))/(-1j*convNu2Ene(1.)) * feat_coeff])
@@ -154,7 +154,8 @@ def test_full_integration():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -227,9 +228,10 @@ def test_full_integration_EVV_axes():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # {'A': [(1,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -304,9 +306,10 @@ def test_full_integration__EVV_axes_with_apply_exp_magn_conditions():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # {'A': [(1,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -385,9 +388,10 @@ def test_full_integration_EVV_axes_dress_these_with_boxes_minimum_box_padding():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # {'A': [(1,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -464,7 +468,8 @@ def test_full_integration_other_axes_choice():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -538,7 +543,8 @@ def test_integration_evv_experiment_until_after_evaluation():
         SignedPulseTuple, SpectralAxis
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     #axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(-1,)], 'B': [(-1,), (2,)]}
     # axis_choice = SpectralAxisSet(
@@ -638,7 +644,8 @@ def test_full_integration_H2O_molecule():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
@@ -709,9 +716,10 @@ def test_full_integration_EVV_axes_getResults_extra():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice: ws.main.spectrum_abstractions.SpectralAxisSet = make_SpectralAxisSet({'A': [1], 'B': [-1,2]}) # {'A': [(1,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 

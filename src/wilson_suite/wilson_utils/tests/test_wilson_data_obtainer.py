@@ -13,7 +13,8 @@ def test_getting_data():
     from ...fixtures import evv_experiment
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     mol_system = ws.main.abstractions.MolecularSystem(name='h2o', natoms=3)
     calc_setup_blank = ws.main.abstractions.DataOriginInfo()
 

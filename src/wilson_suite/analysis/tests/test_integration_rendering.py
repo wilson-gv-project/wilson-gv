@@ -10,7 +10,8 @@ def test_full_integration():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     # ?? why no other axes choice works?
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     print()
@@ -90,7 +91,8 @@ def test_full_integration_other_axes_choice():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     # ?? why no other axes choice works?
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -146,7 +148,8 @@ def test_full_integration_H2O_molecule():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',

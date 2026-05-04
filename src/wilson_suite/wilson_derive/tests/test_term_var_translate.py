@@ -1,6 +1,7 @@
 from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
 from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables, translate_magn_conditions_to_axisvars
+from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
 from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet, IndependentVariableSet, SignedPulseTuple, SpectralAxis
 
 def test_find_pulse_id_tuples_as_axis_vars():
@@ -15,7 +16,7 @@ def test_translate_terms_to_axis_variables():
 
     evv_exp = evv_experiment()
     terms = get_fully_enhanced_terms(experiment=evv_exp)
-
+    flat_terms = derived_terms_flat(terms, tolist=True)
     evv_exp.tell_axis_options()
 
     # Testing axis A = -w1, axis B = w2
@@ -24,10 +25,11 @@ def test_translate_terms_to_axis_variables():
     assert axis_choice_mw1_pw2.axes[0].var_set.var_set[0].pulse_refs == (-1,)
     assert axis_choice_mw1_pw2.axes[1].label == 'B'
     assert axis_choice_mw1_pw2.axes[1].var_set.var_set[0].pulse_refs == (2,)
-    translated_terms = translate_terms_to_axis_variables(terms, axis_choice_mw1_pw2)
+    translated_terms = translate_terms_to_axis_variables(flat_terms, axis_choice_mw1_pw2)
 
     # Arbitrary el. anharm term
-    t = terms[1][(1, 0)][0]
+    t = [t for t in flat_terms if t.anharmonicity==(1,0)][0]
+    # t = terms[1][(1, 0)][0]
 
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
@@ -36,7 +38,8 @@ def test_translate_terms_to_axis_variables():
     assert t.res[1].diff.sr.q == ['a']
     assert t.res[1].pf == [-1, 2]
 
-    tt = translated_terms[1][(1, 0)][0]
+    # tt = translated_terms[1][(1, 0)][0]
+    tt = [t for t in translated_terms if t.anharmonicity==(1,0)][0]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']
@@ -85,7 +88,8 @@ def test_translate_terms_to_axis_variables():
     assert len(tt.res) == 2
 
     # Arbitrary mech. anharm term (here testing only res. cond.)
-    t = terms[1][(0, 1)][8]
+    # t = terms[1][(0, 1)][8]
+    t = [t for t in flat_terms if t.anharmonicity==(0,1)][8]
 
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
@@ -94,7 +98,8 @@ def test_translate_terms_to_axis_variables():
     assert t.res[1].diff.sr.q == ['a']
     assert t.res[1].pf == [-1, 2]
 
-    tt = translated_terms[1][(0, 1)][8]
+    # tt = translated_terms[1][(0, 1)][8]
+    tt = [t for t in translated_terms if t.anharmonicity==(0,1)][8]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']
@@ -113,10 +118,11 @@ def test_translate_terms_to_axis_variables():
     assert axis_choice_mw1_mw1_w2.axes[1].var_set.var_set[0].pulse_refs == (-1,)
     assert axis_choice_mw1_mw1_w2.axes[1].var_set.var_set[1].pulse_refs == (2,)
 
-    translated_terms = translate_terms_to_axis_variables(terms, axis_choice_mw1_mw1_w2)
+    translated_terms = translate_terms_to_axis_variables(flat_terms, axis_choice_mw1_mw1_w2)
 
     # Testing the same terms again
-    tt = translated_terms[1][(1, 0)][0]
+    # tt = translated_terms[1][(1, 0)][0]
+    tt = [t for t in translated_terms if t.anharmonicity==(1,0)][0]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']
@@ -125,7 +131,8 @@ def test_translate_terms_to_axis_variables():
     assert tt.res[1].diff.sr.q == ['a']
     assert tt.res[1].pf == ['B']
 
-    tt = translated_terms[1][(0, 1)][8]
+    # tt = translated_terms[1][(0, 1)][8]
+    tt = [t for t in translated_terms if t.anharmonicity==(0,1)][8]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']
@@ -142,10 +149,11 @@ def test_translate_terms_to_axis_variables():
                            var_set=(SignedPulseTuple(pulse_refs=(-1,)), SignedPulseTuple(pulse_refs=(2,)))))))
 
 
-    translated_terms = translate_terms_to_axis_variables(terms, custom_axis_choice)
+    translated_terms = translate_terms_to_axis_variables(flat_terms, custom_axis_choice)
 
     # Testing the same terms again
-    tt = translated_terms[1][(1, 0)][0]
+    # tt = translated_terms[1][(1, 0)][0]
+    tt = [t for t in translated_terms if t.anharmonicity==(1,0)][0]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']
@@ -154,7 +162,8 @@ def test_translate_terms_to_axis_variables():
     assert tt.res[1].diff.sr.q == ['a']
     assert tt.res[1].pf == ['B']
 
-    tt = translated_terms[1][(0, 1)][8]
+    # tt = translated_terms[1][(0, 1)][8]
+    tt = [t for t in translated_terms if t.anharmonicity==(0,1)][8]
 
     assert tt.res[0].diff.sl.q == []
     assert tt.res[0].diff.sr.q == ['a']

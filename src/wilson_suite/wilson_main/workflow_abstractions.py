@@ -141,7 +141,7 @@ class WilsonSimulation:
 
 		self.system = system
 
-	def addTerms(self, terms: dict, extend: bool=False):
+	def addTerms(self, terms: list, extend: bool=False):
 		"""
 		Add terms
 

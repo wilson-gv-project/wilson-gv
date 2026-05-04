@@ -12,7 +12,8 @@ def test_saving_obtained_data():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -91,7 +92,8 @@ def test_save_wilsonsim():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -124,7 +126,7 @@ def test_save_wilsonsim():
 
     vib_ana.set_include_modes_list()
     
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice = make_SpectralAxisSet({'A': [2], 'B': [-1, 2]})
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
 

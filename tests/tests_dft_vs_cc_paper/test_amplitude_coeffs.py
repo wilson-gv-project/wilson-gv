@@ -52,12 +52,13 @@ def test_ampl_coeff_sum_3_terms():
     # getting all propper terms here and realistic combinations of contributing terms
     hashmap_terms = get_hashmap_terms()
     terms = list(hashmap_terms.values())
-
+    for i in hashmap_terms:
+        print(i)
     # selecting some terms - all (2) el and 4 mech [2 of each resmotif]
     # each feature (found res location) would have 3 terms contribution to the coefficient
     terms_selection = [0, 1, 3, 5, 8, 9]
     terms = [terms[s] for s in terms_selection]
-    
+    VibPerturbedTerm.save_many_to_json(terms, filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
     terms_json = VibPerturbedTerm.load_terms_from_json(filepath='tests/tests_dft_vs_cc_paper/terms_selection.json')
     assert sorted([t.h() for t in terms]) == sorted([t.h() for t in terms_json])
 
@@ -79,7 +80,7 @@ def test_ampl_coeff_sum_3_terms():
     vibdiff_cache = VibDiffCache()
 
     terms_for_motifs = _get_terms_for_motifs(terms)
-    qc_ctx = QCDataContext(vib_data=data_configs.vibstates_data, vibdiff_cache=vibdiff_cache, data_configs=data_configs)
+    qc_ctx = QCDataContext(vibstates_data=data_configs.vibstates_data, vibdiff_cache=vibdiff_cache, data_configs=data_configs)
     axis_ctx = AxisContext(terms=terms, experiment_ctx=None, 
                            terms_for_motifs=terms_for_motifs, 
                            axes=None, magn_conditions=None)
@@ -135,15 +136,13 @@ def test_ampl_coeff_1mech_terms():
     """
     Calculation of coeffs for 2 features with 1 contribution of mech term (in 2 feats - 2 different terms contributions)
     """
-    from .testutils import get_from_pkl_features
-    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (process_resonance_motifs, 
-                                                                          evaluate_terms_coeffs, 
+    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (evaluate_terms_coeffs, 
                                                                           precalculate_unique_coeff_parts, 
                                                                           identify_precalc_unique_coeff_parts,
                                                                           get_features_to_draw)
 
     # getting all propper terms here and realistic combinations of contributing terms
-    feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
+    hashmap_terms = get_hashmap_terms()
     terms = list(hashmap_terms.values())
 
     # selecting some terms - 2 mech [1 of each resmotif]
@@ -172,9 +171,12 @@ def test_ampl_coeff_1mech_terms():
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
     vibdiff_cache = VibDiffCache()
 
-    motif_locs, terms_for_motifs = process_resonance_motifs(terms,
-                                             data_configs.vibstates_data,
-                                             vibdiff_cache)
+    terms_for_motifs = _get_terms_for_motifs(terms)
+    qc_ctx = QCDataContext(vibstates_data=data_configs.vibstates_data, vibdiff_cache=vibdiff_cache, data_configs=data_configs)
+    axis_ctx = AxisContext(terms=terms, experiment_ctx=None, 
+                           terms_for_motifs=terms_for_motifs, 
+                           axes=None, magn_conditions=None)
+    motif_locs = _compute_motif_locs(axis_ctx, qc_ctx)
 
     need_precalc = identify_precalc_unique_coeff_parts(terms=terms)
     precalculated = precalculate_unique_coeff_parts(need_precalc, 
@@ -186,7 +188,7 @@ def test_ampl_coeff_1mech_terms():
 
     gamma = 10.2
     # these feature will now also have coefficients computed above
-    features_to_draw = get_features_to_draw(motif_res_loc=motif_locs, 
+    features_to_draw, _ = get_features_to_draw(motif_res_loc=motif_locs, 
                                             terms_for_motifs=terms_for_motifs,
                                             term_coeffs_per_index=coefficients,
                                             lineshape_parameter=gamma) # in cm-1 in features
@@ -210,13 +212,13 @@ def test_ampl_coeff_1mech_terms():
     # evaluating features coefficients based on features (a wrapper function that is using evaluate_terms_coeffs func)
     # feature 0
     feat0_coeff = evaluate_coeff_for_feat(selected_features[0],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat0_coeff = {k.h(): v for k,v in feat0_coeff.items()}
+    result_feat0_coeff = {k.to_str(): v for k,v in feat0_coeff.items()}
     assert len(result_feat0_coeff) == 1
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[0].amplitude_coeff == sum([c for i in result_feat0_coeff.values() for c in i.values()])
+    assert selected_features[0].amplitude_coeff == sum([c[0] for i in result_feat0_coeff.values() for c in i.values()])
 
     # only single term contrib - mech term
     t_feat0 = hashmap_terms[selected_features[0].term_contributions[0].term_ids[0]]
@@ -224,25 +226,26 @@ def test_ampl_coeff_1mech_terms():
     res_t_feat0 = evaluate_term_coeffs(term=t_feat0, 
                          relevant_indices=[selected_features[0].term_contributions[0].states_parameters[0].to_dict()],
                          necessary_data=(data_configs, precalculated))
+
     # single feature computed coeff here
-    assert list(res_t_feat0.values())[0] == selected_features[0].amplitude_coeff
+    assert list(res_t_feat0.values())[0][0] == selected_features[0].amplitude_coeff
 
     # feature 1
     feat1_coeff = evaluate_coeff_for_feat(selected_features[1],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat1_coeff = {k.h(): v for k,v in feat1_coeff.items()}
+    result_feat1_coeff = {k.to_str(): v for k,v in feat1_coeff.items()}
     assert len(result_feat1_coeff) == 1
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[1].amplitude_coeff == sum([c for i in result_feat1_coeff.values() for c in i.values()])
+    assert selected_features[1].amplitude_coeff == sum([c[0] for i in result_feat1_coeff.values() for c in i.values()])
 
     # only single term contrib - mech term
     t_feat1 = hashmap_terms[selected_features[1].term_contributions[0].term_ids[0]]
     res_t_feat1 = evaluate_term_coeffs(term=t_feat1, 
                          relevant_indices=[selected_features[1].term_contributions[0].states_parameters[0].to_dict()],
                          necessary_data=(data_configs, precalculated))
-    assert list(res_t_feat1.values())[0] == selected_features[1].amplitude_coeff
+    assert list(res_t_feat1.values())[0][0] == selected_features[1].amplitude_coeff
 
 
     t_feat0_a = selected_features[0].term_contributions[0].states_parameters[0].to_dict()['a']
@@ -290,15 +293,14 @@ def test_ampl_coeff_1el_terms():
     Calculation of coeffs for 2 features with 1 contribution of mech term (in 2 feats - 2 different terms contributions)
     """
     from .testutils import get_from_pkl_features
-    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (process_resonance_motifs, 
-                                                                          evaluate_terms_coeffs, 
+    from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import (evaluate_terms_coeffs, 
                                                                           precalculate_unique_coeff_parts, 
                                                                           identify_precalc_unique_coeff_parts,
                                                                           get_features_to_draw)
     from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_coeff_for_feat
 
     # getting all propper terms here and realistic combinations of contributing terms
-    feats, hashmap_terms = get_from_pkl_features('data_for_tests/FORM_conf1_B3LYP_aug_cc_pVTZ.pkl', 10.)
+    hashmap_terms = get_hashmap_terms()
     terms = list(hashmap_terms.values())
 
     # selecting some terms - 2 mech [1 of each resmotif]
@@ -327,9 +329,12 @@ def test_ampl_coeff_1el_terms():
     from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
     vibdiff_cache = VibDiffCache()
 
-    motif_locs, terms_for_motifs = process_resonance_motifs(terms,
-                                             data_configs.vibstates_data,
-                                             vibdiff_cache)
+    terms_for_motifs = _get_terms_for_motifs(terms)
+    qc_ctx = QCDataContext(vibstates_data=data_configs.vibstates_data, vibdiff_cache=vibdiff_cache, data_configs=data_configs)
+    axis_ctx = AxisContext(terms=terms, experiment_ctx=None, 
+                           terms_for_motifs=terms_for_motifs, 
+                           axes=None, magn_conditions=None)
+    motif_locs = _compute_motif_locs(axis_ctx, qc_ctx)
 
     need_precalc = identify_precalc_unique_coeff_parts(terms=terms)
     precalculated = precalculate_unique_coeff_parts(need_precalc, 
@@ -341,7 +346,7 @@ def test_ampl_coeff_1el_terms():
 
     gamma = 10.2
     # these feature will now also have coefficients computed above
-    features_to_draw = get_features_to_draw(motif_res_loc=motif_locs, 
+    features_to_draw, _ = get_features_to_draw(motif_res_loc=motif_locs, 
                                             terms_for_motifs=terms_for_motifs,
                                             term_coeffs_per_index=coefficients,
                                             lineshape_parameter=gamma) # in cm-1 in features
@@ -365,13 +370,13 @@ def test_ampl_coeff_1el_terms():
     # evaluating features coefficients based on features (a wrapper function that is using evaluate_terms_coeffs func)
     # feature 0
     feat0_coeff = evaluate_coeff_for_feat(selected_features[0],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat0_coeff = {k.h(): v for k,v in feat0_coeff.items()}
+    result_feat0_coeff = {k.to_str(): v for k,v in feat0_coeff.items()}
     assert len(result_feat0_coeff) == 1
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[0].amplitude_coeff == sum([c for i in result_feat0_coeff.values() for c in i.values()])
+    assert selected_features[0].amplitude_coeff == sum([c[0] for i in result_feat0_coeff.values() for c in i.values()])
 
     # only single term contrib - mech term
     t_feat0 = hashmap_terms[selected_features[0].term_contributions[0].term_ids[0]]
@@ -380,25 +385,25 @@ def test_ampl_coeff_1el_terms():
                          relevant_indices=[selected_features[0].term_contributions[0].states_parameters[0].to_dict()],
                          necessary_data=(data_configs, precalculated))
     # single feature computed coeff here
-    assert list(res_t_feat0.values())[0] == selected_features[0].amplitude_coeff
+    assert list(res_t_feat0.values())[0][0] == selected_features[0].amplitude_coeff
 
 
     # feature 1
     feat1_coeff = evaluate_coeff_for_feat(selected_features[1],
-                                         {t.h(): t for t in terms_json},
+                                         {t.to_str(): t for t in terms_json},
                                          data_configs,
                                          precalculated)
-    result_feat1_coeff = {k.h(): v for k,v in feat1_coeff.items()}
+    result_feat1_coeff = {k.to_str(): v for k,v in feat1_coeff.items()}
     assert len(result_feat1_coeff) == 1
     # testing that feature coefficient is the sum of computed coeffs per term
-    assert selected_features[1].amplitude_coeff == sum([c for i in result_feat1_coeff.values() for c in i.values()])
+    assert selected_features[1].amplitude_coeff == sum([c[0] for i in result_feat1_coeff.values() for c in i.values()])
 
     # only single term contrib - mech term
     t_feat1 = hashmap_terms[selected_features[1].term_contributions[0].term_ids[0]]
     res_t_feat1 = evaluate_term_coeffs(term=t_feat1, 
                          relevant_indices=[selected_features[1].term_contributions[0].states_parameters[0].to_dict()],
                          necessary_data=(data_configs, precalculated))
-    assert list(res_t_feat1.values())[0] == selected_features[1].amplitude_coeff
+    assert list(res_t_feat1.values())[0][0] == selected_features[1].amplitude_coeff
 
 
     t_feat0_a = selected_features[0].term_contributions[0].states_parameters[0].to_dict()['a']

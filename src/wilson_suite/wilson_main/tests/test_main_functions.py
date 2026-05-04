@@ -3,7 +3,8 @@ from ...fixtures import evv_experiment
 
 def test_find_props():
     experiment_a = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = experiment_a.derive_terms()
     props = ws.main.main_functions.find_props(terms=terms)
 
     for p in props:
@@ -26,7 +27,9 @@ def test_find_props_and_max_state_lvl():
                                                vibana_own_analysis='anharm', number_of_modes=3)
     
     experiment_a = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = experiment_a.derive_terms()
+    
     props, _, _ = ws.main.main_functions.find_props_and_max_state_lvl(terms=terms, vib_ana=vib_ana)
     print([k.h(1) for k in props], '\n')
     print(set([k.h(1) for k in props]), '\n')

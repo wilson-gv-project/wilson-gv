@@ -169,7 +169,7 @@ def derived_terms_dict_to_dicts(derived_terms, tolistonly: bool=False):
 
     return result_list
 
-def derived_terms_flat(derived_terms, tolistonly: bool=False):
+def derived_terms_flat(derived_terms, tolist: bool=False):
     """
     put data in a form for use on the evaluation step
     """
@@ -185,13 +185,13 @@ def derived_terms_flat(derived_terms, tolistonly: bool=False):
             for term in derived_terms[key_num_anharms][anharms_tuple]:
                 
                 term.anharmonicity = anharms_tuple
-                if tolistonly:
+                if tolist:
                     result_list.append(term)
 
                 else:
                     result_dict[f'{count}_{anharms_tuple}'] = term
                 count += 1
-    if tolistonly:
+    if tolist:
         return result_list
     else:
         return result_dict

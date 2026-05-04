@@ -60,7 +60,7 @@ def run():
 
     # SpectralAxisSet convenient builder - new axes labels to collection of independent vars, 
     #                                                      here - laser pulses with chosen signs
-    spec_axes = ws.utils.some_reprs.make_SpectralAxisSet({"A": [1], "B": [-1, 2]})
+    spec_axes = ws.utils.builders.make_SpectralAxisSet({"A": [1], "B": [-1, 2]})
 
     eval_info = ws.main.spectrum_abstractions.EvaluationInfo(Gamma=10.0, Gamma_unit='cm-1', 
                                                             margins={'diag_margin': 5.0}, 
@@ -95,7 +95,8 @@ def run():
     # -- setting attributes
     sim.addExperiment(experiment=experiment)
 
-    DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
+    # DERIVED_EVV_TERMS_dict = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
+    DERIVED_EVV_TERMS = experiment.derive_terms()
     sim.addTerms(terms=DERIVED_EVV_TERMS)
     sim.addSystem(system=molecular_system)
     sim.addVibAnaSetup(vib_ana)

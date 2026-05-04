@@ -22,7 +22,8 @@ def test_anharm_analyzer_wilsonsim():
 
     printtest(f'vibana.vibana_own_analysis: {vib_ana.vibana_own_analysis}')
     experiment_a = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
+    terms = experiment_a.derive_terms()
     axes_choice = experiment_a.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
