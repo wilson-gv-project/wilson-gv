@@ -27,6 +27,7 @@ def test_expr1():
     nm_indices_symb = sorted(set(expression.get_mode_indices()))
     print(nm_indices_symb)
     from ...amplitudes.utils import generate_index_choices_general
+    print('nm_indices_symb', nm_indices_symb)
     idxs = generate_index_choices_general(indlabels_in_motif=nm_indices_symb, labels=['1', '2', '3'])
     print()
     for i in idxs:

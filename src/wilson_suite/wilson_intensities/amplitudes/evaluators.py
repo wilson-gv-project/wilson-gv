@@ -53,6 +53,46 @@ def prepDataForEval(pulse_polarization_vector: np.ndarray,
 
     return vibstates_data, vibdiff_cache, data_and_configs
 
+def set_up_qc_data_request(terms,
+                   vibana_own_analysis, vib_regime,
+                    freqs: str = 'static') -> list:
+    """
+    put data in a form for use on the evaluation step
+    """
+    from wilson_suite.wilson_main.main_functions import tell_needed_props_for_vib_analysis_simple, find_props
+    props = find_props(terms, freqs=freqs)
+    vib_props = tell_needed_props_for_vib_analysis_simple(vibana_own_analysis=vibana_own_analysis, regime=vib_regime)
+
+    return list(set(props+vib_props))
+
+
+def set_up_qc_data(props: list, 
+                   nc_sqrt_eigval: dict,
+                   number_of_modes: int,
+                   states: list,
+                   exclude_modes,
+                   pulse_polarization_vector):
+
+    include_list = tuple([v for v in list(nc_sqrt_eigval.keys()) if v not in exclude_modes])
+    if include_list == tuple():
+        raise ValueError("include_list of included normal modes labels is empty")
+    
+
+    vibstates_data = VibStatesData(allstates=tuple(states), 
+                                   harmonic_osc_states_labels=include_list,
+                                   number_of_nmodes=number_of_modes)
+    vibdiff_cache = VibDiffCache()
+    props = MolPropsCollection(properties=props)
+    
+    data_and_configs = EvaluationDataAndConfigs(props_data=props,
+                                                vibstates_data=vibstates_data,
+                                                number_of_nmodes=number_of_modes,
+                                                nm_inds_choices=include_list,
+                                                pulse_polarization_vector=pulse_polarization_vector,
+                                                nc_sqrt_eigval=nc_sqrt_eigval)
+
+    return vibstates_data, vibdiff_cache, data_and_configs
+
 
 def _get_terms_for_motifs(derived_terms: list['VibPerturbedTerm']):
     
@@ -75,7 +115,7 @@ def _compute_motif_locs(axis_ctx: 'AxisContext', qc: 'QCDataContext'):
     for res_motif in unique_res_motifs:
         this_motif_res_locs = find_resonance_locations_wrt_index_choices(
             motif=res_motif,
-            vibstates_data=qc.vib_data,
+            vibstates_data=qc.vibstates_data,
             vibdiff_cache=qc.vibdiff_cache,
             spec_window=None
         )

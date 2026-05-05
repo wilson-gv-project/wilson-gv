@@ -13,9 +13,12 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, ResLocGeoObject
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
+    from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
+from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
 from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridManager
@@ -28,7 +31,11 @@ from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_t
 from wilson_suite.wilson_intensities.amplitudes.evaluators import _compute_motif_locs, _get_terms_for_motifs
 
 from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_regions
+from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
+from wilson_suite.wilson_main.abstractions import MolecularProperty
 
+
+from wilson_suite.wilson_intensities.amplitudes import evaluators
 import logging
 logger = logging.getLogger("wilson")
 
@@ -55,7 +62,7 @@ class AxisContext:
 
 @dataclass(frozen=True)
 class QCDataContext:
-    vib_data: 'VibStatesData'
+    vibstates_data: 'VibStatesData'
     vibdiff_cache: 'VibDiffCache'
     data_configs: 'EvaluationDataAndConfigs'
 
@@ -116,12 +123,11 @@ class RenderSettings:
 
 
 def build_experiment_context(simulation: 'WilsonSimulation') -> ExperimentContext:
-    flat_terms = derived_terms_flat(simulation.terms, tolistonly=True)
     return ExperimentContext(
-        raw_terms=flat_terms,
+        raw_terms=simulation.terms,
         pulse_polarization_vector=tuple(simulation.exp.polarization_avg_vector),
         magn_conditions=tuple(simulation.exp.magn_conditions),
-        need_precalc=identify_precalc_unique_coeff_parts(flat_terms),
+        need_precalc=identify_precalc_unique_coeff_parts(simulation.terms),
     )
 
 def build_qc_context(simulation: 'WilsonSimulation') -> QCDataContext:
@@ -131,10 +137,41 @@ def build_qc_context(simulation: 'WilsonSimulation') -> QCDataContext:
         simulation.props,
     )
     return QCDataContext(
-        vib_data=vib_data,
+        vibstates_data=vib_data,
         vibdiff_cache=vibdiff_cache,
         data_configs=data_configs,
     )
+
+'''
+def request_and_build_qcdata_ctx(calc_setup, 
+                                 pulse_polarization_vector,
+                                 number_of_modes,
+                                 states,
+                                 exclude_modes):
+    """
+    !
+    """
+    props_rq = evaluators.set_up_qc_data_request()
+    p_rq = {}
+    for key in props_rq:
+        if isinstance(key, MolecularProperty):
+            p_rq[key.trivial_name] = 
+    if not isinstance(calc_setup, dict):
+        p_rq = {p.trivial_name: calc_setup for p in props_rq if isinstance(p, MolecularProperty)}
+    else:
+        p_rq = {p.trivial_name: calc_setup[p.trivial_name] for p in props_rq if isinstance(p, MolecularProperty)}
+
+    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    obtained_data = wilson_data_obtainer(p_rq)
+
+    vibstates_data, vibdiff_cache, data_and_configs = evaluators.set_up_qc_data()
+    
+    return QCDataContext(
+        vibstates_data=vibstates_data,
+        vibdiff_cache=vibdiff_cache,
+        data_configs=data_and_configs,
+    )
+'''
 
 def build_precalc_context(
     experiment: ExperimentContext,
@@ -156,14 +193,10 @@ def build_axis_context(
     simulation: 'WilsonSimulation',
 ) -> AxisContext:
     if simulation.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
-        from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
         translated_magn_conditions = translate_magn_conditions_to_axisvars(experiment_ctx.magn_conditions, simulation.axis_choice)
     else:
         translated_magn_conditions = None
-    if isinstance(simulation.terms_in_axis_choice, dict):
-        translated_terms = derived_terms_flat(simulation.terms_in_axis_choice, tolistonly=True)
-    else:
-        translated_terms = simulation.terms_in_axis_choice
+    translated_terms = simulation.terms_in_axis_choice
 
     return AxisContext(
         experiment_ctx=experiment_ctx,
@@ -218,28 +251,109 @@ def build_grid_context(
     )
 
 
-def build_machinery(experiment, axes_choice):
-    derived_terms = experiment
-    derived_flat_terms = derived_terms_flat(derived_terms, tolistonly=True)
+@dataclass(frozen=True)
+class TheMachine:
+    experiment: ExperimentContext
+    axes: AxisContext
+
+    def feed_data(self, qc_data: QCDataContext, gamma: float,
+                  magn_conditions_margin: float = 1.) -> FeatureResult:
+        precalc_ctx = build_precalc_context(self.experiment, qc_data)
+        bound_mofifs = bind_motifs(self.axes, precalc_ctx)
+        feat_result = compute_features(bound_mofifs, gamma)
+        
+        if self.axes.magn_conditions is not None:
+            surviving = SpectralFeature.apply_magn_cond_filter(
+                    feat_result.features,
+                    magn_conditions=self.axes.magn_conditions,
+                    magn_conditions_margin=magn_conditions_margin,
+                )
+            surviving_zeros = SpectralFeature.apply_magn_cond_filter(
+                    feat_result.features,
+                    magn_conditions=self.axes.magn_conditions,
+                    magn_conditions_margin=magn_conditions_margin,
+                )
+            return FeatureResult(features=surviving, zero_feats=surviving_zeros)
+        
+        return feat_result
+    
+    def request_data(self, vib_regime, vibana_own_analysis):
+        
+        props_rq = evaluators.set_up_qc_data_request(self.experiment.raw_terms,
+                                                     vib_regime=vib_regime,
+                                                     vibana_own_analysis=vibana_own_analysis)
+        
+        return
+
+
+def build_machinery_from_experiment(experiment: 'VibExperiment', 
+                    axes_choice_dict: dict[str,list]) -> TheMachine:
+    """
+    axes_choice_dict: e.g., {"A": [1], "B": [-1, 2]}
+    """
+    axes_choice = make_SpectralAxisSet(axes_choice_dict)
+    # TODO: validate this axes_choice against experiment??
+    derived_terms = experiment.derive_terms()
+
     exp_context = ExperimentContext(
-            raw_terms=derived_flat_terms,
+            raw_terms=derived_terms,
             pulse_polarization_vector=tuple(experiment.polarization_avg_vector),
             magn_conditions=tuple(experiment.magn_conditions),
-            need_precalc=identify_precalc_unique_coeff_parts(derived_flat_terms),
+            need_precalc=identify_precalc_unique_coeff_parts(derived_terms),
         )
     
-    terms_in_axis_choice = translate_terms_to_axis_variables(self.terms, self.axis_choice)
+    terms_in_axis_choice = translate_terms_to_axis_variables(derived_terms, axes_choice)
+
+    translated_magn_conditions = None
+    if experiment.magn_conditions is not None:
+        translated_magn_conditions = translate_magn_conditions_to_axisvars(experiment.magn_conditions, axes_choice)
+
     
-    translated_terms = derived_terms_flat(terms_in_axis_choice, tolistonly=True)
-    axes_contenxt = AxisContext(
+    axes_context = AxisContext(
             experiment_ctx=exp_context,
             axes=axes_choice,
-            terms=translated_terms,
-            terms_for_motifs=_get_terms_for_motifs(translated_terms),
+            terms=terms_in_axis_choice,
+            terms_for_motifs=_get_terms_for_motifs(terms_in_axis_choice),
             magn_conditions=translated_magn_conditions,
         )
     
-    return
+    return TheMachine(exp_context, axes_context)
+
+def build_machinery_from_terms(terms: list['VibPerturbedTerm'],
+                    axes_choice_dict: dict[str,list],
+                    polarization_avg_vector, magn_conditions
+                    ) -> TheMachine:
+    """
+    polarization_avg_vector -- ZZZZ is [1., 1., 1.]
+    magn_conditions -- 
+
+    axes_choice_dict: e.g., {"A": [1], "B": [-1, 2]}
+    """
+    axes_choice = make_SpectralAxisSet(axes_choice_dict)
+    # TODO: validate this axes_choice against indep vars??
+
+    exp_context = ExperimentContext(
+            raw_terms=terms,
+            pulse_polarization_vector=tuple(polarization_avg_vector),
+            magn_conditions=tuple(magn_conditions),
+            need_precalc=identify_precalc_unique_coeff_parts(terms),
+        )
+    
+    terms_in_axis_choice = translate_terms_to_axis_variables(terms, axes_choice)
+
+    translated_magn_conditions = None
+    if magn_conditions is not None:
+        translated_magn_conditions = translate_magn_conditions_to_axisvars(magn_conditions, axes_choice)
+    
+    axes_context = AxisContext(
+            experiment_ctx=exp_context,
+            axes=axes_choice,
+            terms=terms_in_axis_choice,
+            terms_for_motifs=_get_terms_for_motifs(terms_in_axis_choice),
+            magn_conditions=translated_magn_conditions,
+        )
+    
+    return TheMachine(exp_context, axes_context)
 
 
 def _settings_from_ev_info(ev_info: 'EvaluationInfo') -> RenderSettings:
@@ -347,7 +461,7 @@ def evaluate_regions_on_grid(
     if not regions:
         raise ValueError("No regions were created")
     regions_results = evaluate_regions(
-        regions, qc.vib_data, qc.vibdiff_cache, gamma_au, verbose
+        regions, qc.vibstates_data, qc.vibdiff_cache, gamma_au, verbose
     )
     return RegionEvaluation(regions=regions, regions_results=regions_results), eval_grid
 

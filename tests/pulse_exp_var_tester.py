@@ -238,7 +238,7 @@ eval_vars_meshgrids = {}
 for i, key in enumerate(eval_vars.keys()):
     eval_vars_meshgrids[key] = meshgrids[i]
 
-from wilson_suite.analysis.render.spectrum_renderer import PlotConfig, NormalizationType
+from wilson_suite.wilson_analysis.render.spectrum_renderer import PlotConfig, NormalizationType
 
 style_config = PlotConfig(
     figsize=(35, 45),
@@ -296,4 +296,4 @@ intensities_spec = np.abs(sim.spec) ** 2
 
 hist, bin_edges = np.histogram(intensities_spec, bins=10)
 
-sim.render(renderer=ws.analysis.render.render_spectrum)
+sim.render(renderer=ws.wilson_analysis.render.render_spectrum)

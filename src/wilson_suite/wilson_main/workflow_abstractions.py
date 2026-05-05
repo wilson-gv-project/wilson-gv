@@ -531,7 +531,7 @@ class WilsonSimulation:
 		if self.spec is None:
 			raise ValueError("No spectrum data to render")
 		
-		from wilson_suite.analysis.render.matplotlib_renderer import MatplotlibRenderer
+		from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 		
 		filename = self.spec_eval_setup.rnd_info.filename
 		backend = self.spec_eval_setup.rnd_info.backend

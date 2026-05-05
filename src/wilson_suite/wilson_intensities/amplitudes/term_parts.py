@@ -442,13 +442,6 @@ class TermParametersChoice:
             and self.states_parameters == other.states_parameters
         )
 
-    # def __lt__(self, other):
-    #     if len(self.term_ids) != len(other.term_ids):
-    #         return len(self.term_ids) < len(other.term_ids)
-    #     else:
-    #         self.states_parameters
-    #     return
-
     def __lt__(self, other):
         if not isinstance(other, TermParametersChoice):
             return NotImplemented
@@ -464,6 +457,34 @@ class TermParametersChoice:
         # 3. Compare the sequences of ParameterSets
         # Python will compare self.states_parameters[0] < other.states_parameters[0], etc.
         return self.states_parameters < other.states_parameters
+    
+    @classmethod
+    def check_states_parameters(cls, coll_tparamchoices: tuple['TermParametersChoice']) -> dict[str, str|int]:
+        """
+        across a collection of TermParametersChoice - extract a single dict of parameter choices if possible
+        """
+        all_unique_configs = set()
+
+        for tpc in coll_tparamchoices:
+            for i in tpc.states_parameters:
+                # 1. Convert dict to a hashable tuple
+                d = i.to_dict()
+                hashable_dict = tuple(sorted(d.items()))
+                
+                # 2. Add to our master set of unique configurations
+                all_unique_configs.add(hashable_dict)
+        
+        # 3. If there is exactly one unique configuration across everything
+        if len(all_unique_configs) == 1:
+            # Convert the tuple back into a dict to return it
+            # We use pop() to get the only item out of the set
+            return dict(all_unique_configs.pop())
+        elif len(all_unique_configs) == 0:
+            return None
+        else:
+            raise ValueError(f'Found {len(all_unique_configs)} different parameter choices; expected 1.')
+
+
 # -------------------------------------------------------
 
 

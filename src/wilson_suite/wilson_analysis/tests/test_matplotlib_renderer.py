@@ -1,8 +1,8 @@
 import numpy as np
-from wilson_suite.analysis.render.matplotlib_renderer import MatplotlibRenderer
+from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 from wilson_suite.wilson_main.spectrum_abstractions import EvaluationInfo, RenderingInfo
 import pytest
-from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.paths import SUITE_ROOT, ANALYSIS_ROOT
 import os
 
 from unittest.mock import MagicMock
@@ -99,8 +99,8 @@ def test_render_returns():
     fig, ax, contour, cbar = MatplotlibRenderer(spec_data=spec, 
                                                 spec_grid=spec_grid, 
                                                 ev_info=ev_info, rnd_info=rnd_info, 
-                                                do_diagn=True).render(SUITE_ROOT+'/wilson_suite/analysis/tests/f0.svg')
-    fig.savefig(SUITE_ROOT+'/wilson_suite/analysis/tests/f0.svg', 
+                                                do_diagn=True).render(ANALYSIS_ROOT+'/tests/f0.svg')
+    fig.savefig(ANALYSIS_ROOT+'/tests/f0.svg', 
                 bbox_inches='tight',
                 dpi=200, format='svg')
     import matplotlib
@@ -130,11 +130,11 @@ def test_render_returns():
     # returns None when images are considered the same (within tolerance)
     # returns a dict when images differ too much
     diff = compare_images(
-        SUITE_ROOT+'/wilson_suite/analysis/tests/f0.svg',
-        SUITE_ROOT+'/wilson_suite/analysis/tests/f_ref.svg',
+        ANALYSIS_ROOT+'/tests/f0.svg',
+        ANALYSIS_ROOT+'/tests/f_ref.svg',
         tol=2.0  # allow small numerical differences
     )
     assert diff is None, diff # if diff is not None, show diff as the error message
-    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f0.svg')
-    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f0_svg.png')
-    os.remove(SUITE_ROOT+'/wilson_suite/analysis/tests/f_ref_svg.png')
+    os.remove(ANALYSIS_ROOT+'/tests/f0.svg')
+    os.remove(ANALYSIS_ROOT+'/tests/f0_svg.png')
+    os.remove(ANALYSIS_ROOT+'/tests/f_ref_svg.png')

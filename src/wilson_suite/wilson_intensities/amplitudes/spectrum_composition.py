@@ -296,6 +296,21 @@ class SpectralFeature:
             return NotImplemented
         return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
 
+    @property
+    def param_set(self):
+        if self.term_contributions is not None and self.term_contributions!=():
+            d = TermParametersChoice.check_states_parameters(self.term_contributions)
+            del d['zero']
+            return d
+        else:
+            return None
+
+    def __repr__(self) -> str:
+        """
+        Returns a string representation showing type and coordinates.
+        """        
+        return f'SpectralFeature(location={self.location}, params={self.param_set}, amplitude_coeff={self.amplitude_coeff})'
+
     @classmethod
     def sort_by_params(cls, features: list['SpectralFeature']):
         params_lens = [len(i.term_contributions) for i in features]
@@ -421,6 +436,7 @@ class SpectralFeature:
     # UNUSED
     def get_res_motifs(self) -> list[ResonanceMotif]:
         return [i.res_motif for i in self.term_contributions]
+
 
     @classmethod
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],

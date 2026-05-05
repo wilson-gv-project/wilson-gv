@@ -79,6 +79,57 @@ def tell_needed_props_for_vib_analysis(vib_ana: VibAnaSetup):
 	return needed_props
 
 
+def tell_needed_props_for_vib_analysis_simple(vibana_own_analysis, regime):
+    """
+	List MolecularProperty instances required for a vibrational analysis.
+	
+	"""
+    is_none    = vibana_own_analysis == 'none'
+    is_anharm  = vibana_own_analysis == 'anharm'
+    is_full    = vibana_own_analysis == 'full'
+    is_compare = regime == 'compare'
+
+    needs_harmonic   = regime == 'harmonic' or is_compare
+    needs_anharmonic = 'PT2' in regime or is_compare
+    does_own_anharm  = is_anharm or is_full or (is_none and is_compare)
+
+    props = []
+
+    # External harmonic eigenvalues — needed unless 'full' derives them itself
+    # (still needed in 'full + compare' to compare against externally derived ones)
+    if is_none or (needs_anharmonic and (is_anharm or (is_full and is_compare))):
+        props.append({'nc_sqrt_eigval': None})
+
+    # External state lists — only when vibana itself does no analysis
+    if is_none:
+        if needs_harmonic:
+            props.append({'harmonic_states': None})
+        if needs_anharmonic:
+            props.append({'anharmonic_states': None})
+
+    # Hessian: 'full' derives nc_sqrt_eigval / nc_eigvec from this internally
+    # FIXME: target units?
+    if is_full:
+        props.append(_geom_prop(['g', 'g'], ord_geo=2))
+
+    # Cubic/quartic force constants + dipole + mixed term for PT2 corrections
+    # FIXME: extra flag for semidiagonal-only force constants
+    if needs_anharmonic and does_own_anharm:
+        props.append(_geom_prop(['g', 'g', 'g'],      ord_geo=3))
+        props.append(_geom_prop(['g', 'g', 'g', 'g'], ord_geo=4))
+        props.append(_geom_prop(['r'],                ord_rot=1))
+        props.append(_geom_prop(['g', 'g', 'r'],      ord_geo=2, ord_rot=1))
+
+    return props
+
+
+def _geom_prop(ops, **trivname_kwargs):
+    return MolecularProperty(
+        {'ops': tuple(ops), 'freq': (0.0,) * len(ops)},
+        trivial_name=prop_trivname(**trivname_kwargs),
+    )
+
+
 def do_full_vib_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 				   analyzer: Callable[[MolecularSystem, list[MolecularProperty], str, str],
 				   tuple[dict, dict, list[VibState], dict]]):
@@ -171,7 +222,7 @@ def do_anharmonic_analysis(vib_ana: VibAnaSetup, props: list[MolecularProperty],
 
 # WilsonSimulation related functions
 
-def find_props(terms, freqs: str='static') -> list[MolecularProperty]:
+def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[MolecularProperty]:
 
 	props = []
 	
@@ -179,59 +230,54 @@ def find_props(terms, freqs: str='static') -> list[MolecularProperty]:
 		raise AssertionError('There must be terms present to determine needed properties')
 
 	# FIXME: Consider checking if terms are VibPerturbedTerm instances
-	for i in terms:
+	for term in terms:
 
-		for a in terms[i]:
-			for t in terms[i][a]:
-				for j in t.props:
+		for pol_prop in term.props:
 
-					ops = []
+			ops = []
 
-					m = j.dord
-					for k in range(m):
-						ops.append('g')
+			m = pol_prop.dord
+			for _ in range(m):
+				ops.append('g')
 
-					n = len(j.ops)
+			n = len(pol_prop.ops)
 
-					for k in range(n):
-						ops.append('f')
+			for _ in range(n):
+				ops.append('f')
 
-					if freqs == 'static':
-						pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
+			if freqs == 'static':
+				pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
 
-					else:
-						raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
+			else:
+				raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
 
-					new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n))
+			new_prop = MolecularProperty(pdict, trivial_name=prop_trivname(ord_geo=m, ord_el=n))
 
-					if new_prop.h(1) not in [k.h(1) for k in props]:
-						props.append(copy.deepcopy(new_prop))
+			if new_prop.h(1) not in [k.h(1) for k in props]:
+				props.append(copy.deepcopy(new_prop))
 
 	return props
 
 
 def find_max_state_lvl(terms: list[VibPerturbedTerm]) -> int:
 
-	for i in terms:
+	for term in terms:
 
-		for a in terms[i]:
-			for t in terms[i][a]:
+		max_state_lvl = 0
 
-				max_state_lvl = 0
+		for vibdiff in term.freqterms:
 
-				for j in t.freqterms:
+			if len(vibdiff.sl.q) > max_state_lvl:
+				max_state_lvl = len(vibdiff.sl.q)
+			if len(vibdiff.sr.q) > max_state_lvl:
+				max_state_lvl = len(vibdiff.sr.q)
 
-					if len(j.sl.q) > max_state_lvl:
-						max_state_lvl = len(j.sl.q)
-					if len(j.sr.q) > max_state_lvl:
-						max_state_lvl = len(j.sr.q)
+		for res_cond in term.res:
 
-				for j in t.res:
-
-					if len(j.diff.sl.q) > max_state_lvl:
-						max_state_lvl = len(j.diff.sl.q)
-					if len(j.diff.sr.q) > max_state_lvl:
-						max_state_lvl = len(j.diff.sr.q)
+			if len(res_cond.diff.sl.q) > max_state_lvl:
+				max_state_lvl = len(res_cond.diff.sl.q)
+			if len(res_cond.diff.sr.q) > max_state_lvl:
+				max_state_lvl = len(res_cond.diff.sr.q)
 
 	return max_state_lvl
 
