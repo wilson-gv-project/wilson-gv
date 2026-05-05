@@ -272,6 +272,7 @@ class SpectralFeature:
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
+    _param_set: dict = None
     
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
@@ -298,13 +299,24 @@ class SpectralFeature:
 
     @property
     def param_set(self):
-        if self.term_contributions is not None and self.term_contributions!=():
+        # 1. Check if a manual value was set first
+        if self._param_set is not None:
+            return self._param_set
+            
+        # 2. Fallback to calculation logic
+        if self.term_contributions:
             d = TermParametersChoice.check_states_parameters(self.term_contributions)
-            del d['zero']
-            return d
-        else:
-            return None
-
+            params = dict(d)
+            params.pop('zero', None)
+            return params
+            
+        return None
+    
+    @param_set.setter
+    def param_set(self, value):
+        self._param_set = value
+    
+    
     def __repr__(self) -> str:
         """
         Returns a string representation showing type and coordinates.
