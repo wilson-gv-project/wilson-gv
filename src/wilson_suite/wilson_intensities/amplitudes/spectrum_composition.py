@@ -273,6 +273,7 @@ class SpectralFeature:
     feat_type: str = None
     feat_box: Box = None
     _param_set: dict = None
+    _res_motif: str = None
     
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
@@ -316,6 +317,17 @@ class SpectralFeature:
     def param_set(self, value):
         self._param_set = value
     
+    def anharm_contributions(self, term_map: dict):
+        if self.term_contrib_by_id is None:
+            return {}
+        
+        result = {}
+        for term_key, val in self.term_contrib_by_id.items():
+            if term_map[term_key].anharmonicity not in result:
+                result[term_map[term_key].anharmonicity] = {term_key: val[0]}
+            else:
+                result[term_map[term_key].anharmonicity][term_key] = val[0]
+        return {k: sum(list(v.values())) for k,v in result.items()}
     
     def __repr__(self) -> str:
         """
@@ -449,6 +461,11 @@ class SpectralFeature:
     def get_res_motifs(self) -> list[ResonanceMotif]:
         return [i.res_motif for i in self.term_contributions]
 
+    def get_res_motif_str(self) -> str:
+        q: list[ResonanceMotif] = [i.res_motif for i in self.term_contributions]
+        if len(set(q)) != 1:
+            raise ValueError('several different motifs contribute to this feature')
+        return list(set(q))[0].motif_str()
 
     @classmethod
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],

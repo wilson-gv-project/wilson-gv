@@ -168,6 +168,16 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    def motif_str(self) -> str:
+        """
+        ((((), ('a',)), ('-A',)), ((('a','b'), ('a',)), ('B',))) -> '0,a;a+b,a'
+        """
+        motif = self._tuplify()
+        return ';'.join(
+            f"{'+'.join(sl) or '0'},{'+'.join(sr) or '0'}"
+            for (sl, sr), _pf in motif
+        )
+
     def to_str(self):
         """
         EVV / paper1 spectific here
