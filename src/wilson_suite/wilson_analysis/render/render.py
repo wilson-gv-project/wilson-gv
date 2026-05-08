@@ -67,7 +67,12 @@ def render_spectrum(spec_data, spec_eval_setup: 'SpecEvalSetup',
     fig, ax, contour, cbar = renderer.render(filename)
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    textstr = f'max(intensity) {np.max(np.abs(spec_data)**2):.3e}'
+
+    intensity = np.abs(spec_data)**2
+    flat_idx = np.argmax(intensity)
+    row, col = np.unravel_index(flat_idx, intensity.shape)
+    spec_eval_setup.grid['A'][row,col]
+    textstr = f'max(intensity) {np.max(intensity):.3e} = {np.max(intensity)/renderer.rnd_info.reference_max:.3f}; A={spec_eval_setup.grid['A'][row,col]:.1f}, B={spec_eval_setup.grid['B'][row,col]:.1f}'
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=14,
             verticalalignment='top', bbox=props)
     
