@@ -35,20 +35,20 @@ def test_evv_experiment_terms():
 
     # Paper 1 terms     Here                        Coeff sign wrt. paper
     #
-    # Term 0            terms[1][(1,0)][0]          -1
     # Term 1            terms[1][(1,0)][1]          -1
-    # Term 2a           terms[1][(0, 1)][11]        -1
-    # Term 2b           terms[1][(0, 1)][6]          1 (pert. WF diff. term opposite order)
-    # Term 3a           terms[1][(0, 1)][4]         -1
-    # Term 3b           terms[1][(0, 1)][1]         -1
-    # Term 4a           terms[1][(0, 1)][8]          1 (pert. WF diff. term opposite order)
-    # Term 4b           terms[1][(0, 1)][9]         -1
-    # Term 5a           terms[1][(0, 1)][7]          1 (pert. WF diff. term opposite order)
-    # Term 5b           terms[1][(0, 1)][10]        -1
-    # Term 6a           terms[1][(0, 1)][2]          1 (pert. WF diff. term opposite order)
-    # Term 6b           terms[1][(0, 1)][3]         -1
-    # Term 7a           terms[1][(0, 1)][5]          1 (pert. WF diff. term opposite order)
-    # Term 7b           terms[1][(0, 1)][0]         -1
+    # Term 2            terms[1][(1,0)][0]          -1
+    # Term 3a           terms[1][(0, 1)][11]        -1
+    # Term 3b           terms[1][(0, 1)][6]          1 (pert. WF diff. term opposite order)
+    # Term 4a           terms[1][(0, 1)][4]         -1
+    # Term 4b           terms[1][(0, 1)][1]         -1
+    # Term 5a           terms[1][(0, 1)][8]          1 (pert. WF diff. term opposite order)
+    # Term 5b           terms[1][(0, 1)][9]         -1
+    # Term 6a           terms[1][(0, 1)][7]          1 (pert. WF diff. term opposite order)
+    # Term 6b           terms[1][(0, 1)][10]        -1
+    # Term 7a           terms[1][(0, 1)][2]          1 (pert. WF diff. term opposite order)
+    # Term 7b           terms[1][(0, 1)][3]         -1
+    # Term 8a           terms[1][(0, 1)][5]          1 (pert. WF diff. term opposite order)
+    # Term 8b           terms[1][(0, 1)][0]         -1
 
     # Cross-checks: Relative signs/magnitudes between term coefficients
     # Depends on both relative signs of terms as written and "coeff sign" column in above table
@@ -61,10 +61,11 @@ def test_evv_experiment_terms():
     assert terms[1][(1, 0)][0].coeff == -2 * terms[1][(0, 1)][1].coeff
     assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][8].coeff
     assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][9].coeff
-    # Example: I am on the next code line comparing term 0 and 5a:
-    # Term 0's coefficient should be -4 times term 5a's coefficient according to the derivation
-    # However, wilson-derive outputs the term corresponding to 5a with the pert WF diff. term in
-    # opposite order (it did not do so for the term corresponding to term 0)
+
+    # Example: I am on the next code line comparing term 1 and 6a:
+    # Term 1's coefficient should be -4 times term 5a's coefficient according to the derivation
+    # However, wilson-derive outputs the term corresponding to 6a with the pert WF diff. term in
+    # opposite order (it did not do so for the term corresponding to term 1)
     # Therefore, the relative coefficient when compared w.r.t. the wilson-derive terms should here be (plus) 4
     assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][7].coeff
     assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][10].coeff
@@ -77,7 +78,7 @@ def test_evv_experiment_terms():
 
     # Electrical anharmonicity
 
-    # Paper 1 term 1
+    # Paper 1 term 2
     t = terms[1][(1,0)][0]
 
     # -1/4
@@ -131,7 +132,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 0
+    # Paper 1 term 1
     t = terms[1][(1, 0)][1]
 
     # -1/4
@@ -187,7 +188,7 @@ def test_evv_experiment_terms():
     # Mechanical anharmonicity
 
 
-    # Paper 1 term 7b
+    # Paper 1 term 8b
     t = terms[1][(0, 1)][0]
 
     # -1/16
@@ -256,7 +257,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 3b
+    # Paper 1 term 4b
     t = terms[1][(0, 1)][1]
 
     # 1/8
@@ -325,7 +326,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 6a
+    # Paper 1 term 7a
     t = terms[1][(0, 1)][2]
 
     # 1/16 (factor -1 on top of the "polarizability -1 sign"
@@ -395,7 +396,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 6b
+    # Paper 1 term 7b
     t = terms[1][(0, 1)][3]
 
     # -1/16
@@ -464,7 +465,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 3a
+    # Paper 1 term 4a
     t = terms[1][(0, 1)][4]
 
     # 1/8
@@ -533,7 +534,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 7a
+    # Paper 1 term 8a
     t = terms[1][(0, 1)][5]
 
     # 1/16 (factor -1 on top of the "polarizability -1 sign"
@@ -603,7 +604,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 2b
+    # Paper 1 term 3b
     t = terms[1][(0, 1)][6]
 
     # -1/8 (factor -1 on top of the "polarizability -1 sign"
@@ -673,7 +674,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 5a
+    # Paper 1 term 6a
     t = terms[1][(0, 1)][7]
 
     # -1/16 (factor -1 on top of the "polarizability -1 sign"
@@ -743,7 +744,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 4a
+    # Paper 1 term 5a
     t = terms[1][(0, 1)][8]
 
     # -1/16 (factor -1 on top of the "polarizability -1 sign"
@@ -813,7 +814,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 4b
+    # Paper 1 term 5b
     t = terms[1][(0, 1)][9]
 
     # 1/16
@@ -882,7 +883,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 5b
+    # Paper 1 term 6b
     t = terms[1][(0, 1)][10]
 
     # 1/16
@@ -951,7 +952,7 @@ def test_evv_experiment_terms():
     assert t.res[1].pf == [-1, 2]
 
 
-    # Paper 1 term 2a
+    # Paper 1 term 3a
     t = terms[1][(0, 1)][11]
 
     # 1/8
