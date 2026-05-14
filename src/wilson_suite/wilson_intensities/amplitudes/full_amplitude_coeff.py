@@ -280,6 +280,7 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
+        # print('---- avrg_expr, index_dict', avrg_expr, index_dict)
         # print('\nAVRG zero - ', avrg_expr, index_dict, '\n\n')
         return 0.0, {'AVRG': AVRG}
     # Evaluate VIBDIFF_TERMS
@@ -343,7 +344,7 @@ def eval_avrg_per_indexdict(avrg_expr: avrgprops.PropsCollection,
     avrg_index_tuple = avrgprops.get_ind_tuple_from_base(expr=avrg_expr, 
                                                          base_expr=avrg_tensor_expr, 
                                                          index_dict=index_dict)
-    if np.isclose(avrg_tensor[avrg_index_tuple], zero_tol):
+    if np.isclose(avrg_tensor[avrg_index_tuple], zero_tol, atol=1e-20): # FIXME: against abs()
         return 0.
     return avrg_tensor[avrg_index_tuple]
 
