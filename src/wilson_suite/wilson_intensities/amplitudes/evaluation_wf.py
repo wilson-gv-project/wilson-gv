@@ -391,18 +391,18 @@ def apply_magn_cond_filter(
         magn_conditions=settings.exp_magn_conditions,
         magn_conditions_margin=settings.magn_conditions_margin,
     )
-    '''    
     surviving_contrib = SpectralFeature.apply_magn_cond_filter(
         window.contrib_features,
         magn_conditions=settings.exp_magn_conditions,
         magn_conditions_margin=settings.magn_conditions_margin,
     )
-    '''
+
     if not surviving_full:
         raise ValueError("Magn-condition filter left 0 features")
     if verbose:
         print(f" After magn-cond filter: {len(surviving_full)} features")
     window.full_features = surviving_full
+    window.contrib_features = surviving_contrib
     return window
 
 def _get_intensity_bounds(window: 'SpectralWindow'):
@@ -443,8 +443,22 @@ def prepare_features_for_evaluation(
     settings: RenderSettings,
     verbose: bool = False,
 ) -> 'SpectralWindow':
+    
     window = filter_features_to_window(features, spec_window)
+    # print('\nafter filter_features_to_window')
+    # print('window.full_features', len(window.full_features))
+    # print('window.contrib_features', len(window.contrib_features))
+    # for i in window.full_features:
+    #     print(i.location)
+    
     window = apply_magn_cond_filter(window, settings, verbose)
+    # print('\nafter apply_magn_cond_filter')
+    # print('window.full_features', len(window.full_features))
+    # print('window.contrib_features', len(window.contrib_features))
+    # for f in window.contrib_features:
+    #     print(f.location)
+    # for i in window.full_features:
+    #     print(i.location)
     window = dress_features_with_boxes(window, settings)
     return window
 
@@ -500,8 +514,8 @@ class EvaluationWorkflow:
         self._precalc_ctx = None
         self._bound_motifs_ctx = None
     
-        self.feat_result = None
-        self.region_eval = None
+        self.feat_result: FeatureResult = None
+        self.region_eval: RegionEvaluation = None
 
     @property
     def experiment_ctx(self):
