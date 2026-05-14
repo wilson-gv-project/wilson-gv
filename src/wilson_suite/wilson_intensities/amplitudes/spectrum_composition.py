@@ -628,8 +628,11 @@ class SpectralFeature:
                 else:
                     delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
 
+                # gamma = feat.lineshape_parameter
+                # c = feat.amplitude_coeff
                 box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
-
+                # print('box_extent', box_extent, np.abs(c/(box_extent-1j*gamma)/(box_extent-1j*gamma)), np.abs(c/(-1j*gamma)/(-1j*gamma)), feat.amplitude_coeff)
+                
                 feat.feat_box = Box({k: (v - box_extent,
                                          v + box_extent)
                                      for k,v in feat.location._coord_dict.items()})
@@ -665,6 +668,7 @@ class SpectralFeature:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
             print('term_contributions', feat.term_contributions)
             print('term_contrib_by_id', feat.term_contrib_by_id)
+
 
 @dataclass
 class SpectralWindow:
