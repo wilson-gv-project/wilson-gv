@@ -133,11 +133,24 @@ def test_all_uneq_walks():
 
 def test_go_for_a_walk():
 
+    # Sketch (EVV relevant test):
+    # Take one or a few properly prepared VibContribTerm instance (i.e. after expand_term;
+    # follow get_fully_enhanced_terms) and go for a walk with both an el and a mech style walk
+    # Inspect results for veracity and build the requisite assertions
 
 
     pass
 
 def test_do_hermaut():
+
+    # Sketch (EVV relevant test):
+    # Take one or a few properly prepared VibContribTerm instance (i.e. after expand_term;
+    # follow get_fully_enhanced_terms) and do_hermaut with them
+    # Include both at least one mech anharm and one el anharm case
+    # Inspect results for veracity and build the requisite assertions
+    # NOTE: Do this test last in this test file since all_uneq_walks and go_for_a_walk are then verified
+    # NOTE: It's OK that the results are not yet simplified since that is a separate test; can in fact use same test case
+    # as test case for simplify test
 
     pass
 

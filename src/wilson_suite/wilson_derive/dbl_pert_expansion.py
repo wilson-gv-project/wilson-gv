@@ -132,19 +132,20 @@ def make_anharm_orders_rec(total: int, limit_el: int, limit_mech: int, new_entry
             orders[sum(new_entry)] = [tuple(new_entry)]
 
         else:
-            if not(new_entry in orders[sum(new_entry)]):
+
+            if not(tuple(new_entry) in orders[sum(new_entry)]):
                 orders[sum(new_entry)].append(tuple(new_entry))
 
     else:
 
-        if not(new_entry[0] > limit_el):
+        if not(new_entry[0] >= limit_el):
 
             # Give to el
             next_entry = copy.deepcopy(new_entry)
             next_entry[0] += 1
             make_anharm_orders_rec(total - 1, limit_el, limit_mech, next_entry, orders)
 
-        if not(new_entry[1] > limit_mech):
+        if not(new_entry[1] >= limit_mech):
 
             # Give to mech
             next_entry = copy.deepcopy(new_entry)
