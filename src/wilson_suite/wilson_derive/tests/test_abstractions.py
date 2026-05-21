@@ -150,6 +150,19 @@ def test_resonance_condition():
     assert res_cond_a_bc.diff.sr.q == ['b', 'c']
     assert res_cond_a_bc.id == 2
 
+    # Testing uvCancels method
+    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.072}
+    assert not(res_cond_a_bc.uvCancels(cfs_uv=cfs_uv))
+
+    cfs_uv = {1: 0.072, 2: 0.072, 3: 0.0}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
+
+    cfs_uv = {1: 0.072, 2: 0.144, 3: 0.072}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
+
+    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.0}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
+
     # Overall state energy lvl difference sign is here indeterminate without further information
     assert res_cond_a_bc.netStateSign() == -3
 
