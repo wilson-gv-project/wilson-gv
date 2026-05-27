@@ -6,6 +6,9 @@ from wilson_suite.wilson_utils import common_labels as wu_common
 
 def test_get_vib_sos():
 
+    # TODO: Either go with this specific test or hard code own test for full 3rd order
+    #  DECISION: Go with full 3rd order
+
     # Test case: EVV terms
     order = 3
     R_sos = get_vib_sos(order)
@@ -45,7 +48,6 @@ def test_get_vib_sos():
     assert(len(R_sos_selected) == 4)
 
     # NOTE: Can actually bring this down to one (sign of first interaction for 4 -> 2, pattern of max enhancement possible for 2 -> 1)
-    # CONTINUE HERE
 
     print('len R_sos_selected', len(R_sos_selected))
 
