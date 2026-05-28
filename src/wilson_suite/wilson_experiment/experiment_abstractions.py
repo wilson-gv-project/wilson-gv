@@ -470,8 +470,19 @@ class VibExperiment:
         self.all_polarizations = all_polarizations
 
         # Determine the macroscopic orientational average polarization vector
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-        self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+        # from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+        # self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+
+        self._derive_polarization_avg_vector()
+
+    def _derive_polarization_avg_vector(self):
+        if len(self.all_polarizations)<=6:
+            # Determine the macroscopic orientational average polarization vector
+            from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+            self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+        else:
+            pass
+            # raise ValueError('Orientational averaging is unsupported for number of polarizations > 6.')        
 
     def tell_axis_options(self):
 
