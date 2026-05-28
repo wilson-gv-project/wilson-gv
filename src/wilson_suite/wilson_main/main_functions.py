@@ -260,10 +260,9 @@ def find_props(terms: list[VibPerturbedTerm], freqs: str='static') -> list[Molec
 
 
 def find_max_state_lvl(terms: list[VibPerturbedTerm]) -> int:
+	max_state_lvl = 0
 
 	for term in terms:
-
-		max_state_lvl = 0
 
 		for vibdiff in term.freqterms:
 
