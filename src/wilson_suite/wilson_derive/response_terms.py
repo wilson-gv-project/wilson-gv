@@ -271,6 +271,35 @@ class VibPerturbedTerm:
 
         return self.hsh
 
+    def __hash__(self, also_sort: bool=False, nm_inds: list=None) -> int:
+        """
+        Hashing function
+
+        also_sort: Also sort term before hash is calculated?
+        nm_inds: List of normal mode indices if sorting
+        """
+
+        if not(self.was_sorted) and not(also_sort):
+            raise AssertionError('Term for which hash was requested has not been sorted')
+
+        if also_sort:
+            self.sort(nm_inds)
+
+        # Getting hashes of constituent parts
+        props_h = tuple([hash(i) for i in self.props])
+        ft_h = tuple([i.h() for i in self.freqterms])
+        res_h = tuple([i.h() for i in self.res])
+
+        # Combine constituent hashes for collective hash for this term
+        self.hsh = hash((props_h, ft_h, res_h))
+
+        return self.hsh
+
+    def __eq__(self, other):
+        if isinstance(other, VibPerturbedTerm):
+            return hash(self) == hash(other)
+        return False
+
     def full_enhancement_possible(self, magn_conditions=None) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
