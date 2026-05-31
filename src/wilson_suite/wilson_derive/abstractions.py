@@ -250,7 +250,8 @@ class ResonanceCondition:
             if not (isinstance(i, str) or isinstance(i, int)):
                 raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
 
-        self.pf = pf
+        self.pf = sorted(pf, key=lambda x: abs(x) if isinstance(x, int) else x.lstrip('-'))
+
 
         if id is not None:
             if not isinstance(id, int):
@@ -275,6 +276,9 @@ class ResonanceCondition:
 
     def __repr__(self):
         return f'ResCond(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
+
+    def __hash__(self):
+        return hash(( self.diff.h(), tuple(self.pf), self.id ))
 
     def present(self):
         """
