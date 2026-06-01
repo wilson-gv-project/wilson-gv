@@ -1,3 +1,5 @@
+from fractions import Fraction
+
 import pytest
 
 from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
@@ -6,15 +8,16 @@ from wilson_suite.wilson_utils import common_labels as wu_common
 
 def test_get_vib_sos():
 
-    # TODO: Either go with this specific test or hard code own test for full 3rd order
-    #  DECISION: Go with full 3rd order
+    # TODO: This test now for EVV terms. For general testing, need more complete testing at at least 3rd order and should have
+    #  spot checks at some other orders (preferably up to order 6)
 
-    # Test case: EVV terms
+    # Test case: EVV relevant terms: "mu**2 alpha" terms with alpha operators restricted to [0,3]
     order = 3
     R_sos = get_vib_sos(order)
 
-    # Selecting EVV relevant terms (i.e. "mu**2 alpha" terms with alpha operators restricted to [0,3])
-    # If testing like this, then also test elsewhere that the other contribs are removed from consideration in the EVV results
+    # Selecting EVV relevant terms (i.e. "mu**2 alpha" terms with alpha operators restricted to [0,3]). NOTE: Further reduction
+    # possible but not done here.
+    # Since testing like this, then also test elsewhere that the other contribs are removed from consideration in the EVV results
     # Specifically: Verify that non-mu**2 alpha terms are removed and that non-epoch matching mu**2 alpha terms are removed
 
     R_sos_selected = []
@@ -47,15 +50,139 @@ def test_get_vib_sos():
     # Should here have four terms
     assert(len(R_sos_selected) == 4)
 
-    # NOTE: Can actually bring this down to one (sign of first interaction for 4 -> 2, pattern of max enhancement possible for 2 -> 1)
+    # Corresponds to derivation p.22 res. term 1
+    t = R_sos_selected[0]
 
-    print('len R_sos_selected', len(R_sos_selected))
+    assert t.coeff == Fraction(1)
+    assert len(t.ints) == 3
 
-    for i in R_sos_selected:
-        print('\n\n')
-        i.present()
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 2
+    assert t.ints[0].prop.ops[0].o == 0
+    assert t.ints[0].prop.ops[1].o == 3
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'n'
 
-    # For higher orders (preferably up to 6): With final pen/paper verification of method proof, can generate terms and
-    # test get_vib_sos results against that (try to do this up to order 6)
+    assert t.ints[1].bra.s == 'n'
+    assert len(t.ints[1].prop.ops) == 1
+    assert t.ints[1].prop.ops[0].o == 2
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'm'
 
-    pass
+    assert t.ints[2].bra.s == 'm'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 1
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == 'm'
+    assert t.res[0].diff.sr.s == '0'
+    assert t.res[0].pf == [1]
+
+    assert t.res[1].diff.sl.s == 'n'
+    assert t.res[1].diff.sr.s == '0'
+    assert t.res[1].pf == [1, 2]
+
+    # Corresponds to derivation p.21 res. term 2
+    t = R_sos_selected[1]
+
+    assert t.coeff == Fraction(-1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 2
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'n'
+
+    assert t.ints[1].bra.s == 'n'
+    assert len(t.ints[1].prop.ops) == 2
+    assert t.ints[1].prop.ops[0].o == 0
+    assert t.ints[1].prop.ops[1].o == 3
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'm'
+
+    assert t.ints[2].bra.s == 'm'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 1
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == 'm'
+    assert t.res[0].diff.sr.s == '0'
+    assert t.res[0].pf == [1]
+
+    assert t.res[1].diff.sl.s == 'm'
+    assert t.res[1].diff.sr.s == 'n'
+    assert t.res[1].pf == [1, 2]
+
+
+    # Corresponds to derivation p.21 res. term 1
+    t = R_sos_selected[2]
+
+    assert t.coeff == Fraction(-1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 1
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'm'
+
+    assert t.ints[1].bra.s == 'm'
+    assert len(t.ints[1].prop.ops) == 2
+    assert t.ints[1].prop.ops[0].o == 0
+    assert t.ints[1].prop.ops[1].o == 3
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'n'
+
+    assert t.ints[2].bra.s == 'n'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 2
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == '0'
+    assert t.res[0].diff.sr.s == 'm'
+    assert t.res[0].pf == [1]
+
+    assert t.res[1].diff.sl.s == 'n'
+    assert t.res[1].diff.sr.s == 'm'
+    assert t.res[1].pf == [1, 2]
+
+    # Corresponds to derivation p.22 res. term 2
+    t = R_sos_selected[3]
+
+    assert t.coeff == Fraction(1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 1
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'm'
+
+    assert t.ints[1].bra.s == 'm'
+    assert len(t.ints[1].prop.ops) == 1
+    assert t.ints[1].prop.ops[0].o == 2
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'n'
+
+    assert t.ints[2].bra.s == 'n'
+    assert len(t.ints[2].prop.ops) == 2
+    assert t.ints[2].prop.ops[0].o == 0
+    assert t.ints[2].prop.ops[1].o == 3
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == '0'
+    assert t.res[0].diff.sr.s == 'm'
+    assert t.res[0].pf == [1]
+
+    assert t.res[1].diff.sl.s == '0'
+    assert t.res[1].diff.sr.s == 'n'
+    assert t.res[1].pf == [1, 2]
