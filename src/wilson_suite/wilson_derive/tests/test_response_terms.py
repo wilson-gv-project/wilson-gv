@@ -1,3 +1,5 @@
+from fractions import Fraction
+
 import pytest
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm, VibContribTerm
@@ -91,49 +93,111 @@ def test_vib_perturbed_term():
 
 def test_vib_contrib_term():
 
-    # Sketch: Make EVV relevant term instance(s), test init (why not also datatype asserts) and methods
-    # May need a few different cases for the methods
-
     # NOTE: Test allRspEpochContained for wider selection of cfgs; see if non-counting ordered pulse refs still give
     # correct result
 
     import copy
-    from fractions import Fraction
     from wilson_suite.fixtures import evv_experiment
     from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
     from wilson_suite.wilson_derive.abstractions import TransitionIntegral, PolProp, VibStateSymbolic, ResonanceCondition, QOperator, VibDiffTerm
-    from wilson_suite.wilson_utils import common_labels as wu_common
 
     evv_exp = evv_experiment()
     R_sos = get_vib_sos(evv_exp.order)
 
-    # Constructor type checking on a raw SOS term
-    raw_term = R_sos[0]
+    # Taking an EVV relevant term
+    t_choice = R_sos[21]
+
+    # Constructor type checking
     with pytest.raises(TypeError):
-        VibContribTerm(1, raw_term.ints, raw_term.res)  # coeff not Fraction
+        VibContribTerm(1, t_choice.ints, t_choice.res)  # coeff not Fraction
     with pytest.raises(TypeError):
-        VibContribTerm(raw_term.coeff, [object()], raw_term.res)  # bad ints type
+        VibContribTerm(t_choice.coeff, [object()], t_choice.res)  # bad ints type
     with pytest.raises(TypeError):
-        VibContribTerm(raw_term.coeff, raw_term.ints, [object()])  # bad res type
+        VibContribTerm(t_choice.coeff, t_choice.ints, [object()])  # bad res type
+
+    # Taking the EVV term and re-initializing a VibContribTerm
+    t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res)
+
+    t.present()
+
+    assert t.coeff == Fraction(-1)
+
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 1
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'm'
+
+    assert t.ints[1].bra.s == 'm'
+    assert len(t.ints[1].prop.ops) == 2
+    assert t.ints[1].prop.ops[0].o == 0
+    assert t.ints[1].prop.ops[1].o == 3
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'n'
+
+    assert t.ints[2].bra.s == 'n'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 2
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == '0'
+    assert t.res[0].diff.sr.s == 'm'
+    assert t.res[0].pf == [1]
+    assert t.res[1].diff.sl.s == 'n'
+    assert t.res[1].diff.sr.s == 'm'
+    assert t.res[1].pf == [1, 2]
+    assert len(t.freqdiff) == 0
+
+    # Testing addFreqTerm
+    td = copy.deepcopy(t)
+    assert len(td.freqdiff) == 0
+
+    symb_state_a = VibStateSymbolic('n')
+    symb_state_b = VibStateSymbolic('p')
+    td.addFreqTerm(VibDiffTerm(symb_state_a, symb_state_b, is_pert_wf_diff=True))
+
+    assert len(td.freqdiff) == 1
+    assert td.freqdiff[0].sl.s == 'n'
+    assert td.freqdiff[0].sr.s == 'p'
+    assert td.freqdiff[0].is_pert_wf_diff == True
+
+    # Testing dressWithPulseInteractions
+    td = copy.deepcopy(t)
+
+    assert evv_exp.int_sequences == [({1: -1}, {2: 1}, {3: 1})]
+
+    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
+
+    assert [k.o for k in td.ints[0].prop.ops] == [1]
+    assert [k.o for k in td.ints[1].prop.ops] == [0, 3]
+    assert [k.o for k in td.ints[2].prop.ops] == [2]
+
+    assert td.res[0].pf == [-1]
+    assert td.res[1].pf == [-1, 2]
+
+    td = copy.deepcopy(t)
+    td.dressWithPulseInteractions(({3: 1}, {2: -1}, {1: 1}))
+
+    assert [k.o for k in td.ints[0].prop.ops] == [3]
+    assert [k.o for k in td.ints[1].prop.ops] == [0, 1]
+    assert [k.o for k in td.ints[2].prop.ops] == [2]
+
+    assert td.res[0].pf == [3]
+    assert td.res[1].pf == [3, -2]
+
+    print('epox', evv_exp.epochs)
+    print('cfuv', evv_exp.cfuv)
 
     # Dress and filter to get EVV terms
     R_sos_evv = []
     for int_seq in evv_exp.int_sequences:
-        for term in R_sos:
-            t = copy.deepcopy(term)
-            t.dressWithPulseInteractions(int_seq)
-            if t.allElRspEpochContained(evv_exp.epochs, 0) and t.allUVCancels(evv_exp.cfuv):
-                R_sos_evv.append(t)
+        if t.allElRspEpochContained(evv_exp.epochs, 0) and t.allUVCancels(evv_exp.cfuv):
+            R_sos_evv.append(t)
     assert len(R_sos_evv) == 4
-
-    # Structural checks on EVV terms: each has 3 integrals, "mu^2 alpha" pattern = op counts [1,1,2]
-    for term in R_sos_evv:
-        op_counts = sorted([len(i.prop.ops) for i in term.ints])
-        assert op_counts == [1, 1, 2]
-        # The integral with 2 operators must contain the omega (detected) operator
-        two_op_ints = [i for i in term.ints if len(i.prop.ops) == 2]
-        assert len(two_op_ints) == 1
-        assert 0 in [op.o for op in two_op_ints[0].prop.ops]
 
     # allUVCancels: EVV terms must cancel; a term with UV in resonance condition should not
     assert all(t.allUVCancels(evv_exp.cfuv) for t in R_sos_evv)
@@ -162,8 +226,10 @@ def test_vib_contrib_term():
 
 
     # TODO:
-    #  verify and possibly amend above init related code
-    #  addfreqterm test
-    #  verify and amend above dresswithpulseinteractions code
+    #  verify and possibly amend above init related code DONE
+    #  addfreqterm test DONE
+    #  verify and amend above dresswithpulseinteractions code: DONE
     #  small alluvcancels test (mostly subcall to uvCancels which is already covered)
+    #    - Here can test for a few of the full R_sos terms, and a couple of different cfuv setups
     #  small allelrspepochcontained test (mostly subcall to epochContained which is already covered)
+    #    - Here can test for a few of the full R_sos terms, and a couple of different epochs
