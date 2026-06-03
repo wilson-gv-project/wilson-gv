@@ -1,6 +1,6 @@
 [![docs absent](https://img.shields.io/badge/docs-absent-red)](https://www.gnu.org/licenses/lgpl-3.0.html)
 [![License LGPL 3.0](https://img.shields.io/badge/license-LGPL_v3.0-blue)](https://www.gnu.org/licenses/lgpl-3.0.html)
-[![DOI:](https://img.shields.io/badge/DOI-set_it_up-red)](https://www.gnu.org/licenses/lgpl-3.0.html)
+[![DOI:](https://img.shields.io/badge/DOI-none-red)](https://www.gnu.org/licenses/lgpl-3.0.html)
 
 # Wilson Suite
 
@@ -28,12 +28,19 @@ Wilson Suite is a Python package for computing response functions for vibrationa
 3. Install
 
 ```
-git clone git@github.com:wilson-gv-project/wilson-suite-mono.git
-cd wilson-suite-mono
-<make env>
+git clone git@github.com:wilson-gv-project/wilson-gv.git
+cd wilson-gv
+conda env create -f environment.yml
 pip install .
 ```
 
+### `CQCParse`  - package for parting quantum chemistry software outputs
+
+```
+git clone git@github.com:wlevand/CQCParse.git
+cd CQCParse
+pip install .
+```
 
 ## Quick start
 

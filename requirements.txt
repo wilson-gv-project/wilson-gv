@@ -1,7 +1,0 @@
--e ./wilson_intensities
--e ./wilson_main
--e ./wilson_derive
--e ./wilson_experiment
--e ./wilson_utils
--e ./wilson_analysis
--e ./CQCParse
