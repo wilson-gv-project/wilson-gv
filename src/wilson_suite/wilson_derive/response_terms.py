@@ -91,7 +91,7 @@ class VibPerturbedTerm:
     def nmRenameAndInternalResort(self, mask: dict):
         """
         Take a mask (dictionary of single-character key: value pairs) in an ordering to be replaced by the canonical normal mode
-        index list: Example: mask is ['b': 'a', 'a': 'b', 'c': 'c'] -> Replace every reference to 'b' in self with 'a',
+        index list: Example: mask is {'b': 'a', 'a': 'b', 'c': 'c'} -> Replace every reference to 'b' in self with 'a',
         replace every (original) 'a' with 'b' and leave 'c' unchanged
         """
 
@@ -121,18 +121,19 @@ class VibPerturbedTerm:
 
     def sort(self, nm_inds):
         """
-        Sort and possibly rename indices in term to put in canonical term:
+        Sort and possibly rename indices in term:
         - Sort resonance conditions in increasing order of number of perturbing frequencies
         - Rename normal mode indices according to encountered state labels in resonance conditions (currently leaving
         further indices in arbitrary order)
         - Sort operator references in properties in increasing numerolexical order
         - Sort properties among each order in increasing order of geometric differentiation
         - Then sort properties at same order of differentiation according to operator (numerolexical) ordering
-        - Sort frequency difference terms internally to have greatest number of quanta in bra state
+        - Sort frequency difference terms internally to have greatest number of quanta in left-hand state
         - Sort terms tied wrt. previous sorting according to lexical order of state tuples
-        - Sort freq diff terms wrt. each other according to lexical ordering of bras (sort tied terms by ket lex. ordering)
+        - Sort freq diff terms wrt. each other according to lexical ordering of right-hand state indices
+          (sort tied terms by left-hand state lex. ordering)
 
-        nm_inds: List of canonically ordered normal mode indices (['a', 'b', ...])
+        nm_inds: List of canonically ordered normal mode indices (would normally be ['a', 'b', ...])
         """
 
         # Sort resonance conditions in increasing order of number of perturbing frequencies
@@ -218,10 +219,10 @@ class VibPerturbedTerm:
 
         # Inter-term sorting
 
-        # Sort freq diff terms first according to ket indices
+        # Sort freq diff terms first according to right-hand indices
         self.freqterms = sorted(self.freqterms, key=lambda j:j.sr.q)
 
-        # Then sort tied freq diff terms according to bra indices
+        # Then sort tied freq diff terms according to left-hand indices
         ketq_starts = [0]
 
         m = 0
@@ -287,14 +288,22 @@ class VibPerturbedTerm:
         #
         #    return True
 
+        print('new invocation')
+
         if magn_conditions is not None:
 
             prev_res = None
             for i in self.res:
                 if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=prev_res)):
+                    print('did not pass prev res test')
                     return False
+                print('passed prev res test')
+
                 if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=None)):
+                    print('did not pass direct test')
                     return False
+                print('passed direct test')
+
                 prev_res = copy.deepcopy(i)
 
             return True
