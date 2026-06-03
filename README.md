@@ -36,35 +36,80 @@ pip install .
 
 
 ## Quick start
+The example below runs the full EVV pipeline for formaldehyde.
+A step-by-step walkthrough with intermediate outputs is in
+[`examples/quick_start.ipynb`](examples/quick_start.ipynb).
 
-### Derived EVV terms
+### 1. Derive response function terms
+
+Define the experiment and derive the symbolic response function terms, then
+translate them to your chosen spectral axis variables.
 
 ```python
 import wilson_suite as ws
 from wilson_suite.fixtures import evv_experiment
+from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
 
-EVV_EXPERIMENT = evv_experiment()
-DERIVED_EVV_TERMS = ws.derive.derive.get_fully_enhanced_terms(experiment=EVV_EXPERIMENT)
+experiment = evv_experiment()
+
+terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
+axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
+translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axis_choice)
 ```
 
-### Independent variables and possible axes choices
+### 2. Configure the simulation
 
 ```python
+from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_analysis.render.render_utils import NormalizationType
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
 
+sim = ws.main.workflow_abstractions.WilsonSimulation()
+sim.addExperiment(experiment)
+sim.addTerms(terms=translated_terms)
+
+sim.addSystem(ws.main.abstractions.MolecularSystem(name='FORM', natoms=4))
+vibana = ws.main.abstractions.VibAnaSetup(system=sim.system, regime='GVPT2', vibana_own_analysis='none')
+sim.addVibAnaSetup(vibana)
+sim.addPropEvalSetup(eval_uniform=ws.main.abstractions.DataOriginInfo(
+    source_type='gaussian',
+    lvl_theory='B3LYP',
+    basis_set='cc-pVQZ',
+    base_file_loc=SUITE_ROOT + '/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out',
+))
+
+sim.addSpecEvalSetup(ws.main.spectrum_abstractions.SpecEvalSetup(
+    ev_info=ws.main.spectrum_abstractions.EvaluationInfo(
+        Gamma=4.7,
+        Gamma_unit='cm-1',
+        dynamic_range=500,
+        grid_resolution={'A': 700, 'B': 700},
+        spectral_window=SpectralWindow(box=Box({'A': (700., 3400.), 'B': (10., 3500.)})),
+    ),
+    rnd_info=ws.main.spectrum_abstractions.RenderingInfo(
+        intensity_normalization_type=NormalizationType.LOG_RATIO,
+        filename='evv_spectrum.svg',
+    ),
+))
 ```
 
-### What data is needed for evaluation
+### 3. Evaluate and render
 
 ```python
+sim.setPropsAndMaxStateLvl()
+sim.dressPropsWithSetup()
+sim.getResults(obtainer=wilson_data_obtainer)
+sim.vib_ana_setup.set_include_modes_list()
 
+sim.axis_choice = axis_choice
+sim.terms_in_axis_choice = translated_terms
+sim.evaluate()
+
+sim.spec_eval_setup.rnd_info.style_config.figsize = (10, 10)
+sim.render_spectrum(do_diagn=False)
+# spectrum saved to evv_spectrum.svg
 ```
 
-
-### Evaluation of response function (contributions)
-
-```python
-
-```
 
 ## Documentation
 
