@@ -36,6 +36,7 @@ pip install .
 
 
 ## Quick start
+
 The example below runs the full EVV pipeline for formaldehyde.
 A step-by-step walkthrough with intermediate outputs is in
 [`examples/quick_start.ipynb`](examples/quick_start.ipynb).
@@ -49,6 +50,7 @@ translate them to your chosen spectral axis variables.
 import wilson_suite as ws
 from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 experiment = evv_experiment()
 
