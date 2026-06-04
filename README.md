@@ -2,23 +2,26 @@
 [![License LGPL 3.0](https://img.shields.io/badge/license-LGPL_v3.0-blue)](https://www.gnu.org/licenses/lgpl-3.0.html)
 [![DOI:](https://img.shields.io/badge/DOI-none-red)](https://www.gnu.org/licenses/lgpl-3.0.html)
 
-# Wilson Suite
+# Wilson
 
-Wilson Suite is a Python package for computing response functions for vibrational wave-mixing spectroscopy.
+Wilson is a Python package for simulation of vibrational wave-mixing spectroscopy under detuning from electronic resonance:
+Its design goal is to derive expressions for contributions to spectral intensities in this category of experiments and
+evaluate these as spectra, offering the opportunity for in-depth results analysis by access to the detailed data that results
+from the structure and ab initio nature of its implementation.
 
 ## Key features
 
 <!-- - Derivation of response function contribution expressions for vibrational wave-mixing spectroscopy experiments. -->
 
-- Parse force constants, molecular properties, and derivatives from Gaussian and CFOUR outputs via CQCParse package
+While some core functionality of Wilson is still under development, the list of current and intended features includes:  
+
+- Define spectroscopic experiments via the `wilson-experiment` module in terms of parameters such as pulse configuration, detection method, phase-matching, and polarization
+- Derive response function terms symbolically in an "order-open-ended" manner with configurable anharmonicity limits and automatic perturbation expansion via the `wilson-derive` module, 
+- Parse force constants, molecular properties, and derivatives usable in the evaluation of the derived terms from the `Gaussian` and `CFOUR` quantum chemistry programs via the `CQCParse` package
 - Compute vibrational state energies across harmonic, VPT2, GVPT2, and DVPT2 regimes, with Fermi resonance detection
-- Define spectroscopic experiments via parameters such as pulse configuration, detection method, phase-matching, and polarization
-- Derive response function terms symbolically, with configurable anharmonicity limits and automatic perturbation expansion
-- Evaluate response function amplitudes numerically on multi-dimensional spectral grids, with localized evaluation near resonances
-- Identify which vibrational transitions produce resonant features in a given spectral region
-- Compute isotropic orientational averages for a given polarization configuration
-- Render 2D contour spectra with logarithmic normalization, dynamic range control, and configurable styling
-- Run the full symbolic-to-spectrum pipeline through a single simulation container with built-in validation, diagnostics, and intermediate caching
+- Evaluate response function amplitudes for a large variety of experiments in scope numerically on multi-dimensional spectral grids via the `wilson-intensities` module, with localized evaluation near resonances and identification of which vibrational transitions produce resonant features in a given spectral region
+- Render 1D and 2D spectra of the spectral results with versatile configuration options for rendering and figure styling
+- Run the full symbolic-to-spectrum pipeline through a single simulation container utilizing the `wilson-main` module with built-in validation, diagnostics, and intermediate caching
 
 ## Installation
 
@@ -122,5 +125,6 @@ sim.render_spectrum(do_diagn=False)
 
 ## Documentation
 
-readthedocs.io?
+No comprehensive documentation for Wilson is yet available but is intended to be manifested both in terms of existing and future in-code comments,
+tutorials and usage examples such as the one shown above, journal publication and in online technical document form.
 
