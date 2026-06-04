@@ -245,26 +245,14 @@ def test_vib_perturbed_term():
     assert t_special.freqterms[3].sl.q == ['a']
     assert t_special.freqterms[3].sr.q == ['b']
 
-
-
-    # TODO:
-    #  verify and possibly amend above init checks DONE
-    #  nmRenameAndInternalResort testing DONE
-    #  sort testing DONE
-    #  more full_enhancement_possible testing
-
     # Testing full_enhancement_possible
     # Is mostly a wrapper for couldBeResonantWithFieldByConditions (tested separately), so not much further testing
     # needed here
-
-    print('magn conds', evv_exp.magn_conditions)
 
     assert evv_exp.magn_conditions == ((-1, 2),)
 
     # Same test term as before
     t = terms[1][(0, 1)][2]
-
-    t.present()
 
     # No magnitude conditions, should here not lead to any restriction
     assert t.full_enhancement_possible()
@@ -279,19 +267,13 @@ def test_vib_perturbed_term():
     assert t.full_enhancement_possible(magn_conditions=((1, -2),))
 
     # Finding follows from both magnitude condition and previous resonance
-    assert t.full_enhancement_possible(magn_conditions=((2),))
+    assert t.full_enhancement_possible(magn_conditions=((2,),))
 
-    # FIXME
-    # CONTINUE HERE: It should be possible to determine non-fulfillment here: Try to improve couldBeResonant... for this
     # Cannot fulfill second resonance condition (finding must follow from both magnitude condition and previous resonance)
-    assert not (t.full_enhancement_possible(magn_conditions=((-2),)))
-
-
+    assert not (t.full_enhancement_possible(magn_conditions=((-2,),)))
 
     # New test term ("a+b, a" term from el. anharm.)
     t = terms[1][(1, 0)][1]
-
-    t.present()
 
     # EVV magnitude conditions, should here not lead to any restriction
     assert t.full_enhancement_possible(magn_conditions=evv_exp.magn_conditions)
@@ -303,12 +285,10 @@ def test_vib_perturbed_term():
     assert not(t.full_enhancement_possible(magn_conditions=((1, -2),)))
 
     # Finding follows from both magnitude condition and previous resonance
-    assert t.full_enhancement_possible(magn_conditions=((2),))
+    assert t.full_enhancement_possible(magn_conditions=((2,),))
 
-    # FIXME (related to l284 FIXME)
     # Cannot fulfill second resonance condition (finding must follow from both magnitude condition and previous resonance)
-    assert not (t.full_enhancement_possible(magn_conditions=((-2),)))
-
+    assert not (t.full_enhancement_possible(magn_conditions=((-2,),)))
 
 
 def test_vib_contrib_term():
