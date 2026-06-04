@@ -3,19 +3,184 @@ import pytest
 from wilson_suite.wilson_derive.derive import (get_dressed_vib_sos_with_exp_filtering,
                                                do_dbl_pert_expand_and_hermaut_with_enh_filtering,
                                                get_fully_enhanced_terms)
+from wilson_suite.fixtures import evv_experiment
 
 def test_get_dressed_vib_sos_with_exp_filtering():
 
-    pass
+    from fractions import Fraction
+
+    # Test case: EVV terms
+
+    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
+
+    evv_exp = evv_experiment()
+
+    R_sos = get_dressed_vib_sos_with_exp_filtering(evv_exp.order, evv_exp.int_sequences, evv_exp.epochs,
+                                                   evv_exp.cfuv)
+    print('\nAFTER FILTERING\n')
+    k = 0
+
+    for i in R_sos:
+        print('Term, ', k, '\n')
+        i.present()
+        print('\n\n')
+        k += 1
+
+    # Surviving terms here are actually the same terms which are currently tested in
+    # test_vib_sos (filtration there was done "manually"), except now dressed with
+    # interactions according to -k1 + k2 + k3 phase-matching condition
+
+    # Should have four terms
+    assert (len(R_sos) == 4)
+
+    # Corresponds to derivation p.22 res. term 1
+    t = R_sos[0]
+
+    assert t.coeff == Fraction(1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 2
+    assert t.ints[0].prop.ops[0].o == 0
+    assert t.ints[0].prop.ops[1].o == 3
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'n'
+
+    assert t.ints[1].bra.s == 'n'
+    assert len(t.ints[1].prop.ops) == 1
+    assert t.ints[1].prop.ops[0].o == 2
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'm'
+
+    assert t.ints[2].bra.s == 'm'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 1
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == 'm'
+    assert t.res[0].diff.sr.s == '0'
+    assert t.res[0].pf == [-1]
+
+    assert t.res[1].diff.sl.s == 'n'
+    assert t.res[1].diff.sr.s == '0'
+    assert t.res[1].pf == [-1, 2]
+
+    # Corresponds to derivation p.21 res. term 2
+    t = R_sos[1]
+
+    assert t.coeff == Fraction(-1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 2
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'n'
+
+    assert t.ints[1].bra.s == 'n'
+    assert len(t.ints[1].prop.ops) == 2
+    assert t.ints[1].prop.ops[0].o == 0
+    assert t.ints[1].prop.ops[1].o == 3
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'm'
+
+    assert t.ints[2].bra.s == 'm'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 1
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == 'm'
+    assert t.res[0].diff.sr.s == '0'
+    assert t.res[0].pf == [-1]
+
+    assert t.res[1].diff.sl.s == 'm'
+    assert t.res[1].diff.sr.s == 'n'
+    assert t.res[1].pf == [-1, 2]
+
+    # Corresponds to derivation p.21 res. term 1
+    t = R_sos[2]
+
+    assert t.coeff == Fraction(-1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 1
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'm'
+
+    assert t.ints[1].bra.s == 'm'
+    assert len(t.ints[1].prop.ops) == 2
+    assert t.ints[1].prop.ops[0].o == 0
+    assert t.ints[1].prop.ops[1].o == 3
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'n'
+
+    assert t.ints[2].bra.s == 'n'
+    assert len(t.ints[2].prop.ops) == 1
+    assert t.ints[2].prop.ops[0].o == 2
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == '0'
+    assert t.res[0].diff.sr.s == 'm'
+    assert t.res[0].pf == [-1]
+
+    assert t.res[1].diff.sl.s == 'n'
+    assert t.res[1].diff.sr.s == 'm'
+    assert t.res[1].pf == [-1, 2]
+
+    # Corresponds to derivation p.22 res. term 2
+    t = R_sos[3]
+
+    assert t.coeff == Fraction(1)
+    assert len(t.ints) == 3
+
+    assert t.ints[0].bra.s == '0'
+    assert len(t.ints[0].prop.ops) == 1
+    assert t.ints[0].prop.ops[0].o == 1
+    assert t.ints[0].prop.dord == 0
+    assert t.ints[0].ket.s == 'm'
+
+    assert t.ints[1].bra.s == 'm'
+    assert len(t.ints[1].prop.ops) == 1
+    assert t.ints[1].prop.ops[0].o == 2
+    assert t.ints[1].prop.dord == 0
+    assert t.ints[1].ket.s == 'n'
+
+    assert t.ints[2].bra.s == 'n'
+    assert len(t.ints[2].prop.ops) == 2
+    assert t.ints[2].prop.ops[0].o == 0
+    assert t.ints[2].prop.ops[1].o == 3
+    assert t.ints[2].prop.dord == 0
+    assert t.ints[2].ket.s == '0'
+
+    assert len(t.res) == 2
+    assert t.res[0].diff.sl.s == '0'
+    assert t.res[0].diff.sr.s == 'm'
+    assert t.res[0].pf == [-1]
+
+    assert t.res[1].diff.sl.s == '0'
+    assert t.res[1].diff.sr.s == 'n'
+    assert t.res[1].pf == [-1, 2]
+
 
 def test_do_dbl_pert_expand_and_hermaut_with_enh_filtering():
+
+    # Test case: EVV
+
+    # TODO: For one term, do both mech and el expansion, verify results and make requisite asserts
 
     pass
 
 def test_get_fully_enhanced_terms():
 
-    from fractions import Fraction
-    from wilson_suite.fixtures import evv_experiment
+    # Test case: EVV terms
 
     # The assertions in this test depend on wilson-derive retaining ordering of terms
     evv_exp = evv_experiment()
@@ -1035,5 +1200,3 @@ def test_get_fully_enhanced_terms():
     assert t.res[1].diff.sr.q == ['a']
     assert t.res[1].pf == [-1, 2]
 
-
-    pass
