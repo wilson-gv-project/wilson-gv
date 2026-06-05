@@ -302,7 +302,7 @@ def test_full_integration_other_axes_choice():
 
 
 def test_integration_evv_experiment_until_after_evaluation():
-
+    print()
     from ....fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
     from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet, IndependentVariableSet, \
@@ -312,12 +312,6 @@ def test_integration_evv_experiment_until_after_evaluation():
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
     #axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(-1,)], 'B': [(-1,), (2,)]}
-    # axis_choice = SpectralAxisSet(
-    #axes = (SpectralAxis(label='A', var_set=IndependentVariableSet(var_set=(SignedPulseTuple(pulse_refs=(1,)),))),
-    #        SpectralAxis(label='B', var_set=IndependentVariableSet(
-    #            var_set=(SignedPulseTuple(pulse_refs=(-1,)),
-    #                     SignedPulseTuple(pulse_refs=(2,)))))))  # {'A': [(1,)], 'B': [(-1,), (2,)]}
-
 
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
@@ -348,9 +342,7 @@ def test_integration_evv_experiment_until_after_evaluation():
     #bounds_dict = {'A': (-3000, -1200.), 'B': (1200., 6000.)} # {'A': [(-1,)], 'B': [(2,)]}
     bounds_dict = {'A': (-3000, -1200.), 'B': (500., 3000.)} # {'A': [(-1,)], 'B': [(-1,), (2,)]}
 
-    # These bounds raise a "no features in window" error but I thought they would correspond to what I used for
-    # {'A': [(-1,)], 'B': [(-1,), (2,)]} right above here
-    # bounds_dict = {'A': (1200, 3000.), 'B': (500., 3000.)} # {'A': [(1,)], 'B': [(-1,), (2,)]}
+
 
     spectral_window = SpectralWindow(box=Box(bounds_dict))
 
