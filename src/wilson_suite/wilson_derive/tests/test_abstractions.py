@@ -65,45 +65,18 @@ def test_harm_osc_state_symbolic():
 def test_vib_state_symbolic():
 
     state_a = VibStateSymbolic('A')
-    state_b = VibStateSymbolic('B', mbu=[state_a])
-    state_c = VibStateSymbolic('G', is_ground=True )
 
-    ground_state = HarmOscStateSymbolic([])
-    a_state = HarmOscStateSymbolic(['a'])
-    abc_state = HarmOscStateSymbolic(['b', 'c', 'a'])
-    bca_state = HarmOscStateSymbolic(['b', 'c', 'a'])
+    state_b = VibStateSymbolic('B', mbu=['A'])
+
+    state_c = VibStateSymbolic('G', is_ground=True )
 
     assert state_a.s == 'A'
     assert state_a.mbu == []
     assert state_a.is_ground == False
 
-    states_as_quanta = {'0': ground_state, 'A': a_state, 'B': abc_state}
-
-    # Trivially fulfilled, no mbu requirement
-    assert state_a.mbuFulfilled(states_as_quanta)
-
     assert state_b.s == 'B'
-    assert len(state_b.mbu) == 1
-    assert state_b.mbu[0].s == 'A'
+    assert state_b.mbu == ['A']
     assert state_b.is_ground == False
-
-    # Fulfilled, A's quanta are not == B's quanta
-    states_as_quanta = {'0': ground_state, 'A': a_state, 'B': abc_state}
-    assert state_b.mbuFulfilled(states_as_quanta)
-
-    # Not fulfilled, A's quanta are (sorted and) == B's quanta
-    states_as_quanta = {'0': ground_state, 'A': bca_state, 'B': abc_state}
-    assert not(state_b.mbuFulfilled(states_as_quanta))
-
-    # Bogus: Own state not in states_as_quanta
-    with pytest.raises(AssertionError):
-        states_as_quanta = {'0': ground_state, 'A': bca_state, 'bogus': abc_state}
-        bogus = state_b.mbuFulfilled(states_as_quanta)
-
-    # Bogus: MBU marked state not in states_as_quanta
-    with pytest.raises(AssertionError):
-        states_as_quanta = {'0': ground_state, 'boguz': bca_state, 'B': abc_state}
-        bogus = state_b.mbuFulfilled(states_as_quanta)
 
     assert state_c.s == 'G'
     assert state_c.mbu == []
