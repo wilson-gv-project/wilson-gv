@@ -10,9 +10,21 @@ def test_get_dressed_vib_sos_with_exp_filtering():
     from fractions import Fraction
 
     # Test case: EVV terms
+
+    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
+
     evv_exp = evv_experiment()
+
     R_sos = get_dressed_vib_sos_with_exp_filtering(evv_exp.order, evv_exp.int_sequences, evv_exp.epochs,
                                                    evv_exp.cfuv)
+    print('\nAFTER FILTERING\n')
+    k = 0
+
+    for i in R_sos:
+        print('Term, ', k, '\n')
+        i.present()
+        print('\n\n')
+        k += 1
 
     # Surviving terms here are actually the same terms which are currently tested in
     # test_vib_sos (filtration there was done "manually"), except now dressed with
@@ -160,77 +172,9 @@ def test_get_dressed_vib_sos_with_exp_filtering():
 
 def test_do_dbl_pert_expand_and_hermaut_with_enh_filtering():
 
-    # TODO for general verification: Make exp. situation where more than one term survives "enhancement" possible
-    #  filtering and consider each such term separately
-
     # Test case: EVV
-    evv_exp = evv_experiment()
-    R_sos = get_dressed_vib_sos_with_exp_filtering(evv_exp.order, evv_exp.int_sequences, evv_exp.epochs,
-                                                   evv_exp.cfuv)
-    print('\nAFTER FILTERING\n')
-    k = 0
 
-    for i in R_sos:
-        print('Term, ', k, '\n')
-        i.present()
-        print('\n\n')
-        k += 1
-
-    # This term (criteria "m, 0", "n, 0") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[0]], 1,
-                                                                 0, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[0]], 0,
-                                                                 1, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    # This term (criteria "m, 0", "m, n") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[1]], 1,
-                                                                 0, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[1]], 0,
-                                                                 1, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    # This term (criteria "n, m", "0, m") gets no result at the double harmonic level but will get results at the
-    # 1st order of anharmonicity
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 0,
-                                                                 0, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    # Two el. anharm. terms: Contents already tested in test_get_fully_enhanced_terms
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 1,
-                                                                 0, evv_exp.magn_conditions)
-
-    assert len(R_result) == 2
-
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 0,
-                                                                 1, evv_exp.magn_conditions)
-    # Twelve mech. anharm. terms: Contents already tested in test_get_fully_enhanced_terms
-    assert len(R_result) == 12
-
-    # This term (criteria "0, m", "0, n") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[3]], 1,
-                                                                 0, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[3]], 0,
-                                                                 1, evv_exp.magn_conditions)
-
-    assert len(R_result) == 0
-
-
+    # TODO: For one term, do both mech and el expansion, verify results and make requisite asserts
 
     pass
 

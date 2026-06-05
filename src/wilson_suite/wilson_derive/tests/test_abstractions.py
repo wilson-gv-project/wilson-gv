@@ -48,9 +48,9 @@ def test_harm_osc_state_symbolic():
     # Will be sorted
     assert bca_state.q == ['a', 'b', 'c']
 
-    # Quanta malformed type which is not tuple or list
+    # Quanta as tuple
     with pytest.raises(TypeError):
-        bogus_state = HarmOscStateSymbolic({('a',): 'a'})
+        bogus_state = HarmOscStateSymbolic(('a',))
 
     # Non-character quantum
     with pytest.raises(TypeError):
