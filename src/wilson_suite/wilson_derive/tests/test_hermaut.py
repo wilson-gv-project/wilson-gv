@@ -100,7 +100,7 @@ def test_all_uneq_walks():
             #   - f must be c and (d, e) must be either (a, b) or (b, a): Origin of D and G
             #   - All unequal gives 1/8 factor
             #   - (a = b, c != a): (d, e, f) must be (a, a, c) with factor 1/4 distr. into resp. D and G
-            #   - (a = c, b != a): (d, e, f) must be (a, b, a) or (b, a, a) each with 1/8 factor distr. into resp D and G
+            #   - (a = c, c != a): (d, e, f) must be (a, b, a) or (b, a, a) each with 1/8 factor distr. into resp D and G
             #   - (b = c, a != b): (d, e, f) must be (a, b, b) or (b, a, b) each with 1/8 factor distr. into resp D and G
             #   - (a = b = c): (d, e, f) must be (a, a, a) giving 1/4 factor distr. into D and G
             #   - Altogether full a, b, c summation with Hermite factor 1/8
