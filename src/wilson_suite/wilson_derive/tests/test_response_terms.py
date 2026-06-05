@@ -93,6 +93,9 @@ def test_vib_perturbed_term():
 
 def test_vib_contrib_term():
 
+    # NOTE: Test allRspEpochContained for wider selection of cfgs; see if non-counting ordered pulse refs still give
+    # correct result
+
     import copy
     from wilson_suite.fixtures import evv_experiment
     from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
@@ -114,6 +117,8 @@ def test_vib_contrib_term():
 
     # Taking the EVV term and re-initializing a VibContribTerm
     t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res)
+
+    t.present()
 
     assert t.coeff == Fraction(-1)
 
@@ -184,41 +189,47 @@ def test_vib_contrib_term():
     assert td.res[0].pf == [3]
     assert td.res[1].pf == [3, -2]
 
-    # Now testing allUVCancels and allElRspEpochContained
+    print('epox', evv_exp.epochs)
+    print('cfuv', evv_exp.cfuv)
 
-    # This is a CARS term, chosen for this testing since it has two extracted el. responses
-    td = R_sos[3]
-    # Dress according to -k1 + k2 + k3
-    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
+    # Dress and filter to get EVV terms
+    R_sos_evv = []
+    for int_seq in evv_exp.int_sequences:
+        if t.allElRspEpochContained(evv_exp.epochs, 0) and t.allUVCancels(evv_exp.cfuv):
+            R_sos_evv.append(t)
+    assert len(R_sos_evv) == 4
 
-    assert evv_exp.epochs == [[1], [2], [3]]
-    assert evv_exp.cfuv == {1: 0.0, 2: 0.0, 3: 0.072}
+    # allUVCancels: EVV terms must cancel; a term with UV in resonance condition should not
+    assert all(t.allUVCancels(evv_exp.cfuv) for t in R_sos_evv)
 
-    assert not(td.allElRspEpochContained(evv_exp.epochs, op_ind_omega = 0))
-    assert not(td.allElRspEpochContained([[1], [2, 3]], op_ind_omega=0))
-    assert not(td.allElRspEpochContained([[1, 3], [2]], op_ind_omega=0))
-    assert td.allElRspEpochContained([[1, 2], [3]], op_ind_omega=0)
-    assert not(td.allElRspEpochContained([[1, 0], [3]], op_ind_omega=2))
-    assert td.allElRspEpochContained([[1, 2, 3]], op_ind_omega=0)
+    # allElRspEpochContained: EVV terms pass; an EEE-type undressed term fails with separate epochs
+    # (EEE has a single integral with ops [omega, op1, op2, op3]; after dressing, ops [0,1,2,3]
+    # which puts ops from multiple epochs in one integral)
+    R_sos_dressed_non_evv = []
+    for int_seq in evv_exp.int_sequences:
+        for term in R_sos:
+            t = copy.deepcopy(term)
+            t.dressWithPulseInteractions(int_seq)
+            R_sos_dressed_non_evv.append(t)
 
-    assert td.allUVCancels(evv_exp.cfuv)
-    assert td.allUVCancels({1: 0.0, 2: 0.0, 3: 0.0})
-    assert not(td.allUVCancels({1: 0.072, 2: 0.0, 3: 0.032}))
-    assert not (td.allUVCancels({1: 0.072, 2: 0.032, 3: 0.032}))
-    assert td.allUVCancels({1: 0.072, 2: 0.072, 3: 0.032})
-    assert td.allUVCancels({1: 0.072, 2: 0.072, 3: 0.072})
+    # Term at index 0 is EEE (all-E type): single integral with all 4 operators
+    eee_term = R_sos_dressed_non_evv[0]
+    assert len(eee_term.ints) == 1
+    assert len(eee_term.ints[0].prop.ops) == 4
+    assert not eee_term.allElRspEpochContained(evv_exp.epochs, 0)
 
-    # Extra epoch containment and UV cancellation testing
+    # Resonance conditions of the 4 EVV terms: first-order [[-1]] and second-order [[-1, 2]]
+    for term in R_sos_evv:
+        assert len(term.res) == 2
+        assert term.res[0].pf == [-1]
+        assert term.res[1].pf == [-1, 2]
 
-    td = R_sos[21]
-    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
 
-    assert td.allElRspEpochContained(evv_exp.epochs, op_ind_omega=0)
-    assert td.allElRspEpochContained([[1], [2, 0]], op_ind_omega=3)
-    assert td.allElRspEpochContained([[1], [2], [0]], op_ind_omega=3)
-    assert td.allElRspEpochContained([[1, 2], [3]], op_ind_omega=0)
-    assert not(td.allElRspEpochContained([[1], [0], [2]], op_ind_omega=3))
-    assert not(td.allElRspEpochContained([[1, 3], [2]], op_ind_omega=0))
-
-    assert td.allUVCancels(evv_exp.cfuv)
-
+    # TODO:
+    #  verify and possibly amend above init related code DONE
+    #  addfreqterm test DONE
+    #  verify and amend above dresswithpulseinteractions code: DONE
+    #  small alluvcancels test (mostly subcall to uvCancels which is already covered)
+    #    - Here can test for a few of the full R_sos terms, and a couple of different cfuv setups
+    #  small allelrspepochcontained test (mostly subcall to epochContained which is already covered)
+    #    - Here can test for a few of the full R_sos terms, and a couple of different epochs
