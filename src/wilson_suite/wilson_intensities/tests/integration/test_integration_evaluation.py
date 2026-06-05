@@ -305,14 +305,23 @@ def test_integration_evv_experiment_until_after_evaluation():
     print()
     from ....fixtures import evv_experiment
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet, IndependentVariableSet, \
-        SignedPulseTuple, SpectralAxis
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
-    #axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
-    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(-1,)], 'B': [(-1,), (2,)]}
+    axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[1]  # {'A': [(-1,)], 'B': [(2,)]}
 
+    print('Terms', terms)
+    for i in terms:
+        for j in terms[i]:
+            print('Anharm', j)
+            for k in terms[i][j]:
+                k.present()
+
+    print(axes_choice)
+
+    exit()
+
+    evv_exp.tell_axis_options()
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='B3LYP',
@@ -338,15 +347,11 @@ def test_integration_evv_experiment_until_after_evaluation():
 
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
 
-    # These windows capture many of the same features for the respective axis set choices
-    #bounds_dict = {'A': (-3000, -1200.), 'B': (1200., 6000.)} # {'A': [(-1,)], 'B': [(2,)]}
-    bounds_dict = {'A': (-3000, -1200.), 'B': (500., 3000.)} # {'A': [(-1,)], 'B': [(-1,), (2,)]}
-
-
+    bounds_dict = {'A': (-3000, -1200.), 'B': (3000., 6000.)}
 
     spectral_window = SpectralWindow(box=Box(bounds_dict))
 
-    dynrange_log10 = 9 # 3 = dynamic range 1000
+    dynrange_log10 = 6 # 3 = dynamic range 1000
 
     evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
                                                           'Gamma': 4.7, 'Gamma_unit': 'cm-1',

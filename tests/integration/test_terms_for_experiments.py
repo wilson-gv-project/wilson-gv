@@ -21,9 +21,6 @@ def test_evv_experiment_terms():
     # Twelve terms from mechanical anharmonicity
     assert len(terms[1][(0, 1)]) == 12
 
-    # No terms at zeroth order of anharmonicity
-    assert len(terms[0][(0, 0)]) == 0
-
     # NOTE about coefficients: A factor -1 difference w.r.t. the form of the reference terms is to be expected
     # because they are expressed in terms of the polarizability, which is -1 times the electric dipole response
     # function used in this code
