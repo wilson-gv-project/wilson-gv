@@ -51,10 +51,7 @@ def go_for_a_walk(term: VibContribTerm, walk):
     Traverse a Hermite walk with a term and return a collection of (vibState, harmOscState) pairs
     and normal mode indices for each derivative
 
-    term: VibContribTerm instance being "walked". The term is assumed to be telescopic (i.e. state progression
-    <0 | a> <a | b> <b | ... | 0>) and with non-repeating state indices (i.e. each state index ket/bra pair
-    occurs exactly once: NB: Does not rule out that states corresponding to different indices may turn out to have
-    the same quanta)
+    term: VibContribTerm instance being "walked"
     walk: The raise/lower progression (the "walk") w.r.t. which term will be subjected (see curr_walk)
     definition in all_uneq_walks
     """
@@ -85,19 +82,13 @@ def go_for_a_walk(term: VibContribTerm, walk):
         for j in range(i.prop.dord):
 
             # If there was already one excitation corresponding to this index, then
-            # the next encounter must be deexcitation, otherwise malformed
+            # the next encounter must be deexcitation, so remove this index
             if walk[w-1][0] in quanta:
-                if not walk[w-1][1] == -1:
-                    raise ValueError('Error: More than one raising of index', walk[w-1][0])
-                else:
-                    quanta.remove(walk[w-1][0])
+                quanta.remove(walk[w-1][0])
 
-            # Otherwise make a new entry for a quantum of this index unless it is a lowering index (malformed)
+            # Otherwise make a new entry for a quantum of this index
             else:
-                if not walk[w - 1][1] == 1:
-                    raise ValueError('Error: Index', walk[w - 1][0], 'was lowered before raising')
-                else:
-                    quanta.append(walk[w-1][0])
+                quanta.append(walk[w-1][0])
 
             this_deriv_inds.insert(0, walk[w-1][0])
 
@@ -107,8 +98,6 @@ def go_for_a_walk(term: VibContribTerm, walk):
         # If at end verify that the resulting state is the ground state and do not make a new state entry
         if (w == 0):
 
-            # With the above derivative order loop malformation check, this problem should never be encountered,
-            # still keeping it as sanity check
             if not quanta == []:
                 raise AssertionError('Error: Final bra state was not walked back to ground state')
 
