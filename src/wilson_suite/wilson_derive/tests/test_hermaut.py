@@ -19,11 +19,11 @@ def test_all_uneq_walks():
         print('Walks for n_pairs = ', n_pairs)
         print(walks)
 
-        if n_pairs == 1:
+        if n == 1:
             # Trivial (reading right to left): Up one and down one
             assert walks == [['a', -1], ['a', 1]]
 
-        elif n_pairs == 2:
+        elif n == 2:
             # Two create/annihilate patterns (R to L): (D, U, D, U) and (D, D, U, U)
             # Starting from original indices: a, b, c, d
             # (D, U, D, U): Only a, a, b, b possible
@@ -46,7 +46,7 @@ def test_all_uneq_walks():
                              [['a', -1], ['b', -1], ['a', 1], ['b', 1]],
                              [['a', -1], ['b', -1], ['b', 1], ['a', 1]]]
 
-        elif n_pairs == 3:
+        elif n == 3:
             assert walks == [[['a', -1], ['a', 1], ['b', -1], ['b', 1], ['c', -1], ['c', 1]],
                              [['a', -1], ['a', 1], ['b', -1], ['c', -1], ['b', 1], ['c', 1]],
                              [['a', -1], ['a', 1], ['b', -1], ['c', -1], ['c', 1], ['b', 1]],
