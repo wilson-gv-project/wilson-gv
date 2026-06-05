@@ -4,10 +4,6 @@ from wilson_suite.wilson_derive.dbl_pert_expansion import expand_term, make_anha
 
 def test_expand_term():
 
-    # Sketch (EVV relevant test):
-    # Take one or a few VibContribTerm instances as formed for EVV
-    # Put through expand_term for anharm orders (0,0), (1,0), (0,1), inspect results for veracity and
-    # build the requisite assertions
 
 
     pass
