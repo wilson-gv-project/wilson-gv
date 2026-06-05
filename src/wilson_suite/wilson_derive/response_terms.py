@@ -288,15 +288,21 @@ class VibPerturbedTerm:
         #
         #    return True
 
+        print('new invocation')
+
         if magn_conditions is not None:
 
             prev_res = None
             for i in self.res:
                 if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=prev_res)):
+                    print('did not pass prev res test')
                     return False
+                print('passed prev res test')
 
                 if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=None)):
+                    print('did not pass direct test')
                     return False
+                print('passed direct test')
 
                 prev_res = copy.deepcopy(i)
 
