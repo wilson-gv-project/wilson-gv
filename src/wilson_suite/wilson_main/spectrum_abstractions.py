@@ -271,9 +271,6 @@ class EvaluationInfo:
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
 	dynamic_range: float = 100
 	spectral_axes: SpectralAxisSet = None
-	box_range_safety_margin: float = 0.1
-	scale_wrt_max_intensity: bool = False
-	minimum_box_padding: float = 0.0
 
 
 @dataclass
