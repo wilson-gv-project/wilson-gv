@@ -21,7 +21,7 @@ def test_all_uneq_walks():
 
         if n_pairs == 1:
             # Trivial (reading right to left): Up one and down one
-            assert walks == [[['a', -1], ['a', 1]]]
+            assert walks == [['a', -1], ['a', 1]]
 
         elif n_pairs == 2:
             # Two create/annihilate patterns (R to L): (D, U, D, U) and (D, D, U, U)
