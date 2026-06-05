@@ -94,7 +94,11 @@ def get_pol_laser(pol):
     A = get_pol_tensor(A, pol)
     A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
 
+    #print('A', A)
+
     f = get_iso_f(len(pol))
+
+    #print('f', f)
 
     # NOTE: This is real-valued for now since it only currently deals with linear polarization and assumed overall
     # phase of zero. If any of these conditions are relaxed this must be changed to be complex-valued
@@ -107,6 +111,8 @@ def get_pol_laser(pol):
 
         for j in range(len(f[i][1])):
             pl[i] -= A[tuple(f[i][1][j])]
+
+    #print('A * f', np.transpose(pl))
 
     return [float(i) for i in pl]
 
