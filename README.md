@@ -80,7 +80,8 @@ detector = wexp.SpecDetector(
 )
 
 experiment = wexp.VibExperiment(field=field, detector=detector, scans=(), magn_conditions=((-1, 2),),)
-evv_terms = derived_terms_flat(get_fully_enhanced_terms(exp), tolistonly=True)
+# flat list for inspection
+evv_terms = derived_terms_flat(get_fully_enhanced_terms(experiment), tolistonly=True)
 ```
 
 ### 2. Derive response function terms
