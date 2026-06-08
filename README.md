@@ -58,8 +58,7 @@ pip install .
 ## Quick start
 
 The example below runs the full EVV pipeline for formaldehyde.
-A step-by-step walkthrough with intermediate outputs is in
-[`examples/quick_start.ipynb`](examples/quick_start.ipynb).
+This example is also available in a Jupyter notebook form: [`examples/quick_start.ipynb`](examples/quick_start.ipynb).
 
 ### 1. Set up a vibrational N-wave mixing experiment
 
@@ -157,6 +156,13 @@ sim.addSpecEvalSetup(ws.main.spectrum_abstractions.SpecEvalSetup(
 # previously specified source, and specify normal mode inclusion regime
 sim.setPropsAndMaxStateLvl()
 sim.dressPropsWithSetup()
+
+# [OPTIONAL] Inspect the data requests
+data_requests = sim.requestData()
+print("Properties needed for evaluation with DataOriginInfo:")
+for name, origin in data_requests.items():
+    print(f"  {name}  <-  {origin.source_type} {origin.lvl_theory}/{origin.basis_set}")
+
 sim.getResults(obtainer=wilson_data_obtainer)
 sim.vib_ana_setup.set_include_modes_list()
 
