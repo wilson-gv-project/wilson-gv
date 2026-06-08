@@ -17,7 +17,7 @@ While some core functionality of Wilson is still under development, the list of 
 
 - Define spectroscopic experiments via the `wilson-experiment` module in terms of parameters such as pulse configuration, detection method, phase-matching, and polarization
 - Derive response function terms symbolically in an "order-open-ended" manner with configurable anharmonicity limits and automatic perturbation expansion via the `wilson-derive` module, 
-- Parse force constants, molecular properties, and derivatives usable in the evaluation of the derived terms from the `Gaussian` and `CFOUR` quantum chemistry programs via the `CQCParse` package
+- Parse force constants, molecular properties, and derivatives usable in the evaluation of the derived terms from the `Gaussian` and `CFOUR` quantum chemistry programs via the `CQCParse` package (external)
 - Compute vibrational state energies across harmonic, VPT2, GVPT2, and DVPT2 regimes, with Fermi resonance detection
 - Evaluate response function amplitudes for a large variety of experiments in scope numerically on multi-dimensional spectral grids via the `wilson-intensities` module, with localized evaluation near resonances and identification of which vibrational transitions produce resonant features in a given spectral region
 - Render 1D and 2D spectra of the spectral results with versatile configuration options for rendering and figure styling
@@ -51,25 +51,44 @@ The example below runs the full EVV pipeline for formaldehyde.
 A step-by-step walkthrough with intermediate outputs is in
 [`examples/quick_start.ipynb`](examples/quick_start.ipynb).
 
-### 1. Derive response function terms
+### 1. Set up a vibrational N-wave mixing experiment
 
-Define the experiment and derive the symbolic response function terms, then
+```python
+import wilson_suite.wilson_experiment.experiment_abstractions as wexp
+from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
+from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+
+pulse_ir_1 = wexp.make_impulsive_gaussian_pulse(tc=50.0, id=1)
+pulse_ir_2 = wexp.make_impulsive_gaussian_pulse(tc=100.0, id=2)
+pulse_uvvis_1 = wexp.make_impulsive_gaussian_pulse(tc=120.0, cf_uv=0.072, id=3)
+field = wexp.ElectricField(pulses=(pulse_ir_1, pulse_ir_2, pulse_uvvis_1))
+
+detector = wexp.SpecDetector(
+    detection_method='freq',
+    wv_filter=[{1: -1, 2: 1, 3: 1}],
+    detection_polarization=(1.0, 1.0, 1.0),
+)
+
+experiment = wexp.VibExperiment(field=field, detector=detector, scans=(), magn_conditions=((-1, 2),),)
+evv_terms = derived_terms_flat(get_fully_enhanced_terms(exp), tolistonly=True)
+```
+
+### 2. Derive response function terms
+
+Based on the experiment, derive the symbolic response function terms, then
 translate them to your chosen spectral axis variables.
 
 ```python
 import wilson_suite as ws
-from wilson_suite.fixtures import evv_experiment
 from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
-
-experiment = evv_experiment()
 
 terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
 axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
 translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, axis_choice)
 ```
 
-### 2. Configure the simulation
+### 3. Configure the simulation
 
 ```python
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
@@ -105,7 +124,7 @@ sim.addSpecEvalSetup(ws.main.spectrum_abstractions.SpecEvalSetup(
 ))
 ```
 
-### 3. Evaluate and render
+### 4. Evaluate and render
 
 ```python
 sim.setPropsAndMaxStateLvl()
