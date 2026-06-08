@@ -23,6 +23,14 @@ While some core functionality of Wilson is still under development, the list of 
 - Render 1D and 2D spectra of the spectral results with versatile configuration options for rendering and figure styling
 - Run the full symbolic-to-spectrum pipeline through a single simulation container utilizing the `wilson-main` module with built-in validation, diagnostics, and intermediate caching
 
+### Workflow
+
+![alt text](wilson_workflow.png)
+
+### Scopes - symbolic vs numerical
+![alt text](2scopes_wilson.png)
+
+
 ## Installation
 
 ### From source
