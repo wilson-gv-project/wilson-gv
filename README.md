@@ -47,6 +47,8 @@ pip install .
 
 ### `CQCParse`  - package for parting quantum chemistry software outputs
 
+The repository is here: [CQCParse](https://github.com/wlevand/CQCParse)
+
 ```
 git clone git@github.com:wlevand/CQCParse.git
 cd CQCParse
