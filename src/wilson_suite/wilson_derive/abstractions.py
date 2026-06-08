@@ -250,7 +250,8 @@ class ResonanceCondition:
             if not (isinstance(i, str) or isinstance(i, int)):
                 raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
 
-        self.pf = sorted(pf, key=lambda x: abs(x) if isinstance(x, int) else x.lstrip('-'))
+        # self.pf = sorted(pf, key=lambda x: abs(x) if isinstance(x, int) else x.lstrip('-'))
+        self.pf = pf
 
 
         if id is not None:
