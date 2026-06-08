@@ -116,6 +116,7 @@ from wilson_suite.wilson_analysis.render.render_utils import NormalizationType
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
 
 # Create a WilsonSimulation instance and add the experiment and (translated to axes choice) terms as attributes
+# WilsonSimulation object stores simulation parameters and supports the full workflow from input to evaluation and/or rendering result
 sim = ws.main.workflow_abstractions.WilsonSimulation()
 sim.addExperiment(experiment)
 sim.addTerms(terms=translated_terms)
