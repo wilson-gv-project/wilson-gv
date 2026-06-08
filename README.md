@@ -35,13 +35,14 @@ While some core functionality of Wilson is still under development, the list of 
 
 ### From source
 1. Get source code
-2. Prepare the environment
+2. Prepare the environment and activate it
 3. Install
 
 ```
 git clone git@github.com:wilson-gv-project/wilson-gv.git
 cd wilson-gv
 conda env create -f environment.yml
+conda activate wilson_gv
 pip install .
 ```
 
