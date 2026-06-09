@@ -114,6 +114,9 @@ from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 from wilson_suite.wilson_analysis.render.render_utils import NormalizationType
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
 
+from importlib.resources import files
+data_dir = files('wilson_suite').joinpath('data_for_tests')
+
 # Create a WilsonSimulation instance and add the experiment and (translated to axes choice) terms as attributes
 # WilsonSimulation object stores simulation parameters and supports the full workflow from input to evaluation and/or rendering result
 sim = ws.main.workflow_abstractions.WilsonSimulation()

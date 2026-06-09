@@ -1,5 +1,7 @@
 import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
+from importlib.resources import files
+data_dir = files('wilson_suite').joinpath('data_for_tests')
 
 def test_getting_data():
     """
@@ -91,7 +93,7 @@ def test_getting_data():
 
     
     data_orig_g16 = DataOriginInfo(source_type='gaussian',
-                                base_file_loc='/home/vlev/monorepo/src/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     complete_info_keys = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff', 'diphess']
     complete_rq = dict.fromkeys(complete_info_keys, data_orig_g16)
     

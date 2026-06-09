@@ -37,7 +37,7 @@ def test_saving_obtained_data():
     sim.dressPropsWithSetup()
 
     data_orig_g16 = DataOriginInfo(source_type='gaussian',
-                                   base_file_loc='/home/vlev/monorepo/src/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                   base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     rq_none_keys = ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'nc_sqrt_eigval', 'anharmonic_states']
     request_dict = dict.fromkeys(rq_none_keys, data_orig_g16)
 
