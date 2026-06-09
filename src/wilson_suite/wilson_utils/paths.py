@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
+from importlib.resources import files
 
-UTILS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SUITE_ROOT = os.path.abspath(os.path.join(UTILS_ROOT, '..'))
+SUITE_ROOT = str(files('wilson_suite'))               # wilson_suite/
+UTILS_ROOT = str(files('wilson_suite.wilson_utils'))  # wilson_suite/wilson_utils/
 
 
 WORKFLOW_BASE_DIR = Path(os.environ.get("WORKFLOW_BASE_DIR", "../workflows")).expanduser().resolve()

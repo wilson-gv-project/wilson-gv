@@ -137,8 +137,9 @@ def get_eval_ready_evv_terms():
 
 def get_terms_from_json():
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    return VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/../terms_fuller_flat.json')
+    from importlib.resources import files
+    json_path = files('wilson_suite').joinpath('terms_fuller_flat.json')
+    return VibPerturbedTerm.load_many_from_json(str(json_path))
 
 # # QC calculations/vibana parameters
 # mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)

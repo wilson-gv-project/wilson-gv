@@ -97,7 +97,6 @@ translate them to your chosen spectral axis variables.
 ```python
 import wilson_suite as ws
 from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
-from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 # Derive the relevant contributing terms, here return in default structure (ordered by anharmonicity)
 terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
@@ -130,7 +129,7 @@ sim.addPropEvalSetup(eval_uniform=ws.main.abstractions.DataOriginInfo(
     source_type='gaussian',
     lvl_theory='B3LYP',
     basis_set='cc-pVQZ',
-    base_file_loc=SUITE_ROOT + '/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out',
+    base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out',
 ))
 
 # Add spectrum evaluation setup (lineshape parameter, evaluation dynamic range, spectral 
