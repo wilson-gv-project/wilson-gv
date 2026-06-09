@@ -1,6 +1,7 @@
 import wilson_suite as ws
 import numpy as np
-
+from importlib.resources import files
+data_dir = files('wilson_suite').joinpath('data_for_tests')
 
 def test_evaluation_general_customdata_1elterm():
     print()
@@ -163,7 +164,6 @@ def test_evaluation_general_customdata_1mechterm():
 def test_full_integration():
     print()
     from ....fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -172,7 +172,7 @@ def test_full_integration():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -235,7 +235,6 @@ def test_full_integration():
 def test_full_integration_other_axes_choice():
     print()
     from ....fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -244,7 +243,7 @@ def test_full_integration_other_axes_choice():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -304,7 +303,6 @@ def test_full_integration_other_axes_choice():
 def test_full_integration_H2O_molecule():
     print()
     from ....fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -313,7 +311,7 @@ def test_full_integration_H2O_molecule():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -370,12 +368,3 @@ def test_full_integration_H2O_molecule():
     plt.colorbar(label='log intensity')
     #plt.show()
 
-'''
-def test_debugging():
-    print()
-    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
-    wf = unpickle_smth_from('/home/vlev/monorepo/eval_wf.pkl')
-    print(type(wf))
-    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
-    SpectralFeature.print_list_features(wf.artifacts.features)
-'''

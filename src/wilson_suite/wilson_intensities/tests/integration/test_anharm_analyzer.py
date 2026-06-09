@@ -1,6 +1,8 @@
 from ....wilson_utils.printing import printtest, separatorprint
 from ....fixtures import evv_experiment
 import wilson_suite as ws
+from importlib.resources import files
+data_dir = files('wilson_suite').joinpath('data_for_tests')
 
 def test_anharm_analyzer_wilsonsim():
     """
@@ -14,7 +16,6 @@ def test_anharm_analyzer_wilsonsim():
     """
     separatorprint()
 
-    from ....wilson_utils.paths import SUITE_ROOT
     from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='h2o', natoms=3)
@@ -27,7 +28,7 @@ def test_anharm_analyzer_wilsonsim():
     calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
 
     sim = ws_main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(experiment_a)
@@ -81,7 +82,6 @@ def test_anharm_analyzer_vibana():
     """
     separatorprint()
 
-    from ....wilson_utils.paths import SUITE_ROOT
     from .... import wilson_main as ws_main
 
     # ---- prep VibAnaSetup for anharm analysis
@@ -97,7 +97,7 @@ def test_anharm_analyzer_vibana():
     calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    
@@ -143,7 +143,6 @@ def test_anharm_analyzer_vibana_excludemodes():
     """
     separatorprint()
 
-    from ....wilson_utils.paths import SUITE_ROOT
     from .... import wilson_main as ws_main
 
     # ---- prep VibAnaSetup for anharm analysis
@@ -160,7 +159,7 @@ def test_anharm_analyzer_vibana_excludemodes():
     calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
 
     from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    

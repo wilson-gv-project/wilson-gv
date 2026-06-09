@@ -2,6 +2,8 @@ import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 import numpy as np
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from importlib.resources import files
+data_dir = files('wilson_suite').joinpath('data_for_tests')
 
 def test_saving_obtained_data():
     """
@@ -27,7 +29,7 @@ def test_saving_obtained_data():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     calc_setup_blank = ws.main.abstractions.DataOriginInfo()
     sim.addPropEvalSetup(eval_uniform=calc_setup_blank)
     
@@ -35,13 +37,12 @@ def test_saving_obtained_data():
     sim.dressPropsWithSetup()
 
     data_orig_g16 = DataOriginInfo(source_type='gaussian',
-                                   base_file_loc='/home/vlev/monorepo/src/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                   base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     rq_none_keys = ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'nc_sqrt_eigval', 'anharmonic_states']
     request_dict = dict.fromkeys(rq_none_keys, data_orig_g16)
 
     # pickling data dict - testing save_obtained_data
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
-    filepath = SUITE_ROOT+'/wilson_suite/wilson_main/tests/test_compl_data.pkl'
+    filepath = SUITE_ROOT+'/wilson_main/tests/test_compl_data.pkl'
     print(filepath, type(filepath))
     ws.utils.save_obtained_data(request_dict, format='pkl', filename=filepath)
 
@@ -54,7 +55,7 @@ def test_saving_obtained_data():
     sim.dressPropsWithSetup()
 
     # saving data
-    filepath_wf = SUITE_ROOT+'/wilson_suite/wilson_main/tests/myfile.pkl'
+    filepath_wf = SUITE_ROOT+'/wilson_main/tests/myfile.pkl'
     sim.getResults(obtainer=wilson_data_obtainer, save_to_filename=filepath_wf)
 
     # for requestData to have reset values for props and residual_vib_info
@@ -88,7 +89,6 @@ def assert_equal(a, b):
 
 def test_save_wilsonsim():
     from ...fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
     terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -106,7 +106,7 @@ def test_save_wilsonsim():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='HF', 
                                                      basis_set='STO-3G', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_h2o_HF_STO3G.out')
+                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     sim.addPropEvalSetup(eval_uniform=calc_setup)
     
     sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props

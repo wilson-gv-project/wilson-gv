@@ -1,15 +1,15 @@
-name: wilsonsuite
+name: wilson_gv
 channels:
-  - defaults
   - conda-forge
+  - defaults
 dependencies:
   - python=3.12
   - numpy
   - scipy
+  - sympy
   - pandas
   - matplotlib
-  - plotly
-  - altair
+  - jupyter
+  - ipykernel
   - pip
-  - pip:
-      - -r requirements.txt
+  - rich

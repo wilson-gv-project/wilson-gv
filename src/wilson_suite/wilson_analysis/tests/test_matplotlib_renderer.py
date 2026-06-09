@@ -101,7 +101,7 @@ def test_render_returns():
     fig, ax, contour, cbar = MatplotlibRenderer(spec_data=spec, 
                                                 spec_grid=spec_grid, 
                                                 ev_info=ev_info, rnd_info=rnd_info, 
-                                                do_diagn=True).render(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
+                                                do_diagn=True).render(SUITE_ROOT+'/wilson_analysis/tests/f0.svg')
     import matplotlib
     assert isinstance(fig, matplotlib.figure.Figure)
     assert isinstance(ax, matplotlib.axes.Axes)
@@ -129,14 +129,14 @@ def test_render_returns():
     # returns None when images are considered the same (within tolerance)
     # returns a dict when images differ too much
     diff = compare_images(
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg',
-        SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref.svg',
+        SUITE_ROOT+'/wilson_analysis/tests/f0.svg',
+        SUITE_ROOT+'/wilson_analysis/tests/f_ref.svg',
         tol=2.0  # allow small numerical differences
     )
     assert diff is None, diff # if diff is not None, show diff as the error message
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0.svg')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f0_svg.png')
-    os.remove(SUITE_ROOT+'/wilson_suite/wilson_analysis/tests/f_ref_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_analysis/tests/f0.svg')
+    os.remove(SUITE_ROOT+'/wilson_analysis/tests/f0_svg.png')
+    os.remove(SUITE_ROOT+'/wilson_analysis/tests/f_ref_svg.png')
 
 
 class TestCreateContour:
