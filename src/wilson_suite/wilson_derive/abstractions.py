@@ -557,7 +557,6 @@ class ResonanceCondition:
                 for i in given_prev_res.pf:
                     pf_test.remove(i)
 
-
         # Start off sign as unset
         pf_overall_sign = None
 

@@ -288,9 +288,16 @@ class EvaluationWorkflow:
                 max_intensity_in_window = SpectralFeature.get_max_intensity_feat(self.artifacts.features).get_intensity()
                 min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
 
-                self.artifacts.features = SpectralFeature.dress_these_with_boxes(self.artifacts.features, 
+                self.artifacts.features = SpectralFeature.dress_these_with_boxes(self.artifacts.features,
                                                                                  max_intensity_in_window, 
-                                                                                 min_intensity_in_window)
+                                                                                 min_intensity_in_window,
+                                                                                 box_range_safety_margin=
+                                                                                 self.inputs.spec_eval_setup.ev_info.box_range_safety_margin,
+                                                                                 scale_wrt_max_intensity=
+                                                                                 self.inputs.spec_eval_setup.ev_info.scale_wrt_max_intensity,
+                                                                                 minimum_box_padding=
+                                                                                 self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
+                                                                                 )
                 SpectralFeature.print_list_features(self.artifacts.features)
 
             with self.step("place_in_specwindow"):

@@ -48,9 +48,9 @@ def test_harm_osc_state_symbolic():
     # Will be sorted
     assert bca_state.q == ['a', 'b', 'c']
 
-    # Quanta as tuple
+    # Quanta malformed type which is not tuple or list
     with pytest.raises(TypeError):
-        bogus_state = HarmOscStateSymbolic(('a',))
+        bogus_state = HarmOscStateSymbolic({('a',): 'a'})
 
     # Non-character quantum
     with pytest.raises(TypeError):
@@ -65,18 +65,45 @@ def test_harm_osc_state_symbolic():
 def test_vib_state_symbolic():
 
     state_a = VibStateSymbolic('A')
-
-    state_b = VibStateSymbolic('B', mbu=['A'])
-
+    state_b = VibStateSymbolic('B', mbu=[state_a])
     state_c = VibStateSymbolic('G', is_ground=True )
+
+    ground_state = HarmOscStateSymbolic([])
+    a_state = HarmOscStateSymbolic(['a'])
+    abc_state = HarmOscStateSymbolic(['b', 'c', 'a'])
+    bca_state = HarmOscStateSymbolic(['b', 'c', 'a'])
 
     assert state_a.s == 'A'
     assert state_a.mbu == []
     assert state_a.is_ground == False
 
+    states_as_quanta = {'0': ground_state, 'A': a_state, 'B': abc_state}
+
+    # Trivially fulfilled, no mbu requirement
+    assert state_a.mbuFulfilled(states_as_quanta)
+
     assert state_b.s == 'B'
-    assert state_b.mbu == ['A']
+    assert len(state_b.mbu) == 1
+    assert state_b.mbu[0].s == 'A'
     assert state_b.is_ground == False
+
+    # Fulfilled, A's quanta are not == B's quanta
+    states_as_quanta = {'0': ground_state, 'A': a_state, 'B': abc_state}
+    assert state_b.mbuFulfilled(states_as_quanta)
+
+    # Not fulfilled, A's quanta are (sorted and) == B's quanta
+    states_as_quanta = {'0': ground_state, 'A': bca_state, 'B': abc_state}
+    assert not(state_b.mbuFulfilled(states_as_quanta))
+
+    # Bogus: Own state not in states_as_quanta
+    with pytest.raises(AssertionError):
+        states_as_quanta = {'0': ground_state, 'A': bca_state, 'bogus': abc_state}
+        bogus = state_b.mbuFulfilled(states_as_quanta)
+
+    # Bogus: MBU marked state not in states_as_quanta
+    with pytest.raises(AssertionError):
+        states_as_quanta = {'0': ground_state, 'boguz': bca_state, 'B': abc_state}
+        bogus = state_b.mbuFulfilled(states_as_quanta)
 
     assert state_c.s == 'G'
     assert state_c.mbu == []
@@ -149,6 +176,19 @@ def test_resonance_condition():
     res_cond_a_bc = ResonanceCondition(vd_harm_a_bc, pert_freq_1m23, id=2)
     assert res_cond_a_bc.diff.sr.q == ['b', 'c']
     assert res_cond_a_bc.id == 2
+
+    # Testing uvCancels method
+    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.072}
+    assert not(res_cond_a_bc.uvCancels(cfs_uv=cfs_uv))
+
+    cfs_uv = {1: 0.072, 2: 0.072, 3: 0.0}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
+
+    cfs_uv = {1: 0.072, 2: 0.144, 3: 0.072}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
+
+    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.0}
+    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
 
     # Overall state energy lvl difference sign is here indeterminate without further information
     assert res_cond_a_bc.netStateSign() == -3
