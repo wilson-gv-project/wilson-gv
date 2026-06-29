@@ -122,6 +122,7 @@ class VibPerturbedTerm:
     def sort(self, nm_inds):
         """
         Sort and possibly rename indices in term:
+        - Sort "perturbing field" arguments in resonance conditions
         - Sort resonance conditions in increasing order of number of perturbing frequencies
         - Rename normal mode indices according to encountered state labels in resonance conditions (currently leaving
         further indices in arbitrary order)
@@ -135,6 +136,10 @@ class VibPerturbedTerm:
 
         nm_inds: List of canonically ordered normal mode indices (would normally be ['a', 'b', ...])
         """
+
+        # Sort "perturbing field" arguments in resonance conditions
+        for i in range(len(self.res)):
+            self.res[i].pf = sorted(self.res[i].pf)
 
         # Sort resonance conditions in increasing order of number of perturbing frequencies
         self.res = sorted(self.res, key=lambda j:len(j.pf))
@@ -518,14 +523,18 @@ class VibContribTerm:
 
         self.freqdiff.append(new_term)
 
-    def dressWithPulseInteractions(self, int_seq: tuple[dict]):
+    def dressWithPulseInteractions(self, int_seq: tuple[dict], coeff: Fraction | int =  Fraction(1)):
         """
         Substitute interaction dummy indices in my resonance conditions
         and in my polarization property axes with those of a specific pulse interaction sequence
 
         int_seq: tuple of dictionaries ({interaction #1 pulse label: sign}, {int. #2 pulse label: sign}, ...)
+        coeff: Scaling coefficient (canonically associated with division over the possible interaction pathways)
         """
         # FIXME: Must get tests as part of averaging work
+
+        # Scale
+        self.coeff *= coeff
 
         int_ids = [list(i.keys())[0] for i in int_seq]
 

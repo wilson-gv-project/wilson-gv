@@ -375,7 +375,9 @@ def test_vib_contrib_term():
     assert td.res[1].pf == [-1, 2]
 
     td = copy.deepcopy(t)
-    td.dressWithPulseInteractions(({3: 1}, {2: -1}, {1: 1}))
+    td.dressWithPulseInteractions(({3: 1}, {2: -1}, {1: 1}), coeff=Fraction(1, 2))
+
+    assert td.coeff == Fraction(-1, 2)
 
     assert [k.o for k in td.ints[0].prop.ops] == [3]
     assert [k.o for k in td.ints[1].prop.ops] == [0, 1]

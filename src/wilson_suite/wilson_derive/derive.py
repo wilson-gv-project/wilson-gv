@@ -1,3 +1,5 @@
+from fractions import Fraction
+
 from ..wilson_experiment.experiment_abstractions import VibExperiment
 from . import dbl_pert_expansion
 from . import hermaut
@@ -12,10 +14,15 @@ def get_dressed_vib_sos_with_exp_filtering(order: int, int_sequences: list, epoc
     """
     Take an order parameter and an experiment's a) interaction sequences, b) epochs, and c) UV carrier frequency info
     and 1) Get the sum-over-states expression for the vibrational contribution to this order's response function with
-    dummy interaction indices, 2) dress the terms with the pulse references for each valid interaction sequence, and
+    dummy interaction indices, 2) dress the terms with the pulse references for each valid interaction sequence,
+    scaling each term such dressed by 1/total number of valid interaction sequences, and
     3) filter the resulting terms by i) discarding terms where any pulses involved in an electronic response are not
     confined to the same epoch, ii) discarding terms where carrier frequencies of pulses in an electronic response
     do not have UV frequency components that together sum to zero
+
+    NOTE: This routine assumes that the provided interaction sequences are all of the valid sequences in the
+    experiment and no invalid such sequence. If called with data that doesn't fulfill this, the scaling factor will not
+    in general be correct.
 
     Returns: A list of VibContribTerm instances constituting the filtered SOS expression
     """
@@ -27,7 +34,7 @@ def get_dressed_vib_sos_with_exp_filtering(order: int, int_sequences: list, epoc
     for i in int_sequences:
         for j in R_sos:
             new_R_sos = copy.deepcopy(j)
-            new_R_sos.dressWithPulseInteractions(i)
+            new_R_sos.dressWithPulseInteractions(i, coeff= Fraction(1, len(int_sequences)))
             if new_R_sos.allElRspEpochContained(epochs, 0):
                 if new_R_sos.allUVCancels(cfuv):
                     R_sos_filtered.append(new_R_sos)
