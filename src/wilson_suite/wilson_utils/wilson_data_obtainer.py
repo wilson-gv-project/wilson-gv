@@ -26,6 +26,10 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
     if get_displacements:
         requested_data_dict.update({'normal_modes': requested_data_dict['nc_sqrt_eigval']})
 
+    if reindex_modes:
+        requested_data_dict.update({'modes_mapping': requested_data_dict['nc_sqrt_eigval'],
+                                    'normal_modes':  requested_data_dict['nc_sqrt_eigval']})
+
     for k, v in requested_data_dict.items():
         
         if v not in origin_to_req_data:
