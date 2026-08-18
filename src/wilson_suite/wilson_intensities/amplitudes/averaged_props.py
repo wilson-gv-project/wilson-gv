@@ -1,5 +1,155 @@
 """
 PROPERTIES in VibPerturbedTerm ---- #TODO still
+
+---
+Claude Code summary
+
+# Unique averaged tensors: identification and use
+
+## The problem
+
+An "averaged expression" is a product of molecular properties with an orientational
+average over Cartesian components, e.g.
+
+    polgrad['a'] * dipgrad['b'] * dipgrad['c']
+
+To get a number out of it you must say which normal mode goes into each property slot.
+Feed it modes (2, 0, 5) and you get one number; (1, 1, 4) gives another. So the
+expression is a FUNCTION of its mode indices.
+
+calculate_avrg_tensor() evaluates that function at every combination of modes and
+stores the results in an array with one axis per distinct mode index. Three slots means
+a 3-dimensional array; with 30 modes that is 27000 orientational averages. Expensive.
+
+Every term in the response expansion has such an expression. Computing one array per
+term would repeat the same work many times over.
+
+## The observation
+
+Two expressions that differ only in the NAMES of their indices are the same function:
+
+    polgrad['a'] * dipgrad['b'] * dipgrad['c']
+    polgrad['c'] * dipgrad['a'] * dipgrad['b']
+
+Both say "polgrad gets some mode, each dipgrad gets some mode". The letters are labels,
+not content. One array serves both.
+
+For the standard EVV term set: 14 terms -> 7 distinct expressions -> 3 arrays.
+
+## Identification (make_unique_avrg_tensors_mapping)
+
+Step 1 - extract the averaged part of each term
+    PropsCollection(term.props).get_averaged_props().sort()
+    keeps the properties carrying EM operators, ordered by first operator index.
+
+Step 2 - group by numerator motif        group_PropsColls_by_numerator()
+    identify_avrg_motif() copies the expression and sets every index to None, giving a
+    key that captures WHICH properties with WHICH operators and derivative orders,
+    ignoring index names. Expressions in different motifs are different quantities and
+    can never share an array.
+
+Step 3 - key each member by its repetition pattern
+                                    nm_indices_repetition_reduce_deriv_symmetry()
+    Within a motif, members differ only in which label sits in which slot. Two members
+    can share an array iff their labels REPEAT in the same way. The key is built as:
+
+        expr labels           ['b', 'a', 'a', 'b']
+        repetition codes      ( 1 ,  2 ,  2 ,  1 )     0 = occurs once
+        split per property    [[1], [2], [2, 1]]       template [1, 1, 2]
+        sort each group       [[1], [2], [1, 2]]       <-- see note below
+        key                   (1, 2, 1, 2)
+
+    NOTE - the sort within each property is the permutational symmetry of a geometric
+    derivative in its own mode indices (d2u/dQa dQb == d2u/dQb dQa). It is what lets two
+    expressions that differ only in how a derivative's indices line up share one array.
+    It assumes the derivative arrays (diphess, polhess, cff, qff) are symmetric in their
+    mode indices. Nothing in the code enforces this.
+
+Step 4 - one base expression per key
+    The key is decoded to canonical letters and used to refill the motif:
+
+        key (1,2,1,2) -> ['a','b','a','b']
+                      -> polgrad['a'] * dipgrad['b'] * diphess['a','b']
+
+    If any member of a motif has ALL-DISTINCT indices, its array has one axis per slot,
+    so every other member can be read off it. That member's key becomes the base for the
+    whole motif and the pattern groups merge into it.
+
+Result: a mapping {expression -> base expression}. The distinct values are the arrays
+that actually have to be computed.
+
+## Use in calculations
+
+Precalculation                          precalculate_unique_coeff_parts()
+    One calculate_avrg_tensor() call per distinct base. The array's axes are the base's
+    unique labels in ALPHABETICAL order, so for base
+    polgrad['a'] * dipgrad['b'] * diphess['a','b']:
+
+        axis 0 = 'a' = the polgrad slot
+        axis 1 = 'b' = the dipgrad slot
+
+Evaluation                              eval_avrg_per_indexdict()
+    Reading a value out of the base's array takes two hops:
+
+        hop 1   base's index label  ->  this expression's index label
+        hop 2   this expression's label  ->  normal mode number   (index_dict)
+
+    get_ind_tuple_from_base() does both and returns the index tuple.
+
+    Hop 1 exists because the base is built from canonical letters, which are in general
+    a PERMUTATION of the labels the expression uses:
+
+        expr   polgrad['b'] * dipgrad['a'] * diphess['a','b']
+        base   polgrad['a'] * dipgrad['b'] * diphess['a','b']    'a' and 'b' swapped
+
+    With index_dict {'a': 0, 'b': 1}: the expression wants polgrad on mode 1 and dipgrad
+    on mode 0, which is tensor[1, 0]. Skipping hop 1 reads tensor[0, 1] - the transposed
+    element, silently wrong.
+
+    Hop 1 cannot be done by lining the two expressions up as they stand:
+
+        base:  a  b  a  b
+        expr:  b  a  a  b     base 'a' -> 'b', then base 'a' -> 'a': contradiction
+
+    The base's letters were laid down against the codes AFTER those codes were sorted
+    within each property (step 3), so the expression's labels must go through the same
+    sort first:
+
+        expr sorted:  b  a  b  a
+        base:         a  b  a  b     base 'a' -> 'b', base 'b' -> 'a', repeats agree
+
+Downstream
+    The coefficient is a product of this averaged value with the non-averaged properties,
+    the vibrational energy denominators and the vibrational difference terms. Terms
+    sharing a resonance motif and location are SUMMED into one SpectralFeature amplitude,
+    which is then dropped if it is exactly zero. So an error in the averaged value can
+    change a peak height, or make a peak appear or vanish.
+
+## Rules the mapping obeys
+
+    - The array's axes are the BASE's unique labels, alphabetically.
+
+    - The base -> expression label map must be a well-defined FUNCTION (one value per
+      base label). It need NOT be injective.
+
+    - Several base labels -> the same expression label is FINE and expected. The
+      expression uses fewer distinct modes than the base has axes, so it reads a
+      diagonal of the base's array:
+
+          base ['a','b','c'] serving expr ['a','c','c']
+          gives {a: a, b: c, c: c} and index (i_a, i_c, i_c)
+          - a rank 3 array serving a rank 2 expression.
+
+    - One base label -> several expression labels is IMPOSSIBLE. The expression needs
+      more distinct modes than the base has axes; that base cannot serve it.
+
+    - A base whose letters are a permutation of the expression's is NOT an error - it is
+      what the deduplication is for. Nothing is wrong until an index is built from it.
+
+    - Equal slot counts between base and expression do NOT establish that the base can
+      represent the expression: two motifs can have the same total slot count
+      (polhess*dip*dip and polgrad*dip*diphess both have 4). Sharing a numerator motif is
+      what makes a base valid, and it holds by construction.
 """
 from typing import Callable
 import copy
@@ -248,18 +398,181 @@ def identify_unique_avrg_tensors(avrg_expressions: list[PropsCollection]) -> lis
     """
     return set(make_unique_avrg_tensors_mapping(avrg_expressions).values())
 
-
+'''
+#####################################################################################
+# SUPERSEDED - kept only for side-by-side comparison, and SHADOWED by the definition
+# of the same name below (Python keeps the last one, so this body never runs).
+# Delete once compared.
+#####################################################################################
 def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
-    """Map expr to indices according to base expression's unique symbols."""
+    """Map expr to indices according to base expression's unique symbols.
+
+    Both branches return an index tuple into the base's tensor, whose axes are the base's unique
+    labels in alphabetical order. They split on whether the base has repeated indices:
+
+        len(base_unique) == len(expr_inds)   the base's indices are all distinct
+        len(base_unique) <  len(expr_inds)   the base has repeats, so fewer axes than index slots
+
+    (Within one numerator motif every expression has the same number of index slots, so the
+    comparison is really just asking "is the base all-distinct?".)
+
+    -- the '==' branch is correct --
+
+    When the base is all-distinct its labels are already 'a', 'b', 'c', ... in slot order, so
+    tensor axis k corresponds to slot k, and indexing by expr's own labels taken slot by slot is
+    exactly right:
+
+        expr   polgrad['b'] * dipgrad['a'] * dipgrad['c']      base   ['a', 'b', 'c']
+        ->  (index_dict['b'], index_dict['a'], index_dict['c'])       correct
+
+    Expressions with repeated labels are handled by the same branch, and land on a diagonal of
+    the base's tensor:
+
+        expr   polgrad['b'] * dipgrad['a'] * dipgrad['b']
+        ->  (index_dict['b'], index_dict['a'], index_dict['b'])       correct
+
+    -- the '<' branch is WRONG, and is why this version was replaced --
+
+    First, to be clear about what is NOT the problem: a base whose letters are a permutation of
+    the expression's is perfectly fine, and is exactly what the deduplication is for. The base is
+    only a representative expression. The '==' branch above meets relabelled bases too and still
+    gets the right answer. Nothing is wrong until an index is built from the base.
+
+    The defect is in how this branch builds that index. It walks the BASE's labels and looks them
+    up in index_dict, which is keyed by THIS EXPRESSION's labels - silently assuming the two use
+    the same letter for the same slot. Where they happen to, the answer is right. Where they do
+    not, it is wrong and nothing complains:
+
+        expr   polgrad['b'] * dipgrad['a'] * diphess['a','b']
+        base   polgrad['a'] * dipgrad['b'] * diphess['a','b']      'a' and 'b' swapped
+
+        base_unique is ['a', 'b'], so this returns (index_dict['a'], index_dict['b'])
+        but the base's first axis is the polgrad slot, which in expr holds 'b'
+        -> the wanted value is at (index_dict['b'], index_dict['a']): the TRANSPOSED element
+
+    No error is raised; a wrong number is returned. With index_dict {'a': 0, 'b': 1} it reads
+    tensor[0, 1] where the value lives at tensor[1, 0].
+
+    The replacement below fixes this by rebuilding the base-label -> expr-label correspondence
+    instead of assuming it, which also removes the need for the two branches.
+    """
     base_unique = sorted(list(set(base_expr.get_mode_indices())))
     expr_inds = expr.get_mode_indices()
 
     if len(base_unique) < len(expr_inds):
         # walk through only base_unique ind labels
+        # BUG: base_unique are the BASE's letters, but index_dict is keyed by EXPR's letters
         return tuple(index_dict[sym] for sym in base_unique)
     elif len(base_unique) == len(expr_inds):
         # walk through all expr_inds labels, there are repeated labels
+        # correct: expr's own labels, slot by slot, against an all-distinct base
         return tuple(index_dict[sym] for sym in expr_inds)
     else:
         # this should not be possible in the worflow
         raise ValueError('This base_expr cannot be a base expression for this expr')
+'''
+
+def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
+    """
+    Work out WHICH ELEMENT of the base expression's precalculated tensor holds the value of
+    'expr' for this choice of normal mode indices.
+
+    -- why there is a base at all --
+
+    An averaged expression is a function of "which normal mode goes into which property slot".
+    calculate_avrg_tensor evaluates that function at every combination of modes and stores the
+    results in an array with one axis per distinct mode index. Expressions that differ only in
+    the NAMES of their indices are the same function, so one array can serve all of them:
+    make_unique_avrg_tensors_mapping picks one of them (the "base") and maps the rest onto it.
+
+    Reusing the array means reading the right element out of it, which takes two steps:
+
+        hop 1:  base's index label   ->  this expression's index label
+        hop 2:  this expression's index label  ->  normal mode number     (this is index_dict)
+
+    -- why hop 1 is needed --
+
+    The base is built from canonical letters ('a', 'b', ...), which are in general a PERMUTATION
+    of the labels this expression uses:
+
+        expr   polgrad['b'] * dipgrad['a'] * diphess['a','b']
+        base   polgrad['a'] * dipgrad['b'] * diphess['a','b']        'a' and 'b' are swapped
+
+    so with index_dict {'a': 0, 'b': 1} the wanted value sits at tensor[1, 0] and NOT at
+    tensor[0, 1]. Skipping hop 1 returns the transposed element.
+
+    -- why the two cannot simply be lined up as they stand --
+
+        base:  a  b  a  b
+        expr:  b  a  a  b       base 'a' -> 'b', then base 'a' -> 'a': contradiction
+
+    The base's letters were laid down against the repetition codes AFTER those codes had been
+    sorted within each property (see nm_indices_repetition_reduce_deriv_symmetry; that sort is
+    legitimate because a geometric derivative is symmetric in its own mode indices). So this
+    expression's labels must be put through the same sort before they will line up:
+
+        expr labels           ['b', 'a', 'a', 'b']
+        repetition codes      ( 1 ,  2 ,  2 ,  1 )
+        split per property    [['b'], ['a'], ['a', 'b']]    codes [[1], [2], [2, 1]]
+        sort each by code     [['b'], ['a'], ['b', 'a']]    ->  ['b', 'a', 'b', 'a']
+
+        base:  a  b  a  b
+        expr:  b  a  b  a       base 'a' -> 'b', base 'b' -> 'a', and the repeats agree
+
+    NOTE: if nm_indices_repetition_reduce_deriv_symmetry ever changes how it orders indices,
+    the sort below has to change with it.
+
+    Returns the index tuple into the base's tensor, whose axes are the base's unique labels in
+    alphabetical order (the order calculate_avrg_tensor built them in).
+    """
+    # ---- hop 1: rebuild which of the base's labels stands for which of this expression's ----
+
+    # how many mode indices each property owns, e.g. [1, 1, 2] for polgrad * dipgrad * diphess
+    template = expr.get_mode_indices_group_template()
+
+    # chop the codes and the labels into the same per-property groups so they stay aligned
+    grouped_codes = group_nm_indices(nm_indices_repetition_encoding(expr.get_mode_indices()), template)
+    grouped_labels = group_nm_indices(expr.get_mode_indices(), template)
+
+    # sort each property's slots by repetition code and move its labels the same way, which
+    # reproduces the ordering the base's letters were assigned in
+    expr_inds_sorted = []
+    for codes, labels in zip(grouped_codes, grouped_labels):
+        order = sorted(range(len(codes)), key=lambda i: codes[i])
+        expr_inds_sorted.extend(labels[i] for i in order)
+
+    base_inds = base_expr.get_mode_indices()
+
+    # Shape guard only - it protects the zip below, which would otherwise truncate silently.
+    # Equal slot counts do NOT establish that base_expr can represent expr: two different
+    # numerator motifs can have the same total number of slots (polhess * dip * dip and
+    # polgrad * dip * diphess both have 4). What actually makes a base valid is sharing the
+    # expression's numerator motif, and that holds by construction - the base is built from that
+    # motif in reconstruct_unique_avrg_expression - so it is not re-tested here, where this
+    # function runs inside the per-index evaluation loop.
+    if len(base_inds) != len(expr_inds_sorted):
+        raise ValueError(
+            f'base_expr has {len(base_inds)} mode index slots but expr has '
+            f'{len(expr_inds_sorted)}: they cannot belong to the same numerator motif')
+
+    # The two now line up slot by slot. This map only has to be a well-defined FUNCTION - each
+    # base label with a single value - it does NOT have to be injective:
+    #
+    #   several base labels -> the same expr label     FINE, and expected. The expression uses
+    #       fewer distinct modes than the base has axes, so it reads a diagonal of the base's
+    #       tensor. Base ['a','b','c'] serving expr ['a','c','c'] gives {a: a, b: c, c: c},
+    #       hence the index (index_dict['a'], index_dict['c'], index_dict['c']) - a rank 3
+    #       tensor serving a rank 2 expression.
+    #
+    #   one base label -> several expr labels          IMPOSSIBLE. The expression needs more
+    #       distinct modes than the base has axes, so this base cannot serve it at all.
+    base_to_expr = {}
+    for base_sym, expr_sym in zip(base_inds, expr_inds_sorted):
+        if base_to_expr.setdefault(base_sym, expr_sym) != expr_sym:
+            raise ValueError(
+                f'This base_expr cannot be a base expression for this expr: base index '
+                f'{base_sym!r} maps to both {base_to_expr[base_sym]!r} and {expr_sym!r}')
+
+    # ---- hop 2: expression labels -> mode numbers, in the tensor's axis order ----
+    return tuple(index_dict[base_to_expr[sym]] for sym in sorted(set(base_inds)))
+
