@@ -326,7 +326,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: avrgprops.PropsCollection,
 
         NON_AVRG = data_and_configs.props_data.get(triv_name).vals[na_prop_inds]
 
-        if np.isclose(NON_AVRG, zero_tol):
+        if np.isclose(NON_AVRG, 0.0, atol=zero_tol, rtol=0.0):
             return 0.
         else:
             product_all *= NON_AVRG
@@ -344,9 +344,11 @@ def eval_avrg_per_indexdict(avrg_expr: avrgprops.PropsCollection,
     avrg_index_tuple = avrgprops.get_ind_tuple_from_base(expr=avrg_expr, 
                                                          base_expr=avrg_tensor_expr, 
                                                          index_dict=index_dict)
-    if np.isclose(avrg_tensor[avrg_index_tuple], zero_tol, atol=1e-20): # FIXME: against abs()
+    value = avrg_tensor[avrg_index_tuple]
+    if np.isclose(value, 0.0, atol=zero_tol, rtol=0.0):
         return 0.
-    return avrg_tensor[avrg_index_tuple]
+    return value
+
 
 def eval_vibdiff_pert_wf_diff(extra_freqterms: FreqTermsCollection,
                               index_dict: dict,

@@ -102,7 +102,10 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     props_data['polgrad'][0, 1, 0] = 0.3
     props_data['polhess'][0, 0, 0, 0] = 0.15
     props_data['diphess'][0, 0, 1] = 0.15
-    
+    # off-diagonal diphess: term 1 is the only term here using diphess, and without this
+    # every a != b element of its averaged tensor is zero, so an a/b mix-up stays invisible
+    props_data['diphess'][0, 1, 1] = props_data['diphess'][1, 0, 1] = 0.15
+
     props_data['cff'][0, 1, 1] = props_data['cff'][1, 0, 1] = props_data['cff'][1, 1, 0] = 0.7
 
     props = []
@@ -168,6 +171,47 @@ def test_evaluate_term_coeffs_single_c_ind_contrib():
     ref_term1_coeff = -1./4 * 1./convNu2Ene(964.+15.)/convNu2Ene(964.+15.) * t1_avrg_tensor[0, 0]
     term1_coeff = list(term1_coeff_dict.values())[0] # list with single element
     assert term1_coeff[0] == ref_term1_coeff
+
+    ### term 1 -- el -- OFF-DIAGONAL indices
+    # avrg_expressions_t1 ---- polgrad['b'][0, 3]_d1 * dipgrad['a'][1]_d1 * diphess['a', 'b'][2]_d2
+    # This is the only expression in this test that is NOT symmetric under a <-> b, so it is the
+    # only one that can detect an index mix-up between the shared precalculated ("base") tensor
+    # and this term's own index labels. The {'a': 0, 'b': 0} check above cannot: on the diagonal
+    # T[a, b] and T[b, a] are the same element.
+    #
+    # Independent oracle: the tensor of term 1's OWN expression, axes = sorted unique labels (a, b).
+    # calculate_avrg_tensor is checked against reference_avrg_tensor_bruteforce in test_averaged_props.py.
+    t1_own_tensor = avrgprops.calculate_avrg_tensor(avrg_expression=avrg_expressions_t1,
+                                                    pulse_polarization_vector=settings.pulse_polarization_vector,
+                                                    props_data=settings.props_data,
+                                                    number_of_nmodes=settings.number_of_nmodes,
+                                                    nm_inds_choices=settings.nm_inds_choices)
+
+    # guard: if the data ever stops distinguishing T[a, b] from T[b, a], everything below is vacuous
+    assert not np.allclose(t1_own_tensor, t1_own_tensor.T), \
+        'test data no longer distinguishes T[a, b] from T[b, a]'
+
+    # retrieval through the shared base tensor must reproduce the directly computed tensor
+    for ia in range(settings.number_of_nmodes):
+        for ib in range(settings.number_of_nmodes):
+            retrieved = fac.eval_avrg_per_indexdict(avrg_expressions_t1, {'a': ia, 'b': ib}, results)
+            assert np.isclose(retrieved, t1_own_tensor[ia, ib]), (
+                f'AVRG retrieval mismatch at a={ia}, b={ib}: got {retrieved} from the base tensor '
+                f'{results.avrg_expr_tensor_mapping[avrg_expressions_t1]}, '
+                f'expected {t1_own_tensor[ia, ib]} '
+                f'(transposed element T[b, a] = {t1_own_tensor[ib, ia]})')
+
+    # and the same through the full coefficient
+    for ia, ib in [(0, 0), (0, 1), (1, 0)]:
+        t1_offdiag_dict = fac.evaluate_term_coeffs(term=terms_select[1],
+                                                   relevant_indices=[{'a': ia, 'b': ib}],
+                                                   necessary_data=(settings, results))
+        # frac * vibene denom (1/(E_a * E_b)) * orient avrg
+        ref_t1_offdiag = -1./4 * 1./convNu2Ene(settings.nc_sqrt_eigval[ia]) \
+                              / convNu2Ene(settings.nc_sqrt_eigval[ib]) * t1_own_tensor[ia, ib]
+        t1_offdiag = list(t1_offdiag_dict.values())[0][0]
+        assert np.isclose(t1_offdiag, ref_t1_offdiag), (
+            f'term 1 coefficient mismatch at a={ia}, b={ib}: got {t1_offdiag}, expected {ref_t1_offdiag}')
     
     ### term 2 -- mech
     term2_coeff_dict = fac.evaluate_term_coeffs(term=terms_select[2], 

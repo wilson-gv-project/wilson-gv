@@ -907,6 +907,176 @@ def test_get_avrg_motif_relation():
     print(g, '---------\n')
 
 
+#####################################
+def test_eval_vs_base():
+    """
+    Compare here evaluated expression indexed value
+        vs retrieval of this value from base avrg tensor
+
+    side A - build the tensor for the expression ITSELF, with calculate_avrg_tensor (the same
+             function the precalculation uses, just called here on the expression rather than
+             on its base), and read the value straight out of it with the index dict.
+    side B - build the tensor for the BASE the expression maps to, and read the value out of
+             that one at the index get_ind_tuple_from_base hands back.
+
+    Both sides must give the same number: that is the whole premise of reusing one tensor for
+    several expressions.
+    """
+    import itertools
+
+    n_modes = 5
+    pulse_polarization_vector = [1., 1., 1.]
+    mol_props = MolPropsCollection(dict_to_proplist(_props_data_for_retrieval_check(n_modes)))
+
+    tensor_kwargs = dict(pulse_polarization_vector=pulse_polarization_vector,
+                         props_data=mol_props,
+                         number_of_nmodes=n_modes,
+                         nm_inds_choices=list(range(n_modes)))
+
+    # the interesting case: the base is a RELABELLING of this expression, 'a' and 'b' swapped
+    expr = make_avrg_expr([((0, 3), ('b',)), ((1,), ('a',)), ((2,), ('a', 'b'))])
+    base = avrgprops.make_unique_avrg_tensors_mapping([expr])[expr]
+
+    expr_tensor = avrgprops.calculate_avrg_tensor(avrg_expression=expr, **tensor_kwargs)
+    base_tensor = avrgprops.calculate_avrg_tensor(avrg_expression=base, **tensor_kwargs)
+
+    print(f'\nexpr {expr}\nbase {base}')
+
+    # --- worked single case ---------------------------------------------------------------
+    index_dict = {'a': 4, 'b': 2}
+
+    # side A: the expression's own tensor. Its axes are the expression's unique labels in
+    # alphabetical order, so the index dict maps onto them directly.
+    expr_labels = sorted(set(expr.get_mode_indices()))                     # ['a', 'b']
+    value_direct = expr_tensor[tuple(index_dict[sym] for sym in expr_labels)]
+
+    # side B: the base's tensor, indexed through the base -> expr label correspondence
+    base_index = avrgprops.get_ind_tuple_from_base(expr=expr, base_expr=base, index_dict=index_dict)
+    value_via_base = base_tensor[base_index]
+
+    print(f'\n{index_dict}')
+    print(f'   side A  own tensor  {expr_labels} -> {tuple(index_dict[s] for s in expr_labels)}'
+          f'  = {value_direct}')
+    print(f'   side B  base tensor -> {base_index}  = {value_via_base}')
+
+    assert not np.isclose(value_direct, 0.0), \
+        'this index choice gives zero, so it would not distinguish a wrong index'
+    assert np.isclose(value_direct, value_via_base), (
+        f'value from the expression\'s own tensor differs from the one taken via the base\n'
+        f'   expr       {expr}\n'
+        f'   base       {base}\n'
+        f'   index_dict {index_dict}  ->  base tensor index {base_index}\n'
+        f'   direct {value_direct}, via base {value_via_base}')
+
+    # --- and the same over every index choice ----------------------------------------------
+    for combo in itertools.product(range(n_modes), repeat=len(expr_labels)):
+        index_dict = dict(zip(expr_labels, combo))
+        base_index = avrgprops.get_ind_tuple_from_base(expr=expr, base_expr=base, index_dict=index_dict)
+
+        assert np.isclose(expr_tensor[combo], base_tensor[base_index]), (
+            f'value from the expression\'s own tensor differs from the one taken via the base\n'
+            f'   expr       {expr}\n'
+            f'   base       {base}\n'
+            f'   index_dict {index_dict}  ->  base tensor index {base_index}\n'
+            f'   direct {expr_tensor[combo]}, via base {base_tensor[base_index]}')
+
+#####################################
+
+
+def _props_data_for_retrieval_check(n_modes: int):
+    """
+    Random property values for the retrieval checks below.
+    Geometric derivatives are symmetrised in their mode indices, as the physics requires and as
+    the averaged-tensor deduplication assumes (see nm_indices_repetition_reduce_deriv_symmetry).
+    """
+    rng = np.random.default_rng(20250814)
+
+    diphess = rng.random((n_modes, n_modes, 3))
+    polhess = rng.random((n_modes, n_modes, 3, 3))
+
+    return {'dipgrad': rng.random((n_modes, 3)),
+            'polgrad': rng.random((n_modes, 3, 3)),
+            'diphess': 0.5 * (diphess + diphess.transpose(1, 0, 2)),
+            'polhess': 0.5 * (polhess + polhess.transpose(1, 0, 2, 3))}
+
+
+def _assert_base_retrieval_matches_direct(expressions, n_modes=3, pulse_polarization_vector=(1., 1., 1.)):
+    """
+    For each expression: reading its value out of the precalculated base tensor, at the index
+    tuple get_ind_tuple_from_base gives, must equal the tensor computed for that expression
+    directly. calculate_avrg_tensor is the oracle - it is checked against
+    reference_avrg_tensor_bruteforce elsewhere in this file.
+    """
+    import itertools
+
+    mol_props = MolPropsCollection(dict_to_proplist(_props_data_for_retrieval_check(n_modes)))
+    kwargs = dict(pulse_polarization_vector=list(pulse_polarization_vector),
+                  props_data=mol_props,
+                  number_of_nmodes=n_modes,
+                  nm_inds_choices=list(range(n_modes)))
+
+    mapping = avrgprops.make_unique_avrg_tensors_mapping(expressions)
+    base_tensors = {base: avrgprops.calculate_avrg_tensor(avrg_expression=base, **kwargs)
+                    for base in set(mapping.values())}
+
+    for expr in expressions:
+        base = mapping[expr]
+        direct = avrgprops.calculate_avrg_tensor(avrg_expression=expr, **kwargs)
+        labels = sorted(set(expr.get_mode_indices()))
+
+        for combo in itertools.product(range(n_modes), repeat=len(labels)):
+            index_dict = dict(zip(labels, combo))
+            idx = avrgprops.get_ind_tuple_from_base(expr=expr, base_expr=base, index_dict=index_dict)
+
+            assert np.isclose(base_tensors[base][idx], direct[combo]), (
+                f'retrieval mismatch for {expr}\n'
+                f'   base       {base}\n'
+                f'   index_dict {index_dict} -> base tensor index {idx}\n'
+                f'   got {base_tensors[base][idx]}, expected {direct[combo]}')
+
+
+def test_get_ind_tuple_from_base_relabelled_base():
+    """
+    The base is built from canonical letters, so its labels can be a PERMUTATION of the
+    expression's own. get_ind_tuple_from_base has to undo that permutation.
+
+    polgrad['b'] * dipgrad['a'] * diphess['a','b']   is keyed to the base
+    polgrad['a'] * dipgrad['b'] * diphess['a','b']   -- 'a' and 'b' swapped
+
+    so the base tensor's first axis is the expression's 'b': its value lives at
+    tensor[index_dict['b'], index_dict['a']], not tensor[index_dict['a'], index_dict['b']].
+    """
+    print()
+    expr = make_avrg_expr([((0, 3), ('b',)),
+                           ((1,), ('a',)),
+                           ((2,), ('a', 'b'))])
+
+    base = avrgprops.make_unique_avrg_tensors_mapping([expr])[expr]
+    print('expr:', expr)
+    print('base:', base)
+
+    # premise of this test: the base really is relabelled. If canonicalisation ever stops
+    # relabelling here, this test no longer covers what it is meant to cover.
+    assert base.get_mode_indices() != expr.get_mode_indices(), \
+        'base is no longer relabelled relative to the expression; this test is now vacuous'
+
+    _assert_base_retrieval_matches_direct([expr])
+
+
+def test_get_ind_tuple_from_base_matches_direct_tensor():
+    """
+    Regression guard for the expressions that already retrieve correctly: same numerator motif,
+    all-distinct base, members with and without repeated indices.
+    """
+    print()
+    expressions = [make_avrg_expr([((0, 3), ('c',)), ((1,), ('a',)), ((2,), ('b',))]),
+                   make_avrg_expr([((0, 3), ('b',)), ((1,), ('a',)), ((2,), ('b',))]),
+                   make_avrg_expr([((0, 3), ('a',)), ((1,), ('a',)), ((2,), ('b',))]),
+                   make_avrg_expr([((0, 3), ('b',)), ((1,), ('a',)), ((2,), ('a',))])]
+
+    _assert_base_retrieval_matches_direct(expressions)
+
+
 ####################
 
 def reference_avrg_tensor_bruteforce(props_arrays, props_cart_op_indices, 
