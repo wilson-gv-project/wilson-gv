@@ -592,131 +592,6 @@ class EvaluationWorkflow_NEW:
             self.ctx.timing[name] = time.time() - start
 
 
-    def run_get_feats(self):
-        """
-        Workflow with these steps:
-            prep_terms
-            prep_data
-            process_resonances
-            term_coefficients
-            all_features -- this? should be accessible on top of list of feats
-        """
-        
-        try:
-            # Part 1: Preparation
-            with self.step("prep_terms"):
-                self.artifacts.terms = prepTermsForEval(self.inputs.terms)
-
-            with self.step("prep_data"): # could be in data inputs
-                _data, _cache, _configs = prepDataForEval(self.inputs.pulse_polarization_vector, 
-                                                          self.inputs.vib_ana_setup, 
-                                                          self.inputs.props)
-                self.artifacts.vib_data = _data
-                self.artifacts.vibdiff_cache = _cache
-                self.artifacts.data_configs = _configs
-
-            # self._save_checkpoint('Step1')  # Save checkpoint
-
-            # Part 2: Process resonances and calculate coefficients
-            # get resonances locations for all terms
-            with self.step("process_resonances"):
-                self.artifacts.motif_locs, self.artifacts.terms_for_motifs = process_resonance_motifs(self.artifacts.terms,
-                                                                                                            self.artifacts.vib_data,
-                                                                                                            self.artifacts.vibdiff_cache)
-            with self.step("term_coefficients"):
-                self.artifacts.need_precalc = identify_precalc_unique_coeff_parts(terms=self.artifacts.terms)
-                self.artifacts.precalculated = precalculate_unique_coeff_parts(
-                    need_to_precalc=self.artifacts.need_precalc, data_and_configs=self.artifacts.data_configs)
-                self.artifacts.coefficients = evaluate_terms_coeffs(self.artifacts.terms,
-                                                                       self.artifacts.motif_locs,
-                                                                       self.artifacts.data_configs,
-                                                                       self.artifacts.precalculated)
-
-            # self._save_checkpoint('Step2')  # Save checkpoint
-
-            # Part 3: Extract features and place them in the spectral window
-            with self.step("all_features"):
-                
-                # maybe should check unit by the value here as well? or somewhere before taking unit flag
-                if self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'au':
-                    gamma = convNu2Ene(self.inputs.spec_eval_setup.ev_info.Gamma, reverse=True)
-                elif self.inputs.spec_eval_setup.ev_info.Gamma_unit == 'cm-1':
-                    gamma = self.inputs.spec_eval_setup.ev_info.Gamma
-                else:
-                    raise ValueError('Gamma cannot be converted from the given unit to au')
-                
-                # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
-                self.artifacts.features, self.artifacts.zero_feats = get_features_to_draw(motif_res_loc=self.artifacts.motif_locs, 
-                                                                  terms_for_motifs=self.artifacts.terms_for_motifs,
-                                                                  term_coeffs_per_index=self.artifacts.coefficients,
-                                                                  lineshape_parameter=gamma)
-                # print('\nall_features step')
-                # print(f' There are {len(self.artifacts.features)} features')
-
-        except Exception as e:
-            from wilson_suite.wilson_utils.serialization import pickle_this_to
-            filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self, filename_pkl)
-            
-            raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-            ) from e
-
-
-    def run_specwindow_feats(self, features=None):
-        """
-        
-        """
-        # features_to_use will be used only in first step - further steps are chained
-        if self.artifacts.features is None:
-            if features is None:
-                raise ValueError("This workflow does not have self.artifacts.features values nor input features!")
-            features_to_use = features
-        else:
-            features_to_use = self.artifacts.features
-        
-        try:
-            with self.step("dress_with_featboxes"):
-                max_intensity_in_window = SpectralFeature.get_max_intensity_feat(features_to_use).get_intensity()
-                min_intensity_in_window = max_intensity_in_window / self.inputs.spec_eval_setup.ev_info.dynamic_range
-
-                self.artifacts.features = SpectralFeature.dress_these_with_boxes(features_to_use,
-                                                                                 max_intensity_in_window, 
-                                                                                 min_intensity_in_window,
-                                                                                 box_range_safety_margin=
-                                                                                 self.inputs.spec_eval_setup.ev_info.box_range_safety_margin,
-                                                                                 scale_wrt_max_intensity=
-                                                                                 self.inputs.spec_eval_setup.ev_info.scale_wrt_max_intensity,
-                                                                                 minimum_box_padding=
-                                                                                 self.inputs.spec_eval_setup.ev_info.minimum_box_padding,
-                                                                                 )
-                # print('\ndress_with_featboxes step')
-                # print(f' There are {len(self.artifacts.features)} features')
-                # SpectralFeature.print_list_features(self.artifacts.features)
-
-            if self.inputs.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval:
-                with self.step("filter_magn_conds"):
-                    self.artifacts.features = SpectralFeature.apply_magn_cond_filter(self.artifacts.features,
-                                                                                    magn_conditions=self.setup_inputs.terms_in_axes.magn_conditions,
-                                                                                    magn_conditions_margin=self.setup_inputs.spec_eval.ev_info.magn_conditions_margin)
-                    # print('\nfilter_magn_conds step')
-                    # print(f' There are {len(self.artifacts.features)} features')
-                    # SpectralFeature.print_list_features(self.artifacts.features)
-
-            with self.step("place_in_specwindow"):
-                self.artifacts.spec_window = SpectralFeature.filter_to_spec_window(self.artifacts.features, self.inputs.spec_eval_setup.ev_info.spectral_window)
-                if not self.artifacts.spec_window.full_features:
-                    raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
-
-        except Exception as e:
-            from wilson_suite.wilson_utils.serialization import pickle_this_to
-            filename_pkl = 'eval_wf.pkl'
-            pickle_this_to(self, filename_pkl)
-            
-            raise type(e)(
-                f"Failed at '{self.ctx.failed_at}': {e} EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-            ) from e
-    
 
     def run(self, custom_grid=None, verbose=False):
         """
@@ -735,7 +610,6 @@ class EvaluationWorkflow_NEW:
         place_results - 
         """
         
-        # try:
         # Part 1: Preparation
 
         with self.step("prep_data"): # could be in data inputs
@@ -749,7 +623,6 @@ class EvaluationWorkflow_NEW:
                                                         nm_inds_choices=self.setup_inputs.vib_ana.include_list,
                                                         pulse_polarization_vector=self.setup_inputs.experiment.polarization_avg_vector,
                                                         nc_sqrt_eigval=self.setup_inputs.vib_ana.nc_sqrt_eigval)
-
 
         # self._save_checkpoint('Step1')  # Save checkpoint
 
@@ -871,15 +744,7 @@ class EvaluationWorkflow_NEW:
 
         # Return results
         return self.artifacts.grid_manager.full_grid
-            
-        # except Exception as e:
-        #     from wilson_suite.wilson_utils.serialization import pickle_this_to
-        #     filename_pkl = 'eval_wf.pkl'
-        #     pickle_this_to(self, filename_pkl)
-            
-        #     raise type(e)(
-        #         f"Failed at '{self.ctx.failed_at}': {e}. EvaluationWorkflow instanse was saved to `{filename_pkl}`."
-        #     ) from e
+        
  
     def _save_checkpoint(self, name: str):
         """
