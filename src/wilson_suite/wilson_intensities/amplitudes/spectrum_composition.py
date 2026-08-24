@@ -659,6 +659,7 @@ class SpectralFeature:
             elif magn_conditions == (('-A', 'B',),):
                 if feat.location._coord_dict['B'] - feat.location._coord_dict['A'] > (0+magn_conditions_margin):
                     res_features.append(feat)
+            # FIXME(!): raise error on else
         return res_features
 
     
