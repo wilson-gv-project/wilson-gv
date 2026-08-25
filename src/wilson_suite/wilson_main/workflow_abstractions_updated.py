@@ -292,6 +292,29 @@ class SimulationBuilder:
 			magn_conditions_translated = translate_magn_conditions_to_axisvars(
 				experiment.magn_conditions, axes
 			)
+
+		ev_info = self._spec_eval.ev_info if self._spec_eval is not None else None
+		if ev_info is not None:
+			# legacy field: read only by EvaluationWorkflow. Normally identical to what we
+			# just translated (same source, same function) - only flag a real mismatch.
+			if (ev_info.exp_magn_conditions is not None
+					and ev_info.exp_magn_conditions != magn_conditions_translated):
+				logger.warning(
+					"spec_eval.ev_info.exp_magn_conditions (%r) disagrees with the conditions "
+					"translated from experiment.magn_conditions (%r). The sealed-setup path uses "
+					"the latter; the ev_info field is read only by the legacy EvaluationWorkflow. "
+					"This usually means it was set by hand, or translated under a different "
+					"axis_choice than the current one.",
+					ev_info.exp_magn_conditions, magn_conditions_translated,
+				)
+			if ev_info.apply_exp_magn_conditions_eval and magn_conditions_translated is None:
+				raise RuntimeError(
+					"apply_exp_magn_conditions_eval is True but no magnitude conditions are "
+					"available: experiment.magn_conditions is None. Set them on the experiment, "
+					"or switch the eval filter off."
+				)
+
+
 		terms_in_axes = self._terms_collection.translate_to_ax_choice(axes, magn_conditions_translated)
 		
 		return SealedSetup(
