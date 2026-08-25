@@ -5,6 +5,21 @@
 4. request Data for evaluation [necessary for intensities eval, vib info - max state level only, nothing about vib analysis] -> 
 5. get DataResults
 
+---
+terms [props, max_state_lvl]
+
+magn_conds
+pulse_polarization_vector
+gamma
+dyn_range
+spec_window
+vib_ana_configs (harm/ahnarm - anharm_inhouse or not)
+axis_choice
+
+data:
+number of normal modes (total and choices here)
+states and energies (all)
+
 """
 import copy
 from pathlib import Path
@@ -45,11 +60,15 @@ class SimulationSetup:
 
 # derived from setup + terms
 @dataclass
-class PropertyOrder:             
-    # props: list[MolecularProperty]
-    props_coll: MolPropsCollection
-    residual_vib_info: dict
-    max_state_lvl: int
+class PropertyRequest:
+	props_coll: MolPropsCollection
+	residual_vib_info: dict
+	max_state_lvl: int
+
+	@property
+	def is_dressed(self):
+		return self.props_coll.are_dressed
+
 
 @dataclass
 class SimulationResult:
@@ -82,11 +101,11 @@ class SealedSetup:
     axis_choice: SpectralAxisSet
     vib_ana: 'VibAnaSetup'
     spec_eval: 'SpecEvalSetup'
-    prop_order: PropertyOrder
+    prop_order: PropertyRequest
 
     @property
     def is_dressed(self) -> bool:
-        return self.prop_order.is_dressed
+        return self.prop_order.is_dressed and self.vib_ana.isAllSet
 
 
 class SimulationBuilder:
@@ -111,7 +130,6 @@ class SimulationBuilder:
 		self._experiment = copy.deepcopy(experiment)
 
 		self._explicit_axes = None
-		self._terms_dct = None
 
 		self._explicit_terms: dict | None = None   # user-supplied via set_terms
 		self._cached_derived_terms: dict | None = None   # cache of self._experiment.derive_terms()
@@ -122,7 +140,7 @@ class SimulationBuilder:
 		self._eval_uniform = copy.deepcopy(eval_uniform)
 		self._eval_by_prop = copy.deepcopy(eval_by_prop)
 
-		self._prop_order: PropertyOrder | None = None
+		self._prop_order: PropertyRequest | None = None
 		self._dressed: bool = False
 
 	@property
@@ -139,7 +157,7 @@ class SimulationBuilder:
 		return self._cached_derived_terms
 
 	@property
-	def prop_order(self) -> PropertyOrder:
+	def prop_order(self) -> PropertyRequest:
 		"""
 		Resolved property order. Cached after first access.
 		freqs='static' only now
@@ -149,7 +167,7 @@ class SimulationBuilder:
 			props, resid, max_lvl = find_props_and_max_state_lvl(
 				self.terms, self._vib_ana, freqs='static'
 			)
-			self._prop_order = PropertyOrder(
+			self._prop_order = PropertyRequest(
 				props_coll=MolPropsCollection(props), 
 				residual_vib_info=resid, 
 				max_state_lvl=max_lvl
@@ -176,7 +194,7 @@ class SimulationBuilder:
 		self._experiment = copy.deepcopy(experiment)
 
 		self._explicit_axes = None
-		self._terms_dct = None
+		self._cached_derived_terms = None
 		self._prop_order = None
 		self._dressed = False
 
@@ -230,7 +248,7 @@ class SimulationBuilder:
 
 	@property
 	def _terms_collection(self) -> VibPertTermsCollection:
-		"""Fresh wrapper around _terms_dct; built on each access."""
+		"""Fresh wrapper around terms; built on each access."""
 		return VibPertTermsCollection(
 			term_dict=self.terms, experiment=self._experiment
 		)
