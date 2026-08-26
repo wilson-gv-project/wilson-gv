@@ -156,34 +156,29 @@ class RspFunEvalSetup:
     def make_datarequest(self) -> dict[str, DataOriginInfo]:
         return {name: self.calc_config for name in self.terms.need_what()}
 
-@dataclass
-class DataForRspFunEval:
 
-    gamma_cm1: float
-    polarization: np.ndarray
-    grid: SpectralGrid
-    mol_props: list
-    vib_anharm_states: None
-    eigenvals: None
-    eigenvecs: None
+@dataclass(frozen=True)
+class EvalData:
+    """Everything obtained externally. No configuration."""
+    mol_props: MolPropsCollection
+    states: tuple
+    eigenvals: np.ndarray
+    eigenvecs: np.ndarray
 
-    @classmethod
-    def from_rspfuneval_setup(cls, rspfuneval_setup: RspFunEvalSetup):
-        return cls(gamma_cm1=rspfuneval_setup.gamma_cm1,
-                   polarization=rspfuneval_setup.polarization, 
-                   grid=rspfuneval_setup.grid)
 
-def stage_prep_data():
+
+def stage_prep_data(eval_data: EvalData, include_states_list ):
     vibdiff_cache = VibDiffCache()
-    vib_data = VibStatesData(allstates=tuple(self.setup_inputs.vib_ana.states), 
-                                harmonic_osc_states_labels=self.setup_inputs.vib_ana.include_list,
-                                number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes)
+    vib_data = VibStatesData(allstates=tuple(eval_data.states), 
+                             harmonic_osc_states_labels=include_states_list,
+                             number_of_nmodes=len(eval_data.eigenvals))
+    
     data_configs = EvaluationDataAndConfigs(props_data=self.setup_inputs.prop_order.props_coll,
-                                                vibstates_data=self.artifacts.vib_data,
-                                                number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes,
-                                                nm_inds_choices=self.setup_inputs.vib_ana.include_list,
-                                                pulse_polarization_vector=self.setup_inputs.experiment.polarization_avg_vector,
-                                                nc_sqrt_eigval=self.setup_inputs.vib_ana.nc_sqrt_eigval)
+                                            vibstates_data=self.artifacts.vib_data,
+                                            number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes,
+                                            nm_inds_choices=self.setup_inputs.vib_ana.include_list,
+                                            pulse_polarization_vector=self.setup_inputs.experiment.polarization_avg_vector,
+                                            nc_sqrt_eigval=self.setup_inputs.vib_ana.nc_sqrt_eigval)
 
 def stage_process_resonances(terms_flat, vib_data, vibdiffs) -> tuple[dict, dict]: ...
 def stage_term_coefficients(terms_flat, motif_locs, data_configs, precalc) -> dict: ...
