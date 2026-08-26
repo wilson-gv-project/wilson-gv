@@ -465,10 +465,24 @@ class VibExperiment:
         self.relevant_phasematch = relevant_phasematch
 
         # Here do:
-        #  - If the experiment is an ideal frequency-domain experiment, then limit pulse scanning
-        #  attributes (scanning time centerpoint and spread parameters is then not meaningful)
-        #  - Construct fields_under_scan attribute
+        #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
+        #  attributes are valid (scanning time centerpoint is then less meaningful)
+        #  - If the experiment is an ideal time-domain experiment, then also limit scan attribute validity
+        #  (scanning carrier frequency is then less meaningful)
+        # - Maybe take tc resp. cf (for freq.-ideal resp. time-ideal) as "sleeping" parameters but need specification
+        #  if scanning time spread? Then may need some inverse stuff for one case (touch/depart from infinity)
+        #  (could also handle this more practically but less elegantly with large number instead of infty throughout)
 
+        # - Construct fields_under_scan attribute
+        # - Handle better the discretization of scans
+        # - Handle separation/combination of response-side/integration-side scans
+        # - Handle making compound pulses (with delay param for nonzero el relaxation?
+        #   not to begin with I think but can "leave room" for it)
+        #       - Compounding should be a simple product and for Gaussians, is another Gaussian
+        #       - Either here or as part of ElectricField: Handle superset of compoundings (can even inform
+        #         if nonresonant "full electronic" terms are likely to contribute)
+        #   - Also consider and maybe handle phase question between "differently-compounding" features here
+        # - Likely do away with cfuv stuff and handle these attributes explicitly
 
 
 
