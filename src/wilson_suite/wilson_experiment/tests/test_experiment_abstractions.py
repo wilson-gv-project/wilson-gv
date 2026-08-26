@@ -288,16 +288,25 @@ def test_electric_field():
     pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=2)
     pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=3)
 
+    from math import inf as infinity
+    pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1)
+    pulse_cw_b = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=2)
+    pulse_cw_c = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=3)
+
+    pulse_mix_c = EmPulse(env='gaussian', tc=120.0, dev=10.0, cf= 0.002, id=3)
+
     # Pulse ids out of order but that doesn't matter as long as all IDs from 1 to num of pulses are represented
     pulses = (pulse_a, pulse_c, pulse_b)
 
     field = ElectricField(pulses)
 
-    # Not a lot to test here
+    # Testing basic attributes
     assert len(field.pulses) == 3
     assert isinstance(field.pulses[0], EmPulse)
     assert isinstance(field.pulses[1], EmPulse)
     assert isinstance(field.pulses[2], EmPulse)
+    assert field.impulsive_field
+    assert not(field.cw_field)
 
     # Identifiers in sequence but don't start at 1
     with pytest.raises(ValueError):
@@ -310,6 +319,22 @@ def test_electric_field():
         pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=0)
         pulses_bogus = (pulse_a, pulse_b, pulse_d)
         field_bogus = ElectricField(pulses_bogus)
+
+    # Testing if continuous-wave field is recognized as such
+    pulses_cw = (pulse_cw_a, pulse_cw_b, pulse_cw_c)
+    field_cw = ElectricField(pulses_cw)
+    assert field_cw.cw_field
+
+    # Mixes of impulsive, continuous and neither-type fields, should flag field as neither cw nor impulsive
+    pulses_mix_1 = (pulse_cw_a, pulse_cw_b, pulse_c)
+    field_mix_1 = ElectricField(pulses_mix_1)
+    assert not(field_mix_1.cw_field)
+    assert not(field_mix_1.impulsive_field)
+
+    pulses_mix_2 = (pulse_cw_a, pulse_b, pulse_mix_c)
+    field_mix_2 = ElectricField(pulses_mix_2)
+    assert not(field_mix_2.cw_field)
+    assert not(field_mix_2.impulsive_field)
 
 
 def test_vib_experiment():

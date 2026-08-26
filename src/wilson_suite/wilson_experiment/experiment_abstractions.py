@@ -359,6 +359,17 @@ class ElectricField:
         if not pulse_id_target == []:
             raise AssertionError('Collection of pulse IDs do not correspond to ordinal list')
 
+        if all([i.tendsContinuous() for i in self.pulses]):
+            self.cw_field = True
+        else:
+            self.cw_field = False
+
+        if all([i.tendsImpulsive() for i in self.pulses]):
+            self.impulsive_field = True
+        else:
+            self.impulsive_field = False
+
+
 @dataclass
 class VibExperiment:
     """
@@ -452,6 +463,14 @@ class VibExperiment:
                 k += 1
 
         self.relevant_phasematch = relevant_phasematch
+
+        # Here do:
+        #  - If the experiment is an ideal frequency-domain experiment, then limit pulse scanning
+        #  attributes (scanning time centerpoint and spread parameters is then not meaningful)
+        #  - Construct fields_under_scan attribute
+
+
+
 
         # FIXME: Replace with try...except in case not sufficient data specified
         try:
