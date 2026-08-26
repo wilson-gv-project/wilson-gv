@@ -6,19 +6,24 @@
 5. get DataResults
 
 ---
-terms [props, max_state_lvl]
-
-magn_conds
-pulse_polarization_vector
+terms [props, max_state_lvl] -- from get_fully_enhanced_terms(VibExperiment, ...)
+magn_conds - from VibExperiment
+pulse_polarization_vector -- terms should have that as a parameter???
 gamma
+axis_choice
+
+vib_ana_configs (harm/ahnarm - anharm_inhouse or not)
+
 dyn_range
 spec_window
-vib_ana_configs (harm/ahnarm - anharm_inhouse or not)
-axis_choice
 
 data:
 number of normal modes (total and choices here)
 states and energies (all)
+
+
+get_fully_enhanced_terms(VibExperiment, ...)
+
 
 """
 import copy

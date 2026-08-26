@@ -76,6 +76,125 @@ class EvaluationInputs:
     vib_ana_setup: 'VibAnaSetup'
     pulse_polarization_vector: tuple[float, float, float]
 
+"""
+terms [props, max_state_lvl] -- from get_fully_enhanced_terms(VibExperiment, ...)
+magn_conds - from VibExperiment
+pulse_polarization_vector -- terms should have that as a parameter???
+gamma
+axis_choice
+
+vib_ana_configs (harm/ahnarm - anharm_inhouse or not)
+
+dyn_range --- render config
+spec_window
+
+data:
+number of normal modes (total and choices here)
+states and energies (all)
+
+"""
+@dataclass(frozen=True)
+class DerivedTerms:
+    """Expressions and the conditions they were derived under. Experiment coordinates."""
+    terms: dict[int, dict[tuple, VibPerturbedTerm]]
+    magn_conds: MagnConditions | None
+    available_axes: tuple[SpectralAxisSet, ...]
+
+    def in_axes(self, axis_choice: SpectralAxisSet) -> 'TermsInAxes':
+        if axis_choice not in self.available_axes:
+            raise ValueError(f"{axis_choice} not available for these terms")
+        return TermsInAxes(
+            axis_choice=axis_choice,
+            terms=translate_terms_to_axis_variables(self.terms, axis_choice),
+            magn_conds=(None if self.magn_conds is None else
+                        translate_magn_conditions_to_axisvars(self.magn_conds, axis_choice)),
+        )
+
+
+@dataclass(frozen=True)
+class TermsInAxes:
+    """Everything in axis variables. Ready to evaluate."""
+    axis_choice: SpectralAxisSet
+    terms: dict[int, dict[tuple, VibPerturbedTerm]]
+    magn_conds: MagnConditions | None
+
+    def need_what(self) -> set[str]: ...
+
+
+@dataclass(frozen=True)
+class RspFunEvalSetup:
+    terms: TermsInAxes # attributes: magn_conds, axis_choices(all possible), axes
+    # methods: input_vars -- what data is needed for evaluation (states vib ene, max_state_lvs, axis_choice, gamma, pulse_polarization_vector)
+    # this defines experiment represented
+    # here should be with axis_choice
+    # terms post axis selection
+
+    # how to eval
+    gamma_cm1: float
+    polarization: np.ndarray
+    grid: SpectralGrid
+    vib_ana: VibAnaConfig
+    calc_config: DataOriginInfo
+    mask_forbidden_region: bool = False
+
+    @property
+    def gamma_au(self) -> float:
+        return convNu2Ene(self.gamma_cm1)
+    
+    @property
+    def axis_choice(self):
+        return self.terms.axis_choice
+
+    @property
+    def magn_conds(self):
+        return self.terms.magn_conds
+
+    def __post_init__(self):
+        if self.mask_forbidden_region and self.terms.magn_conds is None:
+            raise ValueError("mask_forbidden_region set but terms carry no magn_conds")
+
+    def make_datarequest(self) -> dict[str, DataOriginInfo]:
+        return {name: self.calc_config for name in self.terms.need_what()}
+
+@dataclass
+class DataForRspFunEval:
+
+    gamma_cm1: float
+    polarization: np.ndarray
+    grid: SpectralGrid
+    mol_props: list
+    vib_anharm_states: None
+    eigenvals: None
+    eigenvecs: None
+
+    @classmethod
+    def from_rspfuneval_setup(cls, rspfuneval_setup: RspFunEvalSetup):
+        return cls(gamma_cm1=rspfuneval_setup.gamma_cm1,
+                   polarization=rspfuneval_setup.polarization, 
+                   grid=rspfuneval_setup.grid)
+
+def stage_prep_data():
+    vibdiff_cache = VibDiffCache()
+    vib_data = VibStatesData(allstates=tuple(self.setup_inputs.vib_ana.states), 
+                                harmonic_osc_states_labels=self.setup_inputs.vib_ana.include_list,
+                                number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes)
+    data_configs = EvaluationDataAndConfigs(props_data=self.setup_inputs.prop_order.props_coll,
+                                                vibstates_data=self.artifacts.vib_data,
+                                                number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes,
+                                                nm_inds_choices=self.setup_inputs.vib_ana.include_list,
+                                                pulse_polarization_vector=self.setup_inputs.experiment.polarization_avg_vector,
+                                                nc_sqrt_eigval=self.setup_inputs.vib_ana.nc_sqrt_eigval)
+
+def stage_process_resonances(terms_flat, vib_data, vibdiffs) -> tuple[dict, dict]: ...
+def stage_term_coefficients(terms_flat, motif_locs, data_configs, precalc) -> dict: ...
+def stage_evaluate_regions(regions, vib_data, vibdiffs, gamma_au, pool) -> dict: ...
+
+class Pipeline:
+    STAGES = [...]  # ordered list of (name, callable, input_names, output_names)
+
+    def run(self, setup, data, *, upto=None, resume_from=None): ...
+
+
 @dataclass(frozen=True)
 class EvaluationInputsExtended:
     """
