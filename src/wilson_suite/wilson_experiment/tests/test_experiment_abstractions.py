@@ -55,12 +55,19 @@ def test_scan_object():
     assert obj_a.subcategory == 'cf'
     assert obj_a.id == 1
     assert obj_a.coeff == 2.0
+    assert obj_a.scan_affects == 'integration'
 
     # Referring to the detection range of the detector, testing that optional parameters not included
     # have default values
     obj_b = ScanObject('detector', 'detection_range')
     assert obj_b.id == 0
     assert obj_b.coeff == 1.0
+    assert obj_b.scan_affects == 'integration'
+
+    # Scan over polarization, to test if scan here is classified as affecting 'response'
+    obj_c = ScanObject('pulse', 'pol', id=1, coeff=1.0)
+    assert obj_c.scan_affects == 'response'
+
 
     # Unrecognized scan category
     with pytest.raises(ValueError):

@@ -86,12 +86,31 @@ class ScanObject:
         # indicate actual support for a specific scan.
 
         valid_scan_objs = ['pulse', 'detector']
-        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
+        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev', 'pol'], 'detector': ['detection_range']}
 
         if not self.category in valid_scan_objs:
             raise ValueError('Scan category not supported')
         if not self.subcategory in valid_scan_attributes[self.category]:
             raise ValueError('Scan subcategory not supported')
+
+        # Classify if the scan affects only the pulse integration (convolution)
+        # (e.g. is invariant over the response function), affects only the response function (is invariant over
+        # the pulse integration), or affects both
+
+        self.scan_affects = None
+
+        if self.category == 'pulse':
+            if self.subcategory in ['cf', 'tc', 'dev']:
+                self.scan_affects = 'integration'
+            elif self.subcategory in ['pol']:
+                self.scan_affects = 'response'
+
+        elif self.category == 'detector':
+            if self.subcategory in ['detection_range']:
+                self.scan_affects = 'integration'
+
+        if self.scan_affects == None:
+            raise ValueError('Scan subcategory domain of effect is indeterminate')
 
 
 @dataclass
@@ -103,6 +122,12 @@ class SpecScan:
 
     range: Iterable over which scan objects are varied (scaled by their multipliers as represented by
     their 'coeff' attributes)
+
+    TODO: Support scanning concurrently over several attributes: Either extend this in ScanObject or
+     here in SpecScan specify dependencies between singleton scan objects
+
+    TODO: Support several ranges and link each to a scan object for situations where attributes to be scanned
+     simultaneously don't live in the same space (e.g. polarization (vector) and carrier frequency (scalar))
     """
 
     scan_objs: tuple[ScanObject]
