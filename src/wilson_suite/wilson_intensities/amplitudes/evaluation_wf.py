@@ -39,20 +39,6 @@ from contextlib import contextmanager
 import logging
 logger = logging.getLogger("wilson")
 
-
-class WorkflowError(Exception):
-    """Base class for workflow errors."""
-    pass
-class InputValidationError(WorkflowError):
-    """Raised when input validation fails."""
-    pass
-class StepExecutionError(WorkflowError):
-    """Raised when a specific step fails."""
-    def __init__(self, step_name, original_exception):
-        super().__init__(f"Step '{step_name}' failed: {original_exception}")
-        self.step_name = step_name
-        self.original_exception = original_exception
-
 @dataclass
 class EvaluationContext:
     """
