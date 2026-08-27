@@ -174,7 +174,9 @@ class EvalData:
     eigenvals: np.ndarray
     eigenvecs: np.ndarray
 
-
+def stage_prep_terms(terms):
+    terms = prepTermsForEval(terms)
+    return terms
 
 def stage_prep_data(eval_data: EvalData, rsp_eval_setup: RspFunEvalSetup, include_states_list):
     vibdiff_cache = VibDiffCache()
@@ -287,7 +289,12 @@ def stage_place_results(grid_manager, regions_results):
 
 
 class Pipeline:
-    STAGES = [...]  # ordered list of (name, callable, input_names, output_names)
+    STAGES = [stage_prep_terms, stage_prep_data, 
+              stage_process_resonances,
+              stage_precalculations, stage_term_coefficients, 
+              stage_get_allfeats,
+              stage_evaluate_regions, stage_dress_with_featboxes, 
+              stage_filter_magn_conds]
 
     def run(self, setup, data, *, upto=None, resume_from=None): ...
 
