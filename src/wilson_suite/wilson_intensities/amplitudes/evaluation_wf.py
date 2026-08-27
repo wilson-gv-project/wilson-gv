@@ -29,6 +29,10 @@ from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_terms
 from wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff import (precalculate_unique_coeff_parts, 
                                                                              identify_precalc_unique_coeff_parts)
 from wilson_suite.wilson_intensities.amplitudes.evaluators import get_features_to_draw
+from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars, translate_terms_to_axis_variables
+from wilson_suite.wilson_main.abstractions import DataOriginInfo
+from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolPropsCollection
 
 from contextlib import contextmanager
 
@@ -93,11 +97,16 @@ number of normal modes (total and choices here)
 states and energies (all)
 
 """
+
+# -w1 + w2 is always significantly > 0 ==> magn_conditions=((-1, 2),)
+MagnConditions = tuple[tuple[int]]
+
 @dataclass(frozen=True)
 class DerivedTerms:
     """Expressions and the conditions they were derived under. Experiment coordinates."""
     terms: dict[int, dict[tuple, VibPerturbedTerm]]
     magn_conds: MagnConditions | None
+    # because this may be derived with more info than just the terms
     available_axes: tuple[SpectralAxisSet, ...]
 
     def in_axes(self, axis_choice: SpectralAxisSet) -> 'TermsInAxes':
@@ -167,22 +176,115 @@ class EvalData:
 
 
 
-def stage_prep_data(eval_data: EvalData, include_states_list ):
+def stage_prep_data(eval_data: EvalData, rsp_eval_setup: RspFunEvalSetup, include_states_list):
     vibdiff_cache = VibDiffCache()
+
+    number_of_nmodes = len(eval_data.eigenvals)
     vib_data = VibStatesData(allstates=tuple(eval_data.states), 
                              harmonic_osc_states_labels=include_states_list,
-                             number_of_nmodes=len(eval_data.eigenvals))
+                             number_of_nmodes=number_of_nmodes)
     
-    data_configs = EvaluationDataAndConfigs(props_data=self.setup_inputs.prop_order.props_coll,
-                                            vibstates_data=self.artifacts.vib_data,
-                                            number_of_nmodes=self.setup_inputs.vib_ana.number_of_modes,
-                                            nm_inds_choices=self.setup_inputs.vib_ana.include_list,
-                                            pulse_polarization_vector=self.setup_inputs.experiment.polarization_avg_vector,
-                                            nc_sqrt_eigval=self.setup_inputs.vib_ana.nc_sqrt_eigval)
+    data_configs = EvaluationDataAndConfigs(props_data=eval_data.mol_props,
+                                            vibstates_data=vib_data,
+                                            number_of_nmodes=number_of_nmodes,
+                                            nm_inds_choices=include_states_list,
+                                            pulse_polarization_vector=rsp_eval_setup.polarization,
+                                            nc_sqrt_eigval=eval_data.eigenvals)
 
-def stage_process_resonances(terms_flat, vib_data, vibdiffs) -> tuple[dict, dict]: ...
-def stage_term_coefficients(terms_flat, motif_locs, data_configs, precalc) -> dict: ...
-def stage_evaluate_regions(regions, vib_data, vibdiffs, gamma_au, pool) -> dict: ...
+    return vibdiff_cache, vib_data, data_configs
+
+def stage_process_resonances(terms_flat, vib_data, vibdiffs) -> tuple[dict, dict]:
+    motif_locs, terms_for_motifs = process_resonance_motifs(terms_flat, vib_data, vibdiffs)
+
+    return motif_locs, terms_for_motifs
+
+
+def stage_precalculations(terms_flat, data_configs):
+    need_precalc = identify_precalc_unique_coeff_parts(terms=terms_flat)
+    precalculated = precalculate_unique_coeff_parts(
+        need_to_precalc=need_precalc, data_and_configs=data_configs)
+    return precalculated
+
+
+def stage_term_coefficients(terms_flat, motif_locs, data_configs, precalc) -> dict:
+
+    return evaluate_terms_coeffs(terms_flat, motif_locs, data_configs, precalc)
+
+
+def stage_get_allfeats(motif_locs, terms_for_motifs, coefficients, gamma):
+    """
+    gamma = rsp_eval_setup.gamma_cm1
+    """
+    # lineshape_parameter here is goint to be a single float now and be the same(uniform) for all features
+    features, zero_feats = get_features_to_draw(motif_res_loc=motif_locs, 
+                                                terms_for_motifs=terms_for_motifs,
+                                                term_coeffs_per_index=coefficients,
+                                                lineshape_parameter=gamma)
+
+    return features, zero_feats
+
+def stage_evaluate_regions(regions, vib_data, vibdiffs, gamma_au, pool) -> dict:
+    return
+
+def stage_dress_with_featboxes(features, dyn_range):
+    """
+    box_range_safety_margin, scale_wrt_max_intensity, minimum_box_padding
+
+    """
+
+    max_intensity_in_window = SpectralFeature.get_max_intensity_feat(features).get_intensity()
+    min_intensity_in_window = max_intensity_in_window / dyn_range
+
+    features = SpectralFeature.dress_these_with_boxes(features,
+                                                      max_intensity_in_window, 
+                                                      min_intensity_in_window,
+                                                      box_range_safety_margin=box_range_safety_margin,
+                                                      scale_wrt_max_intensity=scale_wrt_max_intensity,
+                                                      minimum_box_padding=minimum_box_padding,
+                                                                        )
+
+    return features
+
+def stage_filter_magn_conds(features, rsp_eval_setup):
+    features = SpectralFeature.apply_magn_cond_filter(features,
+                                                      magn_conditions=rsp_eval_setup.terms.magn_conds,
+                                                      magn_conditions_margin=magn_conditions_margin)
+
+    return features
+
+def stage_place_in_specwindow(features, spec_window):
+    spec_window = SpectralFeature.filter_to_spec_window(features, spec_window)
+    if not spec_window.full_features:
+        raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
+
+    return spec_window
+
+
+def stage_make_grid_manager(spec_window):
+    grid_manager = GridManager(spec_window)
+    grid_manager.make_fullgrid(grid_resolution)
+
+    return grid_manager
+
+
+def stage_make_regions(grid_manager):
+    regions = grid_manager.create_regions()
+    if not regions:
+        raise ValueError("No regions were created")
+
+    return regions
+
+def stage_regions_results():
+
+    regions_results = evaluate_regions(regions, vib_data, vibdiff_cache, gmma, verbose)
+
+    return regions_results
+
+def stage_place_results(grid_manager, regions_results):
+    grid_manager.place_results_into_grid(regions_results)
+
+    return grid_manager.full_grid
+
 
 class Pipeline:
     STAGES = [...]  # ordered list of (name, callable, input_names, output_names)
