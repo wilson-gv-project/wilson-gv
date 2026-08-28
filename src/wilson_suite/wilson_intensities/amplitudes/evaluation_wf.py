@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
     from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
     from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, ResLocGeoObject
-    from wilson_suite.wilson_derive.abstractions import VibPerturbedTerm
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 
 from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
 from wilson_suite.wilson_intensities.amplitudes.term_parts import PrecalculatedData, VibStatesData
@@ -211,8 +211,6 @@ def stage_get_allfeats(motif_locs, terms_for_motifs, coefficients, gamma):
 
     return features, zero_feats
 
-def stage_evaluate_regions(regions, vib_data, vibdiffs, gamma_au, pool) -> dict:
-    return
 
 def stage_dress_with_featboxes(features, dyn_range):
     """
@@ -262,9 +260,9 @@ def stage_make_regions(grid_manager):
 
     return regions
 
-def stage_regions_results():
+def stage_regions_results(regions, vib_data, vibdiffs):
 
-    regions_results = evaluate_regions(regions, vib_data, vibdiff_cache, gmma, verbose)
+    regions_results = evaluate_regions(regions, vib_data, vibdiffs, gamma)
 
     return regions_results
 
@@ -279,8 +277,13 @@ class Pipeline:
               stage_process_resonances,
               stage_precalculations, stage_term_coefficients, 
               stage_get_allfeats,
-              stage_evaluate_regions, stage_dress_with_featboxes, 
-              stage_filter_magn_conds]
+              stage_dress_with_featboxes, 
+              # stage_filter_magn_conds,
+              stage_place_in_specwindow,
+              stage_make_grid_manager,
+              stage_make_regions,
+              stage_regions_results,
+              stage_place_results]
 
     def run(self, setup, data, *, upto=None, resume_from=None): ...
 
@@ -626,7 +629,7 @@ class EvaluationWorkflow:
                                                                                                             self.artifacts.vibdiff_cache)
             with self.step("term_coefficients"):
                 self.artifacts.need_precalc = identify_precalc_unique_coeff_parts(terms=self.artifacts.terms)
-                self.artifacts.precalculated = precalculate_unique_coeff_parts(
+                self.artif8u7acts.precalculated = precalculate_unique_coeff_parts(
                     need_to_precalc=self.artifacts.need_precalc, data_and_configs=self.artifacts.data_configs)
                 self.artifacts.coefficients = evaluate_terms_coeffs(self.artifacts.terms,
                                                                        self.artifacts.motif_locs,
@@ -972,40 +975,30 @@ class EvaluationWorkflow_NEW:
 def evaluate_regions(regions: list["GridRegion"], 
                      vib_data: "VibStatesData", 
                      vibdiff_cache: "VibDiffCache", 
-                     gamma: float,
-                     verbose: bool):
+                     gamma: float):
 
     # Step 2: Evaluate each region
     region_results = {}
     for region in regions:
-        if verbose:
-            logger.info(f"\nEvaluating region with {len(region.features)} features")
         
-        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, gamma, verbose)
+        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, gamma)
         
-        if verbose:
-            intensity = region_results[region]
-            logger.info(f"  Region shape: {intensity.shape}")
-            logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
+
     return region_results
 
 def evaluate_region(region: "GridRegion",
                     vib_data: "VibStatesData", 
                     vibdiff_cache: "VibDiffCache", 
-                    gamma: float,
-                    verbose: bool = False) -> np.ndarray:
+                    gamma: float) -> np.ndarray:
     """Evaluate all features in a single grid region."""
     # Initialize result array
     target_shape = np.broadcast(*(arr for arr in region.coords.values())).shape
-    # result = np.zeros_like(next(iter(region.coords.values())), dtype=complex)
     result = np.zeros(target_shape, dtype=complex)
     
     # Sum contributions from all features
     for feature in region.features:
-        if verbose:
-            logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
         
-        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords_au, verbose)
+        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords_au)
         
     return result
 
@@ -1013,20 +1006,14 @@ def evaluate_feature(feature: 'SpectralFeature',
                      vib_data: "VibStatesData", 
                      vibdiff_cache: "VibDiffCache", 
                      gamma: float,
-                     coords: dict[str, np.ndarray],
-                     verbose: bool = False) -> np.ndarray:
+                     coords: dict[str, np.ndarray]) -> np.ndarray:
     """Evaluate a single feature on grid coordinates."""
     # Compile feature to numerical form
     from .numerical_abstractions import compile_feature
     compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
-
-    
-    if verbose:
-        logger.info(f"    Compiled into {len(compiled_groups)} term groups")
     
     # Sum all compiled groups
     target_shape = np.broadcast(*(arr for arr in coords.values())).shape
-    # feature_sum = np.zeros_like(next(iter(coords.values())), dtype=complex)
     feature_sum = np.zeros(target_shape, dtype=complex)
 
     
@@ -1052,7 +1039,6 @@ def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
     """
     target_shape = np.broadcast(*(arr for arr in coords.values())).shape
     total = np.ones(target_shape, dtype=complex)
-    # total = np.ones_like(next(iter(coords.values())), dtype=complex)
     
     for res_cond in motif.res_conds:
         # Calculate photon frequency: sum over axes
@@ -1060,7 +1046,6 @@ def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
                     for ax in res_cond.pf_dict)
         # Resonance denominator
         z = res_cond.vib_energy_diff - pfreq - 1j * gamma
-        # print(z)
         total *= 1.0 / z
         
     return total
