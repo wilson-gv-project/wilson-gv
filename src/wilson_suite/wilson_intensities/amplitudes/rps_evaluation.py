@@ -6,6 +6,15 @@ from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_main.abstractions import DataOriginInfo, MolecularSystem
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
+from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
+
+
+from wilson_suite.wilson_intensities.amplitudes.vibene_differences import VibDiffCache
+from wilson_suite.wilson_intensities.amplitudes.term_parts import EvaluationDataAndConfigs
+from wilson_suite.wilson_intensities.amplitudes.term_parts import VibStatesData
+from wilson_suite.wilson_intensities.amplitudes.evaluators import process_resonance_motifs, evaluate_terms_coeffs, get_features_to_draw
+from wilson_suite.wilson_intensities.amplitudes.full_amplitude_coeff import (precalculate_unique_coeff_parts, 
+                                                                             identify_precalc_unique_coeff_parts)
 
 # -w1 + w2 is always significantly > 0 ==> magn_conditions=((-1, 2),)
 MagnConditions = tuple[tuple[int]]
@@ -74,17 +83,30 @@ class RspFunEvalSetup:
 
 
 def compute_features(setup: RspFunEvalSetup, data: MolSystemData) -> list[SpectralFeature]:
+    """
+    1. terms for eval
+    2. data for eval
+    3. res motifs - finding locations
+    4. precalculate parts for term coeffs
+    5. coeffs
+    6. features from locs and coeffs
+    """
     terms = _prep_terms(setup.terms)
-    vib_data, configs = _prep_data(data, setup.polarization)
-    vibdiffs = _precompute_vibdiffs(terms, vib_data)
-    motif_locs, terms_for_motifs = _process_resonances(terms, vib_data, vibdiffs)
+    vibdiffs, vib_data, configs = _prep_data(data, setup.polarization)
+    motif_locs, terms_for_motifs = process_resonance_motifs(terms, vib_data, vibdiffs)
+
     precalc = _precalculate(terms, configs)
-    coeffs = _term_coefficients(terms, motif_locs, configs, precalc)
-    features, _zero = _get_features(motif_locs, terms_for_motifs, coeffs, setup.gamma_cm1)
+    coeffs = evaluate_terms_coeffs(terms, motif_locs, configs, precalc)
+    features, _zero = get_features_to_draw(motif_locs, terms_for_motifs,
+                                           coeffs, setup.gamma_cm1)
     return features
 
 
 def render_grid(features, setup: RspFunEvalSetup, executor=None) -> EvaluatedResult:
+    """
+    1. 
+    2. 
+    """
     features = _dress_with_boxes(features, setup.boxes)
     if setup.mask_forbidden_region:
         features = _filter_magn_conds(features, setup.magn_conds, setup.magn_conds_margin)
@@ -104,7 +126,7 @@ def _prep_terms(terms: dict | list) -> list:
     if isinstance(terms, type([])):
         for t in terms:
             if not isinstance(t, VibPerturbedTerm):
-                raise ValueError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
+                raise TypeError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
         return terms
 
     if isinstance(terms, type({})):
@@ -119,7 +141,7 @@ def _prep_terms(terms: dict | list) -> list:
                 return terms_as_list
             else:
                 if not isinstance(terms[t_key], VibPerturbedTerm):
-                    raise ValueError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
+                    raise TypeError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
                 return list(terms.values())
 
 def _prep_data(eval_data: MolSystemData, rsp_eval_setup: RspFunEvalSetup, include_states_list):
@@ -138,6 +160,12 @@ def _prep_data(eval_data: MolSystemData, rsp_eval_setup: RspFunEvalSetup, includ
                                             nc_sqrt_eigval=eval_data.eigenvals)
 
     return vibdiff_cache, vib_data, data_configs
+
+def _precalculate(terms, configs):
+    need_precalc = identify_precalc_unique_coeff_parts(terms=terms)
+    precalculated = precalculate_unique_coeff_parts(need_to_precalc=need_precalc, 
+                                                    data_and_configs=configs)
+    return precalculated
 
 #--------------------------
 def _dress_with_boxes(features, dyn_range):
