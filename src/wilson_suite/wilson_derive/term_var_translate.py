@@ -151,7 +151,9 @@ def translate_terms_to_axis_variables(terms: dict[int, dict[tuple, VibPerturbedT
 
     return translated_terms
 
-def translate_magn_conditions_to_axisvars(magn_conditions: tuple[tuple], axis_choice: SpectralAxisSet):
+MagnConditions = tuple[tuple[int]]
+
+def translate_magn_conditions_to_axisvars(magn_conditions: MagnConditions, axis_choice: SpectralAxisSet):
     """
     magn_conditions attribute of VibExperiment object is given in terms of signed pulse references.
 

@@ -51,7 +51,7 @@ class EvaluationContext:
     timing: dict[str, float] = field(default_factory=dict)
 
     # name of the step currently executing / last failed
-    failed_at: str = None
+    failed_at: str | None = None
 
     # optional: step name -> arbitrary object
     intermediates: dict[str, Any] = field(default_factory=dict)
@@ -241,12 +241,13 @@ def stage_filter_magn_conds(features, rsp_eval_setup):
 def stage_place_in_specwindow(features, spec_window):
     spec_window = SpectralFeature.filter_to_spec_window(features, spec_window)
     if not spec_window.full_features:
-        raise ValueError("This SpectralWindow does not contain any features. Change the bounds of the window or use different terms.")
+        raise ValueError("This SpectralWindow does not contain any features. " \
+        "Change the bounds of the window or use different terms.")
 
     return spec_window
 
 
-def stage_make_grid_manager(spec_window):
+def stage_make_grid_manager(spec_window, grid_resolution):
     grid_manager = GridManager(spec_window)
     grid_manager.make_fullgrid(grid_resolution)
 

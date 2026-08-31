@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
+from typing import Any
 import numpy as np
 
 from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_main.abstractions import DataOriginInfo, MolecularSystem
+from wilson_suite.wilson_main.abstractions import DataOriginInfo, MolPropsCollection
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralFeature
@@ -32,16 +33,16 @@ class TermsInAxes:
 class MolSystemData:
     """Everything obtained externally. No configuration."""
     name: str
-    natoms: int = None
+    natoms: int | None = None
     geo: Any = None
     geo_extra: Any = None
     linear: bool = False
     conformer: str = 'conf1'
 
-    mol_props: MolPropsCollection
-    states: tuple
-    eigenvals: np.ndarray
-    eigenvecs: np.ndarray
+    mol_props: MolPropsCollection | None = None
+    states: tuple | None = None
+    eigenvals: np.ndarray | None = None
+    eigenvecs: np.ndarray | None = None
 
 
 
@@ -92,7 +93,7 @@ def compute_features(setup: RspFunEvalSetup, data: MolSystemData) -> list[Spectr
     6. features from locs and coeffs
     """
     terms = _prep_terms(setup.terms)
-    vibdiffs, vib_data, configs = _prep_data(data, setup.polarization)
+    vibdiffs, vib_data, configs = _prep_data(data, setup)
     motif_locs, terms_for_motifs = process_resonance_motifs(terms, vib_data, vibdiffs)
 
     precalc = _precalculate(terms, configs)
