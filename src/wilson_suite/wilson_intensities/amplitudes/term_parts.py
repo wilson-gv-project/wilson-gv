@@ -416,8 +416,8 @@ class TermParametersChoice:
     in compile_feature() 
     """
     res_motif: "ResonanceMotif"
-    states_parameters: Tuple["ParameterSet"]
-    term_ids: Tuple[int] = field(default_factory=tuple)
+    states_parameters: Tuple["ParameterSet", ...]
+    term_ids: tuple[int|str, ...] = field(default_factory=tuple)
 
     def sort_parameters(self) -> "TermParametersChoice":
         """
