@@ -38,8 +38,7 @@ class PropsCollection:
         self.props = tuple(self.props)
 
     def __iter__(self):
-        for prop in self.props:
-            yield prop
+        yield from self.props
 
     def __hash__(self):
         # return hash(tuple([tuple(self.get_cart_axes()), self.get_total_difforder()]))
