@@ -10,6 +10,7 @@ rsp_evaluator
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition, HarmOscStateSymbolic, PolProp, VibDiffTerm
 
@@ -26,7 +27,7 @@ class PropsCollection:
         get_mode_indices
         get_total_difforder
     """
-    props: list[PolProp]
+    props: Sequence[PolProp]
 
     def __post_init__(self):
         self.props = tuple(self.props)
@@ -36,7 +37,7 @@ class PropsCollection:
 
     def __hash__(self):
         # return hash(tuple([tuple(self.get_cart_axes()), self.get_total_difforder()]))
-        return hash(tuple([tuple(self.get_cart_axes()), tuple(self.get_mode_indices())]))
+        return hash( (self.get_cart_axes(), self.get_mode_indices()) )
     
     def __eq__(self, other):
         """
@@ -54,10 +55,10 @@ class PropsCollection:
         return PropsCollection(props=[p for p in self.props if not p.ops])
     
     def get_cart_axes(self):
-        return [op.o for p in self.props for op in p.ops]
+        return tuple(op.o for p in self.props for op in p.ops)
     def get_mode_indices(self):
         groups = [p.inds if p.inds is not None else [] for p in self.props]
-        return [idx for p_inds in groups for idx in p_inds]
+        return tuple(idx for p_inds in groups for idx in p_inds)
     
     # UNUSED
     def get_mode_indices_grouped(self):
