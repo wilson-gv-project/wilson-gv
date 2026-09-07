@@ -78,12 +78,12 @@ field = wexp.ElectricField(pulses=(pulse_ir_1, pulse_ir_2, pulse_uvvis_1))
 # Set the detector to detect vertically polarized light with the wavevector -k1 + k2 + k3
 detector = wexp.SpecDetector(
     detection_method='freq',
-    wv_filter=[{1: -1, 2: 1, 3: 1}],
+    phasematch_filter=[{1: -1, 2: 1, 3: 1}],
     detection_polarization=(1.0, 0.0, 0.0),
 )
 
 # Create the experiment instance
-experiment = wexp.VibExperiment(field=field, detector=detector, scans=(), magn_conditions=((-1, 2),),)
+experiment = wexp.VibExperiment(field=field, detector=detector, scans=(), magn_conditions=((-1, 2),), )
 
 # Derive the relevant contributing terms, here return data as "flat" list for ease of inspection
 evv_terms = derived_terms_flat(get_fully_enhanced_terms(experiment), tolistonly=True)

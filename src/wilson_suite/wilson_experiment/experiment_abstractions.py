@@ -17,8 +17,10 @@ class SpecDetector:
     If detection_method is "integrated", then the detection data is a scalar
     Currently, only "freq" (frequency-range) detection is supported.
 
-    detector_location: List of floats: Unit vector describing the direction in which the detector is facing.
-    Default: [0.0, 0.0, 1.0]. Currently only used for defining polarization filtering.
+    detector_location: List of floats: Taking the system to be positioned at the origin,
+    this parameter is the (unit) vector describing the direction along which the detector is located (i.e., the
+    detector is located along this vector from the system and facing the opposite direction).
+    Default: [0.0, 0.0, 1.0].
 
     detection_polarization: List of floats: Detect only light with this specific polarization vector. Default:
     [1.0, 0.0, 0.0].
@@ -26,8 +28,8 @@ class SpecDetector:
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
 
-    wv_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
-    phase-matching direction(s)
+    phasematch_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
+    phase-matching condition(s)
 
     ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
     Currently not used.
@@ -40,7 +42,7 @@ class SpecDetector:
     
     # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
     detection_range: Optional[list[float]] = None
-    wv_filter: Optional[list[dict]] = None
+    phasematch_filter: Optional[list[dict]] = None
     ignore_collinear: bool = True
 
     overall_phase: complex = 1.0 + 0.0j
@@ -55,6 +57,12 @@ class SpecDetector:
         # Will currently not be reach because of restriction to zero shift, but will be relevant when that is lifted
         if not(abs(self.overall_phase) - 1.0 < 1e-10):
             raise ValueError('Detector overall phase must be of unit length')
+
+        if self.phasematch_filter is not None:
+            raise NotImplementedError('Non-specification of wavevector/phase')
+
+        if not(self.ignore_collinear):
+            raise NotImplementedError('Non-ignorance of effects collinear to specified condition(s) is currently not implemented')
 
 @dataclass
 class ScanObject:
@@ -174,6 +182,9 @@ class EmPulse:
 
     id: integer: Pulse ID label
     """
+
+    # TODO: rm cf_uv attribute and usage, alt. keep as optional for possible wilson-derive use?
+
     env: str
     
     tc: float = None
@@ -286,6 +297,12 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
+def make_gaussian_product_pulse(p1, p2):
+
+    if not(p1.env == 'gaussian' and p2.env == 'gaussian'):
+        raise AttributeError('Both pulses combining to form a Gaussian product pulse must themselves be Gaussian')
+
+    return EmPulse()
 
 # FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
 def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
@@ -432,7 +449,7 @@ class VibExperiment:
         relevant_phasematch = []
 
         # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
-        if self.detector.wv_filter is None:
+        if self.detector.phasematch_filter is None:
 
             from itertools import product as iter_prod
             k = 0
@@ -452,17 +469,29 @@ class VibExperiment:
 
             k = 0
 
-            for i in range(len(self.detector.wv_filter)):
+            for i in range(len(self.detector.phasematch_filter)):
 
                 new_phasematch = []
 
-                for j in self.detector.wv_filter[i]:
-                    new_phasematch.append(j * self.detector.wv_filter[i][j])
+                for j in self.detector.phasematch_filter[i]:
+                    new_phasematch.append(j * self.detector.phasematch_filter[i][j])
 
                 relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
                 k += 1
 
         self.relevant_phasematch = relevant_phasematch
+
+        # Do first:
+        # - For (and indexed by) relevant phase-matching conditions (as determined above):
+        #   -  Generate a new field with the appropriate pulses (and possibly resultant wavevector)
+        #       - Will need to lift pos. carrier freq condition on pulse for this
+        # - For all lower- or same-order phase-matching conditions:
+        #   - At least determine resultant wavevectors and determine if they are parallel to any of those of the
+        #     relevant phase-matching conditions
+        #   - (FOR LATER) Generate the corresponding fields/scans
+        #   - For now, only warn if other cascading (collinear) effects may intrude on the signal if ignore_collinear is not set to True
+
+
 
         # Here do:
         #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
@@ -632,16 +661,16 @@ class VibExperiment:
 
 
 
-        if self.detector.wv_filter is None:
+        if self.detector.phasematch_filter is None:
             raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')
 
-        if len(self.detector.wv_filter) > 1:
+        if len(self.detector.phasematch_filter) > 1:
             raise AssertionError('Interaction sequence determination currently not supported for more than one phase-matching direction')
 
         int_sequences = []
         int_seed = []
 
-        for i in self.detector.wv_filter:
+        for i in self.detector.phasematch_filter:
 
             interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
 

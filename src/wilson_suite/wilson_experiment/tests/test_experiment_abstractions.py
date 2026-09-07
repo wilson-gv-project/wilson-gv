@@ -17,18 +17,18 @@ def test_spec_detector():
     #   - "Wavevector filter" (for selecting phase-matching conditions) here -k1 + k2 +k3
 
     detector_a = SpecDetector(detection_method='freq',
-                             detector_location=(0.0, 0.0, 1.0),
-                             detection_polarization=(1.0, 0.0, 0.0),
-                             detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                             wv_filter=[{1: -1, 2: 1, 3: 1}])
+                              detector_location=(0.0, 0.0, 1.0),
+                              detection_polarization=(1.0, 0.0, 0.0),
+                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              phasematch_filter=[{1: -1, 2: 1, 3: 1}])
 
     assert detector_a.detection_method == 'freq'
     assert detector_a.detector_location == (0.0, 0.0, 1.0)
     assert detector_a.detection_polarization == (1.0, 0.0, 0.0)
     assert detector_a.detection_range == [0.003 + 0.0001 * i for i in range(101)]
-    assert detector_a.wv_filter[0][1] == -1
-    assert detector_a.wv_filter[0][2] == 1
-    assert detector_a.wv_filter[0][3] == 1
+    assert detector_a.phasematch_filter[0][1] == -1
+    assert detector_a.phasematch_filter[0][2] == 1
+    assert detector_a.phasematch_filter[0][3] == 1
 
     # Asserting default values of optional parameters not included
     assert detector_a.ignore_collinear
@@ -353,10 +353,10 @@ def test_vib_experiment():
     field_a = ElectricField(pulses)
 
     detector_a = SpecDetector(detection_method='freq',
-                                   detector_location=(0.0, 0.0, 1.0),
-                                   detection_polarization=(1.0, 0.0, 0.0),
-                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                   wv_filter=[{1: -1, 2: 1, 3: 1}])
+                              detector_location=(0.0, 0.0, 1.0),
+                              detection_polarization=(1.0, 0.0, 0.0),
+                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              phasematch_filter=[{1: -1, 2: 1, 3: 1}])
 
     # Push one carrier freq
     scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
@@ -459,7 +459,7 @@ def test_vib_experiment():
                                   detector_location=(0.0, 0.0, 1.0),
                                   detection_polarization=(1.0, 0.0, 0.0),
                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                  wv_filter=[{1: -1, 2: 1, 3: 1}, {1: 1, 2: 1, 3: -1}])
+                                  phasematch_filter=[{1: -1, 2: 1, 3: 1}, {1: 1, 2: 1, 3: -1}])
 
         exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
 
@@ -475,10 +475,10 @@ def test_vib_experiment():
     field_a = ElectricField(pulses)
 
     detector_a = SpecDetector(detection_method='freq',
-                                   detector_location=(0.0, 0.0, 1.0),
-                                   detection_polarization=(1.0, 0.0, 0.0),
-                                   detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                   wv_filter=[{1: -1, 2: 1, 3: 1, 4: 1, 5:-1}])
+                              detector_location=(0.0, 0.0, 1.0),
+                              detection_polarization=(1.0, 0.0, 0.0),
+                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              phasematch_filter=[{1: -1, 2: 1, 3: 1, 4: 1, 5:-1}])
 
     # Scan IR pulse 1 carrier freq
     scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)

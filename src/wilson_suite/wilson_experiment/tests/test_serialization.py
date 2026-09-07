@@ -65,13 +65,13 @@ def test_dict_SpecDetector():
     detector_a = we_abst.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
                                               detection_polarization=[0.0, 0.0, 1.0],
                                               detection_range=[0.003 + 0.0001*i for i in range(10)],
-                                              wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
+                                              phasematch_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
     dd = {'detection_method': 'freq', 'detector_location': [0.0, 0.0, 1.0], 'detection_polarization': [0.0, 0.0, 1.0], 
           'detection_range': [0.003, 0.0031, 0.0032, 0.0033, 0.0034000000000000002, 0.0035, 0.0036, 0.0037, 0.0038, 0.0039000000000000003], 
-          'wv_filter': [{1: [-1], 2: [1], 3: [1]}], 'ignore_collinear': True}
+          'phasematch_filter': [{1: [-1], 2: [1], 3: [1]}], 'ignore_collinear': True}
     assert asdict(detector_a) == dd
-    assert asdict(detector_a)['wv_filter'] == [{1: [-1], 2: [1], 3: [1]}]
-    assert asdict(detector_a)['wv_filter'] == detector_a.wv_filter
+    assert asdict(detector_a)['phasematch_filter'] == [{1: [-1], 2: [1], 3: [1]}]
+    assert asdict(detector_a)['phasematch_filter'] == detector_a.phasematch_filter
 
 
 def test_dict_SpecScan():
@@ -97,7 +97,7 @@ def test_dict_VibExperiment():
     detector_a = we_abst.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
                                       detection_polarization=[0.0, 0.0, 1.0],
                                       detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                      wv_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
+                                      phasematch_filter=[{1: [-1], 2: [1], 3: [1]}]) #, {1: [-1], 2: [1], 3: [1]}
 
     # Push one carrier freq
     scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
