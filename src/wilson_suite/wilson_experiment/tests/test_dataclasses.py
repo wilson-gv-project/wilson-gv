@@ -15,7 +15,7 @@ def test_SpecDetector():
     detector_datacls = we_abst_dataclass.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
                                             detection_polarization=[0.0, 0.0, 1.0],
                                             detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                            phasematch_filter=[{1: [-1], 2: [1], 3: [1]}])
+                                            interaction_filter=[{1: [-1], 2: [1], 3: [1]}])
     assert check_if_jsonsafe(asdict(detector_datacls))
 
 def test_SpecScan():
@@ -63,7 +63,7 @@ def test_VibExperiment():
     detector_a_d = we_abst_dataclass.SpecDetector('freq', detector_location=[0.0, 0.0, 1.0],
                                       detection_polarization=[0.0, 0.0, 1.0],
                                       detection_range=[0.003 + 0.0001*i for i in range(101)],
-                                      phasematch_filter=[{1: [-1], 2: [1], 3: [1]}])
+                                      interaction_filter=[{1: [-1], 2: [1], 3: [1]}])
     scan_obj_a_d = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
     scan_range_a_d = [0.0001*i for i in range(101)]
     scan_a_d = we_abst_dataclass.SpecScan(scan_obj_a_d, scan_range_a_d)

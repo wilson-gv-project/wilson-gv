@@ -28,8 +28,11 @@ class SpecDetector:
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
 
-    phasematch_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
-    phase-matching condition(s)
+    interaction_filter: List of interaction patterns as lists: Filter signal to include only this/these
+    (signed) interaction patterns. Note that any ordering here is not taken as a causal interaction order requirement
+    and also note that while this parameter can be thought of as close to a phase-matching filter, it is not exactly the
+    same (VibExperiment setup may further consider other signals in the same phase-matching direction(s) or isolate
+    specific interaction sequences)
 
     ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
     Currently not used.
@@ -42,7 +45,7 @@ class SpecDetector:
     
     # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
     detection_range: Optional[list[float]] = None
-    phasematch_filter: Optional[list[dict]] = None
+    interaction_filter: Optional[list[list]] = None
     ignore_collinear: bool = True
 
     overall_phase: complex = 1.0 + 0.0j
@@ -51,6 +54,13 @@ class SpecDetector:
         if self.detection_method not in {'time', 'freq', 'int'}:
             raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
 
+        if (self.detection_method in {'time', 'freq'}) and self.detection_range is None:
+            raise ValueError("If the detection type is 'time' or 'freq', the detection range must be specified")
+
+        # Derived property: Detection granularity
+        if self.detection_range is not None:
+            self.dlen = len(self.detection_range)
+
         if not self.overall_phase == 1.0 + 0.0j:
             raise ValueError('Detector overall phase currently restricted to zero shift')
 
@@ -58,8 +68,8 @@ class SpecDetector:
         if not(abs(self.overall_phase) - 1.0 < 1e-10):
             raise ValueError('Detector overall phase must be of unit length')
 
-        if self.phasematch_filter is not None:
-            raise NotImplementedError('Non-specification of wavevector/phase')
+        if self.interaction_filter is not None:
+            raise NotImplementedError('Non-specification of detector interaction pattern filter')
 
         if not(self.ignore_collinear):
             raise NotImplementedError('Non-ignorance of effects collinear to specified condition(s) is currently not implemented')
@@ -85,7 +95,6 @@ class ScanObject:
     subcategory: str
     id: int = 0
     coeff: float = 1.0
-
 
     def __post_init__(self):
 
@@ -449,7 +458,7 @@ class VibExperiment:
         relevant_phasematch = []
 
         # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
-        if self.detector.phasematch_filter is None:
+        if self.detector.interaction_filter is None:
 
             from itertools import product as iter_prod
             k = 0
@@ -469,12 +478,12 @@ class VibExperiment:
 
             k = 0
 
-            for i in range(len(self.detector.phasematch_filter)):
+            for i in range(len(self.detector.interaction_filter)):
 
                 new_phasematch = []
 
-                for j in self.detector.phasematch_filter[i]:
-                    new_phasematch.append(j * self.detector.phasematch_filter[i][j])
+                for j in self.detector.interaction_filter[i]:
+                    new_phasematch.append(j * self.detector.interaction_filter[i][j])
 
                 relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
                 k += 1
@@ -490,7 +499,7 @@ class VibExperiment:
         #     relevant phase-matching conditions
         #   - (FOR LATER) Generate the corresponding fields/scans
         #   - For now, only warn if other cascading (collinear) effects may intrude on the signal if ignore_collinear is not set to True
-
+        # - Take pulse with scans and
 
 
         # Here do:
@@ -661,16 +670,16 @@ class VibExperiment:
 
 
 
-        if self.detector.phasematch_filter is None:
+        if self.detector.interaction_filter is None:
             raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')
 
-        if len(self.detector.phasematch_filter) > 1:
+        if len(self.detector.interaction_filter) > 1:
             raise AssertionError('Interaction sequence determination currently not supported for more than one phase-matching direction')
 
         int_sequences = []
         int_seed = []
 
-        for i in self.detector.phasematch_filter:
+        for i in self.detector.interaction_filter:
 
             interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
 

@@ -30,7 +30,7 @@ def evv_experiment() -> ws_experiment.experiment_abstractions.VibExperiment:
                                    detector_location=(0.0, 0.0, 1.0),
                                    detection_polarization=(1.0, 0.0, 0.0),
                                    detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                   phasematch_filter=[{1: -1, 2: 1, 3: 1}])
+                                   interaction_filter=[[-1, 2, 3]])
 
     # Push one carrier freq
     scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
@@ -63,7 +63,7 @@ def evv_experiment_pulse_1_and_2_coincident() -> ws_experiment.experiment_abstra
                                    detector_location=(0.0, 0.0, 1.0),
                                    detection_polarization=(1.0, 0.0, 0.0),
                                    detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                   phasematch_filter=[{1: -1, 2: 1, 3: 1}])
+                                   interaction_filter=[[-1, 2, 3]])
 
     # Push one carrier freq
     scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
@@ -103,7 +103,7 @@ def experiment_beta_alpha_cars() -> ws_experiment.experiment_abstractions.VibExp
                                    detector_location=(0.0, 0.0, 1.0),
                                    detection_polarization=(1.0, 0.0, 0.0),
                                    detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                   phasematch_filter=[{1: 1, 2: 1, 3: -1, 4: 1}])
+                                   interaction_filter=[[1, 2, -3, 4]])
 
     # Push one carrier freq
     scan_obj_a = wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0)
