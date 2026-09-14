@@ -110,5 +110,3 @@ def test_getGeneralPolarizationAveragingExpression():
                 assert ((lin_comb_vvvv[(i, i, j, j)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
                 assert ((lin_comb_vvvv[(i, j, i, j)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
                 assert ((lin_comb_vvvv[(i, j, j, i)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
-
-    print('linear combination for vvvv', lin_comb_vvvv)

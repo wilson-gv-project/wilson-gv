@@ -8,6 +8,7 @@ setup(
     url="https://github.com/your-repo",  # Replace with your repo URL
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    package_data={"wilson_suite": ["data_for_tests/**/*", "terms_fuller_flat.json"]},
     include_package_data=True,
     install_requires=[
         # Add your dependencies here

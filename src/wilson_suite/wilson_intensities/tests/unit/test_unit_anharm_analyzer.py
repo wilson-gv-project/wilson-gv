@@ -4,7 +4,7 @@ from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 import wilson_suite as ws
 
-pickles_dir = SUITE_ROOT+'/wilson_suite/wilson_intensities/tests/datafiles'
+pickles_dir = SUITE_ROOT+'/wilson_intensities/tests/datafiles'
 
 def test_form_vpt2():
     file = 'HF_STO_3G_VPT2.pkl'
