@@ -201,7 +201,6 @@ class SpectrumRenderer(ABC):
         if self.intensities is None:
             if spec_data_operations == 'abs()**2':
                 self.intensities = np.abs(self.spec_data) ** 2
-                print('intensities')
             elif spec_data_operations == 'abs':
                 self.intensities = np.abs(self.spec_data)
             elif spec_data_operations == 'real':
