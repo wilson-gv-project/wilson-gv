@@ -225,7 +225,6 @@ def test_full_integration():
 def test_full_integration_EVV_axes():
     print()
     from ....fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
     # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
@@ -237,7 +236,7 @@ def test_full_integration_EVV_axes():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
