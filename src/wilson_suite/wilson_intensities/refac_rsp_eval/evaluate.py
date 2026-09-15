@@ -1,4 +1,13 @@
 """
+
+[] 
+[] 
+---
+
+==> tuple[CompiledTerm]
+"""
+
+"""
 rsp_eval draft — response-function evaluation: design summary and refactoring TODO
 ==================================================================================
 
@@ -174,7 +183,7 @@ from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 
-# symbolic
+
 @dataclass
 class PropsCollection:
     """
@@ -260,7 +269,7 @@ class PropsCollection:
         full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}_d{p.dord}' for i, p in enumerate(self.props)]
         return ' * '.join(full_string)
 
-# symbolic
+
 @dataclass
 class FreqTermsCollection:
     """
@@ -1265,4 +1274,15 @@ def eval_vibenedenom(freqterms: FreqTermsCollection,
     vibeneden_index_tuple = tuple([index_dict[i] for i in freqterms.get_num_indices_vibenedenom()])
 
     return vibenedenoms_tensor[vibeneden_index_tuple]
+
+
+## --------------------------------------------------------------------
+@dataclass
+class CompiledTerm:
+    pass
+     
+
+## --------------------------------------------------------------------
+def compile_terms(terms, axis_choice, magn_conditions) -> tuple[CompiledTerm]:
+     pass
 
