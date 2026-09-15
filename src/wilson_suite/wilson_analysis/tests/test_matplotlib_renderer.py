@@ -2,7 +2,7 @@ import numpy as np
 from wilson_suite.wilson_analysis.render.matplotlib_renderer import MatplotlibRenderer
 from wilson_suite.wilson_main.spectrum_abstractions import EvaluationInfo, RenderingInfo
 import pytest
-from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.paths import SUITE_ROOT, ANALYSIS_ROOT
 import os
 
 from unittest.mock import MagicMock
@@ -73,8 +73,7 @@ def tests_MatplotlibRenderer():
 
 
     spec_grid = {'x': X, 'y': Y}
-    rnd_info = RenderingInfo(intensity_normalization_type=None, 
-                             spec_data_operations='none')
+    rnd_info = RenderingInfo(spec_data_operations='none')
     rnd_info.style_config.colormap_spacing = 'linear'
 
     with pytest.raises(ValueError) as error:
@@ -93,8 +92,7 @@ def test_render_returns():
     spec = -(X**2 + Y**2)
 
     spec_grid = {'xlabel': X, 'y_lbl': Y}
-    rnd_info = RenderingInfo(intensity_normalization_type=None, 
-                             spec_data_operations='none')
+    rnd_info = RenderingInfo(spec_data_operations='none')
     rnd_info.spec_data_operations = 'abs()**2'
     ev_info = EvaluationInfo(dynamic_range=1000)
     

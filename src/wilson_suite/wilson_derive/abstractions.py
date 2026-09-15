@@ -188,7 +188,10 @@ class VibDiffTerm:
         elif isinstance(self.sl, HarmOscStateSymbolic):
             bra = self.sl.q
             ket = self.sr.q
-
+        
+        # to distinguish harmonic factors from other vibdiff denominators
+        if (ket is None or ket == []) and not self.is_pert_wf_diff:
+            return f"{'+'.join(bra)}"
         return ','.join([f"{'+'.join(bra)}",f"{'+'.join(ket)}"])
 
     def present(self):
@@ -247,7 +250,9 @@ class ResonanceCondition:
             if not (isinstance(i, str) or isinstance(i, int)):
                 raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
 
+        # self.pf = sorted(pf, key=lambda x: abs(x) if isinstance(x, int) else x.lstrip('-'))
         self.pf = pf
+
 
         if id is not None:
             if not isinstance(id, int):
@@ -272,6 +277,9 @@ class ResonanceCondition:
 
     def __repr__(self):
         return f'ResCond(diff = {self.diff}, pf = {self.pf}, id = {self.id})'
+
+    def __hash__(self):
+        return hash(( self.diff.h(), tuple(self.pf), self.id ))
 
     def present(self):
         """

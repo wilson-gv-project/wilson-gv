@@ -22,7 +22,7 @@ class GridRegion:
     """A single region of the evaluation grid."""
     domain: 'RectangularDomain'
     coords: Dict[str, np.ndarray]  # axis_label -> meshgrid
-    indices: tuple  # Slice indices into full grid
+    indices: tuple  = None# Slice indices into full grid
     region_id: int = field(default=0)  # Unique identifier for hashing
     
     def __hash__(self):

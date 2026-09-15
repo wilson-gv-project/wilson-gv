@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import Optional, Iterable
+from typing import Optional, Iterable, TYPE_CHECKING
 from operator import itemgetter
 import copy
 from math import inf as infinity
-
+if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 # TODO: Expand functionality according to below TODOs
 
 @dataclass
@@ -469,8 +470,19 @@ class VibExperiment:
         self.all_polarizations = all_polarizations
 
         # Determine the macroscopic orientational average polarization vector
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-        self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+        # from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+        # self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+
+        self._derive_polarization_avg_vector()
+
+    def _derive_polarization_avg_vector(self):
+        if len(self.all_polarizations)<=6:
+            # Determine the macroscopic orientational average polarization vector
+            from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+            self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
+        else:
+            pass
+            # raise ValueError('Orientational averaging is unsupported for number of polarizations > 6.')        
 
     def tell_axis_options(self):
 
@@ -588,6 +600,15 @@ class VibExperiment:
             interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
 
         return int_sequences
+
+    def derive_terms(self) -> list['VibPerturbedTerm']:
+        """
+        returns original derived terms with pulses (independent vars)
+        """
+        from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
+        from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+
+        return derived_terms_flat(get_fully_enhanced_terms(experiment=self), tolist=True)
 
 
 def get_carrier_freqs_uv(pulses) -> dict:
