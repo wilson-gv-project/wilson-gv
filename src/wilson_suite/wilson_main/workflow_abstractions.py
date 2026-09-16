@@ -19,7 +19,9 @@ from pathlib import Path
 import logging
 
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
-from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
+
+if TYPE_CHECKING:
+	from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 
 logger = logging.getLogger("wilson")
 
@@ -426,6 +428,8 @@ class WilsonSimulation:
 
 	def evaluate(self, *, verbose: bool = False, save_dir: Path = None):
 		"""Run evaluation. Stores result on self.spec; stashes workflow for inspection."""
+		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
+
 		if self.axis_choice is None:
 			self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
 		

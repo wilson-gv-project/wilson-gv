@@ -4,7 +4,7 @@ from importlib.resources import files
 
 SUITE_ROOT = str(files('wilson_suite'))               # wilson_suite/
 UTILS_ROOT = str(files('wilson_suite.wilson_utils'))  # wilson_suite/wilson_utils/
-
+ANALYSIS_ROOT = str(files('wilson_suite.wilson_analysis'))  # wilson_suite/wilson_analysis/
 
 WORKFLOW_BASE_DIR = Path(os.environ.get("WORKFLOW_BASE_DIR", "../workflows")).expanduser().resolve()
 # .resolve() -- converts the path to an absolute path; normalizes . and ..
