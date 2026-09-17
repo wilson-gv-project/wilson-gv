@@ -1,6 +1,14 @@
 """
 ONLY importer of wilson_derive
-  in:  terms, axis choice        out: EvalPlan + WorkManifest
+  
+  in:  terms IN axis choice -- as VibPertTermsCollection
+       magn_conds IN axis choice -- 
+                            -w1 + w2 is always > 0 ==> magn_conds = ((-1, 2),)
+                            MagnConditions = tuple[tuple[int|str, ...], ...]
+
+  
+  out: EvalPlan + WorkManifest
+  
   holds: PropsCollection, FreqTermsCollection, ResonanceMotif,
          parse_vibpert_term, index bookkeeping, motif keys
 
@@ -11,6 +19,18 @@ ONLY importer of wilson_derive
 ---
 
 ==> tuple[CompiledTerm]
+"""
+
+"""
+int or tuple of ints would be independent vars.
+
+independent vars here are -1 and 2:
+    {'A': [-1], 'B': [2]} or {'A': [-1], 'B': [-1, 2]}
+independent vars here are -1+2 and 3:
+    {'A': [(-1,2),], 'B': [3,]} or {'A': [(-1,2),], 'B': [(-1, 2), 3]}
+
+SpectralAxisSetDict = dict[str, tuple[int|tuple[int,...],...]]
+
 """
 
 import copy
@@ -24,8 +44,7 @@ from wilson_suite.wilson_derive.abstractions import (
     ResonanceCondition,  # here and term_parts
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
-from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet, translate_one_term_to_axis_variables, translate_magn_conditions_to_axisvars
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
+from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -313,15 +332,7 @@ class ParameterSet(Mapping[str, int]):
     def __setstate__(self, state):
         object.__setattr__(self, "_parameters", MappingProxyType(state['_parameters']))
 
-"""
-int or tuple of ints would be independent vars.
 
-independent vars here are -1 and 2:
-    {'A': [-1], 'B': [2]} or {'A': [-1], 'B': [-1, 2]}
-independent vars here are -1+2 and 3:
-    {'A': [(-1,2),], 'B': [3,]} or {'A': [(-1,2),], 'B': [(-1, 2), 3]}
-"""
-SpectralAxisSetDict = dict[str, tuple[int|tuple[int,...],...]]
 
 """
 -w1 + w2 is always > 0 ==> magn_conds = ((-1, 2),)
@@ -342,29 +353,19 @@ class CompiledTerm:
     cmp_resmotf: ResonanceMotif
     cmp_freqdenom: FreqTermsCollection
     frac_factor: float
-    # axis_choice: SpectralAxisSet # better to have it in CompiledTermCollection
-    # magn_conds: MagnConditions # better to have it in CompiledTermCollection
-    
+
     @classmethod
-    def from_VibPertTerm(cls, term: 'VibPerturbedTerm', axis_choice_dict: SpectralAxisSetDict, magn_conds: MagnConditions):
+    def from_VibPertTerm(cls, term: 'VibPerturbedTerm'):
 
-        axis_choice_inst = make_SpectralAxisSet(axis_choice_dict)
-
-        transl_term = translate_one_term_to_axis_variables(term, axis_choice_dict)
-        # todo: what is going on in translate_terms_to_axis_variables() function before translate_one_term_to_axis_variables() call
-        # fixme: is translate_one_term_to_axis_variables() even usable??
-        transl_magn_conds = translate_magn_conditions_to_axisvars(magn_conds, axis_choice_inst)
-
-        frac_factor = float(transl_term.coeff)
-        properties = PropsCollection(transl_term.props)
-        freq_denom = FreqTermsCollection(transl_term.freqterms)
-        res_conds = ResonanceMotif.from_conditions(transl_term.res)
+        frac_factor = float(term.coeff)
+        properties = PropsCollection(term.props)
+        freq_denom = FreqTermsCollection(term.freqterms)
+        res_conds = ResonanceMotif.from_conditions(term.res)
 
         return cls(properties, res_conds, freq_denom, frac_factor)
 
 
 ## --------------------------------------------------------------------
-def compile_terms(terms: tuple['VibPerturbedTerm'], 
-                  axis_choice, magn_conditions) -> tuple[CompiledTerm]:
-    pass
 
+def compile_terms():
+    pass
