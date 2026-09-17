@@ -22,6 +22,7 @@ ONLY importer of wilson_derive
 """
 
 """
+=================================
 int or tuple of ints would be independent vars.
 
 independent vars here are -1 and 2:
@@ -31,6 +32,10 @@ independent vars here are -1+2 and 3:
 
 SpectralAxisSetDict = dict[str, tuple[int|tuple[int,...],...]]
 
+----
+
+# -w1 + w2 is always > 0 ==> magn_conds = ((-1, 2),)
+MagnConditions = tuple[tuple[int|str, ...], ...]
 """
 
 import copy
@@ -44,9 +49,7 @@ from wilson_suite.wilson_derive.abstractions import (
     ResonanceCondition,  # here and term_parts
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
-from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
@@ -334,12 +337,6 @@ class ParameterSet(Mapping[str, int]):
 
 
 
-"""
--w1 + w2 is always > 0 ==> magn_conds = ((-1, 2),)
-"""
-MagnConditions = tuple[tuple[int|str, ...], ...]
-
-
 ## --------------------------------------------------------------------
 @dataclass
 class CompiledTerm:
@@ -367,5 +364,10 @@ class CompiledTerm:
 
 ## --------------------------------------------------------------------
 
-def compile_terms():
-    pass
+def compile_terms(terms: Sequence['VibPerturbedTerm']):
+
+    compiled = []
+    for t in terms:
+        compiled.append(CompiledTerm.from_VibPertTerm(t))
+
+    return compiled

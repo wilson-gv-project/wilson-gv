@@ -9,13 +9,12 @@ Derived terms plus molecular data in, spectrum out. Three modules, one direction
 | `grid.py` | features, window, resolution | spectrum array | full-grid Lorentzians |
 
 `evaluate.py` and `grid.py` import numpy and `spectrum_composition`, nothing from `wilson_main` or
-`wilson_derive`. The adapter that turns `VibAnaSetup` and `MolPropsCollection` into `MolData` lives in
-`wilson_main`.
+`wilson_derive`. The adapter that turns `VibAnaSetup` and `MolPropsCollection` into `MolData` lives in `wilson_main`.
 
 ## Signatures
 
 ```python
-compile_terms(terms, axis_choice, magn_conditions) -> (tuple[CompiledTerm], translated_magn_conditions)
+compile_terms(terms) -> (tuple[CompiledTerm])
 
 compute_features(terms, data: MolData, gamma_cm1) -> list[SpectralFeature]
 
