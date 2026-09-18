@@ -7,163 +7,8 @@
 ==> list[SpectralFeature]
 """
 
-"""
-rsp_eval draft — response-function evaluation: design summary and refactoring TODO
-==================================================================================
-
-Long-form reasoning lives in refac_rsp_eval/q.md. This docstring is the actionable list.
-
-
-Design summary
---------------
-The pipeline has three independent inputs, hence three stages:
-
-    symbolic   (wilson_derive)   terms with free symbols; no molecule, no experiment
-    compiled   (plan)            terms + axis choice -> RspEvalTerm + WorkManifest; no molecule
-    evaluated  (numeric)         plan + MolSystemData -> tables -> coefficients -> features
-
-
-Ownership rule: a type belongs to the layer that defines its identity (__eq__ / __hash__ /
-canonical form). Derive keeps PolProp.inds inside identity; the motif key here erases it.
-One __eq__ per class => PropsCollection & co. are evaluator types, whatever they hold.
-
-Boundary rules (all checkable):
-    R1  exactly one module in wilson_intensities imports wilson_derive   (today: 8)
-    R2  identity ownership, as above
-    R3  never write to derive-owned objects   (today held only by remembering to deepcopy)
-    R4  a method that builds a key into an external table is reusable by nobody without
-        that table -> a class with such methods is not a generic container
-    R5  the plan stage runs, and its output is assertable, with zero molecular data
-    R6  shared-looking code goes at the consumer; promote on the second real use
-
-Target layout (import direction one-way, top to bottom):
-
-    rsp_eval/
-      plan.py        # ONLY importer of wilson_derive
-                     #   in:  terms, axis choice        out: EvalPlan + WorkManifest
-                     #   holds: PropsCollection, FreqTermsCollection, ResonanceMotif,
-                     #          parse_vibpert_term, index bookkeeping, motif keys
-      ingest.py      # MolSystemData, VibStatesData — the data door
-      precompute.py  # manifest + data -> Tables (resolution tensors, vibenedenom, vibdiff energies)
-      kernel.py      # arrays and floats only; the hierarchical sum; picklable
-      features.py    # locations + coefficients -> SpectralFeature
-      render.py      # grid
-
-Boundary types: EvalPlan (frozen, the compiled program), WorkManifest (what data/tensors are
-needed; answers need_what()), Tables (numeric precomputation keyed by manifest entries),
-Coefficients (dict[IndexAssignment, complex]), SpectralFeature (exists).
-
-
-TODO — structure
-----------------
-[ ] Decide the fate of this file vs amplitudes/term_parts.py, averaged_props.py,
-    vibene_differences.py. The classes below duplicate those. One tree survives, not both.
-[ ] Delete the copied data-model classes: DataOriginInfo, MolecularProperty,
-    MolPropsCollection, VibState (the tab-indented block is the copy from
-    wilson_main/abstractions.py). Import them from a leaf package that sits below both
-    wilson_main and wilson_intensities. Package-level cycle today:
-    wilson_main.spectrum_abstractions -> amplitudes; amplitudes.evaluators -> wilson_main.
-    Three VibState definitions exist (wilson_main/abstractions.py, utils/spectrum_utils.py,
-    here).
-[ ] MolSystemData: keep as the single data door. Also defined in rps_evaluation.py:115 —
-    one home.
-[ ] Split EvaluationDataAndConfigs by reader: config (plan stage) vs data (numeric stage).
-    Split PrecalculatedData into named tables. No None default that is dereferenced
-    unconditionally (README rule 2).
-[ ] Make RspEvalTerm the only thing the evaluator sees. evaluate_term_coeffs re-derives
-    avrg_expr / non_avrg_expr / freqterms / index split from the raw term inside the loop,
-    while RspEvalTerm is consumed by nothing.
-[ ] parse_vibpert_term is the one derive-facing function. Bugs: term_id is never passed
-    (required field -> TypeError); num_coeff is typed FreqTermsCollection, assigned float.
-[ ] RspEvalTerm frozen; all_indices as a @property, not a stored derived field (README rule 4).
-[ ] evaluate_single_index_dict takes the whole term only to read term.coeff — pass the float.
-[ ] Normalise indentation (mixed tabs/spaces from the copied block).
-
-
-TODO — value types
-------------------
-[ ] PropsCollection / FreqTermsCollection __eq__ is `all(p in other)`: asymmetric, ignores
-    length and multiplicity — and these are dict keys. Derive __eq__ and __hash__ from one
-    canonical tuple (ResonanceMotif._tuplify already does this correctly).
-[ ] PropsCollection.sort() mutates self.props (and turns the tuple back into a list) on an
-    object used as a dict key. Frozen; sorted() returns a new instance.
-[ ] Split PropsCollection along its three method families:
-      (a) payload predicates — get_cart_axes, get_mode_indices, bool(p.ops) — may move to
-          derive as free functions over Sequence[PolProp];
-      (b) identity / canonical form — a frozen key type, evaluator-owned;
-      (c) key builders for external tables — evaluator-owned, named as such.
-[ ] identify_avrg_motif: translate into an own key type instead of deepcopy + writing
-    inds=None onto PolProp. inds=None means "not yet assigned" to derive and
-    "index-agnostic" here; that collision is why this class hand-rolls __hash__ and guards
-    None in three places. It also returns None implicitly on empty, and that None becomes a
-    dict key in group_PropsColls_by_numerator. Make it total (raise) or handle None at the
-    call site.
-[ ] get_mode_indices_group_template: the None branch returns [] inside a list of ints.
-[ ] ResonanceMotif.resonance_location_class is a @property with a required parameter.
-    to_str is EVV/paper-specific — move it out of the type. Drop the UNUSED methods.
-[ ] ParameterSet: declared Mapping[str, int] but injects 'zero': 'zero' (a str) and remaps
-    '' -> 'zero'; __lt__ hardcodes ('a'..'h'). Decide: generic frozen index assignment (the
-    conventions live in a labelling module) or a domain type (IndexAssignment) with the
-    conventions explicit and tested. The ground state is spelled '', 'zero', and
-    state_label == 'zero' within this file.
-[ ] VibDiff.cache_it / VibDiffCache thread a cache through a domain object (README rules 5, 7).
-    The energy difference is a pure function of a normalised label pair — memoise that
-    function. make_vibdiff_key is a key builder -> plan stage. VibDiff.from_symbolic takes a
-    VibDiffTerm, i.e. a derive-boundary crossing outside plan.py.
-[ ] VibStatesData._fill_storage unpacks dict keys as pairs (broken; UNUSED).
-    harmonic_osc_states_labels defaults to None and is dereferenced in
-    get_harmonic_osc_states.
-[ ] MolecularProperty.h reads self.system (not a field) and calls calc_setup.h() (no such
-    method); MolPropsCollection.of_order reads p.order (not a field). Moot once the copies go.
-
-
-TODO — numerics / physics
--------------------------
-[ ] Cache-key gap (a live defect, independent of any design choice): the tensors in
-    avrg_tensors are already contracted with the polarization recipe, but the key is
-    (Cartesian motif, repetition pattern) only. ZZZZ and XXYY collide. The key must include
-    the recipe. Manifest entry = motif x repetition pattern x CartesianResolution.
-[ ] Name the recipe: CartesianResolution = {component tuple: coefficient}. Today it exists
-    only as the local polarization_linear_comb inside make_gen_func_to_compute_avrg, which
-    constructs it (getGeneralPolarizationAveragingExpression) rather than receiving it.
-    pulse_polarization_vector is threaded through EvaluationDataAndConfigs ->
-    calculate_avrg_tensor -> make_gen_func_to_compute_avrg as a stand-in for that recipe.
-[ ] Single molecule-frame component selection (e.g. gamma_xxyz) is a one-entry recipe
-    {(x,x,y,z): 1.0}; the evaluation loop already handles it unchanged. DECIDE whether the
-    feature is wanted. If yes: the avrg vocabulary (~29 identifiers, ~180 sites, plus the
-    filename averaged_props.py) has to move, as its own commit, never mixed with behaviour
-    changes. If no: leave avrg scoped and honest and document the limitation.
-[ ] Zero test: np.isclose(x, zero_tol) with zero_tol=1e-18 evaluates
-    abs(x - 1e-18) <= 1e-8 + 1e-5*1e-18, i.e. effectively abs(x) <= 1e-8. The zero_tol
-    argument is ignored. Use abs(x) < tol (eval_non_avrg_per_indexdict,
-    eval_avrg_per_indexdict).
-[ ] get_ind_tuple_from_base: sorted(set(base symbols)) is a no-op only because
-    nm_indices_repetition_decoding allocates letters in first-appearance order — assert
-    that invariant. The `<` branch is the repeated-index rank-reduction path
-    ((a,b,a) -> rank-2 tensor), not dead code; say so in its docstring. The function is
-    duplicated from averaged_props.py.
-[ ] The motif is one of two keys. Stripping inds is correct — mode indices are spectators
-    to orientational averaging; the repetition pattern recovers the coincidence structure.
-    Keep the two-level grouping and document it where the motif is defined.
-[ ] eval_non_avrg_per_indexdict indexes vals with mode indices only. Correct for ops=[]
-    props (F_abc); returns a sub-array for any ops-carrying prop routed there. Currently
-    unreachable — assert `not prop.ops`.
-
-
-Open decisions
---------------
-[ ] Does the plan depend on the axis choice, or only on the terms? TermsInAxes bundles
-    both; this decides what a sweep over axes invalidates.
-[ ] Motif identification (plan, no molecule) vs motif location (needs vibstates_data): one
-    function today — split them.
-[ ] Who owns the molecular data model: wilson_main (and accept the cycle) or a leaf package.
-[ ] Is single-component Cartesian selection a wanted feature?
-
-zero_tol fix and get_ind_tuple_from_base docstring TODOs are already done on this branch
-"""
-
-from collections.abc import Callable
-from dataclasses import InitVar, dataclass, field
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -263,7 +108,7 @@ class MolecularProperty:
 	# FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
 	prop_spec: dict
 	trivial_name: str | None = None
-	vals: InitVar[Any] = field(default=None, repr=False)
+	vals: Any = field(default=None, repr=False)
 	calc_setup: DataOriginInfo | None = None
 	extra_data: dict | None = None
 
@@ -273,43 +118,6 @@ class MolecularProperty:
 			"trivial_name": self.trivial_name,
 		}
 
-	# FIXME: Complete/update this
-	def h(self, htype: int) -> int:
-		"""
-		Hashing function with four hash types
-
-		htype: integer: Hash type: Valid choices are
-
-		1: "head only" information (only hash(prop_spec))
-		2: hash involves attributes from 1) but also tgt basis, tgt units
-		3: hash involves attributes from 2) but also system, calc_setup
-		4: hash involves attributes from 3) but also in_basis, in_units
-		# TODO: Check for adequate property specification and values format when known
-		# TODO: Consider enforcing specification of units and basis when values are provided
-
-		Returns an integer hash value
-		"""
-
-		hlist = []
-
-		if (htype < 1) or (htype > 4):
-
-			raise AssertionError('Property hash must be requested with type argument (1-4)')
-
-		if htype >= 1:
-
-			for i in self.prop_spec:
-
-				hlist.append(i)
-				hlist.append(self.prop_spec[i])
-
-		if htype >= 3:
-
-			hlist.append(self.system.h())
-			hlist.append(self.calc_setup.h())
-
-
-		return hash(tuple(hlist))
 
 	def addSystem(self, system: MolSystemData):
 		"""
@@ -383,7 +191,7 @@ class MolPropsCollection:
 
 	def of_order(self, order: int) -> 'MolPropsCollection':
 		"""Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
-		return self.filter(lambda p: p.order == order)
+		return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
 
 	def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
 		"""Bucket properties by which setup they use. For batching QC jobs."""
@@ -416,7 +224,15 @@ class MolPropsCollection:
 		"""Build a {name: DataOriginInfo} shopping list."""
 		if not self.are_dressed:
 			raise RuntimeError("Collection must be dressed before requesting data.")
-		return {p.trivial_name: p.calc_setup for p in self.properties}
+
+		result: dict[str, DataOriginInfo] = {}
+		for p in self.properties:
+			if p.trivial_name is None:
+				raise ValueError("All properties must have a trivial name.")
+			if p.calc_setup is None:
+				raise ValueError("All properties must have a calc setup.")
+			result[p.trivial_name] = p.calc_setup
+		return result
 
 	def fill_from(self, data_dict: dict):
 		"""Load obtained data into each property's .vals."""
@@ -454,8 +270,8 @@ class VibState:
 	energy: float = 0.0
 	displacement: Any = None
 	serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
-	state_label: str = None
-	harmonic_WF: bool = None
+	state_label: str = ""
+	harmonic_WF: bool = False
 
 	def __post_init__(self) -> None:
 		"""Convert tuple keys to comma-separated strings for JSON serialization."""
@@ -474,7 +290,7 @@ class VibState:
 	def __eq__(self, other: 'VibState') -> bool:
 		if not isinstance(other, VibState):
 			return NotImplemented
-		return self.state_label == other.state_label and np.isclose(self.energy, other.energy)
+		return self.state_label == other.state_label and bool(np.isclose(self.energy, other.energy))
 
 	def __lt__(self, other: 'VibState') -> bool:
 		if not isinstance(other, VibState):
@@ -492,9 +308,9 @@ class VibStatesData:
     """
     Holds vib states data and can compute vib states energy differences
     """
-    allstates: tuple[VibState]
-    harmonic_osc_states_labels: tuple[int] = None
-    number_of_nmodes: int = None
+    allstates: tuple[VibState,...]
+    harmonic_osc_states_labels: tuple[int,...] = ()
+    number_of_nmodes: int = 0
     
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
@@ -503,13 +319,7 @@ class VibStatesData:
         
         self.allenergies_map = {i.state_label: i.energy for i in self.allstates}
         self.allstates_map = {i.state_label: i for i in self.allstates}
-        self._storage = dict()
-
-    # UNUSED
-    def _fill_storage(self):
-        for vlabel_a, energy_a in self.allenergies_map:
-            for vlabel_b, energy_b in self.allenergies_map:
-                self._storage[(vlabel_a, vlabel_b)] = convNu2Ene(energy_a - energy_b)
+        self._storage = {}
 
 
     def get_harmonic_osc_states(self):
@@ -565,8 +375,8 @@ class VibDiff:
     Numerical representation that holds values, as opposed to VibDiffTerm which is symbolic.
     Handles special case of zero states (ground state) in comparisons.
     """
-    left: VibState
-    right: VibState
+    left: VibState | None
+    right: VibState | None
     
     def is_zero_state(self, state: VibState) -> bool:
         """
@@ -581,6 +391,8 @@ class VibDiff:
         Return normalized form where left <= right.
         Zero states are considered smaller than any other state.
         """
+        if self.left is None or self.right is None:
+            raise ValueError("Both left and right states must be provided for normalization.")
         left_is_zero = self.is_zero_state(self.left)
         right_is_zero = self.is_zero_state(self.right)
         
@@ -600,6 +412,8 @@ class VibDiff:
         Calculate energy difference between states.
         For zero states, energy is considered to be 0.0
         """
+        if self.left is None or self.right is None:
+            raise ValueError("Both left and right states must be provided to calculate energy difference.")
         left_energy = 0.0 if self.is_zero_state(self.left) else self.left.energy
         right_energy = 0.0 if self.is_zero_state(self.right) else self.right.energy
         if au:
@@ -668,8 +482,14 @@ class VibDiffCache:
     
     def get(self, vib_diff: VibDiff) -> float | None:
         """Get cached energy difference"""
+        if vib_diff.left is None or vib_diff.right is None:
+            raise ValueError("Both left and right states must be provided to retrieve energy difference.")
         key = (vib_diff.left.state_label, vib_diff.right.state_label)
+
         norm_diff = vib_diff.normalized()
+
+        if norm_diff.left is None or norm_diff.right is None:
+            raise ValueError("Both left and right states must be provided for normalized VibDiff.")
         norm_key = (norm_diff.left.state_label, norm_diff.right.state_label)
         
         if key in self._cache:
@@ -681,6 +501,8 @@ class VibDiffCache:
     def add(self, vib_diff: VibDiff, energy: float):
         """Cache energy difference"""
         norm_diff = vib_diff.normalized()
+        if norm_diff.left is None or norm_diff.right is None:
+            raise ValueError("Both left and right states must be provided to cache energy difference.")
         self._cache[(norm_diff.left.state_label, norm_diff.right.state_label)] = energy
 
 ## ------------------------------------------------------------------
@@ -690,20 +512,20 @@ class EvaluationDataAndConfigs:
     """
     data holding abstractions are used here
     """
-    props_data: MolPropsCollection = None
-    vibstates_data: 'VibStatesData' = None
-    number_of_nmodes: int = None
-    nm_inds_choices: list[int] = None
-    pulse_polarization_vector: list = None
-    nc_sqrt_eigval: dict = None
+    props_data: MolPropsCollection
+    vibstates_data: 'VibStatesData'
+    number_of_nmodes: int
+    nm_inds_choices: Sequence[int]
+    pulse_polarization_vector: list
+    nc_sqrt_eigval: dict
 
 
 @dataclass()
 class PrecalculatedData:
-    vibdiff_cache: 'VibDiffCache' = None
-    avrg_tensors: dict = None
-    avrg_expr_tensor_mapping: dict = None
-    vibenedenoms_tensors: dict = None
+    vibdiff_cache: 'VibDiffCache'
+    avrg_tensors: dict
+    avrg_expr_tensor_mapping: dict
+    vibenedenoms_tensors: dict
 
 ## ------------------------------------------------------------------
 
@@ -736,19 +558,12 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',        # term
     results = {}
     data_and_configs, precalculated_data = necessary_data
     
-    # extract AVRG and NON_AVRG expressions
-    avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
-    non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
-    
-    # extract frequency terms and their differences
-    freqterms = compl_term.cmp_freqdenom
-    extra_freqterms = freqterms.get_pert_wf_diff()
     
     # Get all indices
-    idx_summ, idx_nonsumm = compl_term.tellNonSummSummIndices()
+    idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
     term_idx_all = sorted(idx_summ + idx_nonsumm)
     
-    def hierarchical_sum(index_dict: dict, remaining_indices: list[str], dict_of_sum: dict) -> float:
+    def hierarchical_sum(index_dict: dict, remaining_indices: list[str], dict_of_sum: dict) -> tuple[float, dict]:
         """
         Perform hierarchical summation over the remaining indices.
         Parameters:
@@ -764,7 +579,7 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',        # term
         """
         # Base case: no remaining indices to sum over
         if not remaining_indices:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, avrg_expr, non_avrg_expr, extra_freqterms, freqterms, data_and_configs, precalculated_data, zero_tol)
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, data_and_configs, precalculated_data, zero_tol)
             dict_of_sum[ParameterSet(index_dict)] = contribs
             # returns coef and dict with param contribs
 
@@ -875,10 +690,20 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     
     for non_avrg_prop in non_avrg_expr:
         # accessing values for non-averaged properties from data
-        na_prop_inds = tuple([index_dict[i] for i in non_avrg_prop.inds])
+        if non_avrg_prop.inds is None or len(non_avrg_prop.inds) == 0:
+            # If there are no indices, we assume it's a scalar property
+            na_prop_inds = ()
+        else:
+            na_prop_inds = tuple([index_dict[i] for i in non_avrg_prop.inds])
+        
         triv_name = prop_trivname(ord_el=len(non_avrg_prop.ops), ord_geo=non_avrg_prop.dord)
 
-        NON_AVRG = data_and_configs.props_data.get(triv_name).vals[na_prop_inds]
+        if triv_name not in data_and_configs.props_data.names():
+            raise ValueError(f"Trivial name {triv_name} not found in props_data.")
+
+        prop = data_and_configs.props_data.get(triv_name)
+        if prop is not None:
+            NON_AVRG = prop.vals[na_prop_inds]
 
         if np.isclose(NON_AVRG, zero_tol):
             return 0.

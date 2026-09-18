@@ -261,7 +261,7 @@ class ParameterSet(Mapping[str, int]):
     """
     _parameters: Mapping[str, int]
 
-    def __init__(self, parameters: Mapping[str, int]):
+    def __init__(self, parameters: Mapping[str, int|str]):
         if not isinstance(parameters, Mapping):
             raise TypeError("ParameterSet must be initialized with a mapping.")
 
@@ -352,6 +352,7 @@ class CompiledTerm:
     cmp_resmotf: ResonanceMotif
     cmp_freqdenom: FreqTermsCollection
     frac_factor: float
+    idx_summ_nonsumm: tuple[tuple[str, ...], tuple[str, ...]]
 
     @classmethod
     def from_VibPertTerm(cls, term: 'VibPerturbedTerm'):
@@ -361,7 +362,7 @@ class CompiledTerm:
         freq_denom = FreqTermsCollection(term.freqterms)
         res_conds = ResonanceMotif.from_conditions(term.res)
 
-        return cls(properties, res_conds, freq_denom, frac_factor)
+        return cls(properties, res_conds, freq_denom, frac_factor, term.tellNonSummSummIndices())
 
     """
     summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
@@ -384,30 +385,18 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']):
 
 def parse_vibpert_term(term: 'VibPerturbedTerm'):
     
-    # extract AVRG and NON_AVRG expressions
-    avrg_expr = PropsCollection(props=term.props).get_averaged_props().sort()
-    non_avrg_expr = PropsCollection(props=term.props).get_non_averaged_props()
-
-    res_conds = ResonanceMotif(term.res)
-    
-    # extract frequency terms and their differences
-    freqterms_all = FreqTermsCollection(freqterms=term.freqterms)
-    extra_freqterms = freqterms_all.get_pert_wf_diff() # fixme
-
-    ene_prefac = freqterms_all.get_vibenedenom() # fixme
     """
     precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
-    """
-
-    num_coeff = float(term.coeff)
 
     idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
+    """
 
-    return RspEvalTerm(rot_avrg_props=avrg_expr,
-                       rot_invr_props=non_avrg_expr,
-                       res_conds=res_conds,
-                       vibdiffs=extra_freqterms,
-                       ene_prefac=ene_prefac,
-                       num_coeff=num_coeff,
-                       summation_indices=idx_summ,
-                       non_summation_indices=idx_nonsumm)
+    frac_factor = float(term.coeff)
+    properties = PropsCollection(term.props)
+    freq_denom = FreqTermsCollection(term.freqterms)
+    res_conds = ResonanceMotif.from_conditions(term.res)
+
+    # Get all indices
+    idx_summ_nonsumm = term.tellNonSummSummIndices()
+
+    return CompiledTerm(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm)
