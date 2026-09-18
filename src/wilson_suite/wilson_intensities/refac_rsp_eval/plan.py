@@ -172,7 +172,9 @@ class FreqTermsCollection:
 
     def get_vibenedenom(self):
         """
-        freqterm.sl. and freqterm.sr. should be HarmOscStateSymbolic instances
+        Only one vib state energy.
+
+        freqterm.sl and freqterm.sr should be HarmOscStateSymbolic instances
         """
         def sr_or_sl_only(freqterm: VibDiffTerm):
             return (freqterm.sl.q == []) or (freqterm.sr.q == [])
@@ -184,7 +186,7 @@ class FreqTermsCollection:
     
     def get_num_indices_vibenedenom(self):
         """
-        these vibdiffterms have only sl, sr is zero
+        these vibdiffterms have only sl, sr is zero -- fixme? should it be this?
         """
         return tuple(sorted({i for vd in self.get_vibenedenom() for i in vd.sl.q}))
 
@@ -361,6 +363,12 @@ class CompiledTerm:
 
         return cls(properties, res_conds, freq_denom, frac_factor)
 
+    """
+    summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
+    non_summation_indices: tuple[str, ...] | None
+    all_indices: tuple[str, ...] | None        # sorted union
+    """
+
 
 ## --------------------------------------------------------------------
 
@@ -371,3 +379,35 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']):
         compiled.append(CompiledTerm.from_VibPertTerm(t))
 
     return compiled
+
+
+
+def parse_vibpert_term(term: 'VibPerturbedTerm'):
+    
+    # extract AVRG and NON_AVRG expressions
+    avrg_expr = PropsCollection(props=term.props).get_averaged_props().sort()
+    non_avrg_expr = PropsCollection(props=term.props).get_non_averaged_props()
+
+    res_conds = ResonanceMotif(term.res)
+    
+    # extract frequency terms and their differences
+    freqterms_all = FreqTermsCollection(freqterms=term.freqterms)
+    extra_freqterms = freqterms_all.get_pert_wf_diff() # fixme
+
+    ene_prefac = freqterms_all.get_vibenedenom() # fixme
+    """
+    precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
+    """
+
+    num_coeff = float(term.coeff)
+
+    idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
+
+    return RspEvalTerm(rot_avrg_props=avrg_expr,
+                       rot_invr_props=non_avrg_expr,
+                       res_conds=res_conds,
+                       vibdiffs=extra_freqterms,
+                       ene_prefac=ene_prefac,
+                       num_coeff=num_coeff,
+                       summation_indices=idx_summ,
+                       non_summation_indices=idx_nonsumm)

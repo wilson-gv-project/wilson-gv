@@ -162,10 +162,8 @@ Open decisions
 zero_tol fix and get_ind_tuple_from_base docstring TODOs are already done on this branch
 """
 
-import copy
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable
 from dataclasses import InitVar, dataclass, field
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -173,11 +171,18 @@ import numpy as np
 from wilson_suite.wilson_derive.abstractions import (
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    ParameterSet,
+)
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
-    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+        CompiledTerm,
+        FreqTermsCollection,
+        PropsCollection,
+    )
 
 
 
@@ -680,7 +685,6 @@ class VibDiffCache:
 
 ## ------------------------------------------------------------------
 
-
 @dataclass(frozen=True)
 class EvaluationDataAndConfigs:
     """
@@ -701,61 +705,11 @@ class PrecalculatedData:
     avrg_expr_tensor_mapping: dict = None
     vibenedenoms_tensors: dict = None
 
+## ------------------------------------------------------------------
 
-@dataclass
-class RspEvalTerm:
-
-    term_id: int | str          # provenance back to the symbolic term
-
-    rot_avrg_props: PropsCollection | None
-    rot_invr_props: PropsCollection | None
-
-    res_conds: ResonanceMotif | None
-
-    vibdiffs: FreqTermsCollection | None
-    ene_prefac: FreqTermsCollection | None
-    num_coeff: FreqTermsCollection | None
-
-    summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
-    non_summation_indices: tuple[str, ...] | None
-    all_indices: tuple[str, ...] | None       # sorted union
-
-
-
-def parse_vibpert_term(term: 'VibPerturbedTerm') -> RspEvalTerm:
-    
-    # extract AVRG and NON_AVRG expressions
-    avrg_expr = PropsCollection(props=term.props).get_averaged_props().sort()
-    non_avrg_expr = PropsCollection(props=term.props).get_non_averaged_props()
-
-    res_conds = ResonanceMotif(term.res)
-    
-    # extract frequency terms and their differences
-    freqterms_all = FreqTermsCollection(freqterms=term.freqterms)
-    extra_freqterms = freqterms_all.get_pert_wf_diff() # fixme
-
-    ene_prefac = freqterms_all.get_vibenedenom() # fixme
-    """
-    precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
-    """
-
-    num_coeff = float(term.coeff)
-
-    idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
-
-    return RspEvalTerm(rot_avrg_props=avrg_expr,
-                       rot_invr_props=non_avrg_expr,
-                       res_conds=res_conds,
-                       vibdiffs=extra_freqterms,
-                       ene_prefac=ene_prefac,
-                       num_coeff=num_coeff,
-                       summation_indices=idx_summ,
-                       non_summation_indices=idx_nonsumm)
-
-
-def evaluate_term_coeffs(term: 'VibPerturbedTerm', 
-                         relevant_indices: list[dict], 
-                         necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'], 
+def evaluate_term_coeffs(compl_term: 'CompiledTerm',        # term
+                         relevant_indices: list[dict],      # computing for these indices
+                         necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'], # hm
                          zero_tol: float = 1e-18) -> dict['ParameterSet', float]:
     """
     Evaluate the coefficient part of the term 'term' for all of the indices in 'relevant_indices',
@@ -783,15 +737,15 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
     data_and_configs, precalculated_data = necessary_data
     
     # extract AVRG and NON_AVRG expressions
-    avrg_expr = PropsCollection(props=term.props).get_averaged_props().sort()
-    non_avrg_expr = PropsCollection(props=term.props).get_non_averaged_props()
+    avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
+    non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
     
     # extract frequency terms and their differences
-    freqterms = FreqTermsCollection(freqterms=term.freqterms)
+    freqterms = compl_term.cmp_freqdenom
     extra_freqterms = freqterms.get_pert_wf_diff()
     
     # Get all indices
-    idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
+    idx_summ, idx_nonsumm = compl_term.tellNonSummSummIndices()
     term_idx_all = sorted(idx_summ + idx_nonsumm)
     
     def hierarchical_sum(index_dict: dict, remaining_indices: list[str], dict_of_sum: dict) -> float:
@@ -810,7 +764,7 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
         """
         # Base case: no remaining indices to sum over
         if not remaining_indices:
-            value, contribs = evaluate_single_index_dict(term, index_dict, avrg_expr, non_avrg_expr, extra_freqterms, freqterms, data_and_configs, precalculated_data, zero_tol)
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, avrg_expr, non_avrg_expr, extra_freqterms, freqterms, data_and_configs, precalculated_data, zero_tol)
             dict_of_sum[ParameterSet(index_dict)] = contribs
             # returns coef and dict with param contribs
 
@@ -855,12 +809,12 @@ def evaluate_term_coeffs(term: 'VibPerturbedTerm',
     return results
 
 
-def evaluate_single_index_dict(term: 'VibPerturbedTerm', 
-                               index_dict: dict, 
-                               avrg_expr, 
-                               non_avrg_expr, 
-                               extra_freqterms, 
-                               freqterms, 
+def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
+                               index_dict: dict,            # index choice (a,b,c...)
+                            #    avrg_expr,                   # avrg xpr
+                            #    non_avrg_expr,               # non avrg xpr
+                            #    extra_freqterms,             # extra_freq xpr
+                            #    freqterms,                   # freq xpr
                                data_and_configs, 
                                precalculated_data, 
                                zero_tol: float) -> tuple[float, dict]:
@@ -873,42 +827,41 @@ def evaluate_single_index_dict(term: 'VibPerturbedTerm',
         float: The computed coefficient for the given index dictionary.
     """
     # Evaluate NON_AVRG
+    non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
+    avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
+
     NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, data_and_configs, zero_tol)
     if NON_AVRG == 0.0:
-        # print('\nNON_AVRG zero - ', non_avrg_expr, index_dict, '\n\n')
         AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
+
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
-        # print('\nAVRG zero - ', avrg_expr, index_dict, '\n\n')
         return 0.0, {'AVRG': AVRG}
+
     # Evaluate VIBDIFF_TERMS
+    extra_freqterms = compl_term.cmp_freqdenom.get_pert_wf_diff()
     VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, data_and_configs)
     if VIBDIFF_TERMS == 0.0:
-        # print('\nVIBDIFF_TERMS zero - ', extra_freqterms, index_dict, '\n\n')
         return 0.0, {'VIBDIFF_TERMS': VIBDIFF_TERMS}
+
     # Evaluate VIBENE_DENOM
+    freqterms = compl_term.cmp_freqdenom.get_vibenedenom()
     VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
     if VIBENE_DENOM == 0.0:
-        # print('\nVIBENE_DENOM zero - ', freqterms, index_dict, '\n\n')
         return 0.0, {'VIBENE_DENOM': VIBENE_DENOM}
+
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
-    # print('\nindex_dict', index_dict)
-    # print('NON_AVRG', NON_AVRG)
-    # print('AVRG', AVRG)
-    # print('VIBDIFF_TERMS', VIBDIFF_TERMS)
-    # print('VIBENE_DENOM', VIBENE_DENOM, '\n')
-
     dict_contribs = {'NON_AVRG': NON_AVRG, 'AVRG': AVRG, 'VIBDIFF_TERMS': VIBDIFF_TERMS, 'VIBENE_DENOM': VIBENE_DENOM}
 
-    return float(term.coeff) * float(product_all), dict_contribs
+    return float(compl_term.frac_factor) * float(product_all), dict_contribs
 
 
 # TODO: error handling for missing or invalid data for all functions below
-def eval_non_avrg_per_indexdict(non_avrg_expr: PropsCollection, 
+def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection', 
                                 index_dict: dict, 
                                 data_and_configs: EvaluationDataAndConfigs, 
                                 zero_tol: float = 1e-18):
@@ -935,9 +888,9 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: PropsCollection,
     return product_all
 
 
-def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, index_dict: dict):
+def get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection', index_dict: dict):
     """Map expr to indices according to base expression's unique symbols."""
-    base_unique = sorted(list(set(base_expr.get_mode_indices())))
+    base_unique = sorted(set(base_expr.get_mode_indices()))
     expr_inds = expr.get_mode_indices()
 
     if len(base_unique) < len(expr_inds):
@@ -951,7 +904,7 @@ def get_ind_tuple_from_base(expr: PropsCollection, base_expr: PropsCollection, i
         raise ValueError('This base_expr cannot be a base expression for this expr')
 
 
-def eval_avrg_per_indexdict(avrg_expr: PropsCollection, 
+def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection', 
                             index_dict: dict, 
                             precalculated_data: PrecalculatedData,
                             zero_tol: float = 1e-18):
@@ -966,7 +919,7 @@ def eval_avrg_per_indexdict(avrg_expr: PropsCollection,
         return 0.
     return avrg_tensor[avrg_index_tuple]
 
-def eval_vibdiff_pert_wf_diff(extra_freqterms: FreqTermsCollection,
+def eval_vibdiff_pert_wf_diff(extra_freqterms: 'FreqTermsCollection',
                               index_dict: dict,
                               precalculated_data: PrecalculatedData,
                               data_and_configs: EvaluationDataAndConfigs):
@@ -981,7 +934,7 @@ def eval_vibdiff_pert_wf_diff(extra_freqterms: FreqTermsCollection,
     
     return product_all
 
-def eval_vibenedenom(freqterms: FreqTermsCollection,
+def eval_vibenedenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      precalculated_data: PrecalculatedData):
     
@@ -990,15 +943,4 @@ def eval_vibenedenom(freqterms: FreqTermsCollection,
     vibeneden_index_tuple = tuple([index_dict[i] for i in freqterms.get_num_indices_vibenedenom()])
 
     return vibenedenoms_tensor[vibeneden_index_tuple]
-
-
-## --------------------------------------------------------------------
-@dataclass
-class CompiledTerm:
-    pass
-     
-
-## --------------------------------------------------------------------
-def compile_terms(terms, axis_choice, magn_conditions) -> tuple[CompiledTerm]:
-     pass
 
