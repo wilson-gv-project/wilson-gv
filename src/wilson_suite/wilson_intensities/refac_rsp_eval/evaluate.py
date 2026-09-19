@@ -71,214 +71,6 @@ class DataOriginInfo:
 
 
 ## ------------------------------------------------------------------
-@dataclass(frozen=True)
-class MolSystemData:
-    """
-    data and holding abstractions.
-
-    would be constructed outside of evaluation, and passed in to evaluation functions
-    """
-    name: str
-    eigenvals: np.ndarray | None
-    eigenvecs: np.ndarray | None
-    mol_props: 'MolPropsCollection'
-    natoms: int = 0
-    states: tuple = ()
-    geo: Any = None
-    geo_extra: Any = None
-    linear: bool = False
-    data_origin: DataOriginInfo | None = None
-
-
-    @property
-    def data_filled(self) -> bool:
-        """Check if all properties have values."""
-        return self.mol_props.is_filled
-
-
-    @classmethod
-    def from_datadict(cls, 
-                      mol_props: 'MolPropsCollection',  # to be filled with data
-                      data_dict: dict,                  # data obtained from obtainer
-                      states_choice: str = 'harmonic'):
-        """
-        loading data into self.props (and optionally to self.vib_ana_setup)
-
-        data_dict: dict - {data_name: values}
-
-        """
-        mol_props.fill_from(data_dict)
-
-        harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
-        if states_choice == 'harmonic':
-            states = harm_states
-        elif states_choice == 'anharmonic':
-            states = anharm_states
-
-        geo = data_dict.get('geo', None)
-        natoms = len(geo) if geo is not None else 0
-
-        return cls(name='from_data_dict',
-                   eigenvals=data_dict.get('nc_sqrt_eigval', None), # FIXME: none values should be handled better
-                   eigenvecs=data_dict.get('eigenvecs', None), # FIXME: none values should be handled better
-                   mol_props=mol_props,
-                   natoms=natoms,
-                   states=states,
-                   geo=geo,
-                   geo_extra=data_dict.get('geo_extra', None),
-                   linear=data_dict.get('linear', False),
-                   data_origin=data_dict.get('data_origin', None))
-
-
-def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
-    """
-    Construct tuple['VibState'] from data_dict.
-    """
-
-    harm_states = ()
-    if 'harmonic_states' in data_dict:
-        states_dict: dict = data_dict['harmonic_states']
-
-        for state, energy in states_dict.items():
-            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
-
-    anharm_states = ()
-    if 'anharmonic_states' in data_dict:
-        states_dict: dict = data_dict['anharmonic_states']
-
-        for state, energy in states_dict.items():
-            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
-
-    return harm_states, anharm_states
-
-
-
-@dataclass
-class MolecularProperty:
-    """
-    Class to represent a molecular (energy derivative or similar) property
-    Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
-    and "full" (system, calc_setup) for a particular realization (optional with/without values)
-    
-    ----
-    prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
-    triv_name: String: Trivial name For simplified reference
-    vals: Form not specified: Values of properties - could be array or dictionary
-    system: MolecularSystem instance: For which system?
-    calc_setup: DataOriginInfo instance: For which calculation setup?
-
-    see more in test_main_dataclasses.py::test_MolecularProperty
-    """
-    # FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
-    prop_spec: dict
-    trivial_name: str | None = None
-    system: MolSystemData | None = None
-    calc_setup: DataOriginInfo | None = None
-    vals: Any = field(default=None, repr=False)
-    extra_data: dict | None = None
-
-    def to_dict(self):
-        return {
-            "prop_spec": self.prop_spec,
-            "trivial_name": self.trivial_name,
-        }
-
-
-@dataclass
-class MolPropsCollection:
-    properties: list[MolecularProperty]
-
-    def get(self, trivial_name: str):
-        d = {prop.trivial_name: prop for prop in self.properties}
-        if trivial_name not in d:
-            raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
-        return d.get(trivial_name)
-
-    def __getitem__(self, trivial_name):
-        """Allow coll[name] syntax."""
-        return self.get(trivial_name)
-
-    def __contains__(self, trivial_name: str) -> bool:
-        """Allow `name in coll` syntax."""
-        return any(p.trivial_name == trivial_name for p in self.properties)
-
-    def __iter__(self):
-        """Allow `for p in coll` syntax."""
-        return iter(self.properties)
-
-    def __len__(self) -> int:
-        return len(self.properties)
-
-    def names(self) -> list[str]:
-        """All trivial names."""
-        return [p.trivial_name for p in self.properties if p.trivial_name is not None]
-
-    def filter(self, predicate: Callable[[MolecularProperty], bool]) -> 'MolPropsCollection':
-        return MolPropsCollection([p for p in self.properties if predicate(p)])
-
-    def without_values(self) -> 'MolPropsCollection':
-        """Properties still awaiting data — useful for finding what's missing."""
-        return self.filter(lambda p: p.vals is None)
-
-    def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
-        """All properties computed with a given setup."""
-        return self.filter(lambda p: p.calc_setup == origin)
-
-    def of_order(self, order: int) -> 'MolPropsCollection':
-        """Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
-        return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
-
-    def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
-        """Bucket properties by which setup they use. For batching QC jobs."""
-        from collections import defaultdict
-        groups = defaultdict(list)
-        for p in self.properties:
-            groups[p.calc_setup].append(p)
-        return {k: MolPropsCollection(v) for k, v in groups.items()}
-
-    def dress(self, uniform: DataOriginInfo | None = None, 
-            by_name: dict[str, DataOriginInfo] | None = None):
-        """Attach DataOriginInfo to each property. 
-        by_name takes precedence; uniform is the fallback."""
-        if uniform is None and by_name is None:
-            raise ValueError("Provide `uniform` or `by_name` (or both).")
-        
-        for p in self.properties:
-            if by_name and p.trivial_name in by_name:
-                p.calc_setup = by_name[p.trivial_name]
-            elif uniform is not None:
-                p.calc_setup = uniform
-            else:
-                raise ValueError(f"No setup for property {p}")
-
-    @property
-    def are_dressed(self) -> bool:
-        return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
-
-    def build_request_dict(self) -> dict[str, DataOriginInfo]:
-        """Build a {name: DataOriginInfo} shopping list."""
-        if not self.are_dressed:
-            raise RuntimeError("Collection must be dressed before requesting data.")
-
-        result: dict[str, DataOriginInfo] = {}
-        for p in self.properties:
-            if p.trivial_name is None:
-                raise ValueError("All properties must have a trivial name.")
-            if p.calc_setup is None:
-                raise ValueError("All properties must have a calc setup.")
-            result[p.trivial_name] = p.calc_setup
-        return result
-
-    def fill_from(self, data_dict: dict):
-        """Load obtained data into each property's .vals."""
-        for p in self.properties:
-            if p.trivial_name in data_dict:
-                p.vals = data_dict[p.trivial_name]
-
-    @property
-    def is_filled(self) -> bool:
-        return all(p.vals is not None for p in self.properties)
-
 
 @dataclass
 class VibState:
@@ -536,6 +328,219 @@ class VibDiffCache:
             raise ValueError("Both left and right states must be provided to cache energy difference.")
         self._cache[(norm_diff.left.state_label, norm_diff.right.state_label)] = energy
 
+
+@dataclass(frozen=True)
+class MolSystemData:
+    """
+    data and holding abstractions.
+
+    would be constructed outside of evaluation, and passed in to evaluation functions
+    """
+    name: str
+    eigenvals: np.ndarray | None
+    eigenvecs: np.ndarray | None
+    mol_props: 'MolPropsCollection'
+    states: 'VibStatesData'
+    natoms: int = 0
+    geo: Any = None
+    geo_extra: Any = None
+    linear: bool = False
+    data_origin: DataOriginInfo | None = None
+    vibdiff_cache: VibDiffCache = field(default_factory=VibDiffCache)
+
+    @property
+    def data_filled(self) -> bool:
+        """Check if all properties have values."""
+        return self.mol_props.is_filled
+
+
+    @classmethod
+    def from_datadict(cls, 
+                      mol_props: 'MolPropsCollection',  # to be filled with data
+                      data_dict: dict,                  # data obtained from obtainer
+                      states_choice: str = 'harmonic'):
+        """
+        loading data into self.props (and optionally to self.vib_ana_setup)
+
+        data_dict: dict - {data_name: values}
+
+        """
+        mol_props.fill_from(data_dict)
+
+        harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
+        if states_choice == 'harmonic':
+            labels = tuple(int(i[0]) for i in harm_states if len(i))
+            states = VibStatesData(allstates=harm_states, harmonic_osc_states_labels=labels)
+
+        elif states_choice == 'anharmonic':
+            labels = tuple(int(i[0]) for i in anharm_states if len(i))
+            states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
+
+        geo = data_dict.get('geo', None)
+        natoms = len(geo) if geo is not None else 0
+
+        return cls(name='from_data_dict',
+                   eigenvals=data_dict.get('nc_sqrt_eigval', None), # FIXME: none values should be handled better
+                   eigenvecs=data_dict.get('eigenvecs', None), # FIXME: none values should be handled better
+                   mol_props=mol_props,
+                   natoms=natoms,
+                   states=states,
+                   geo=geo,
+                   geo_extra=data_dict.get('geo_extra', None),
+                   linear=data_dict.get('linear', False),
+                   data_origin=data_dict.get('data_origin', None))
+
+
+def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
+    """
+    Construct tuple['VibState'] from data_dict.
+    """
+
+    harm_states = ()
+    if 'harmonic_states' in data_dict:
+        states_dict: dict = data_dict['harmonic_states']
+
+        for state, energy in states_dict.items():
+            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+
+    anharm_states = ()
+    if 'anharmonic_states' in data_dict:
+        states_dict: dict = data_dict['anharmonic_states']
+
+        for state, energy in states_dict.items():
+            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+
+    return harm_states, anharm_states
+
+
+
+@dataclass
+class MolecularProperty:
+    """
+    Class to represent a molecular (energy derivative or similar) property
+    Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
+    and "full" (system, calc_setup) for a particular realization (optional with/without values)
+    
+    ----
+    prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
+    triv_name: String: Trivial name For simplified reference
+    vals: Form not specified: Values of properties - could be array or dictionary
+    system: MolecularSystem instance: For which system?
+    calc_setup: DataOriginInfo instance: For which calculation setup?
+
+    see more in test_main_dataclasses.py::test_MolecularProperty
+    """
+    # FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
+    prop_spec: dict
+    trivial_name: str | None = None
+    system: MolSystemData | None = None
+    calc_setup: DataOriginInfo | None = None
+    vals: Any = field(default=None, repr=False)
+    extra_data: dict | None = None
+
+    def to_dict(self):
+        return {
+            "prop_spec": self.prop_spec,
+            "trivial_name": self.trivial_name,
+        }
+
+
+@dataclass
+class MolPropsCollection:
+    properties: list[MolecularProperty]
+
+    def get(self, trivial_name: str):
+        d = {prop.trivial_name: prop for prop in self.properties}
+        if trivial_name not in d:
+            raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
+        return d.get(trivial_name)
+
+    def __getitem__(self, trivial_name):
+        """Allow coll[name] syntax."""
+        return self.get(trivial_name)
+
+    def __contains__(self, trivial_name: str) -> bool:
+        """Allow `name in coll` syntax."""
+        return any(p.trivial_name == trivial_name for p in self.properties)
+
+    def __iter__(self):
+        """Allow `for p in coll` syntax."""
+        return iter(self.properties)
+
+    def __len__(self) -> int:
+        return len(self.properties)
+
+    def names(self) -> list[str]:
+        """All trivial names."""
+        return [p.trivial_name for p in self.properties if p.trivial_name is not None]
+
+    def filter(self, predicate: Callable[[MolecularProperty], bool]) -> 'MolPropsCollection':
+        return MolPropsCollection([p for p in self.properties if predicate(p)])
+
+    def without_values(self) -> 'MolPropsCollection':
+        """Properties still awaiting data — useful for finding what's missing."""
+        return self.filter(lambda p: p.vals is None)
+
+    def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
+        """All properties computed with a given setup."""
+        return self.filter(lambda p: p.calc_setup == origin)
+
+    def of_order(self, order: int) -> 'MolPropsCollection':
+        """Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
+        return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
+
+    def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
+        """Bucket properties by which setup they use. For batching QC jobs."""
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for p in self.properties:
+            groups[p.calc_setup].append(p)
+        return {k: MolPropsCollection(v) for k, v in groups.items()}
+
+    def dress(self, uniform: DataOriginInfo | None = None, 
+            by_name: dict[str, DataOriginInfo] | None = None):
+        """Attach DataOriginInfo to each property. 
+        by_name takes precedence; uniform is the fallback."""
+        if uniform is None and by_name is None:
+            raise ValueError("Provide `uniform` or `by_name` (or both).")
+        
+        for p in self.properties:
+            if by_name and p.trivial_name in by_name:
+                p.calc_setup = by_name[p.trivial_name]
+            elif uniform is not None:
+                p.calc_setup = uniform
+            else:
+                raise ValueError(f"No setup for property {p}")
+
+    @property
+    def are_dressed(self) -> bool:
+        return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
+
+    def build_request_dict(self) -> dict[str, DataOriginInfo]:
+        """Build a {name: DataOriginInfo} shopping list."""
+        if not self.are_dressed:
+            raise RuntimeError("Collection must be dressed before requesting data.")
+
+        result: dict[str, DataOriginInfo] = {}
+        for p in self.properties:
+            if p.trivial_name is None:
+                raise ValueError("All properties must have a trivial name.")
+            if p.calc_setup is None:
+                raise ValueError("All properties must have a calc setup.")
+            result[p.trivial_name] = p.calc_setup
+        return result
+
+    def fill_from(self, data_dict: dict):
+        """Load obtained data into each property's .vals."""
+        for p in self.properties:
+            if p.trivial_name in data_dict:
+                p.vals = data_dict[p.trivial_name]
+
+    @property
+    def is_filled(self) -> bool:
+        return all(p.vals is not None for p in self.properties)
+
+
 ## ------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -558,11 +563,11 @@ class PrecalculatedData:
     avrg_expr_tensor_mapping: dict
     vibenedenoms_tensors: dict
 
-## ------------------------------------------------------------------
 
 def evaluate_term_coeffs(compl_term: 'CompiledTerm',
                          relevant_indices: list[dict],
                          necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'],
+                         molsys_data: 'MolSystemData',
                          zero_tol: float = 1e-18) -> dict['ParameterSet', float]:
     """
     Evaluate the coefficient part of the term 'term' for all of the indices in 'relevant_indices',
@@ -587,7 +592,7 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         Dict[ParameterSet, float]: A dictionary mapping ParameterSet to computed coefficients.
     """
     results = {}
-    data_and_configs, precalculated_data = necessary_data
+    _, precalculated_data = necessary_data
     
     
     # Get all indices
@@ -610,7 +615,7 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         """
         # Base case: no remaining indices to sum over
         if not remaining_indices:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, data_and_configs, precalculated_data, zero_tol)
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, precalculated_data, molsys_data, zero_tol)
             dict_of_sum[ParameterSet(index_dict)] = contribs
             # returns coef and dict with param contribs
 
@@ -657,12 +662,8 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
 
 def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
                                index_dict: dict,            # index choice (a,b,c...)
-                            #    avrg_expr,                   # avrg xpr
-                            #    non_avrg_expr,               # non avrg xpr
-                            #    extra_freqterms,             # extra_freq xpr
-                            #    freqterms,                   # freq xpr
-                               data_and_configs, 
-                               precalculated_data, 
+                               molsys_data: MolSystemData,
+                               precalculated_data: PrecalculatedData | None,
                                zero_tol: float) -> tuple[float, dict]:
     """
     Evaluate the term for a single index dictionary.
@@ -676,25 +677,34 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
     non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
     avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
 
-    NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, data_and_configs, zero_tol)
+    NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, molsys_data, zero_tol)
     if NON_AVRG == 0.0:
-        AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
+        if precalculated_data is not None:
+            AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
 
     # Evaluate AVRG
-    AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
+    if precalculated_data is not None:
+        AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
     if AVRG == 0.0:
         return 0.0, {'AVRG': AVRG}
 
     # Evaluate VIBDIFF_TERMS
     extra_freqterms = compl_term.cmp_freqdenom.get_pert_wf_diff()
-    VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, data_and_configs)
+
+    # VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, molsys_data)
+    VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
     if VIBDIFF_TERMS == 0.0:
         return 0.0, {'VIBDIFF_TERMS': VIBDIFF_TERMS}
 
     # Evaluate VIBENE_DENOM
     freqterms = compl_term.cmp_freqdenom.get_vibenedenom()
-    VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
+
+    if precalculated_data is None or precalculated_data.vibenedenoms_tensors is None:
+        VIBENE_DENOM = otf_vibdiffdenom(freqterms, index_dict, molsys_data)
+    else:
+        VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
+
     if VIBENE_DENOM == 0.0:
         return 0.0, {'VIBENE_DENOM': VIBENE_DENOM}
 
@@ -706,16 +716,17 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
     return float(compl_term.frac_factor) * float(product_all), dict_contribs
 
 
-# TODO: error handling for missing or invalid data for all functions below
 def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection', 
                                 index_dict: dict, 
-                                data_and_configs: EvaluationDataAndConfigs, 
+                                molsys_data: MolSystemData,
                                 zero_tol: float = 1e-18):
     """
     non_avrg_expr - extracted part of VibPerturbed term 
 
     order of indices generally: a,b,c,... 
     E.g. in CFF tensor index tuple is (a,b,c)
+
+    TODO: error handling for missing or invalid data for all functions below
     """
     product_all = 1.
     
@@ -729,10 +740,10 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         
         triv_name = prop_trivname(ord_el=len(non_avrg_prop.ops), ord_geo=non_avrg_prop.dord)
 
-        if triv_name not in data_and_configs.props_data.names():
+        if triv_name not in molsys_data.mol_props.names():
             raise ValueError(f"Trivial name {triv_name} not found in props_data.")
 
-        prop = data_and_configs.props_data.get(triv_name)
+        prop = molsys_data.mol_props.get(triv_name)
         if prop is not None:
             NON_AVRG = prop.vals[na_prop_inds]
 
@@ -775,28 +786,152 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
         return 0.
     return avrg_tensor[avrg_index_tuple]
 
-def eval_vibdiff_pert_wf_diff(extra_freqterms: 'FreqTermsCollection',
-                              index_dict: dict,
-                              precalculated_data: PrecalculatedData,
-                              data_and_configs: EvaluationDataAndConfigs):
-    product_all = 1.
 
-    for vibdiff in extra_freqterms:
-        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, 
-                                                        data_and_configs.vibstates_data)
-        vib_diff_w_value.cache_it(vibdiff_cache=precalculated_data.vibdiff_cache)
+def make_gen_func_to_compute_avrg(*,
+                              avrg_expression: 'PropsCollection',
+                              pulse_polarization_vector: list) -> Callable[[dict, 'MolPropsCollection'], float]:
+    """
+    for an expression with properties data values,
+    compute average with given polarization setup for a choice of normal mode indices
+    """
+    num_pulses = len(avrg_expression.get_cart_axes())  # should this be a set?
 
-        product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
+    from wilson_suite.wilson_intensities.amplitudes.averaging import (
+        getGeneralPolarizationAveragingExpression,
+    )
+
+    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank = num_pulses,
+                                                                        laser_pol = pulse_polarization_vector)
+
+    def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
+        """
+        index_choices: dict, props_data: 'MolPropsCollection'
+        """
+
+        if not isinstance(props_data, MolPropsCollection):
+            raise TypeError(
+                f"props_data must be a MolPropsCollection, got {type(props_data).__name__}"
+            )
+
+        # Validate index_choices has all required keys
+        required_inds = {i for prop in avrg_expression for i in prop.inds}
+        missing = required_inds - index_choices.keys()
+        if missing:
+            raise KeyError(
+                f"index_choices is missing required mode indices: {missing}"
+            )
+
+        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+        total = 0.
+
+        for cart_axes in polarization_linear_comb:
+
+            # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
+            # couldn't think of any but want to discuss and double check for safety
+
+            product = 1.
+
+            for prop in avrg_expression:
+
+                prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
+
+                nm_inds = tuple([index_choices[i] for i in prop.inds])
+                cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
+                all_inds = (*nm_inds, *cart_inds)
+
+                # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
+                product *= props_data.get(prop_tuple_key).vals[all_inds]
+
+            # if product != 0.:
+            #     logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
+
+            total += product * polarization_linear_comb[cart_axes]
+
+        return total
+
+    return compute_for_idx_choice
+
+
+def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
+                          pulse_polarization_vector: list,
+                          props_data: 'MolPropsCollection',
+                          number_of_nmodes: int,
+                          nm_inds_choices: list[int]):
+    """
+    Precalculating the full tensor for given avrg_expression
+
+    nm_inds_choices - could be generated with for all normal modes with:
+        nm_inds_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
+
+    """
+    # so indices are in alphabetical order in full_tensor below
+    mode_inds = sorted(set(avrg_expression.get_mode_indices()))  # list, deterministic order
+
+    from wilson_suite.wilson_intensities.amplitudes.utils import (
+        generate_index_choices_general,
+    )
+
+    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
+
+    # Indicating generalized version for updating
+    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
+
+    full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
+
+    for idx in ind_choices:
+        # so indices are in alphabetical order
+        full_tensor[tuple(idx[k] for k in mode_inds)] = func_general(idx, props_data)
+
+    return full_tensor
+
+# def eval_vibdiff_pert_wf_diff(extra_freqterms: 'FreqTermsCollection',
+#                               index_dict: dict,
+#                             #   precalculated_data: PrecalculatedData,
+#                               molsys_data: MolSystemData):
+#     """
+#     try without precalculated data
+#     """
+
+#     return otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
+
+    # product_all = 1.
+
+    # for vibdiff in extra_freqterms:
+    #     vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, 
+    #                                                     molsys_data.states)
+    #     vib_diff_w_value.cache_it(vibdiff_cache=precalculated_data.vibdiff_cache)
+
+    #     product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
     
-    return product_all
+    # return product_all
 
 def eval_vibenedenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      precalculated_data: PrecalculatedData):
-    
+    """
+    try without precalculated data
+    """
     vibenedenoms_tensor = precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
 
     vibeneden_index_tuple = tuple([index_dict[i] for i in freqterms.get_num_indices_vibenedenom()])
 
     return vibenedenoms_tensor[vibeneden_index_tuple]
 
+def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
+                     index_dict: dict,
+                     molsys_data: MolSystemData):
+    """
+    try without precalculated data - cache vibdiffs in molsys_data.vibdiff_cache
+    """
+    product_all = 1.
+
+    for vibdiff in freqterms:
+        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, 
+                                                        molsys_data.states)
+
+        vib_diff_w_value.cache_it(vibdiff_cache=molsys_data.vibdiff_cache)
+        
+        product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
+    
+    return product_all
