@@ -31,278 +31,311 @@ if TYPE_CHECKING:
 
 
 
-## ------------------------------------------------------------------
-# numerical
-@dataclass(frozen=True)
-class MolSystemData:
-    """Everything obtained externally. No configuration."""
-
-    name: str
-    states: tuple
-    eigenvals: np.ndarray
-    eigenvecs: np.ndarray
-    mol_props: 'MolPropsCollection'
-    natoms: int | None = None
-    geo: Any = None
-    geo_extra: Any = None
-    linear: bool = False
-    conformer: str = "conf1"
-
-
 @dataclass(frozen=True)
 class DataOriginInfo:
-	"""
-	Class to represent computational setups for properties obtained external to Wilson
-	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
-	"get from file"
+    """
+    Class to represent computational setups for properties obtained external to Wilson
+    Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
+    "get from file"
 
-	----
-	source_type: String: Options: gaussian, cfour, wilson
-	lvl_theory: String: Level of theory
-	basis_set: String: Basis set
-	base_file_loc: String: path to the base file
-	"""
-	# Strings
-	source_type: str = ''
-	
-	lvl_theory: str = ''
-	basis_set: str = ''
+    ----
+    source_type: String: Options: gaussian, cfour, wilson
+    lvl_theory: String: Level of theory
+    basis_set: String: Basis set
+    base_file_loc: String: path to the base file
+    """
+    # Strings
+    source_type: str = ''
+    
+    lvl_theory: str = ''
+    basis_set: str = ''
 
-	base_file_loc: str = ''
+    base_file_loc: str = ''
 
 
-	def __hash__(self):
-		def to_tuple(x):
-			return tuple(sorted(x.items())) if isinstance(x, dict) else x
-		return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
+    def __hash__(self):
+        def to_tuple(x):
+            return tuple(sorted(x.items())) if isinstance(x, dict) else x
+        return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
 
-	def __eq__(self, other):
-		if not isinstance(other, DataOriginInfo):
-			return False
-		
-		return (
+    def __eq__(self, other):
+        if not isinstance(other, DataOriginInfo):
+            return False
+        
+        return (
             self.source_type == other.source_type and
             self.lvl_theory == other.lvl_theory and
             self.basis_set == other.basis_set and
-			self.base_file_loc == other.base_file_loc
-		)
+            self.base_file_loc == other.base_file_loc
+        )
 
 
-# numerical
+## ------------------------------------------------------------------
+@dataclass(frozen=True)
+class MolSystemData:
+    """
+    data and holding abstractions.
+
+    would be constructed outside of evaluation, and passed in to evaluation functions
+    """
+    name: str
+    eigenvals: np.ndarray | None
+    eigenvecs: np.ndarray | None
+    mol_props: 'MolPropsCollection'
+    natoms: int = 0
+    states: tuple = ()
+    geo: Any = None
+    geo_extra: Any = None
+    linear: bool = False
+    data_origin: DataOriginInfo | None = None
+
+
+    @property
+    def data_filled(self) -> bool:
+        """Check if all properties have values."""
+        return self.mol_props.is_filled
+
+
+    @classmethod
+    def from_datadict(cls, 
+                      mol_props: 'MolPropsCollection',  # to be filled with data
+                      data_dict: dict,                  # data obtained from obtainer
+                      states_choice: str = 'harmonic'):
+        """
+        loading data into self.props (and optionally to self.vib_ana_setup)
+
+        data_dict: dict - {data_name: values}
+
+        """
+        mol_props.fill_from(data_dict)
+
+        harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
+        if states_choice == 'harmonic':
+            states = harm_states
+        elif states_choice == 'anharmonic':
+            states = anharm_states
+
+        geo = data_dict.get('geo', None)
+        natoms = len(geo) if geo is not None else 0
+
+        return cls(name='from_data_dict',
+                   eigenvals=data_dict.get('nc_sqrt_eigval', None), # FIXME: none values should be handled better
+                   eigenvecs=data_dict.get('eigenvecs', None), # FIXME: none values should be handled better
+                   mol_props=mol_props,
+                   natoms=natoms,
+                   states=states,
+                   geo=geo,
+                   geo_extra=data_dict.get('geo_extra', None),
+                   linear=data_dict.get('linear', False),
+                   data_origin=data_dict.get('data_origin', None))
+
+
+def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
+    """
+    Construct tuple['VibState'] from data_dict.
+    """
+
+    harm_states = ()
+    if 'harmonic_states' in data_dict:
+        states_dict: dict = data_dict['harmonic_states']
+
+        for state, energy in states_dict.items():
+            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+
+    anharm_states = ()
+    if 'anharmonic_states' in data_dict:
+        states_dict: dict = data_dict['anharmonic_states']
+
+        for state, energy in states_dict.items():
+            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+
+    return harm_states, anharm_states
+
+
+
 @dataclass
 class MolecularProperty:
-	"""
-	Class to represent a molecular (energy derivative or similar) property
-	Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
+    """
+    Class to represent a molecular (energy derivative or similar) property
+    Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
     and "full" (system, calc_setup) for a particular realization (optional with/without values)
-	
-	----
-	prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
-	triv_name: String: Trivial name For simplified reference
-	vals: Form not specified: Values of properties - could be array or dictionary
-	system: MolecularSystem instance: For which system?
-	calc_setup: DataOriginInfo instance: For which calculation setup?
+    
+    ----
+    prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
+    triv_name: String: Trivial name For simplified reference
+    vals: Form not specified: Values of properties - could be array or dictionary
+    system: MolecularSystem instance: For which system?
+    calc_setup: DataOriginInfo instance: For which calculation setup?
 
-	see more in test_main_dataclasses.py::test_MolecularProperty
-	"""
-	# FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
-	prop_spec: dict
-	trivial_name: str | None = None
-	vals: Any = field(default=None, repr=False)
-	calc_setup: DataOriginInfo | None = None
-	extra_data: dict | None = None
+    see more in test_main_dataclasses.py::test_MolecularProperty
+    """
+    # FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
+    prop_spec: dict
+    trivial_name: str | None = None
+    system: MolSystemData | None = None
+    calc_setup: DataOriginInfo | None = None
+    vals: Any = field(default=None, repr=False)
+    extra_data: dict | None = None
 
-	def to_dict(self):
-		return {
-			"prop_spec": self.prop_spec,
-			"trivial_name": self.trivial_name,
-		}
-
-
-	def addSystem(self, system: MolSystemData):
-		"""
-		Associate a MolecularSystem instance
-
-		system:	MolecularSystem instance: The system to be attached
-		"""
-
-		self.system = system
-
-	def addCalcSetup(self, calc_setup):
-		"""
-		Associate an DataOriginInfo instance
-
-		calc_setup: DataOriginInfo instance: The setup to be attached
-		"""
-
-		self.calc_setup = calc_setup
-	
-	# Add values (usually scalars or a numPy array)
-	def addValues(self, values: Any):
-		"""
-		Associate values to this property
-
-		values: Undetermined form: The values to be added
-		"""
-
-		self.vals = values
+    def to_dict(self):
+        return {
+            "prop_spec": self.prop_spec,
+            "trivial_name": self.trivial_name,
+        }
 
 
-# numerical
 @dataclass
 class MolPropsCollection:
-	properties: list[MolecularProperty]
+    properties: list[MolecularProperty]
 
-	def get(self, trivial_name: str):
-		d = {prop.trivial_name: prop for prop in self.properties}
-		if trivial_name not in d:
-			raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
-		return d.get(trivial_name)
+    def get(self, trivial_name: str):
+        d = {prop.trivial_name: prop for prop in self.properties}
+        if trivial_name not in d:
+            raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
+        return d.get(trivial_name)
 
-	def __getitem__(self, trivial_name):
-		"""Allow coll[name] syntax."""
-		return self.get(trivial_name)
+    def __getitem__(self, trivial_name):
+        """Allow coll[name] syntax."""
+        return self.get(trivial_name)
 
-	def __contains__(self, trivial_name: str) -> bool:
-		"""Allow `name in coll` syntax."""
-		return any(p.trivial_name == trivial_name for p in self.properties)
+    def __contains__(self, trivial_name: str) -> bool:
+        """Allow `name in coll` syntax."""
+        return any(p.trivial_name == trivial_name for p in self.properties)
 
-	def __iter__(self):
-		"""Allow `for p in coll` syntax."""
-		return iter(self.properties)
+    def __iter__(self):
+        """Allow `for p in coll` syntax."""
+        return iter(self.properties)
 
-	def __len__(self) -> int:
-		return len(self.properties)
+    def __len__(self) -> int:
+        return len(self.properties)
 
-	def names(self) -> list[str]:
-		"""All trivial names."""
-		return [p.trivial_name for p in self.properties if p.trivial_name is not None]
+    def names(self) -> list[str]:
+        """All trivial names."""
+        return [p.trivial_name for p in self.properties if p.trivial_name is not None]
 
-	def filter(self, predicate: Callable[[MolecularProperty], bool]) -> 'MolPropsCollection':
-		return MolPropsCollection([p for p in self.properties if predicate(p)])
+    def filter(self, predicate: Callable[[MolecularProperty], bool]) -> 'MolPropsCollection':
+        return MolPropsCollection([p for p in self.properties if predicate(p)])
 
-	def without_values(self) -> 'MolPropsCollection':
-		"""Properties still awaiting data — useful for finding what's missing."""
-		return self.filter(lambda p: p.vals is None)
+    def without_values(self) -> 'MolPropsCollection':
+        """Properties still awaiting data — useful for finding what's missing."""
+        return self.filter(lambda p: p.vals is None)
 
-	def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
-		"""All properties computed with a given setup."""
-		return self.filter(lambda p: p.calc_setup == origin)
+    def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
+        """All properties computed with a given setup."""
+        return self.filter(lambda p: p.calc_setup == origin)
 
-	def of_order(self, order: int) -> 'MolPropsCollection':
-		"""Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
-		return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
+    def of_order(self, order: int) -> 'MolPropsCollection':
+        """Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
+        return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
 
-	def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
-		"""Bucket properties by which setup they use. For batching QC jobs."""
-		from collections import defaultdict
-		groups = defaultdict(list)
-		for p in self.properties:
-			groups[p.calc_setup].append(p)
-		return {k: MolPropsCollection(v) for k, v in groups.items()}
+    def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
+        """Bucket properties by which setup they use. For batching QC jobs."""
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for p in self.properties:
+            groups[p.calc_setup].append(p)
+        return {k: MolPropsCollection(v) for k, v in groups.items()}
 
-	def dress(self, uniform: DataOriginInfo | None = None, 
-			by_name: dict[str, DataOriginInfo] | None = None):
-		"""Attach DataOriginInfo to each property. 
-		by_name takes precedence; uniform is the fallback."""
-		if uniform is None and by_name is None:
-			raise ValueError("Provide `uniform` or `by_name` (or both).")
-		
-		for p in self.properties:
-			if by_name and p.trivial_name in by_name:
-				p.addCalcSetup(by_name[p.trivial_name])
-			elif uniform is not None:
-				p.addCalcSetup(uniform)
-			else:
-				raise ValueError(f"No setup for property {p}")
+    def dress(self, uniform: DataOriginInfo | None = None, 
+            by_name: dict[str, DataOriginInfo] | None = None):
+        """Attach DataOriginInfo to each property. 
+        by_name takes precedence; uniform is the fallback."""
+        if uniform is None and by_name is None:
+            raise ValueError("Provide `uniform` or `by_name` (or both).")
+        
+        for p in self.properties:
+            if by_name and p.trivial_name in by_name:
+                p.calc_setup = by_name[p.trivial_name]
+            elif uniform is not None:
+                p.calc_setup = uniform
+            else:
+                raise ValueError(f"No setup for property {p}")
 
-	@property
-	def are_dressed(self) -> bool:
-		return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
+    @property
+    def are_dressed(self) -> bool:
+        return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
 
-	def build_request_dict(self) -> dict[str, DataOriginInfo]:
-		"""Build a {name: DataOriginInfo} shopping list."""
-		if not self.are_dressed:
-			raise RuntimeError("Collection must be dressed before requesting data.")
+    def build_request_dict(self) -> dict[str, DataOriginInfo]:
+        """Build a {name: DataOriginInfo} shopping list."""
+        if not self.are_dressed:
+            raise RuntimeError("Collection must be dressed before requesting data.")
 
-		result: dict[str, DataOriginInfo] = {}
-		for p in self.properties:
-			if p.trivial_name is None:
-				raise ValueError("All properties must have a trivial name.")
-			if p.calc_setup is None:
-				raise ValueError("All properties must have a calc setup.")
-			result[p.trivial_name] = p.calc_setup
-		return result
+        result: dict[str, DataOriginInfo] = {}
+        for p in self.properties:
+            if p.trivial_name is None:
+                raise ValueError("All properties must have a trivial name.")
+            if p.calc_setup is None:
+                raise ValueError("All properties must have a calc setup.")
+            result[p.trivial_name] = p.calc_setup
+        return result
 
-	def fill_from(self, data_dict: dict):
-		"""Load obtained data into each property's .vals."""
-		for p in self.properties:
-			if p.trivial_name in data_dict:
-				p.vals = data_dict[p.trivial_name]
+    def fill_from(self, data_dict: dict):
+        """Load obtained data into each property's .vals."""
+        for p in self.properties:
+            if p.trivial_name in data_dict:
+                p.vals = data_dict[p.trivial_name]
 
-	@property
-	def is_filled(self) -> bool:
-		return all(p.vals is not None for p in self.properties)
+    @property
+    def is_filled(self) -> bool:
+        return all(p.vals is not None for p in self.properties)
 
 
-# numerical
 @dataclass
 class VibState:
-	"""
-	Class to represent a vibrational state.
-	This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
+    """
+    Class to represent a vibrational state.
+    This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
 
-	----
-	s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
-	e: float: State energy level
-	d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
+    ----
+    s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+    e: float: State energy level
+    d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
 
-	UPD:
-	dictionary self.s is not JSON-serializable (tuples can't be keys), but self.serial_s is.
-	self.serial_s is set up in post_init; deserialize_state_dict will return original self.s based on self.serial_s.
+    UPD:
+    dictionary self.s is not JSON-serializable (tuples can't be keys), but self.serial_s is.
+    self.serial_s is set up in post_init; deserialize_state_dict will return original self.s based on self.serial_s.
 
-	Notes:
-	s: InitVar[dict] = field(repr=False) - means that this atribute will not be in repr() of the class instance
-	InitVar - is an init-only variable
-	This seems to be okay for now, but should mind this feature
-	"""
-	harm_quanta_coeffs: dict[tuple[int, ...], float]
-	energy: float = 0.0
-	displacement: Any = None
-	serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
-	state_label: str = ""
-	harmonic_WF: bool = False
+    Notes:
+    s: InitVar[dict] = field(repr=False) - means that this atribute will not be in repr() of the class instance
+    InitVar - is an init-only variable
+    This seems to be okay for now, but should mind this feature
+    """
+    harm_quanta_coeffs: dict[tuple[int, ...], float]
+    energy: float = 0.0
+    displacement: Any = None
+    serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
+    state_label: str = ""
+    harmonic_WF: bool = False
 
-	def __post_init__(self) -> None:
-		"""Convert tuple keys to comma-separated strings for JSON serialization."""
-		self.serial_harm_quanta_coeffs = {
-			",".join(map(str, k)): v
-			for k, v in self.harm_quanta_coeffs.items()
-		}
+    def __post_init__(self) -> None:
+        """Convert tuple keys to comma-separated strings for JSON serialization."""
+        self.serial_harm_quanta_coeffs = {
+            ",".join(map(str, k)): v
+            for k, v in self.harm_quanta_coeffs.items()
+        }
 
-	def deserialize_state_dict(self) -> dict[tuple[int, ...], float]:
-		"""Convert serialized dictionary back to original format with tuple keys."""
-		return {
-			tuple(int(x) for x in k.split(",")): v
-			for k, v in self.serial_harm_quanta_coeffs.items()
-		}
+    def deserialize_state_dict(self) -> dict[tuple[int, ...], float]:
+        """Convert serialized dictionary back to original format with tuple keys."""
+        return {
+            tuple(int(x) for x in k.split(",")): v
+            for k, v in self.serial_harm_quanta_coeffs.items()
+        }
 
-	def __eq__(self, other: 'VibState') -> bool:
-		if not isinstance(other, VibState):
-			return NotImplemented
-		return self.state_label == other.state_label and bool(np.isclose(self.energy, other.energy))
+    def __eq__(self, other: 'VibState') -> bool:
+        if not isinstance(other, VibState):
+            return NotImplemented
+        return self.state_label == other.state_label and bool(np.isclose(self.energy, other.energy))
 
-	def __lt__(self, other: 'VibState') -> bool:
-		if not isinstance(other, VibState):
-			return NotImplemented
-		return self.state_label < other.state_label
-	
-	@classmethod
-	def get_1q_states(cls, states: list['VibState']):
-		return [s for s in states if len(s.state_label.split(','))==1]
+    def __lt__(self, other: 'VibState') -> bool:
+        if not isinstance(other, VibState):
+            return NotImplemented
+        return self.state_label < other.state_label
+    
+    @classmethod
+    def get_1q_states(cls, states: list['VibState']):
+        return [s for s in states if len(s.state_label.split(','))==1]
 
 
-# numerical
 @dataclass
 class VibStatesData:
     """
@@ -367,7 +400,6 @@ def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, 
     return (left_state_label, right_state_label)
 
 
-# numerical
 @dataclass
 class VibDiff:
     """
@@ -462,7 +494,6 @@ class VibDiff:
             vibdiff_cache.add(self, energy)
 
 
-# numerical
 @dataclass
 class VibDiffCache:
     """
@@ -529,9 +560,9 @@ class PrecalculatedData:
 
 ## ------------------------------------------------------------------
 
-def evaluate_term_coeffs(compl_term: 'CompiledTerm',        # term
-                         relevant_indices: list[dict],      # computing for these indices
-                         necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'], # hm
+def evaluate_term_coeffs(compl_term: 'CompiledTerm',
+                         relevant_indices: list[dict],
+                         necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'],
                          zero_tol: float = 1e-18) -> dict['ParameterSet', float]:
     """
     Evaluate the coefficient part of the term 'term' for all of the indices in 'relevant_indices',

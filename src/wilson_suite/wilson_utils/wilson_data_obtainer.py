@@ -1,5 +1,6 @@
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 
+
 def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo], 
                          get_geometry=False, get_displacements=False,
                          reindex_modes=False):
@@ -43,8 +44,9 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
 
         if o.source_type in ['cfour', 'gaussian']:
 
-            from CQCParse.parsing import parse_from_source
             from dataclasses import asdict
+
+            from CQCParse.parsing import parse_from_source
 
             these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], 
                                                    reindex_modes=reindex_modes,  **asdict(o))
