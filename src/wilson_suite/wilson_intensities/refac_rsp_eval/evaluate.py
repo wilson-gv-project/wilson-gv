@@ -615,7 +615,7 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         """
         # Base case: no remaining indices to sum over
         if not remaining_indices:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, precalculated_data, molsys_data, zero_tol)
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, molsys_data, precalculated_data, zero_tol)
             dict_of_sum[ParameterSet(index_dict)] = contribs
             # returns coef and dict with param contribs
 
@@ -626,7 +626,7 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         remaining = remaining_indices[1:]
         
         # Perform summation over all possible values for the current index
-        n_modes = data_and_configs.number_of_nmodes
+        n_modes = len(molsys_data.eigenvals) if molsys_data.eigenvals is not None else 0
         total_sum = 0.0
 
         for value in range(n_modes):
@@ -857,14 +857,19 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
                           pulse_polarization_vector: list,
                           props_data: 'MolPropsCollection',
                           number_of_nmodes: int,
-                          nm_inds_choices: list[int]):
+                          modes_to_fill: list[int] | None = None) -> np.ndarray:
     """
     Precalculating the full tensor for given avrg_expression
 
-    nm_inds_choices - could be generated with for all normal modes with:
-        nm_inds_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))
+    modes_to_fill - could be generated with for all normal modes with:
+        modes_to_fill: list[int] = list(range(number_of_nmodes))
 
     """
+    if modes_to_fill is None:
+        modes_to_fill = list(range(number_of_nmodes))
+    if max(modes_to_fill) >= number_of_nmodes:
+        raise ValueError(f"modes_to_fill contains indices exceeding number_of_nmodes ({number_of_nmodes})")
+    
     # so indices are in alphabetical order in full_tensor below
     mode_inds = sorted(set(avrg_expression.get_mode_indices()))  # list, deterministic order
 
@@ -872,7 +877,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
         generate_index_choices_general,
     )
 
-    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
+    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=modes_to_fill)
 
     # Indicating generalized version for updating
     func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
@@ -922,7 +927,7 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      molsys_data: MolSystemData):
     """
-    try without precalculated data - cache vibdiffs in molsys_data.vibdiff_cache
+    without precalculated data - cache vibdiffs in molsys_data.vibdiff_cache
     """
     product_all = 1.
 
