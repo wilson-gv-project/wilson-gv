@@ -279,55 +279,6 @@ class VibDiff:
         return cls(left=zero if ll == 'zero' else vibstates_data.get_state_by_label(ll),
                    right=zero if rl == 'zero' else vibstates_data.get_state_by_label(rl))
 
-    def cache_it(self, vibdiff_cache: 'VibDiffCache'):
-        """Ensure this VibDiff's energy is cached."""
-        if vibdiff_cache.get(self) is None:
-            energy = self.energy_difference()
-            vibdiff_cache.add(self, energy)
-
-
-@dataclass
-class VibDiffCache:
-    """
-    bank keys
-    ('0', '2')   -> sorted version is the key --- ('0', '2')
-    ('0,2', '2') -> sorted version is the key --- ('2', '0,2')
-    ('1,2', '3') -> sorted version is the key --- ('3', '1,2')
-    ('1,2,4', '3,1') -> sorted version is the key --- ('1,3', '1,2,4')
-    ('4,1,2', '3,1') -> sorted version is the key --- ('1,3', '1,2,4')
-
-    """
-    def __init__(self):
-        self._cache: dict[tuple[str, str], float] = {}
-    
-    def __repr__(self):
-        return str(self._cache)
-    
-    def get(self, vib_diff: VibDiff) -> float | None:
-        """Get cached energy difference"""
-        if vib_diff.left is None or vib_diff.right is None:
-            raise ValueError("Both left and right states must be provided to retrieve energy difference.")
-        key = (vib_diff.left.state_label, vib_diff.right.state_label)
-
-        norm_diff = vib_diff.normalized()
-
-        if norm_diff.left is None or norm_diff.right is None:
-            raise ValueError("Both left and right states must be provided for normalized VibDiff.")
-        norm_key = (norm_diff.left.state_label, norm_diff.right.state_label)
-        
-        if key in self._cache:
-            return self._cache[key]
-        if norm_key in self._cache:
-            return -self._cache[norm_key] if key != norm_key else self._cache[norm_key]
-        return None
-        
-    def add(self, vib_diff: VibDiff, energy: float):
-        """Cache energy difference"""
-        norm_diff = vib_diff.normalized()
-        if norm_diff.left is None or norm_diff.right is None:
-            raise ValueError("Both left and right states must be provided to cache energy difference.")
-        self._cache[(norm_diff.left.state_label, norm_diff.right.state_label)] = energy
-
 
 @dataclass(frozen=True)
 class MolSystemData:
@@ -346,7 +297,6 @@ class MolSystemData:
     geo_extra: Any = None
     linear: bool = False
     data_origin: DataOriginInfo | None = None
-    vibdiff_cache: VibDiffCache = field(default_factory=VibDiffCache)
 
     @property
     def data_filled(self) -> bool:
@@ -558,7 +508,6 @@ class EvaluationDataAndConfigs:
 
 @dataclass()
 class PrecalculatedData:
-    vibdiff_cache: 'VibDiffCache'
     avrg_tensors: dict
     avrg_expr_tensor_mapping: dict
     vibenedenoms_tensors: dict
@@ -566,7 +515,7 @@ class PrecalculatedData:
 
 def evaluate_term_coeffs(compl_term: 'CompiledTerm',
                          relevant_indices: list[dict],
-                         necessary_data: tuple['EvaluationDataAndConfigs', 'PrecalculatedData'],
+                         precalculated_data: 'PrecalculatedData',
                          molsys_data: 'MolSystemData',
                          zero_tol: float = 1e-18) -> dict['ParameterSet', float]:
     """
@@ -584,16 +533,14 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
             The term to evaluate, containing properties and frequency terms.
         relevant_indices: List[Dict]
             List of dictionaries specifying the relevant indices for evaluation.
-        necessary_data: Tuple[EvaluationDataAndConfigs, PrecalculatedData]
-            Tuple containing data and configurations required for evaluation.
+        precalculated_data: PrecalculatedData
+            Data and configurations required for evaluation.
         zero_tol: float
             Tolerance for considering a value as zero.
     Returns:
         Dict[ParameterSet, float]: A dictionary mapping ParameterSet to computed coefficients.
     """
     results = {}
-    _, precalculated_data = necessary_data
-    
     
     # Get all indices
     idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
@@ -657,6 +604,30 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         result = hierarchical_sum(index_dict, missing_indices, dict_of_sum)
         results[ParameterSet(index_dict)] = result
     
+    return results
+
+def evaluate_term_coeffs(compl_term: 'CompiledTerm',
+                         relevant_indices: list[dict],
+                         precalculated_data: 'PrecalculatedData',
+                         molsys_data: 'MolSystemData',
+                         zero_tol: float = 1e-18):
+    idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
+    term_idx_all = sorted(idx_summ + idx_nonsumm)
+    n_modes = len(molsys_data.eigenvals) if molsys_data.eigenvals is not None else 0
+
+    def sum_over(index_dict, remaining, leaves):
+        if not remaining:
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, molsys_data, precalculated_data, zero_tol)
+            leaves[ParameterSet(index_dict)] = contribs
+            return value
+        current, rest = remaining[0], remaining[1:]
+        return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
+
+    results = {}
+    for index_dict in relevant_indices:
+        missing = [i for i in term_idx_all if i not in index_dict]
+        leaves = {}
+        results[ParameterSet(index_dict)] = (sum_over(index_dict, missing, leaves), leaves)
     return results
 
 
@@ -747,7 +718,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         if prop is not None:
             NON_AVRG = prop.vals[na_prop_inds]
 
-        if np.isclose(NON_AVRG, zero_tol):
+        if np.isclose(NON_AVRG, 0.0, atol=zero_tol, rtol=0.0):
             return 0.
         else:
             product_all *= NON_AVRG
@@ -775,6 +746,9 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
                             index_dict: dict, 
                             precalculated_data: PrecalculatedData,
                             zero_tol: float = 1e-18):
+    """
+    with precalculated_data
+    """
     avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
     
     avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]
@@ -782,7 +756,7 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     avrg_index_tuple = get_ind_tuple_from_base(expr=avrg_expr, 
                                                          base_expr=avrg_tensor_expr, 
                                                          index_dict=index_dict)
-    if np.isclose(avrg_tensor[avrg_index_tuple], zero_tol):
+    if np.isclose(avrg_tensor[avrg_index_tuple], 0.0, atol=zero_tol, rtol=0.0):
         return 0.
     return avrg_tensor[avrg_index_tuple]
 
@@ -890,26 +864,6 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
 
     return full_tensor
 
-# def eval_vibdiff_pert_wf_diff(extra_freqterms: 'FreqTermsCollection',
-#                               index_dict: dict,
-#                             #   precalculated_data: PrecalculatedData,
-#                               molsys_data: MolSystemData):
-#     """
-#     try without precalculated data
-#     """
-
-#     return otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
-
-    # product_all = 1.
-
-    # for vibdiff in extra_freqterms:
-    #     vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, 
-    #                                                     molsys_data.states)
-    #     vib_diff_w_value.cache_it(vibdiff_cache=precalculated_data.vibdiff_cache)
-
-    #     product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
-    
-    # return product_all
 
 def eval_vibenedenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
@@ -927,16 +881,14 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      molsys_data: MolSystemData):
     """
-    without precalculated data - cache vibdiffs in molsys_data.vibdiff_cache
+    without precalculated data
     """
     product_all = 1.
 
     for vibdiff in freqterms:
-        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, 
+        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict,
                                                         molsys_data.states)
 
-        vib_diff_w_value.cache_it(vibdiff_cache=molsys_data.vibdiff_cache)
-        
         product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
-    
+
     return product_all

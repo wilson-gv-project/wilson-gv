@@ -1,0 +1,340 @@
+"""
+evaluate.py — the numeric stage. Everything here is built by hand from tiny arrays;
+no VibPerturbedTerm, no data files.
+"""
+
+import numpy as np
+import pytest
+
+import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
+from wilson_suite.wilson_derive.abstractions import (
+    HarmOscStateSymbolic,
+    PolProp,
+    QOperator,
+    VibDiffTerm,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    DataOriginInfo,
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+    ParameterSet,
+    PrecalculatedData,
+    VibDiff,
+    VibState,
+    VibStatesData,
+    _make_hq_states_from_datadict,
+    eval_non_avrg_per_indexdict,
+    eval_vibenedenom,
+    evaluate_single_index_dict,
+    evaluate_term_coeffs,
+    get_ind_tuple_from_base,
+    make_vibdiff_key,
+    otf_vibdiffdenom,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    CompiledTerm,
+    FreqTermsCollection,
+    PropsCollection,
+    ResonanceMotif,
+)
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
+
+def polprop(ops: tuple[int, ...] = (), inds: str = '') -> PolProp:
+    p = PolProp(ops=[QOperator(o=i) for i in ops], dord=len(inds))
+    p.setInds(list(inds))
+    return p
+
+
+def vibdiff(sl: str = '', sr: str = '', pert: bool = False) -> VibDiffTerm:
+    return VibDiffTerm(sl=HarmOscStateSymbolic(list(sl)), sr=HarmOscStateSymbolic(list(sr)), is_pert_wf_diff=pert)
+
+
+def state(label: str, energy: float) -> VibState:
+    return VibState(harm_quanta_coeffs={}, energy=energy, state_label=label)
+
+
+# Two modes; energies in cm-1 chosen so every difference is distinct.
+E0, E1, E01, E00 = 1000., 1500., 2600., 1950.
+
+
+@pytest.fixture
+def states() -> VibStatesData:
+    return VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E01), state('0,0', E00)),
+                         harmonic_osc_states_labels=(0, 1))
+
+
+## VibState / VibStatesData -------------------------------------------------
+
+def test_vibstate_serial_roundtrip():
+    s = VibState(harm_quanta_coeffs={(0, 1): 0.9, (1,): 0.1}, state_label='0,1')
+
+    assert s.serial_harm_quanta_coeffs == {'0,1': 0.9, '1': 0.1}
+    assert s.deserialize_state_dict() == {(0, 1): 0.9, (1,): 0.1}
+
+
+def test_vibstate_equality_is_label_and_energy():
+    assert state('0', 1000.) == state('0', 1000. + 1e-12)
+    assert state('0', 1000.) != state('1', 1000.)
+    assert state('0', 1000.) != state('0', 1001.)
+    assert state('0', 1.) < state('1', 0.)
+
+
+def test_vibstatesdata_appends_ground_state(states):
+    assert 'zero' in states.allstates_map
+    assert states.get_state_by_label('zero').energy == 0.
+    assert states.get_state_by_label('0,1').energy == E01
+
+
+def test_vibstatesdata_unknown_label_raises(states):
+    with pytest.raises(ValueError):
+        states.get_state_by_label('7')
+
+
+def test_vibstatesdata_harmonic_osc_states_filters_by_label_choice():
+    data = VibStatesData(allstates=(state('1', E1), state('0', E0), state('0,1', E01)),
+                         harmonic_osc_states_labels=(0,))
+
+    assert data.get_harmonic_osc_states() == {0: E0}
+
+
+def test_make_hq_states_from_datadict_joins_quanta_labels():
+    harm, anharm = _make_hq_states_from_datadict({'harmonic_states': {('0',): E0, ('0', '1'): E01}})
+
+    assert [s.state_label for s in harm] == ['0', '0,1']
+    assert [s.energy for s in harm] == [E0, E01]
+    assert anharm == ()
+
+
+## VibDiff ------------------------------------------------------------------
+
+def test_make_vibdiff_key_maps_symbols_sorts_and_names_ground():
+    key = make_vibdiff_key(vibdiff(sl='ab', sr=''), {'a': 1, 'b': 0})
+
+    assert key == ('0,1', 'zero')
+
+
+def test_vibdiff_normalized_puts_ground_left_then_label_order():
+    zero, s0, s1 = state('zero', 0.), state('0', E0), state('1', E1)
+
+    assert VibDiff(s0, zero).normalized() == VibDiff(zero, s0)
+    assert VibDiff(s1, s0).normalized() == VibDiff(s0, s1)
+    assert VibDiff(s0, s1).normalized() == VibDiff(s0, s1)
+
+
+def test_vibdiff_energy_difference_cm1_and_au():
+    vd = VibDiff(state('0,1', E01), state('0', E0))
+
+    assert vd.energy_difference() == pytest.approx(E01 - E0)
+    assert vd.energy_difference(au=True) == pytest.approx(convNu2Ene(E01 - E0))
+
+
+def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
+    index_dict = {'a': 0, 'b': 1}
+
+    symb = VibDiff.from_symbolic(vibdiff(sl='ab', sr='a'), index_dict, states)
+    quanta = VibDiff.from_quanta(('a', 'b'), ('a',), index_dict, states)
+
+    assert symb == quanta
+    assert symb.energy_difference() == pytest.approx(E01 - E0)
+
+
+## MolPropsCollection -------------------------------------------------------
+
+@pytest.fixture
+def props() -> MolPropsCollection:
+    return MolPropsCollection([
+        MolecularProperty(prop_spec={'ops': ['g', 'g', 'g']}, trivial_name='cff'),
+        MolecularProperty(prop_spec={'ops': ['e', 'e', 'g']}, trivial_name='polgrad'),
+    ])
+
+
+def test_molpropscollection_lookup(props):
+    assert props.names() == ['cff', 'polgrad']
+    assert 'cff' in props and 'hess' not in props
+    assert props['polgrad'] is props.get('polgrad')
+    assert len(props) == 2
+    with pytest.raises(ValueError):
+        props.get('hess')
+
+
+def test_molpropscollection_fill_from_and_is_filled(props):
+    assert not props.is_filled
+    assert props.without_values().names() == ['cff', 'polgrad']
+
+    props.fill_from({'cff': np.zeros(1), 'unrelated': 1})
+
+    assert props['cff'].vals is not None
+    assert props.without_values().names() == ['polgrad']
+    assert not props.is_filled
+
+
+def test_molpropscollection_dress_by_name_wins_over_uniform(props):
+    uniform = DataOriginInfo(source_type='wilson')
+    special = DataOriginInfo(source_type='cfour', lvl_theory='CCSD')
+
+    assert not props.are_dressed
+    props.dress(uniform=uniform, by_name={'polgrad': special})
+
+    assert props.are_dressed
+    assert props.build_request_dict() == {'cff': uniform, 'polgrad': special}
+    assert props.by_calc_setup(special).names() == ['polgrad']
+    assert set(props.group_by_calc_setup()) == {uniform, special}
+
+
+def test_molpropscollection_request_dict_requires_dressing(props):
+    with pytest.raises(RuntimeError):
+        props.build_request_dict()
+    with pytest.raises(ValueError):
+        props.dress()
+
+
+def test_molpropscollection_of_order_counts_geometric_ops(props):
+    assert props.of_order(3).names() == ['cff']
+    assert props.of_order(1).names() == ['polgrad']
+
+
+## Evaluation kernels -------------------------------------------------------
+
+CFF = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.   # cff[a, b, c] = 1 + 4a + 2b + c
+POLGRAD_AVRG = np.array([10., 20.])                    # already-averaged <polgrad>[a]
+
+
+@pytest.fixture
+def molsys(states) -> MolSystemData:
+    props = MolPropsCollection([MolecularProperty(prop_spec={}, trivial_name='cff', vals=CFF)])
+    return MolSystemData(name='toy', eigenvals=np.array([E0, E1]), eigenvecs=None, mol_props=props, states=states)
+
+
+def test_eval_non_avrg_reads_tensor_by_symbol_order(molsys):
+    expr = PropsCollection([polprop(inds='abc')])
+
+    assert eval_non_avrg_per_indexdict(expr, {'a': 1, 'b': 0, 'c': 1}, molsys) == CFF[1, 0, 1]
+
+
+def test_eval_non_avrg_short_circuits_on_zero(molsys):
+    molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
+    expr = PropsCollection([polprop(inds='abc'), polprop(inds='abc')])
+
+    assert eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0, 'c': 0}, molsys) == 0.
+
+
+def test_eval_non_avrg_missing_property_raises(molsys):
+    expr = PropsCollection([polprop(inds='ab')])  # 'hess' is not in molsys
+
+    with pytest.raises(ValueError):
+        eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0}, molsys)
+
+
+def test_get_ind_tuple_from_base_full_and_reduced_rank():
+    base = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
+    index_dict = {'a': 1, 'b': 0}
+
+    same = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
+    assert get_ind_tuple_from_base(same, base, index_dict) == (1, 0)
+
+    # (a, a) against a base with one unique symbol: the rank-reduced tensor takes one index
+    repeated = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
+    assert get_ind_tuple_from_base(repeated, PropsCollection([polprop(ops=(0, 1), inds='a')]), index_dict) == (1,)
+
+    # a base with more unique symbols than expr has indices cannot be its base
+    with pytest.raises(ValueError):
+        get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
+
+
+def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
+    freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
+
+    value = otf_vibdiffdenom(freqterms, {'a': 0, 'b': 1}, molsys)
+
+    assert value == pytest.approx(1. / convNu2Ene(E01 - E0) / convNu2Ene(E1))
+
+
+def test_eval_vibenedenom_reads_precomputed_tensor():
+    tensor = np.array([[1., 2.], [3., 4.]])
+    pre = PrecalculatedData(avrg_tensors={}, avrg_expr_tensor_mapping={},
+                            vibenedenoms_tensors={('a', 'b'): tensor})
+    freqterms = FreqTermsCollection([vibdiff(sl='b'), vibdiff(sl='a')])
+
+    assert eval_vibenedenom(freqterms, {'a': 1, 'b': 0}, pre) == 3.
+
+
+## One term end to end -------------------------------------------------------
+
+@pytest.fixture
+def term_and_precalc():
+    """
+    0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a ; sum over b, c ; a fixed.
+    """
+    avrg = polprop(ops=(0, 1), inds='a')
+    term = CompiledTerm(
+        cmp_props=PropsCollection([polprop(inds='abc'), avrg]),
+        cmp_resmotf=ResonanceMotif(()),
+        cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)]),
+        frac_factor=0.5,
+        idx_summ_nonsumm=(('b', 'c'), ('a',)),
+    )
+    avrg_key = PropsCollection([avrg])
+    pre = PrecalculatedData(avrg_tensors={avrg_key: POLGRAD_AVRG},
+                            avrg_expr_tensor_mapping={avrg_key: avrg_key},
+                            vibenedenoms_tensors=None)  # None -> harmonic denominator on the fly
+    return term, pre
+
+
+def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc, molsys):
+    term, pre = term_and_precalc
+
+    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys, pre, zero_tol=1e-18)
+
+    # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
+    assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0))
+    assert set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'}
+    assert contribs['NON_AVRG'] == CFF[0, 1, 1]
+    assert contribs['AVRG'] == POLGRAD_AVRG[0]
+
+
+def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_precalc, molsys):
+    term, pre = term_and_precalc
+    molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
+
+    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys, pre, zero_tol=1e-18)
+
+    assert value == 0.
+    assert contribs['NON_AVRG'] == 0.
+
+
+## evaluate_term_coeffs: sum over whichever of a, b, c the caller left unfixed ---------------
+
+@pytest.mark.parametrize('fixed, expected_leaves, expected_total', [
+    ({'a': 1, 'b': 0, 'c': 1}, {(1, 0, 1)},                                 101),  # nothing missing
+    ({'a': 1, 'b': 0},         {(1, 0, 0), (1, 0, 1)},                       201),  # sum over c
+    ({'a': 1},                 {(1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)}, 422),  # sum over b and c
+])
+def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed, expected_leaves, expected_total,
+                                                                    molsys, monkeypatch):
+    # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
+    monkeypatch.setattr(evaluate_mod, 'evaluate_single_index_dict',
+                        lambda term, idx, *_: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
+    # Only the index split is read from the term here; molsys has 2 modes, so each missing index runs over {0, 1}.
+    term = CompiledTerm(PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
+                        idx_summ_nonsumm=(('b', 'c'), ('a',)))
+
+    results = evaluate_term_coeffs(term, [fixed], None, molsys)
+
+    total, leaves = results[ParameterSet(fixed)]
+    assert total == expected_total
+    assert {tuple(leaf[k] for k in 'abc') for leaf in leaves} == expected_leaves
+
+
+def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_precalc, molsys):
+    term, pre = term_and_precalc
+
+    results = evaluate_term_coeffs(term, [{'a': 0}], pre, molsys)
+
+    total, leaves = results[ParameterSet({'a': 0})]
+    per_leaf = {leaf: evaluate_single_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys, pre, zero_tol=1e-18)
+                for leaf in leaves}
+    assert len(leaves) == 4                                                    # b, c in {0, 1}
+    assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))
+    assert leaves == {leaf: contribs for leaf, (_, contribs) in per_leaf.items()}
