@@ -90,8 +90,14 @@ class PropsCollection:
         return False
     
     def get_averaged_props(self):
+        """
+        ops is a list of QOperator instances - electromagnetic field coupling operators
+        """
         return PropsCollection(props=[p for p in self.props if p.ops])
     def get_non_averaged_props(self):
+        """
+        also, dord is geometry differentiation order, so dord=0 for non-averaged props
+        """
         return PropsCollection(props=[p for p in self.props if not p.ops])
     
     def get_cart_axes(self):
@@ -177,7 +183,7 @@ class FreqTermsCollection:
         freqterm.sl and freqterm.sr should be HarmOscStateSymbolic instances
         """
         def sr_or_sl_only(freqterm: VibDiffTerm):
-            return (freqterm.sl.q == []) or (freqterm.sr.q == [])
+            return (freqterm.sl.q == []) or (freqterm.sr.q == []) # type: ignore
 
         return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if not ft.is_pert_wf_diff or sr_or_sl_only(ft)])
     
@@ -188,7 +194,7 @@ class FreqTermsCollection:
         """
         these vibdiffterms have only sl, sr is zero -- fixme? should it be this?
         """
-        return tuple(sorted({i for vd in self.get_vibenedenom() for i in vd.sl.q}))
+        return tuple(sorted({i for vd in self.get_vibenedenom() for i in vd.sl.q})) # type: ignore
 
 
 @dataclass(frozen=True)
@@ -219,7 +225,7 @@ class ResonanceMotif:
     @classmethod
     def from_conditions(cls, conditions: Sequence[ResonanceCondition]) -> 'ResonanceMotif':
         return cls(tuple(
-            ResCondKey(diff=(tuple(c.diff.sl.q), tuple(c.diff.sr.q)), pf=tuple(c.pf))
+            ResCondKey(diff=(tuple(c.diff.sl.q), tuple(c.diff.sr.q)), pf=tuple(c.pf)) # type: ignore
             for c in conditions
         ))
 
@@ -362,7 +368,7 @@ class CompiledTerm:
         freq_denom = FreqTermsCollection(term.freqterms)
         res_conds = ResonanceMotif.from_conditions(term.res)
 
-        return cls(properties, res_conds, freq_denom, frac_factor, term.tellNonSummSummIndices())
+        return cls(properties, res_conds, freq_denom, frac_factor, term.tellNonSummSummIndices()) # type: ignore
 
     """
     summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
@@ -399,4 +405,4 @@ def parse_vibpert_term(term: 'VibPerturbedTerm'):
     # Get all indices
     idx_summ_nonsumm = term.tellNonSummSummIndices()
 
-    return CompiledTerm(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm)
+    return CompiledTerm(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm) # type: ignore

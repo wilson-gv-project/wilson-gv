@@ -94,9 +94,9 @@ def test_vibstatesdata_unknown_label_raises(states):
 
 def test_vibstatesdata_harmonic_osc_states_filters_by_label_choice():
     data = VibStatesData(allstates=(state('1', E1), state('0', E0), state('0,1', E01)),
-                         harmonic_osc_states_labels=(0,))
+                         harmonic_osc_states_labels=(0,1))
 
-    assert data.get_harmonic_osc_states() == {0: E0}
+    assert data.get_harmonic_osc_states() == {0: E0, 1: E1}
 
 
 def test_make_hq_states_from_datadict_joins_quanta_labels():
@@ -119,7 +119,12 @@ def test_vibdiff_normalized_puts_ground_left_then_label_order():
     zero, s0, s1 = state('zero', 0.), state('0', E0), state('1', E1)
 
     assert VibDiff(s0, zero).normalized() == VibDiff(zero, s0)
+    assert VibDiff(s0, zero) != VibDiff(zero, s0)
+    assert VibDiff(s0, zero).energy_difference() == s0.energy
+    assert VibDiff(zero, s0).energy_difference() == -s0.energy
+
     assert VibDiff(s1, s0).normalized() == VibDiff(s0, s1)
+    assert VibDiff(s1, s0) != VibDiff(s0, s1)
     assert VibDiff(s0, s1).normalized() == VibDiff(s0, s1)
 
 
@@ -227,18 +232,31 @@ def test_eval_non_avrg_missing_property_raises(molsys):
         eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0}, molsys)
 
 
-def test_get_ind_tuple_from_base_full_and_reduced_rank():
-    base = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
+def test_get_ind_tuple_from_base_distinct_vs_repeated_base_labels():
+    """
+    `expr` is an averaged property product as it appears in one term, with that term's mode
+    labels. `base_expr` is the member of expr's motif whose tensor was actually computed
+    (avrg_expr_tensor_mapping[expr] -> base_expr); that tensor has one axis per UNIQUE base
+    label, in alphabetical order. get_ind_tuple_from_base returns the position in that tensor
+    holding expr's value for the mode assignment index_dict (keyed by expr's labels).
+
+    Two shapes of base:
+      - all base labels distinct -> one axis per slot; expr's labels are read slot by slot
+      - a base label repeats     -> fewer axes than slots; only the unique labels are read
+    A base with more unique labels than expr has slots cannot stand in for expr.
+    """
     index_dict = {'a': 1, 'b': 0}
 
-    same = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
-    assert get_ind_tuple_from_base(same, base, index_dict) == (1, 0)
+    # all-distinct base: axes (a, b) <-> slots, so expr's labels are read slot by slot
+    base = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
+    expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
+    assert get_ind_tuple_from_base(expr, base, index_dict) == (1, 0)
 
-    # (a, a) against a base with one unique symbol: the rank-reduced tensor takes one index
+    # repeated base label: 'a' fills both slots, the tensor has a single axis -> one index
     repeated = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
     assert get_ind_tuple_from_base(repeated, PropsCollection([polprop(ops=(0, 1), inds='a')]), index_dict) == (1,)
 
-    # a base with more unique symbols than expr has indices cannot be its base
+    # more unique base labels than expr has slots: base cannot represent expr
     with pytest.raises(ValueError):
         get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
 
@@ -278,7 +296,7 @@ def term_and_precalc():
     avrg_key = PropsCollection([avrg])
     pre = PrecalculatedData(avrg_tensors={avrg_key: POLGRAD_AVRG},
                             avrg_expr_tensor_mapping={avrg_key: avrg_key},
-                            vibenedenoms_tensors=None)  # None -> harmonic denominator on the fly
+                            vibenedenoms_tensors=None)  # None -> harmonic denominator on the fly # type: ignore
     return term, pre
 
 
@@ -311,8 +329,24 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_precal
     ({'a': 1, 'b': 0},         {(1, 0, 0), (1, 0, 1)},                       201),  # sum over c
     ({'a': 1},                 {(1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)}, 422),  # sum over b and c
 ])
-def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed, expected_leaves, expected_total,
+def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
+                                                                    expected_leaves, expected_total,
                                                                     molsys, monkeypatch):
+    """
+    evaluate_term_coeffs takes a term with mode labels (a, b, c) and a list of caller-supplied
+    PARTIAL assignments ("relevant indices", e.g. {'a': 1}). For each partial assignment it fills
+    every label the caller did not fix with each mode 0..n_modes-1, calls
+    evaluate_single_index_dict once per complete assignment (a "leaf"), and returns
+
+        results[ParameterSet(partial)] = (sum of leaf values, {ParameterSet(leaf): contribs})
+
+    Which labels get summed is decided by what is missing from the partial dict, not by the
+    term's idx_summ_nonsumm split; the split is read only to learn which labels the term has.
+
+    This test checks the enumeration alone: evaluate_single_index_dict is stubbed to return
+    100a + 10b + c, so each leaf value spells out its own assignment and the expected totals
+    can be added by hand, e.g. {'a': 1} -> 100 + 101 + 110 + 111 = 422.
+    """
     # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
     monkeypatch.setattr(evaluate_mod, 'evaluate_single_index_dict',
                         lambda term, idx, *_: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
@@ -320,7 +354,7 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed, expec
     term = CompiledTerm(PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
                         idx_summ_nonsumm=(('b', 'c'), ('a',)))
 
-    results = evaluate_term_coeffs(term, [fixed], None, molsys)
+    results = evaluate_term_coeffs(term, [fixed], precalculated_data=None, molsys_data=molsys) # type: ignore
 
     total, leaves = results[ParameterSet(fixed)]
     assert total == expected_total
@@ -328,6 +362,19 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed, expec
 
 
 def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_precalc, molsys):
+    """
+    Same summation, now with the real evaluate_single_index_dict and the fixture's toy term
+    (0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a). Fix a=0 and let b, c run
+    over the two modes -> four leaves.
+
+    The value of a single leaf is already covered by test_evaluate_single_index_dict_*; here the
+    check is that evaluate_term_coeffs passes leaves through faithfully: the total equals the sum
+    of evaluating each leaf assignment independently (nothing dropped, double-counted or
+    rescaled), and the contribs stored per leaf are exactly what that call returns.
+
+    Leaves are keyed by ParameterSet, which adds a 'zero' sentinel entry, so
+    {k: leaf[k] for k in 'abc'} recovers the plain (a, b, c) dict needed to re-evaluate a leaf.
+    """
     term, pre = term_and_precalc
 
     results = evaluate_term_coeffs(term, [{'a': 0}], pre, molsys)
@@ -335,6 +382,6 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     total, leaves = results[ParameterSet({'a': 0})]
     per_leaf = {leaf: evaluate_single_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys, pre, zero_tol=1e-18)
                 for leaf in leaves}
-    assert len(leaves) == 4                                                    # b, c in {0, 1}
+    assert len(leaves) == 4             # b, c in {0, 1}
     assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))
     assert leaves == {leaf: contribs for leaf, (_, contribs) in per_leaf.items()}

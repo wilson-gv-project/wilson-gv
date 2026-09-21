@@ -38,7 +38,7 @@ def vibdiff(sl: str = '', sr: str = '', pert: bool = False) -> VibDiffTerm:
 
 def vibdiff_keys(coll: FreqTermsCollection) -> list[tuple]:
     """VibDiffTerm compares by identity and the collection deepcopies, so compare by content."""
-    return [(tuple(ft.sl.q), tuple(ft.sr.q), ft.is_pert_wf_diff) for ft in coll]
+    return [(tuple(ft.sl.q), tuple(ft.sr.q), ft.is_pert_wf_diff) for ft in coll] # type: ignore
 
 
 ## PropsCollection ----------------------------------------------------------
@@ -79,7 +79,7 @@ def test_identify_avrg_motif_erases_inds_on_a_copy_only():
 
     motif = coll.identify_avrg_motif()
 
-    assert [p.inds for p in motif] == [None]
+    assert [p.inds for p in motif] == [None] # type: ignore
     assert coll.get_mode_indices() == ('a', 'a', 'b')
 
 
@@ -136,7 +136,7 @@ def test_resonance_motif_is_immutable():
     motif = ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
 
     with pytest.raises(AttributeError):
-        motif.conditions = ()
+        motif.conditions = () # type: ignore
 
 
 def test_resonance_motif_axes_and_mode_indices():
@@ -162,7 +162,7 @@ def test_parameterset_injects_zero_and_maps_empty_label():
 
 def test_parameterset_rejects_non_mapping():
     with pytest.raises(TypeError):
-        ParameterSet([('a', 0)])
+        ParameterSet([('a', 0)]) # type: ignore
 
 
 def test_parameterset_equality_is_order_independent():
@@ -197,7 +197,7 @@ def _fake_vibpert_term():
 
 
 def test_compiled_term_from_vibpert_term():
-    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term())
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
 
     assert ct.frac_factor == 0.5
     assert ct.cmp_props.get_mode_indices() == ('a', 'a', 'b')
@@ -207,7 +207,7 @@ def test_compiled_term_from_vibpert_term():
 
 
 def test_compile_terms_one_compiled_per_term():
-    compiled = compile_terms([_fake_vibpert_term(), _fake_vibpert_term()])
+    compiled = compile_terms([_fake_vibpert_term(), _fake_vibpert_term()]) # type: ignore
 
     assert len(compiled) == 2
     assert all(isinstance(c, CompiledTerm) for c in compiled)

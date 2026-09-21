@@ -177,8 +177,8 @@ def make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, 
 
     returns keys for vibdiff bank for vib states expression and choice of indices
     """
-    left_state_symb = vibdiff_term.sl.q
-    right_state_symb = vibdiff_term.sr.q
+    left_state_symb = vibdiff_term.sl.q # type: ignore
+    right_state_symb = vibdiff_term.sr.q # type: ignore
 
 
     left_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in left_state_symb])])
@@ -517,99 +517,6 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
                          relevant_indices: list[dict],
                          precalculated_data: 'PrecalculatedData',
                          molsys_data: 'MolSystemData',
-                         zero_tol: float = 1e-18) -> dict['ParameterSet', float]:
-    """
-    Evaluate the coefficient part of the term 'term' for all of the indices in 'relevant_indices',
-    handling hierarchical summation over indices.
-
-    example_relevant_indices = [
-        {'e': 0},  # Sum over 'a', 'b', 'c', 'd'
-        {'e': 1},  # Sum over 'a', 'b', 'c', 'd'
-        {'e': 2},  # Sum over 'a', 'b', 'c', 'd'
-    ]
-
-    Parameters:
-        term: VibPerturbedTerm
-            The term to evaluate, containing properties and frequency terms.
-        relevant_indices: List[Dict]
-            List of dictionaries specifying the relevant indices for evaluation.
-        precalculated_data: PrecalculatedData
-            Data and configurations required for evaluation.
-        zero_tol: float
-            Tolerance for considering a value as zero.
-    Returns:
-        Dict[ParameterSet, float]: A dictionary mapping ParameterSet to computed coefficients.
-    """
-    results = {}
-    
-    # Get all indices
-    idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
-    term_idx_all = sorted(idx_summ + idx_nonsumm)
-    
-    def hierarchical_sum(index_dict: dict, remaining_indices: list[str], dict_of_sum: dict) -> tuple[float, dict]:
-        """
-        Perform hierarchical summation over the remaining indices.
-        Parameters:
-            index_dict: Dict
-                The current index dictionary with some indices fixed.
-            remaining_indices: List[str]
-                The list of indices that still need to be summed over.
-        Returns:
-            float: The result of the summation for the given index dictionary.
-            
-            dict_of_sum: top level: 
-                    {ParameterSet(index_dict): {}}
-        """
-        # Base case: no remaining indices to sum over
-        if not remaining_indices:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, molsys_data, precalculated_data, zero_tol)
-            dict_of_sum[ParameterSet(index_dict)] = contribs
-            # returns coef and dict with param contribs
-
-            return value, dict_of_sum
-        
-        # Get the next index to sum over
-        current_index = remaining_indices[0]
-        remaining = remaining_indices[1:]
-        
-        # Perform summation over all possible values for the current index
-        n_modes = len(molsys_data.eigenvals) if molsys_data.eigenvals is not None else 0
-        total_sum = 0.0
-
-        for value in range(n_modes):
-            # Update the index dictionary with the current value
-            new_index_dict = index_dict.copy()
-            new_index_dict[current_index] = value
-            
-            parent_key = ParameterSet(index_dict)
-            child_key = ParameterSet(new_index_dict)
-            # if parent_key not in dict_of_sum:
-            #     dict_of_sum[parent_key] = {}
-            # dict_of_sum[parent_key][child_key] = {}
-            
-            # Recursively compute the sum for the remaining indices
-            recurse_res = hierarchical_sum(new_index_dict, remaining, dict_of_sum[ParameterSet(index_dict)])
-            total_sum += recurse_res[0]
-        
-        return total_sum, dict_of_sum
-    
-    # Iterate over the relevant indices -- 
-    for index_dict in relevant_indices:
-        # Identify missing indices
-        missing_indices = [index for index in term_idx_all if index not in index_dict]
-        
-        dict_of_sum = {ParameterSet(index_dict): {}}
-        
-        # Perform hierarchical summation for the current index_dict
-        result = hierarchical_sum(index_dict, missing_indices, dict_of_sum)
-        results[ParameterSet(index_dict)] = result
-    
-    return results
-
-def evaluate_term_coeffs(compl_term: 'CompiledTerm',
-                         relevant_indices: list[dict],
-                         precalculated_data: 'PrecalculatedData',
-                         molsys_data: 'MolSystemData',
                          zero_tol: float = 1e-18):
     idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
     term_idx_all = sorted(idx_summ + idx_nonsumm)
@@ -788,7 +695,7 @@ def make_gen_func_to_compute_avrg(*,
             )
 
         # Validate index_choices has all required keys
-        required_inds = {i for prop in avrg_expression for i in prop.inds}
+        required_inds = {i for prop in avrg_expression for i in prop.inds} # type: ignore
         missing = required_inds - index_choices.keys()
         if missing:
             raise KeyError(
@@ -810,12 +717,14 @@ def make_gen_func_to_compute_avrg(*,
 
                 prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
 
-                nm_inds = tuple([index_choices[i] for i in prop.inds])
+                nm_inds = tuple([index_choices[i] for i in prop.inds]) # type: ignore
                 cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
                 all_inds = (*nm_inds, *cart_inds)
 
                 # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                product *= props_data.get(prop_tuple_key).vals[all_inds]
+                getprop = props_data.get(prop_tuple_key)
+                if getprop:
+                    product *= getprop.vals[all_inds]
 
             # if product != 0.:
             #     logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
