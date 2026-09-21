@@ -70,7 +70,6 @@ class DataOriginInfo:
         )
 
 
-## ------------------------------------------------------------------
 
 @dataclass
 class VibState:

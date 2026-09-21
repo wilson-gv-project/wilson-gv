@@ -259,7 +259,6 @@ class ResonanceMotif:
 """
 ParameterSet has a type that lies. Declared Mapping[str, int], but __init__ injects params['zero'] = 'zero' (a str value) and __getitem__ remaps '' → 'zero'; __lt__ hardcodes the alphabet ('a'..'h'). A generic index-assignment type that secretly knows vibrational-state labelling conventions. Decide which it is: if generic, the zero sentinel and ordering are policy living in a labelling module; if domain, name it (IndexAssignment) and make the conventions explicit and tested. The ground state currently spelled three ways ('', 'zero', state_label == 'zero') is that ambiguity leaking.
 """
-# numerical
 @dataclass(frozen=True)
 class ParameterSet(Mapping[str, int]):
     """
@@ -346,7 +345,7 @@ class ParameterSet(Mapping[str, int]):
 
 
 ## --------------------------------------------------------------------
-@dataclass
+@dataclass(frozen=True)
 class CompiledTerm:
     """
     In Axes.

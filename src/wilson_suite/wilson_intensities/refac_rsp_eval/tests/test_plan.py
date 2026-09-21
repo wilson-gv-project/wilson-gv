@@ -115,12 +115,38 @@ def test_freqterms_num_indices_are_sorted_unique_left_quanta():
     assert coll.get_num_indices_vibenedenom() == ('a', 'b')
 
 
+## ResCondKey ---------------------------------------------------------------
+# One resonance condition stripped to what identifies it: which quanta sit on each side of the
+# energy difference, and which perturbing frequencies enter. plan.py keeps these instead of
+# derive's ResonanceCondition so a ResonanceMotif can be hashed, compared and pickled without
+# holding derive objects.
+
+def test_rescondkey_left_right_and_ground_state():
+    key = ResCondKey(diff=(('a', 'b'), ()), pf=('1',))     # E_ab - E_0, perturbed by freq '1'
+
+    assert key.left == ('a', 'b')
+    assert key.right == ()        # ground state is the empty tuple
+    assert key.pf == ('1',)
+
+
+def test_rescondkey_is_a_frozen_value_usable_as_dict_key():
+    key = ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2'))
+    same = ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2'))
+
+    assert key == same and hash(key) == hash(same)
+    assert {key: 'motif'}[same] == 'motif'
+    with pytest.raises(AttributeError):
+        key.pf = ()  # type: ignore
+
+
 ## ResonanceMotif -----------------------------------------------------------
 
 def test_resonance_motif_from_conditions_matches_from_tuples():
+    """Both constructors reduce each condition to the same ResCondKey: quanta sorted (as
+    HarmOscStateSymbolic does), ground state as (), pf list -> tuple."""
     conds = [
-        ResonanceCondition(diff=vibdiff(sl='ba'), pf=['1']),
-        ResonanceCondition(diff=vibdiff(sl='a', sr='c'), pf=['-1', '2']),
+        ResonanceCondition(diff=vibdiff(sl='ba'), pf=['1']),              # E_ab - E_0
+        ResonanceCondition(diff=vibdiff(sl='a', sr='c'), pf=['-1', '2']),  # E_a - E_c
     ]
 
     from_conds = ResonanceMotif.from_conditions(conds)
@@ -129,7 +155,20 @@ def test_resonance_motif_from_conditions_matches_from_tuples():
 
     assert from_conds == from_tuples
     assert hash(from_conds) == hash(from_tuples)
-    assert from_conds.conditions[0] == ResCondKey(diff=(('a', 'b'), ()), pf=('1',))
+    assert {from_conds: 'shared'}[from_tuples] == 'shared'     # what makes it a dedup key
+    assert from_conds.conditions == (ResCondKey(diff=(('a', 'b'), ()), pf=('1',)),
+                                     ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2')))
+
+
+def test_resonance_motif_axes_and_mode_indices():
+    # a motif is just a tuple of keys; build one directly to show that
+    motif = ResonanceMotif((ResCondKey(diff=(('a',), ()), pf=('-1', '2')),
+                            ResCondKey(diff=(('a', 'b'), ('c',)), pf=('2',))))
+
+    assert motif.get_max_different_freq_axes() == {'1', '2'}   # sign on pf is stripped
+    assert motif.get_nm_indices() == {'a', 'b', 'c'}          # both sides of every diff
+    assert len(motif) == 2
+    assert list(motif) == list(motif.conditions)               # iterating yields the keys
 
 
 def test_resonance_motif_is_immutable():
@@ -137,15 +176,6 @@ def test_resonance_motif_is_immutable():
 
     with pytest.raises(AttributeError):
         motif.conditions = () # type: ignore
-
-
-def test_resonance_motif_axes_and_mode_indices():
-    motif = ResonanceMotif.from_tuples([((('a',), ()), ('-1', '2')),
-                                        ((('a', 'b'), ('c',)), ('2',))])
-
-    assert motif.get_max_different_freq_axes() == {'1', '2'}
-    assert motif.get_nm_indices() == {'a', 'b', 'c'}
-    assert len(motif) == 2
 
 
 ## ParameterSet -------------------------------------------------------------
