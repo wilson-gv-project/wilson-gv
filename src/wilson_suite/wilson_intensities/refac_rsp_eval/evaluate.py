@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from wilson_suite.wilson_derive.abstractions import (
+    PolProp,
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -392,6 +393,29 @@ class MolecularProperty:
             "prop_spec": self.prop_spec,
             "trivial_name": self.trivial_name,
         }
+
+    @classmethod
+    def from_polprop(cls, polprop: 'PolProp', 
+                     freqs: str = 'static') -> 'MolecularProperty':
+        """
+        Construct MolecularProperty from a PolProp instance.
+        """
+        ops = []
+
+        ord_geo = polprop.dord
+        for _ in range(ord_geo):
+            ops.append('g')
+
+        ord_el = len(polprop.ops)
+        for _ in range(ord_el):
+            ops.append('f')
+
+        if freqs == 'static':
+            pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
+        else:
+            raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
+
+        return cls(prop_spec=pdict, trivial_name=prop_trivname(ord_geo=ord_geo, ord_el=ord_el))
 
 
 @dataclass

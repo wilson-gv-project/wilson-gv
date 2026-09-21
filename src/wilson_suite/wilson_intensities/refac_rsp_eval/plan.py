@@ -196,6 +196,9 @@ class FreqTermsCollection:
         """
         return tuple(sorted({i for vd in self.get_vibenedenom() for i in vd.sl.q})) # type: ignore
 
+    def get_max_state_lvl(self):
+        return max(max(len(vd.sl.q), len(vd.sr.q)) for vd in self.freqterms) # type: ignore
+
 
 @dataclass(frozen=True)
 class ResCondKey:
@@ -251,6 +254,9 @@ class ResonanceMotif:
 
     def get_nm_indices(self):
         return {label for c in self.conditions for quanta in c.diff for label in quanta}
+
+    def get_max_state_lvl(self):
+        return max(max(len(c.diff[0]), len(c.diff[1])) for c in self.conditions) # type: ignore
 
     def __repr__(self):
         return f'{self.conditions}'
@@ -364,10 +370,34 @@ class CompiledTerm:
 
         frac_factor = float(term.coeff)
         properties = PropsCollection(term.props)
-        freq_denom = FreqTermsCollection(term.freqterms)
-        res_conds = ResonanceMotif.from_conditions(term.res)
+        freq_denom = FreqTermsCollection(term.freqterms) # states
+        res_conds = ResonanceMotif.from_conditions(term.res) # states
+        idx_summ_nonsumm = term.tellNonSummSummIndices()
 
-        return cls(properties, res_conds, freq_denom, frac_factor, term.tellNonSummSummIndices()) # type: ignore
+        return cls(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm) # type: ignore
+
+    @property
+    def max_state_lvl(self):
+        return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
+
+    def make_data_request(self):
+        from wilson_suite.wilson_main.main_functions import tell_needed_props_for_vib_analysis_simple
+        self.cmp_props
+        self.cmp_freqdenom
+        self.cmp_resmotf
+
+        data_dict = {}
+        from .main_functions import request_props, request_residual_vib_info
+
+        if not all(isinstance(p.calc_setup, DataOriginInfo) for p in self.props):
+            raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset props values")
+        request_props(self.props, data_dict)
+
+        if not all(isinstance(i, DataOriginInfo) for i in self.residual_vib_info.values()):
+            raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset residual_vib_info values")
+        request_residual_vib_info(self.residual_vib_info, data_dict)
+
+        return data_dict
 
     """
     summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
@@ -386,22 +416,3 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']):
 
     return compiled
 
-
-
-def parse_vibpert_term(term: 'VibPerturbedTerm'):
-    
-    """
-    precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
-
-    idx_summ, idx_nonsumm = term.tellNonSummSummIndices()
-    """
-
-    frac_factor = float(term.coeff)
-    properties = PropsCollection(term.props)
-    freq_denom = FreqTermsCollection(term.freqterms)
-    res_conds = ResonanceMotif.from_conditions(term.res)
-
-    # Get all indices
-    idx_summ_nonsumm = term.tellNonSummSummIndices()
-
-    return CompiledTerm(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm) # type: ignore
