@@ -50,7 +50,6 @@ from wilson_suite.wilson_derive.abstractions import (
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import MolecularProperty
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
@@ -412,7 +411,7 @@ class CompiledTerm:
     idx_summ_nonsumm: tuple[tuple[str, ...], tuple[str, ...]]
 
     @classmethod
-    def from_VibPertTerm(cls, term: 'VibPerturbedTerm'):
+    def from_VibPertTerm(cls, term: 'VibPerturbedTerm') -> 'CompiledTerm':
 
         frac_factor = float(term.coeff)
         properties = PropsCollection(term.props)
@@ -438,7 +437,7 @@ class CompiledTerm:
 
 ## --------------------------------------------------------------------
 
-def compile_terms(terms: Sequence['VibPerturbedTerm']):
+def compile_terms(terms: Sequence['VibPerturbedTerm']) -> list[CompiledTerm]:
 
     compiled = []
     for t in terms:
@@ -446,7 +445,7 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']):
 
     return compiled
 
-def make_request_from_term(cmp_term: CompiledTerm):
+def make_request_from_term(cmp_term: CompiledTerm) -> dict:
     # self.cmp_props
     # self.cmp_freqdenom
     # self.cmp_resmotf

@@ -308,7 +308,8 @@ class MolSystemData:
     def from_datadict(cls, 
                       mol_props: 'MolPropsCollection',  # to be filled with data
                       data_dict: dict,                  # data obtained from obtainer
-                      states_choice: str = 'harmonic'):
+                      states_choice: str = 'harmonic',
+                      name: str = 'from_data_dict'):
         """
         loading data into self.props (and optionally to self.vib_ana_setup)
 
@@ -319,19 +320,19 @@ class MolSystemData:
 
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
         if states_choice == 'harmonic':
-            labels = tuple(int(i[0]) for i in harm_states if len(i))
+            labels = tuple((int(i.state_label.split(',')[0]),) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=harm_states, harmonic_osc_states_labels=labels)
 
         elif states_choice == 'anharmonic':
-            labels = tuple(int(i[0]) for i in anharm_states if len(i))
+            labels = tuple((int(i.state_label.split(',')[0]),) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
 
         geo = data_dict.get('geo', None)
         natoms = len(geo) if geo is not None else 0
 
-        return cls(name='from_data_dict',
+        return cls(name=name,
                    eigenvals=data_dict.get('nc_sqrt_eigval', None), # FIXME: none values should be handled better
-                   eigenvecs=data_dict.get('eigenvecs', None), # FIXME: none values should be handled better
+                   eigenvecs=data_dict.get('normal_modes', None), # FIXME: none values should be handled better
                    mol_props=mol_props,
                    natoms=natoms,
                    states=states,
@@ -340,13 +341,11 @@ class MolSystemData:
                    linear=data_dict.get('linear', False),
                    data_origin=data_dict.get('data_origin', None))
 
-    def add_calcsetup():
-        
-        return
 
-    def sys_info_request(self):
-        keys = ['anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'nc_eigvec']
-        return dict.fromkeys(keys, self.data_origin)
+def _sys_info_request(data_origin: DataOriginInfo):
+    keys = ['anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'normal_modes',
+            'atoms', 'equilibrium_geometry']
+    return dict.fromkeys(keys, data_origin)
 
 
 

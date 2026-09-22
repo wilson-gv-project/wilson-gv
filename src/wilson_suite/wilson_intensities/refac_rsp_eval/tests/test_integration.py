@@ -2,7 +2,9 @@ from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     MolPropsCollection,
+    MolecularProperty,
     MolSystemData,
+    DataOriginInfo
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -11,6 +13,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 
 def res_to_str(res):
@@ -27,14 +31,14 @@ def term_to_str(term):
     return f"{float(term.coeff)} * ( {pp} ) / ( {ft} ) / {res}"
 
 def compl_evv_terms():
-    terms = VibPerturbedTerm.load_many_from_json('./test_terms.json')
+    terms = VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/wilson_intensities/refac_rsp_eval/tests/test_terms.json')
 
     axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}) # type: ignore
     translated_terms = term_var_translate.translate_terms_to_axis_variables(terms, axis_choice)
 
-    for i, term in enumerate(translated_terms):
-        print(f"Term {i}:")
-        print(f"{term_to_str(term)}\n")
+    # for i, term in enumerate(translated_terms):
+    #     print(f"Term {i}:")
+    #     print(f"{term_to_str(term)}\n")
 
     return compile_terms(terms=translated_terms)
 
@@ -52,12 +56,25 @@ def test_plan_compiled_term():
 
 
 def test_eval_molsys_data():
-    molprops = MolPropsCollection()
 
     compiled_terms = compl_evv_terms()
-    print(compiled_terms[0].cmp_props.build_request_dict())
 
-    # request = {}
-    # datadict = wilson_data_obtainer(requested_data_dict=request)
-    # molsys = MolSystemData.from_datadict(data_dict=datadict)
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in compiled_terms[0].cmp_props])
+    
+    calc_dataorigin = DataOriginInfo(source_type='gaussian',
+                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    request = compiled_terms[0].cmp_props.build_request_dict(calc_setup=calc_dataorigin)
 
+    from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+        _sys_info_request,
+    )
+    request.update(_sys_info_request(calc_dataorigin))
+
+    datadict = wilson_data_obtainer(requested_data_dict=request)
+
+    print(datadict.keys())
+
+    molsys = MolSystemData.from_datadict(mol_props=molprops,
+                                         data_dict=datadict)
+
+    print(molsys.eigenvecs)

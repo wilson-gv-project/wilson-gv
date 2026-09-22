@@ -1,4 +1,6 @@
-from wilson_suite.wilson_main.abstractions import DataOriginInfo
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import DataOriginInfo
+
+# from wilson_suite.wilson_main.abstractions import DataOriginInfo
 
 
 def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo], 
