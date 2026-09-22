@@ -26,9 +26,7 @@ def term_to_str(term):
     pp = ' '.join([f'{i[0]}[{",".join([f"{j.o}" for j in i[2]])};{",".join([f"{k}" for k in i[1]])}]' for i in p_names]) # type: ignore
     return f"{float(term.coeff)} * ( {pp} ) / ( {ft} ) / {res}"
 
-def test_plan_compiled_term():
-    """Integration test for plan module."""
-    print('\n\n')
+def compl_evv_terms():
     terms = VibPerturbedTerm.load_many_from_json('./test_terms.json')
 
     axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}) # type: ignore
@@ -38,7 +36,13 @@ def test_plan_compiled_term():
         print(f"Term {i}:")
         print(f"{term_to_str(term)}\n")
 
-    compiled_terms = compile_terms(terms=translated_terms)
+    return compile_terms(terms=translated_terms)
+
+
+def test_plan_compiled_term():
+    """Integration test for plan module."""
+    print('\n\n')
+    compiled_terms = compl_evv_terms()
 
     assert isinstance(compiled_terms[0], CompiledTerm)
     assert compiled_terms[0].max_state_lvl == 1
@@ -46,9 +50,14 @@ def test_plan_compiled_term():
     assert compiled_terms[13].max_state_lvl == 3
 
 
-# def test_eval_molsys_data():
-#     molprops = MolPropsCollection()
-#     request = {}
-#     datadict = wilson_data_obtainer(requested_data_dict=request)
-#     molsys = MolSystemData.from_datadict(data_dict=datadict)
+
+def test_eval_molsys_data():
+    molprops = MolPropsCollection()
+
+    compiled_terms = compl_evv_terms()
+    print(compiled_terms[0].cmp_props.build_request_dict())
+
+    # request = {}
+    # datadict = wilson_data_obtainer(requested_data_dict=request)
+    # molsys = MolSystemData.from_datadict(data_dict=datadict)
 

@@ -150,8 +150,8 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
 @pytest.fixture
 def props() -> MolPropsCollection:
     return MolPropsCollection([
-        MolecularProperty(prop_spec={'ops': ['g', 'g', 'g']}, trivial_name='cff'),
-        MolecularProperty(prop_spec={'ops': ['e', 'e', 'g']}, trivial_name='polgrad'),
+        MolecularProperty(trivial_name='cff', extra_data={'ops': ['g', 'g', 'g']}),
+        MolecularProperty(trivial_name='polgrad', extra_data={'ops': ['e', 'e', 'g']}),
     ])
 
 
@@ -175,31 +175,6 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert not props.is_filled
 
 
-def test_molpropscollection_dress_by_name_wins_over_uniform(props):
-    uniform = DataOriginInfo(source_type='wilson')
-    special = DataOriginInfo(source_type='cfour', lvl_theory='CCSD')
-
-    assert not props.are_dressed
-    props.dress(uniform=uniform, by_name={'polgrad': special})
-
-    assert props.are_dressed
-    assert props.build_request_dict() == {'cff': uniform, 'polgrad': special}
-    assert props.by_calc_setup(special).names() == ['polgrad']
-    assert set(props.group_by_calc_setup()) == {uniform, special}
-
-
-def test_molpropscollection_request_dict_requires_dressing(props):
-    with pytest.raises(RuntimeError):
-        props.build_request_dict()
-    with pytest.raises(ValueError):
-        props.dress()
-
-
-def test_molpropscollection_of_order_counts_geometric_ops(props):
-    assert props.of_order(3).names() == ['cff']
-    assert props.of_order(1).names() == ['polgrad']
-
-
 ## Evaluation kernels -------------------------------------------------------
 
 CFF = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.   # cff[a, b, c] = 1 + 4a + 2b + c
@@ -208,7 +183,7 @@ POLGRAD_AVRG = np.array([10., 20.])                    # already-averaged <polgr
 
 @pytest.fixture
 def molsys(states) -> MolSystemData:
-    props = MolPropsCollection([MolecularProperty(prop_spec={}, trivial_name='cff', vals=CFF)])
+    props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=CFF, extra_data={})])
     return MolSystemData(name='toy', eigenvals=np.array([E0, E1]), eigenvecs=None, mol_props=props, states=states)
 
 

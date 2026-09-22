@@ -340,6 +340,15 @@ class MolSystemData:
                    linear=data_dict.get('linear', False),
                    data_origin=data_dict.get('data_origin', None))
 
+    def add_calcsetup():
+        
+        return
+
+    def sys_info_request(self):
+        keys = ['anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'nc_eigvec']
+        return dict.fromkeys(keys, self.data_origin)
+
+
 
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
     """
@@ -363,35 +372,26 @@ def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tup
     return harm_states, anharm_states
 
 
-
 @dataclass
 class MolecularProperty:
     """
     Class to represent a molecular (energy derivative or similar) property
-    Can both be used "head only" (only prop_spec, target_basis, target_units) to specify only the concept of a property
-    and "full" (system, calc_setup) for a particular realization (optional with/without values)
+
+    holds name (key), values; 
+        does not hold provenance info but would be retireved from MolSystemData with this info
     
     ----
-    prop_spec: Dictionary {'attr name': val, ...}: Info like perturbing operators, frequencies etc. (all values must be hashable)
     triv_name: String: Trivial name For simplified reference
     vals: Form not specified: Values of properties - could be array or dictionary
-    system: MolecularSystem instance: For which system?
-    calc_setup: DataOriginInfo instance: For which calculation setup?
-
-    see more in test_main_dataclasses.py::test_MolecularProperty
     """
-    # FIXME: Improve on prop_spec name; settle more consistently what the attributes will be and what must be default
-    prop_spec: dict
     trivial_name: str | None = None
-    system: MolSystemData | None = None
-    calc_setup: DataOriginInfo | None = None
     vals: Any = field(default=None, repr=False)
     extra_data: dict | None = None
 
     def to_dict(self):
         return {
-            "prop_spec": self.prop_spec,
             "trivial_name": self.trivial_name,
+            "extra_data": self.extra_data,
         }
 
     @classmethod
@@ -415,7 +415,8 @@ class MolecularProperty:
         else:
             raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
 
-        return cls(prop_spec=pdict, trivial_name=prop_trivname(ord_geo=ord_geo, ord_el=ord_el))
+        return cls(trivial_name=prop_trivname(ord_geo=ord_geo, ord_el=ord_el),
+                   extra_data=pdict)
 
 
 @dataclass
@@ -454,61 +455,11 @@ class MolPropsCollection:
         """Properties still awaiting data — useful for finding what's missing."""
         return self.filter(lambda p: p.vals is None)
 
-    def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
-        """All properties computed with a given setup."""
-        return self.filter(lambda p: p.calc_setup == origin)
-
-    def of_order(self, order: int) -> 'MolPropsCollection':
-        """Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
-        return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
-
-    def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
-        """Bucket properties by which setup they use. For batching QC jobs."""
-        from collections import defaultdict
-        groups = defaultdict(list)
-        for p in self.properties:
-            groups[p.calc_setup].append(p)
-        return {k: MolPropsCollection(v) for k, v in groups.items()}
-
-    def dress(self, uniform: DataOriginInfo | None = None, 
-            by_name: dict[str, DataOriginInfo] | None = None):
-        """Attach DataOriginInfo to each property. 
-        by_name takes precedence; uniform is the fallback."""
-        if uniform is None and by_name is None:
-            raise ValueError("Provide `uniform` or `by_name` (or both).")
-        
-        for p in self.properties:
-            if by_name and p.trivial_name in by_name:
-                p.calc_setup = by_name[p.trivial_name]
-            elif uniform is not None:
-                p.calc_setup = uniform
-            else:
-                raise ValueError(f"No setup for property {p}")
-
-    @property
-    def are_dressed(self) -> bool:
-        return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
-
-    def build_request_dict(self) -> dict[str, DataOriginInfo]:
-        """Build a {name: DataOriginInfo} shopping list."""
-        if not self.are_dressed:
-            raise RuntimeError("Collection must be dressed before requesting data.")
-
-        result: dict[str, DataOriginInfo] = {}
-        for p in self.properties:
-            if p.trivial_name is None:
-                raise ValueError("All properties must have a trivial name.")
-            if p.calc_setup is None:
-                raise ValueError("All properties must have a calc setup.")
-            result[p.trivial_name] = p.calc_setup
-        return result
-
     def fill_from(self, data_dict: dict):
         """Load obtained data into each property's .vals."""
         for p in self.properties:
             if p.trivial_name in data_dict:
                 p.vals = data_dict[p.trivial_name]
-
     @property
     def is_filled(self) -> bool:
         return all(p.vals is not None for p in self.properties)

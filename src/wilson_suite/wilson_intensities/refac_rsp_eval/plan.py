@@ -50,9 +50,11 @@ from wilson_suite.wilson_derive.abstractions import (
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import MolecularProperty
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import DataOriginInfo
 
 
 @dataclass
@@ -145,6 +147,50 @@ class PropsCollection:
         inds_all = [len(p.inds) if p.inds else 0 for p in self.props]
         full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}_d{p.dord}' for i, p in enumerate(self.props)]
         return ' * '.join(full_string)
+
+    # -------------------------------------
+
+    def build_request_dict(self, calc_setup: 'DataOriginInfo') -> dict[str, 'DataOriginInfo']:
+        """Build a {name: DataOriginInfo} shopping list."""
+
+        result: dict[str, DataOriginInfo] = {}
+        for p in self.props:
+            trivial_name = prop_trivname(ord_geo=p.dord, ord_el=len(p.ops))
+            result[trivial_name] = calc_setup
+        return result
+
+
+    # def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
+    #     """All properties computed with a given setup."""
+    #     return self.filter(lambda p: p.calc_setup == origin)
+
+    # def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
+    #     """Bucket properties by which setup they use. For batching QC jobs."""
+    #     from collections import defaultdict
+    #     groups = defaultdict(list)
+    #     for p in self.properties:
+    #         groups[p.calc_setup].append(p)
+    #     return {k: MolPropsCollection(v) for k, v in groups.items()}
+
+    # def dress(self, uniform: DataOriginInfo | None = None, 
+    #         by_name: dict[str, DataOriginInfo] | None = None):
+    #     """Attach DataOriginInfo to each property. 
+    #     by_name takes precedence; uniform is the fallback."""
+    #     if uniform is None and by_name is None:
+    #         raise ValueError("Provide `uniform` or `by_name` (or both).")
+        
+    #     for p in self.properties:
+    #         if by_name and p.trivial_name in by_name:
+    #             p.calc_setup = by_name[p.trivial_name]
+    #         elif uniform is not None:
+    #             p.calc_setup = uniform
+    #         else:
+    #             raise ValueError(f"No setup for property {p}")
+
+    # @property
+    # def are_dressed(self) -> bool:
+    #     return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
+
 
 
 @dataclass
@@ -381,23 +427,7 @@ class CompiledTerm:
         return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
 
     def make_data_request(self):
-        from wilson_suite.wilson_main.main_functions import tell_needed_props_for_vib_analysis_simple
-        self.cmp_props
-        self.cmp_freqdenom
-        self.cmp_resmotf
-
-        data_dict = {}
-        from .main_functions import request_props, request_residual_vib_info
-
-        if not all(isinstance(p.calc_setup, DataOriginInfo) for p in self.props):
-            raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset props values")
-        request_props(self.props, data_dict)
-
-        if not all(isinstance(i, DataOriginInfo) for i in self.residual_vib_info.values()):
-            raise ValueError("Run WilsonSimulation.dressPropsWithSetup() to reset residual_vib_info values")
-        request_residual_vib_info(self.residual_vib_info, data_dict)
-
-        return data_dict
+        pass
 
     """
     summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
@@ -416,3 +446,14 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']):
 
     return compiled
 
+def make_request_from_term(cmp_term: CompiledTerm):
+    # self.cmp_props
+    # self.cmp_freqdenom
+    # self.cmp_resmotf
+
+    from .evaluate import MolecularProperty
+
+    molprops = [MolecularProperty.from_polprop(p) for p in cmp_term.cmp_props]
+    data_dict = dict.fromkeys([molprop.trivial_name for molprop in molprops])
+
+    return data_dict
