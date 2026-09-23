@@ -636,6 +636,10 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     """
     if precalculated_data provided - use it;
     otherwise - compute with molsys_data
+    ---
+    Averaging papers
+    https://pubs.aip.org/aip/jcp/article/67/11/5026/788630/On-three-dimensional-rotational-averages
+    https://pubs.aip.org/aip/jcp/article/141/20/204103/193500/Rotational-averaging-of-multiphoton-absorption
     """
     if precalculated_data is not None:
         avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
