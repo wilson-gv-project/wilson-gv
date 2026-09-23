@@ -45,7 +45,6 @@ class DataOriginInfo:
     basis_set: String: Basis set
     base_file_loc: String: path to the base file
     """
-    # Strings
     source_type: str = ''
     
     lvl_theory: str = ''
@@ -351,7 +350,6 @@ def _sys_info_request(data_origin: DataOriginInfo):
     return dict.fromkeys(keys, data_origin)
 
 
-
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
     """
     Construct tuple['VibState'] from data_dict.
@@ -425,15 +423,24 @@ class MolecularProperty:
 class MolPropsCollection:
     properties: list[MolecularProperty]
 
-    def get(self, trivial_name: str):
-        d = {prop.trivial_name: prop for prop in self.properties}
-        if trivial_name not in d:
-            raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
-        return d.get(trivial_name)
+    # def get(self, trivial_name: str):
+    #     d = {prop.trivial_name: prop for prop in self.properties}
+    #     if trivial_name not in d:
+    #         raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
+    #     return d.get(trivial_name)
 
-    def __getitem__(self, trivial_name):
-        """Allow coll[name] syntax."""
-        return self.get(trivial_name)
+    # def __getitem__(self, trivial_name):
+    #     """Allow coll[name] syntax."""
+    #     return self.get(trivial_name)
+
+    def get(self, trivial_name: str) -> MolecularProperty | None:
+        return next((p for p in self.properties if p.trivial_name == trivial_name), None)
+
+    def __getitem__(self, trivial_name: str) -> MolecularProperty:
+        prop = self.get(trivial_name)
+        if prop is None:
+            raise KeyError(f'trivial_name {trivial_name} is not in MolPropsCollection')
+        return prop
 
     def __contains__(self, trivial_name: str) -> bool:
         """Allow `name in coll` syntax."""
@@ -472,19 +479,6 @@ class MolPropsCollection:
 
 ## ------------------------------------------------------------------
 
-@dataclass(frozen=True)
-class EvaluationDataAndConfigs:
-    """
-    data holding abstractions are used here
-    """
-    props_data: MolPropsCollection
-    vibstates_data: 'VibStatesData'
-    number_of_nmodes: int
-    nm_inds_choices: Sequence[int]
-    pulse_polarization_vector: list
-    nc_sqrt_eigval: dict
-
-
 @dataclass()
 class PrecalculatedData:
     avrg_tensors: dict
@@ -492,19 +486,24 @@ class PrecalculatedData:
     vibenedenoms_tensors: dict
 
 
-def evaluate_term_coeffs(compl_term: 'CompiledTerm',
-                         relevant_indices: list[dict],
+# EVALUATION OF A SINGLE TERM - ONE INDEX SET: SUM OVER SET
+def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
+                        #  relevant_indices: list[dict],
+                         idx_dict: dict,
                          molsys_data: 'MolSystemData',
                          pol_prop_vec: tuple | None = None,
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18):
     idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
     term_idx_all = sorted(idx_summ + idx_nonsumm)
-    n_modes = len(molsys_data.eigenvals) if molsys_data.eigenvals is not None else 0
+    
+    if molsys_data.eigenvals is not None:
+        n_modes = len(molsys_data.eigenvals)
+    else: raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
 
     def sum_over(index_dict, remaining, leaves):
         if not remaining:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, 
+            value, contribs = evaluate_full_index_dict(compl_term, index_dict, 
                                                          molsys_data,
                                                          pol_prop_vec,
                                                          precalculated_data, 
@@ -514,15 +513,17 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
         current, rest = remaining[0], remaining[1:]
         return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
 
-    results = {}
-    for index_dict in relevant_indices:
-        missing = [i for i in term_idx_all if i not in index_dict]
-        leaves = {}
-        results[ParameterSet(index_dict)] = (sum_over(index_dict, missing, leaves), leaves)
-    return results
+    # results = {}
+    # for index_dict in relevant_indices:
+    missing = [i for i in term_idx_all if i not in idx_dict]
+    leaves = {}
+    # results[ParameterSet(index_dict)] = (sum_over(index_dict, missing, leaves), leaves)
+
+    return {ParameterSet(idx_dict): (sum_over(idx_dict, missing, leaves), leaves)}
 
 
-def evaluate_single_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
+# EVALUATION OF A SINGLE TERM - ONE INDEX SET: FULL INDEX SET
+def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                molsys_data: MolSystemData,
                                pol_prop_vec: tuple | None = None,
                                precalculated_data: PrecalculatedData | None = None,
@@ -548,9 +549,13 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
     avrg_expr.pulse_polarization_vector = pol_prop_vec
 
+    avrg_func = _make_gen_func_to_compute_avrg(avrg_expression=avrg_expr)
+
     # Evaluate AVRG
-    AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, 
-                                   molsys_data=molsys_data, precalculated_data=precalculated_data,
+    AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict,
+                                   avrg_func=avrg_func,
+                                   molsys_data=molsys_data, 
+                                   precalculated_data=precalculated_data,
                                    zero_tol=zero_tol)
 
     if AVRG == 0.0:
@@ -564,21 +569,16 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     # Evaluate VIBDIFF_TERMS
     extra_freqterms = compl_term.cmp_freqdenom.get_pert_wf_diff()
 
-    # VIBDIFF_TERMS = eval_vibdiff_pert_wf_diff(extra_freqterms, index_dict, precalculated_data, molsys_data)
     VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
-    if VIBDIFF_TERMS == 0.0:
-        return 0.0, {'VIBDIFF_TERMS': VIBDIFF_TERMS}
 
     # Evaluate VIBENE_DENOM
     freqterms = compl_term.cmp_freqdenom.get_vibenedenom()
 
-    if precalculated_data is None or precalculated_data.vibenedenoms_tensors is None:
+    if precalculated_data is None:
         VIBENE_DENOM = otf_vibdiffdenom(freqterms, index_dict, molsys_data)
     else:
         VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
 
-    if VIBENE_DENOM == 0.0:
-        return 0.0, {'VIBENE_DENOM': VIBENE_DENOM}
 
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
@@ -588,7 +588,8 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     return float(compl_term.frac_factor) * float(product_all), dict_contribs
 
 
-def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection', 
+# EVALUATION OF TERM PARTS FOR ONE INDEX SET
+def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
                                 index_dict: dict, 
                                 molsys_data: MolSystemData,
                                 zero_tol: float = 1e-18):
@@ -612,12 +613,8 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         
         triv_name = prop_trivname(ord_el=len(non_avrg_prop.ops), ord_geo=non_avrg_prop.dord)
 
-        if triv_name not in molsys_data.mol_props.names():
-            raise ValueError(f"Trivial name {triv_name} not found in props_data.")
-
-        prop = molsys_data.mol_props.get(triv_name)
-        if prop is not None:
-            NON_AVRG = prop.vals[na_prop_inds]
+        prop: MolecularProperty = molsys_data.mol_props[triv_name]
+        NON_AVRG = prop.vals[na_prop_inds]
 
         if np.isclose(NON_AVRG, 0.0, atol=zero_tol, rtol=0.0):
             return 0.
@@ -627,8 +624,12 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     return product_all
 
 
-def get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection', index_dict: dict):
-    """Map expr to indices according to base expression's unique symbols."""
+def _get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection', index_dict: dict):
+    """
+    Map expr to indices according to base expression's unique symbols.
+    
+    TODO: expand docs
+    """
     base_unique = sorted(set(base_expr.get_mode_indices()))
     expr_inds = expr.get_mode_indices()
 
@@ -642,17 +643,11 @@ def get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection
         # this should not be possible in the worflow
         raise ValueError('This base_expr cannot be a base expression for this expr')
 
-def calculate_avrg_for_nm_idx(avrg_expr: 'PropsCollection', 
-                              index_dict: dict,
-                              molsys_data: MolSystemData):
 
-    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expr)
-
-    return func_general(index_dict, molsys_data.mol_props)
-
-
+# EVALUATION OF TERM PARTS FOR ONE INDEX SET
 def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection', 
-                            index_dict: dict,
+                            index_dict: dict, *,
+                            avrg_func=None,
                             molsys_data: MolSystemData | None = None,
                             precalculated_data: PrecalculatedData | None = None,
                             zero_tol: float = 1e-18):
@@ -667,22 +662,22 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     if precalculated_data is not None:
         avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
         avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]        
-        avrg_index_tuple = get_ind_tuple_from_base(expr=avrg_expr, 
+        avrg_index_tuple = _get_ind_tuple_from_base(expr=avrg_expr, 
                                                    base_expr=avrg_tensor_expr, 
                                                    index_dict=index_dict)
+        result = avrg_tensor[avrg_index_tuple]
 
-        if np.isclose(avrg_tensor[avrg_index_tuple], 0.0, atol=zero_tol, rtol=0.0):
-            return 0.
-        return avrg_tensor[avrg_index_tuple]
-
+    elif molsys_data is not None:
+        func = avrg_func or _make_gen_func_to_compute_avrg(avrg_expression=avrg_expr)
+        result = func(index_dict, molsys_data.mol_props)
+    
     else:
-        if molsys_data is not None:
-            return calculate_avrg_for_nm_idx(avrg_expr, index_dict, molsys_data)
-        else:
-            raise ValueError('No data provided (precalculated_data nor molsys_data)')
+        raise ValueError('No data provided (precalculated_data nor molsys_data)')
+
+    return 0. if np.isclose(result, 0.0, atol=zero_tol, rtol=0.0) else result
 
 
-def make_gen_func_to_compute_avrg(*,
+def _make_gen_func_to_compute_avrg(*,
                               avrg_expression: 'PropsCollection') -> Callable[[dict, 'MolPropsCollection'], float]:
     """
     for an expression with properties data values,
@@ -734,11 +729,9 @@ def make_gen_func_to_compute_avrg(*,
                 cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
                 all_inds = (*nm_inds, *cart_inds)
 
-                # retrieve data for preperty (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                getprop = props_data.get(prop_tuple_key)
-                if getprop:
-                    product *= getprop.vals[all_inds]
-
+                # retrieve data for property (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
+                product *= props_data.get(prop_tuple_key).vals[all_inds]
+                
             # if product != 0.:
             #     logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
 
@@ -775,7 +768,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=modes_to_fill)
 
     # Indicating generalized version for updating
-    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression)
+    func_general = _make_gen_func_to_compute_avrg(avrg_expression=avrg_expression)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
@@ -786,6 +779,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     return full_tensor
 
 
+# EVALUATION OF TERM PARTS FOR ONE INDEX SET - from precalculated_data
 def eval_vibenedenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      precalculated_data: PrecalculatedData):
@@ -798,6 +792,8 @@ def eval_vibenedenom(freqterms: 'FreqTermsCollection',
 
     return vibenedenoms_tensor[vibeneden_index_tuple]
 
+
+# EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
 def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
                      index_dict: dict,
                      molsys_data: MolSystemData):
@@ -807,9 +803,10 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
     product_all = 1.
 
     for vibdiff in freqterms:
-        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict,
-                                                        molsys_data.states)
+        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, molsys_data.states)
 
+        if vib_diff_w_value.energy_difference(au=True) == 0.:
+            raise ZeroDivisionError("VibDiff is zero - division by zero")
         product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
 
     return product_all

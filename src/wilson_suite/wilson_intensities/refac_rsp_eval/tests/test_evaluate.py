@@ -25,9 +25,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     _make_hq_states_from_datadict,
     eval_non_avrg_per_indexdict,
     eval_vibenedenom,
-    evaluate_single_index_dict,
-    evaluate_term_coeffs,
-    get_ind_tuple_from_base,
+    evaluate_full_index_dict,
+    evaluate_term_coeff_sumover,
+    _get_ind_tuple_from_base,
     make_vibdiff_key,
     otf_vibdiffdenom,
 )
@@ -159,8 +159,7 @@ def test_molpropscollection_lookup(props):
     assert 'cff' in props and 'hess' not in props
     assert props['polgrad'] is props.get('polgrad')
     assert len(props) == 2
-    with pytest.raises(ValueError):
-        props.get('hess')
+    assert props.get('hess') is None
 
 
 def test_molpropscollection_fill_from_and_is_filled(props):
@@ -202,7 +201,7 @@ def test_eval_non_avrg_short_circuits_on_zero(molsys):
 def test_eval_non_avrg_missing_property_raises(molsys):
     expr = PropsCollection([polprop(inds='ab')])  # 'hess' is not in molsys
 
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0}, molsys)
 
 
@@ -224,15 +223,15 @@ def test_get_ind_tuple_from_base_distinct_vs_repeated_base_labels():
     # all-distinct base: axes (a, b) <-> slots, so expr's labels are read slot by slot
     base = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
     expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
-    assert get_ind_tuple_from_base(expr, base, index_dict) == (1, 0)
+    assert _get_ind_tuple_from_base(expr, base, index_dict) == (1, 0)
 
     # repeated base label: 'a' fills both slots, the tensor has a single axis -> one index
     repeated = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
-    assert get_ind_tuple_from_base(repeated, PropsCollection([polprop(ops=(0, 1), inds='a')]), index_dict) == (1,)
+    assert _get_ind_tuple_from_base(repeated, PropsCollection([polprop(ops=(0, 1), inds='a')]), index_dict) == (1,)
 
     # more unique base labels than expr has slots: base cannot represent expr
     with pytest.raises(ValueError):
-        get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
+        _get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
 
 
 def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
@@ -277,7 +276,7 @@ def term_and_precalc():
 def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc, molsys):
     term, pre = term_and_precalc
 
-    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
 
     # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
     assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0))
@@ -290,7 +289,7 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_precal
     term, pre = term_and_precalc
     molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
 
-    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
 
     assert value == 0.
     assert contribs['NON_AVRG'] == 0.
@@ -317,18 +316,18 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     Which labels get summed is decided by what is missing from the partial dict, not by the
     term's idx_summ_nonsumm split; the split is read only to learn which labels the term has.
 
-    This test checks the enumeration alone: evaluate_single_index_dict is stubbed to return
+    This test checks the enumeration alone: evaluate_full_index_dict is stubbed to return
     100a + 10b + c, so each leaf value spells out its own assignment and the expected totals
     can be added by hand, e.g. {'a': 1} -> 100 + 101 + 110 + 111 = 422.
     """
     # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
-    monkeypatch.setattr(evaluate_mod, 'evaluate_single_index_dict',
+    monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict',
                         lambda term, idx, *_: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
     # Only the index split is read from the term here; molsys has 2 modes, so each missing index runs over {0, 1}.
     term = CompiledTerm(PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
                         idx_summ_nonsumm=(('b', 'c'), ('a',)))
 
-    results = evaluate_term_coeffs(term, [fixed], precalculated_data=None, molsys_data=molsys, pol_prop_vec=(1.,1.,1.)) # type: ignore
+    results = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, pol_prop_vec=(1.,1.,1.)) # type: ignore
 
     total, leaves = results[ParameterSet(fixed)]
     assert total == expected_total
@@ -351,10 +350,10 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     """
     term, pre = term_and_precalc
 
-    results = evaluate_term_coeffs(term, [{'a': 0}], precalculated_data=pre, molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
+    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
 
     total, leaves = results[ParameterSet({'a': 0})]
-    per_leaf = {leaf: evaluate_single_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
                 for leaf in leaves}
     assert len(leaves) == 4             # b, c in {0, 1}
     assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))

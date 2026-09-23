@@ -11,8 +11,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     MolPropsCollection,
     MolSystemData,
     _sys_info_request,
-    evaluate_single_index_dict,
-    evaluate_term_coeffs,
+    evaluate_full_index_dict,
+    evaluate_term_coeff_sumover,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -149,7 +149,7 @@ def test_evaluate_term():
 
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
 
-    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
                                                  molsys_data=molsys,
                                                  pol_prop_vec=(1.,1.,1.),
                                                  precalculated_data=None, 
@@ -159,14 +159,14 @@ def test_evaluate_term():
 
 
     with pytest.raises(ValueError) as e:
-        evaluate_single_index_dict(term, {'a': 0, 'b': 1}, 
+        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, 
                                                  molsys_data=molsys,
                                                  pol_prop_vec=(1.,1.,1.),
                                                  precalculated_data=None, 
                                                  zero_tol=1e-18)
         assert e.value == 'term has indices that do not have values in index_dict.'
 
-    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
                                                  molsys_data=molsys,
                                                  pol_prop_vec=(1.,1.,1.),
                                                  precalculated_data=None, 
@@ -174,6 +174,6 @@ def test_evaluate_term():
     print(value)
     print(contribs)
 
-    results = evaluate_term_coeffs(term, [{'a': 0}], precalculated_data=None, 
+    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None, 
                                    molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
     print(results)
