@@ -244,7 +244,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
                           number_of_nmodes: int,
                           nm_inds_choices: list[int]):
     """
-    Precalculating the full tensor for given avrg_expression
+    Precalculating the full tensor (over all nm inds) for given avrg_expression
 
     nm_inds_choices - could be generated with for all normal modes with:
         nm_inds_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=list(range(number_of_nmodes)))

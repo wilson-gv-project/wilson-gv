@@ -627,6 +627,15 @@ def get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection
         # this should not be possible in the worflow
         raise ValueError('This base_expr cannot be a base expression for this expr')
 
+def calculate_avrg_for_nm_idx(avrg_expr: 'PropsCollection', 
+                              index_dict: dict,
+                              molsys_data: MolSystemData):
+
+    pol_vec = avrg_expr.pulse_polarization_vector
+    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expr, pulse_polarization_vector=pol_vec)
+
+    return func_general(index_dict, molsys_data.mol_props)
+
 
 def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection', 
                             index_dict: dict,
@@ -654,25 +663,12 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
 
     else:
         if molsys_data is not None:
-            from wilson_suite.wilson_intensities.amplitudes.averaged_props import (
-                calculate_avrg_tensor,
-            )
-            props_data = molsys_data.mol_props
-            number_of_nmodes = len(molsys_data.eigenvals)
-            pulse_polarization_vector = avrg_expr.pulse_polarization_vector
-            nm_inds_choices
-
-            return calculate_avrg_tensor(avrg_expression=avrg_expr,
-                                        pulse_polarization_vector=pulse_polarization_vector,
-                                        props_data=props_data,
-                                        number_of_nmodes=number_of_nmodes,
-                                        nm_inds_choices=nm_inds_choices)
+            return calculate_avrg_for_nm_idx(avrg_expr, index_dict, molsys_data)
 
 
 
 def make_gen_func_to_compute_avrg(*,
-                              avrg_expression: 'PropsCollection',
-                              pulse_polarization_vector: list) -> Callable[[dict, 'MolPropsCollection'], float]:
+                              avrg_expression: 'PropsCollection') -> Callable[[dict, 'MolPropsCollection'], float]:
     """
     for an expression with properties data values,
     compute average with given polarization setup for a choice of normal mode indices
@@ -684,7 +680,7 @@ def make_gen_func_to_compute_avrg(*,
     )
 
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank = num_pulses,
-                                                                        laser_pol = pulse_polarization_vector)
+                                                                        laser_pol = avrg_expression.pulse_polarization_vector)
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
         """
