@@ -10,12 +10,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     MolecularProperty,
     MolPropsCollection,
     MolSystemData,
-    eval_non_avrg_per_indexdict,
-    eval_vibenedenom,
+    _sys_info_request,
     evaluate_single_index_dict,
     evaluate_term_coeffs,
-    _sys_info_request,
-
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -79,7 +76,7 @@ def test_plan_compiled_term():
     assert cmpl_terms[13].frac_factor == 0.125
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        cmpl_terms[8].frac_factor = 0.5
+        cmpl_terms[8].frac_factor = 0.5 # type: ignore
 
     freqdenom_idx = sorted([freqt.to_latex() for freqt in cmpl_terms[8].cmp_freqdenom])
     assert freqdenom_idx == sorted(['a', 'b', 'c', 'a+b,c'])
@@ -116,14 +113,14 @@ def test_eval_molsys_data():
     # finally, putting data in -- requires empty MolPropsCollection and dict with data
     # also, resets values, because props in collection shold be from the same source
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    print(molsys)
 
     import numpy as np
-    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04, -0.,  0., -0.17,  0., -0.,  0.7, -0., -0., 0.7,  0.,  0.]))
+    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04, -0.,  0., -0.17,  0., -0.,  0.7, -0., -0., 0.7,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
     assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
 
     # with empty datadict
-    molsys = MolSystemData.from_datadict(mol_props=molprops,
-                                         data_dict={})
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={})
     assert molsys.eigenvals is None
     assert molsys.eigenvecs is None
     assert molsys.natoms == 0
@@ -140,8 +137,9 @@ def test_eval_molsys_data():
 
 
 def test_evaluate_term():
+    print()
 
-    term = cmpl_terms[0]
+    term = cmpl_terms[2]
     molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.cmp_props])
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
@@ -151,6 +149,31 @@ def test_evaluate_term():
 
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
 
-    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys, 
-                                                 precalculated_data=None, zero_tol=1e-18)
+    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
+                                                 molsys_data=molsys,
+                                                 pol_prop_vec=(1.,1.,1.),
+                                                 precalculated_data=None, 
+                                                 zero_tol=1e-18)
+    print(value)
+    print(contribs)
 
+
+    with pytest.raises(ValueError) as e:
+        evaluate_single_index_dict(term, {'a': 0, 'b': 1}, 
+                                                 molsys_data=molsys,
+                                                 pol_prop_vec=(1.,1.,1.),
+                                                 precalculated_data=None, 
+                                                 zero_tol=1e-18)
+        assert e.value == 'term has indices that do not have values in index_dict.'
+
+    value, contribs = evaluate_single_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
+                                                 molsys_data=molsys,
+                                                 pol_prop_vec=(1.,1.,1.),
+                                                 precalculated_data=None, 
+                                                 zero_tol=1e-18)
+    print(value)
+    print(contribs)
+
+    results = evaluate_term_coeffs(term, [{'a': 0}], precalculated_data=None, 
+                                   molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
+    print(results)

@@ -426,6 +426,13 @@ class CompiledTerm:
     def max_state_lvl(self):
         return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
 
+    @property
+    def mode_indices(self):
+        self.cmp_freqdenom.get_num_indices_vibenedenom()
+        self.cmp_props.get_mode_indices()
+        self.cmp_resmotf.get_nm_indices()
+        return
+    
     # def make_data_request(self):
     #     pass
 

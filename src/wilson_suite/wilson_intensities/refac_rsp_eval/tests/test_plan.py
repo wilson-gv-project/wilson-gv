@@ -235,6 +235,11 @@ def test_compiled_term_from_vibpert_term():
     assert ct.cmp_resmotf == ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
     assert ct.idx_summ_nonsumm == (('b',), ('a',))
 
+    indices = set(ct.cmp_props.get_mode_indices()
+                  + ct.cmp_freqdenom.get_num_indices_vibenedenom()
+                  + tuple(ct.cmp_resmotf.get_nm_indices()))
+    assert sorted(set(ct.idx_summ_nonsumm[0]+ct.idx_summ_nonsumm[1])) == sorted(indices)
+
 
 def test_compile_terms_one_compiled_per_term():
     compiled = compile_terms([_fake_vibpert_term(), _fake_vibpert_term()]) # type: ignore

@@ -321,11 +321,11 @@ class MolSystemData:
 
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
         if states_choice == 'harmonic':
-            labels = tuple((int(i.state_label.split(',')[0]),) for i in harm_states if len(i.state_label.split(','))==1)
+            labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=harm_states, harmonic_osc_states_labels=labels)
 
         elif states_choice == 'anharmonic':
-            labels = tuple((int(i.state_label.split(',')[0]),) for i in harm_states if len(i.state_label.split(','))==1)
+            labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
 
         # VibStatesData could be empty if no data
@@ -494,8 +494,9 @@ class PrecalculatedData:
 
 def evaluate_term_coeffs(compl_term: 'CompiledTerm',
                          relevant_indices: list[dict],
-                         precalculated_data: 'PrecalculatedData',
                          molsys_data: 'MolSystemData',
+                         pol_prop_vec: tuple | None = None,
+                         precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18):
     idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
     term_idx_all = sorted(idx_summ + idx_nonsumm)
@@ -503,7 +504,11 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
 
     def sum_over(index_dict, remaining, leaves):
         if not remaining:
-            value, contribs = evaluate_single_index_dict(compl_term, index_dict, molsys_data, precalculated_data, zero_tol)
+            value, contribs = evaluate_single_index_dict(compl_term, index_dict, 
+                                                         molsys_data,
+                                                         pol_prop_vec,
+                                                         precalculated_data, 
+                                                         zero_tol)
             leaves[ParameterSet(index_dict)] = contribs
             return value
         current, rest = remaining[0], remaining[1:]
@@ -517,11 +522,11 @@ def evaluate_term_coeffs(compl_term: 'CompiledTerm',
     return results
 
 
-def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
-                               index_dict: dict,            # index choice (a,b,c...)
+def evaluate_single_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                molsys_data: MolSystemData,
-                               precalculated_data: PrecalculatedData | None,
-                               zero_tol: float) -> tuple[float, dict]:
+                               pol_prop_vec: tuple | None = None,
+                               precalculated_data: PrecalculatedData | None = None,
+                               zero_tol: float = 1e-18) -> tuple[float, dict]:
     """
     Evaluate the term for a single index dictionary.
     Parameters:
@@ -529,10 +534,19 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
     
     Returns:
         float: The computed coefficient for the given index dictionary.
+    ---
+        compl_term: 'CompiledTerm',    # term
+        index_dict: dict,            # index choice (a,b,c...)
     """
-    # Evaluate NON_AVRG
+    # requested nm indices dict should hold values for all indices in the term
+    t_indices = sorted(set(compl_term.idx_summ_nonsumm[0]+compl_term.idx_summ_nonsumm[1]))
+    if not all(index in list(index_dict.keys()) for index in t_indices):
+        raise ValueError('term has indices that do not have values in index_dict.')
+
+    # splitting properties - avrg and non-avrg
     non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
     avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
+    avrg_expr.pulse_polarization_vector = pol_prop_vec
 
     # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, 
@@ -542,6 +556,7 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
     if AVRG == 0.0:
         return 0.0, {'AVRG': AVRG}
 
+    # Evaluate NON_AVRG
     NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, molsys_data, zero_tol)
     if NON_AVRG == 0.0:
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
@@ -631,8 +646,7 @@ def calculate_avrg_for_nm_idx(avrg_expr: 'PropsCollection',
                               index_dict: dict,
                               molsys_data: MolSystemData):
 
-    pol_vec = avrg_expr.pulse_polarization_vector
-    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expr, pulse_polarization_vector=pol_vec)
+    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expr)
 
     return func_general(index_dict, molsys_data.mol_props)
 
@@ -664,7 +678,8 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     else:
         if molsys_data is not None:
             return calculate_avrg_for_nm_idx(avrg_expr, index_dict, molsys_data)
-
+        else:
+            raise ValueError('No data provided (precalculated_data nor molsys_data)')
 
 
 def make_gen_func_to_compute_avrg(*,
@@ -735,7 +750,6 @@ def make_gen_func_to_compute_avrg(*,
 
 
 def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
-                          pulse_polarization_vector: list,
                           props_data: 'MolPropsCollection',
                           number_of_nmodes: int,
                           modes_to_fill: list[int] | None = None) -> np.ndarray:
@@ -761,7 +775,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
     ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=modes_to_fill)
 
     # Indicating generalized version for updating
-    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression, pulse_polarization_vector=pulse_polarization_vector)
+    func_general = make_gen_func_to_compute_avrg(avrg_expression=avrg_expression)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
