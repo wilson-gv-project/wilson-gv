@@ -14,7 +14,6 @@ from wilson_suite.wilson_derive.abstractions import (
     VibDiffTerm,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    DataOriginInfo,
     MolecularProperty,
     MolPropsCollection,
     MolSystemData,

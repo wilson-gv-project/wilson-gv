@@ -67,6 +67,7 @@ class PropsCollection:
         get_total_difforder
     """
     props: Sequence[PolProp]
+    pulse_polarization_vector: tuple | None = None
 
     def __post_init__(self):
         """
@@ -425,8 +426,8 @@ class CompiledTerm:
     def max_state_lvl(self):
         return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
 
-    def make_data_request(self):
-        pass
+    # def make_data_request(self):
+    #     pass
 
     """
     summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices

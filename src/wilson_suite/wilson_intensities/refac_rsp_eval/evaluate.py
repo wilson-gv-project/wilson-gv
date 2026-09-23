@@ -316,6 +316,7 @@ class MolSystemData:
         data_dict: dict - {data_name: values}
 
         """
+        # resets values, because props in collection shold be from the same source
         mol_props.fill_from(data_dict)
 
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
@@ -326,6 +327,8 @@ class MolSystemData:
         elif states_choice == 'anharmonic':
             labels = tuple((int(i.state_label.split(',')[0]),) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
+
+        # VibStatesData could be empty if no data
 
         geo = data_dict.get('geo', None)
         natoms = len(geo) if geo is not None else 0
@@ -457,8 +460,11 @@ class MolPropsCollection:
     def fill_from(self, data_dict: dict):
         """Load obtained data into each property's .vals."""
         for p in self.properties:
+            # resets values, because props in collection shold be from the same source
+            p.vals = None
             if p.trivial_name in data_dict:
                 p.vals = data_dict[p.trivial_name]
+    
     @property
     def is_filled(self) -> bool:
         return all(p.vals is not None for p in self.properties)
@@ -528,17 +534,17 @@ def evaluate_single_index_dict(compl_term: 'CompiledTerm',    # term
     non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
     avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
 
-    NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, molsys_data, zero_tol)
-    if NON_AVRG == 0.0:
-        if precalculated_data is not None:
-            AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
-        return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
-
     # Evaluate AVRG
-    if precalculated_data is not None:
-        AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, precalculated_data, zero_tol)
+    AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict, 
+                                   molsys_data=molsys_data, precalculated_data=precalculated_data,
+                                   zero_tol=zero_tol)
+
     if AVRG == 0.0:
         return 0.0, {'AVRG': AVRG}
+
+    NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, molsys_data, zero_tol)
+    if NON_AVRG == 0.0:
+        return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
 
     # Evaluate VIBDIFF_TERMS
     extra_freqterms = compl_term.cmp_freqdenom.get_pert_wf_diff()
@@ -623,22 +629,41 @@ def get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection
 
 
 def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection', 
-                            index_dict: dict, 
-                            precalculated_data: PrecalculatedData,
+                            index_dict: dict,
+                            molsys_data: MolSystemData | None = None,
+                            precalculated_data: PrecalculatedData | None = None,
                             zero_tol: float = 1e-18):
     """
-    with precalculated_data
+    if precalculated_data provided - use it;
+    otherwise - compute with molsys_data
     """
-    avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
-    
-    avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]
-    
-    avrg_index_tuple = get_ind_tuple_from_base(expr=avrg_expr, 
-                                                         base_expr=avrg_tensor_expr, 
-                                                         index_dict=index_dict)
-    if np.isclose(avrg_tensor[avrg_index_tuple], 0.0, atol=zero_tol, rtol=0.0):
-        return 0.
-    return avrg_tensor[avrg_index_tuple]
+    if precalculated_data is not None:
+        avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
+        avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]        
+        avrg_index_tuple = get_ind_tuple_from_base(expr=avrg_expr, 
+                                                   base_expr=avrg_tensor_expr, 
+                                                   index_dict=index_dict)
+
+        if np.isclose(avrg_tensor[avrg_index_tuple], 0.0, atol=zero_tol, rtol=0.0):
+            return 0.
+        return avrg_tensor[avrg_index_tuple]
+
+    else:
+        if molsys_data is not None:
+            from wilson_suite.wilson_intensities.amplitudes.averaged_props import (
+                calculate_avrg_tensor,
+            )
+            props_data = molsys_data.mol_props
+            number_of_nmodes = len(molsys_data.eigenvals)
+            pulse_polarization_vector = avrg_expr.pulse_polarization_vector
+            nm_inds_choices
+
+            return calculate_avrg_tensor(avrg_expression=avrg_expr,
+                                        pulse_polarization_vector=pulse_polarization_vector,
+                                        props_data=props_data,
+                                        number_of_nmodes=number_of_nmodes,
+                                        nm_inds_choices=nm_inds_choices)
+
 
 
 def make_gen_func_to_compute_avrg(*,
