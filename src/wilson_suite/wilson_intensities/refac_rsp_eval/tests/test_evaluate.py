@@ -23,6 +23,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     VibState,
     VibStatesData,
     _get_ind_tuple_from_base,
+    _make_func_to_compute_avrg,
     _make_hq_states_from_datadict,
     _make_vibdiff_key,
     calculate_avrg_tensor,
@@ -175,7 +176,7 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert props.without_values().names() == ['polgrad']
     assert not props.is_filled
 
-## 
+## DATA REQUEST
 
 def test_build_data_request_for_term():
     assert False
@@ -246,6 +247,7 @@ def test_eval_avrg_per_indexdict():
 def test_calculate_avrg_tensor():
     assert False
 
+
 def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
     freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
 
@@ -272,7 +274,8 @@ def term_and_precalc():
     """
     avrg = polprop(ops=(0, 1), inds='a')
     term = CompiledTerm(
-        cmp_props=PropsCollection([polprop(inds='abc'), avrg]),
+        avrg_props=PropsCollection([avrg]),
+        non_avrg_props=PropsCollection([polprop(inds='abc')]),
         cmp_resmotf=ResonanceMotif(()),
         cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)]),
         frac_factor=0.5,
@@ -288,7 +291,8 @@ def term_and_precalc():
 def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc, molsys):
     term, pre = term_and_precalc
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
+                                               molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18)
 
     # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
     assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0))
@@ -301,7 +305,8 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_precal
     term, pre = term_and_precalc
     molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
+                                               molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18)
 
     assert value == 0.
     assert contribs['NON_AVRG'] == 0.
@@ -335,11 +340,13 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict',
                         lambda term, idx, *_: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
+    # the stub term has no averaged props, so the avrg factory is stubbed out too
+    monkeypatch.setattr(evaluate_mod, '_make_func_to_compute_avrg', lambda **_: None)
     # Only the index split is read from the term here; molsys has 2 modes, so each missing index runs over {0, 1}.
-    term = CompiledTerm(PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
+    term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
                         idx_summ_nonsumm=(('b', 'c'), ('a',)))
 
-    results = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, pol_prop_vec=(1.,1.,1.)) # type: ignore
+    results = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, polarization_vec=(1.,1.,1.))
 
     total, leaves = results[ParameterSet(fixed)]
     assert total == expected_total
@@ -362,10 +369,11 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     """
     term, pre = term_and_precalc
 
-    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
+    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys)
 
     total, leaves = results[ParameterSet({'a': 0})]
-    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, pol_prop_vec=(1.,1.,1.), zero_tol=1e-18)
+
+    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18)
                 for leaf in leaves}
     assert len(leaves) == 4             # b, c in {0, 1}
     assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))

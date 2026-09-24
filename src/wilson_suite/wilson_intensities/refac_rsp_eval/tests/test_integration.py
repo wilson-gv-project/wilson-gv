@@ -11,6 +11,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     MolPropsCollection,
     MolSystemData,
     _sys_info_request,
+    _make_func_to_compute_avrg,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
 )
@@ -89,25 +90,26 @@ def test_eval_molsys_data():
     term0_el = cmpl_terms[0]
 
     # property collection from term0_el
-    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term0_el.cmp_props])
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term0_el.all_props])
+
     
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
     # request dict is built from PropsCollection
-    request = term0_el.cmp_props.build_request_dict(calc_setup=calc_dataorigin)
+    request = term0_el.all_props.build_request_dict(calc_setup=calc_dataorigin)
 
     # base info about system, including vib states
     request.update(_sys_info_request(calc_dataorigin))
     # obtainer is using DataOriginInfo to parse sources with CQCParse
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
-    assert list(request.keys()) == ['dipgrad', 'polhess', 
-                                    'anharmonic_states', 'harmonic_states', 
-                                    'nc_sqrt_eigval', 'normal_modes', 
-                                    'atoms', 'equilibrium_geometry']
-    assert list(datadict.keys()) == ['equilibrium_geometry', 'atoms', 'normal_modes', 
-                                     'anharmonic_states', 'harmonic_states', 
-                                     'nc_sqrt_eigval', 'dipgrad', 'polhess', 'reindex_modes']
+    assert set(request.keys()) == {'dipgrad', 'polhess',
+                                   'anharmonic_states', 'harmonic_states',
+                                   'nc_sqrt_eigval', 'normal_modes',
+                                   'atoms', 'equilibrium_geometry'}
+    assert set(datadict.keys()) == {'equilibrium_geometry', 'atoms', 'normal_modes',
+                                    'anharmonic_states', 'harmonic_states',
+                                    'nc_sqrt_eigval', 'dipgrad', 'polhess', 'reindex_modes'}
     assert list(datadict.keys()) != list(request.keys())
 
     # finally, putting data in -- requires empty MolPropsCollection and dict with data
@@ -140,18 +142,19 @@ def test_evaluate_term():
     print()
 
     term = cmpl_terms[2]
-    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.cmp_props])
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    request = term.cmp_props.build_request_dict(calc_setup=calc_dataorigin)
+    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
     request.update(_sys_info_request(calc_dataorigin))
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    avrg_func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_vec=(1.,1.,1.))
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
                                                  molsys_data=molsys,
-                                                 pol_prop_vec=(1.,1.,1.),
+                                                 avrg_func=avrg_func,
                                                  precalculated_data=None, 
                                                  zero_tol=1e-18)
     print(value)
@@ -161,19 +164,19 @@ def test_evaluate_term():
     with pytest.raises(ValueError) as e:
         evaluate_full_index_dict(term, {'a': 0, 'b': 1}, 
                                                  molsys_data=molsys,
-                                                 pol_prop_vec=(1.,1.,1.),
+                                                 avrg_func=avrg_func,
                                                  precalculated_data=None, 
                                                  zero_tol=1e-18)
         assert e.value == 'term has indices that do not have values in index_dict.'
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
                                                  molsys_data=molsys,
-                                                 pol_prop_vec=(1.,1.,1.),
+                                                 avrg_func=avrg_func,
                                                  precalculated_data=None, 
                                                  zero_tol=1e-18)
     print(value)
     print(contribs)
 
     results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None, 
-                                   molsys_data=molsys, pol_prop_vec=(1.,1.,1.))
+                                   molsys_data=molsys, polarization_vec=(1.,1.,1.))
     print(results)

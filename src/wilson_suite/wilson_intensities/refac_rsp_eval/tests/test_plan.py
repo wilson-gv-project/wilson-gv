@@ -230,12 +230,12 @@ def test_compiled_term_from_vibpert_term():
     ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
 
     assert ct.frac_factor == 0.5
-    assert ct.cmp_props.get_mode_indices() == ('a', 'a', 'b')
+    assert ct.all_props.get_mode_indices() == ('a', 'a', 'b')
     assert ct.cmp_freqdenom.get_num_indices_vibenedenom() == ('a',)
     assert ct.cmp_resmotf == ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
     assert ct.idx_summ_nonsumm == (('b',), ('a',))
 
-    indices = set(ct.cmp_props.get_mode_indices()
+    indices = set(ct.all_props.get_mode_indices()
                   + ct.cmp_freqdenom.get_num_indices_vibenedenom()
                   + tuple(ct.cmp_resmotf.get_nm_indices()))
     assert sorted(set(ct.idx_summ_nonsumm[0]+ct.idx_summ_nonsumm[1])) == sorted(indices)

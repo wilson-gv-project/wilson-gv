@@ -405,33 +405,44 @@ class CompiledTerm:
     full = 1.num_fact * 2.(avrg_props * nonavrg_props) * 3.freq_denom * 4.res_motf
         cmp_props = (avrg_props * nonavrg_props)
     """
-    cmp_props: PropsCollection
+    avrg_props: PropsCollection
+    non_avrg_props: PropsCollection
+
     cmp_resmotf: ResonanceMotif
     cmp_freqdenom: FreqTermsCollection
     frac_factor: float
     idx_summ_nonsumm: tuple[tuple[str, ...], tuple[str, ...]]
 
+
     @classmethod
     def from_VibPertTerm(cls, term: 'VibPerturbedTerm') -> 'CompiledTerm':
 
         frac_factor = float(term.coeff)
-        properties = PropsCollection(term.props)
         freq_denom = FreqTermsCollection(term.freqterms) # states
         res_conds = ResonanceMotif.from_conditions(term.res) # states
         idx_summ_nonsumm = term.tellNonSummSummIndices()
 
-        return cls(properties, res_conds, freq_denom, frac_factor, idx_summ_nonsumm) # type: ignore
+        properties = PropsCollection(term.props)
+        non_avrg_props = properties.get_non_averaged_props()
+        avrg_props = properties.get_averaged_props().sort()
+
+        return cls(avrg_props, non_avrg_props, res_conds, freq_denom, frac_factor, idx_summ_nonsumm) # type: ignore
+
+    @property
+    def all_props(self) -> PropsCollection:
+        """avrg + non-avrg props together, e.g. for building the data request"""
+        return PropsCollection([*self.avrg_props, *self.non_avrg_props])
 
     @property
     def max_state_lvl(self):
         return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
 
-    @property
-    def mode_indices(self):
-        self.cmp_freqdenom.get_num_indices_vibenedenom()
-        self.cmp_props.get_mode_indices()
-        self.cmp_resmotf.get_nm_indices()
-        return
+    # @property
+    # def mode_indices(self):
+    #     self.cmp_freqdenom.get_num_indices_vibenedenom()
+    #     self.cmp_props.get_mode_indices()
+    #     self.cmp_resmotf.get_nm_indices()
+    #     return
     
     # def make_data_request(self):
     #     pass
@@ -454,13 +465,10 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']) -> list[CompiledTerm]:
     return compiled
 
 def make_request_from_term(cmp_term: CompiledTerm) -> dict:
-    # self.cmp_props
-    # self.cmp_freqdenom
-    # self.cmp_resmotf
 
     from .evaluate import MolecularProperty
 
-    molprops = [MolecularProperty.from_polprop(p) for p in cmp_term.cmp_props]
+    molprops = [MolecularProperty.from_polprop(p) for p in cmp_term.all_props]
     data_dict = dict.fromkeys([molprop.trivial_name for molprop in molprops])
 
     return data_dict

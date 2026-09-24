@@ -348,7 +348,8 @@ def _sys_info_request(data_origin: DataOriginInfo):
     return dict.fromkeys(keys, data_origin)
 
 def build_data_request_for_term(term: 'CompiledTerm', data_origin: DataOriginInfo) -> dict:
-    request = term.cmp_props.build_request_dict(calc_setup=data_origin)
+    request = term.avrg_props.build_request_dict(calc_setup=data_origin)
+    request.update(term.non_avrg_props.build_request_dict(calc_setup=data_origin))
     request.update(_sys_info_request(data_origin))
     return request
 
@@ -476,9 +477,13 @@ class MolPropsCollection:
 
 @dataclass
 class PrecalculatedData:
-    avrg_tensors: dict
-    avrg_expr_tensor_mapping: dict
-    vibenedenoms_tensors: dict
+    """
+    if avrg_expr in pre.avrg_expr_tensor_mapping:
+    """
+    avrg_tensors: dict = field(default_factory=dict)
+    avrg_expr_tensor_mapping: dict = field(default_factory=dict)
+    vibenedenoms_tensors: dict = field(default_factory=dict)
+    polarization_vec: tuple = ()
 
 
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: SUM OVER SET
@@ -486,7 +491,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                         #  relevant_indices: list[dict],
                          idx_dict: dict,
                          molsys_data: 'MolSystemData',
-                         pol_prop_vec: tuple | None = None,
+                         polarization_vec: tuple | None = None,
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18):
     idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
@@ -496,13 +501,21 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         n_modes = len(molsys_data.eigenvals)
     else: raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
 
+    # only needed when the avrg value isn't looked up from a precalculated tensor
+    avrg_func = None
+    if precalculated_data is None or compl_term.avrg_props not in precalculated_data.avrg_expr_tensor_mapping:
+        if polarization_vec is None:
+            raise ValueError('polarization_vec is required when the avrg tensor is not precalculated')
+        avrg_func = _make_func_to_compute_avrg(avrg_expression=compl_term.avrg_props,
+                                               polarization_vec=polarization_vec)
+
     def sum_over(index_dict, remaining, leaves):
         if not remaining:
             value, contribs = evaluate_full_index_dict(compl_term, index_dict, 
-                                                         molsys_data,
-                                                         pol_prop_vec,
-                                                         precalculated_data, 
-                                                         zero_tol)
+                                                       molsys_data,
+                                                       avrg_func,
+                                                       precalculated_data,
+                                                       zero_tol)
             leaves[ParameterSet(index_dict)] = contribs
             return value
         current, rest = remaining[0], remaining[1:]
@@ -520,7 +533,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: FULL INDEX SET
 def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                molsys_data: MolSystemData,
-                               pol_prop_vec: tuple | None = None,
+                               avrg_func: Callable | None = None,
                                precalculated_data: PrecalculatedData | None = None,
                                zero_tol: float = 1e-18) -> tuple[float, dict]:
     """
@@ -539,15 +552,9 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     if not all(index in list(index_dict.keys()) for index in t_indices):
         raise ValueError('term has indices that do not have values in index_dict.')
 
-    # splitting properties - avrg and non-avrg
-    non_avrg_expr = compl_term.cmp_props.get_non_averaged_props()
-    avrg_expr = compl_term.cmp_props.get_averaged_props().sort()
-    avrg_expr.pulse_polarization_vector = pol_prop_vec
-
-    avrg_func = _make_func_to_compute_avrg(avrg_expression=avrg_expr)
 
     # Evaluate AVRG
-    AVRG = eval_avrg_per_indexdict(avrg_expr, index_dict,
+    AVRG = eval_avrg_per_indexdict(compl_term.avrg_props, index_dict,
                                    avrg_func=avrg_func,
                                    molsys_data=molsys_data, 
                                    precalculated_data=precalculated_data,
@@ -557,7 +564,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
         return 0.0, {'AVRG': AVRG}
 
     # Evaluate NON_AVRG
-    NON_AVRG = eval_non_avrg_per_indexdict(non_avrg_expr, index_dict, molsys_data, zero_tol)
+    NON_AVRG = eval_non_avrg_per_indexdict(compl_term.non_avrg_props, index_dict, molsys_data, zero_tol)
     if NON_AVRG == 0.0:
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
 
@@ -640,9 +647,9 @@ def _get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollectio
 
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET
-def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection', 
+def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
                             index_dict: dict, *,
-                            avrg_func=None,
+                            avrg_func: Callable | None = None,
                             molsys_data: MolSystemData | None = None,
                             precalculated_data: PrecalculatedData | None = None,
                             zero_tol: float = 1e-18):
@@ -654,26 +661,21 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     https://pubs.aip.org/aip/jcp/article/67/11/5026/788630/On-three-dimensional-rotational-averages
     https://pubs.aip.org/aip/jcp/article/141/20/204103/193500/Rotational-averaging-of-multiphoton-absorption
     """
-    if precalculated_data is not None and precalculated_data.avrg_tensors is not None:
+    if precalculated_data is not None and avrg_expr in precalculated_data.avrg_expr_tensor_mapping:
         avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
-        avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]        
-        avrg_index_tuple = _get_ind_tuple_from_base(expr=avrg_expr, 
-                                                   base_expr=avrg_tensor_expr, 
-                                                   index_dict=index_dict)
-        result = avrg_tensor[avrg_index_tuple]
-
-    elif molsys_data is not None:
-        func = avrg_func or _make_func_to_compute_avrg(avrg_expression=avrg_expr)
-        result = func(index_dict, molsys_data.mol_props)
-    
+        avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]
+        result = avrg_tensor[_get_ind_tuple_from_base(avrg_expr, avrg_tensor_expr, index_dict)]
+    elif avrg_func is not None and molsys_data is not None:
+        result = avrg_func(index_dict, molsys_data.mol_props)
     else:
-        raise ValueError('No data provided (precalculated_data nor molsys_data)')
+        raise ValueError('avrg_expr not in precalculated_data and no avrg_func/molsys_data given')
 
     return 0. if np.isclose(result, 0.0, atol=zero_tol, rtol=0.0) else result
 
 
 def _make_func_to_compute_avrg(*,
-                              avrg_expression: 'PropsCollection') -> Callable[[dict, 'MolPropsCollection'], float]:
+                              avrg_expression: 'PropsCollection',
+                              polarization_vec: tuple) -> Callable[[dict, 'MolPropsCollection'], float]:
     """
     for an expression with properties data values,
     compute average with given polarization setup for a choice of normal mode indices
@@ -685,7 +687,7 @@ def _make_func_to_compute_avrg(*,
     )
 
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank = num_pulses,
-                                                                        laser_pol = avrg_expression.pulse_polarization_vector)
+                                                                        laser_pol = polarization_vec)
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
         """
@@ -725,7 +727,7 @@ def _make_func_to_compute_avrg(*,
                 all_inds = (*nm_inds, *cart_inds)
 
                 # retrieve data for property (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                product *= props_data.get(prop_tuple_key).vals[all_inds]
+                product *= props_data[prop_tuple_key].vals[all_inds]
                 
             # if product != 0.:
             #     logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
@@ -741,6 +743,7 @@ def _make_func_to_compute_avrg(*,
 def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
                           props_data: 'MolPropsCollection',
                           number_of_nmodes: int,
+                          polarization_vec: tuple = (),
                           modes_to_fill: list[int] | None = None) -> np.ndarray:
     """
     Precalculating the full tensor for given avrg_expression
@@ -761,10 +764,12 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
         generate_index_choices_general,
     )
 
-    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=modes_to_fill)
+    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, 
+                                                                       labels=modes_to_fill)
 
     # Indicating generalized version for updating
-    func_general = _make_func_to_compute_avrg(avrg_expression=avrg_expression)
+    func_general = _make_func_to_compute_avrg(avrg_expression=avrg_expression,
+                                              polarization_vec=polarization_vec)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
@@ -816,4 +821,5 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
 5. evaluating `term coeff full` per index set   [eval coeff]
 6. evaluating `term res cond - res location`    [res loc]
 7. evaluating `term res cond - on the grid`     [res loc]
+
 """
