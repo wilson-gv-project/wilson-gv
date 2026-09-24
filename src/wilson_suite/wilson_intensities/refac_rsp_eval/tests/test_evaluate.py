@@ -38,6 +38,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
     PropsCollection,
+    ResonanceCondition,
     ResonanceMotif,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -175,6 +176,29 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert props['cff'].vals is not None
     assert props.without_values().names() == ['polgrad']
     assert not props.is_filled
+
+
+## ResonanceMotif -----------------------------------------------------------
+
+def test_resmotif(states):
+    rc1 = ResonanceCondition.make_from_tuples(left_state=('a','b'),right_state=('a',), pert_freqs=('A','B',))
+    rc2 = ResonanceCondition.make_from_tuples(left_state=('b',),right_state=('a',), pert_freqs=('-A',))
+    
+    print('\n')
+    mot1 = ResonanceMotif.from_conditions([rc1,rc2])
+    print(mot1)
+    for rc in mot1:
+        # print(rc.diff[0])
+        vd2 = VibDiff.from_quanta(*rc.diff, {'a': 1, 'b': 0}, states)
+        print(vd2.energy_difference())
+
+    print()
+    # print(rc1)
+
+    print()
+    vd1 = VibDiff.from_symbolic(rc1.diff, {'a': 1, 'b': 0}, states)
+    # print(vd1.energy_difference())
+
 
 ## DATA REQUEST
 

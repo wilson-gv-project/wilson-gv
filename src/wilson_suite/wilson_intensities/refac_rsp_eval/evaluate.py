@@ -19,6 +19,7 @@ from wilson_suite.wilson_derive.abstractions import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
+    ResLocGeoObject,
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
         CompiledTerm,
         FreqTermsCollection,
         PropsCollection,
+        ResonanceMotif,
     )
 
 
@@ -813,13 +815,98 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
     return product_all
 
 
+## ----------------------------------------------------
+
+def generate_LHS_motif(motif: 'ResonanceMotif'):
+    """
+    motif is a tuple/collection of res_conditions
+        res_conditions is a tuple of (vib_difference, axes)
+            vib_difference is a tuple of states indices
+    """
+    from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
+    # maximum different normal mode index across all tuples
+    max_different_freq_axes = motif.get_max_different_freq_axes()
+    num_axes = len(max_different_freq_axes)
+
+    # for matrix construction
+    if num_axes == 1:
+        num_axes = len(motif)
+
+    # to identify coeff matrix shape
+    coeff_matrix = np.zeros((num_axes,num_axes))
+
+    for i, r_cond_key in enumerate(motif):
+        axis_tupleID: tuple[str,...] = r_cond_key.pf
+
+        # axis_tupleID = ('A', '-B') --> {'A': 1, 'B': -1} better?
+        # coeffs {'A': 1, 'B': -1}
+        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
+
+        for alpha_label, coefficient in coeffs.items():
+             # Reverse the sign (FIXME???) and place it in the correct position
+             coeff_matrix[i, num_cap_alpha_labels[alpha_label]] = -1 * np.sign(coefficient)
+
+    return coeff_matrix
+
+
+def get_RHS_motif(motif: 'ResonanceMotif',
+            parameters: ParameterSet, vibstates_data: VibStatesData,
+            unit: str='Eh'):
+    """
+    making a constants vector from a list of tuples
+    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
+    ind_tuple = (1, 2, 3) --- 
+    vibdiffbank: VibDiffBank instance
+
+    output: [5, -3, 2]
+    """
+    constants = []
+
+    for res_cond_key in motif:
+        vib_diff_w_value = VibDiff.from_quanta(*res_cond_key.diff, parameters.to_dict(), vibstates_data)
+        constants.append((-1)*vib_diff_w_value.energy_difference(au=(unit=='Eh')))
+
+    return constants
+
+
+def solve_LSE_motif(motif: 'ResonanceMotif',
+                    parameters: ParameterSet, vibdata: VibStatesData,
+                    unit: str='Eh') -> ResLocGeoObject:
+    """
+    solving a linear system of equations
+    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
+    constants = [5, -3, 2]
+    output: [5. 2. 0.]
+
+    returns a dict {f'w{i+1}': solution}
+    """
+
+    coeff_matrix = generate_LHS_motif(motif)
+    constants = get_RHS_motif(motif, parameters, vibdata, unit)
+
+    A = np.array(coeff_matrix)
+    b = np.array(constants)
+
+    try:
+        solution = np.linalg.solve(A, b)
+
+    except np.linalg.LinAlgError as e:
+        print("Error solving linear system:", e)
+
+    from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
+    num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
+
+    return ResLocGeoObject({num_to_ax[i]: float(val) for i, val in enumerate(solution)})
+
+
+
 """
 1. compiled terms
 2. data request dict
 3. molsys data
-4. evaluating `term coeff parts` per index set  [eval coeff]
-5. evaluating `term coeff full` per index set   [eval coeff]
-6. evaluating `term res cond - res location`    [res loc]
-7. evaluating `term res cond - on the grid`     [res loc]
+4. evaluating `term coeff parts` per index set  [eval coeff]    [x]
+5. evaluating `term coeff full` per index set   [eval coeff]    [x]
+6. evaluating `term res cond - res location`    [res loc]       []
+7. evaluating `term res cond - on the grid`     [res loc]       []
 
 """

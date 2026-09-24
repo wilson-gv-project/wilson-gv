@@ -42,7 +42,7 @@ import copy
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from wilson_suite.wilson_derive.abstractions import (
     PolProp,  # here and term_parts
@@ -245,6 +245,10 @@ class FreqTermsCollection:
     def get_max_state_lvl(self):
         return max(max(len(vd.sl.q), len(vd.sr.q)) for vd in self.freqterms) # type: ignore
 
+@dataclass
+class ResCondCollection:
+    resconds: Sequence[ResonanceCondition]
+
 
 @dataclass(frozen=True)
 class ResCondKey:
@@ -394,6 +398,74 @@ class ParameterSet(Mapping[str, int]):
     def __setstate__(self, state):
         object.__setattr__(self, "_parameters", MappingProxyType(state['_parameters']))
 
+
+# Type aliases
+CoordValue = float | Literal['all']
+Coordinates = tuple[tuple[str, CoordValue], ...]
+
+class ResLocGeoObject:
+    """
+    Represents geometric objects in N-dimensional space that are hashable.
+
+    Examples:
+        Point:      (('A', 1864.0), ('B', 900.0))
+        Line:       (('A', 1864.0), ('B', 'all'))
+        Plane:      (('A', 'all'), ('B', 'all'), ('C', 1200.0))
+    """
+    def __init__(self, coord_dict: dict[str, CoordValue]):
+        self._coord_dict = coord_dict
+        # Convert dict to sorted tuple of tuples for consistent hashing
+        self.coordinates: Coordinates = tuple(sorted(coord_dict.items()))
+
+    # UNUSED - useful for analysis or for future?
+    @property
+    def dims(self) -> tuple[str, ...]:
+        return tuple(k for k, _ in self.coordinates)
+
+    @property
+    def values(self) -> tuple[CoordValue, ...]:
+        return tuple(v for _, v in self.coordinates)
+
+    @property
+    def dimensionality(self) -> int:
+        """Returns dimensionality of the object (0=point, 1=line, 2=plane, etc)"""
+        return sum(1 for v in self.values if v == 'all')
+
+    def __getitem__(self, axis: str) -> CoordValue:
+        for k, v in self.coordinates:
+            if k == axis:
+                return v
+        raise KeyError(f"Axis {axis} not found")
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, ResLocGeoObject):
+            return NotImplemented
+        return self.coordinates == other.coordinates
+
+    def __hash__(self) -> int:
+        return hash(self.coordinates)
+
+    def is_point(self) -> bool:
+        return self.dimensionality == 0
+
+    def is_line(self) -> bool:
+        return self.dimensionality == 1
+
+    def is_plane(self) -> bool:
+        return self.dimensionality == 2
+
+    def __repr__(self) -> str:
+        """
+        Returns a string representation showing type and coordinates.
+
+        Examples:
+            Point(A=1864.0, B=900.0)
+            Line(A=1864.0, B=all)
+            Plane(A=all, B=all, C=1200.0)
+        """
+        type_name = "Point" if self.is_point() else "Line" if self.is_line() else "Plane" if self.is_plane() else "Object"
+        coords = ", ".join(f"{k}={v}" for k, v in self.coordinates)
+        return f"{type_name}({coords})"
 
 
 ## --------------------------------------------------------------------
