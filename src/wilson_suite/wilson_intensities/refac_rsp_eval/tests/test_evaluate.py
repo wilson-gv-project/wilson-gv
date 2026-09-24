@@ -22,13 +22,15 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     VibDiff,
     VibState,
     VibStatesData,
+    _get_ind_tuple_from_base,
     _make_hq_states_from_datadict,
+    _make_vibdiff_key,
+    calculate_avrg_tensor,
+    eval_avrg_per_indexdict,
     eval_non_avrg_per_indexdict,
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
-    _get_ind_tuple_from_base,
-    make_vibdiff_key,
     otf_vibdiffdenom,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -109,10 +111,11 @@ def test_make_hq_states_from_datadict_joins_quanta_labels():
 ## VibDiff ------------------------------------------------------------------
 
 def test_make_vibdiff_key_maps_symbols_sorts_and_names_ground():
-    key = make_vibdiff_key(vibdiff(sl='ab', sr=''), {'a': 1, 'b': 0})
-
+    key = _make_vibdiff_key(vibdiff(sl='ab', sr=''), {'a': 1, 'b': 0})
     assert key == ('0,1', 'zero')
 
+    key = _make_vibdiff_key(vibdiff(sl='', sr='abc'), {'a': 1, 'b': 0, 'c': 2})
+    assert key == ('zero', '0,1,2')
 
 def test_vibdiff_normalized_puts_ground_left_then_label_order():
     zero, s0, s1 = state('zero', 0.), state('0', E0), state('1', E1)
@@ -172,6 +175,10 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert props.without_values().names() == ['polgrad']
     assert not props.is_filled
 
+## 
+
+def test_build_data_request_for_term():
+    assert False
 
 ## Evaluation kernels -------------------------------------------------------
 
@@ -233,6 +240,11 @@ def test_get_ind_tuple_from_base_distinct_vs_repeated_base_labels():
     with pytest.raises(ValueError):
         _get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
 
+def test_eval_avrg_per_indexdict():
+    assert False
+
+def test_calculate_avrg_tensor():
+    assert False
 
 def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
     freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
