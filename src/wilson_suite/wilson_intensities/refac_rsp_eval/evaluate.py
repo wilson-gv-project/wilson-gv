@@ -817,36 +817,29 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
 
 ## ----------------------------------------------------
 
-def generate_LHS_motif(motif: 'ResonanceMotif'):
+def generate_LHS_motif(motif: 'ResonanceMotif') -> tuple[np.ndarray, tuple[str, ...]]:
     """
     motif is a tuple/collection of res_conditions
         res_conditions is a tuple of (vib_difference, axes)
             vib_difference is a tuple of states indices
+
+    returns (coeff_matrix, axes): one row per condition, one column per axis in `axes`
+    (the distinct axes of the motif, sorted)
     """
-    from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
-    # maximum different normal mode index across all tuples
-    max_different_freq_axes = motif.get_max_different_freq_axes()
-    num_axes = len(max_different_freq_axes)
+    axes = tuple(sorted(motif.get_max_different_freq_axes()))
+    col = {ax: j for j, ax in enumerate(axes)}
 
-    # for matrix construction
-    if num_axes == 1:
-        num_axes = len(motif)
-
-    # to identify coeff matrix shape
-    coeff_matrix = np.zeros((num_axes,num_axes))
+    coeff_matrix = np.zeros((len(motif), len(axes)))
 
     for i, r_cond_key in enumerate(motif):
-        axis_tupleID: tuple[str,...] = r_cond_key.pf
-
-        # axis_tupleID = ('A', '-B') --> {'A': 1, 'B': -1} better?
-        # coeffs {'A': 1, 'B': -1}
-        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in axis_tupleID}
+        # ('A', '-B') --> {'A': 1, 'B': -1}
+        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in r_cond_key.pf}
 
         for alpha_label, coefficient in coeffs.items():
              # Reverse the sign (FIXME???) and place it in the correct position
-             coeff_matrix[i, num_cap_alpha_labels[alpha_label]] = -1 * np.sign(coefficient)
+             coeff_matrix[i, col[alpha_label]] = -1 * np.sign(coefficient)
 
-    return coeff_matrix
+    return coeff_matrix, axes
 
 
 def get_RHS_motif(motif: 'ResonanceMotif',
@@ -878,25 +871,23 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
     constants = [5, -3, 2]
     output: [5. 2. 0.]
 
-    returns a dict {f'w{i+1}': solution}
+    returns a point ResLocGeoObject {axis: w}
+
+    raises np.linalg.LinAlgError if the location is not a unique point:
+    underdetermined (rank < number of axes) or inconsistent conditions.
     """
 
-    coeff_matrix = generate_LHS_motif(motif)
-    constants = get_RHS_motif(motif, parameters, vibdata, unit)
+    A, axes = generate_LHS_motif(motif)
+    b = np.array(get_RHS_motif(motif, parameters, vibdata, unit))
 
-    A = np.array(coeff_matrix)
-    b = np.array(constants)
+    solution, _, rank, _ = np.linalg.lstsq(A, b, rcond=None)
 
-    try:
-        solution = np.linalg.solve(A, b)
+    if rank < len(axes):
+        raise np.linalg.LinAlgError(f"resonance location of {motif} is not a point (rank {rank} < {len(axes)} axes)")
+    if not np.allclose(A @ solution, b):
+        raise np.linalg.LinAlgError(f"resonance conditions of {motif} are inconsistent: no resonance location")
 
-    except np.linalg.LinAlgError as e:
-        print("Error solving linear system:", e)
-
-    from wilson_suite.wilson_utils.common_labels import num_cap_alpha_labels
-    num_to_ax = {v:k for k,v in num_cap_alpha_labels.items()}
-
-    return ResLocGeoObject({num_to_ax[i]: float(val) for i, val in enumerate(solution)})
+    return ResLocGeoObject({ax: float(val) for ax, val in zip(axes, solution)})
 
 
 

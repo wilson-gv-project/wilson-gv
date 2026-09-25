@@ -234,19 +234,20 @@ def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
 
 
 ## generate_LHS_motif ---------------------------------------------------------
-# Row i <-> condition i of the motif (conditions are kept sorted), column j <-> axis j
-# ('A' -> 0, 'B' -> 1, ...). Entry is -s_j: the equation is written as
+# Row i <-> condition i of the motif (conditions are kept sorted), column j <-> j-th of the
+# motif's distinct axes, sorted. Entry is -s_j: the equation is written as
 # -sum_j s_j w_j = -(E_left - E_right).
 
-@pytest.mark.parametrize('motif, expected', [
-    (MOTIF_AB,      [[-1., 0.], [0., -1.]]),
-    (MOTIF_A,       [[-1.]]),
-    (MOTIF_MIXED,   [[-1., 1.], [0., -1.]]),     # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
-    (MOTIF_B_TWICE, [[0., -1.], [0., -1.]]),     # one axis, two rows -> padded to 2x2, column A empty
+@pytest.mark.parametrize('motif, expected, expected_axes', [
+    (MOTIF_AB,      [[-1., 0.], [0., -1.]], ('A', 'B')),
+    (MOTIF_A,       [[-1.]],                ('A',)),
+    (MOTIF_MIXED,   [[-1., 1.], [0., -1.]], ('A', 'B')),   # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
+    (MOTIF_B_TWICE, [[-1.], [-1.]],         ('B',)),       # two conditions, one axis -> 2x1
 ])
-def test_generate_LHS_motif(motif, expected):
-    lhs = generate_LHS_motif(ResonanceMotif.from_tuples(motif))
+def test_generate_LHS_motif(motif, expected, expected_axes):
+    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(motif))
 
+    assert axes == expected_axes
     assert lhs.shape == np.shape(expected)
     np.testing.assert_array_equal(lhs, expected)
 
@@ -257,7 +258,7 @@ def test_generate_LHS_motif_ignores_states():
     one = ResonanceMotif.from_tuples(((((), ('a',)), ('A', '-B')), ((('b',), ()), ('B',))))
     other = ResonanceMotif.from_tuples(((((), ('b',)), ('A', '-B')), ((('a', 'b'), ('a',)), ('B',))))
 
-    np.testing.assert_array_equal(generate_LHS_motif(one), generate_LHS_motif(other))
+    np.testing.assert_array_equal(generate_LHS_motif(one)[0], generate_LHS_motif(other)[0])
 
 
 ## get_RHS_motif --------------------------------------------------------------
@@ -334,16 +335,18 @@ def test_solve_LSE_motif_hartree_is_cm1_converted(params, states):
     assert in_eh.values == pytest.approx(tuple(convNu2Ene(v) for v in in_cm1.values))  # type: ignore
 
 
-@pytest.mark.xfail(raises=UnboundLocalError, strict=True,
-                   reason="singular system: the LinAlgError is printed and swallowed, then `solution` is unbound")
-def test_solve_LSE_motif_singular_system_raises_linalg_error(params, states):
+def test_solve_LSE_motif_inconsistent_system_raises_linalg_error(params, states):
     """MOTIF_B_TWICE asks w_B = -E0 and w_B = E1 - E0 at once: no resonance location exists."""
-    with pytest.raises(np.linalg.LinAlgError):
+    with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
         solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states)
 
 
-@pytest.mark.xfail(raises=IndexError, strict=True,
-                   reason="LHS is sized by the number of distinct axes but indexed by alphabet position")
+def test_solve_LSE_motif_underdetermined_system_raises_linalg_error(params, states):
+    """One condition on A + B: the resonance is a line, not a point."""
+    with pytest.raises(np.linalg.LinAlgError, match='not a point'):
+        solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('A', 'B')),)), params, states)
+
+
 def test_solve_LSE_motif_single_axis_other_than_A(params, states):
     location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params, states, unit='cm-1')
 
