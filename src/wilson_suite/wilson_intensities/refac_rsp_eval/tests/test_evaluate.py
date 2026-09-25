@@ -32,12 +32,17 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
+    generate_LHS_motif,
+    get_RHS_motif,
     otf_vibdiffdenom,
+    solve_LSE_motif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
     PropsCollection,
+    ResCondKey,
+    ResLocGeoObject,
     ResonanceCondition,
     ResonanceMotif,
 )
@@ -179,25 +184,170 @@ def test_molpropscollection_fill_from_and_is_filled(props):
 
 
 ## ResonanceMotif -----------------------------------------------------------
+# A motif is a set of resonance conditions  E_left - E_right = sum_j s_j * w_j , one per
+# ResCondKey: `diff` names the two states by quanta labels, `pf` the frequency axes w_j with
+# sign s_j ('-B' -> s = -1). Fixing the mode labels (a, b, ...) to modes turns the motif into
+# a linear system  LHS @ w = RHS  whose solution is where on the axes the term resonates.
+#
+# The four motifs below are the ones used for the pre-refactor amplitudes/resonances.py.
+# With the `states` fixture and a=0, b=1:  E_a = E0, E_b = E1, E_ab = E01, E_0 = 0.
 
-def test_resmotif(states):
-    rc1 = ResonanceCondition.make_from_tuples(left_state=('a','b'),right_state=('a',), pert_freqs=('A','B',))
-    rc2 = ResonanceCondition.make_from_tuples(left_state=('b',),right_state=('a',), pert_freqs=('-A',))
-    
-    print('\n')
-    mot1 = ResonanceMotif.from_conditions([rc1,rc2])
-    print(mot1)
-    for rc in mot1:
-        # print(rc.diff[0])
-        vd2 = VibDiff.from_quanta(*rc.diff, {'a': 1, 'b': 0}, states)
-        print(vd2.energy_difference())
+MOTIF_AB = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))        # one axis per condition
+MOTIF_A = (((('a', 'b'), ('a',)), ('A',)),)                                    # single condition
+MOTIF_MIXED = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))             # A - B in one condition
+MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           # two conditions, one axis
 
-    print()
-    # print(rc1)
 
-    print()
-    vd1 = VibDiff.from_symbolic(rc1.diff, {'a': 1, 'b': 0}, states)
-    # print(vd1.energy_difference())
+@pytest.fixture
+def params() -> ParameterSet:
+    return ParameterSet({'a': 0, 'b': 1})
+
+
+def resonance_residuals(motif: ResonanceMotif, location: ResLocGeoObject, index_dict: dict, states) -> list[float]:
+    """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py."""
+    def energy(quanta):
+        label = ','.join(str(i) for i in sorted(index_dict[q] for q in quanta))
+        return states.get_state_by_label(label).energy if label else 0.
+
+    return [energy(c.left) - energy(c.right)
+            - sum((-1. if ax.startswith('-') else 1.) * location[ax.strip('-')] for ax in c.pf)  # type: ignore
+            for c in motif]
+
+
+def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
+    """A motif keeps only quanta labels; resolving them with VibDiff.from_quanta must land on the
+    same states as resolving the original derive-side VibDiffTerm with from_symbolic."""
+    rc1 = ResonanceCondition.make_from_tuples(left_state=('a', 'b'), right_state=('a',), pert_freqs=('A', 'B'))
+    rc2 = ResonanceCondition.make_from_tuples(left_state=('b',), right_state=('a',), pert_freqs=('-A',))
+    index_dict = {'a': 1, 'b': 0}
+
+    motif = ResonanceMotif.from_conditions([rc1, rc2])
+
+    assert motif.conditions == (ResCondKey(diff=(('a', 'b'), ('a',)), pf=('A', 'B')),
+                                ResCondKey(diff=(('b',), ('a',)), pf=('-A',)))
+    for key, rc in zip(motif, (rc1, rc2)):
+        assert VibDiff.from_quanta(*key.diff, index_dict, states) == VibDiff.from_symbolic(rc.diff, index_dict, states)
+
+    # a=1, b=0:  E_ab - E_a = E01 - E1 ,  E_b - E_a = E0 - E1
+    assert [VibDiff.from_quanta(*k.diff, index_dict, states).energy_difference() for k in motif] \
+        == pytest.approx([E01 - E1, E0 - E1])
+
+
+## generate_LHS_motif ---------------------------------------------------------
+# Row i <-> condition i of the motif (conditions are kept sorted), column j <-> axis j
+# ('A' -> 0, 'B' -> 1, ...). Entry is -s_j: the equation is written as
+# -sum_j s_j w_j = -(E_left - E_right).
+
+@pytest.mark.parametrize('motif, expected', [
+    (MOTIF_AB,      [[-1., 0.], [0., -1.]]),
+    (MOTIF_A,       [[-1.]]),
+    (MOTIF_MIXED,   [[-1., 1.], [0., -1.]]),     # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
+    (MOTIF_B_TWICE, [[0., -1.], [0., -1.]]),     # one axis, two rows -> padded to 2x2, column A empty
+])
+def test_generate_LHS_motif(motif, expected):
+    lhs = generate_LHS_motif(ResonanceMotif.from_tuples(motif))
+
+    assert lhs.shape == np.shape(expected)
+    np.testing.assert_array_equal(lhs, expected)
+
+
+def test_generate_LHS_motif_ignores_states():
+    """Only pf enters the LHS; which states resonate is the RHS's business.
+    (States do fix the row order, so both motifs here sort the ('A', '-B') condition first.)"""
+    one = ResonanceMotif.from_tuples(((((), ('a',)), ('A', '-B')), ((('b',), ()), ('B',))))
+    other = ResonanceMotif.from_tuples(((((), ('b',)), ('A', '-B')), ((('a', 'b'), ('a',)), ('B',))))
+
+    np.testing.assert_array_equal(generate_LHS_motif(one), generate_LHS_motif(other))
+
+
+## get_RHS_motif --------------------------------------------------------------
+# One entry per condition: -(E_left - E_right), in Eh by default, cm-1 on request.
+
+@pytest.mark.parametrize('motif, expected_cm1', [
+    (MOTIF_AB,      [-(E01 - E0), -(E1 - E0)]),
+    (MOTIF_A,       [-(E01 - E0)]),
+    (MOTIF_MIXED,   [E0, E0]),                    # -(E_0 - E_a)
+    (MOTIF_B_TWICE, [E0, -(E1 - E0)]),
+])
+def test_get_RHS_motif_cm1(motif, expected_cm1, params, states):
+    rhs = get_RHS_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1')
+
+    assert rhs == pytest.approx(expected_cm1)
+
+
+def test_get_RHS_motif_defaults_to_hartree(params, states):
+    motif = ResonanceMotif.from_tuples(MOTIF_AB)
+
+    assert get_RHS_motif(motif, params, states) == get_RHS_motif(motif, params, states, unit='Eh')
+    assert get_RHS_motif(motif, params, states) == pytest.approx([convNu2Ene(-(E01 - E0)), convNu2Ene(-(E1 - E0))])
+
+
+def test_get_RHS_motif_follows_the_mode_assignment(states):
+    """Same motif, a and b swapped -> different states resonate."""
+    motif = ResonanceMotif.from_tuples(MOTIF_AB)
+
+    swapped = get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 0}), states, unit='cm-1')
+
+    assert swapped == pytest.approx([-(E01 - E1), -(E0 - E1)])
+
+
+def test_get_RHS_motif_unknown_state_raises(states):
+    motif = ResonanceMotif.from_tuples(MOTIF_A)
+
+    with pytest.raises(ValueError):          # a=b=1 needs state '1,1', which `states` lacks
+        get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 1}), states)
+
+
+## solve_LSE_motif ------------------------------------------------------------
+
+@pytest.mark.parametrize('motif, expected', [
+    (MOTIF_AB,    {'A': E01 - E0, 'B': E1 - E0}),
+    (MOTIF_A,     {'A': E01 - E0}),
+    (MOTIF_MIXED, {'A': -2 * E0, 'B': -E0}),     # w_B = -E0 ; w_A - w_B = -E0
+])
+def test_solve_LSE_motif_cm1(motif, expected, params, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1')
+
+    assert isinstance(location, ResLocGeoObject)
+    assert location.is_point()
+    assert location.dims == tuple(sorted(expected))
+    assert dict(location.coordinates) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_solve_LSE_motif_location_satisfies_every_condition(motif, params, states):
+    """Independent check: plug the solution back into  E_left - E_right = sum_j s_j w_j ."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+
+    location = solve_LSE_motif(res_motif, params, states, unit='cm-1')
+
+    assert resonance_residuals(res_motif, location, params.to_dict(), states) == pytest.approx([0.] * len(res_motif))
+
+
+def test_solve_LSE_motif_hartree_is_cm1_converted(params, states):
+    motif = ResonanceMotif.from_tuples(MOTIF_MIXED)
+
+    in_cm1 = solve_LSE_motif(motif, params, states, unit='cm-1')
+    in_eh = solve_LSE_motif(motif, params, states)
+
+    assert in_eh.dims == in_cm1.dims
+    assert in_eh.values == pytest.approx(tuple(convNu2Ene(v) for v in in_cm1.values))  # type: ignore
+
+
+@pytest.mark.xfail(raises=UnboundLocalError, strict=True,
+                   reason="singular system: the LinAlgError is printed and swallowed, then `solution` is unbound")
+def test_solve_LSE_motif_singular_system_raises_linalg_error(params, states):
+    """MOTIF_B_TWICE asks w_B = -E0 and w_B = E1 - E0 at once: no resonance location exists."""
+    with pytest.raises(np.linalg.LinAlgError):
+        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states)
+
+
+@pytest.mark.xfail(raises=IndexError, strict=True,
+                   reason="LHS is sized by the number of distinct axes but indexed by alphabet position")
+def test_solve_LSE_motif_single_axis_other_than_A(params, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params, states, unit='cm-1')
+
+    assert location == ResLocGeoObject({'B': -E0})
 
 
 ## DATA REQUEST

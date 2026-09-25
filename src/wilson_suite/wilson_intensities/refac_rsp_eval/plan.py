@@ -250,12 +250,16 @@ class ResCondCollection:
     resconds: Sequence[ResonanceCondition]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class ResCondKey:
     """One resonance condition reduced to identity: quanta labels + perturbing freqs.
-    `diff` is (left quanta, right quanta); ground state is ()."""
+    `diff` is (left quanta, right quanta); ground state is ().
+    `pf` is a sum of signed axes, so its order carries no meaning and is sorted."""
     diff: tuple[tuple[str, ...], tuple[str, ...]]
     pf: tuple[str, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, 'pf', tuple(sorted(self.pf)))
 
     @property
     def left(self):
@@ -269,11 +273,12 @@ class ResCondKey:
 @dataclass(frozen=True)
 class ResonanceMotif:
     """Plan-level dedup key: a motif is its canonical tuple, nothing more.
+    Conditions are sorted, so the same conditions in any order are the same motif.
     Immutable, so it never aliases derive-owned ResonanceConditions and never copies them."""
     conditions: tuple[ResCondKey, ...]
 
     def __post_init__(self):
-        object.__setattr__(self, 'conditions', tuple(self.conditions))
+        object.__setattr__(self, 'conditions', tuple(sorted(self.conditions)))
 
     @classmethod
     def from_conditions(cls, conditions: Sequence[ResonanceCondition]) -> 'ResonanceMotif':

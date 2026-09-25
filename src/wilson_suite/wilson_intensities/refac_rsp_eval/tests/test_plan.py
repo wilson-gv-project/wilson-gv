@@ -156,8 +156,8 @@ def test_resonance_motif_from_conditions_matches_from_tuples():
     assert from_conds == from_tuples
     assert hash(from_conds) == hash(from_tuples)
     assert {from_conds: 'shared'}[from_tuples] == 'shared'     # what makes it a dedup key
-    assert from_conds.conditions == (ResCondKey(diff=(('a', 'b'), ()), pf=('1',)),
-                                     ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2')))
+    assert from_conds.conditions == (ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2')),   # conditions sorted
+                                     ResCondKey(diff=(('a', 'b'), ()), pf=('1',)))
 
 
 def test_resonance_motif_axes_and_mode_indices():
@@ -171,11 +171,89 @@ def test_resonance_motif_axes_and_mode_indices():
     assert list(motif) == list(motif.conditions)               # iterating yields the keys
 
 
+def test_resonance_motif_condition_order_does_not_matter():
+    """Same conditions in another order is the same motif, so reorderings dedup to one key."""
+    forward = ResonanceMotif.from_tuples([((('a',), ()), ('A',)), ((('b',), ('a',)), ('B',))])
+    backward = ResonanceMotif.from_tuples([((('b',), ('a',)), ('B',)), ((('a',), ()), ('A',))])
+
+    assert forward == backward
+    assert hash(forward) == hash(backward)
+    assert forward.conditions == backward.conditions
+    assert len({forward, backward}) == 1
+
+
+def test_resonance_motif_keeps_repeated_conditions():
+    once = ResonanceMotif.from_tuples([((('a',), ()), ('A',))])
+    twice = ResonanceMotif.from_tuples([((('a',), ()), ('A',)), ((('a',), ()), ('A',))])
+
+    assert len(twice) == 2
+    assert once != twice
+
+
 def test_resonance_motif_is_immutable():
     motif = ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
 
     with pytest.raises(AttributeError):
         motif.conditions = () # type: ignore
+
+
+def test_resonance_motif_from_tuples_sorts_quanta_and_pf():
+    """Quanta are a multiset (E_ba is E_ab) and pf a sum of signed axes (A - B is -B + A),
+    so both are sorted; signs stay attached to their axis."""
+    motif = ResonanceMotif.from_tuples([((('c', 'a'), ('b', 'a')), ('B', '-A'))])
+
+    assert motif.conditions == (ResCondKey(diff=(('a', 'c'), ('a', 'b')), pf=('-A', 'B')),)
+
+
+def test_rescondkey_pf_order_does_not_matter():
+    key = ResCondKey(diff=(('a',), ()), pf=('A', '-B'))
+    same = ResCondKey(diff=(('a',), ()), pf=('-B', 'A'))
+
+    assert key == same and hash(key) == hash(same)
+    assert ResonanceMotif((key,)) == ResonanceMotif((same,))
+
+
+def test_resonance_motif_accepts_any_sequence_of_keys():
+    keys = [ResCondKey(diff=(('a',), ()), pf=('1',))]
+
+    assert ResonanceMotif(keys).conditions == tuple(keys)       # type: ignore  # list -> tuple in __post_init__
+    assert ResonanceMotif(keys) == ResonanceMotif(tuple(keys))  # type: ignore
+
+
+def test_resonance_motif_max_state_lvl_counts_quanta_on_either_side():
+    motif = ResonanceMotif.from_tuples([((('a',), ()), ('1',)),
+                                        ((('b',), ('a', 'b', 'c')), ('2',)),
+                                        ((('a', 'b'), ('a',)), ('1', '2'))])
+
+    assert motif.get_max_state_lvl() == 3
+
+
+def test_resonance_motif_empty_is_the_no_resonance_term():
+    """CompiledTerm uses ResonanceMotif(()) for terms without resonance conditions."""
+    motif = ResonanceMotif(())
+
+    assert len(motif) == 0
+    assert list(motif) == []
+    assert motif.get_max_different_freq_axes() == set()
+    assert motif.get_nm_indices() == set()
+    assert motif == ResonanceMotif.from_conditions([])
+
+
+def test_resonance_motif_repeated_axes_are_counted_once():
+    motif = ResonanceMotif.from_tuples([((('a',), ()), ('A', '-B')),
+                                        ((('b',), ()), ('B',)),
+                                        ((('a',), ('b',)), ('-A',))])
+
+    assert motif.get_max_different_freq_axes() == {'A', 'B'}
+
+
+def test_resonance_motif_pickle_roundtrip():
+    motif = ResonanceMotif.from_tuples([((('a', 'b'), ()), ('A',)), ((('b',), ('a',)), ('-A', 'B'))])
+
+    restored = pickle.loads(pickle.dumps(motif))
+
+    assert restored == motif
+    assert hash(restored) == hash(motif)
 
 
 ## ParameterSet -------------------------------------------------------------
