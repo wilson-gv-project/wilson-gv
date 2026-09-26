@@ -1,10 +1,12 @@
-from scipy import constants
+from typing import Any, TypeVar
+
 import numpy as np
-from typing import Any
+from numpy.typing import NDArray
+from scipy import constants
 
 bohr_in_angstroms = constants.physical_constants['Bohr radius'][0]/10**(-10)
 
-def rcm2Eh_a0(rcm_array: np.ndarray, harm_freqs) -> np.ndarray:
+def rcm2Eh_a0(rcm_array: np.ndarray, harm_freqs) -> np.ndarray | None:
     """ Convert from [cm-1] to [Hartree/Bohr^n] """
     
     if rcm_array.ndim == 3:
@@ -49,7 +51,7 @@ def GHz2Nu(ghz: float | np.ndarray) -> float | np.ndarray:
     """Conversion from GHz to cm-1"""
     return ghz*10**9/(constants.c*100)
 
-def convNu2Ene(values: float | np.ndarray, reverse: bool = False) -> float | np.ndarray:
+def convNu2Ene[T: (float, NDArray[np.float64])](values: T, reverse: bool = False) -> T:
     """
     Convert a wavenumber (cm-1) to energy (Hartree) and reverse if specified
     """

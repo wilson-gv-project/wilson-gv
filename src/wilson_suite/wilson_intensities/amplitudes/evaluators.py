@@ -2,7 +2,7 @@
 Evaluator functions for WilsonSimulation
 """
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import ResLocGeoObject, SpectralFeature
-from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs, precalculate_unique_coeff_parts, identify_precalc_unique_coeff_parts
+from ..amplitudes.full_amplitude_coeff import evaluate_term_coeffs
 from ..amplitudes.resonances import find_resonance_locations_wrt_index_choices, identify_unique_resmotifs
 
 from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularSystem, MolPropsCollection
@@ -15,38 +15,17 @@ from ...wilson_derive.response_terms import VibPerturbedTerm
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from wilson_suite.wilson_main.abstractions import VibAnaSetup, MolecularProperty
-    from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup
-    from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
+    from .evaluation_wf import QCDataContext, AxisContext
+    from wilson_suite.wilson_intensities.amplitudes.grid_manager_evaluator import GridRegion
+    from wilson_suite.wilson_intensities.amplitudes.numerical_abstractions import CompiledTermGroup, NumericalResonanceMotif
+
+from .numerical_abstractions import compile_feature
 
 import numpy as np
 
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
-def prepTermsForEval(terms: dict | list) -> list:
-    """
-    put data in a form for use on the evaluation step
-    """
-    if isinstance(terms, type([])):
-        for t in terms:
-            if not isinstance(t, VibPerturbedTerm):
-                raise ValueError("Smth that is not a VibPerturbedTerm was given in a list to prepTermsForEval()")
-        return terms
-
-    if isinstance(terms, type({})):
-        for t_key in terms:
-            if isinstance(terms[t_key], type({})):
-
-                terms_as_list = []
-                for i in terms:
-                    for j in terms[i]:
-                        for t in terms[i][j]:
-                            terms_as_list.append(t)
-                return terms_as_list
-            else:
-                if not isinstance(terms[t_key], VibPerturbedTerm):
-                    raise ValueError("A flat dictionary but has smth other than VibPerturbedTerm as a value")
-                return list(terms.values())
 
 def prepDataForEval(pulse_polarization_vector: np.ndarray,
                     vib_ana_setup: 'VibAnaSetup',
@@ -69,30 +48,55 @@ def prepDataForEval(pulse_polarization_vector: np.ndarray,
                                                 vibstates_data=vibstates_data,
                                                 number_of_nmodes=vib_ana_setup.number_of_modes,
                                                 nm_inds_choices=include_list,
-                                                pulse_polarization_vector=pulse_polarization_vector)
+                                                pulse_polarization_vector=pulse_polarization_vector,
+                                                nc_sqrt_eigval=vib_ana_setup.nc_sqrt_eigval)
+
+    return vibstates_data, vibdiff_cache, data_and_configs
+
+def set_up_qc_data_request(terms,
+                   vibana_own_analysis, vib_regime,
+                    freqs: str = 'static') -> list:
+    """
+    put data in a form for use on the evaluation step
+    """
+    from wilson_suite.wilson_main.main_functions import tell_needed_props_for_vib_analysis_simple, find_props
+    props = find_props(terms, freqs=freqs)
+    vib_props = tell_needed_props_for_vib_analysis_simple(vibana_own_analysis=vibana_own_analysis, regime=vib_regime)
+
+    return list(set(props+vib_props))
+
+
+def set_up_qc_data(props: list, 
+                   nc_sqrt_eigval: dict,
+                   number_of_modes: int,
+                   states: list,
+                   exclude_modes,
+                   pulse_polarization_vector):
+
+    include_list = tuple([v for v in list(nc_sqrt_eigval.keys()) if v not in exclude_modes])
+    if include_list == tuple():
+        raise ValueError("include_list of included normal modes labels is empty")
+    
+
+    vibstates_data = VibStatesData(allstates=tuple(states), 
+                                   harmonic_osc_states_labels=include_list,
+                                   number_of_nmodes=number_of_modes)
+    vibdiff_cache = VibDiffCache()
+    props = MolPropsCollection(properties=props)
+    
+    data_and_configs = EvaluationDataAndConfigs(props_data=props,
+                                                vibstates_data=vibstates_data,
+                                                number_of_nmodes=number_of_modes,
+                                                nm_inds_choices=include_list,
+                                                pulse_polarization_vector=pulse_polarization_vector,
+                                                nc_sqrt_eigval=nc_sqrt_eigval)
 
     return vibstates_data, vibdiff_cache, data_and_configs
 
 
-def process_resonance_motifs(derived_terms: list['VibPerturbedTerm'],
-                            vibstates_data: VibStatesData,
-                            vibdiff_cache: VibDiffCache) -> tuple[dict[ResonanceMotif, ResLocGeoObject], 
-                                                                  dict[ResonanceMotif, list['VibPerturbedTerm']]]:
-    """
-    Take a list of terms and process resonance motifs and find their locations.
-    """
+def _get_terms_for_motifs(derived_terms: list['VibPerturbedTerm']):
+    
     unique_res_motifs = identify_unique_resmotifs(derived_terms)
-    motif_res_loc: dict[ResonanceMotif, ResLocGeoObject] = {}
-    
-    for res_motif in unique_res_motifs:
-        this_motif_res_locs = find_resonance_locations_wrt_index_choices(
-            motif=res_motif,
-            vibstates_data=vibstates_data,
-            vibdiff_cache=vibdiff_cache,
-            spec_window=None
-        )
-        motif_res_loc.update(this_motif_res_locs)
-    
     terms_for_motifs: dict[ResonanceMotif, list[VibPerturbedTerm]] = {res_motif: [] for res_motif in unique_res_motifs}
     
     for vibterm in derived_terms:
@@ -100,8 +104,24 @@ def process_resonance_motifs(derived_terms: list['VibPerturbedTerm'],
         for u_motif in unique_res_motifs:
             if u_motif == res_motif:
                 terms_for_motifs[u_motif].append(vibterm)
-                
-    return motif_res_loc, terms_for_motifs
+    
+    return terms_for_motifs
+
+def _compute_motif_locs(axis_ctx: 'AxisContext', qc: 'QCDataContext'):
+    
+    unique_res_motifs = identify_unique_resmotifs(axis_ctx.terms)
+    motif_res_loc: dict[ResonanceMotif, ResLocGeoObject] = {}
+    
+    for res_motif in unique_res_motifs:
+        this_motif_res_locs = find_resonance_locations_wrt_index_choices(
+            motif=res_motif,
+            vibstates_data=qc.vibstates_data,
+            vibdiff_cache=qc.vibdiff_cache,
+            spec_window=None
+        )
+        motif_res_loc.update(this_motif_res_locs)
+
+    return motif_res_loc
 
 def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
                   motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject]],
@@ -109,6 +129,8 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
                   precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
     """
     Evaluate coefficients for all terms.
+
+    terms to dict with (params to coeff)
     """
     term_coeffs_per_index = {}
     for vibterm in derived_terms:
@@ -121,28 +143,35 @@ def evaluate_terms_coeffs(derived_terms: list['VibPerturbedTerm'],
     
     return term_coeffs_per_index
 
-def get_features_from_terms_for_eval(derived_terms: list['VibPerturbedTerm'],
-                                     vibstates_data: VibStatesData,
-                                     vibdiff_cache: VibDiffCache,
-                                     lineshape_parameter: float=None) -> list[SpectralFeature]:
-    """
-    SpectralFeature:
-        location
-        term_contributions = None
-        lineshape_parameter = None
-        amplitude_coeff = None
-        feat_type: str = None - updated when sorted
-        feat_box: Box = None - post-init if lineshape_parameter
-    """
-    motif_res_loc, terms_for_motifs = process_resonance_motifs(derived_terms, vibstates_data, vibdiff_cache)
 
-    return get_features_to_draw(motif_res_loc, terms_for_motifs, lineshape_parameter=lineshape_parameter)
+def evaluate_coeff_for_feat(feature: SpectralFeature, 
+                            terms_hash_map: dict[int, 'VibPerturbedTerm'],
+                            data_and_configs: EvaluationDataAndConfigs,
+                            precalculated: PrecalculatedData) -> dict['VibPerturbedTerm', dict[ParameterSet, float]]:
+    """
+    Using feature information to evaluate its coefficient.
+
+    A wrapper around evaluate_terms_coeffs()
+    """
+    derived_terms = [terms_hash_map[id] for id in feature.term_contributions[0].term_ids]
+    assert feature.term_contributions[0].res_motif == ResonanceMotif(derived_terms[0].res)
+
+    motif_res_loc = {feature.term_contributions[0].res_motif: 
+                     {feature.location: [dict(p._parameters) for p in feature.term_contributions[0].states_parameters]}}
+
+    term_coeffs_per_index = evaluate_terms_coeffs(derived_terms=derived_terms,
+                                                  motif_res_loc=motif_res_loc,
+                                                  data_and_configs=data_and_configs,
+                                                  precalculated=precalculated)
+
+    return term_coeffs_per_index
+
 
 def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObject, list]],
                          terms_for_motifs: dict[ResonanceMotif, list['VibPerturbedTerm']], 
                          term_coeffs_per_index: dict['VibPerturbedTerm', 
-                                                     dict[ParameterSet, float]]=None,
-                         lineshape_parameter: float=None) -> list[SpectralFeature]:
+                                                     dict[ParameterSet, tuple[float, dict]]]=None,
+                         lineshape_parameter: float=None) -> tuple[list[SpectralFeature], list[SpectralFeature]]:
     """
 
     lineshape_parameter - uniform lineshape parameters (for all axes) for each feature for now
@@ -151,6 +180,7 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
     # a SpectralFeature instanse holds a res_location and list of states parameters that give this res_location; 
     #       the amplitude coefficient is a value in the dict
     features_to_draw: list[SpectralFeature] = []
+    zero_coeff_feats: list[SpectralFeature] = []
 
     for res_motif in motif_res_loc:
 
@@ -159,25 +189,135 @@ def get_features_to_draw(motif_res_loc: dict[ResonanceMotif, dict[ResLocGeoObjec
             lst_params = tuple([ParameterSet(states_dict) for states_dict in list_state_dicts])
             term_contributions=tuple([TermParametersChoice(res_motif=res_motif,
                                         states_parameters=lst_params,
-                                        term_ids=tuple([t.h() for t in terms_for_motifs[res_motif]]) )])
+                                        term_ids=tuple([t.to_str() for t in terms_for_motifs[res_motif]]) )])
 
             if term_coeffs_per_index is not None:
-                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                list_to_sum = [term_coeffs_per_index[term][ParameterSet(states_dict)][0] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts]
+                dict_of_contribs = {term.to_str(): term_coeffs_per_index[term][ParameterSet(states_dict)] for term in terms_for_motifs[res_motif] for states_dict in list_state_dicts}
                 amplitude_coeff = sum(list_to_sum)
             else:
+                dict_of_contribs = None
                 amplitude_coeff = None
             
             # disregard locations where coefficient is zero
+            spec_feature = SpectralFeature(location=res_geo_obj, 
+                                        term_contributions=term_contributions,
+                                        term_contrib_by_id = dict_of_contribs,
+                                        lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
+                                        amplitude_coeff=amplitude_coeff)
             if amplitude_coeff != 0.:
-                spec_feature = SpectralFeature(location=res_geo_obj, 
-                                            term_contributions=term_contributions,
-                                            lineshape_parameter=lineshape_parameter, # uniform lineshape parameters (for all axes) for each feature
-                                            amplitude_coeff=amplitude_coeff)
+
                 if spec_feature not in features_to_draw:
                     features_to_draw.append(spec_feature)
                 else:
                     new_specfeat = spec_feature.union(features_to_draw[res_geo_obj][1])
                     features_to_draw.append(new_specfeat)
+            else:
+                zero_coeff_feats.append(spec_feature)
 
-    return features_to_draw
+    return features_to_draw, zero_coeff_feats
+
+
+
+def evaluate_regions(regions: list["GridRegion"], 
+                     vib_data: "VibStatesData", 
+                     vibdiff_cache: "VibDiffCache", 
+                     gamma: float,
+                     verbose: bool):
+
+    region_results = {}
+    for region in regions:
+        if verbose:
+            logger.info(f"\nEvaluating region with {len(region.features)} features")
+        
+        region_results[region] = evaluate_region(region, vib_data, vibdiff_cache, gamma, verbose)
+        
+        if verbose:
+            intensity = region_results[region]
+            logger.info(f"  Region shape: {intensity.shape}")
+            logger.info(f"  Max intensity: {np.max(np.abs(intensity))}")
+    return region_results
+
+def evaluate_region(region: "GridRegion",
+                    vib_data: "VibStatesData", 
+                    vibdiff_cache: "VibDiffCache", 
+                    gamma: float,
+                    verbose: bool = False) -> np.ndarray:
+    """Evaluate all features in a single grid region."""
+    # Initialize result array
+    target_shape = np.broadcast(*(arr for arr in region.coords.values())).shape
+    result = np.zeros(target_shape, dtype=complex)
+    
+    # Sum contributions from all features
+    for feature in region.features:
+        if verbose:
+            logger.info(f"  Feature: amplitude={feature.amplitude_coeff}")
+        
+        result += evaluate_feature(feature, vib_data, vibdiff_cache, gamma, region.coords_au, verbose)
+        
+    return result
+
+def evaluate_feature(feature: 'SpectralFeature', 
+                     vib_data: "VibStatesData", 
+                     vibdiff_cache: "VibDiffCache", 
+                     gamma: float,
+                     coords: dict[str, np.ndarray],
+                     verbose: bool = False) -> np.ndarray:
+    """Evaluate a single feature on grid coordinates."""
+    # Compile feature to numerical form
+    compiled_groups = compile_feature(feature, vib_data, vibdiff_cache)
+
+    
+    if verbose:
+        logger.info(f"    Compiled into {len(compiled_groups)} term groups")
+    
+    # Sum all compiled groups
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    feature_sum = np.zeros(target_shape, dtype=complex)
+
+    
+    for group in compiled_groups:
+        feature_sum += evaluate_compiled_group(group, coords, gamma)
+    
+    # Apply amplitude coefficient
+    return feature.amplitude_coeff * feature_sum
+
+
+def evaluate_resonance_motif(motif: 'NumericalResonanceMotif',
+                             coords: dict[str, np.ndarray],
+                             gamma: float) -> np.ndarray:
+    """
+    Calculate resonance motif contribution at grid points.
+    
+    Args:
+        motif: Compiled resonance motif with conditions
+        coords: Dict of axis_label -> meshgrid array
+        
+    Returns:
+        Complex array with resonance contributions
+    """
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    total = np.ones(target_shape, dtype=complex)
+    
+    for res_cond in motif.res_conds:
+        # Calculate photon frequency: sum over axes
+        pfreq = sum(coords[ax] * res_cond.pf_dict[ax] 
+                    for ax in res_cond.pf_dict)
+        # Resonance denominator
+        z = res_cond.vib_energy_diff - pfreq - 1j * gamma
+        total *= 1.0 / z
+        
+    return total
+
+def evaluate_compiled_group(group: 'CompiledTermGroup',
+                            coords: dict[str, np.ndarray],
+                            gamma: float) -> np.ndarray:
+    """Sum all resonance motifs in a compiled group."""
+    target_shape = np.broadcast(*(arr for arr in coords.values())).shape
+    result = np.zeros(target_shape, dtype=complex)
+    
+    for motif in group.resonance_motifs:
+        result += evaluate_resonance_motif(motif, coords, gamma)
+    return result
+
 

@@ -7,7 +7,7 @@ import pytest
 import copy
 
 import logging
-setup_logger("wilson", level=logging.DEBUG)
+setup_logger("wilson", level=logging.INFO)
 
 def test_VibAnaSetup_init():
 

@@ -1,23 +1,9 @@
 # Wilson
 
-## Next steps - features
-- [x] Coriolis for GVPT2
-- [x] 3 quanta levels
-- [x] GVPT2 for freqs
-- [x] dynamic range parameters and colorbar scale - figure out rendering
-- [x] optimize intensity calculation - minimize redundant calculations
+
+## Evaluation strategy
 
 
-## Big picture
-
-| Section              | Description                                      | Extra (for paper II) | Module |
-|----------------------|--------------------------------------------------|----------------------|--------|
-| 1. Parsing           | CFOUR and Gaussian outputs parsing               | Class template       |        |
-| 1. Data relay        | data to supply intensities engine                |                      |        |
-| 2. Intensities       | Spectrum class, Expressions class?? calculations |                      |        |
-| 2. Orient. averaging | Derivatives data, averaged tensor                |                      |        |
-| 3. Rendering         | 2D spectrum plot                                 |                      |        |
-| 4. Analysis          | Analysis tools                                   |                      |        |
 
 ---
 ### Data analysis tools

@@ -40,12 +40,22 @@ class LevelCalculator:
     organizes the logic for computing levels and labels
     based on dynamic range, number of levels, and normalization type.
     """
-
+    '''
     @staticmethod
-    def compute_levels(intensities: float, dynamic_range: float, 
-                       nlevels: int, colormap_spacing: str = None) -> Tuple[np.ndarray, List[str]]:
-        """Calculate levels for contours and colorbar ticks"""
-        d_max = np.max(intensities)
+    def compute_levels(intensities: float, dynamic_range: float,
+                    nlevels: int, colormap_spacing: str = None,
+                    reference_max: float = None) -> Tuple[np.ndarray, List[str]]:
+        """Calculate levels for contours and colorbar ticks.
+        
+        If reference_max is provided, levels are computed relative to it
+        instead of the data's own maximum.
+        """
+        if reference_max is not None:
+            d_max = 1.
+            # print(f'Scaling wrt reference_max: {reference_max:.2e}/{np.max(intensities):.2e}={reference_max/np.max(intensities):.2e}')
+        else:
+            d_max = np.max(intensities)
+        
         if d_max <= 0:
             raise ValueError(
                 "Logarithmic colormap requested, but data contains no positive values "
@@ -65,6 +75,38 @@ class LevelCalculator:
 
         LevelCalculator._validate_levels(level_values)
 
+        return level_values, level_labels
+    '''
+
+    @staticmethod
+    def compute_levels(intensities, dynamic_range, nlevels,
+                    colormap_spacing=None, is_normalized=False):
+        """Calculate contour levels matching the data scale.
+
+        If is_normalized=True, the data has already been divided by a
+        reference value, so d_max is fixed at 1.0 (giving a shared scale
+        across spectra normalized to the same reference). Otherwise d_max
+        comes from the data itself.
+        """
+        d_max = 1.0 if is_normalized else np.max(intensities)
+
+        if d_max <= 0:
+            raise ValueError(
+                "Logarithmic colormap requested, but data contains no positive "
+                f"values (max={d_max})."
+            )
+
+        d_min = d_max / dynamic_range
+
+        if colormap_spacing == "log":
+            level_values = np.logspace(np.log10(d_min), np.log10(d_max), nlevels)
+        elif colormap_spacing == "linear":
+            level_values = np.linspace(d_min, d_max, nlevels)
+        else:
+            raise ValueError('Choose log or linear colormap_spacing')
+
+        level_labels = [f"${val:.1e}$" for val in level_values]
+        LevelCalculator._validate_levels(level_values)
         return level_values, level_labels
 
     @staticmethod
@@ -140,7 +182,17 @@ class SpectrumRenderer(ABC):
     def _create_data_masks(self, data: np.ndarray) -> Any:
         """
         """
-        return compute_masks(data=data, dynamic_range=self.ev_info.dynamic_range)
+        
+        if self.rnd_info.apply_exp_magn_conditions_render:
+            magn_conditions = self.rnd_info.exp_magn_conditions
+        else:
+            magn_conditions = None
+        
+        return compute_masks(data=data, 
+                             dynamic_range=self.rnd_info.dynamic_range,
+                             grid=self.spec_grid,
+                             magn_conditions=magn_conditions, 
+                             non_zero_margin=self.rnd_info.magn_conditions_margin)
 
     def prep_data(self, spec_data_operations: str) -> np.ndarray:
         """
@@ -175,6 +227,13 @@ class SpectrumRenderer(ABC):
         elif len(self.spec_grid)==2:
             self.Xdata, self.Ydata = list(self.spec_grid.values())
 
+    def normalize_to_reference_max(self, reference_max=None):
+        """Divide intensities by reference_max for cross-spectrum comparison."""
+        if reference_max is None:
+            reference_max = self.rnd_info.reference_max
+        if reference_max is not None:
+            self.intensities = self.intensities / reference_max
+
     def _validate_inputs(self):
         """
         data and settings should not contradict:
@@ -198,8 +257,8 @@ class SpectrumRenderer(ABC):
             self.config = self.rnd_info.style_config
         if not isinstance(self.ev_info, EvaluationInfo):
             raise TypeError("ev_info should be an instance of a class EvaluationInfo")
-        if self.ev_info.dynamic_range <= 0:
-            raise ValueError("ev_info.dynamic_range must be positive")
+        if self.rnd_info.dynamic_range <= 0:
+            raise ValueError("rnd_info.dynamic_range must be positive")
 
 
     def _validate_data_2d(self):
@@ -217,23 +276,25 @@ class SpectrumRenderer(ABC):
                              f"  y.shape = {self.Ydata.shape}\n"
                              f"  z.shape = {self.intensities.shape}\n"
                              )
-
+    '''
     def render(self, filename: str):
         """Main rendering pipeline"""
         self._validate_inputs()
 
         # prepare data for contour plotting with spec_data_operations and spec_grid.axes
         self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+        self.normalize_to_reference_max(self.rnd_info.reference_max)
         self._validate_data_2d()
 
         # log10 = True if self.rnd_info.intensity_normalization_type is not None else False
-        
+
         # Calculate levels with both original and normalized scales
         levels, labels = self.level_calc.compute_levels(
             intensities=self.intensities,
-            dynamic_range=self.ev_info.dynamic_range,
+            dynamic_range=self.rnd_info.dynamic_range,
             nlevels=self.rnd_info.nlevels,
-            colormap_spacing=self.config.colormap_spacing
+            colormap_spacing=self.config.colormap_spacing,
+            reference_max=self.rnd_info.reference_max
         )
         
         self.levels = levels
@@ -245,15 +306,62 @@ class SpectrumRenderer(ABC):
         fig, ax, cbar = self.add_colorbar(plot_obj=(fig, ax, contour), levels=levels, labels=labels)
         
         self.finalize(plot_obj=(fig, ax, cbar))
-        self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
+        # self.save_plot(plot_obj=(fig, ax, cbar), filename=filename)
 
         return fig, ax, contour, cbar
 
-def compute_masks(data, dynamic_range):
+    '''
+    
+    def render(self, filename: str):
+        self._validate_inputs()
+        self.prep_data(spec_data_operations=self.rnd_info.spec_data_operations)
+
+        is_normalized = self.rnd_info.reference_max is not None
+        self.normalize_to_reference_max(self.rnd_info.reference_max)
+        self._validate_data_2d()
+
+        levels, labels = self.level_calc.compute_levels(
+            intensities=self.intensities,
+            dynamic_range=self.rnd_info.dynamic_range,
+            nlevels=self.rnd_info.nlevels,
+            colormap_spacing=self.config.colormap_spacing,
+            is_normalized=is_normalized,
+        )
+        self.levels, self.labels = levels, labels
+
+        fig, ax = self.initialize_plot()
+        fig, ax, contour = self.create_contour(plot_obj=(fig, ax), levels=levels, data=self.intensities)
+        fig, ax = self.setup_axes(plot_obj=(fig, ax))
+        fig, ax, cbar = self.add_colorbar(plot_obj=(fig, ax, contour), levels=levels, labels=labels)
+        self.finalize(plot_obj=(fig, ax, cbar))
+        return fig, ax, contour, cbar
+
+
+def compute_masks(data: np.ndarray, 
+                  dynamic_range: float, 
+                  grid: dict=None,
+                  magn_conditions: tuple[tuple]=None,
+                  non_zero_margin: float=80.):
     """
     Intensities should be > 0, not negative
+
+    data: intensities array
+    non_zero_margin: added to 0, which is the boundary in magn_conditions
     """
-    no_data = np.isnan(data)
+
+    # ONLY EVV w2>w1 for paper 1 now
+    if magn_conditions==(('B',),):
+        if grid is None:
+            raise ValueError("in compute_masks() grid is None")
+        no_data = grid['B'] < (0 + non_zero_margin)
+    elif magn_conditions==(('-A', 'B',),):
+        if grid is None:
+            raise ValueError("in compute_masks() grid is None")
+        no_data = grid['B'] - grid['A'] < (0 + non_zero_margin)
+    else:
+        no_data = np.isnan(data)
+
+
     d_max = np.nanmax(data)
 
     if not np.isfinite(d_max) or d_max <= 0:

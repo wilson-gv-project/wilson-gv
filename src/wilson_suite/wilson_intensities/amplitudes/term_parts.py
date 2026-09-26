@@ -38,8 +38,7 @@ class PropsCollection:
         self.props = tuple(self.props)
 
     def __iter__(self):
-        for prop in self.props:
-            yield prop
+        yield from self.props
 
     def __hash__(self):
         # return hash(tuple([tuple(self.get_cart_axes()), self.get_total_difforder()]))
@@ -168,6 +167,32 @@ class ResonanceMotif:
             conditions.append(tuple([new_diff, new_pf]))
         return tuple(conditions)
     
+    def motif_str(self) -> str:
+        """
+        ((((), ('a',)), ('-A',)), ((('a','b'), ('a',)), ('B',))) -> '0,a;a+b,a'
+        """
+        motif = self._tuplify()
+        return ';'.join(
+            f"{'+'.join(sl) or '0'},{'+'.join(sr) or '0'}"
+            for (sl, sr), _pf in motif
+        )
+
+    def to_str(self):
+        """
+        EVV / paper1 spectific here
+        """
+        strings = []
+        for cond in self.resonance_conditions:
+            if 'B' in cond.pf[0]:
+                state = []
+                for i in [cond.diff.sl.q, cond.diff.sr.q]:
+                    if len(i)!=0:
+                        state.append('+'.join(i))
+                    else:
+                        state.append('.')
+                strings.append(f'{','.join(state)}')
+        return ' x '.join(strings)
+
     # UNUSED?
     @classmethod
     def from_tuples(cls, tupleOfTuples):
@@ -279,6 +304,30 @@ class ParameterSet(Mapping[str, int]):
         # Order-independent, value-based hash
         return hash(frozenset(self._parameters.items()))
 
+    # def __lt__(self, other):
+    #     if not isinstance(other, ParameterSet):
+    #         return NotImplemented
+    #     # Sort keys to ensure we compare 'a', then 'b', then 'c' 
+    #     # regardless of insertion order.
+    #     self_values = tuple(self[k] for k in sorted(self.keys()))
+    #     other_values = tuple(other[k] for k in sorted(other.keys()))
+        
+    #     return self_values < other_values
+
+    def __lt__(self, other):
+        if not isinstance(other, ParameterSet):
+            return NotImplemented
+        
+        sort_keys = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
+        relevant_keys = [k for k in sort_keys if k in self or k in other]
+
+        # Sort keys to ensure we compare 'a', then 'b', then 'c' 
+        # regardless of insertion order.
+        self_vals = tuple(self.get(k, 0) for k in relevant_keys)
+        other_vals = tuple(other.get(k, 0) for k in relevant_keys)
+        
+        return self_vals < other_vals
+
     # --- Convenience ---
 
     def parameter_labels(self):
@@ -357,6 +406,7 @@ class EvaluationDataAndConfigs:
     number_of_nmodes: int = None
     nm_inds_choices: list[int] = None
     pulse_polarization_vector: list = None
+    nc_sqrt_eigval: dict = None
 
 
 @dataclass()
@@ -375,8 +425,21 @@ class TermParametersChoice:
     in compile_feature() 
     """
     res_motif: "ResonanceMotif"
-    states_parameters: Tuple["ParameterSet"]
-    term_ids: Tuple[int] = field(default_factory=tuple)
+    states_parameters: tuple["ParameterSet", ...]
+    term_ids: tuple[int|str, ...] = field(default_factory=tuple)
+
+    def sort_parameters(self) -> "TermParametersChoice":
+        """
+        Returns a new TermParametersChoice where the states_parameters 
+        are sorted according to the ParameterSet comparison logic.
+        """
+        new_params = tuple(sorted(self.states_parameters))
+        
+        # Replace the current tuple with the sorted one
+        # Using dataclasses.replace for frozen instances
+        from dataclasses import replace
+        return replace(self, states_parameters=new_params)
+
 
     def __hash__(self):
         return hash((self.term_ids, self.states_parameters))
@@ -387,6 +450,49 @@ class TermParametersChoice:
             and self.term_ids == other.term_ids
             and self.states_parameters == other.states_parameters
         )
+
+    def __lt__(self, other):
+        if not isinstance(other, TermParametersChoice):
+            return NotImplemented
+        
+        # 1. Compare lengths of term_ids
+        if len(self.term_ids) != len(other.term_ids):
+            return len(self.term_ids) < len(other.term_ids)
+        
+        # 2. Compare term_ids values (lexicographical)
+        if self.term_ids != other.term_ids:
+            return self.term_ids < other.term_ids
+            
+        # 3. Compare the sequences of ParameterSets
+        # Python will compare self.states_parameters[0] < other.states_parameters[0], etc.
+        return self.states_parameters < other.states_parameters
+    
+    @classmethod
+    def check_states_parameters(cls, coll_tparamchoices: tuple['TermParametersChoice']) -> dict[str, str|int]:
+        """
+        across a collection of TermParametersChoice - extract a single dict of parameter choices if possible
+        """
+        all_unique_configs = set()
+
+        for tpc in coll_tparamchoices:
+            for i in tpc.states_parameters:
+                # 1. Convert dict to a hashable tuple
+                d = i.to_dict()
+                hashable_dict = tuple(sorted(d.items()))
+                
+                # 2. Add to our master set of unique configurations
+                all_unique_configs.add(hashable_dict)
+        
+        # 3. If there is exactly one unique configuration across everything
+        if len(all_unique_configs) == 1:
+            # Convert the tuple back into a dict to return it
+            # We use pop() to get the only item out of the set
+            return dict(all_unique_configs.pop())
+        elif len(all_unique_configs) == 0:
+            return None
+        else:
+            raise ValueError(f'Found {len(all_unique_configs)} different parameter choices; expected 1.')
+
 
 # -------------------------------------------------------
 
