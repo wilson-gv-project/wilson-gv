@@ -487,6 +487,14 @@ class PrecalculatedData:
     vibenedenoms_tensors: dict = field(default_factory=dict)
     polarization_vec: tuple = ()
 
+"""
+The data then passes through these steps:
+
+1. build the request      "please fetch 'polgrad' from CFOUR"          plan.py:158
+2. obtainer returns       data_dict = {'polgrad': array, ...}
+3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot   (slot name from from_polprop, evaluate.py:423)
+4. evaluate               read mol_props['polgrad'].vals[mode, i, j]   evaluate.py:725 (averaged)                                                                       evaluate.py:618 (non-averaged)
+"""
 
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: SUM OVER SET
 def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',

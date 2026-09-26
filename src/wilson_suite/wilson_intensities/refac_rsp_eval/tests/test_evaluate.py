@@ -13,29 +13,13 @@ from wilson_suite.wilson_derive.abstractions import (
     QOperator,
     VibDiffTerm,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import *
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    MolecularProperty,
-    MolPropsCollection,
-    MolSystemData,
-    ParameterSet,
-    PrecalculatedData,
-    VibDiff,
-    VibState,
-    VibStatesData,
     _get_ind_tuple_from_base,
     _make_func_to_compute_avrg,
     _make_hq_states_from_datadict,
     _make_vibdiff_key,
-    calculate_avrg_tensor,
-    eval_avrg_per_indexdict,
-    eval_non_avrg_per_indexdict,
-    eval_vibenedenom,
-    evaluate_full_index_dict,
-    evaluate_term_coeff_sumover,
-    generate_LHS_motif,
-    get_RHS_motif,
-    otf_vibdiffdenom,
-    solve_LSE_motif,
+    _sys_info_request,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -459,8 +443,97 @@ def test_solve_LSE_motif_inconsistent_raises_even_with_extra_axes(params, states
 
 ## DATA REQUEST
 
-def test_build_data_request_for_term():
-    assert False
+## DATA REQUEST -------------------------------------------------------------
+# The request is a {trivial_name: DataOriginInfo} list of what to fetch: one entry per
+# averaged and non-averaged property of the term (named by prop_trivname(dord, len(ops))),
+# plus the fixed system-info keys that MolSystemData.from_datadict needs.
+
+SYS_INFO_KEYS = {'anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'normal_modes',
+                 'atoms', 'equilibrium_geometry'}
+ORIGIN = DataOriginInfo(source_type='cfour', lvl_theory='CCSD(T)', basis_set='ANO0')
+
+
+def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
+    return CompiledTerm(PropsCollection(list(avrg)), PropsCollection(list(non_avrg)),
+                        ResonanceMotif(()), FreqTermsCollection([]), 1., idx_summ_nonsumm=((), ()))
+
+
+def test_build_data_request_for_term_names_avrg_nonavrg_and_sys_info(term_and_precalc):
+    term, _ = term_and_precalc
+
+    request = build_data_request_for_term(term, ORIGIN)
+
+    assert set(request) == {'polgrad', 'cff'} | SYS_INFO_KEYS
+
+
+def test_build_data_request_for_term_every_entry_uses_the_given_origin(term_and_precalc):
+    term, _ = term_and_precalc
+
+    request = build_data_request_for_term(term, ORIGIN)
+
+    assert all(v == ORIGIN for v in request.values())
+
+
+def test_build_data_request_for_term_without_props_is_sys_info_only():
+    assert set(build_data_request_for_term(bare_term(), ORIGIN)) == SYS_INFO_KEYS
+
+
+@pytest.mark.parametrize('avrg, non_avrg, expected_props', [
+    ((),                                    (polprop(inds='abc'), polprop(inds='abc')), {'cff'}),      # repeated factor
+    ((),                                    (polprop(inds='abc'), polprop(inds='ab')),  {'cff', 'hess'}),
+    ((polprop(ops=(0, 1), inds='a'),),       (polprop(inds='a'),),                        {'polgrad', 'grad'}),
+    ((polprop(ops=(0,)), polprop(ops=(0, 1))), (),                                        {'dip', 'pol'}),  # dord=0
+])
+def test_build_data_request_for_term_one_entry_per_distinct_trivial_name(avrg, non_avrg, expected_props):
+    request = build_data_request_for_term(bare_term(avrg, non_avrg), ORIGIN)
+
+    assert set(request) - SYS_INFO_KEYS == expected_props
+
+
+def test_build_data_request_for_term_names_match_molecular_property(term_and_precalc):
+    """The request must ask for exactly the names from_datadict will look up to fill mol_props,
+    i.e. what MolecularProperty.from_polprop calls the same PolProps."""
+    term, _ = term_and_precalc
+    props = [*term.avrg_props.props, *term.non_avrg_props.props]
+
+    request = build_data_request_for_term(term, ORIGIN)
+
+    assert {MolecularProperty.from_polprop(p).trivial_name for p in props} == set(request) - SYS_INFO_KEYS
+
+
+def test_build_data_request_for_term_is_accepted_by_the_obtainer_type_check(term_and_precalc):
+    """wilson_data_obtainer rejects anything that is not dict[str, DataOriginInfo] and, with
+    get_geometry=True, reads request['nc_sqrt_eigval']."""
+    term, _ = term_and_precalc
+
+    request = build_data_request_for_term(term, ORIGIN)
+
+    assert all(isinstance(k, str) and isinstance(v, DataOriginInfo) for k, v in request.items())
+    assert 'nc_sqrt_eigval' in request
+
+
+def test_build_data_request_for_term_does_not_mutate_the_term(term_and_precalc):
+    term, _ = term_and_precalc
+    before = (repr(term.avrg_props), repr(term.non_avrg_props))
+
+    build_data_request_for_term(term, ORIGIN)
+
+    assert (repr(term.avrg_props), repr(term.non_avrg_props)) == before
+
+
+from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+
+
+def test_sys_info_keys_never_collide_with_property_names():
+    """build_data_request_for_term merges property names and system-info keys into one dict,
+    with sys info applied last; a shared name would silently merge a property and, e.g., the
+    normal modes into one data_dict entry."""
+    prop_names = {prop_trivname(ord_geo=g, ord_el=e) for g in range(7) for e in range(7)}
+    # dictA |= dictB means dictA is updated with keys,values from dictB
+    prop_names |= {prop_trivname(ord_rot=1), prop_trivname(ord_rot=1, ord_geo=2)}   # 'B', 'coriolis'
+
+    assert set(_sys_info_request(DataOriginInfo())).isdisjoint(prop_names)
+
 
 ## Evaluation kernels -------------------------------------------------------
 
