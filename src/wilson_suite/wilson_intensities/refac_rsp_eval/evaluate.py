@@ -7,7 +7,7 @@
 ==> list[SpectralFeature]
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -511,7 +511,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         avrg_func = _make_func_to_compute_avrg(avrg_expression=compl_term.avrg_props,
                                                polarization_vec=polarization_vec)
 
-    def sum_over(index_dict, remaining, leaves):
+    def sum_over(index_dict: dict, remaining: list, leaves: dict) -> float:
         if not remaining:
             value, contribs = evaluate_full_index_dict(compl_term, index_dict, 
                                                        molsys_data,
@@ -817,19 +817,25 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
 
 ## ----------------------------------------------------
 
-def generate_LHS_motif(motif: 'ResonanceMotif') -> tuple[np.ndarray, tuple[str, ...]]:
+def generate_LHS_motif(motif: 'ResonanceMotif',
+                       axes: Iterable[str] | None = None) -> tuple[np.ndarray, tuple[str, ...]]:
     """
     motif is a tuple/collection of res_conditions
         res_conditions is a tuple of (vib_difference, axes)
             vib_difference is a tuple of states indices
 
     returns (coeff_matrix, axes): one row per condition, one column per axis in `axes`
-    (the distinct axes of the motif, sorted)
+    (sorted; defaults to the distinct axes of the motif). Axes the motif does not
+    mention get an all-zero column.
     """
-    axes = tuple(sorted(motif.get_max_different_freq_axes()))
-    col = {ax: j for j, ax in enumerate(axes)}
+    motif_axes = motif.get_max_different_freq_axes()
+    all_axes = tuple(sorted(motif_axes if axes is None else set(axes)))
+    if not motif_axes <= set(all_axes):
+        raise ValueError(f"axes {all_axes} do not cover the axes of {motif}: {sorted(motif_axes)}")
+    
+    col = {ax: j for j, ax in enumerate(all_axes)}
 
-    coeff_matrix = np.zeros((len(motif), len(axes)))
+    coeff_matrix = np.zeros((len(motif), len(all_axes)))
 
     for i, r_cond_key in enumerate(motif):
         # ('A', '-B') --> {'A': 1, 'B': -1}
@@ -839,7 +845,7 @@ def generate_LHS_motif(motif: 'ResonanceMotif') -> tuple[np.ndarray, tuple[str, 
              # Reverse the sign (FIXME???) and place it in the correct position
              coeff_matrix[i, col[alpha_label]] = -1 * np.sign(coefficient)
 
-    return coeff_matrix, axes
+    return coeff_matrix, all_axes
 
 
 def get_RHS_motif(motif: 'ResonanceMotif',
@@ -864,30 +870,58 @@ def get_RHS_motif(motif: 'ResonanceMotif',
 
 def solve_LSE_motif(motif: 'ResonanceMotif',
                     parameters: ParameterSet, vibdata: VibStatesData,
-                    unit: str='Eh') -> ResLocGeoObject:
+                    unit: str='Eh',
+                    axes: Iterable[str] | None = None) -> ResLocGeoObject:
     """
-    solving a linear system of equations
-    coeff_matrix = [[1, 0, 0], [1, -1, 0], [0, 1, -1]]
-    constants = [5, -3, 2]
-    output: [5. 2. 0.]
+    Find where in frequency space all resonance conditions of `motif` hold at once.
 
-    returns a point ResLocGeoObject {axis: w}
+    Each condition is one linear equation in the perturbing frequencies, so the motif is
+    a linear system A @ w = b:
+        A  one row per condition, one column per axis (from generate_LHS_motif)
+        b  vibrational energy differences for this index assignment (from get_RHS_motif)
+        w  the frequency of each axis at resonance - what we solve for
 
-    raises np.linalg.LinAlgError if the location is not a unique point:
-    underdetermined (rank < number of axes) or inconsistent conditions.
+    e.g. axes (A, B), conditions on A and on A - B:
+        A = [[-1,  0],       b = [b0, b1]    ->  w_A from row 0,
+             [-1,  1]]                           then w_B from row 1
+
+    `axes` is the full set of spectral axes (defaults to the motif's own axes). Axes the
+    motif does not constrain are free: the location is {axis: w} for constrained axes and
+    {axis: 'all'} for free ones -> a point, line, plane, ... in the space of `axes`.
+
+    raises np.linalg.LinAlgError if the location is not axis-aligned (a constrained axis is
+    still underdetermined, e.g. a single condition on A + B) or the conditions are inconsistent.
     """
 
-    A, axes = generate_LHS_motif(motif)
+    A, all_axes = generate_LHS_motif(motif, axes)
     b = np.array(get_RHS_motif(motif, parameters, vibdata, unit))
 
+    # lstsq always returns an answer: the exact solution if there is one, otherwise the
+    # w minimising |A @ w - b|. So both checks below are needed to trust it.
+    # rank = number of independent conditions.
     solution, _, rank, _ = np.linalg.lstsq(A, b, rcond=None)
 
-    if rank < len(axes):
-        raise np.linalg.LinAlgError(f"resonance location of {motif} is not a point (rank {rank} < {len(axes)} axes)")
+    # An axis no condition mentions has an all-zero column. It can take any value, so it is
+    # 'free' (its lstsq value is a meaningless 0). A.any(axis=0) is True per column with a
+    # nonzero entry; ~ flips it to True for the free columns.
+    free = ~A.any(axis=0)
+    # the remaining axes each need a definite value
+    n_constrained = len(all_axes) - int(free.sum())
+
+    # Pinning down n_constrained unknowns takes n_constrained independent conditions.
+    # Fewer means some constrained axis is still a line, not a value: e.g. one condition
+    # on A + B gives rank 1 < 2, and resonance is the whole diagonal w_A + w_B = b.
+    # FIXME: That is not axis-aligned, so ResLocGeoObject can't express it.
+    if rank < n_constrained:
+        raise np.linalg.LinAlgError(f"resonance location of {motif} is not a point along its axes "
+                                    f"(rank {rank} < {n_constrained} constrained axes)")
+    # More conditions than unknowns may contradict each other (same axis, different energies);
+    # then lstsq's best compromise does not actually satisfy A @ w = b.
     if not np.allclose(A @ solution, b):
         raise np.linalg.LinAlgError(f"resonance conditions of {motif} are inconsistent: no resonance location")
 
-    return ResLocGeoObject({ax: float(val) for ax, val in zip(axes, solution)})
+    return ResLocGeoObject({ax: 'all' if is_free else float(val)
+                            for ax, val, is_free in zip(all_axes, solution, free)})
 
 
 

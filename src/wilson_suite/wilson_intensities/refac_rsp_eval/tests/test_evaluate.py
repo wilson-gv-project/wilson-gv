@@ -222,6 +222,9 @@ def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
     index_dict = {'a': 1, 'b': 0}
 
     motif = ResonanceMotif.from_conditions([rc1, rc2])
+    
+    axes = tuple(sorted(motif.get_max_different_freq_axes()))
+    print(f'\naxes from get_max_different_freq_axes(): {axes}\n')
 
     assert motif.conditions == (ResCondKey(diff=(('a', 'b'), ('a',)), pf=('A', 'B')),
                                 ResCondKey(diff=(('b',), ('a',)), pf=('-A',)))
@@ -250,6 +253,18 @@ def test_generate_LHS_motif(motif, expected, expected_axes):
     assert axes == expected_axes
     assert lhs.shape == np.shape(expected)
     np.testing.assert_array_equal(lhs, expected)
+
+
+def test_generate_LHS_motif_extra_axes_get_zero_columns():
+    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_A), axes=('C', 'A', 'B'))
+
+    assert axes == ('A', 'B', 'C')
+    np.testing.assert_array_equal(lhs, [[-1., 0., 0.]])
+
+
+def test_generate_LHS_motif_axes_must_cover_the_motif():
+    with pytest.raises(ValueError):
+        generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), axes=('A',))
 
 
 def test_generate_LHS_motif_ignores_states():
@@ -351,6 +366,95 @@ def test_solve_LSE_motif_single_axis_other_than_A(params, states):
     location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params, states, unit='cm-1')
 
     assert location == ResLocGeoObject({'B': -E0})
+
+
+## solve_LSE_motif: lines and planes ---------------------------------------------
+# With `axes` the spectrum may have more axes than the motif constrains. Unconstrained axes are
+# free ('all'), so the resonance is a line (one free axis), a plane (two), ...
+
+MOTIF_ON_B = ((((), ('a',)), ('B',)),)                                          # w_B = -E0
+
+
+def assert_location(location: ResLocGeoObject, expected: dict):
+    """Same axes, same free axes, fixed coordinates equal up to lstsq round-off."""
+    assert location.dims == tuple(sorted(expected))
+    assert [ax for ax in location.dims if location[ax] == 'all'] == sorted(ax for ax, v in expected.items() if v == 'all')
+    assert {ax: v for ax, v in location.coordinates if v != 'all'} \
+        == pytest.approx({ax: v for ax, v in expected.items() if v != 'all'})
+
+@pytest.mark.parametrize('motif, axes, expected', [
+    # lines: one free axis
+    (MOTIF_A,     ('A', 'B'),      {'A': E01 - E0, 'B': 'all'}),
+    (MOTIF_ON_B,  ('A', 'B'),      {'A': 'all', 'B': -E0}),
+    (MOTIF_AB,    ('A', 'B', 'C'), {'A': E01 - E0, 'B': E1 - E0, 'C': 'all'}),
+    (MOTIF_MIXED, ('A', 'B', 'C'), {'A': -2 * E0, 'B': -E0, 'C': 'all'}),
+])
+def test_solve_LSE_motif_line(motif, axes, expected, params, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1', axes=axes)
+
+    assert location.is_line()
+    assert_location(location, expected)
+
+
+@pytest.mark.parametrize('motif, axes, expected', [
+    (MOTIF_A,    ('A', 'B', 'C'), {'A': E01 - E0, 'B': 'all', 'C': 'all'}),
+    (MOTIF_ON_B, ('A', 'B', 'C'), {'A': 'all', 'B': -E0, 'C': 'all'}),
+    (MOTIF_A,    ('A', 'C', 'D'), {'A': E01 - E0, 'C': 'all', 'D': 'all'}),     # axis labels need not be contiguous
+])
+def test_solve_LSE_motif_plane(motif, axes, expected, params, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1', axes=axes)
+
+    assert location.is_plane()
+    assert_location(location, expected)
+
+
+@pytest.mark.parametrize('motif, axes', [
+    (MOTIF_A,     ('A', 'B')),
+    (MOTIF_MIXED, ('A', 'B', 'C')),
+    (MOTIF_ON_B,  ('A', 'B', 'C')),
+])
+def test_solve_LSE_motif_line_and_plane_satisfy_every_condition(motif, axes, params, states):
+    """Free axes do not enter any condition, so the fixed coordinates alone must satisfy them."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+
+    location = solve_LSE_motif(res_motif, params, states, unit='cm-1', axes=axes)
+
+    assert location.dims == tuple(sorted(axes))
+    assert resonance_residuals(res_motif, location, params.to_dict(), states) == pytest.approx([0.] * len(res_motif))
+
+
+def test_solve_LSE_motif_axes_equal_to_motif_axes_is_the_default(params, states):
+    motif = ResonanceMotif.from_tuples(MOTIF_MIXED)
+
+    assert solve_LSE_motif(motif, params, states, axes=('B', 'A')) == solve_LSE_motif(motif, params, states)
+
+
+def test_solve_LSE_motif_hartree_keeps_free_axes(params, states):
+    motif = ResonanceMotif.from_tuples(MOTIF_A)
+
+    in_eh = solve_LSE_motif(motif, params, states, axes=('A', 'B', 'C'))
+
+    assert in_eh['A'] == pytest.approx(convNu2Ene(E01 - E0))
+    assert in_eh['B'] == in_eh['C'] == 'all'
+
+
+def test_solve_LSE_motif_axes_missing_a_motif_axis_raises(params, states):
+    with pytest.raises(ValueError):
+        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_AB), params, states, axes=('A', 'C'))
+
+
+def test_solve_LSE_motif_diagonal_line_raises_even_with_extra_axes(params, states):
+    """w_A + w_B = const is a line, but not one ResLocGeoObject can hold: A and B are both
+    constrained yet neither is fixed. An extra free axis C does not change that."""
+    motif = ResonanceMotif.from_tuples(((((), ('a',)), ('A', 'B')),))
+
+    with pytest.raises(np.linalg.LinAlgError, match='not a point'):
+        solve_LSE_motif(motif, params, states, axes=('A', 'B', 'C'))
+
+
+def test_solve_LSE_motif_inconsistent_raises_even_with_extra_axes(params, states):
+    with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
+        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states, axes=('A', 'B'))
 
 
 ## DATA REQUEST
