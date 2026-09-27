@@ -1,0 +1,101 @@
+refac_rsp_eval — leftover TODO
+updated 2026-09-27 (3rd update)
+
+Test status: 111 pass, 2 fail.
+   2 fail = placeholders (C1).
+"item N" = the numbered items from the review answers.
+Next: A3.
+
+
+A. Finish the fixes started on this branch
+------------------------------------------
+[ ] A3  item 3, plan.py CompiledTerm.from_VibPertTerm stores lists, not tuples.
+        hash(CompiledTerm) raises TypeError now.
+        Write: nonsumm, summ = term.tellNonSummSummIndices()
+               idx_summ=tuple(summ), idx_nonsumm=tuple(nonsumm)
+[ ] A4  item 4, evaluate.py evaluate_term_coeff_sumover: the check sits in a string literal.
+        A string literal does nothing. Turn it into code. Sum over `to_sum` only.
+        Then test_integration.py: evaluate_term_coeff_sumover(term, {'a': 0}) -> {'a': 0, 'b': 1}.
+[ ] A6  item 5, evaluate.py harmonic_denom: raise if vd.sr.q is not empty.
+        Add a test where eigenvals differ from the state energies.
+        Today the test data has equal values, so a wrong energy source still passes.
+[ ] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
+[ ] A8  Delete, do not comment out:
+        - plan.py: make_request_from_term and the "# 17." note above it
+        - plan.py: sr_or_sl_only inside the get_vibenedenom docstring; fix that docstring
+        - plan.py: the "# idx_summ_nonsumm" line in CompiledTerm
+        - evaluate.py: old commented body in _make_vibdiff_key
+        - evaluate.py: old commented lines in VibDiff.from_quanta (two blocks)
+[ ] A9  evaluate.py: delete the duplicate "The data then passes through these steps" docstring at
+        the end of the file. The same block exists above PrecalculatedData. The line numbers in the copy are stale.
+[ ] A10 evaluate.py small text fixes:
+        - make_state_label docstring still says `state_label(...)`; rename to make_state_label.
+        - from_datadict comment "resets values, because props ..." is out of date; empty_copy
+          makes a new collection now.
+[ ] A11 evaluate.py VibDiff.from_symbolic still builds its own 'zero' state. Make it one line:
+            return cls.from_quanta(vibdiff_term_symb.sl.q, vibdiff_term_symb.sr.q, index_dict, vibstates_data)
+        test_vibdiff_from_symbolic_and_from_quanta_agree checks the two still agree.
+
+
+B. Correctness, still open
+--------------------------
+[ ] B1  item 1, blocks the OLD pipeline: wilson_utils/wilson_data_obtainer.py imports DataOriginInfo
+        from refac evaluate.py. The old code passes wilson_main's DataOriginInfo -> TypeError.
+        3 old tests fail. Move DataOriginInfo to one leaf module. Import it from there everywhere.
+[ ] B3  item 6: the averaged-tensor cache key has no polarization (TODO in PrecalculatedData).
+[ ] B4  item 7: sign convention in generate_LHS_motif (FIXME???). Check against old resonances.py.
+[ ] B5  eval_vibenedenom (precalculated path) looks up a SET of labels: 1/w_a twice becomes 1/w_a once.
+        harmonic_denom keeps both factors. The two paths disagree for such a term.
+
+
+C. Tests
+--------
+[ ] C1  Fill the placeholders test_eval_avrg_per_indexdict and test_calculate_avrg_tensor.
+[ ] C2  item 24: regression test. Old evaluate_single_index_dict vs new evaluate_full_index_dict.
+        Term 2, a=0 b=1 c=1, compare factor by factor. Needs B1 first.
+
+
+D. Value types (item 19)
+------------------------
+[ ] D1  PropsCollection: frozen, one _key for __eq__ and __hash__, sorted() returns a new instance.
+        Delete identify_avrg_motif and _set_attr_for_all_props (only a test uses them).
+[ ] D2  FreqTermsCollection: same pattern. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
+[ ] D3  ParameterSet: drop the 'zero' injection and the '' -> 'zero' remap.
+        __lt__ without the hard-coded a..h.
+[ ] D4  item 18: copied data classes in evaluate.py (DataOriginInfo, VibState, MolecularProperty,
+        MolPropsCollection) duplicate wilson_main/abstractions.py. Decide who owns the data model.
+
+
+E. Pipeline, not built yet
+--------------------------
+[ ] E1  Step 6: loop over index sets -> solve_LSE_motif -> group terms by (motif, location)
+        -> SpectralFeature.
+[ ] E2  Step 7: grid.py.
+[ ] E3  Step 8: one compute_features entry point. Adapter from wilson_main. Delete rps_evaluation.py.
+[ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
+
+
+F. Later, only if a large molecule is too slow
+----------------------------------------------
+[ ] F1  item 21: einsum for the averaged part. Then maybe for the whole sum over summation labels.
+
+
+Done on this branch
+-------------------
+[x] A0  from_quanta looks up the 'zero' state in VibStatesData (fixed 16 tests)
+[x] A1  test_freqterms_pert_wf_diff_against_ground_is_pert_only replaces the old-overlap test
+[x] A2  _fake_vibpert_term returns (non-summation, summation) in the right order
+[x] 2   pert diff against ground no longer in get_vibenedenom
+[x] 3   CompiledTerm.idx_summ / idx_nonsumm, correct mapping             (A3: store tuples)
+[x] 5   harmonic_denom reads harmonic eigenvals                          (A6)
+[x] 9   empty motif raises ValueError, with test
+[x] 10  from_datadict fills an empty_copy, not the caller's template, with test   (was B2)
+[x] 11  from_datadict raises on an unknown states_choice
+[x] 12  precalc check covers None and {}
+[x] 13  make_state_label used in all 3 places, with mode-10 test         (was A5; A0 broke from_quanta)
+[x] 15  wilson_derive imports in evaluate.py only under TYPE_CHECKING
+[x] 16  make_request_from_term out of use                                (A8: delete)
+[x] 20  eigenvals typed as dict
+[x] 23  pytest.raises uses match=                                        (A7: asserts)
+[x] 8   withdrawn: all real terms have rank 4
+[x] ingest_numeric.py stub deleted
