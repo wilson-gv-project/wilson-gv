@@ -160,6 +160,16 @@ def test_evaluate_term():
     print(value)
     print(contribs)
 
+    import numpy as np
+
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    
+    w = {m: convNu2Ene(e) for m, e in datadict['nc_sqrt_eigval'].items()}      # harmonic omega, Eh
+
+    assert contribs['NON_AVRG'] == datadict['cff'][0, 1, 1]                      # cff[a, c, c]
+    assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[0])                  # E_a - E_0
+    assert contribs['VIBENE_DENOM'] == pytest.approx(1 / (w[0] * w[1] * w[1]))   # 1/(w_a w_b w_c)
+    assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
 
     with pytest.raises(ValueError, match='term has indices that do not have values'):
         evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func)
@@ -175,3 +185,4 @@ def test_evaluate_term():
     results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None, 
                                    molsys_data=molsys, polarization_vec=(1.,1.,1.))
     print(results)
+

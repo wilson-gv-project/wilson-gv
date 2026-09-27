@@ -19,7 +19,7 @@ A. Finish the fixes started on this branch
 [ ] A6  item 5, evaluate.py harmonic_denom: raise if vd.sr.q is not empty.
         Add a test where eigenvals differ from the state energies.
         Today the test data has equal values, so a wrong energy source still passes.
-[ ] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
+[x] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
 [x] A8  Delete, do not comment out:
         - [x] plan.py: make_request_from_term and the "# 17." note above it
         - [x] plan.py: sr_or_sl_only inside the get_vibenedenom docstring; fix that docstring
