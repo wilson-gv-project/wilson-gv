@@ -200,8 +200,8 @@ def _make_vibdiff_key(vibdiff_term: 'VibDiffTerm', index_dict: dict) -> tuple[st
     #     right_state_label = 'zero'
     
     # return (left_state_label, right_state_label)
-    return (make_state_label(index_dict[q] for q in vibdiff_term.sl.q),
-            make_state_label(index_dict[q] for q in vibdiff_term.sr.q))
+    return (make_state_label(index_dict[q] for q in vibdiff_term.sl.q), # type: ignore
+            make_state_label(index_dict[q] for q in vibdiff_term.sr.q)) # type: ignore
 
 
 

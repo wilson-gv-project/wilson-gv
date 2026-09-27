@@ -559,7 +559,7 @@ POLGRAD_AVRG = np.array([10., 20.])                    # already-averaged <polgr
 @pytest.fixture
 def molsys(states) -> MolSystemData:
     props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=CFF, extra_data={})])
-    return MolSystemData(name='toy', eigenvals=np.array([E0, E1]), eigenvecs=None, mol_props=props, states=states)
+    return MolSystemData(name='toy', eigenvals={0: E0, 1: E1}, eigenvecs=None, mol_props=props, states=states)
 
 
 def test_eval_non_avrg_reads_tensor_by_symbol_order(molsys):
