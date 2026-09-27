@@ -137,6 +137,10 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
     assert symb == quanta
     assert symb.energy_difference() == pytest.approx(E01 - E0)
 
+def test_state_labels_agree_for_mode_10():
+    harm, _ = _make_hq_states_from_datadict({'harmonic_states': {('10', '2'): 1.}})
+    assert harm[0].state_label == _make_vibdiff_key(vibdiff(sl='ab'), {'a': 10, 'b': 2})[0] == '2,10'
+
 
 ## MolPropsCollection -------------------------------------------------------
 
@@ -165,6 +169,13 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert props['cff'].vals is not None
     assert props.without_values().names() == ['polgrad']
     assert not props.is_filled
+
+def test_from_datadict_does_not_share_mol_props():
+    template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
+    m1 = MolSystemData.from_datadict(template, {'cff': np.ones(2)})
+    m2 = MolSystemData.from_datadict(template, {})
+    assert m1.data_filled and not m2.data_filled
+    assert template['cff'].vals is None
 
 
 ## ResonanceMotif -----------------------------------------------------------
@@ -440,6 +451,10 @@ def test_solve_LSE_motif_inconsistent_raises_even_with_extra_axes(params, states
     with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
         solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states, axes=('A', 'B'))
 
+def test_solve_LSE_motif_empty_motif_raises(params, states):
+    with pytest.raises(ValueError, match='no resonance conditions'):
+        solve_LSE_motif(ResonanceMotif(()), params, states)
+
 
 ## DATA REQUEST
 
@@ -455,7 +470,7 @@ ORIGIN = DataOriginInfo(source_type='cfour', lvl_theory='CCSD(T)', basis_set='AN
 
 def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
     return CompiledTerm(PropsCollection(list(avrg)), PropsCollection(list(non_avrg)),
-                        ResonanceMotif(()), FreqTermsCollection([]), 1., idx_summ_nonsumm=((), ()))
+                        ResonanceMotif(()), FreqTermsCollection([]), 1., idx_summ=(), idx_nonsumm=())
 
 
 def test_build_data_request_for_term_names_avrg_nonavrg_and_sys_info(term_and_precalc):
@@ -633,7 +648,8 @@ def term_and_precalc():
         cmp_resmotf=ResonanceMotif(()),
         cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)]),
         frac_factor=0.5,
-        idx_summ_nonsumm=(('b', 'c'), ('a',)),
+        idx_summ=('b', 'c'),
+        idx_nonsumm=('a',),
     )
     avrg_key = PropsCollection([avrg])
     pre = PrecalculatedData(avrg_tensors={avrg_key: POLGRAD_AVRG},
@@ -698,7 +714,7 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     monkeypatch.setattr(evaluate_mod, '_make_func_to_compute_avrg', lambda **_: None)
     # Only the index split is read from the term here; molsys has 2 modes, so each missing index runs over {0, 1}.
     term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
-                        idx_summ_nonsumm=(('b', 'c'), ('a',)))
+                        idx_summ=('b', 'c'), idx_nonsumm=('a',))
 
     results = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, polarization_vec=(1.,1.,1.))
 

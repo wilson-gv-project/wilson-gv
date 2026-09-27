@@ -7,16 +7,13 @@
 ==> list[SpectralFeature]
 """
 
+import copy
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from wilson_suite.wilson_derive.abstractions import (
-    PolProp,
-    VibDiffTerm,  # here and term_parts and vibene_differences
-)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocGeoObject,
@@ -25,6 +22,10 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.abstractions import (
+        PolProp,
+        VibDiffTerm,  # here and term_parts and vibene_differences
+    )
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         CompiledTerm,
         FreqTermsCollection,
@@ -170,25 +171,38 @@ class VibStatesData:
         else:
             raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
 
+def make_state_label(modes) -> str:
+    """
+    (10, 2) -> '2,10';  ('1', '0') -> '0,1';  () -> 'zero'
+    
+    assert state_label(('10', '2')) == state_label([2, 10]) == '2,10'
 
-def _make_vibdiff_key(vibdiff_term: VibDiffTerm, index_dict: dict) -> tuple[str, str]:
+    modes is Sequence[int | str]
+    """
+    return ','.join(str(m) for m in sorted(int(m) for m in modes)) or 'zero'
+
+
+def _make_vibdiff_key(vibdiff_term: 'VibDiffTerm', index_dict: dict) -> tuple[str, str]:
     """
     Non-sorted key for VibDiffBank_cache
 
     returns keys for vibdiff bank for vib states expression and choice of indices
     """
-    left_state_symb = vibdiff_term.sl.q # type: ignore
-    right_state_symb = vibdiff_term.sr.q # type: ignore
+    # left_state_symb = vibdiff_term.sl.q # type: ignore
+    # right_state_symb = vibdiff_term.sr.q # type: ignore
 
-    left_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in left_state_symb])])
-    right_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in right_state_symb])])
+    # left_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in left_state_symb])])
+    # right_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in right_state_symb])])
     
-    if left_state_label == '':
-        left_state_label = 'zero'
-    if right_state_label == '':
-        right_state_label = 'zero'
+    # if left_state_label == '':
+    #     left_state_label = 'zero'
+    # if right_state_label == '':
+    #     right_state_label = 'zero'
     
-    return (left_state_label, right_state_label)
+    # return (left_state_label, right_state_label)
+    return (make_state_label(index_dict[q] for q in vibdiff_term.sl.q),
+            make_state_label(index_dict[q] for q in vibdiff_term.sr.q))
+
 
 
 @dataclass
@@ -246,7 +260,7 @@ class VibDiff:
 
     @classmethod
     def from_symbolic(cls, 
-                    vibdiff_term_symb: VibDiffTerm,
+                    vibdiff_term_symb: 'VibDiffTerm',
                     index_dict: dict,
                     vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
@@ -271,12 +285,21 @@ class VibDiff:
     def from_quanta(cls, left_q, right_q, index_dict, vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Same as from_symbolic, but from quanta labels instead of a VibDiffTerm —
         so callers holding a ResCondKey don't need a derive object."""
-        def label(quanta):
-            return ','.join(str(i) for i in sorted(index_dict[i] for i in quanta)) or 'zero'
-        zero = VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
-        ll, rl = label(left_q), label(right_q)
-        return cls(left=zero if ll == 'zero' else vibstates_data.get_state_by_label(ll),
-                   right=zero if rl == 'zero' else vibstates_data.get_state_by_label(rl))
+        # def label(quanta):
+        #     return ','.join(str(i) for i in sorted(index_dict[i] for i in quanta)) or 'zero'
+        # zero = VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
+        # ll, rl = label(left_q), label(right_q)
+        
+        # ll = make_state_label(index_dict[q] for q in left_q)
+        # rl = make_state_label(index_dict[q] for q in right_q)
+
+        # return cls(left=zero if ll == 'zero' else vibstates_data.get_state_by_label(ll),
+        #            right=zero if rl == 'zero' else vibstates_data.get_state_by_label(rl))
+
+        ll = make_state_label(index_dict[q] for q in left_q)
+        rl = make_state_label(index_dict[q] for q in right_q)
+        return cls(left=vibstates_data.get_state_by_label(ll),
+                right=vibstates_data.get_state_by_label(rl))
 
 
 @dataclass(frozen=True)
@@ -287,7 +310,7 @@ class MolSystemData:
     would be constructed outside of evaluation, and passed in to evaluation functions
     """
     name: str
-    eigenvals: np.ndarray | None
+    eigenvals: dict[int, float] | None
     eigenvecs: np.ndarray | None
     mol_props: 'MolPropsCollection'
     states: 'VibStatesData'
@@ -316,6 +339,8 @@ class MolSystemData:
 
         """
         # resets values, because props in collection shold be from the same source
+        
+        mol_props = mol_props.empty_copy()
         mol_props.fill_from(data_dict)
 
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
@@ -326,7 +351,9 @@ class MolSystemData:
         elif states_choice == 'anharmonic':
             labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
             states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
-
+        else:
+            raise ValueError('states_choice can be harmonic or anharmonic.')
+        
         # VibStatesData could be empty if no data
 
         geo = data_dict.get('geo', None)
@@ -365,14 +392,14 @@ def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tup
         states_dict: dict = data_dict['harmonic_states']
 
         for state, energy in states_dict.items():
-            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=make_state_label(state)),)
 
     anharm_states = ()
     if 'anharmonic_states' in data_dict:
         states_dict: dict = data_dict['anharmonic_states']
 
         for state, energy in states_dict.items():
-            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=','.join(state)),)
+            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=make_state_label(state)),)
 
     return harm_states, anharm_states
 
@@ -475,11 +502,18 @@ class MolPropsCollection:
         return all(p.vals is not None for p in self.properties)
 
 
+    def empty_copy(self) -> 'MolPropsCollection':
+        """Same property names, new objects, no values. The template is not touched."""
+        return MolPropsCollection([MolecularProperty(trivial_name=p.trivial_name,
+                                                    extra_data=copy.deepcopy(p.extra_data))
+                                for p in self.properties])
 ## ----------------------------------------------------
 
 @dataclass
 class PrecalculatedData:
     """
+    TODO/FIXME: avrg_tensors should carry polarization info.
+
     if avrg_expr in pre.avrg_expr_tensor_mapping:
     """
     avrg_tensors: dict = field(default_factory=dict)
@@ -504,8 +538,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          polarization_vec: tuple | None = None,
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18):
-    idx_summ, idx_nonsumm = compl_term.idx_summ_nonsumm
-    term_idx_all = sorted(idx_summ + idx_nonsumm)
+    term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
     if molsys_data.eigenvals is not None:
         n_modes = len(molsys_data.eigenvals)
@@ -531,6 +564,15 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         current, rest = remaining[0], remaining[1:]
         return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
 
+    """
+    The call {'a': 0} sums over b and c. The result adds up peaks at different positions into one number, with no error.
+
+    not_fixed = [i for i in compl_term.nonsumm_idx if i not in idx_dict]
+    if not_fixed:
+        raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
+    to_sum = [i for i in compl_term.summ_idx if i not in idx_dict]
+
+    """
     # results = {}
     # for index_dict in relevant_indices:
     missing = [i for i in term_idx_all if i not in idx_dict]
@@ -558,7 +600,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
         index_dict: dict,            # index choice (a,b,c...)
     """
     # requested nm indices dict should hold values for all indices in the term
-    t_indices = sorted(set(compl_term.idx_summ_nonsumm[0]+compl_term.idx_summ_nonsumm[1]))
+    t_indices = sorted(set(compl_term.idx_summ+compl_term.idx_nonsumm))
     if not all(index in list(index_dict.keys()) for index in t_indices):
         raise ValueError('term has indices that do not have values in index_dict.')
 
@@ -586,8 +628,9 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     # Evaluate VIBENE_DENOM
     freqterms = compl_term.cmp_freqdenom.get_vibenedenom()
 
-    if precalculated_data is None or precalculated_data.vibenedenoms_tensors is None:
-        VIBENE_DENOM = otf_vibdiffdenom(freqterms, index_dict, molsys_data)
+    if precalculated_data is None or not precalculated_data.vibenedenoms_tensors:
+
+        VIBENE_DENOM = harmonic_denom(freqterms, index_dict, molsys_data)
     else:
         VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
 
@@ -805,9 +848,7 @@ def eval_vibenedenom(freqterms: 'FreqTermsCollection',
 
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
-def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
-                     index_dict: dict,
-                     molsys_data: MolSystemData):
+def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: MolSystemData):
     """
     without precalculated data
     """
@@ -821,6 +862,17 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection',
         product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
 
     return product_all
+
+def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: MolSystemData) -> float:
+    """product of 1/omega_i, harmonic omega in Eh; one mode per denominator"""
+    if molsys_data.eigenvals is not None:
+        product = 1.
+        for vd in freqterms:
+            (label,) = vd.sl.q          # type: ignore ; raises if a denominator has more than one mode
+            product /= convNu2Ene(molsys_data.eigenvals[index_dict[label]])
+        return product
+    else:
+        raise ValueError("molsys_data.eigenvals is None")
 
 
 ## ----------------------------------------------------
@@ -900,6 +952,8 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
     raises np.linalg.LinAlgError if the location is not axis-aligned (a constrained axis is
     still underdetermined, e.g. a single condition on A + B) or the conditions are inconsistent.
     """
+    if len(motif) == 0:
+        raise ValueError('motif has no resonance conditions: no resonance location')
 
     A, all_axes = generate_LHS_motif(motif, axes)
     b = np.array(get_RHS_motif(motif, parameters, vibdata, unit))
@@ -942,4 +996,13 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 6. evaluating `term res cond - res location`    [res loc]       []
 7. evaluating `term res cond - on the grid`     [res loc]       []
 
+"""
+
+"""
+The data then passes through these steps:
+
+1. build the request      "please fetch 'polgrad' from CFOUR"          plan.py:158
+2. obtainer returns       data_dict = {'polgrad': array, ...}
+3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot   (slot name from from_polprop, evaluate.py:423)
+4. evaluate               read mol_props['polgrad'].vals[mode, i, j]   evaluate.py:725 (averaged)                                                                       evaluate.py:618 (non-averaged)
 """

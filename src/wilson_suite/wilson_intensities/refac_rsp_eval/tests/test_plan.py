@@ -103,10 +103,10 @@ def test_freqterms_split_by_pert_wf_diff():
     assert vibdiff_keys(coll.get_pert_wf_diff()) == [(('a', 'b'), ('a',), True)]
 
 
-def test_freqterms_pert_wf_diff_against_ground_counts_as_vibenedenom():
+def test_freqterms_pert_wf_diff_against_ground_is_pert_only():
     coll = FreqTermsCollection([vibdiff(sl='ab', sr='', pert=True)])
-
-    assert vibdiff_keys(coll.get_vibenedenom()) == [(('a', 'b'), (), True)]
+    assert vibdiff_keys(coll.get_vibenedenom()) == []
+    assert vibdiff_keys(coll.get_pert_wf_diff()) == [(('a', 'b'), (), True)]
 
 
 def test_freqterms_num_indices_are_sorted_unique_left_quanta():
@@ -300,7 +300,7 @@ def _fake_vibpert_term():
         props=[polprop(ops=(0, 1), inds='a'), polprop(inds='ab')],
         freqterms=[vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)],
         res=[ResonanceCondition(diff=vibdiff(sl='a'), pf=['1'])],
-        tellNonSummSummIndices=lambda: (('b',), ('a',)),
+        tellNonSummSummIndices=lambda: (('a',), ('b',)),
     )
 
 
@@ -311,12 +311,13 @@ def test_compiled_term_from_vibpert_term():
     assert ct.all_props.get_mode_indices() == ('a', 'a', 'b')
     assert ct.cmp_freqdenom.get_num_indices_vibenedenom() == ('a',)
     assert ct.cmp_resmotf == ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
-    assert ct.idx_summ_nonsumm == (('b',), ('a',))
+    assert ct.idx_summ == ('b',)
+    assert ct.idx_nonsumm == ('a',)
 
     indices = set(ct.all_props.get_mode_indices()
                   + ct.cmp_freqdenom.get_num_indices_vibenedenom()
                   + tuple(ct.cmp_resmotf.get_nm_indices()))
-    assert sorted(set(ct.idx_summ_nonsumm[0]+ct.idx_summ_nonsumm[1])) == sorted(indices)
+    assert sorted(set(ct.idx_summ+ct.idx_nonsumm)) == sorted(indices)
 
 
 def test_compile_terms_one_compiled_per_term():

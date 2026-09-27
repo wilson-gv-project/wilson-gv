@@ -161,13 +161,8 @@ def test_evaluate_term():
     print(contribs)
 
 
-    with pytest.raises(ValueError) as e:
-        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, 
-                                                 molsys_data=molsys,
-                                                 avrg_func=avrg_func,
-                                                 precalculated_data=None, 
-                                                 zero_tol=1e-18)
-        assert e.value == 'term has indices that do not have values in index_dict.'
+    with pytest.raises(ValueError, match='term has indices that do not have values'):
+        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func)
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
                                                  molsys_data=molsys,
