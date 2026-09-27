@@ -9,7 +9,7 @@ Next: A3.
 
 A. Finish the fixes started on this branch
 ------------------------------------------
-[ ] A3  item 3, plan.py CompiledTerm.from_VibPertTerm stores lists, not tuples.
+[x] A3  item 3, plan.py CompiledTerm.from_VibPertTerm stores lists, not tuples.
         hash(CompiledTerm) raises TypeError now.
         Write: nonsumm, summ = term.tellNonSummSummIndices()
                idx_summ=tuple(summ), idx_nonsumm=tuple(nonsumm)
@@ -20,12 +20,12 @@ A. Finish the fixes started on this branch
         Add a test where eigenvals differ from the state energies.
         Today the test data has equal values, so a wrong energy source still passes.
 [ ] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
-[ ] A8  Delete, do not comment out:
-        - plan.py: make_request_from_term and the "# 17." note above it
-        - plan.py: sr_or_sl_only inside the get_vibenedenom docstring; fix that docstring
-        - plan.py: the "# idx_summ_nonsumm" line in CompiledTerm
-        - evaluate.py: old commented body in _make_vibdiff_key
-        - evaluate.py: old commented lines in VibDiff.from_quanta (two blocks)
+[x] A8  Delete, do not comment out:
+        - [x] plan.py: make_request_from_term and the "# 17." note above it
+        - [x] plan.py: sr_or_sl_only inside the get_vibenedenom docstring; fix that docstring
+        - [x] plan.py: the "# idx_summ_nonsumm" line in CompiledTerm
+        - [x] evaluate.py: old commented body in _make_vibdiff_key
+        - [x] evaluate.py: old commented lines in VibDiff.from_quanta (two blocks)
 [ ] A9  evaluate.py: delete the duplicate "The data then passes through these steps" docstring at
         the end of the file. The same block exists above PrecalculatedData. The line numbers in the copy are stale.
 [ ] A10 evaluate.py small text fixes:

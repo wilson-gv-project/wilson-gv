@@ -226,10 +226,6 @@ class FreqTermsCollection:
         Only one vib state energy.
 
         freqterm.sl and freqterm.sr should be HarmOscStateSymbolic instances
-
-        could be used at some point(??):
-        def sr_or_sl_only(freqterm: VibDiffTerm):
-            return (freqterm.sl.q == []) or (freqterm.sr.q == []) # type: ignore
         """
 
         return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if not ft.is_pert_wf_diff])
@@ -245,6 +241,11 @@ class FreqTermsCollection:
 
     def get_max_state_lvl(self):
         return max(max(len(vd.sl.q), len(vd.sr.q)) for vd in self.freqterms) # type: ignore
+
+
+def sr_or_sl_only(freqterm: VibDiffTerm):
+    return (freqterm.sl.q == []) or (freqterm.sr.q == []) # type: ignore
+
 
 @dataclass
 class ResCondCollection:
@@ -489,7 +490,6 @@ class CompiledTerm:
     cmp_resmotf: ResonanceMotif
     cmp_freqdenom: FreqTermsCollection
     frac_factor: float
-    # idx_summ_nonsumm: tuple[tuple[str, ...], tuple[str, ...]]
     idx_summ: tuple[str, ...]
     idx_nonsumm: tuple[str, ...]
 
@@ -500,13 +500,13 @@ class CompiledTerm:
         frac_factor = float(term.coeff)
         freq_denom = FreqTermsCollection(term.freqterms) # states
         res_conds = ResonanceMotif.from_conditions(term.res) # states
-        idx_nonsumm_summ = term.tellNonSummSummIndices()
+        idx_nonsumm, idx__summ = term.tellNonSummSummIndices()
 
         properties = PropsCollection(term.props)
         non_avrg_props = properties.get_non_averaged_props()
         avrg_props = properties.get_averaged_props().sort()
 
-        return cls(avrg_props, non_avrg_props, res_conds, freq_denom, frac_factor, idx_nonsumm_summ[1], idx_nonsumm_summ[0]) # type: ignore
+        return cls(avrg_props, non_avrg_props, res_conds, freq_denom, frac_factor, tuple(idx__summ), tuple(idx_nonsumm)) # type: ignore
 
     @property
     def all_props(self) -> PropsCollection:
@@ -544,13 +544,3 @@ def compile_terms(terms: Sequence['VibPerturbedTerm']) -> list[CompiledTerm]:
 
     return compiled
 
-# 17. There are three request builders: build_request_dict, make_request_from_term and build_data_request_for_term.
-
-# def make_request_from_term(cmp_term: CompiledTerm) -> dict:
-
-#     from .evaluate import MolecularProperty
-
-#     molprops = [MolecularProperty.from_polprop(p) for p in cmp_term.all_props]
-#     data_dict = dict.fromkeys([molprop.trivial_name for molprop in molprops])
-
-#     return data_dict

@@ -188,18 +188,7 @@ def _make_vibdiff_key(vibdiff_term: 'VibDiffTerm', index_dict: dict) -> tuple[st
 
     returns keys for vibdiff bank for vib states expression and choice of indices
     """
-    # left_state_symb = vibdiff_term.sl.q # type: ignore
-    # right_state_symb = vibdiff_term.sr.q # type: ignore
 
-    # left_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in left_state_symb])])
-    # right_state_label = ','.join([str(i) for i in sorted([index_dict[i] for i in right_state_symb])])
-    
-    # if left_state_label == '':
-    #     left_state_label = 'zero'
-    # if right_state_label == '':
-    #     right_state_label = 'zero'
-    
-    # return (left_state_label, right_state_label)
     return (make_state_label(index_dict[q] for q in vibdiff_term.sl.q), # type: ignore
             make_state_label(index_dict[q] for q in vibdiff_term.sr.q)) # type: ignore
 
@@ -285,16 +274,6 @@ class VibDiff:
     def from_quanta(cls, left_q, right_q, index_dict, vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Same as from_symbolic, but from quanta labels instead of a VibDiffTerm —
         so callers holding a ResCondKey don't need a derive object."""
-        # def label(quanta):
-        #     return ','.join(str(i) for i in sorted(index_dict[i] for i in quanta)) or 'zero'
-        # zero = VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
-        # ll, rl = label(left_q), label(right_q)
-        
-        # ll = make_state_label(index_dict[q] for q in left_q)
-        # rl = make_state_label(index_dict[q] for q in right_q)
-
-        # return cls(left=zero if ll == 'zero' else vibstates_data.get_state_by_label(ll),
-        #            right=zero if rl == 'zero' else vibstates_data.get_state_by_label(rl))
 
         ll = make_state_label(index_dict[q] for q in left_q)
         rl = make_state_label(index_dict[q] for q in right_q)
