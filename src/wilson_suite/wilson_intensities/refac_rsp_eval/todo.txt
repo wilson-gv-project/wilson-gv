@@ -99,3 +99,48 @@ Done on this branch
 [x] 23  pytest.raises uses match=                                        (A7: asserts)
 [x] 8   withdrawn: all real terms have rank 4
 [x] ingest_numeric.py stub deleted
+
+
+------
+
+Your working tree is clean and all changes are committed. Tests: 111 pass, 2 fail, and both failures are the placeholders.
+
+Here is the big picture as 7 phases. Each phase lists what "done" means.
+
+**1. Finish the clean-up on this branch.**
+- Items: A4, A6, A9–A11 and C1.
+- Done when: every refactor test passes and nothing is commented out.
+
+**2. Unblock the old pipeline (B1).**
+- Why: the old pipeline is your reference for correct numbers. Today it cannot load data because of the `DataOriginInfo` import.
+- Done when: the 3 failing old tests pass again.
+
+**3. Prove that new numbers equal old numbers.**
+- Items: C2 (one term's coefficient, compared factor by factor) and B4 (resonance positions compared with the old `resonances.py`).
+- Done when: the old and new code agree on all 14 formaldehyde EVV terms. Every difference must be deliberate and noted in the test, for example the harmonic 1/ω fix or the double-count fix.
+
+**4. Make the keys sound before grouping terms (D1–D3).**
+- Why: phase 5 groups terms and index sets through dict keys. Keys with broken `__eq__`/`__hash__` would merge or split groups silently.
+- Done when: `PropsCollection`, `FreqTermsCollection` and `ParameterSet` are frozen, and `__eq__` and `__hash__` come from one key.
+
+**5. Build the missing pipeline.**
+1. E1: loop over index sets → `solve_LSE_motif` → group terms by (motif, location) → `SpectralFeature`.
+2. E2: grid.py, which draws the features on a spectrum grid.
+3. E3: one entry point, `compute_features` (terms + data → features), plus the grid call.
+- Done when: one function call turns EVV terms and formaldehyde data into a spectrum array.
+
+**6. Compare whole spectra, old vs new.**
+- Done when: both pipelines give the same spectrum for formaldehyde, apart from the deliberate differences from phase 3.
+
+**7. Switch over and delete the old code.**
+1. Decide who owns the data model (D4): `wilson_main`, or a small shared module.
+2. Write the adapter so `wilson_main` calls the new entry point.
+3. Delete the old evaluation code in `amplitudes/` and rps_evaluation.py.
+4. Rewrite the README around the one design that survives (E4).
+- Done when: only one evaluation pipeline exists and all tests pass.
+
+**Later, only when needed:**
+- B3 and B5 matter only once you build the precomputed tables again.
+- F1 (einsum speed-up) matters only once a large molecule is measurably too slow.
+
+Phases 2 and 3 are the most important. Without them, nothing shows that the refactor computes the right physics. I can add these phases to the top of todo.txt if you want.
