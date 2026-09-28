@@ -847,7 +847,11 @@ def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_da
     if molsys_data.eigenvals is not None:
         product = 1.
         for vd in freqterms:
+            if vd.sr.q:
+                raise ValueError(f"this VibDiffTerm's ket state is not a ground state: {vd}")
+            
             (label,) = vd.sl.q          # type: ignore ; raises if a denominator has more than one mode
+
             product /= convNu2Ene(molsys_data.eigenvals[index_dict[label]])
         return product
     else:

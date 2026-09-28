@@ -49,6 +49,7 @@ def state(label: str, energy: float) -> VibState:
 
 # Two modes; energies in cm-1 chosen so every difference is distinct.
 E0, E1, E01, E00 = 1000., 1500., 2600., 1950.
+E0_eigval, E1_eigval = 1100., 1580.
 
 
 @pytest.fixture
@@ -559,7 +560,7 @@ POLGRAD_AVRG = np.array([10., 20.])                    # already-averaged <polgr
 @pytest.fixture
 def molsys(states) -> MolSystemData:
     props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=CFF, extra_data={})])
-    return MolSystemData(name='toy', eigenvals={0: E0, 1: E1}, eigenvecs=None, mol_props=props, states=states)
+    return MolSystemData(name='toy', eigenvals={0: E0_eigval, 1: E1_eigval}, eigenvecs=None, mol_props=props, states=states)
 
 
 def test_eval_non_avrg_reads_tensor_by_symbol_order(molsys):
@@ -665,7 +666,7 @@ def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc
                                                molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18)
 
     # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
-    assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0))
+    assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0_eigval))
     assert set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'}
     assert contribs['NON_AVRG'] == CFF[0, 1, 1]
     assert contribs['AVRG'] == POLGRAD_AVRG[0]

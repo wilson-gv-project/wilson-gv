@@ -16,7 +16,7 @@ A. Finish the fixes started on this branch
 [ ] A4  item 4, evaluate.py evaluate_term_coeff_sumover: the check sits in a string literal.
         A string literal does nothing. Turn it into code. Sum over `to_sum` only.
         Then test_integration.py: evaluate_term_coeff_sumover(term, {'a': 0}) -> {'a': 0, 'b': 1}.
-[ ] A6  item 5, evaluate.py harmonic_denom: raise if vd.sr.q is not empty.
+[x] A6  item 5, evaluate.py harmonic_denom: raise if vd.sr.q is not empty.
         Add a test where eigenvals differ from the state energies.
         Today the test data has equal values, so a wrong energy source still passes.
 [x] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
