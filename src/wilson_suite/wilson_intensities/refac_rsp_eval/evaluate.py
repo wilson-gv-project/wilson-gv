@@ -20,8 +20,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolPropsCollection,
-    VibDiff,
     MolSystemData,
+    VibDiff,
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -397,7 +397,7 @@ def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_da
     if molsys_data.eigenvals is not None:
         product = 1.
         for vd in freqterms:
-            if vd.sr.q:
+            if vd.sr.q: # type: ignore
                 raise ValueError(f"this VibDiffTerm's ket state is not a ground state: {vd}")
             
             (label,) = vd.sl.q          # type: ignore ; raises if a denominator has more than one mode
