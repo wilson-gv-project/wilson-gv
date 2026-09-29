@@ -7,13 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from wilson_suite.wilson_derive.abstractions import (
-    HarmOscStateSymbolic,
-    PolProp,
-    QOperator,
-    ResonanceCondition,
-    VibDiffTerm,
-)
+from wilson_suite.wilson_derive.abstractions import ResonanceCondition
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
@@ -23,17 +17,10 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ResonanceMotif,
     compile_terms,
 )
-
-
-def polprop(ops: tuple[int, ...] = (), inds: str = '') -> PolProp:
-    """ops -> QOperator labels, inds -> one-letter mode symbols (dord = len(inds))."""
-    p = PolProp(ops=[QOperator(o=i) for i in ops], dord=len(inds))
-    p.setInds(list(inds))
-    return p
-
-
-def vibdiff(sl: str = '', sr: str = '', pert: bool = False) -> VibDiffTerm:
-    return VibDiffTerm(sl=HarmOscStateSymbolic(list(sl)), sr=HarmOscStateSymbolic(list(sr)), is_pert_wf_diff=pert)
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+    polprop,
+    vibdiff,
+)
 
 
 def vibdiff_keys(coll: FreqTermsCollection) -> list[tuple]:
@@ -139,6 +126,14 @@ def test_rescondkey_is_a_frozen_value_usable_as_dict_key():
         key.pf = ()  # type: ignore
 
 
+def test_rescondkey_pf_order_does_not_matter():
+    key = ResCondKey(diff=(('a',), ()), pf=('A', '-B'))
+    same = ResCondKey(diff=(('a',), ()), pf=('-B', 'A'))
+
+    assert key == same and hash(key) == hash(same)
+    assert ResonanceMotif((key,)) == ResonanceMotif((same,))
+
+
 ## ResonanceMotif -----------------------------------------------------------
 
 def test_resonance_motif_from_conditions_matches_from_tuples():
@@ -203,14 +198,6 @@ def test_resonance_motif_from_tuples_sorts_quanta_and_pf():
     motif = ResonanceMotif.from_tuples([((('c', 'a'), ('b', 'a')), ('B', '-A'))])
 
     assert motif.conditions == (ResCondKey(diff=(('a', 'c'), ('a', 'b')), pf=('-A', 'B')),)
-
-
-def test_rescondkey_pf_order_does_not_matter():
-    key = ResCondKey(diff=(('a',), ()), pf=('A', '-B'))
-    same = ResCondKey(diff=(('a',), ()), pf=('-B', 'A'))
-
-    assert key == same and hash(key) == hash(same)
-    assert ResonanceMotif((key,)) == ResonanceMotif((same,))
 
 
 def test_resonance_motif_accepts_any_sequence_of_keys():

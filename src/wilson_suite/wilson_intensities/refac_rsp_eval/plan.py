@@ -53,7 +53,7 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import DataOriginInfo
+    from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 
 @dataclass
@@ -406,11 +406,10 @@ class ParameterSet(Mapping[str, int]):
         object.__setattr__(self, "_parameters", MappingProxyType(state['_parameters']))
 
 
-# Type aliases
-CoordValue = float | Literal['all']
+CoordValue = float
 Coordinates = tuple[tuple[str, CoordValue], ...]
 
-class ResLocGeoObject:
+class ResLocPoint:
     """
     Represents geometric objects in N-dimensional space that are hashable.
 
@@ -420,12 +419,11 @@ class ResLocGeoObject:
     """
     def __init__(self, coord_dict: dict[str, CoordValue]):
         self._coord_dict = coord_dict
-        # Convert dict to sorted tuple of tuples for consistent hashing
+        # dict to sorted tuple of tuples for consistent hashing
         self.coordinates: Coordinates = tuple(sorted(coord_dict.items()))
 
-    # UNUSED - useful for analysis or for future?
     @property
-    def dims(self) -> tuple[str, ...]:
+    def axes(self) -> tuple[str, ...]:
         return tuple(k for k, _ in self.coordinates)
 
     @property
@@ -434,8 +432,8 @@ class ResLocGeoObject:
 
     @property
     def dimensionality(self) -> int:
-        """Returns dimensionality of the object (0=point, 1=line, 2=plane, etc)"""
-        return sum(1 for v in self.values if v == 'all')
+        """Returns dimensionality of the point"""
+        return len(self._coord_dict)
 
     def __getitem__(self, axis: str) -> CoordValue:
         for k, v in self.coordinates:
@@ -444,21 +442,12 @@ class ResLocGeoObject:
         raise KeyError(f"Axis {axis} not found")
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, ResLocGeoObject):
+        if not isinstance(other, ResLocPoint):
             return NotImplemented
         return self.coordinates == other.coordinates
 
     def __hash__(self) -> int:
         return hash(self.coordinates)
-
-    def is_point(self) -> bool:
-        return self.dimensionality == 0
-
-    def is_line(self) -> bool:
-        return self.dimensionality == 1
-
-    def is_plane(self) -> bool:
-        return self.dimensionality == 2
 
     def __repr__(self) -> str:
         """
@@ -466,12 +455,9 @@ class ResLocGeoObject:
 
         Examples:
             Point(A=1864.0, B=900.0)
-            Line(A=1864.0, B=all)
-            Plane(A=all, B=all, C=1200.0)
         """
-        type_name = "Point" if self.is_point() else "Line" if self.is_line() else "Plane" if self.is_plane() else "Object"
         coords = ", ".join(f"{k}={v}" for k, v in self.coordinates)
-        return f"{type_name}({coords})"
+        return f"Point({coords})"
 
 
 ## --------------------------------------------------------------------

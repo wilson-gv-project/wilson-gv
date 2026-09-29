@@ -7,7 +7,7 @@
 ==> list[SpectralFeature]
 """
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -15,7 +15,7 @@ import numpy as np
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
-    ResLocGeoObject,
+    ResLocPoint,
 )
 from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         PropsCollection,
         ResonanceMotif,
     )
-    from wilson_suite.wilson_system.system_data import MolSystemData, VibStatesData
+    from wilson_suite.wilson_system.system_data import VibStatesData
 
 
 @dataclass
@@ -463,14 +463,13 @@ def get_RHS_motif(motif: 'ResonanceMotif',
 
 def solve_LSE_motif(motif: 'ResonanceMotif',
                     parameters: ParameterSet, vibdata: 'VibStatesData',
-                    unit: str='Eh',
-                    axes: Iterable[str] | None = None) -> ResLocGeoObject:
+                    unit: str='Eh') -> ResLocPoint:
     """
-    Find where in frequency space all resonance conditions of `motif` hold at once.
+    Find the point in frequency space where all resonance conditions of `motif` hold at once.
 
     Each condition is one linear equation in the perturbing frequencies, so the motif is
     a linear system A @ w = b:
-        A  one row per condition, one column per axis (from generate_LHS_motif)
+        A  one row per condition, one column per axis of the motif (from generate_LHS_motif)
         b  vibrational energy differences for this index assignment (from get_RHS_motif)
         w  the frequency of each axis at resonance - what we solve for
 
@@ -478,17 +477,15 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
         A = [[-1,  0],       b = [b0, b1]    ->  w_A from row 0,
              [-1,  1]]                           then w_B from row 1
 
-    `axes` is the full set of spectral axes (defaults to the motif's own axes). Axes the
-    motif does not constrain are free: the location is {axis: w} for constrained axes and
-    {axis: 'all'} for free ones -> a point, line, plane, ... in the space of `axes`.
+    The location is {axis: w} over the motif's own axes: always a point, every axis has a value.
 
-    raises np.linalg.LinAlgError if the location is not axis-aligned (a constrained axis is
-    still underdetermined, e.g. a single condition on A + B) or the conditions are inconsistent.
+    raises np.linalg.LinAlgError if the location is not a point (fewer independent conditions
+    than axes, e.g. a single condition on A + B) or the conditions are inconsistent.
     """
     if len(motif) == 0:
         raise ValueError('motif has no resonance conditions: no resonance location')
 
-    A, all_axes = generate_LHS_motif(motif, axes)
+    A, all_axes = generate_LHS_motif(motif)
     b = np.array(get_RHS_motif(motif, parameters, vibdata, unit))
 
     # lstsq always returns an answer: the exact solution if there is one, otherwise the
@@ -496,27 +493,18 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
     # rank = number of independent conditions.
     solution, _, rank, _ = np.linalg.lstsq(A, b, rcond=None)
 
-    # An axis no condition mentions has an all-zero column. It can take any value, so it is
-    # 'free' (its lstsq value is a meaningless 0). A.any(axis=0) is True per column with a
-    # nonzero entry; ~ flips it to True for the free columns.
-    free = ~A.any(axis=0)
-    # the remaining axes each need a definite value
-    n_constrained = len(all_axes) - int(free.sum())
-
-    # Pinning down n_constrained unknowns takes n_constrained independent conditions.
-    # Fewer means some constrained axis is still a line, not a value: e.g. one condition
-    # on A + B gives rank 1 < 2, and resonance is the whole diagonal w_A + w_B = b.
-    # FIXME: That is not axis-aligned, so ResLocGeoObject can't express it.
-    if rank < n_constrained:
-        raise np.linalg.LinAlgError(f"resonance location of {motif} is not a point along its axes "
-                                    f"(rank {rank} < {n_constrained} constrained axes)")
+    # A point needs one value per axis, so as many independent conditions as axes.
+    # Fewer leaves a line (or more): e.g. one condition on A + B gives rank 1 < 2,
+    # and resonance is the whole diagonal w_A + w_B = b.
+    if rank < len(all_axes):
+        raise np.linalg.LinAlgError(f"resonance location of {motif} is not a point "
+                                    f"(rank {rank} < {len(all_axes)} axes)")
     # More conditions than unknowns may contradict each other (same axis, different energies);
     # then lstsq's best compromise does not actually satisfy A @ w = b.
     if not np.allclose(A @ solution, b):
         raise np.linalg.LinAlgError(f"resonance conditions of {motif} are inconsistent: no resonance location")
 
-    return ResLocGeoObject({ax: 'all' if is_free else float(val)
-                            for ax, val, is_free in zip(all_axes, solution, free)})
+    return ResLocPoint({ax: float(val) for ax, val in zip(all_axes, solution)})
 
 
 
@@ -530,7 +518,7 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 7. evaluating `term res cond - on the grid`     [res loc]       []
 
 ---------
-ResonanceMotif + ParameterSet + VibStatesData ==> ResLocGeoObject
+ResonanceMotif + ParameterSet + VibStatesData ==> ResLocPoint
 
 iterate over:
     1. Sequence[ResonanceMotif]

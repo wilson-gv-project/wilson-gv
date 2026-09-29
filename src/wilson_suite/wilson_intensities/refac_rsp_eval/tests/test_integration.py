@@ -6,17 +6,20 @@ import pytest
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    MolecularProperty,
-    MolPropsCollection,
-    MolSystemData,
     _make_func_to_compute_avrg,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
 )
-from wilson_suite.wilson_system.system_data import DataOriginInfo, _sys_info_request
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     compile_terms,
+)
+from wilson_suite.wilson_system.system_data import (
+    DataOriginInfo,
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+    _sys_info_request,
 )
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT

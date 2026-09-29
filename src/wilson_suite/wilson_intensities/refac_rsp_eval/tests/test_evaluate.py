@@ -7,61 +7,52 @@ import numpy as np
 import pytest
 
 import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
-from wilson_suite.wilson_derive.abstractions import (
-    HarmOscStateSymbolic,
-    PolProp,
-    QOperator,
-    VibDiffTerm,
-)
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import *
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    PrecalculatedData,
     _get_ind_tuple_from_base,
-    _make_func_to_compute_avrg,
-)
-from wilson_suite.wilson_system.system_data import *
-from wilson_suite.wilson_system.system_data import (
-    _make_hq_states_from_datadict,
-    _make_vibdiff_key,
-    _sys_info_request,
+    eval_non_avrg_per_indexdict,
+    eval_vibenedenom,
+    evaluate_full_index_dict,
+    evaluate_term_coeff_sumover,
+    generate_LHS_motif,
+    get_RHS_motif,
+    otf_vibdiffdenom,
+    solve_LSE_motif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
+    ParameterSet,
     PropsCollection,
-    ResCondKey,
-    ResLocGeoObject,
-    ResonanceCondition,
+    ResLocPoint,
     ResonanceMotif,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+    E0,
+    E01,
+    E1,
+    E0_eigval,
+    E1_eigval,
+    polprop,
+    toy_states,
+    toy_term,
+    vibdiff,
+)
+from wilson_suite.wilson_system.system_data import (
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+    VibStatesData,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 
-def polprop(ops: tuple[int, ...] = (), inds: str = '') -> PolProp:
-    p = PolProp(ops=[QOperator(o=i) for i in ops], dord=len(inds))
-    p.setInds(list(inds))
-    return p
-
-
-def vibdiff(sl: str = '', sr: str = '', pert: bool = False) -> VibDiffTerm:
-    return VibDiffTerm(sl=HarmOscStateSymbolic(list(sl)), sr=HarmOscStateSymbolic(list(sr)), is_pert_wf_diff=pert)
-
-
-def state(label: str, energy: float) -> VibState:
-    return VibState(harm_quanta_coeffs={}, energy=energy, state_label=label)
-
-
-# Two modes; energies in cm-1 chosen so every difference is distinct.
-E0, E1, E01, E00 = 1000., 1500., 2600., 1950.
-E0_eigval, E1_eigval = 1100., 1580.
-
-
 @pytest.fixture
 def states() -> VibStatesData:
-    return VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E01), state('0,0', E00)),
-                         harmonic_osc_states_labels=(0, 1))
+    return toy_states()
 
 
-## ResonanceMotif -----------------------------------------------------------
+## Resonance location: shared motifs -------------------------------------------
 # A motif is a set of resonance conditions  E_left - E_right = sum_j s_j * w_j , one per
 # ResCondKey: `diff` names the two states by quanta labels, `pf` the frequency axes w_j with
 # sign s_j ('-B' -> s = -1). Fixing the mode labels (a, b, ...) to modes turns the motif into
@@ -81,7 +72,7 @@ def params() -> ParameterSet:
     return ParameterSet({'a': 0, 'b': 1})
 
 
-def resonance_residuals(motif: ResonanceMotif, location: ResLocGeoObject, index_dict: dict, states) -> list[float]:
+def resonance_residuals(motif: ResonanceMotif, location: ResLocPoint, index_dict: dict, states) -> list[float]:
     """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py."""
     def energy(quanta):
         label = ','.join(str(i) for i in sorted(index_dict[q] for q in quanta))
@@ -180,9 +171,8 @@ def test_get_RHS_motif_unknown_state_raises(states):
 def test_solve_LSE_motif_cm1(motif, expected, params, states):
     location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1')
 
-    assert isinstance(location, ResLocGeoObject)
-    assert location.is_point()
-    assert location.dims == tuple(sorted(expected))
+    assert isinstance(location, ResLocPoint)
+    assert location.axes == tuple(sorted(expected))
     assert dict(location.coordinates) == pytest.approx(expected)
 
 
@@ -202,7 +192,7 @@ def test_solve_LSE_motif_hartree_is_cm1_converted(params, states):
     in_cm1 = solve_LSE_motif(motif, params, states, unit='cm-1')
     in_eh = solve_LSE_motif(motif, params, states)
 
-    assert in_eh.dims == in_cm1.dims
+    assert in_eh.axes == in_cm1.axes
     assert in_eh.values == pytest.approx(tuple(convNu2Ene(v) for v in in_cm1.values))  # type: ignore
 
 
@@ -221,117 +211,12 @@ def test_solve_LSE_motif_underdetermined_system_raises_linalg_error(params, stat
 def test_solve_LSE_motif_single_axis_other_than_A(params, states):
     location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params, states, unit='cm-1')
 
-    assert location == ResLocGeoObject({'B': -E0})
+    assert location == ResLocPoint({'B': -E0})
 
-
-## solve_LSE_motif: lines and planes ---------------------------------------------
-# With `axes` the spectrum may have more axes than the motif constrains. Unconstrained axes are
-# free ('all'), so the resonance is a line (one free axis), a plane (two), ...
-
-MOTIF_ON_B = ((((), ('a',)), ('B',)),)       # w_B = -E0
-
-
-def assert_location(location: ResLocGeoObject, expected: dict):
-    """Same axes, same free axes, fixed coordinates equal up to lstsq round-off."""
-    assert location.dims == tuple(sorted(expected))
-    assert [ax for ax in location.dims if location[ax] == 'all'] == sorted(ax for ax, v in expected.items() if v == 'all')
-    assert {ax: v for ax, v in location.coordinates if v != 'all'} \
-        == pytest.approx({ax: v for ax, v in expected.items() if v != 'all'})
-
-@pytest.mark.parametrize('motif, axes, expected', [
-    # lines: one free axis
-    (MOTIF_A,     ('A', 'B'),      {'A': E01 - E0, 'B': 'all'}),
-    (MOTIF_ON_B,  ('A', 'B'),      {'A': 'all', 'B': -E0}),
-    (MOTIF_AB,    ('A', 'B', 'C'), {'A': E01 - E0, 'B': E1 - E0, 'C': 'all'}),
-    (MOTIF_MIXED, ('A', 'B', 'C'), {'A': -2 * E0, 'B': -E0, 'C': 'all'}),
-])
-def test_solve_LSE_motif_line(motif, axes, expected, params, states):
-    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1', axes=axes)
-
-    assert location.is_line()
-    assert_location(location, expected)
-
-
-@pytest.mark.parametrize('motif, axes, expected', [
-    (MOTIF_A,    ('A', 'B', 'C'), {'A': E01 - E0, 'B': 'all', 'C': 'all'}),
-    (MOTIF_ON_B, ('A', 'B', 'C'), {'A': 'all', 'B': -E0, 'C': 'all'}),
-    (MOTIF_A,    ('A', 'C', 'D'), {'A': E01 - E0, 'C': 'all', 'D': 'all'}),     # axis labels need not be contiguous
-])
-def test_solve_LSE_motif_plane(motif, axes, expected, params, states):
-    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1', axes=axes)
-
-    assert location.is_plane()
-    assert_location(location, expected)
-
-
-@pytest.mark.parametrize('motif, axes', [
-    (MOTIF_A,     ('A', 'B')),
-    (MOTIF_MIXED, ('A', 'B', 'C')),
-    (MOTIF_ON_B,  ('A', 'B', 'C')),
-])
-def test_solve_LSE_motif_line_and_plane_satisfy_every_condition(motif, axes, params, states):
-    """Free axes do not enter any condition, so the fixed coordinates alone must satisfy them."""
-    res_motif = ResonanceMotif.from_tuples(motif)
-
-    location = solve_LSE_motif(res_motif, params, states, unit='cm-1', axes=axes)
-
-    assert location.dims == tuple(sorted(axes))
-    assert resonance_residuals(res_motif, location, params.to_dict(), states) == pytest.approx([0.] * len(res_motif))
-
-
-def test_solve_LSE_motif_axes_equal_to_motif_axes_is_the_default(params, states):
-    motif = ResonanceMotif.from_tuples(MOTIF_MIXED)
-
-    assert solve_LSE_motif(motif, params, states, axes=('B', 'A')) == solve_LSE_motif(motif, params, states)
-
-
-def test_solve_LSE_motif_hartree_keeps_free_axes(params, states):
-    motif = ResonanceMotif.from_tuples(MOTIF_A)
-
-    in_eh = solve_LSE_motif(motif, params, states, axes=('A', 'B', 'C'))
-
-    assert in_eh['A'] == pytest.approx(convNu2Ene(E01 - E0))
-    assert in_eh['B'] == in_eh['C'] == 'all'
-
-
-def test_solve_LSE_motif_axes_missing_a_motif_axis_raises(params, states):
-    with pytest.raises(ValueError):
-        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_AB), params, states, axes=('A', 'C'))
-
-
-def test_solve_LSE_motif_diagonal_line_raises_even_with_extra_axes(params, states):
-    """w_A + w_B = const is a line, but not one ResLocGeoObject can hold: A and B are both
-    constrained yet neither is fixed. An extra free axis C does not change that."""
-    motif = ResonanceMotif.from_tuples(((((), ('a',)), ('A', 'B')),))
-
-    with pytest.raises(np.linalg.LinAlgError, match='not a point'):
-        solve_LSE_motif(motif, params, states, axes=('A', 'B', 'C'))
-
-
-def test_solve_LSE_motif_inconsistent_raises_even_with_extra_axes(params, states):
-    with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
-        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states, axes=('A', 'B'))
 
 def test_solve_LSE_motif_empty_motif_raises(params, states):
     with pytest.raises(ValueError, match='no resonance conditions'):
         solve_LSE_motif(ResonanceMotif(()), params, states)
-
-
-## DATA REQUEST
-
-## DATA REQUEST -------------------------------------------------------------
-# The request is a {trivial_name: DataOriginInfo} list of what to fetch: one entry per
-# averaged and non-averaged property of the term (named by prop_trivname(dord, len(ops))),
-# plus the fixed system-info keys that MolSystemData.from_datadict needs.
-
-SYS_INFO_KEYS = {'anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'normal_modes',
-                 'atoms', 'equilibrium_geometry'}
-ORIGIN = DataOriginInfo(source_type='cfour', lvl_theory='CCSD(T)', basis_set='ANO0')
-
-
-def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
-    return CompiledTerm(PropsCollection(list(avrg)), PropsCollection(list(non_avrg)),
-                        ResonanceMotif(()), FreqTermsCollection([]), 1., idx_summ=(), idx_nonsumm=())
 
 
 ## Evaluation kernels -------------------------------------------------------
@@ -423,19 +308,10 @@ def test_eval_vibenedenom_reads_precomputed_tensor():
 @pytest.fixture
 def term_and_precalc():
     """
-    0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a ; sum over b, c ; a fixed.
+    toy_term() plus its precalculated <polgrad>[a] tensor (see helpers.toy_term).
     """
-    avrg = polprop(ops=(0, 1), inds='a')
-    term = CompiledTerm(
-        avrg_props=PropsCollection([avrg]),
-        non_avrg_props=PropsCollection([polprop(inds='abc')]),
-        cmp_resmotf=ResonanceMotif(()),
-        cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)]),
-        frac_factor=0.5,
-        idx_summ=('b', 'c'),
-        idx_nonsumm=('a',),
-    )
-    avrg_key = PropsCollection([avrg])
+    term = toy_term()
+    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])   # equal by value to term.avrg_props
     pre = PrecalculatedData(avrg_tensors={avrg_key: POLGRAD_AVRG},
                             avrg_expr_tensor_mapping={avrg_key: avrg_key},
                             vibenedenoms_tensors=None)  # None -> harmonic denominator on the fly # type: ignore
