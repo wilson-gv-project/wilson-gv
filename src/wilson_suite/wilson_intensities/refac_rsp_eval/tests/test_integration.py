@@ -152,7 +152,12 @@ def test_evaluate_term():
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
-    avrg_func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_vec=(1.,1.,1.))
+    
+    from wilson_suite.wilson_intensities.amplitudes.averaging import (
+        getGeneralPolarizationAveragingExpression,
+    )
+    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
+    avrg_func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=polarization_linear_comb)
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
                                                  molsys_data=molsys,
@@ -185,6 +190,6 @@ def test_evaluate_term():
     print(contribs)
 
     results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None, 
-                                   molsys_data=molsys, polarization_vec=(1.,1.,1.))
+                                   molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
     print(results)
 

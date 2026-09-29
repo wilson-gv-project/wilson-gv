@@ -62,7 +62,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                         #  relevant_indices: list[dict],
                          idx_dict: dict,
                          molsys_data: 'MolSystemData',
-                         polarization_vec: tuple | None = None,
+                         polarization_linear_comb: dict | None = None,
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18):
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
@@ -74,10 +74,10 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
     # only needed when the avrg value isn't looked up from a precalculated tensor
     avrg_func = None
     if precalculated_data is None or compl_term.avrg_props not in precalculated_data.avrg_expr_tensor_mapping:
-        if polarization_vec is None:
+        if polarization_linear_comb is None:
             raise ValueError('polarization_vec is required when the avrg tensor is not precalculated')
         avrg_func = _make_func_to_compute_avrg(avrg_expression=compl_term.avrg_props,
-                                               polarization_vec=polarization_vec)
+                                               polarization_linear_comb=polarization_linear_comb)
 
     def sum_over(index_dict: dict, remaining: list, leaves: dict) -> float:
         if not remaining:
@@ -255,21 +255,13 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
 
 def _make_func_to_compute_avrg(*,
                               avrg_expression: 'PropsCollection',
-                              polarization_vec: tuple) -> Callable[[dict, 'MolPropsCollection'], float]:
+                              polarization_linear_comb: dict
+                              ) -> Callable[[dict, 'MolPropsCollection'], float]:
     """
     for an expression with properties data values,
     compute average with given polarization setup for a choice of normal mode indices
 
-    FIXME: input polarization_linear_comb - as dict (would enable no averaging)
     """
-    num_pulses = len(avrg_expression.get_cart_axes())  # should this be a set?
-
-    from wilson_suite.wilson_intensities.amplitudes.averaging import (
-        getGeneralPolarizationAveragingExpression,
-    )
-
-    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank = num_pulses,
-                                                                        laser_pol = polarization_vec)
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
         """
@@ -325,7 +317,7 @@ def _make_func_to_compute_avrg(*,
 def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
                           props_data: 'MolPropsCollection',
                           number_of_nmodes: int,
-                          polarization_vec: tuple = (),
+                          polarization_linear_comb: dict | None = None,
                           modes_to_fill: list[int] | None = None) -> np.ndarray:
     """
     Precalculating the full tensor for given avrg_expression
@@ -334,6 +326,8 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
         modes_to_fill: list[int] = list(range(number_of_nmodes))
 
     """
+    if polarization_linear_comb is None:
+        polarization_linear_comb = {}
     if modes_to_fill is None:
         modes_to_fill = list(range(number_of_nmodes))
     if max(modes_to_fill) >= number_of_nmodes:
@@ -351,7 +345,7 @@ def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
 
     # Indicating generalized version for updating
     func_general = _make_func_to_compute_avrg(avrg_expression=avrg_expression,
-                                              polarization_vec=polarization_vec)
+                                              polarization_linear_comb=polarization_linear_comb)
 
     full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
 
