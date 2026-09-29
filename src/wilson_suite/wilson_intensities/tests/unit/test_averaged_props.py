@@ -344,11 +344,6 @@ def test_precalculate_avrg_tensor_focused():
     print(avrg_expr3)
     print(np.transpose(np.nonzero(t7)))
 
-    num_pulses = len(avrg_expr1.get_cart_axes())
-    polarization = 'ZZZZ'
-
-    from wilson_suite.wilson_intensities.amplitudes.averaging import getPolarizationAveragingExpression
-    polarization_avrg_terms, prefactor = getPolarizationAveragingExpression(num_pulses=num_pulses, polarization=polarization)
 
 
 polhess_ab03 = wd_abst.PolProp(ops=[wd_abst.QOperator(o=0), wd_abst.QOperator(o=3)], dord=2)
