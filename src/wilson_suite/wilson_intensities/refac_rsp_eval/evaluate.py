@@ -711,6 +711,8 @@ def _make_func_to_compute_avrg(*,
     """
     for an expression with properties data values,
     compute average with given polarization setup for a choice of normal mode indices
+
+    FIXME: input polarization_linear_comb - as dict (would enable no averaging)
     """
     num_pulses = len(avrg_expression.get_cart_axes())  # should this be a set?
 

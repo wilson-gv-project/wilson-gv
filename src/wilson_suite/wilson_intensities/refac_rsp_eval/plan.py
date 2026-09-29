@@ -416,8 +416,7 @@ class ResLocGeoObject:
 
     Examples:
         Point:      (('A', 1864.0), ('B', 900.0))
-        Line:       (('A', 1864.0), ('B', 'all'))
-        Plane:      (('A', 'all'), ('B', 'all'), ('C', 1200.0))
+
     """
     def __init__(self, coord_dict: dict[str, CoordValue]):
         self._coord_dict = coord_dict
@@ -483,6 +482,8 @@ class CompiledTerm:
 
     full = 1.num_fact * 2.(avrg_props * nonavrg_props) * 3.freq_denom * 4.res_motf
         cmp_props = (avrg_props * nonavrg_props)
+    
+    TODO: RAISE ERROR IF RES MOTIFS HAVE VARYING NUMBER OF VARIABLES(AXES)
     """
     avrg_props: PropsCollection
     non_avrg_props: PropsCollection
@@ -496,7 +497,11 @@ class CompiledTerm:
 
     @classmethod
     def from_VibPertTerm(cls, term: 'VibPerturbedTerm') -> 'CompiledTerm':
+        """
+        VibPerturbedTerm - in axes.
 
+        TODO: enable possibility of missing parts
+        """
         frac_factor = float(term.coeff)
         freq_denom = FreqTermsCollection(term.freqterms) # states
         res_conds = ResonanceMotif.from_conditions(term.res) # states

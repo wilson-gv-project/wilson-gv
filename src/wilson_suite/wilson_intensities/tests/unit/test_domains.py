@@ -22,6 +22,11 @@ def test_find_domain_groups_by_distance():
     assert len(groups1) == 3
     assert len(groups2) == 4
 
+    points = [(1., 3., 2., 4.), (5., 11., 2., 4.), (4., 2., 2., 4.), (12., 6., 2., 4.), (8., 2., 2., 4.), (11., 4., 2., 4.)]
+    groups1 = domains.find_points_clusters_by_distance(points, distance_thresholds={'A': 4., 'B': 4., 'C': 4., 'D': 4.}, linkage='single')
+    groups2 = domains.find_points_clusters_by_distance(points, distance_thresholds={'A': 4., 'B': 4., 'C': 4., 'D': 4.}, linkage='ward')
+    assert len(groups1) == 3
+    assert len(groups2) == 4
 
 def test_find_domain_distance_threshold():
     print()
