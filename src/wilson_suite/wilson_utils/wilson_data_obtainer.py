@@ -1,4 +1,4 @@
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import DataOriginInfo
+from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 # from wilson_suite.wilson_main.abstractions import DataOriginInfo
 

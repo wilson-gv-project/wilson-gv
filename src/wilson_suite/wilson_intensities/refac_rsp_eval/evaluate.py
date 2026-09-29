@@ -21,6 +21,7 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolPropsCollection,
     VibDiff,
+    MolSystemData,
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -229,7 +230,7 @@ def _get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollectio
 def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
                             index_dict: dict, *,
                             avrg_func: Callable | None = None,
-                            molsys_data: 'MolSystemData' | None = None,
+                            molsys_data: MolSystemData | None = None,
                             precalculated_data: PrecalculatedData | None = None,
                             zero_tol: float = 1e-18):
     """
