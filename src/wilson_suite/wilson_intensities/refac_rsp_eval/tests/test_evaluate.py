@@ -368,7 +368,7 @@ def test_solve_LSE_motif_single_axis_other_than_A(params, states):
 # With `axes` the spectrum may have more axes than the motif constrains. Unconstrained axes are
 # free ('all'), so the resonance is a line (one free axis), a plane (two), ...
 
-MOTIF_ON_B = ((((), ('a',)), ('B',)),)                                          # w_B = -E0
+MOTIF_ON_B = ((((), ('a',)), ('B',)),)       # w_B = -E0
 
 
 def assert_location(location: ResLocGeoObject, expected: dict):

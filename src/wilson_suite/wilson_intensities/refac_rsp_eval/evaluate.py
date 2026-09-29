@@ -979,6 +979,14 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 6. evaluating `term res cond - res location`    [res loc]       []
 7. evaluating `term res cond - on the grid`     [res loc]       []
 
+---------
+ResonanceMotif + ParameterSet + VibStatesData ==> ResLocGeoObject
+
+iterate over:
+    1. Sequence[ResonanceMotif]
+    2. Sequence[ParameterSet] for one ResonanceMotif
+
+
 """
 
 """
