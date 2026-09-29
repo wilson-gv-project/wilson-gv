@@ -57,6 +57,10 @@ The data then passes through these steps:
 4. evaluate               read mol_props['polgrad'].vals[mode, i, j]   evaluate.py:725 (averaged)                                                                       evaluate.py:618 (non-averaged)
 """
 
+## ----------------------------------------------------
+##          coefficient per index set/ParameterSet
+## ----------------------------------------------------
+
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: SUM OVER SET
 def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                         #  relevant_indices: list[dict],
@@ -402,7 +406,10 @@ def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_da
         raise ValueError("molsys_data.eigenvals is None")
 
 
-## ----------------------------------------------------
+## ----------------------------------------------------------------
+##          resonanace on freq grid per index set/ParameterSet
+## ----------------------------------------------------------------
+
 
 def generate_LHS_motif(motif: 'ResonanceMotif',
                        axes: Iterable[str] | None = None) -> tuple[np.ndarray, tuple[str, ...]]:
@@ -501,6 +508,18 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
     return ResLocPoint({ax: float(val) for ax, val in zip(all_axes, solution)})
 
 
+## ------------------------------------------------------------------
+##          loops over collections [terms,index sets,res motifs]
+## ------------------------------------------------------------------
+
+from wilson_suite.wilson_intensities.amplitudes.utils import (
+    generate_index_choices_general,
+)
+
+# mode_inds = sorted(set(avrg_expression.get_mode_indices()))
+
+# ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
+
 
 """
 1. compiled terms
@@ -508,7 +527,7 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 3. molsys data
 4. evaluating `term coeff parts` per index set  [eval coeff]    [x]
 5. evaluating `term coeff full` per index set   [eval coeff]    [x]
-6. evaluating `term res cond - res location`    [res loc]       []
+6. evaluating `term res cond - res location`    [res loc]       [x]
 7. evaluating `term res cond - on the grid`     [res loc]       []
 
 ---------
@@ -518,14 +537,5 @@ iterate over:
     1. Sequence[ResonanceMotif]
     2. Sequence[ParameterSet] for one ResonanceMotif
 
-
 """
 
-"""
-The data then passes through these steps:
-
-1. build the request      "please fetch 'polgrad' from CFOUR"          plan.py:158
-2. obtainer returns       data_dict = {'polgrad': array, ...}
-3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot   (slot name from from_polprop, evaluate.py:423)
-4. evaluate               read mol_props['polgrad'].vals[mode, i, j]   evaluate.py:725 (averaged)                                                                       evaluate.py:618 (non-averaged)
-"""
