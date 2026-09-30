@@ -3,6 +3,8 @@ evaluate.py — the numeric stage. Everything here is built by hand from tiny ar
 no VibPerturbedTerm, no data files.
 """
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -10,13 +12,16 @@ import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     PrecalculatedData,
     _get_ind_tuple_from_base,
+    coefficient_compute_loop,
     eval_non_avrg_per_indexdict,
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     generate_LHS_motif,
     get_RHS_motif,
+    make_idx_sets,
     otf_vibdiffdenom,
+    resonance_compute_loop,
     solve_LSE_motif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -29,6 +34,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0,
+    E00,
     E01,
     E1,
     E0_eigval,
@@ -68,9 +74,12 @@ MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           #
 
 
 @pytest.fixture
-def params() -> ParameterSet:
-    return ParameterSet({'a': 0, 'b': 1})
+def params() -> dict:
+    return {'a': 0, 'b': 1}
 
+@pytest.fixture
+def params_obj() -> ParameterSet:
+    return ParameterSet({'a': 0, 'b': 1})
 
 def resonance_residuals(motif: ResonanceMotif, location: ResLocPoint, index_dict: dict, states) -> list[float]:
     """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py."""
@@ -132,17 +141,17 @@ def test_generate_LHS_motif_ignores_states():
     (MOTIF_MIXED,   [E0, E0]),                    # -(E_0 - E_a)
     (MOTIF_B_TWICE, [E0, -(E1 - E0)]),
 ])
-def test_get_RHS_motif_cm1(motif, expected_cm1, params, states):
-    rhs = get_RHS_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1')
+def test_get_RHS_motif_cm1(motif, expected_cm1, params_obj, states):
+    rhs = get_RHS_motif(ResonanceMotif.from_tuples(motif), params_obj, states, unit='cm-1')
 
     assert rhs == pytest.approx(expected_cm1)
 
 
-def test_get_RHS_motif_defaults_to_hartree(params, states):
+def test_get_RHS_motif_defaults_to_hartree(params_obj, states):
     motif = ResonanceMotif.from_tuples(MOTIF_AB)
 
-    assert get_RHS_motif(motif, params, states) == get_RHS_motif(motif, params, states, unit='Eh')
-    assert get_RHS_motif(motif, params, states) == pytest.approx([convNu2Ene(-(E01 - E0)), convNu2Ene(-(E1 - E0))])
+    assert get_RHS_motif(motif, params_obj, states) == get_RHS_motif(motif, params_obj, states, unit='Eh')
+    assert get_RHS_motif(motif, params_obj, states) == pytest.approx([convNu2Ene(-(E01 - E0)), convNu2Ene(-(E1 - E0))])
 
 
 def test_get_RHS_motif_follows_the_mode_assignment(states):
@@ -168,8 +177,8 @@ def test_get_RHS_motif_unknown_state_raises(states):
     (MOTIF_A,     {'A': E01 - E0}),
     (MOTIF_MIXED, {'A': -2 * E0, 'B': -E0}),     # w_B = -E0 ; w_A - w_B = -E0
 ])
-def test_solve_LSE_motif_cm1(motif, expected, params, states):
-    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params, states, unit='cm-1')
+def test_solve_LSE_motif_cm1(motif, expected, params_obj, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(motif), params_obj, states, unit='cm-1')
 
     assert isinstance(location, ResLocPoint)
     assert location.axes == tuple(sorted(expected))
@@ -177,39 +186,39 @@ def test_solve_LSE_motif_cm1(motif, expected, params, states):
 
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_solve_LSE_motif_location_satisfies_every_condition(motif, params, states):
+def test_solve_LSE_motif_location_satisfies_every_condition(motif, params_obj, states):
     """Independent check: plug the solution back into  E_left - E_right = sum_j s_j w_j ."""
     res_motif = ResonanceMotif.from_tuples(motif)
 
-    location = solve_LSE_motif(res_motif, params, states, unit='cm-1')
+    location = solve_LSE_motif(res_motif, params_obj, states, unit='cm-1')
 
-    assert resonance_residuals(res_motif, location, params.to_dict(), states) == pytest.approx([0.] * len(res_motif))
+    assert resonance_residuals(res_motif, location, params_obj.to_dict(), states) == pytest.approx([0.] * len(res_motif))
 
 
-def test_solve_LSE_motif_hartree_is_cm1_converted(params, states):
+def test_solve_LSE_motif_hartree_is_cm1_converted(params_obj, states):
     motif = ResonanceMotif.from_tuples(MOTIF_MIXED)
 
-    in_cm1 = solve_LSE_motif(motif, params, states, unit='cm-1')
-    in_eh = solve_LSE_motif(motif, params, states)
+    in_cm1 = solve_LSE_motif(motif, params_obj, states, unit='cm-1')
+    in_eh = solve_LSE_motif(motif, params_obj, states)
 
     assert in_eh.axes == in_cm1.axes
     assert in_eh.values == pytest.approx(tuple(convNu2Ene(v) for v in in_cm1.values))  # type: ignore
 
 
-def test_solve_LSE_motif_inconsistent_system_raises_linalg_error(params, states):
+def test_solve_LSE_motif_inconsistent_system_raises_linalg_error(params_obj, states):
     """MOTIF_B_TWICE asks w_B = -E0 and w_B = E1 - E0 at once: no resonance location exists."""
     with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
-        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params, states)
+        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_B_TWICE), params_obj, states)
 
 
-def test_solve_LSE_motif_underdetermined_system_raises_linalg_error(params, states):
+def test_solve_LSE_motif_underdetermined_system_raises_linalg_error(params_obj, states):
     """One condition on A + B: the resonance is a line, not a point."""
     with pytest.raises(np.linalg.LinAlgError, match='not a point'):
-        solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('A', 'B')),)), params, states)
+        solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('A', 'B')),)), params_obj, states)
 
 
-def test_solve_LSE_motif_single_axis_other_than_A(params, states):
-    location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params, states, unit='cm-1')
+def test_solve_LSE_motif_single_axis_other_than_A(params_obj, states):
+    location = solve_LSE_motif(ResonanceMotif.from_tuples(((((), ('a',)), ('B',)),)), params_obj, states, unit='cm-1')
 
     assert location == ResLocPoint({'B': -E0})
 
@@ -217,6 +226,53 @@ def test_solve_LSE_motif_single_axis_other_than_A(params, states):
 def test_solve_LSE_motif_empty_motif_raises(params, states):
     with pytest.raises(ValueError, match='no resonance conditions'):
         solve_LSE_motif(ResonanceMotif(()), params, states)
+
+
+## resonance_compute_loop -----------------------------------------------------
+# One solve_LSE_motif call per index set (always in Eh), results keyed by ParameterSet.
+
+SWAPPED = {'a': 1, 'b': 0}
+SWAPPED_obj = ParameterSet({'a': 1, 'b': 0})
+
+
+def test_resonance_compute_loop_one_location_per_index_set(params, params_obj, states):
+    motif = ResonanceMotif.from_tuples(MOTIF_AB)
+
+    results = resonance_compute_loop([params, SWAPPED], motif, states)
+
+    assert set(results) == {params_obj, SWAPPED_obj}
+    assert results[params_obj] == solve_LSE_motif(motif, params_obj, states)
+    assert results[SWAPPED_obj] == solve_LSE_motif(motif, SWAPPED_obj, states)
+
+
+def test_resonance_compute_loop_locations_follow_the_mode_assignment(params, params_obj, states):
+    """Same motif, a and b swapped -> different resonance points. Hand values in cm-1, the loop returns Eh."""
+    results = resonance_compute_loop([params, SWAPPED], ResonanceMotif.from_tuples(MOTIF_AB), states)
+
+    assert dict(results[params_obj].coordinates) == pytest.approx({'A': convNu2Ene(E01 - E0), 'B': convNu2Ene(E1 - E0)})
+    assert dict(results[SWAPPED_obj].coordinates) == pytest.approx({'A': convNu2Ene(E01 - E1), 'B': convNu2Ene(E0 - E1)})
+
+
+def test_resonance_compute_loop_no_index_sets_gives_empty_dict(states):
+    assert resonance_compute_loop([], ResonanceMotif.from_tuples(MOTIF_AB), states) == {}
+
+
+def test_resonance_compute_loop_accepts_make_idx_sets_output(states):
+    """make_idx_sets gives plain dicts; results are still keyed by ParameterSet, as in evaluate_term_coeff_sumover."""
+    idx_sets = make_idx_sets(2, ['a'])           # [{'a': 0}, {'a': 1}]
+
+    results = resonance_compute_loop(idx_sets, ResonanceMotif.from_tuples(MOTIF_MIXED), states)
+
+    # w_B = -E_a ; w_A - w_B = -E_a
+    assert set(results) == {ParameterSet({'a': 0}), ParameterSet({'a': 1})}
+    assert dict(results[ParameterSet({'a': 0})].coordinates) == pytest.approx({'A': convNu2Ene(-2 * E0), 'B': convNu2Ene(-E0)})
+    assert dict(results[ParameterSet({'a': 1})].coordinates) == pytest.approx({'A': convNu2Ene(-2 * E1), 'B': convNu2Ene(-E1)})
+
+
+def test_resonance_compute_loop_missing_state_raises(params, params_obj, states):
+    """a=b=1 needs state '1,1', which `states` lacks: the whole loop raises, the set is not skipped."""
+    with pytest.raises(ValueError):
+        resonance_compute_loop([params, {'a': 1, 'b': 1}], ResonanceMotif.from_tuples(MOTIF_A), states)
 
 
 ## Evaluation kernels -------------------------------------------------------
@@ -376,9 +432,12 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
                         idx_summ=('b', 'c'), idx_nonsumm=('a',))
 
-    results = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, polarization_vec=(1.,1.,1.))
+    from wilson_suite.wilson_intensities.amplitudes.averaging import (
+        getGeneralPolarizationAveragingExpression,
+    )
+    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
+    total, leaves = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
 
-    total, leaves = results[ParameterSet(fixed)]
     assert total == expected_total
     assert {tuple(leaf[k] for k in 'abc') for leaf in leaves} == expected_leaves
 
@@ -399,12 +458,130 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     """
     term, pre = term_and_precalc
 
-    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys)
-
-    total, leaves = results[ParameterSet({'a': 0})]
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys)
 
     per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18)
                 for leaf in leaves}
     assert len(leaves) == 4             # b, c in {0, 1}
     assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))
     assert leaves == {leaf: contribs for leaf, (_, contribs) in per_leaf.items()}
+
+
+def test_evaluate_term_coeffs_hand_computed_total(term_and_precalc, molsys):
+    """
+    a=0, sum over b, c of  0.5 * cff[0,b,c] * <polgrad>[0] * 1/(E_0b - E_0) * 1/omega_0 .
+    c enters only cff, so the two c values are added first; b picks state '0,0' or '0,1'.
+    """
+    term, pre = term_and_precalc
+
+    total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys)
+
+    by_b = ((CFF[0, 0, 0] + CFF[0, 0, 1]) / convNu2Ene(E00 - E0)
+            + (CFF[0, 1, 0] + CFF[0, 1, 1]) / convNu2Ene(E01 - E0))
+    assert total == pytest.approx(0.5 * POLGRAD_AVRG[0] / convNu2Ene(E0_eigval) * by_b)
+
+
+def test_evaluate_term_coeffs_on_the_fly_avrg_matches_precalculated(term_and_precalc, molsys):
+    """
+    No precalculated tensor -> <polgrad>[a] is built from polarization_linear_comb and the raw
+    'polgrad' data:  <polgrad>[a] = sum over (i, j) of coeff_ij * polgrad[a, i, j] .
+    polgrad is chosen so that this gives POLGRAD_AVRG again (4 + 2*3 = 10, 8 + 2*6 = 20);
+    every other entry is 100, so reading a wrong cartesian slot changes the result.
+    """
+    term, pre = term_and_precalc
+    polgrad = np.full((2, 3, 3), 100.)
+    polgrad[:, 0, 0] = [4., 8.]
+    polgrad[:, 1, 1] = [3., 6.]
+    props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
+    molsys = replace(molsys, mol_props=props)
+
+    precalc_total, precalc_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
+                                                                precalculated_data=pre)
+    otf_total, otf_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
+                                                        polarization_linear_comb={(0, 0): 1., (1, 1): 2.})
+
+    assert otf_total == pytest.approx(precalc_total)
+    assert set(otf_leaves) == set(precalc_leaves)
+    assert all(otf_leaves[leaf]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for leaf in otf_leaves)
+
+
+@pytest.mark.parametrize('pre', [None, PrecalculatedData()], ids=['no precalculated data', 'avrg not in mapping'])
+def test_evaluate_term_coeffs_needs_polarization_when_avrg_not_precalculated(pre, molsys):
+    with pytest.raises(ValueError, match='polarization_vec is required'):
+        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, precalculated_data=pre)
+
+
+def test_evaluate_term_coeffs_needs_eigenvals(term_and_precalc, molsys):
+    """The number of modes to sum over is len(eigenvals); without eigenvals there is nothing to sum over."""
+    term, pre = term_and_precalc
+
+    with pytest.raises(ValueError, match='eigenvals'):
+        evaluate_term_coeff_sumover(term, {'a': 0}, replace(molsys, eigenvals=None), precalculated_data=pre)
+
+
+def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_precalc, molsys, monkeypatch):
+    """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 leaves."""
+    monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_: (1., {}))
+    term, pre = term_and_precalc
+    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
+
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, precalculated_data=pre)
+
+    assert total == 9.
+    assert {(leaf['b'], leaf['c']) for leaf in leaves} == {(b, c) for b in range(3) for c in range(3)}
+
+
+def test_evaluate_term_coeffs_zero_avrg_leaves_are_kept(molsys):
+    """
+    <polgrad>[1] = 0 -> every leaf with a=1 stops right after AVRG. The leaves are still recorded,
+    with only the AVRG entry. The states a=1 would need ('1,1' is missing) are never looked up.
+    """
+    term = toy_term()
+    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])
+    pre = PrecalculatedData(avrg_tensors={avrg_key: np.array([10., 0.])},
+                            avrg_expr_tensor_mapping={avrg_key: avrg_key})
+
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 1}, molsys, precalculated_data=pre)
+
+    assert total == 0.
+    assert len(leaves) == 4
+    assert all(contribs == {'AVRG': 0.} for contribs in leaves.values())
+
+
+def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
+    """
+    Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print).
+    Currently: {ParameterSet(idx_dict): (total, {ParameterSet(full idx): contribs})}, one key only.
+    """
+    term, pre = term_and_precalc
+    ps = ParameterSet({'a': 0, 'b': 0})
+
+    result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, precalculated_data=pre)
+
+    from pprint import pprint
+    pprint(result)
+
+    total, leaves = result
+    assert isinstance(total, float)
+    assert set(leaves) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
+    assert all(set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'} for contribs in leaves.values())
+
+
+## coefficient_compute_loop ---------------------------------------------------
+
+def test_coefficient_compute_loop_result_shape(term_and_precalc, molsys):
+    """
+    Shows the shape of one loop entry (run with -s to see the print).
+    Currently the key appears twice: results[ps][ps] == (total, leaves).
+    """
+    term, pre = term_and_precalc
+    ps = ParameterSet({'a': 0, 'b': 0})
+
+    results = coefficient_compute_loop([{'a': 0, 'b': 0}], term, molsys, None, pre)
+
+    from pprint import pprint
+    pprint(results)
+
+    entry = results[ps]
+    _total, leaves = entry
+    assert len(leaves) == 2              # c in {0, 1}

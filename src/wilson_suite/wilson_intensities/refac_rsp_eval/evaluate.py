@@ -7,7 +7,7 @@
 ==> list[SpectralFeature]
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -63,12 +63,20 @@ The data then passes through these steps:
 
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: SUM OVER SET
 def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
-                        #  relevant_indices: list[dict],
                          idx_dict: dict,
                          molsys_data: 'MolSystemData',
                          polarization_linear_comb: dict | None = None,
                          precalculated_data: PrecalculatedData | None = None,
-                         zero_tol: float = 1e-18):
+                         zero_tol: float = 1e-18) -> tuple[float, dict]:
+    """
+    The call {'a': 0} sums over b and c. The result adds up peaks at different positions into one number, with no error.
+
+    not_fixed = [i for i in compl_term.nonsumm_idx if i not in idx_dict]
+    if not_fixed:
+        raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
+    to_sum = [i for i in compl_term.summ_idx if i not in idx_dict]
+    """
+
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
     if molsys_data.eigenvals is not None:
@@ -94,23 +102,10 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
             return value
         current, rest = remaining[0], remaining[1:]
         return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
-
-    """
-    The call {'a': 0} sums over b and c. The result adds up peaks at different positions into one number, with no error.
-
-    not_fixed = [i for i in compl_term.nonsumm_idx if i not in idx_dict]
-    if not_fixed:
-        raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
-    to_sum = [i for i in compl_term.summ_idx if i not in idx_dict]
-
-    """
-    # results = {}
-    # for index_dict in relevant_indices:
+    
     missing = [i for i in term_idx_all if i not in idx_dict]
     leaves = {}
-    # results[ParameterSet(index_dict)] = (sum_over(index_dict, missing, leaves), leaves)
-
-    return {ParameterSet(idx_dict): (sum_over(idx_dict, missing, leaves), leaves)}
+    return sum_over(idx_dict, missing, leaves), leaves
 
 
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: FULL INDEX SET
@@ -512,14 +507,49 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 ##          loops over collections [terms,index sets,res motifs]
 ## ------------------------------------------------------------------
 
-from wilson_suite.wilson_intensities.amplitudes.utils import (
-    generate_index_choices_general,
-)
+def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
+    """
+    n_modes - number of normal modes
+    mode_labels = sorted(set(avrg_expression.get_mode_indices()))
+    """
+    # all possible labels - tuple(range(n_modes))
+    nm_inds_choices = tuple(range(n_modes))
 
-# mode_inds = sorted(set(avrg_expression.get_mode_indices()))
+    import itertools
+    return [dict(zip(mode_labels, combo)) for combo in itertools.product(nm_inds_choices, repeat=len(mode_labels))]
 
-# ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, labels=nm_inds_choices)
 
+def coefficient_compute_loop(ids_sets: list[dict[str, int]], 
+                                 term: 'CompiledTerm', molsys_data: MolSystemData,
+                                 polarization_linear_comb: dict | None=None, 
+                                 precalculated_data: PrecalculatedData | None=None) -> dict:
+    
+    results = {}
+    for idxset in ids_sets:
+        coeff_evals = evaluate_term_coeff_sumover(term, idxset, molsys_data, 
+                                                  polarization_linear_comb, precalculated_data)
+        results[ParameterSet(idxset)] = coeff_evals
+    
+    return results
+
+
+def resonance_compute_loop(ids_sets: list[dict[str, int]], 
+                               motif: 'ResonanceMotif', 
+                               vibstates_data: 'VibStatesData') -> dict:
+    
+    results = {}
+    for idxset in ids_sets:
+        coeff = solve_LSE_motif(motif, ParameterSet(idxset), vibstates_data)
+        results[ParameterSet(idxset)] = coeff
+    
+    return results
+
+
+
+
+"""
+coefficient should be attached to resonance with the same ParameterSet
+"""
 
 """
 1. compiled terms
