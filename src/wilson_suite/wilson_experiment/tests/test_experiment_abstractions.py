@@ -284,9 +284,9 @@ def test_electric_field():
 
     # Simple 3-pulse field
 
-    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=1)
-    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=2)
-    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=3)
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=1)
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=2)
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=3)
 
     from math import inf as infinity
     pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1)
@@ -308,15 +308,20 @@ def test_electric_field():
     assert field.impulsive_field
     assert not(field.cw_field)
 
+    v_int = field.overlapping_pulses()
+
+    # All pulse subsets should overlap in time here
+    assert v_int == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
+
     # Identifiers in sequence but don't start at 1
     with pytest.raises(ValueError):
-        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=0)
+        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0)
         pulses_bogus = (pulse_0, pulse_a, pulse_b)
         field_bogus = ElectricField(pulses_bogus)
 
     # Identifiers start at 1 but not in sequence
     with pytest.raises(ValueError):
-        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=0.072, id=0)
+        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0)
         pulses_bogus = (pulse_a, pulse_b, pulse_d)
         field_bogus = ElectricField(pulses_bogus)
 
@@ -325,17 +330,48 @@ def test_electric_field():
     field_cw = ElectricField(pulses_cw)
     assert field_cw.cw_field
 
+    v_int_cw = field_cw.overlapping_pulses()
+
+    # Again, all pulses should overlap
+    assert v_int_cw == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
+
     # Mixes of impulsive, continuous and neither-type fields, should flag field as neither cw nor impulsive
     pulses_mix_1 = (pulse_cw_a, pulse_cw_b, pulse_c)
     field_mix_1 = ElectricField(pulses_mix_1)
     assert not(field_mix_1.cw_field)
     assert not(field_mix_1.impulsive_field)
 
+    v_int_mix = field_mix_1.overlapping_pulses()
+
+    # Yet again, all pulses should overlap
+    assert v_int_mix == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
+
     pulses_mix_2 = (pulse_cw_a, pulse_b, pulse_mix_c)
     field_mix_2 = ElectricField(pulses_mix_2)
     assert not(field_mix_2.cw_field)
     assert not(field_mix_2.impulsive_field)
 
+    # More general case: Complicated overlap configurations
+    pulse_gen_a = EmPulse(env='gaussian', tc=120.0, dev=20.0, cf=0.072, id=3)
+    pulse_gen_b = EmPulse(env='gaussian', dev=infinity, cf=0.0, id=1)
+    pulse_gen_c = EmPulse(env='gaussian', tc=300.01, dev=20.0, cf=0.02, id=2)
+    pulse_gen_d = EmPulse(env='gaussian', tc=20.0, dev=0.0, cf=0.072, id=4)
+    pulse_gen_e = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.07, id=6)
+    pulse_gen_f = EmPulse(env='gaussian', tc=230.0, dev=30.0, cf=0.02, id=5)
+
+    field_gen = ElectricField((pulse_gen_a, pulse_gen_b, pulse_gen_c, pulse_gen_d, pulse_gen_e, pulse_gen_f))
+
+    v_int_gen = field_gen.overlapping_pulses()
+
+    assert v_int_gen == [(1,), (2,), (3,), (4,), (5,), (6,), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (2, 3),
+                         (2, 5), (3, 4), (3, 5), (3, 6), (5, 6), (1, 2, 3), (1, 2, 5), (1, 3, 4), (1, 3, 5),
+                         (1, 3, 6), (1, 5, 6), (2, 3, 5), (3, 5, 6), (1, 2, 3, 5), (1, 3, 5, 6)]
+
+    # Lower tolerance (stricter) to rule overlap: Some of the patterns ruled in with default tolerance are now out
+    v_int_gen_b = field_gen.overlapping_pulses(tol_n_dev=2.0)
+
+    assert v_int_gen_b == [(1,), (2,), (3,), (4,), (5,), (6,), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6),
+                         (2, 5), (3, 6), (1, 2, 5), (1, 3, 6) ]
 
 def test_vib_experiment():
 

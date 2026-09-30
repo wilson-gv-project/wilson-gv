@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import cycle
 from typing import Optional, Iterable
 from operator import itemgetter
 import copy
@@ -130,6 +131,7 @@ class ScanObject:
             raise ValueError('Scan subcategory domain of effect is indeterminate')
 
 
+
 @dataclass
 class SpecScan:
     """
@@ -174,10 +176,6 @@ class EmPulse:
     maxstr: Float: Pulse amplitude at maximum of envelope. Default: Zero strength
     tc: Float: Point in time at which pulse envelope is at maximum
     cf: float: (Infrared-range) carrier frequency
-    cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation).
-        - cf_uv should be specified as a nonnegative value: Any cancellation should follow from the phase-matching
-        wavevector--frequency combination in the experiment
-        - For pulses where cf_uv != 0.0, then cf must be 0.0
     dev: float: Deviation parameter (e.g. broadness of Gaussian pulse). An impulsive-like pulse can be considered as the
     dev -> 0.0 limit of a Gaussian pulse. A "continuous-wave"-like pulse can be considered as the dev -> infty limit of
     a Gaussian pulse.
@@ -192,15 +190,12 @@ class EmPulse:
     id: integer: Pulse ID label
     """
 
-    # TODO: rm cf_uv attribute and usage, alt. keep as optional for possible wilson-derive use?
-
     env: str
     
     tc: float = None
     cf: float = None
     dev: float = None
 
-    cf_uv: float = 0.0
     maxstr: float = 0.0
 
     wv: tuple[float] = (0.0, 0.0, 1.0)
@@ -211,22 +206,11 @@ class EmPulse:
 
     def __post_init__(self):
         
-        # TODO: Generalize to arbitrary pulses and chirped pulses
+        # Currently only Gaussian envelopes allowed
         allowed_envelopes = ['gaussian']
 
         if self.env not in allowed_envelopes:
-            raise ValueError('The only current recognized pulse envelope choices is "gaussian"')
-
-        if not (self.cf_uv == 0.0):
-            if not (self.cf == 0.0 or self.cf == None):
-                raise ValueError('Pulses with non-zero UV/VIS carrier freqs. must have IR carrier freq part set to zero or None')
-
-        if not (self.cf_uv >= 0.0):
-            raise ValueError('A carrier frequency must be nonnegative')
-
-        if self.cf is not None:
-            if not (self.cf >= 0.0):
-                raise ValueError('A carrier frequency must be nonnegative')
+            raise ValueError('The only current recognized pulse envelope choice is "gaussian"')
 
         if self.env == 'gaussian':
             if self.cf is None:
@@ -395,6 +379,78 @@ class ElectricField:
         else:
             self.impulsive_field = False
 
+    def overlapping_pulses(self, tol_n_dev: float | int = 5.0) -> tuple[tuple]:
+        """
+        Calculate and tell which pulses of this field have overlapping temporal envelopes
+        under a tolerance parameter. This routine currently only supports this calculation
+        for Gaussian-envelope pulses.
+
+        tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses): Each pulse's
+        "region of influence" is taken as +/- tol_n_dev * the pulse's deviation parameter.
+        A tuple of pulses is ruled to have overlapping temporal envelope if the intersection
+        of all relevant pulse regions is nonempty.
+
+        Returns: A tuple of tuples. Each "inner" tuple is a tuple of pulse IDs ruled to be
+        overlapping in time. Any tuple not in the return data was ruled to not overlap in time.
+        """
+        from itertools import combinations, chain
+        from math import inf as infinity
+
+        # Make interval around each pulse as dictionary
+        pulse_intervals = {}
+
+        for i in self.pulses:
+
+            if not i.env == 'gaussian':
+                raise ValueError('overlapping_pulses currently only supports Gaussian-envelope pulses')
+
+            if i.tendsImpulsive():
+                pulse_intervals[i.id] = [i.tc, i.tc]
+            elif i.tendsContinuous():
+                pulse_intervals[i.id] = [-infinity, infinity]
+            else:
+                pulse_intervals[i.id] = [i.tc - tol_n_dev * i.dev, i.tc + tol_n_dev * i.dev]
+
+        print('pulse intervals', pulse_intervals)
+
+        # Make powerset of pulse IDs
+        pulse_powerset = list(chain.from_iterable(combinations(sorted(pulse_intervals.keys()), i) for i in range(len(pulse_intervals) + 1) ))
+
+        # For each element in powerset (smaller to larger sets): Determine intersection
+        # If intersection is nonempty, add to return data
+
+        valid_intersections = []
+
+        for i in pulse_powerset:
+
+            # The empty tuple is not relevant
+            if len(i) == 0:
+                continue
+
+            # Single pulses are trivially overlapping
+            elif len(i) == 1:
+                valid_intersections.append(i)
+
+            # General case
+            else:
+
+                curr_interval = copy.deepcopy(pulse_intervals[i[0]])
+
+                for j in i[1:]:
+
+                    # If no overlap, break iterations
+                    if (pulse_intervals[j][0] > curr_interval[1]) or (pulse_intervals[j][1] < curr_interval[0]):
+                        break
+
+                    # Otherwise narrow current interval of overlap
+                    curr_interval[0] = max(curr_interval[0], pulse_intervals[j][0])
+                    curr_interval[1] = min(curr_interval[1], pulse_intervals[j][1])
+
+                # If loop was not broken, consider this a valid intersection
+                else:
+                    valid_intersections.append(i)
+
+        return valid_intersections
 
 @dataclass
 class VibExperiment:
