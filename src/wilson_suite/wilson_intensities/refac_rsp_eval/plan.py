@@ -42,7 +42,7 @@ import copy
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from wilson_suite.wilson_derive.abstractions import (
     PolProp,  # here and term_parts

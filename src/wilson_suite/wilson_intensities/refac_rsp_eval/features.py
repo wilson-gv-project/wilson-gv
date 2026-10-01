@@ -415,8 +415,10 @@ class SpectralFeature:
 
         if result is not None:
             return result
-        else:
-            raise ValueError('smth went wrong')
+        if not features:
+            raise ValueError('Expected at least one feature, got an empty list')
+        measure = 'amplitude_coeff' if intensity_expr is None else 'intensity'
+        raise ValueError(f'None of the {len(features)} features has a nonzero {measure}')
     
 
     def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
@@ -445,7 +447,7 @@ class SpectralFeature:
     @classmethod
     def dress_these_with_boxes(cls, features: list['SpectralFeature'],
                                max_intensity, min_intensity,
-                               lineshape_parameter=None, box_range_safety_margin: float=0.1,
+                               box_range_safety_margin: float=0.1,
                                scale_wrt_max_intensity: bool=False,
                                minimum_box_padding: float=0.) -> list['SpectralFeature']:
         """
@@ -479,7 +481,7 @@ class SpectralFeature:
         will probably need to return a box covering the full region of the spectral window spanned by such a feature to
         a given tolerance).
 
-        lineshape_parameter: If specified, overrides each feature's inherent lineshape parameter.
+        Each feature's own lineshape_parameter sets its box size; a feature without one raises a ValueError.
 
         box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
             lorentzian_distance_to_dynrange_weaker_than_max?
@@ -538,8 +540,8 @@ class SpectralFeature:
 
             feat_intensity = feat.get_intensity()
 
-            # Warning: If features removed by this were e.g. close to each other and/or on the shoulder of a stronger feature,
-            # this removal may be too strict. Can be mitigated by choosing nonzero minimum_box_padding.
+            # FIXME Warning: If features removed by this were e.g. close to each other and/or on the shoulder of a stronger feature,
+            # this removal may be too strict. Can be mitigated by choosing nonzero minimum_box_padding. 
             if (feat_intensity < min_intensity) and (minimum_box_padding == 0.0):
                 res_features.remove(feat)
             else:
@@ -548,20 +550,14 @@ class SpectralFeature:
 
                 if feat_intensity > max_intensity:
                     raise ValueError(f"The feature {feat} will have higher intensity than max_intensity ({max_intensity})")
-
-                if lineshape_parameter is not None:
-                    feat.lineshape_parameter = lineshape_parameter
-                
-                if not feat.lineshape_parameter:
-                    raise ValueError('feat.lineshape_parameter is None - value is needed for a box')
                 
                 if scale_wrt_max_intensity:
 
                     feat_intensity_wrt_max = feat_intensity/max_intensity
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange*feat_intensity_wrt_max)
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange*feat_intensity_wrt_max) # type: ignore
 
                 else:
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange) # type: ignore
 
                 # gamma = feat.lineshape_parameter
                 # c = feat.amplitude_coeff
@@ -598,7 +594,6 @@ class SpectralFeature:
             elif magn_conditions == (('-A', 'B',),):
                 if feat.location._coord_dict['B'] - feat.location._coord_dict['A'] > (0+magn_conditions_margin):
                     res_features.append(feat)
-            # FIXME(!): raise error on else
             else:
                 raise ValueError("this magn_conditions isn't implemented")
         return res_features
@@ -658,8 +653,8 @@ class SpectralWindow:
         Each axis gets dim_sizes[ax] points from min to max, both edges included: step = (max - min) / (n - 1).
         """
 
-        if len(dim_sizes) != self.ndim:
-            raise ValueError("Grid shape must match dimensionality.")
+        if set(dim_sizes) != set(self.box.axes):
+            raise ValueError(f"Expected one grid size per window axis {self.box.axes}, got sizes for {tuple(sorted(dim_sizes))}")
         axes = {}
         for ax in self.bounds:
             mn, mx = self.bounds[ax]
@@ -690,7 +685,7 @@ class SpectralWindow:
         
         !warning: it is posssibly late to do this for a window when it has identified full_features and contrib_features
         """
-        feat = SpectralFeature.get_max_intensity_feat(self.full_features)
+        feat = SpectralFeature.get_max_intensity_feat(self.full_features+self.contrib_features)
         max_intensity_in_window = feat.get_intensity()
         min_intensity_in_window = max_intensity_in_window / dynrange
 

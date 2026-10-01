@@ -217,7 +217,7 @@ def test_normalize_coeffs_keeps_zero_amplitude():
 
 
 def test_normalize_coeffs_rejects_all_zero_amplitudes():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='nonzero amplitude_coeff'):
         SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=0.), feat(A=1., amp=0.)])
 
 
@@ -400,8 +400,13 @@ def test_max_intensity_feat_by_amplitude_compares_absolute_values():
 
 
 def test_max_intensity_feat_rejects_empty_list():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='empty list'):
         SpectralFeature.get_max_intensity_feat([])
+
+
+def test_max_intensity_feat_rejects_features_that_all_have_zero_intensity():
+    with pytest.raises(ValueError, match='None of the 2 features has a nonzero intensity'):
+        SpectralFeature.get_max_intensity_feat([feat(A=0., amp=0.), feat(A=1., amp=0.)])
 
 
 ## SpectralFeature: dress_these_with_boxes ----------------------------------
@@ -458,23 +463,9 @@ def test_dress_scaled_boxes_shrink_for_weaker_features():
     assert box_halfwidth(unscaled) == pytest.approx(5. * 51 ** 0.5)
 
 
-def test_dress_lineshape_parameter_overrides_feature_gamma():
-    f = feat(A=0., gamma=5.)
-    top = f.get_intensity()
-
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, lineshape_parameter=2.,
-                                                       box_range_safety_margin=0.)
-
-    assert dressed.lineshape_parameter == 2.
-    assert box_halfwidth(dressed) == pytest.approx(20.)
-
-
-def test_dress_rejects_zero_lineshape_override():
-    f = feat(A=0., gamma=5.)
-    top = f.get_intensity()
-
+def test_dress_needs_lineshape_parameter():
     with pytest.raises(ValueError, match='lineshape_parameter'):
-        SpectralFeature.dress_these_with_boxes([f], top, top / 101, lineshape_parameter=0.)
+        SpectralFeature.dress_these_with_boxes([feat(A=0., gamma=None)], 1., 0.01)
 
 
 def test_dress_rejects_feature_above_max_intensity():
@@ -566,12 +557,16 @@ def test_sample_grid_runs_from_min_to_max_with_both_edges():
     np.testing.assert_allclose(axes['B'], [100., 125., 150., 175., 200.])
 
 
-def test_sample_grid_needs_one_size_per_axis():
-    with pytest.raises(ValueError, match='dimensionality'):
-        SpectralWindow(Box({'A': (0., 10.)})).sample_grid({'A': 5, 'B': 5})
+@pytest.mark.parametrize('dim_sizes', [
+    {'A': 5, 'B': 5},  # one axis too many
+    {'B': 5},          # same number of axes, other name
+])
+def test_sample_grid_needs_one_size_per_window_axis(dim_sizes):
+    with pytest.raises(ValueError, match='one grid size per window axis'):
+        SpectralWindow(Box({'A': (0., 10.)})).sample_grid(dim_sizes)
 
 
-def test_window_dress_with_featboxes_uses_strongest_full_feature():
+def test_window_dress_with_featboxes_keeps_box_and_drops_weak_features():
     strong = feat(A=5., amp=1., gamma=5.)
     weak = feat(A=6., amp=1e-3, gamma=5.)
     near = feat(A=12., amp=0.5, gamma=5.)
@@ -585,8 +580,6 @@ def test_window_dress_with_featboxes_uses_strongest_full_feature():
     assert box_halfwidth(dressed.full_features[0]) == pytest.approx(5. * 10. * 1.1)
 
 
-@pytest.mark.xfail(strict=True, reason='max intensity is taken from full_features only, '
-                                       'so a stronger contributing feature raises')
 def test_window_dress_with_featboxes_allows_a_stronger_contributing_feature():
     weak_inside = feat(A=5., amp=0.1, gamma=5.)
     strong_near = feat(A=12., amp=1., gamma=5.)
