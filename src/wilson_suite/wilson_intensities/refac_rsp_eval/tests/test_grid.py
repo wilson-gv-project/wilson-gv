@@ -75,6 +75,13 @@ def test_box_accepts_int_bounds_and_zero_width():
     assert box.bounds == {'A': (0, 1), 'B': (2., 2.)}
 
 
+def test_box_stores_numpy_numbers_as_plain_floats():
+    box = Box({'A': (np.int64(0), np.int64(1)), 'B': (np.float32(2.), np.float32(3.))}) # type: ignore
+
+    assert box.bounds == {'A': (0., 1.), 'B': (2., 3.)}
+    assert all(type(v) is float for bounds in box.bounds.values() for v in bounds)
+
+
 ## Box: operations ----------------------------------------------------------
 
 def test_box_expand_returns_new_box_and_pads_only_given_axes():
@@ -175,11 +182,12 @@ def test_nd_box_overlap_needs_every_axis(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_box_contains_points(ndim):
+def test_nd_box_contains_points_with_edges_included(ndim):
     points = np.array([[0.5] * ndim,
+                       [1.] * ndim,                  # max corner: edges count as inside
                        [0.5] * (ndim - 1) + [2.]])  # outside on the last axis only
 
-    np.testing.assert_array_equal(cube(ndim, 0., 1.).contains(points), [True, False])
+    np.testing.assert_array_equal(cube(ndim, 0., 1.).contains(points), [True, True, False])
 
 
 ## Box clustering -----------------------------------------------------------

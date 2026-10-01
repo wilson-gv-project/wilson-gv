@@ -125,8 +125,8 @@ class SpectralFeature:
     feat_type: str | None = None
     feat_box: Box | None = None
     _param_set: dict | None = None
-    _res_motif: str | None = None
-    
+    _res_motif: str | None = None # FIXME: never set; the motifs live in term_contributions[i].res_motif. Remove or fill.
+
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
@@ -150,7 +150,7 @@ class SpectralFeature:
     def __lt__(self, other: 'SpectralFeature') -> bool:
         if not isinstance(other, SpectralFeature):
             return NotImplemented
-        if self.amplitude_coeff and other.amplitude_coeff:
+        if self.amplitude_coeff is not None and other.amplitude_coeff is not None:
             return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
         else:
             raise ValueError("cannot compare amplitude_coeff of features")
@@ -194,8 +194,12 @@ class SpectralFeature:
 
     @classmethod
     def sort_by_params(cls, features: list['SpectralFeature']):
-        params_lens = [len(i.term_contributions) for i in features]
-        assert len(params_lens) == sum(params_lens)
+        """
+        Sort features by their term group. Needs exactly one term group per feature.
+        """
+        for f in features:
+            if len(f.term_contributions) != 1:
+                raise ValueError(f'Expected exactly 1 term group per feature, got {len(f.term_contributions)} for {f}')
 
         return sorted(
                 features, 
@@ -207,6 +211,7 @@ class SpectralFeature:
         """
         unfinished
         """
+        # FIXME: unfinished - raises before the loop, and `terms` below is never used. Finish or remove.
         raise NotImplementedError()
         sorted_dict = {}
         for f in features:
@@ -262,36 +267,37 @@ class SpectralFeature:
         return True
 
 
-    def is_inside(self, box: Box, mode: str = 'loc') -> bool:
-        """
-        Return boolean for whether this feature lies inside `box`.
-            mode='loc': the feature location is inside `box`, edges included
-            mode='box': the feature box overlaps `box`, touching edges excluded
-        """
-        if mode=='box':
-            if self.feat_box is not None:
-                return box.overlaps(self.feat_box)
-                # return self.contains_box(spec_feature.feat_box)
-            raise ValueError('Need to add a box for this feature')
-        if mode=='loc':
-            spec_feature_ndim = len(self.location.values)
-            if spec_feature_ndim != box.ndim:
-                raise ValueError(f"Expected SpectralFeature with a location with {box.ndim} coords, got {spec_feature_ndim}")
+    def _check_same_axes(self, box: Box):
+        if self.location.axes != box.axes:
+            raise ValueError(f"Expected SpectralFeature with axes {box.axes}, got {self.location.axes}")
 
-            inside = True
-            for ax, (mn, mx) in box.bounds.items():
-                inside &= (self.location._coord_dict[ax] >= mn) & (self.location._coord_dict[ax] <= mx)
-            return inside
-        raise ValueError('Supported modes of check: `loc`, `box`')
+    def is_inside(self, box: Box) -> bool:
+        """
+        Return boolean for whether the feature location lies inside `box`, edges included.
+        """
+        self._check_same_axes(box)
+
+        inside = True
+        for ax, (mn, mx) in box.bounds.items():
+            inside &= (self.location._coord_dict[ax] >= mn) & (self.location._coord_dict[ax] <= mx)
+        return inside
+
+    def feat_box_overlaps(self, box: Box) -> bool:
+        """
+        Return boolean for whether the feature box (feat_box) overlaps `box`, touching edges excluded.
+        """
+        self._check_same_axes(box)
+
+        if self.feat_box is None:
+            raise ValueError('Need to add a box for this feature')
+        return box.overlaps(self.feat_box)
 
     def contributes_to(self, box: Box) -> bool:
         """
         Return boolean for whether this feature lies outside `box` but still adds intensity inside it:
             within 2*lineshape_parameter of `box` on every axis.
         """
-        spec_feature_ndim = len(self.location.coordinates)
-        if spec_feature_ndim != box.ndim:
-            raise ValueError(f"Expected SpectralFeature with a location with {box.ndim} coords, got {spec_feature_ndim}")
+        self._check_same_axes(box)
 
         if self.lineshape_parameter is None:
             raise ValueError("Expected SpectralFeature with `lineshape_parameter` attribute")
@@ -338,7 +344,7 @@ class SpectralFeature:
         contrib_features = []
 
         for feature in cp_spec_features:
-            if feature.is_inside(spec_window.box, mode='loc'):
+            if feature.is_inside(spec_window.box):
                 feature.feat_type = 'full'
                 full_features.append(feature)
             if feature.contributes_to(spec_window.box):
@@ -355,6 +361,8 @@ class SpectralFeature:
     def find_clusters_by_distance(cls, spec_features: list['SpectralFeature'],
                                   distance_thresholds: dict,
                                   linkage: str = 'single'):
+        # FIXME: imports from the old amplitudes package - port find_points_clusters_by_distance or remove.
+        # FIXME: features at the same location share one dict key below, so all but the last one are lost.
 
         features_locs = {feature.location.values: feature for feature in spec_features}
         from wilson_suite.wilson_intensities.amplitudes import domains
@@ -417,9 +425,11 @@ class SpectralFeature:
         intensity will be returned in au
         """
         
-        if not self.amplitude_coeff or not self.lineshape_parameter:
+        if self.amplitude_coeff is None or self.lineshape_parameter is None:
             raise ValueError('this feature has no amplitude_coeff and/or lineshape_parameter')
-        
+        if self.lineshape_parameter <= 0:
+            raise ValueError(f'lineshape_parameter must be > 0, got {self.lineshape_parameter}')
+
         if intensity_expr == 'abs()**2':
            N = len(self.location.axes)
 

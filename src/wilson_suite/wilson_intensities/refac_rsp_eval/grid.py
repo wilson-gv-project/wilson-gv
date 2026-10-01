@@ -8,6 +8,7 @@ Pure geometry: bounds, boxes and box clustering. No physics, no SpectralFeature 
 
 features.py imports from this module, never the other way around.
 """
+import numbers
 from dataclasses import dataclass
 
 import numpy as np
@@ -63,7 +64,8 @@ class Box:
         # --- Validate numeric consistency ---
         for ax, (mn, mx) in self.bounds.items():
 
-            if not all(isinstance(v, (int, float)) for v in (mn, mx)):
+            # numbers.Real also accepts numpy numbers like np.int64 and np.float32
+            if not all(isinstance(v, numbers.Real) for v in (mn, mx)):
                 raise TypeError(
                     f"Invalid values for bound {ax}: expected numeric (min, max), got ({mn!r}, {mx!r})"
                 )
@@ -71,6 +73,8 @@ class Box:
                 raise ValueError(
                     f"Invalid bound {ax}: min ({mn}) > max ({mx})"
                 )
+        # store plain floats, also for int and numpy inputs
+        self.bounds = {ax: (float(mn), float(mx)) for ax, (mn, mx) in self.bounds.items()}
         self.ndim = len(self.bounds)
 
 
@@ -149,12 +153,15 @@ class Box:
 
     # UNUSED
     def contains(self, points: np.ndarray) -> np.ndarray:
-        """Return boolean mask of which points lie inside the window."""
+        """
+        Return boolean mask of which points lie inside the box, edges included (same rule as SpectralFeature.is_inside).
+        Point coordinates follow the sorted axis order self.axes.
+        """
         if points.shape[-1] != self.ndim:
             raise ValueError(f"Expected points with {self.ndim} coords, got {points.shape[-1]}")
         inside = np.ones(points.shape[:-1], dtype=bool)
         for i, (mn, mx) in enumerate(self.bounds.values()):
-            inside &= (points[..., i] >= mn) & (points[..., i] < mx)
+            inside &= (points[..., i] >= mn) & (points[..., i] <= mx)
         return inside
 
 

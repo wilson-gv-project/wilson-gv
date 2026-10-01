@@ -129,7 +129,6 @@ def test_feature_order_needs_amplitudes():
         sorted([feat(A=0., amp=None), feat(A=0., amp=1.)])
 
 
-@pytest.mark.xfail(strict=True, reason='amplitude 0 is treated as a missing amplitude')
 def test_feature_order_accepts_zero_amplitude():
     assert feat(A=0., amp=0.) < feat(A=1., amp=1.)
 
@@ -183,6 +182,12 @@ def test_sort_by_params_orders_by_first_term_group():
     f_low = feat(A=1., terms=(tpc(a=0),))
 
     assert SpectralFeature.sort_by_params([f_high, f_low]) == [f_low, f_high]
+
+
+def test_sort_by_params_needs_exactly_one_term_group_per_feature():
+    # counts [0, 2] add up to the number of features, which the old assert let through
+    with pytest.raises(ValueError, match='exactly 1 term group'):
+        SpectralFeature.sort_by_params([feat(A=0., terms=()), feat(A=1., terms=(tpc(a=0), tpc(a=1)))])
 
 
 def test_normalize_coeffs_divides_by_largest_absolute_amplitude():
@@ -280,31 +285,31 @@ def test_feature_union_does_not_change_inputs():
 
 ## SpectralFeature: relation to a box ---------------------------------------
 
+@pytest.mark.parametrize('method', ['is_inside', 'feat_box_overlaps', 'contributes_to'])
+def test_feature_box_relations_need_the_box_axes(method):
+    box = Box({'A': (0., 10.)})
+
+    with pytest.raises(ValueError, match='axes'):
+        getattr(feat(B=1.), method)(box)  # same number of axes, other name
+    with pytest.raises(ValueError, match='axes'):
+        getattr(feat(A=1., B=1.), method)(box)  # one axis too many
+
+
 @pytest.mark.parametrize('a, inside', [(5., True), (0., True), (10., True), (10.1, False), (-1., False)])
-def test_feature_is_inside_by_location_includes_edges(a, inside):
+def test_feature_is_inside_includes_edges(a, inside):
     assert feat(A=a).is_inside(Box({'A': (0., 10.)})) == inside
 
 
-def test_feature_is_inside_by_location_needs_same_dimensionality():
-    with pytest.raises(ValueError, match='coords'):
-        feat(A=1., B=1.).is_inside(Box({'A': (0., 10.)}))
-
-
-def test_feature_is_inside_by_box_checks_feature_box_overlap():
+def test_feature_box_overlaps_excludes_touching_edges():
     box = Box({'A': (0., 10.)})
 
-    assert feat(A=10.5, gamma=1.).is_inside(box, mode='box')
-    assert not feat(A=11., gamma=1.).is_inside(box, mode='box')  # boxes only touch
+    assert feat(A=10.5, gamma=1.).feat_box_overlaps(box)
+    assert not feat(A=11., gamma=1.).feat_box_overlaps(box)  # boxes only touch
 
 
-def test_feature_is_inside_by_box_needs_a_feature_box():
-    with pytest.raises(ValueError, match='box'):
-        feat(A=5., gamma=None).is_inside(Box({'A': (0., 10.)}), mode='box')
-
-
-def test_feature_is_inside_rejects_unknown_mode():
-    with pytest.raises(ValueError, match='modes'):
-        feat(A=5.).is_inside(Box({'A': (0., 10.)}), mode='circle')
+def test_feature_box_overlaps_needs_a_feature_box():
+    with pytest.raises(ValueError, match='Need to add a box'):
+        feat(A=5., gamma=None).feat_box_overlaps(Box({'A': (0., 10.)}))
 
 
 @pytest.mark.parametrize('a, contributing', [
@@ -316,11 +321,6 @@ def test_feature_is_inside_rejects_unknown_mode():
 ])
 def test_feature_contributes_to_box_when_outside_but_within_two_gamma(a, contributing):
     assert feat(A=a, gamma=1.).contributes_to(Box({'A': (0., 10.)})) == contributing
-
-
-def test_feature_contributes_to_needs_same_dimensionality():
-    with pytest.raises(ValueError, match='coords'):
-        feat(A=11., B=1.).contributes_to(Box({'A': (0., 10.)}))
 
 
 def test_feature_contributes_to_needs_lineshape_parameter():
@@ -371,7 +371,11 @@ def test_intensity_needs_amplitude_and_gamma(amp, gamma):
         feat(A=0., amp=amp, gamma=gamma).get_intensity()
 
 
-@pytest.mark.xfail(strict=True, reason='amplitude 0 is treated as a missing amplitude')
+def test_intensity_needs_positive_gamma():
+    with pytest.raises(ValueError, match='must be > 0'):
+        feat(A=0., gamma=0.).get_intensity()
+
+
 def test_intensity_of_zero_amplitude_is_zero():
     assert feat(A=0., amp=0.).get_intensity() == 0.
 
@@ -662,7 +666,7 @@ def test_nd_feature_is_inside_only_when_every_axis_is_inside(ndim):
     assert feat(coords(ndim, 10.)).is_inside(box)  # corner
     for ax in AXES[:ndim]:
         assert not feat(coords(ndim, 5., **{ax: 11.})).is_inside(box)
-    assert feat(coords(ndim, 5., **{last: 10.5}), gamma=1.).is_inside(box, mode='box')
+    assert feat(coords(ndim, 5., **{last: 10.5}), gamma=1.).feat_box_overlaps(box)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
