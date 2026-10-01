@@ -14,10 +14,14 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     PropsCollection,
     ResCondKey,
+    ResLocPoint,
     ResonanceMotif,
     compile_terms,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+    AXES,
+    NDIMS,
+    coords,
     polprop,
     vibdiff,
 )
@@ -276,6 +280,45 @@ def test_parameterset_pickle_roundtrip():
     ps = ParameterSet({'a': 1, 'c': 2})
 
     assert pickle.loads(pickle.dumps(ps)) == ps
+
+
+## ResLocPoint --------------------------------------------------------------
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_res_loc_point_sorts_axes_in_any_dimension(ndim):
+    # coordinates given in reverse axis order, e.g. for ndim=3: C=2., B=1., A=0.
+    point = ResLocPoint({ax: float(i) for i, ax in reversed(list(enumerate(AXES[:ndim])))})
+
+    assert point.axes == tuple(AXES[:ndim])
+    assert point.values == tuple(float(i) for i in range(ndim))
+    assert point.dimensionality == ndim
+    assert point[AXES[ndim - 1]] == ndim - 1
+
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_res_loc_point_equality_and_hash_ignore_axis_order(ndim):
+    p1 = ResLocPoint(coords(ndim, 1.))
+    p2 = ResLocPoint(dict(reversed(coords(ndim, 1.).items())))
+
+    assert p1 == p2
+    assert hash(p1) == hash(p2)
+    assert p1 != ResLocPoint(coords(ndim, 1., **{AXES[ndim - 1]: 2.}))
+
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_res_loc_point_repr_lists_every_axis(ndim):
+    expected = 'Point(' + ', '.join(f'{ax}=1.0' for ax in AXES[:ndim]) + ')'
+
+    assert repr(ResLocPoint(coords(ndim, 1.))) == expected
+
+
+def test_res_loc_point_rejects_unknown_axis():
+    with pytest.raises(KeyError):
+        _ = ResLocPoint({'A': 1.})['B']
+
+
+def test_res_loc_point_is_not_equal_to_other_types():
+    assert ResLocPoint({'A': 1.}) != (('A', 1.),)
 
 
 ## CompiledTerm -------------------------------------------------------------

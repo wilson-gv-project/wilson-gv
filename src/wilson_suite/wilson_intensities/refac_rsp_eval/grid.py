@@ -1,16 +1,17 @@
 """
+Pure geometry: bounds, boxes and box clustering. No physics, no SpectralFeature logic.
 
-    in: features, window, resolution 
-    out: spectrum array 
-    notes:full-grid Lorentzians
+  in:  points or (min, max) bounds per named axis
+  out: Box, box adjacency matrix, clusters of boxes
+
+  holds: points_to_bounds, Box, compute_box_adjacency, connected_components_from_adjacency
+
+features.py imports from this module, never the other way around.
 """
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature
 
 def points_to_bounds(points: list[dict[str,float]], 
                      halfwidth: float) -> list[dict[str,tuple[float,float]]]:
@@ -31,6 +32,8 @@ Dim_bounds = tuple[Min_bound, Max_bound]
 @dataclass
 class Box:
     """
+    N-dimensional rectangle with named axes: {axis: (min, max)}. Axes are sorted by name.
+
     not sure about the grid yet
 
     could have different grids for same box?
@@ -41,9 +44,8 @@ class Box:
 
     def __post_init__(self):
         """
-        Create a Box either from:
-            - dict[str, (min, max)], e.g. {'A': (0.0, 1.0), 'B': (5.0, 10.0)}
-            - tuple of (min, max) pairs, e.g. ((0.0, 1.0), (5.0, 10.0))
+        Check and sort the bounds, given as dict[str, (min, max)], e.g. {'B': (5.0, 10.0), 'A': (0.0, 1.0)}.
+        Sets self.axes (sorted axis names) and self.ndim.
         """
         # --- Normalize input ---
         # Ensure all values are 2-tuples of numbers
@@ -154,53 +156,6 @@ class Box:
         for i, (mn, mx) in enumerate(self.bounds.values()):
             inside &= (points[..., i] >= mn) & (points[..., i] < mx)
         return inside
-
-    # ----------------------------------------------
-    # relations to SpectralFeature
-    # ----------------------------------------------
-    def contains_feature(self, spec_feature: 'SpectralFeature', mode='loc') -> bool:
-        """
-        Return boolean for whether SpectralFeature lies inside the window.
-
-        NEW: feature.is_inside(box)
-        """
-        if mode=='box':
-            if spec_feature.feat_box is not None:
-                return self.overlaps(spec_feature.feat_box)
-                # return self.contains_box(spec_feature.feat_box)
-            raise ValueError('Need to add a box for this feature')
-        if mode=='loc':
-            spec_feature_ndim = len(spec_feature.location.values)
-            if spec_feature_ndim != self.ndim:
-                raise ValueError(f"Expected SpectralFeature with a location with {self.ndim} coords, got {spec_feature_ndim}")
-
-            inside = True
-            for ax, (mn, mx) in self.bounds.items():
-                inside &= (spec_feature.location._coord_dict[ax] >= mn) & (spec_feature.location._coord_dict[ax] <= mx)
-            return inside
-        raise ValueError('Supported modes of check: `loc`, `box`')
-
-    def contributing_feature(self, spec_feature: 'SpectralFeature') -> bool:
-        """
-        Return boolean for whether SpectralFeature is contributing to this window, 
-            based on lineshape_parameter of this SpectralFeature
-
-        NEW: feature.contributes_to(box)
-        """
-        spec_feature_ndim = len(spec_feature.location.coordinates)
-        if spec_feature_ndim != self.ndim:
-            raise ValueError(f"Expected SpectralFeature with a location with {self.ndim} coords, got {spec_feature_ndim}")
-
-        if spec_feature.lineshape_parameter is None:
-            raise ValueError("Expected SpectralFeature with `lineshape_parameter` attribute")
-
-        contributing = True
-        for ax, (mn, mx) in self.bounds.items():
-            Gamma = spec_feature.lineshape_parameter
-            # FIXME??   2*Gamma ??
-            # in place ADDition
-            contributing &= (spec_feature.location._coord_dict[ax] >= mn-2*Gamma) & (spec_feature.location._coord_dict[ax] <= mx+2*Gamma)
-        return contributing and not self.contains_feature(spec_feature)
 
 
 def compute_box_adjacency(

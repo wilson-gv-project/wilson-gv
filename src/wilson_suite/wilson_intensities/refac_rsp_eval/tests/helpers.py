@@ -1,5 +1,5 @@
 """
-Small hand-built objects shared by the unit tests of plan.py, evaluate.py and system_data.py.
+Small hand-built objects shared by the unit tests of plan.py, evaluate.py, system_data.py, grid.py and features.py.
 No VibPerturbedTerm, no data files.
 """
 
@@ -9,10 +9,17 @@ from wilson_suite.wilson_derive.abstractions import (
     QOperator,
     VibDiffTerm,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    SpectralFeature,
+    TermParametersChoice,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
+    ParameterSet,
     PropsCollection,
+    ResLocPoint,
     ResonanceMotif,
 )
 from wilson_suite.wilson_system.system_data import VibState, VibStatesData
@@ -56,3 +63,45 @@ def toy_term() -> CompiledTerm:
         idx_summ=('b', 'c'),
         idx_nonsumm=('a',),
     )
+
+
+# --- spectral features (grid.py, features.py) ---
+
+def tpc(term_ids: tuple = (0,), **params) -> TermParametersChoice:
+    """One term group with a single parameter choice, e.g. tpc(a=0, b=1)."""
+    return TermParametersChoice(res_motif=ResonanceMotif(()),
+                                states_parameters=(ParameterSet(params),),
+                                term_ids=term_ids)
+
+
+def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0, amp: float | None = 1.0,
+         terms: tuple | None = None, **coords: float) -> SpectralFeature:
+    """
+    A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1; its box is location +- gamma.
+    The dict form is for N-dimensional tests: feat(coords(3, 100.)).
+    """
+    return SpectralFeature(location=ResLocPoint({**(location or {}), **coords}),
+                           term_contributions=(tpc(a=0),) if terms is None else terms,
+                           lineshape_parameter=gamma,
+                           amplitude_coeff=amp)
+
+
+def box_halfwidth(f: SpectralFeature, axis: str = 'A') -> float:
+    mn, mx = f.feat_box.bounds[axis] # type: ignore
+    return (mx - mn) / 2
+
+
+# --- N-dimensional locations: the same test runs for every spectrum dimensionality in NDIMS ---
+
+NDIMS = (1, 2, 3, 4)
+AXES = 'ABCD'
+
+
+def coords(ndim: int, value: float = 0., **override: float) -> dict[str, float]:
+    """value on the first ndim axes; override sets single axes, e.g. coords(3, 5., C=11.) -> {'A': 5., 'B': 5., 'C': 11.}."""
+    return {ax: override.get(ax, value) for ax in AXES[:ndim]}
+
+
+def cube(ndim: int, mn: float, mx: float, **override: tuple[float, float]) -> Box:
+    """(mn, mx) on the first ndim axes; override sets single axes, e.g. cube(2, 0., 1., B=(5., 6.))."""
+    return Box({ax: override.get(ax, (mn, mx)) for ax in AXES[:ndim]})

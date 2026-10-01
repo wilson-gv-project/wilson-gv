@@ -1,25 +1,13 @@
 """
-A simple rule: **anything that knows about `SpectralFeature` goes to `features.py`**. `grid.py` keeps only pure geometry (boxes, bounds, adjacency). Then `features.py` imports from `grid.py`, and never the other way around.
+Spectral features, and the windows and domains that hold them.
 
-**Move to `features.py`:**
-- `TermParametersChoice` ([grid.py:210](grid.py#L210)): it is physics data (resonance motif and parameter sets) that only features use.
-- `SpectralFeature` ([grid.py:288](grid.py#L288)), with all its classmethods.
-- `features_to_clusters` ([grid.py:798](grid.py#L798)).
-- `SpectralWindow` ([grid.py:814](grid.py#L814)): it holds feature lists, and `find_clusters_by_featboxes` and `dress_with_featboxes` work on features.
-- `RectangularDomain` ([grid.py:891](grid.py#L891)): same reason, it holds features and has `from_features`.
-- The imports from `plan.py` (`ParameterSet`, `ResonanceMotif`, `ResLocPoint`).
+  in:  feature locations (ResLocPoint), amplitudes, lineshape parameters, term groups
+  out: SpectralFeature lists, SpectralWindow, RectangularDomain clusters
 
-**Keep in `grid.py`:**
-- `points_to_bounds`
-- the type aliases (`Min_bound`, `Max_bound`, `Dim_bounds`)
-- `Box`, **without** `contains_feature` and `contributing_feature`
-- `compute_box_adjacency` and `connected_components_from_adjacency`. These only take boxes, so they are pure geometry.
+  holds: TermParametersChoice, SpectralFeature, features_to_clusters, SpectralWindow, RectangularDomain
 
-**The one real change:** move `Box.contains_feature` and `Box.contributing_feature` ([grid.py:170-205](grid.py#L170-L205)) onto `SpectralFeature`, e.g. `feature.is_inside(box)` and `feature.contributes_to(box)`. Inside, they would read `box.bounds` and the feature's own location and `lineshape_parameter`. After that, `Box` no longer needs to know what a feature is.
-
-**One caveat:** `SpectralWindow.sample_grid` is pure grid logic sitting in a class full of feature logic. If that bothers you later, you can split a small geometry-only window (bounds, widths, `sample_grid`) into `grid.py` and have `SpectralWindow` use it. It's fine to leave that for later.
-
-Also, the docstring at the top of `grid.py` ("in: features, window, resolution / out: spectrum array") describes building the spectrum, not the grid. Update it after the split.
+Takes Box and box clustering from grid.py; grid.py never imports from here.
+Note: SpectralWindow.sample_grid is pure geometry and could move to grid.py later.
 """
 import copy
 from dataclasses import dataclass, field
@@ -74,11 +62,12 @@ class TermParametersChoice:
 
 
     def __hash__(self):
-        return hash((self.term_ids, self.states_parameters))
+        return hash((self.res_motif, self.term_ids, self.states_parameters))
 
     def __eq__(self, other):
         return (
             isinstance(other, TermParametersChoice)
+            and self.res_motif == other.res_motif
             and self.term_ids == other.term_ids
             and self.states_parameters == other.states_parameters
         )
@@ -146,8 +135,10 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        return hash((self.term_contributions[0].res_motif, self.term_contributions[0].states_parameters))
-        # return hash(self.location)
+        if self.term_contributions:
+            return hash((self.term_contributions[0].res_motif, self.term_contributions[0].states_parameters, self.location))
+        else:
+            return hash(self.location)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SpectralFeature):
@@ -271,11 +262,12 @@ class SpectralFeature:
         return True
 
 
-    def is_inside(self, box, mode='loc'):
+    def is_inside(self, box: Box, mode: str = 'loc') -> bool:
         """
-        Box.contains_feature
+        Return boolean for whether this feature lies inside `box`.
+            mode='loc': the feature location is inside `box`, edges included
+            mode='box': the feature box overlaps `box`, touching edges excluded
         """
-        """Return boolean for whether SpectralFeature lies inside the window."""
         if mode=='box':
             if self.feat_box is not None:
                 return box.overlaps(self.feat_box)
@@ -292,12 +284,10 @@ class SpectralFeature:
             return inside
         raise ValueError('Supported modes of check: `loc`, `box`')
 
-    def contributes_to(self, box):
+    def contributes_to(self, box: Box) -> bool:
         """
-        Return boolean for whether SpectralFeature is contributing to this window, 
-            based on lineshape_parameter of this SpectralFeature
-
-        NEW: feature.contributes_to(box)
+        Return boolean for whether this feature lies outside `box` but still adds intensity inside it:
+            within 2*lineshape_parameter of `box` on every axis.
         """
         spec_feature_ndim = len(self.location.coordinates)
         if spec_feature_ndim != box.ndim:
@@ -312,7 +302,6 @@ class SpectralFeature:
             # FIXME??   2*Gamma ??
             # in place ADDition
             contributing &= (self.location._coord_dict[ax] >= mn-2*Gamma) & (self.location._coord_dict[ax] <= mx+2*Gamma)
-        # return contributing and not box.contains_feature(self)
         return contributing and not self.is_inside(box)
 
     
@@ -341,16 +330,18 @@ class SpectralFeature:
     def filter_to_spec_window(cls, spec_features: list['SpectralFeature'],
                               spec_window: 'SpectralWindow'):
         """
-        return spectral window with sorted features which are going to be evaluated in it
+        return spectral window with sorted features which are going to be evaluated in it.
+        Creates a deep copy of spec_features.
         """
+        cp_spec_features = copy.deepcopy(spec_features)
         full_features = []
         contrib_features = []
 
-        for feature in spec_features:
-            if spec_window.box.contains_feature(feature, mode='loc'):
+        for feature in cp_spec_features:
+            if feature.is_inside(spec_window.box, mode='loc'):
                 feature.feat_type = 'full'
                 full_features.append(feature)
-            if spec_window.box.contributing_feature(feature):
+            if feature.contributes_to(spec_window.box):
                 feature.feat_type = 'contributing'
                 contrib_features.append(feature)
         upd_spec_window = copy.deepcopy(spec_window)
@@ -616,8 +607,8 @@ def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['S
     """
     feature_boxes = []
     for f in features:
-        if not f:
-            raise ValueError("")
+        if f.feat_box is None:
+            raise ValueError(f"No feature box for {f}")
         else:
             feature_boxes.append(f.feat_box)
     adjacency = compute_box_adjacency(feature_boxes)
@@ -627,9 +618,9 @@ def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['S
 @dataclass
 class SpectralWindow:
     """
-    Represents an N-dimensional rectangular region (bounds only).
-
-    For the full spectrum
+    The full spectrum range (a Box) with the features evaluated in it.
+        full_features: location inside the box
+        contrib_features: location outside the box, but close enough to add intensity inside it
     """
     box: 'Box'
     full_features: list['SpectralFeature'] = field(default_factory=list)
@@ -654,6 +645,7 @@ class SpectralWindow:
     def sample_grid(self, dim_sizes: dict) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
         """
         Generate a regular grid of points spanning the window.
+        Each axis gets dim_sizes[ax] points from min to max, both edges included: step = (max - min) / (n - 1).
         """
 
         if len(dim_sizes) != self.ndim:
@@ -661,8 +653,7 @@ class SpectralWindow:
         axes = {}
         for ax in self.bounds:
             mn, mx = self.bounds[ax]
-            adjusted_mx = mx + (mx - mn) / dim_sizes[ax]
-            axes[ax] = np.linspace(mn, adjusted_mx, dim_sizes[ax], endpoint=False) # adjust min too???
+            axes[ax] = np.linspace(mn, mx, dim_sizes[ax])
 
         coords_vectors = list(axes.values())
         grid = np.meshgrid(*coords_vectors, indexing="ij")
@@ -705,8 +696,7 @@ class SpectralWindow:
 class RectangularDomain:
     """
     N-dimensional domain with labeled axes and spectral features.
-
-
+    from_features makes one domain per cluster: its box spans the boxes of the cluster's features.
     """
     box: Box
     full_features: list['SpectralFeature'] = field(default_factory=list)
