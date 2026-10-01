@@ -85,6 +85,18 @@ def test_plan_compiled_term():
     assert freqdenom_idx == sorted(['a', 'b', 'c', 'a+b,c'])
 
 
+def test_compiled_terms():
+    """
+    CompiledTerm for EVV
+    """
+    print('\n\n')
+
+    u = {term.cmp_resmotf for term in cmpl_terms}
+    print(f"unique resonance conditions: {len(u)}\n")
+    for i in u:
+        print(i)
+
+
 def test_eval_molsys_data():
     """
     getting data into MolPropsCollection (MolecularProperty instances hold values)

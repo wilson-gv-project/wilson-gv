@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocPoint,
@@ -541,6 +542,27 @@ def resonance_compute_loop(ids_sets: list[dict[str, int]],
     for idxset in ids_sets:
         coeff = solve_LSE_motif(motif, ParameterSet(idxset), vibstates_data)
         results[ParameterSet(idxset)] = coeff
+    
+    return results
+
+
+def get_motifs_feats(motifs: Sequence['ResonanceMotif'], 
+                    ids_sets: list[dict[str, int]], 
+                    vibstates_data: 'VibStatesData') -> dict[ParameterSet, dict['ResonanceMotif', 'SpectralFeature']]:
+    """
+    motifs - sequence of ResonanceMotif
+    ids_sets - list of index dictionaries, one per index set
+    vibstates_data - VibStatesData instance
+
+    returns dict[ParameterSet, dict[ResonanceMotif, SpectralFeature]]
+    """
+    results = {}
+    for idxset in ids_sets:
+        ps = ParameterSet(idxset)
+        results[ps] = {}
+        for motif in motifs:
+            resloc = solve_LSE_motif(motif, ps, vibstates_data)
+            results[ps][motif] = SpectralFeature(resloc)
     
     return results
 

@@ -19,6 +19,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     evaluate_term_coeff_sumover,
     generate_LHS_motif,
     get_RHS_motif,
+    get_motifs_feats,
     make_idx_sets,
     otf_vibdiffdenom,
     resonance_compute_loop,
@@ -81,11 +82,16 @@ def params() -> dict:
 def params_obj() -> ParameterSet:
     return ParameterSet({'a': 0, 'b': 1})
 
-def resonance_residuals(motif: ResonanceMotif, location: ResLocPoint, index_dict: dict, states) -> list[float]:
-    """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py."""
+def resonance_residuals(motif: ResonanceMotif,
+                        location: ResLocPoint,
+                        index_dict: dict, states,
+                        unit: str = 'Eh') -> list[float]:
+    """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py.
+    State energies are stored in cm-1; `unit` is the unit of `location` ('Eh' or 'cm-1')."""
     def energy(quanta):
         label = ','.join(str(i) for i in sorted(index_dict[q] for q in quanta))
-        return states.get_state_by_label(label).energy if label else 0.
+        e_cm1 = states.get_state_by_label(label).energy if label else 0.
+        return convNu2Ene(e_cm1) if unit == 'Eh' else e_cm1
 
     return [energy(c.left) - energy(c.right)
             - sum((-1. if ax.startswith('-') else 1.) * location[ax.strip('-')] for ax in c.pf)  # type: ignore
@@ -192,7 +198,7 @@ def test_solve_LSE_motif_location_satisfies_every_condition(motif, params_obj, s
 
     location = solve_LSE_motif(res_motif, params_obj, states, unit='cm-1')
 
-    assert resonance_residuals(res_motif, location, params_obj.to_dict(), states) == pytest.approx([0.] * len(res_motif))
+    assert resonance_residuals(res_motif, location, params_obj.to_dict(), states, unit='cm-1') == pytest.approx([0.] * len(res_motif))
 
 
 def test_solve_LSE_motif_hartree_is_cm1_converted(params_obj, states):
@@ -585,3 +591,35 @@ def test_coefficient_compute_loop_result_shape(term_and_precalc, molsys):
     entry = results[ps]
     _total, leaves = entry
     assert len(leaves) == 2              # c in {0, 1}
+
+
+def test_get_motifs_feats():
+    """
+    The motifs and locations returned by get_motifs_locs are keyed by ParameterSet, one entry
+    per index set. Each location is a ResLocPoint with axes and values in Eh.
+    """
+    motif = ResonanceMotif.from_tuples(MOTIF_AB)
+    idx_sets = [{'a': 0, 'b': 0}, {'a': 1, 'b': 0}, {'a': 0, 'b': 1}]
+
+    results = get_motifs_feats([motif], idx_sets, toy_states())
+
+    assert set(results) == {ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 0, 'b': 1})}
+    for ps in results:
+        loc = results[ps]
+        assert isinstance(loc, dict)
+
+        # check that the location satisfies the resonance conditions
+        res_motif = ResonanceMotif.from_tuples(MOTIF_AB)
+        assert loc[res_motif].location.axes == ('A', 'B')
+
+        residuals = resonance_residuals(res_motif, loc[res_motif].location, ps.to_dict(), toy_states())
+        assert residuals == pytest.approx([0.] * len(res_motif))
+
+    print()
+    for r,v in results.items():
+        print(f"{r}:")
+        for m, loc in v.items():
+            print(f"  {m}:")
+            for ax, val in zip(loc.location.axes, loc.location.values):
+                print(f"    {ax}: {val:.6f} Eh")
+        print()
