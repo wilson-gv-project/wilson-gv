@@ -162,10 +162,8 @@ def test_box_overlaps_excludes_touching_edges():
     assert not box.overlaps(Box({'A': (3., 4.)}))
 
 
-@pytest.mark.xfail(strict=True, reason='Box.contains loops over dict keys, not (min, max) pairs')
 def test_box_contains_points():
     box = Box({'A': (0., 1.), 'B': (0., 1.)})
-
     np.testing.assert_array_equal(box.contains(np.array([[0.5, 0.5], [2., 0.5]])), [True, False])
 
 
@@ -349,7 +347,6 @@ def test_normalize_coeffs_rejects_missing_amplitude():
         SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=None)], external_max=1.)
 
 
-@pytest.mark.xfail(strict=True, reason='a zero amplitude falls through to the "max_feat_coeff is None" error')
 def test_normalize_coeffs_keeps_zero_amplitude():
     result = SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=2.), feat(A=1., amp=0.)])
 
@@ -394,7 +391,6 @@ def test_feature_union_needs_amplitudes():
         feat(A=1., amp=None).union(feat(A=1.))
 
 
-@pytest.mark.xfail(strict=True, reason='union() does not pass lineshape_parameter to the new feature')
 def test_feature_union_keeps_lineshape_parameter():
     merged = feat(A=1., gamma=2.).union(feat(A=1., gamma=2.))
 
@@ -539,7 +535,7 @@ def test_dress_drops_the_weak_one_of_two_equal_features():
     strong, weak = feat(A=0., amp=1.), feat(A=0., amp=1e-3)  # same location, gamma and terms
     top = strong.get_intensity()
 
-    result = SpectralFeature.dress_these_with_boxes([strong, weak], top, top / 100)
+    result = SpectralFeature.dress_these_with_boxes([strong, weak], max_intensity=top, min_intensity=(top / 100))
 
     assert [f.amplitude_coeff for f in result] == [1.]
 
@@ -564,7 +560,6 @@ def test_magn_cond_filter_keeps_B_minus_A_above_margin():
     assert SpectralFeature.apply_magn_cond_filter(feats, (('-A', 'B'),), magn_conditions_margin=0.) == [feats[1]]
 
 
-@pytest.mark.xfail(strict=True, reason='FIXME in grid.py: an unknown condition silently drops every feature')
 def test_magn_cond_filter_rejects_unknown_condition():
     with pytest.raises(ValueError):
         SpectralFeature.apply_magn_cond_filter([feat(A=0., B=1.)], (('A',),), 0.)
@@ -664,7 +659,6 @@ def test_window_dress_with_featboxes_uses_strongest_full_feature():
     assert box_halfwidth(dressed.full_features[0]) == pytest.approx(5. * 10. * 1.1)
 
 
-@pytest.mark.xfail(strict=True, reason='RectangularDomain.from_features passes features, not boxes, to Box.union')
 def test_window_find_clusters_by_featboxes():
     f0, f1, f2 = feat(A=0.), feat(A=1.5), feat(A=10.)
     window = SpectralWindow(Box({'A': (-5., 15.)}), full_features=[f0, f1, f2])
@@ -676,7 +670,6 @@ def test_window_find_clusters_by_featboxes():
 
 ## RectangularDomain --------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='from_features passes features, not boxes, to Box.union')
 def test_domain_from_features_spans_feature_boxes():
     f0, f1 = feat(A=0.), feat(A=5.)
 

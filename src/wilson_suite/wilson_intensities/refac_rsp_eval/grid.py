@@ -160,7 +160,7 @@ class Box:
         if points.shape[-1] != self.ndim:
             raise ValueError(f"Expected points with {self.ndim} coords, got {points.shape[-1]}")
         inside = np.ones(points.shape[:-1], dtype=bool)
-        for i, (mn, mx) in enumerate(self.bounds):
+        for i, (mn, mx) in enumerate(self.bounds.values()):
             inside &= (points[..., i] >= mn) & (points[..., i] < mx)
         return inside
 
@@ -396,11 +396,12 @@ class SpectralFeature:
         return_feats = copy.deepcopy(features)
 
         for f in return_feats:
-            if max_feat_coeff and f.amplitude_coeff:
+            if max_feat_coeff is not None and f.amplitude_coeff is not None:
                 f.amplitude_coeff = f.amplitude_coeff / abs(max_feat_coeff)
             elif f.amplitude_coeff is None:
                 raise ValueError(f'feature {f} has no amplitude_coeff')
             else:
+                print('max_feat_coeff', max_feat_coeff, 'f.amplitude_coeff', f.amplitude_coeff)
                 raise ValueError('max_feat_coeff is None')
         return return_feats
 
@@ -438,10 +439,14 @@ class SpectralFeature:
             t1 = self.term_contributions if self.term_contributions is not None else ()
             t2 = other.term_contributions if other.term_contributions is not None else ()
             term_contributions = t1 + t2
-
+            if self.lineshape_parameter == other.lineshape_parameter:
+                linshpar = self.lineshape_parameter
+            else:
+                linshpar = None
             return SpectralFeature(location=self.location,
                                    term_contributions=term_contributions,
-                                   amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff)
+                                   amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff,
+                                   lineshape_parameter=linshpar)
         else:
             raise ValueError('Union is possible only when both location and lineshape_parameter are the same')
 
@@ -706,6 +711,8 @@ class SpectralFeature:
                 if feat.location._coord_dict['B'] - feat.location._coord_dict['A'] > (0+magn_conditions_margin):
                     res_features.append(feat)
             # FIXME(!): raise error on else
+            else:
+                raise ValueError("this magn_conditions isn't implemented")
         return res_features
 
     
@@ -934,7 +941,7 @@ class RectangularDomain:
             if f.feat_box is None:
                 raise ValueError(f'feature {f} does not have feat_box')
             else:
-                feats.append(f)
+                feats.append(f.feat_box)
         return cls(
             box=Box.union(feats),
             full_features=features
