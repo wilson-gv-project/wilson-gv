@@ -321,6 +321,30 @@ def test_res_loc_point_is_not_equal_to_other_types():
     assert ResLocPoint({'A': 1.}) != (('A', 1.),)
 
 
+def test_res_loc_point_ignores_later_changes_to_the_input_dict():
+    """Before, the point kept the caller's dict: the values changed, but the hash did not."""
+    coord = {'A': 1.}
+    point = ResLocPoint(coord)
+    before = hash(point)
+
+    coord['A'] = 2.
+    coord['B'] = 3.
+
+    assert point.as_dict() == {'A': 1.}
+    assert point.dimensionality == 1
+    assert hash(point) == before
+
+
+def test_res_loc_point_as_dict_returns_a_new_dict():
+    point = ResLocPoint({'A': 1., 'B': 2.})
+
+    d = point.as_dict()
+    d['A'] = 5.
+
+    assert point.as_dict() == {'A': 1., 'B': 2.}
+    assert point['A'] == 1.
+
+
 ## CompiledTerm -------------------------------------------------------------
 
 def _fake_vibpert_term():

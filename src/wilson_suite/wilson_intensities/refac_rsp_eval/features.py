@@ -130,7 +130,7 @@ class SpectralFeature:
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
         if self.lineshape_parameter is not None:
-            bounds = points_to_bounds(points=[self.location._coord_dict],
+            bounds = points_to_bounds(points=[self.location.as_dict()],
                                     halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
 
@@ -279,7 +279,7 @@ class SpectralFeature:
 
         inside = True
         for ax, (mn, mx) in box.bounds.items():
-            inside &= (self.location._coord_dict[ax] >= mn) & (self.location._coord_dict[ax] <= mx)
+            inside &= (self.location[ax] >= mn) & (self.location[ax] <= mx)
         return inside
 
     def feat_box_overlaps(self, box: Box) -> bool:
@@ -307,7 +307,7 @@ class SpectralFeature:
             Gamma = self.lineshape_parameter
             # FIXME??   2*Gamma ??
             # in place ADDition
-            contributing &= (self.location._coord_dict[ax] >= mn-2*Gamma) & (self.location._coord_dict[ax] <= mx+2*Gamma)
+            contributing &= (self.location[ax] >= mn-2*Gamma) & (self.location[ax] <= mx+2*Gamma)
         return contributing and not self.is_inside(box)
 
     
@@ -566,7 +566,7 @@ class SpectralFeature:
                 
                 feat.feat_box = Box({k: (v - box_extent,
                                          v + box_extent)
-                                     for k,v in feat.location._coord_dict.items()})
+                                     for k,v in feat.location.as_dict().items()})
 
         return res_features
 
@@ -589,10 +589,10 @@ class SpectralFeature:
 
         for feat in features:
             if magn_conditions == (('B',),):
-                if feat.location._coord_dict['B'] > (0+magn_conditions_margin):
+                if feat.location['B'] > (0+magn_conditions_margin):
                     res_features.append(feat)
             elif magn_conditions == (('-A', 'B',),):
-                if feat.location._coord_dict['B'] - feat.location._coord_dict['A'] > (0+magn_conditions_margin):
+                if feat.location['B'] - feat.location['A'] > (0+magn_conditions_margin):
                     res_features.append(feat)
             else:
                 raise ValueError("this magn_conditions isn't implemented")

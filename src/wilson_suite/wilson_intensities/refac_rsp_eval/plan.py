@@ -418,7 +418,8 @@ class ResLocPoint:
 
     """
     def __init__(self, coord_dict: dict[str, CoordValue]):
-        self._coord_dict = coord_dict
+        # own copy: a later change to the caller's dict must not change this point
+        self._coord_dict = dict(coord_dict)
         # dict to sorted tuple of tuples for consistent hashing
         self.coordinates: Coordinates = tuple(sorted(coord_dict.items()))
 
@@ -434,6 +435,10 @@ class ResLocPoint:
     def dimensionality(self) -> int:
         """Returns dimensionality of the point"""
         return len(self._coord_dict)
+
+    def as_dict(self) -> dict[str, CoordValue]:
+        """{axis: value} as a new dict; changing it does not change the point."""
+        return dict(self._coord_dict)
 
     def __getitem__(self, axis: str) -> CoordValue:
         for k, v in self.coordinates:

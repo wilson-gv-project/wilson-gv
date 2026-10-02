@@ -458,6 +458,9 @@ def get_RHS_motif(motif: 'ResonanceMotif',
 
     output: [5, -3, 2]
     """
+    if unit not in ('Eh', 'cm-1'):
+        raise ValueError(f"unit must be 'Eh' or 'cm-1', got {unit!r}")
+
     constants = []
 
     for res_cond_key in motif:

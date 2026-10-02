@@ -169,6 +169,13 @@ def test_get_RHS_motif_follows_the_mode_assignment(states):
     assert swapped == pytest.approx([-(E01 - E1), -(E0 - E1)])
 
 
+@pytest.mark.parametrize('unit', ['cm', 'cm^-1', 'eh', 'au'])
+def test_get_RHS_motif_unknown_unit_raises(unit, params_obj, states):
+    """Before, every text except 'Eh' silently meant cm-1."""
+    with pytest.raises(ValueError, match="unit must be 'Eh' or 'cm-1'"):
+        get_RHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, unit=unit)
+
+
 def test_get_RHS_motif_unknown_state_raises(states):
     motif = ResonanceMotif.from_tuples(MOTIF_A)
 
@@ -209,6 +216,11 @@ def test_solve_LSE_motif_hartree_is_cm1_converted(params_obj, states):
 
     assert in_eh.axes == in_cm1.axes
     assert in_eh.values == pytest.approx(tuple(convNu2Ene(v) for v in in_cm1.values))  # type: ignore
+
+
+def test_solve_LSE_motif_unknown_unit_raises(params_obj, states):
+    with pytest.raises(ValueError, match="unit must be 'Eh' or 'cm-1'"):
+        solve_LSE_motif(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, unit='cm')
 
 
 def test_solve_LSE_motif_inconsistent_system_raises_linalg_error(params_obj, states):
