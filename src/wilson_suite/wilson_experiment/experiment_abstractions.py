@@ -226,11 +226,7 @@ class EmPulse:
         if isinstance(self.wv, tuple):
             if len(self.wv) == 3:
                 if all([isinstance(i, float) for i in self.wv]):
-                    wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
-                    if not wv_len == 1.0:
-                        print('Wavevector was normalized')
-                    self.wv = tuple([i/wv_len for i in self.wv])
-
+                    self.wv = tuple(self.wv)
                 else:
                     raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
             else:
@@ -245,7 +241,7 @@ class EmPulse:
                 if all([isinstance(i, float) for i in self.pol]):
                     pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
                     if not pol_len == 1.0:
-                        print('Wavevector was normalized')
+                        print('Polarization vector was normalized')
                     self.pol = tuple([i/pol_len for i in self.pol])
 
                     wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
@@ -352,12 +348,16 @@ class ElectricField:
     ----
     pulses: List of EmPulse instances: The pulses making up the field. While EmPulse itself does not require an ID to
     be specified, the use of pulses in ElectricField must have each pulse be assigned an ordinal integer ID starting from 1
+    These pulses are understood as "hosting" a cos(w_c t + k*r) oscillatory factor; post-init
+    will further divide them into individual positive/negative e^(i (-w_c t + k*r) + c.c. components
     """
 
     pulses: tuple[EmPulse]
 
     def __post_init__(self):
 
+        # NOTE: This restriction can be softened somewhat to pulse IDs needing to be a positive integer
+        # (but not necessarily together correspond exactly to the ordinal list)
         pulse_id_target = [i + 1 for i in range(len(self.pulses))]
         for i in self.pulses:
             if not i.id in pulse_id_target:
@@ -379,11 +379,108 @@ class ElectricField:
         else:
             self.impulsive_field = False
 
-    def overlapping_pulses(self, tol_n_dev: float | int = 5.0) -> tuple[tuple]:
+        # Making signed field: A dictionary corresponding to pulse IDs, divided into positive/negative
+        # freq/wavevector components. Negative components will have IDs = -1 * original ID.
+        # The pulses created here will be understood to have an oscillatory factor e^(i (-w_c t + k*r) or c.c.
+        # Organizing in dictionary when the pulse ID is also in the instance is redundant but kept for convenience
+
+        signed_pulses = {}
+
+        for i in self.pulses:
+
+            # Positive component
+            signed_pulses[i.id] = copy.deepcopy(i)
+
+            # Negative component
+            # FIXME: What happens to the polarization and overall phase? kept same for now but is it flipped?
+            signed_pulses[-1 * i.id] = EmPulse(i.env, i.tc, -1 * i.cf, i.dev, i.maxstr,
+                                               tuple([-1.0*j for j in i.wv]),
+                                               i.pol, i.overall_phase, -1 * i.id)
+
+            self.signed_pulses = signed_pulses
+
+
+    # Take a reference to an interaction pattern and return all interaction patterns whose vector sum
+    # corresponds to the same direction
+    def wavevectors_matching_ids(self, ids: list | tuple, filter: str='same_order') -> list[tuple]:
+        """
+        ids: List or tuple making up an interaction pattern (ordering arbitrary).
+        Example: To represent the phase-matching direction k1 - k1 + k2 + k3, ids = [2, -1, 3, 1] is a valid choice
+        (as are all its permutations)
+
+        filter: A flag to constrain the search (default and currently only supported: 'same_order', which will
+        make this function return only those patterns which both correspond to the same direction and contain the
+        same number of interactions as ids, and 'up_to_order', which will additionally return all lower-order
+        combinations summing to this pattern.
+
+        Returns: A list of tuples: Each tuple is a (sorted and filtered to unique after sorting) interaction pattern
+        whose wavevector will be oriented in the same direction as that corresponding to ids
+        """
+        from itertools import combinations_with_replacement as combs
+
+        valid_filters = ['same_order', 'up_to_order']
+
+        if not filter in valid_filters:
+            raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
+
+        sorted_ids = sorted(list(ids))
+
+        # Make target wavevector
+        target_wv = [0.0, 0.0, 0.0]
+        for i in sorted_ids:
+            target_wv = [target_wv[j] + self.signed_pulses[i].wv[j] for j in range(3)]
+
+        # Normalize
+        t_len = (sum([k ** 2 for k in target_wv])) ** 0.5
+        if not t_len == 0.0:
+            target_wv = [j/t_len for j in target_wv]
+
+        # The input interaction pattern trivially matches
+        matching_wv = [tuple(sorted_ids)]
+
+
+        if filter == 'same_order':
+            ord_start = len(sorted_ids)
+            ord_end = len(sorted_ids) + 1
+
+        elif filter == 'up_to_order':
+            ord_start = 1
+            ord_end = len(sorted_ids) + 1
+
+        all_ids = self.signed_pulses.keys()
+
+        parallel_tol = 1.e-10
+
+        for ord in range(ord_start, ord_end):
+
+            # Make all unique combinations of signed pulses keys of len ord
+            for c in combs(all_ids, ord):
+
+                # Make candidate wavevector
+                cand_wv = [0.0, 0.0, 0.0]
+                for i in c:
+                    cand_wv = [cand_wv[j] + self.signed_pulses[i].wv[j] for j in range(3)]
+
+                c_len = (sum([k ** 2 for k in cand_wv])) ** 0.5
+                if not c_len == 0.0:
+                    cand_wv = [j / c_len for j in cand_wv]
+
+                if abs(sum([cand_wv[i] * target_wv[i] for i in range(3)]) - 1) < parallel_tol:
+
+                    tc = tuple(sorted(c))
+                    if not tc in matching_wv:
+                        matching_wv.append(tc)
+
+        return matching_wv
+
+    def overlapping_pulses_for_interaction_pattern(self, pattern: list | tuple, tol_n_dev: float | int = 5.0) -> tuple[tuple]:
         """
         Calculate and tell which pulses of this field have overlapping temporal envelopes
-        under a tolerance parameter. This routine currently only supports this calculation
-        for Gaussian-envelope pulses.
+        under a tolerance parameter for the given interaction pattern.
+        This routine currently only supports this calculation for Gaussian-envelope pulses.
+
+        pattern: List or tuple describing interactions with field. Ordering is arbitrary and
+        duplicates are fine.
 
         tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses): Each pulse's
         "region of influence" is taken as +/- tol_n_dev * the pulse's deviation parameter.
@@ -393,28 +490,32 @@ class ElectricField:
         Returns: A tuple of tuples. Each "inner" tuple is a tuple of pulse IDs ruled to be
         overlapping in time. Any tuple not in the return data was ruled to not overlap in time.
         """
+
+        #TODO: Make this w.r.t. a phase-matching condition and signed fields
+
         from itertools import combinations, chain
         from math import inf as infinity
+
+        pattern_sorted = sorted(list(pattern))
 
         # Make interval around each pulse as dictionary
         pulse_intervals = {}
 
-        for i in self.pulses:
+        for i in pattern_sorted:
 
-            if not i.env == 'gaussian':
+            if not self.signed_pulses[i].env == 'gaussian':
                 raise ValueError('overlapping_pulses currently only supports Gaussian-envelope pulses')
 
-            if i.tendsImpulsive():
-                pulse_intervals[i.id] = [i.tc, i.tc]
-            elif i.tendsContinuous():
-                pulse_intervals[i.id] = [-infinity, infinity]
+            if self.signed_pulses[i].tendsImpulsive():
+                pulse_intervals[i] = [self.signed_pulses[i].tc, self.signed_pulses[i].tc]
+            elif self.signed_pulses[i].tendsContinuous():
+                pulse_intervals[i] = [-infinity, infinity]
             else:
-                pulse_intervals[i.id] = [i.tc - tol_n_dev * i.dev, i.tc + tol_n_dev * i.dev]
-
-        print('pulse intervals', pulse_intervals)
+                pulse_intervals[i] = [self.signed_pulses[i].tc - tol_n_dev * self.signed_pulses[i].dev,
+                                      self.signed_pulses[i].tc + tol_n_dev * self.signed_pulses[i].dev]
 
         # Make powerset of pulse IDs
-        pulse_powerset = list(chain.from_iterable(combinations(sorted(pulse_intervals.keys()), i) for i in range(len(pulse_intervals) + 1) ))
+        pulse_powerset = list(chain.from_iterable(combinations(pattern_sorted, i) for i in range(len(pattern_sorted) + 1) ))
 
         # For each element in powerset (smaller to larger sets): Determine intersection
         # If intersection is nonempty, add to return data
@@ -429,7 +530,8 @@ class ElectricField:
 
             # Single pulses are trivially overlapping
             elif len(i) == 1:
-                valid_intersections.append(i)
+                if not i in valid_intersections:
+                    valid_intersections.append(tuple(i))
 
             # General case
             else:
@@ -448,7 +550,8 @@ class ElectricField:
 
                 # If loop was not broken, consider this a valid intersection
                 else:
-                    valid_intersections.append(i)
+                    if not i in valid_intersections:
+                        valid_intersections.append(tuple(i))
 
         return valid_intersections
 

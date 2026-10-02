@@ -308,7 +308,7 @@ def test_electric_field():
     assert field.impulsive_field
     assert not(field.cw_field)
 
-    v_int = field.overlapping_pulses()
+    v_int = field.overlapping_pulses_for_interaction_pattern(pattern=(1, 2, 3))
 
     # All pulse subsets should overlap in time here
     assert v_int == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
@@ -330,7 +330,7 @@ def test_electric_field():
     field_cw = ElectricField(pulses_cw)
     assert field_cw.cw_field
 
-    v_int_cw = field_cw.overlapping_pulses()
+    v_int_cw = field_cw.overlapping_pulses_for_interaction_pattern(pattern=[1, 2, 3])
 
     # Again, all pulses should overlap
     assert v_int_cw == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
@@ -341,7 +341,7 @@ def test_electric_field():
     assert not(field_mix_1.cw_field)
     assert not(field_mix_1.impulsive_field)
 
-    v_int_mix = field_mix_1.overlapping_pulses()
+    v_int_mix = field_mix_1.overlapping_pulses_for_interaction_pattern(pattern=[1, 2, 3])
 
     # Yet again, all pulses should overlap
     assert v_int_mix == [(1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
@@ -352,26 +352,58 @@ def test_electric_field():
     assert not(field_mix_2.impulsive_field)
 
     # More general case: Complicated overlap configurations
-    pulse_gen_a = EmPulse(env='gaussian', tc=120.0, dev=20.0, cf=0.072, id=3)
-    pulse_gen_b = EmPulse(env='gaussian', dev=infinity, cf=0.0, id=1)
-    pulse_gen_c = EmPulse(env='gaussian', tc=300.01, dev=20.0, cf=0.02, id=2)
-    pulse_gen_d = EmPulse(env='gaussian', tc=20.0, dev=0.0, cf=0.072, id=4)
-    pulse_gen_e = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.07, id=6)
-    pulse_gen_f = EmPulse(env='gaussian', tc=230.0, dev=30.0, cf=0.02, id=5)
+
+    pulse_gen_b = EmPulse(env='gaussian', dev=infinity, cf=0.0, id=1, wv=(1.0, 0.0, 0.0), pol=(0.0, 1.0, 0.0))
+    pulse_gen_c = EmPulse(env='gaussian', tc=300.01, dev=20.0, cf=0.02, id=2, wv=(1.0, 2.0, 0.0), pol=(0.0, 0.0, 1.0))
+    pulse_gen_a = EmPulse(env='gaussian', tc=120.0, dev=20.0, cf=0.072, id=3, wv=(1.0, 0.0, 0.0), pol=(0.0, 1.0, 0.0))
+    pulse_gen_d = EmPulse(env='gaussian', tc=20.0, dev=0.0, cf=0.072, id=4, wv=(0.0, 2.0, 4.0), pol=(1.0, 0.0, 0.0))
+    pulse_gen_f = EmPulse(env='gaussian', tc=230.0, dev=30.0, cf=0.02, id=5, wv=(0.0, 1.0, -4.0), pol=(1.0, 0.0, 0.0))
+    pulse_gen_e = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.07, id=6, wv=(1.0, 2.0, 0.0), pol=(0.0, 0.0, 2.0))
+
 
     field_gen = ElectricField((pulse_gen_a, pulse_gen_b, pulse_gen_c, pulse_gen_d, pulse_gen_e, pulse_gen_f))
 
-    v_int_gen = field_gen.overlapping_pulses()
+    v_int_gen = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, 2, 3, 4, 5, 6))
 
     assert v_int_gen == [(1,), (2,), (3,), (4,), (5,), (6,), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (2, 3),
                          (2, 5), (3, 4), (3, 5), (3, 6), (5, 6), (1, 2, 3), (1, 2, 5), (1, 3, 4), (1, 3, 5),
                          (1, 3, 6), (1, 5, 6), (2, 3, 5), (3, 5, 6), (1, 2, 3, 5), (1, 3, 5, 6)]
 
     # Lower tolerance (stricter) to rule overlap: Some of the patterns ruled in with default tolerance are now out
-    v_int_gen_b = field_gen.overlapping_pulses(tol_n_dev=2.0)
+    v_int_gen_b = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, 2, 3, 4, 5, 6), tol_n_dev=2.0)
 
     assert v_int_gen_b == [(1,), (2,), (3,), (4,), (5,), (6,), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6),
                          (2, 5), (3, 6), (1, 2, 5), (1, 3, 6) ]
+
+    v_int_gen_b = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, -2, 3, 4, -5, 6), tol_n_dev=2.0)
+    assert v_int_gen_b == [ (-5,), (-2,), (1,), (3,), (4,), (6,), (-5, -2), (-5, 1), (-2, 1), (1, 3), (1, 4), (1, 6),
+                            (3, 6), (-5, -2, 1), (1, 3, 6)]
+
+    v_int_gen_b = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, -1, 1, -1, 3, -5), tol_n_dev=2.0)
+
+    assert sorted(v_int_gen_b) == sorted([(-5,), (-1,), (1,), (3,), (-5, -1), (-5, 1), (-1, -1), (-1, 1), (-1, 3), (1, 1), (1, 3),
+                           (-5, -1, -1), (-5, -1, 1), (-5, 1, 1), (-1, -1, 1), (-1, -1, 3),
+                           (-1, 1, 1), (-1, 1, 3), (1, 1, 3), (-5, -1, -1, 1), (-5, -1, 1, 1), (-1, -1, 1, 1),
+                           (-1, -1, 1, 3), (-1, 1, 1, 3), (-5, -1, -1, 1, 1), (-1, -1, 1, 1, 3)  ])
+
+
+
+    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -2, 3, -4), filter='same_order')
+
+    # TODO: These matching_wv results verified for positive ID but not for false negatives
+    assert matching_wv == [(-4, -2, 1, 3), (-4, -2, 3, 3), (-6, -4, 3, 3), (-6, -4, 1, 3), (-4, -2, 1, 1), (-6, -4, 1, 1)]
+
+    # TODO: VERIFY THE REST OF THE RESULTS IN THIS FN
+    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -1, 6, -5), filter='same_order')
+    assert matching_wv == [(-5, -1, 1, 6), (-5, -3, 2, 3), (-5, -3, 3, 6), (-5, -1, 2, 3), (-5, -1, 3, 6),
+                           (-5, -3, 1, 2), (-5, -3, 1, 6), (-5, -1, 1, 2), (-5, -2, 2, 2), (-6, -5, 2, 2),
+                           (-5, -5, 2, 2), (-5, -2, 2, 6), (-5, -4, 2, 4), (-6, -5, 2, 6), (-5, -5, 2, 6),
+                           (-5, -5, 2, 5), (-5, -2, 6, 6), (-5, -4, 4, 6), (-6, -5, 6, 6), (-5, -5, 6, 6),
+                           (-5, -5, 5, 6)]
+
+
+    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, 3, -5), filter='up_to_order')
+    assert matching_wv == [(-5, 1, 3), (-5, 3, 3), (-5, 1, 1)]
 
 def test_vib_experiment():
 
