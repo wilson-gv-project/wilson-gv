@@ -201,7 +201,18 @@ def test_evaluate_term():
     print(value)
     print(contribs)
 
-    results = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None, 
-                                   molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
-    print(results)
+    # term 2: resonance labels a, b are fixed; summation label c runs over every mode
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, precalculated_data=None,
+                                                molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
+    n_modes = len(molsys.eigenvals) # type: ignore
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_func=avrg_func)[0]
+                  for c in range(n_modes))
+    assert by_hand != 0.
+    assert total == pytest.approx(by_hand)
+    assert len(leaves) == n_modes
+
+    # b is a resonance label: summing over b would add peaks at different positions
+    with pytest.raises(ValueError, match=r"resonance labels \['b'\] must be fixed"):
+        evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None,
+                                    molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
 

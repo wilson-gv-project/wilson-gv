@@ -7,7 +7,8 @@
 ==> list[SpectralFeature]
 """
 
-from collections.abc import Callable, Iterable, Sequence
+from collections import defaultdict
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -70,13 +71,21 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18) -> tuple[float, dict]:
     """
-    The call {'a': 0} sums over b and c. The result adds up peaks at different positions into one number, with no error.
+    Coefficient of one term at one resonance location.
 
-    not_fixed = [i for i in compl_term.nonsumm_idx if i not in idx_dict]
+    idx_dict must fix every resonance label (compl_term.idx_nonsumm): these labels decide where
+    the peak sits. Every label left out is summed over all modes. The summed pieces all sit at
+    the same location, so adding them is safe.
+
+    e.g. a term with resonance labels (a, b) and summation label c:
+        {'a': 0, 'b': 1}  ->  f(0,1,0) + f(0,1,1) + ... + f(0,1,n_modes-1)
+        {'a': 0}          ->  ValueError: summing over b would add peaks at different positions
+
+    returns (total, leaves): leaves maps each full index set to its factors
+    """
+    not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
         raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
-    to_sum = [i for i in compl_term.summ_idx if i not in idx_dict]
-    """
 
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
@@ -523,7 +532,7 @@ def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
 def coefficient_compute_loop(ids_sets: list[dict[str, int]], 
                                  term: 'CompiledTerm', molsys_data: MolSystemData,
                                  polarization_linear_comb: dict | None=None, 
-                                 precalculated_data: PrecalculatedData | None=None) -> dict:
+                                 precalculated_data: PrecalculatedData | None=None) -> dict[ParameterSet, tuple[float, dict]]:
     
     results = {}
     for idxset in ids_sets:
@@ -536,12 +545,12 @@ def coefficient_compute_loop(ids_sets: list[dict[str, int]],
 
 def resonance_compute_loop(ids_sets: list[dict[str, int]], 
                                motif: 'ResonanceMotif', 
-                               vibstates_data: 'VibStatesData') -> dict:
+                               vibstates_data: 'VibStatesData') -> dict[ParameterSet, ResLocPoint]:
     
     results = {}
     for idxset in ids_sets:
-        coeff = solve_LSE_motif(motif, ParameterSet(idxset), vibstates_data)
-        results[ParameterSet(idxset)] = coeff
+        reslocpoint = solve_LSE_motif(motif, ParameterSet(idxset), vibstates_data)
+        results[ParameterSet(idxset)] = reslocpoint
     
     return results
 
@@ -561,11 +570,99 @@ def get_motifs_feats(motifs: Sequence['ResonanceMotif'],
         ps = ParameterSet(idxset)
         results[ps] = {}
         for motif in motifs:
-            resloc = solve_LSE_motif(motif, ps, vibstates_data)
-            results[ps][motif] = SpectralFeature(resloc)
-    
+            try:
+                resloc = solve_LSE_motif(motif, ps, vibstates_data)
+                results[ps][motif] = SpectralFeature(resloc)
+            except np.linalg.LinAlgError:
+                pass
+
     return results
 
+## -------------------------------------------------------------------------------
+##          Complete data computation: from terms to contributions to features
+## -------------------------------------------------------------------------------
+
+"""
+CompiledTerm list
+  │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
+  v
+(term, params) pairs
+  │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
+  │    skip the pair if coeff == 0
+  │ 3. location: solve_LSE_motif, once per (motif, params)            ← VibStatesData
+  v
+ContributionRow(term_id, term, params, location, coeff)    "why" layer
+  │ 4. group by rounded location, add the coeffs
+  v
+SpectralFeature(location, rows)                            "what" layer
+  │ 5. add peak width, filter to the spectral window
+  v
+grid.py → spectrum array                                   the picture
+
+"""
+
+@dataclass(frozen=True)
+class ContributionRow:
+    term_id: int
+    term: 'CompiledTerm'
+    params: ParameterSet
+    location: ResLocPoint
+    coeff: float
+
+    @property
+    def motif(self) -> 'ResonanceMotif':
+        return self.term.cmp_resmotf
+
+
+class ContributionTable:
+    def __init__(self, rows: Iterable[ContributionRow]):
+        self._rows = tuple(rows)
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self):
+        return len(self._rows)
+
+    # the two general tools
+    def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
+        return ContributionTable(r for r in self._rows if keep(r))
+
+    def group_by(self, key: Callable[[ContributionRow], Hashable]) -> dict[Hashable, 'ContributionTable']:
+        groups = defaultdict(list)
+        for r in self._rows:
+            groups[key(r)].append(r)
+        return {k: ContributionTable(v) for k, v in groups.items()}
+
+    # named shortcuts for frequent questions
+    def by_params(self):
+        return self.group_by(lambda r: r.params)
+
+    def by_motif(self):
+        return self.group_by(lambda r: r.motif)
+
+    def by_location(self, decimals=6):
+        return self.group_by(lambda r: tuple((ax, round(v, decimals)) for ax, v in r.location.coordinates))
+
+    def axis_range(self, axis):
+        vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
+        return min(vals), max(vals)
+
+
+def build_contributions(terms, n_modes, molsys_data, vibstates_data,
+                        polarization_linear_comb=None, precalculated_data=None) -> 'ContributionTable':
+    locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
+    rows = []
+    for term_id, term in enumerate(terms):
+        for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
+            ps = ParameterSet(idxset)
+            key = (term.cmp_resmotf, ps)
+            if key not in locations:         # one solve per (motif, params)
+                locations[key] = solve_LSE_motif(term.cmp_resmotf, ps, vibstates_data)
+            coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data,
+                                                   polarization_linear_comb, precalculated_data)
+            rows.append(ContributionRow(term_id, term, ps, locations[key], coeff))
+    return ContributionTable(rows)
 
 
 

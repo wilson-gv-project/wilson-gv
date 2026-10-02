@@ -422,8 +422,9 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
 
         results[ParameterSet(partial)] = (sum of leaf values, {ParameterSet(leaf): contribs})
 
-    Which labels get summed is decided by what is missing from the partial dict, not by the
-    term's idx_summ_nonsumm split; the split is read only to learn which labels the term has.
+    Which labels get summed is decided by what is missing from the partial dict. The term's
+    idx_nonsumm labels must all be fixed (see test_evaluate_term_coeffs_resonance_labels_must_be_fixed);
+    here idx_nonsumm is just ('a',), so b and c may be left out.
 
     This test checks the enumeration alone: evaluate_full_index_dict is stubbed to return
     100a + 10b + c, so each leaf value spells out its own assignment and the expected totals
@@ -446,6 +447,24 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
 
     assert total == expected_total
     assert {tuple(leaf[k] for k in 'abc') for leaf in leaves} == expected_leaves
+
+
+@pytest.mark.parametrize('fixed, not_fixed', [
+    ({'a': 0},  ['b']),
+    ({'b': 0},  ['a']),
+    ({},        ['a', 'b']),
+])
+def test_evaluate_term_coeffs_resonance_labels_must_be_fixed(fixed, not_fixed, molsys):
+    """
+    a and b are resonance labels: they decide where the peak sits. Summing over b would add
+    peaks at different positions into one number, so the call raises instead.
+    """
+    term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
+                        idx_summ=('c',), idx_nonsumm=('a', 'b'))
+
+    with pytest.raises(ValueError) as err:
+        evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys)
+    assert str(err.value) == f'resonance labels {not_fixed} must be fixed, not summed'
 
 
 def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_precalc, molsys):
