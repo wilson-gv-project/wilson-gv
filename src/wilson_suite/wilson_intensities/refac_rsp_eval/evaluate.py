@@ -7,14 +7,17 @@
 ==> list[SpectralFeature]
 """
 
-from collections import defaultdict
-from collections.abc import Callable, Hashable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionRow,
+    ContributionTable,
+    SpectralFeature,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocPoint,
@@ -532,141 +535,54 @@ def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
     return [dict(zip(mode_labels, combo)) for combo in itertools.product(nm_inds_choices, repeat=len(mode_labels))]
 
 
-def coefficient_compute_loop(ids_sets: list[dict[str, int]], 
-                                 term: 'CompiledTerm', molsys_data: MolSystemData,
-                                 polarization_linear_comb: dict | None=None, 
-                                 precalculated_data: PrecalculatedData | None=None) -> dict[ParameterSet, tuple[float, dict]]:
-    
-    results = {}
-    for idxset in ids_sets:
-        coeff_evals = evaluate_term_coeff_sumover(term, idxset, molsys_data, 
-                                                  polarization_linear_comb, precalculated_data)
-        results[ParameterSet(idxset)] = coeff_evals
-    
-    return results
-
-
-def resonance_compute_loop(ids_sets: list[dict[str, int]], 
-                               motif: 'ResonanceMotif', 
-                               vibstates_data: 'VibStatesData') -> dict[ParameterSet, ResLocPoint]:
-    
-    results = {}
-    for idxset in ids_sets:
-        reslocpoint = solve_LSE_motif(motif, ParameterSet(idxset), vibstates_data)
-        results[ParameterSet(idxset)] = reslocpoint
-    
-    return results
-
-
-def get_motifs_feats(motifs: Sequence['ResonanceMotif'], 
-                    ids_sets: list[dict[str, int]], 
-                    vibstates_data: 'VibStatesData') -> dict[ParameterSet, dict['ResonanceMotif', 'SpectralFeature']]:
+def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemData,
+                        polarization_linear_comb=None, precalculated_data=None
+                        ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]], list[tuple[int, ParameterSet, float]]]:
     """
-    motifs - sequence of ResonanceMotif
-    ids_sets - list of index dictionaries, one per index set
-    vibstates_data - VibStatesData instance
+    One row per (term, index set) that adds to the spectrum. Index sets fix the term's
+    resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
+    The number of modes comes from molsys_data.eigenvals, the state energies from molsys_data.states.
 
-    returns dict[ParameterSet, dict[ResonanceMotif, SpectralFeature]]
+    returns (rows, zero, failed), so that len(rows) + len(zero) + len(failed) == number of pairs:
+        zero   - (term_id, params) with coeff == 0: no row, no location solved
+        failed - (term_id, params, coeff) with no single resonance point (LinAlgError)
     """
-    results = {}
-    for idxset in ids_sets:
-        ps = ParameterSet(idxset)
-        results[ps] = {}
-        for motif in motifs:
-            try:
-                resloc = solve_LSE_motif(motif, ps, vibstates_data)
-                results[ps][motif] = SpectralFeature(resloc)
-            except np.linalg.LinAlgError:
-                pass
+    if molsys_data.eigenvals is None:
+        raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
+    n_modes = len(molsys_data.eigenvals)
 
-    return results
-
-## -------------------------------------------------------------------------------
-##          Complete data computation: from terms to contributions to features
-## -------------------------------------------------------------------------------
-
-"""
-CompiledTerm list
-  │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
-  v
-(term, params) pairs
-  │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
-  │    skip the pair if coeff == 0
-  │ 3. location: solve_LSE_motif, once per (motif, params)            ← VibStatesData
-  v
-ContributionRow(term_id, term, params, location, coeff)    "why" layer
-  │ 4. group by rounded location, add the coeffs
-  v
-SpectralFeature(location, rows)                            "what" layer
-  │ 5. add peak width, filter to the spectral window
-  v
-grid.py → spectrum array                                   the picture
-
-"""
-
-@dataclass(frozen=True)
-class ContributionRow:
-    term_id: int
-    term: 'CompiledTerm'
-    params: ParameterSet
-    location: ResLocPoint
-    coeff: float
-
-    @property
-    def motif(self) -> 'ResonanceMotif':
-        return self.term.cmp_resmotf
-
-
-class ContributionTable:
-    def __init__(self, rows: Iterable[ContributionRow]):
-        self._rows = tuple(rows)
-
-    def __iter__(self):
-        return iter(self._rows)
-
-    def __len__(self):
-        return len(self._rows)
-
-    # the two general tools
-    def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
-        return ContributionTable(r for r in self._rows if keep(r))
-
-    def group_by(self, key: Callable[[ContributionRow], Hashable]) -> dict[Hashable, 'ContributionTable']:
-        groups = defaultdict(list)
-        for r in self._rows:
-            groups[key(r)].append(r)
-        return {k: ContributionTable(v) for k, v in groups.items()}
-
-    # named shortcuts for frequent questions
-    def by_params(self):
-        return self.group_by(lambda r: r.params)
-
-    def by_motif(self):
-        return self.group_by(lambda r: r.motif)
-
-    def by_location(self, decimals=6):
-        return self.group_by(lambda r: tuple((ax, round(v, decimals)) for ax, v in r.location.coordinates))
-
-    def axis_range(self, axis):
-        vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
-        return min(vals), max(vals)
-
-
-def build_contributions(terms, n_modes, molsys_data, vibstates_data,
-                        polarization_linear_comb=None, precalculated_data=None) -> 'ContributionTable':
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
-    rows = []
+    rows, zero, failed = [], [], []
     for term_id, term in enumerate(terms):
+        motif = term.cmp_resmotf
         for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
             ps = ParameterSet(idxset)
-            key = (term.cmp_resmotf, ps)
-            if key not in locations:         # one solve per (motif, params)
-                locations[key] = solve_LSE_motif(term.cmp_resmotf, ps, vibstates_data)
+
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data,
                                                    polarization_linear_comb, precalculated_data)
-            rows.append(ContributionRow(term_id, term, ps, locations[key], coeff))
-    return ContributionTable(rows)
+            # not saving 0 coeffs
+            if coeff == 0.:
+                zero.append((term_id, ps))
+                continue
+            key = (motif, ps)
+            
+            # one solve per (motif, params)
+            if key not in locations:
+                try:
+                    locations[key] = solve_LSE_motif(motif, ps, molsys_data.states, unit='cm-1')
+                
+                # Case 1: the resonance is a line, not a point. 
+                # Case 2: the resonance conditions are inconsistent, no solution.
+                except np.linalg.LinAlgError:
+                    failed.append((term_id, ps, coeff))
+                    continue
+            rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
+    return ContributionTable(rows), zero, failed
 
+
+def features_from_rows(table: ContributionTable, tol_cm: float = 0.01) -> list[SpectralFeature]:
+    return [SpectralFeature(location=next(iter(group)).location, rows=tuple(group))
+            for group in table.by_location(tol_cm).values()]
 
 
 """

@@ -10,6 +10,8 @@ Takes Box and box clustering from grid.py; grid.py never imports from here.
 Note: SpectralWindow.sample_grid is pure geometry and could move to grid.py later.
 """
 import copy
+from collections import defaultdict
+from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -34,7 +36,6 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         ResLocPoint,
     )
-
 
 @dataclass(frozen=True)
 class TermParametersChoice:
@@ -752,5 +753,76 @@ class RectangularDomain:
             box=Box.union(feats),
             full_features=features
         )
+
+
+
+## -------------------------------------------------------------------------------
+##          Complete data computation: from terms to contributions to features
+## -------------------------------------------------------------------------------
+
+"""
+CompiledTerm list
+  │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
+  v
+(term, params) pairs
+  │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
+  │    skip the pair if coeff == 0
+  │ 3. location: solve_LSE_motif, once per (motif, params)            ← VibStatesData
+  v
+ContributionRow(term_id, motif, params, location, coeff)   "why" layer
+  │ 4. group by rounded location, add the coeffs
+  v
+SpectralFeature(location, rows)                            "what" layer
+  │ 5. add peak width, filter to the spectral window
+  v
+grid.py → spectrum array                                   the picture
+
+"""
+
+@dataclass(frozen=True)
+class ContributionRow:
+    """One term at one index set. The term itself is terms[term_id]."""
+    term_id: int
+    motif: ResonanceMotif
+    params: ParameterSet
+    location: 'ResLocPoint'
+    coeff: float
+
+
+class ContributionTable:
+    def __init__(self, rows: Iterable[ContributionRow]):
+        self._rows = tuple(rows)
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self):
+        return len(self._rows)
+
+    # the two general tools
+    def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
+        return ContributionTable(r for r in self._rows if keep(r))
+
+    def group_by(self, key: Callable[[ContributionRow], Hashable]) -> dict[Hashable, 'ContributionTable']:
+        groups = defaultdict(list)
+        for r in self._rows:
+            groups[key(r)].append(r)
+        return {k: ContributionTable(v) for k, v in groups.items()}
+
+    # named shortcuts for frequent questions
+    def by_params(self):
+        return self.group_by(lambda r: r.params)
+
+    def by_motif(self):
+        return self.group_by(lambda r: r.motif)
+
+    def by_location(self, tol_cm: float = 0.01):
+        return self.group_by(lambda r: tuple((ax, round(v / tol_cm)) for ax, v in r.location.coordinates))
+
+    def axis_range(self, axis):
+        vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
+        return min(vals), max(vals)
+
+
 
 

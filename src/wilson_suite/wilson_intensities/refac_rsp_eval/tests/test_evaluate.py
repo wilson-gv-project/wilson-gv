@@ -12,17 +12,14 @@ import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     PrecalculatedData,
     _get_ind_tuple_from_base,
-    coefficient_compute_loop,
+    build_contributions,
     eval_non_avrg_per_indexdict,
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     generate_LHS_motif,
     get_RHS_motif,
-    get_motifs_feats,
-    make_idx_sets,
     otf_vibdiffdenom,
-    resonance_compute_loop,
     solve_LSE_motif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -244,53 +241,6 @@ def test_solve_LSE_motif_single_axis_other_than_A(params_obj, states):
 def test_solve_LSE_motif_empty_motif_raises(params, states):
     with pytest.raises(ValueError, match='no resonance conditions'):
         solve_LSE_motif(ResonanceMotif(()), params, states)
-
-
-## resonance_compute_loop -----------------------------------------------------
-# One solve_LSE_motif call per index set (always in Eh), results keyed by ParameterSet.
-
-SWAPPED = {'a': 1, 'b': 0}
-SWAPPED_obj = ParameterSet({'a': 1, 'b': 0})
-
-
-def test_resonance_compute_loop_one_location_per_index_set(params, params_obj, states):
-    motif = ResonanceMotif.from_tuples(MOTIF_AB)
-
-    results = resonance_compute_loop([params, SWAPPED], motif, states)
-
-    assert set(results) == {params_obj, SWAPPED_obj}
-    assert results[params_obj] == solve_LSE_motif(motif, params_obj, states)
-    assert results[SWAPPED_obj] == solve_LSE_motif(motif, SWAPPED_obj, states)
-
-
-def test_resonance_compute_loop_locations_follow_the_mode_assignment(params, params_obj, states):
-    """Same motif, a and b swapped -> different resonance points. Hand values in cm-1, the loop returns Eh."""
-    results = resonance_compute_loop([params, SWAPPED], ResonanceMotif.from_tuples(MOTIF_AB), states)
-
-    assert dict(results[params_obj].coordinates) == pytest.approx({'A': convNu2Ene(E01 - E0), 'B': convNu2Ene(E1 - E0)})
-    assert dict(results[SWAPPED_obj].coordinates) == pytest.approx({'A': convNu2Ene(E01 - E1), 'B': convNu2Ene(E0 - E1)})
-
-
-def test_resonance_compute_loop_no_index_sets_gives_empty_dict(states):
-    assert resonance_compute_loop([], ResonanceMotif.from_tuples(MOTIF_AB), states) == {}
-
-
-def test_resonance_compute_loop_accepts_make_idx_sets_output(states):
-    """make_idx_sets gives plain dicts; results are still keyed by ParameterSet, as in evaluate_term_coeff_sumover."""
-    idx_sets = make_idx_sets(2, ['a'])           # [{'a': 0}, {'a': 1}]
-
-    results = resonance_compute_loop(idx_sets, ResonanceMotif.from_tuples(MOTIF_MIXED), states)
-
-    # w_B = -E_a ; w_A - w_B = -E_a
-    assert set(results) == {ParameterSet({'a': 0}), ParameterSet({'a': 1})}
-    assert dict(results[ParameterSet({'a': 0})].coordinates) == pytest.approx({'A': convNu2Ene(-2 * E0), 'B': convNu2Ene(-E0)})
-    assert dict(results[ParameterSet({'a': 1})].coordinates) == pytest.approx({'A': convNu2Ene(-2 * E1), 'B': convNu2Ene(-E1)})
-
-
-def test_resonance_compute_loop_missing_state_raises(params, params_obj, states):
-    """a=b=1 needs state '1,1', which `states` lacks: the whole loop raises, the set is not skipped."""
-    with pytest.raises(ValueError):
-        resonance_compute_loop([params, {'a': 1, 'b': 1}], ResonanceMotif.from_tuples(MOTIF_A), states)
 
 
 ## Evaluation kernels -------------------------------------------------------
@@ -604,53 +554,88 @@ def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
     assert all(set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'} for contribs in leaves.values())
 
 
-## coefficient_compute_loop ---------------------------------------------------
+## build_contributions --------------------------------------------------------
+# One row per (term, index set) with a nonzero coefficient. The toy term fixes a, b (its motif's
+# labels) and sums over c. <polgrad>[1] = 0, so every pair with a=1 has coeff 0: 2 rows (a=0) and
+# 2 zero pairs (a=1). a=b=1 needs state '1,1', which `states` lacks, so solving any a=1 pair would
+# raise: these tests also show that zero pairs never reach solve_LSE_motif.
 
-def test_coefficient_compute_loop_result_shape(term_and_precalc, molsys):
-    """
-    Shows the shape of one loop entry (run with -s to see the print).
-    Currently the key appears twice: results[ps][ps] == (total, leaves).
-    """
-    term, pre = term_and_precalc
-    ps = ParameterSet({'a': 0, 'b': 0})
-
-    results = coefficient_compute_loop([{'a': 0, 'b': 0}], term, molsys, None, pre)
-
-    from pprint import pprint
-    pprint(results)
-
-    entry = results[ps]
-    _total, leaves = entry
-    assert len(leaves) == 2              # c in {0, 1}
+PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
+PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})
 
 
-def test_get_motifs_feats():
-    """
-    The motifs and locations returned by get_motifs_locs are keyed by ParameterSet, one entry
-    per index set. Each location is a ResLocPoint with axes and values in Eh.
-    """
-    motif = ResonanceMotif.from_tuples(MOTIF_AB)
-    idx_sets = [{'a': 0, 'b': 0}, {'a': 1, 'b': 0}, {'a': 0, 'b': 1}]
+def ab_term(motif=MOTIF_AB) -> CompiledTerm:
+    return replace(toy_term(), cmp_resmotf=ResonanceMotif.from_tuples(motif), idx_summ=('c',), idx_nonsumm=('a', 'b'))
 
-    results = get_motifs_feats([motif], idx_sets, toy_states())
 
-    assert set(results) == {ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 0, 'b': 1})}
-    for ps in results:
-        loc = results[ps]
-        assert isinstance(loc, dict)
+@pytest.fixture
+def pre_a1_zero() -> PrecalculatedData:
+    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])
+    return PrecalculatedData(avrg_tensors={avrg_key: np.array([10., 0.])},
+                             avrg_expr_tensor_mapping={avrg_key: avrg_key})
 
-        # check that the location satisfies the resonance conditions
-        res_motif = ResonanceMotif.from_tuples(MOTIF_AB)
-        assert loc[res_motif].location.axes == ('A', 'B')
 
-        residuals = resonance_residuals(res_motif, loc[res_motif].location, ps.to_dict(), toy_states())
-        assert residuals == pytest.approx([0.] * len(res_motif))
+def test_build_contributions_one_row_per_nonzero_pair(molsys, pre_a1_zero):
+    rows, zero, failed = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
 
-    print()
-    for r,v in results.items():
-        print(f"{r}:")
-        for m, loc in v.items():
-            print(f"  {m}:")
-            for ax, val in zip(loc.location.axes, loc.location.values):
-                print(f"    {ax}: {val:.6f} Eh")
-        print()
+    assert {r.params for r in rows} == {PS_00, PS_01}
+    assert all(r.term_id == 0 and r.motif == ResonanceMotif.from_tuples(MOTIF_AB) for r in rows)
+    assert zero == [(0, PS_10), (0, PS_11)]
+    assert failed == []
+    assert len(rows) + len(zero) + len(failed) == 4          # every (a, b) pair exactly once
+
+
+def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys, pre_a1_zero):
+    term = ab_term()
+
+    rows, _, _ = build_contributions([term], molsys, precalculated_data=pre_a1_zero)
+
+    for r in rows:
+        expected, _ = evaluate_term_coeff_sumover(term, {'a': r.params['a'], 'b': r.params['b']}, molsys,
+                                                  precalculated_data=pre_a1_zero)
+        assert r.coeff == expected != 0.
+
+
+def test_build_contributions_locations_are_in_cm1(molsys, pre_a1_zero):
+    rows, _, _ = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+
+    location = {r.params: r.location for r in rows}
+    assert location[PS_01].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # 1600, 500 cm-1
+    assert location[PS_00].as_dict() == pytest.approx({'A': E00 - E0, 'B': 0.})
+
+
+def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero, monkeypatch):
+    """Two terms with one motif: 2 solves, not 4, and the rows of both terms hold the same location object."""
+    solved = []
+    real_solve = evaluate_mod.solve_LSE_motif
+    def counting_solve(motif, ps, *args, **kwargs):
+        solved.append(ps)
+        return real_solve(motif, ps, *args, **kwargs)
+    monkeypatch.setattr(evaluate_mod, 'solve_LSE_motif', counting_solve)
+    term = ab_term()
+
+    rows, _, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys,
+                                     precalculated_data=pre_a1_zero)
+
+    assert sorted(solved) == [PS_00, PS_01]
+    row = {(r.term_id, r.params): r for r in rows}
+    for ps in (PS_00, PS_01):
+        assert row[(0, ps)].location is row[(1, ps)].location
+        assert row[(1, ps)].coeff == pytest.approx(4 * row[(0, ps)].coeff)    # frac_factor 0.5 -> 2.
+
+
+def test_build_contributions_no_single_point_goes_to_failed(molsys, pre_a1_zero):
+    """MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair."""
+    rows, zero, failed = build_contributions([ab_term(MOTIF_B_TWICE)], molsys,
+                                             precalculated_data=pre_a1_zero)
+
+    assert len(rows) == 0
+    assert [(term_id, ps) for term_id, ps, _ in failed] == [(0, PS_00), (0, PS_01)]
+    assert all(coeff != 0. for _, _, coeff in failed)        # failed pairs would have added to the spectrum
+    assert zero == [(0, PS_10), (0, PS_11)]
+
+
+def test_build_contributions_needs_eigenvals(molsys, pre_a1_zero):
+    """The number of modes comes from molsys_data.eigenvals."""
+    with pytest.raises(ValueError, match='eigenvals'):
+        build_contributions([ab_term()], replace(molsys, eigenvals=None), precalculated_data=pre_a1_zero)
