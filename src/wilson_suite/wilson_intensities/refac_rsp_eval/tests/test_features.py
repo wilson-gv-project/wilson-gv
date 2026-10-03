@@ -39,6 +39,77 @@ CM_TO_AU = 4.556335e-6  # 1 cm-1 in Hartree
 OTHER_MOTIF = ResonanceMotif.from_tuples((((('a',), ()), ('A',)),))  # row() uses the empty motif
 
 
+## ContributionTable --------------------------------------------------------
+# R0, R1: empty motif; R2: OTHER_MOTIF. R0, R2: a=0; R1: a=1. R2 also has axis B.
+
+R0 = row(0.3, term_id=0, location=ResLocPoint({'A': 1650.}), a=0)
+R1 = row(-0.1, term_id=1, location=ResLocPoint({'A': 1700.}), a=1)
+R2 = row(0.2, term_id=2, motif=OTHER_MOTIF, location=ResLocPoint({'A': 1600., 'B': 10.}), a=0)
+
+
+def test_table_keeps_rows_in_order():
+    table = ContributionTable([R0, R1, R2])
+
+    assert list(table) == [R0, R1, R2]
+    assert len(table) == 3
+
+
+def test_table_where_keeps_matching_rows_and_returns_a_table():
+    table = ContributionTable([R0, R1, R2])
+
+    kept = table.where(lambda r: r.coeff > 0)
+
+    assert isinstance(kept, ContributionTable)
+    assert list(kept) == [R0, R2]
+    assert len(table) == 3                  # the original table is unchanged
+
+
+def test_table_group_by_keeps_first_appearance_order():
+    groups = ContributionTable([R0, R1, R2]).group_by(lambda r: r.coeff > 0)
+
+    assert list(groups) == [True, False]
+    assert all(isinstance(g, ContributionTable) for g in groups.values())
+    assert list(groups[True]) == [R0, R2]
+    assert list(groups[False]) == [R1]
+
+
+def test_table_by_params_and_by_motif():
+    table = ContributionTable([R0, R1, R2])
+
+    assert {ps: list(g) for ps, g in table.by_params().items()} == {ParameterSet({'a': 0}): [R0, R2],
+                                                                     ParameterSet({'a': 1}): [R1]}
+    assert {m: list(g) for m, g in table.by_motif().items()} == {ResonanceMotif(()): [R0, R1],
+                                                                 OTHER_MOTIF: [R2]}
+
+
+def test_table_by_location_rounds_to_steps_of_tol_cm():
+    """Steps, not a distance: rows 0.002 apart can be split, rows 0.008 apart can share a step."""
+    r_004, r_006, r_014 = (row(location=ResLocPoint({'A': v}), a=0) for v in (1650.004, 1650.006, 1650.014))
+
+    groups = ContributionTable([r_004, r_006, r_014]).by_location(tol_cm=0.01)
+
+    assert [list(g) for g in groups.values()] == [[r_004], [r_006, r_014]]
+
+
+def test_table_by_location_never_joins_different_axes():
+    on_a = row(location=ResLocPoint({'A': 1.}), a=0)
+    on_ab = row(location=ResLocPoint({'A': 1., 'B': 0.}), a=0)
+
+    assert len(ContributionTable([on_a, on_ab]).by_location()) == 2
+
+
+def test_table_axis_range_skips_rows_without_the_axis():
+    table = ContributionTable([R0, R1, R2])
+
+    assert table.axis_range('A') == (1600., 1700.)
+    assert table.axis_range('B') == (10., 10.)
+
+
+def test_table_axis_range_needs_a_row_with_the_axis():
+    with pytest.raises(ValueError, match="no row has axis 'C'"):
+        ContributionTable([R0, R1, R2]).axis_range('C')
+
+
 ## SpectralFeature: basics --------------------------------------------------
 
 def test_feature_without_gamma_has_no_box():
@@ -169,6 +240,24 @@ def test_features_from_rows_keeps_locations_apart():
     rows = (row(location=LOC_1650, a=0), row(location=loc_1651, a=1))
 
     assert [f.location for f in features_from_rows(ContributionTable(rows))] == [LOC_1650, loc_1651]
+
+
+def test_features_from_rows_groups_equal_locations_that_are_different_objects():
+    """Two index sets can land on one point: separate ResLocPoint objects with equal values."""
+    rows = (row(0.30, location=ResLocPoint({'A': 1650.}), a=0), row(0.20, location=ResLocPoint({'A': 1650.}), a=1))
+    assert rows[0].location is not rows[1].location
+
+    [f] = features_from_rows(ContributionTable(rows))
+
+    assert f.rows == rows
+    assert f.amplitude_coeff == pytest.approx(0.5)
+
+
+def test_features_from_rows_does_not_round_locations():
+    """Exact key on purpose: float noise gives two features at almost one point; the grid adds them anyway."""
+    rows = (row(location=ResLocPoint({'A': 1650.}), a=0), row(location=ResLocPoint({'A': 1650. + 1e-9}), a=1))
+
+    assert len(features_from_rows(ContributionTable(rows))) == 2
 
 
 def test_features_from_rows_gives_every_feature_the_lineshape_parameter():

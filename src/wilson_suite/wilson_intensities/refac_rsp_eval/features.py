@@ -106,6 +106,8 @@ class ContributionTable:
 
     def axis_range(self, axis):
         vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
+        if not vals:
+            raise ValueError(f'no row has axis {axis!r}')
         return min(vals), max(vals)
 
 
