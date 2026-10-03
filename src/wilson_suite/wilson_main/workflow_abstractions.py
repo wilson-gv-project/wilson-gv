@@ -14,10 +14,14 @@ from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
 from wilson_suite.wilson_main.abstractions import VibState
 
 import numpy as np
+from pathlib import Path
 
 import logging
 
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
+
+if TYPE_CHECKING:
+	from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 
 logger = logging.getLogger("wilson")
 
@@ -139,7 +143,7 @@ class WilsonSimulation:
 
 		self.system = system
 
-	def addTerms(self, terms: dict, extend: bool=False):
+	def addTerms(self, terms: list, extend: bool=False):
 		"""
 		Add terms
 
@@ -306,7 +310,8 @@ class WilsonSimulation:
 		return data_dict
 	
 	def getResults(self, obtainer: Callable[[dict[str,DataOriginInfo]], dict],
-					save_to_filename: str = None, save_to_dir: str = None):
+				get_geometry: bool = False, get_displacements: bool = False,
+				save_to_filename: str = None, save_to_dir: str = None):
 		"""
 		obtainer must return : a dictionary:
 		 	keys: trivial_name for properties or residual_vib_info keys
@@ -314,7 +319,8 @@ class WilsonSimulation:
 		
 		# todo: default obtainer??
 		"""
-		data_dict = obtainer(self.requestData())
+		data_dict = obtainer(self.requestData(), 
+					   get_geometry=get_geometry, get_displacements=get_displacements)
 		
 		# FIXME should it be a separate function with saving option??
 		if save_to_filename is not None:
@@ -349,7 +355,47 @@ class WilsonSimulation:
 
 		pass
 
-	def evaluate(self, save_evalinputs_pkl: str = None):
+	def apply_exp_magn_conditions(self, where: str):
+		"""
+		Use VibExperiment.magn_conditions in calculation(?) and rendering
+
+		should apply limits for axes - where there will be no data because it is a "forbidden" region.
+		
+		where:
+			rendering: 
+				[x] use different color for the "forbidden" region
+			evaluation: 
+				[x] filter out features that fall into the "forbidden" region
+		"""
+		if self.exp is None:
+			raise ValueError("exp is None")
+		
+		if self.exp.magn_conditions is None:
+			raise ValueError("exp.magn_conditions is None")
+		
+		if self.spec_eval_setup is None:
+			raise ValueError("spec_eval_setup is None")
+		if self.spec_eval_setup.ev_info is None:
+			raise ValueError("spec_eval_setup.ev_info is None")
+
+		from wilson_suite.wilson_derive.term_var_translate import translate_magn_conditions_to_axisvars
+		translated_magn_cond = translate_magn_conditions_to_axisvars(self.exp.magn_conditions, self.axis_choice)
+		
+		if where in ['evaluation', 'eval', 'evl']:
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_eval = True
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
+			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
+		
+		elif where in ['rendering', 'render', 'rnd']:
+			self.spec_eval_setup.ev_info.apply_exp_magn_conditions_render = True
+			self.spec_eval_setup.ev_info.exp_magn_conditions = translated_magn_cond
+
+		else:
+			raise ValueError(f"unknown where flag: {where}")
+
+
+	'''	
+	def evaluate(self, save_evalinputs_pkl: str = None, verbose: bool = False):
 		"""
 		Evaluating method, using EvaluationWorkflow
 		"""
@@ -370,15 +416,34 @@ class WilsonSimulation:
 
 		workflow = EvaluationWorkflow(inputs=eval_inputs)
 		self._workflow = workflow
-		wf_result = workflow.run()
+		wf_result = workflow.run(verbose=verbose)
 
 		if self.diagn is None:
 			self.diagn = {}
 		self.diagn.update({'artifacts': workflow.artifacts})
-
 		# TODO: this is a temporary fix? can be organized better?
 		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
 		self.spec = wf_result['result']
+		'''
+
+	def evaluate(self, *, verbose: bool = False, save_dir: Path = None):
+		"""Run evaluation. Stores result on self.spec; stashes workflow for inspection."""
+		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
+
+		if self.axis_choice is None:
+			self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
+		
+		workflow = EvaluationWorkflow(self)
+		self._workflow = workflow
+		
+		evaluated = workflow.evaluate()
+		
+		if save_dir is not None:
+			workflow.save_to(save_dir)
+		
+		self.spec = evaluated.result
+		self.spec_eval_setup.grid = evaluated.axes
+		return evaluated
 
 	def evaluate_with_default_setup_fill(self):
 		"""
@@ -428,6 +493,7 @@ class WilsonSimulation:
 
 	def render(self, renderer: Callable[[np.ndarray, MolecularSystem, VibExperiment,
 														dict, str, 'SpecEvalSetup'], tuple[Any, dict]],
+														features=None,
 														do_diagn: bool=False):
 		"""
 		Render the spectral data
@@ -446,7 +512,8 @@ class WilsonSimulation:
 		
 		context = dict(spec_data=self.spec,
 					   spec_eval_setup=self.spec_eval_setup, 
-					   do_diagn=do_diagn)
+					   do_diagn=do_diagn,
+					   features=features)
 		
 		logger.debug('context')
 		logger.debug(context)

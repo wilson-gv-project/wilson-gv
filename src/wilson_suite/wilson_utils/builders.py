@@ -60,8 +60,15 @@ def make_SpectralAxisSet(axes_set_dict: dict[str,list[tuple]]) -> SpectralAxisSe
     axes_set_dict: {'A': [-1], 'B': [-1, 2]} - lists are sufficient here because each element of the list will be in a SignedPulseTuple
 
     """
-    axes = tuple(SpectralAxis(label=label, var_set=make_IndependentVariableSet(vars)) for label, vars in axes_set_dict.items())
+    axes = tuple(SpectralAxis(label=label, var_set=make_IndependentVariableSet(variables)) for label, variables in axes_set_dict.items())
     return SpectralAxisSet(axes=axes)
 
 def make_IndependentVariableSet(pulse_refs_tuples: list) -> IndependentVariableSet:
-    return IndependentVariableSet(var_set=tuple(SignedPulseTuple(pulse_refs=(t,)) for t in pulse_refs_tuples))
+    return IndependentVariableSet(var_set=tuple(make_SignedPulseTuple(pulse_refs=t) for t in pulse_refs_tuples))
+
+def make_SignedPulseTuple(pulse_refs: tuple|int):
+    if isinstance(pulse_refs, tuple):
+        return SignedPulseTuple(pulse_refs=pulse_refs)
+    if isinstance(pulse_refs, int):
+        return SignedPulseTuple(pulse_refs=(pulse_refs,))
+

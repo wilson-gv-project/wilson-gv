@@ -1,0 +1,237 @@
+refac_rsp_eval — leftover TODO
+updated 2026-09-27 (3rd update)
+
+Test status: 111 pass, 2 fail.
+   2 fail = placeholders (C1).
+"item N" = the numbered items from the review answers.
+Next: A3.
+
+
+A. Finish the fixes started on this branch
+------------------------------------------
+[x] A3  item 3, plan.py CompiledTerm.from_VibPertTerm stores lists, not tuples.
+        hash(CompiledTerm) raises TypeError now.
+        Write: nonsumm, summ = term.tellNonSummSummIndices()
+               idx_summ=tuple(summ), idx_nonsumm=tuple(nonsumm)
+[ ] A4  item 4, evaluate.py evaluate_term_coeff_sumover: the check sits in a string literal.
+        A string literal does nothing. Turn it into code. Sum over `to_sum` only.
+        Then test_integration.py: evaluate_term_coeff_sumover(term, {'a': 0}) -> {'a': 0, 'b': 1}.
+[x] A6  item 5, evaluate.py harmonic_denom: raise if vd.sr.q is not empty.
+        Add a test where eigenvals differ from the state energies.
+        Today the test data has equal values, so a wrong energy source still passes.
+[x] A7  item 23, test_integration.py test_evaluate_term: replace the prints with asserts.
+[x] A8  Delete, do not comment out:
+        - [x] plan.py: make_request_from_term and the "# 17." note above it
+        - [x] plan.py: sr_or_sl_only inside the get_vibenedenom docstring; fix that docstring
+        - [x] plan.py: the "# idx_summ_nonsumm" line in CompiledTerm
+        - [x] evaluate.py: old commented body in _make_vibdiff_key
+        - [x] evaluate.py: old commented lines in VibDiff.from_quanta (two blocks)
+[ ] A9  evaluate.py: delete the duplicate "The data then passes through these steps" docstring at
+        the end of the file. The same block exists above PrecalculatedData. The line numbers in the copy are stale.
+[ ] A10 evaluate.py small text fixes:
+        - make_state_label docstring still says `state_label(...)`; rename to make_state_label.
+        - from_datadict comment "resets values, because props ..." is out of date; empty_copy
+          makes a new collection now.
+[ ] A11 evaluate.py VibDiff.from_symbolic still builds its own 'zero' state. Make it one line:
+            return cls.from_quanta(vibdiff_term_symb.sl.q, vibdiff_term_symb.sr.q, index_dict, vibstates_data)
+        test_vibdiff_from_symbolic_and_from_quanta_agree checks the two still agree.
+
+
+B. Correctness, still open
+--------------------------
+[ ] B1  item 1, blocks the OLD pipeline: wilson_utils/wilson_data_obtainer.py imports DataOriginInfo
+        from refac evaluate.py. The old code passes wilson_main's DataOriginInfo -> TypeError.
+        3 old tests fail. Move DataOriginInfo to one leaf module. Import it from there everywhere.
+[ ] B3  item 6: the averaged-tensor cache key has no polarization (TODO in PrecalculatedData).
+[ ] B4  item 7: sign convention in generate_LHS_motif (FIXME???). Check against old resonances.py.
+[ ] B5  eval_vibenedenom (precalculated path) looks up a SET of labels: 1/w_a twice becomes 1/w_a once.
+        harmonic_denom keeps both factors. The two paths disagree for such a term.
+
+
+C. Tests
+--------
+[ ] C1  Fill the placeholders test_eval_avrg_per_indexdict and test_calculate_avrg_tensor.
+[ ] C2  item 24: regression test. Old evaluate_single_index_dict vs new evaluate_full_index_dict.
+        Term 2, a=0 b=1 c=1, compare factor by factor. Needs B1 first.
+
+
+D. Value types (item 19)
+------------------------
+[ ] D1  PropsCollection: frozen, one _key for __eq__ and __hash__, sorted() returns a new instance.
+        Delete identify_avrg_motif and _set_attr_for_all_props (only a test uses them).
+[ ] D2  FreqTermsCollection: same pattern. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
+[ ] D3  ParameterSet: drop the 'zero' injection and the '' -> 'zero' remap.
+        __lt__ without the hard-coded a..h.
+[ ] D4  item 18: copied data classes in evaluate.py (DataOriginInfo, VibState, MolecularProperty,
+        MolPropsCollection) duplicate wilson_main/abstractions.py. Decide who owns the data model.
+
+
+E. Pipeline, not built yet
+--------------------------
+[ ] E1  Step 6: loop over index sets -> solve_LSE_motif -> group terms by (motif, location)
+        -> SpectralFeature.
+[ ] E2  Step 7: grid.py.
+[ ] E3  Step 8: one compute_features entry point. Adapter from wilson_main. Delete rps_evaluation.py.
+[ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
+
+
+F. Later, only if a large molecule is too slow
+----------------------------------------------
+[ ] F1  item 21: einsum for the averaged part. Then maybe for the whole sum over summation labels.
+
+
+Done on this branch
+-------------------
+[x] A0  from_quanta looks up the 'zero' state in VibStatesData (fixed 16 tests)
+[x] A1  test_freqterms_pert_wf_diff_against_ground_is_pert_only replaces the old-overlap test
+[x] A2  _fake_vibpert_term returns (non-summation, summation) in the right order
+[x] 2   pert diff against ground no longer in get_vibenedenom
+[x] 3   CompiledTerm.idx_summ / idx_nonsumm, correct mapping             (A3: store tuples)
+[x] 5   harmonic_denom reads harmonic eigenvals                          (A6)
+[x] 9   empty motif raises ValueError, with test
+[x] 10  from_datadict fills an empty_copy, not the caller's template, with test   (was B2)
+[x] 11  from_datadict raises on an unknown states_choice
+[x] 12  precalc check covers None and {}
+[x] 13  make_state_label used in all 3 places, with mode-10 test         (was A5; A0 broke from_quanta)
+[x] 15  wilson_derive imports in evaluate.py only under TYPE_CHECKING
+[x] 16  make_request_from_term out of use                                (A8: delete)
+[x] 20  eigenvals typed as dict
+[x] 23  pytest.raises uses match=                                        (A7: asserts)
+[x] 8   withdrawn: all real terms have rank 4
+[x] ingest_numeric.py stub deleted
+
+
+------
+
+Your working tree is clean and all changes are committed. Tests: 111 pass, 2 fail, and both failures are the placeholders.
+
+Here is the big picture as 7 phases. Each phase lists what "done" means.
+
+**1. Finish the clean-up on this branch.**
+- Items: A4, A6, A9–A11 and C1.
+- Done when: every refactor test passes and nothing is commented out.
+
+**2. Unblock the old pipeline (B1).**
+- Why: the old pipeline is your reference for correct numbers. Today it cannot load data because of the `DataOriginInfo` import.
+- Done when: the 3 failing old tests pass again.
+
+**3. Prove that new numbers equal old numbers.**
+- Items: C2 (one term's coefficient, compared factor by factor) and B4 (resonance positions compared with the old `resonances.py`).
+- Done when: the old and new code agree on all 14 formaldehyde EVV terms. Every difference must be deliberate and noted in the test, for example the harmonic 1/ω fix or the double-count fix.
+
+**4. Make the keys sound before grouping terms (D1–D3).**
+- Why: phase 5 groups terms and index sets through dict keys. Keys with broken `__eq__`/`__hash__` would merge or split groups silently.
+- Done when: `PropsCollection`, `FreqTermsCollection` and `ParameterSet` are frozen, and `__eq__` and `__hash__` come from one key.
+
+**5. Build the missing pipeline.**
+1. E1: loop over index sets → `solve_LSE_motif` → group terms by (motif, location) → `SpectralFeature`.
+2. E2: grid.py, which draws the features on a spectrum grid.
+3. E3: one entry point, `compute_features` (terms + data → features), plus the grid call.
+- Done when: one function call turns EVV terms and formaldehyde data into a spectrum array.
+
+**6. Compare whole spectra, old vs new.**
+- Done when: both pipelines give the same spectrum for formaldehyde, apart from the deliberate differences from phase 3.
+
+**7. Switch over and delete the old code.**
+1. Decide who owns the data model (D4): `wilson_main`, or a small shared module.
+2. Write the adapter so `wilson_main` calls the new entry point.
+3. Delete the old evaluation code in `amplitudes/` and rps_evaluation.py.
+4. Rewrite the README around the one design that survives (E4).
+- Done when: only one evaluation pipeline exists and all tests pass.
+
+**Later, only when needed:**
+- B3 and B5 matter only once you build the precomputed tables again.
+- F1 (einsum speed-up) matters only once a large molecule is measurably too slow.
+
+Phases 2 and 3 are the most important. Without them, nothing shows that the refactor computes the right physics. I can add these phases to the top of todo.txt if you want.
+
+---
+
+
+## What it is
+
+`ResLocGeoObject` stores where a resonance sits in frequency space. It holds one value per spectral axis:
+- A number (like `1864.0`) means the resonance is fixed at that frequency on that axis.
+- `'all'` means that axis is free, so the resonance covers the whole axis.
+
+Depending on how many axes are free, the object is a point (none free), a line (one free) or a plane (two free).
+
+**Where it's made:**
+- `solve_LSE_motif` in [evaluate.py:968](src/wilson_suite/wilson_intensities/refac_rsp_eval/evaluate.py#L968) (new code). Axes that no condition mentions get `'all'`.
+- `solve_LSE_motif` in [resonances.py:125](src/wilson_suite/wilson_intensities/amplitudes/resonances.py#L125) (old code). It only ever makes points.
+
+**Where it's used:**
+- As a dictionary key, to group features by location: `dict[ResonanceMotif, dict[ResLocGeoObject, list]]`.
+- As `SpectralFeature.location`, which drives the box around each feature, the window checks and the intensity calculation.
+
+## Pros
+
+- **Can be a dictionary key.** It supports hashing and `==`, so features at the same spot group together.
+- **Axis order doesn't matter.** The coordinates are sorted, so `{'A':1,'B':2}` equals `{'B':2,'A':1}`.
+- **Handles any number of dimensions.** Point, line and plane all use the same class.
+- **Readable printout**, e.g. `Line(A=1864.0, B=all)`.
+- **Small and simple**, with its own tests in `test_geoobject.py`.
+
+## Cons and risks
+
+**1. There are two copies of the class.**
+- The two copies (in [plan.py:413](src/wilson_suite/wilson_intensities/refac_rsp_eval/plan.py#L413) and [spectrum_composition.py:201](src/wilson_suite/wilson_intensities/amplitudes/spectrum_composition.py#L201)) are identical today, but they are separate classes.
+- The equality check (`__eq__`) first checks that the other object is the same class. So an object from one copy never equals one from the other copy, even with the same coordinates.
+- Right now the new code makes objects from the `plan.py` copy, and the old code makes and compares them with the other copy. If the two paths ever meet, matching locations won't group and features will quietly not match.
+
+**2. It isn't really read-only.**
+- `_coord_dict` is the caller's own dict, not a copy. If the caller changes that dict later, `_coord_dict` changes but `coordinates` and the hash don't. The two then disagree.
+- `coordinates` is a normal attribute that anyone can reassign. For something used as a dictionary key, that's unsafe.
+
+**3. Callers reach into its private data.**
+- `location._coord_dict[...]` is read directly in about 6 places in `spectrum_composition.py` and in tests.
+- There is no public way to "give me the value on axis A as a number", although `loc['A']` exists.
+
+**4. `'all'` breaks the point-only code.**
+- `contains_feature`, `contributing_feature` and the box code compare values with `>=`. With `'all'` they crash (Python can't compare text with a number).
+- The new solver can now produce lines, so this crash can actually happen.
+
+**5. Exact float matching.**
+- Locations come from a least-squares solver (`lstsq`). Tiny rounding noise, like `1864.0` vs `1864.0000000002`, gives two different dictionary keys. Resonances that should group together won't.
+
+**6. It can only describe lines and planes that run straight along the axes.**
+- A diagonal resonance like `w_A + w_B = b` can't be stored. There's already a FIXME for this at [evaluate.py:959](src/wilson_suite/wilson_intensities/refac_rsp_eval/evaluate.py#L959).
+
+**7. Smaller issues:**
+- `features_in_bounds` calls `location.as_array()`, which doesn't exist ([spectrum_composition.py:810](src/wilson_suite/wilson_intensities/amplitudes/spectrum_composition.py#L810)). The code is marked unused, but it would crash if called.
+- `dims` is marked "UNUSED", but it is used at [spectrum_composition.py:504](src/wilson_suite/wilson_intensities/amplitudes/spectrum_composition.py#L504), where `N = len(dims)` counts free axes too. Check whether a line feature should count them.
+- There's no input check: an empty dict, `NaN`, `'All'` or other text are all accepted.
+- There's no sort order, so you can't sort features by location to get a stable order.
+- The printout says "Object" for 3+ free axes, and "Point()" for an empty location.
+- `find_clusters_by_distance` uses `location.values` as a key. That drops the axis names, so order depends on sorting.
+
+## Suggestions (in order of value)
+
+1. **Keep a single copy.** Keep it in one module (probably `plan.py`, since the refactor is heading there). The other module should just import it.
+2. **Make it a frozen dataclass** (a data class whose fields can't be changed after creation):
+   - Store only `coordinates` (the sorted tuple).
+   - Copy the input dict when the object is made.
+   - Drop `_coord_dict`, or make it a read-only view.
+3. **Add public helpers** so callers stop using `_coord_dict`:
+   - `fixed_axes()` / `free_axes()`
+   - `as_dict()`
+   - `as_array(axes)` (this also fixes the missing method)
+   - `value(axis) -> float` that fails clearly on `'all'`
+4. **Round when creating the object.** Something like `round(v, 6)`, or snap to a set tolerance, so solver noise doesn't split keys.
+5. **Check inputs.** Refuse an empty dict and `NaN`, and allow only a number or the free marker.
+6. **Replace the `'all'` string** with a dedicated marker (e.g. `FREE = ...` or an enum). This avoids typos and makes type checks stricter.
+7. **Make the window and box code handle free axes.** A free axis always "overlaps" the window. Or have those functions clearly say "points only".
+8. **Add `__lt__`** (sort by axis values) so feature order is stable.
+
+## Future potential
+
+- **Diagonal resonances.** Store a general flat shape: one base point plus direction vectors (an "affine subspace"). That fixes the FIXME and supports conditions like `w_A + w_B = b`. The current axis-aligned form becomes a special case.
+- **Geometry operations:**
+  - `intersect(other)`: where two resonances meet (e.g. a line crossing a point).
+  - `contains(point)`: does this point lie on the line or plane?
+  - `distance(point)`: useful for clustering and for deciding if a feature contributes to a window.
+  - `project(axes)`: look at a 2D location in 1D, e.g. for slices of a 2D spectrum.
+- **Drawing.** `dimensionality` could decide what to draw: a marker, a line or a band.
+- **Caching.** Now that the new `solve_LSE_motif` takes `axes`, stored locations could be reused across runs as long as their keys are stable (points 4 and 6 above).
+
+If you want, I can do suggestions 1–3 first. They are low risk and remove the biggest hidden bugs.

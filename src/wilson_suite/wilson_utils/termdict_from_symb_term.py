@@ -169,7 +169,7 @@ def derived_terms_dict_to_dicts(derived_terms, tolistonly: bool=False):
 
     return result_list
 
-def derived_terms_flat(derived_terms, tolistonly: bool=False):
+def derived_terms_flat(derived_terms, tolist: bool=False):
     """
     put data in a form for use on the evaluation step
     """
@@ -184,16 +184,44 @@ def derived_terms_flat(derived_terms, tolistonly: bool=False):
         for anharms_tuple in derived_terms[key_num_anharms]:
             for term in derived_terms[key_num_anharms][anharms_tuple]:
                 
-                if tolistonly:
+                term.anharmonicity = anharms_tuple
+                if tolist:
                     result_list.append(term)
 
                 else:
                     result_dict[f'{count}_{anharms_tuple}'] = term
                 count += 1
-    if tolistonly:
+    if tolist:
         return result_list
     else:
         return result_dict
+
+
+def get_path_terms(derived_terms: dict[int, dict[tuple, list[VibPerturbedTerm]]], pathway: str):
+    """
+    for EVV paper1
+
+    pathway: 'a+b,a' or 'b,a'
+    """
+
+    result_dict = {}
+    if pathway=='b,a':
+        pw_latex = ['(\\omega_{,a} +A)(\\omega_{b,a} -B)', '(\\omega_{,a} +1)(\\omega_{b,a} +1-2)']
+    elif pathway=='a+b,a':
+        pw_latex = ['(\\omega_{,a} +A)(\\omega_{a+b,a} -B)', '(\\omega_{,a} +1)(\\omega_{a+b,a} +1-2)']
+
+    for key_num_anharms in derived_terms:
+        result_dict[key_num_anharms] = {}
+        for anharms_tuple in derived_terms[key_num_anharms]:
+            result_dict[key_num_anharms][anharms_tuple] = []
+
+            for term in derived_terms[key_num_anharms][anharms_tuple]:
+                motif_latex = ''.join([rc.to_latex() for rc in term.res])
+                if motif_latex in pw_latex:
+                    result_dict[key_num_anharms][anharms_tuple].append(term)
+    return result_dict
+
+
 
 def flip_modes_indices(term_dict, upd_dict):
     """
