@@ -16,7 +16,6 @@ import numpy as np
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     ContributionTable,
-    SpectralFeature,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
@@ -578,11 +577,6 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
                     continue
             rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
     return ContributionTable(rows), zero, failed
-
-
-def features_from_rows(table: ContributionTable, tol_cm: float = 0.01) -> list[SpectralFeature]:
-    return [SpectralFeature(location=next(iter(group)).location, rows=tuple(group))
-            for group in table.by_location(tol_cm).values()]
 
 
 """

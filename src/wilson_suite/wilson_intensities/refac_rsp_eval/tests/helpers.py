@@ -10,8 +10,8 @@ from wilson_suite.wilson_derive.abstractions import (
     VibDiffTerm,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionRow,
     SpectralFeature,
-    TermParametersChoice,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -67,23 +67,24 @@ def toy_term() -> CompiledTerm:
 
 # --- spectral features (grid.py, features.py) ---
 
-def tpc(term_ids: tuple = (0,), **params) -> TermParametersChoice:
-    """One term group with a single parameter choice, e.g. tpc(a=0, b=1)."""
-    return TermParametersChoice(res_motif=ResonanceMotif(()),
-                                states_parameters=(ParameterSet(params),),
-                                term_ids=term_ids)
+def row(coeff: float = 1., term_id: int = 0, motif: ResonanceMotif = ResonanceMotif(()),
+        location: ResLocPoint | None = None, **params) -> ContributionRow:
+    """One contribution, e.g. row(0.3, a=0, b=1). Location defaults to A=0."""
+    return ContributionRow(term_id=term_id, motif=motif, params=ParameterSet(params),
+                           location=ResLocPoint({'A': 0.}) if location is None else location, coeff=coeff)
 
 
 def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0, amp: float | None = 1.0,
-         terms: tuple | None = None, **coords: float) -> SpectralFeature:
+         rows: tuple | None = None, **coords: float) -> SpectralFeature:
     """
     A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1; its box is location +- gamma.
     The dict form is for N-dimensional tests: feat(coords(3, 100.)).
+    Without `rows`, the feature gets one row with coeff=amp and a=0 (amp=None -> no rows, so no amplitude).
     """
-    return SpectralFeature(location=ResLocPoint({**(location or {}), **coords}),
-                           term_contributions=(tpc(a=0),) if terms is None else terms,
-                           lineshape_parameter=gamma,
-                           amplitude_coeff=amp)
+    loc = ResLocPoint({**(location or {}), **coords})
+    if rows is None:
+        rows = () if amp is None else (row(amp, location=loc, a=0),)
+    return SpectralFeature(location=loc, rows=rows, lineshape_parameter=gamma)
 
 
 def box_halfwidth(f: SpectralFeature, axis: str = 'A') -> float:

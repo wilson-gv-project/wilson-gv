@@ -1,10 +1,11 @@
 """
 Spectral features, and the windows and domains that hold them.
 
-  in:  feature locations (ResLocPoint), amplitudes, lineshape parameters, term groups
+  in:  ContributionRow tables (built by evaluate.build_contributions), lineshape parameters
   out: SpectralFeature lists, SpectralWindow, RectangularDomain clusters
 
-  holds: TermParametersChoice, SpectralFeature, features_to_clusters, SpectralWindow, RectangularDomain
+  holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, features_to_clusters,
+         SpectralWindow, RectangularDomain
 
 Takes Box and box clustering from grid.py; grid.py never imports from here.
 Note: SpectralWindow.sample_grid is pure geometry and could move to grid.py later.
@@ -13,7 +14,7 @@ import copy
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 
@@ -27,7 +28,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResonanceMotif,
 )
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene, linewidth_cm_or_au
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
@@ -37,96 +38,90 @@ if TYPE_CHECKING:
         ResLocPoint,
     )
 
+## -------------------------------------------------------------------------------
+##          Complete data computation: from terms to contributions to features
+## -------------------------------------------------------------------------------
+
+"""
+CompiledTerm list
+  │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
+  v
+(term, params) pairs
+  │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
+  │    skip the pair if coeff == 0
+  │ 3. location: solve_LSE_motif, once per (motif, params)            ← VibStatesData
+  v
+ContributionRow(term_id, motif, params, location, coeff)   "why" layer
+  │ 4. features_from_rows: group by (motif, location), add the coeffs
+  v
+SpectralFeature(location, rows)                            "what" layer
+  │ 5. add peak width, filter to the spectral window
+  v
+grid.py → spectrum array                                   the picture
+
+"""
+
+K = TypeVar('K', bound=Hashable)   # group_by key
+
+
 @dataclass(frozen=True)
-class TermParametersChoice:
-    """
-    Minimal representation of a group of terms that share a resonance motif.
-    Each term is identified only by its integer term_id.
-
-    in compile_feature() 
-    """
-    res_motif: "ResonanceMotif"
-    states_parameters: tuple["ParameterSet", ...]
-    term_ids: tuple[int|str, ...] = field(default_factory=tuple)
-
-    def sort_parameters(self) -> "TermParametersChoice":
-        """
-        Returns a new TermParametersChoice where the states_parameters 
-        are sorted according to the ParameterSet comparison logic.
-        """
-        new_params = tuple(sorted(self.states_parameters))
-        
-        # Replace the current tuple with the sorted one
-        # Using dataclasses.replace for frozen instances
-        from dataclasses import replace
-        return replace(self, states_parameters=new_params)
+class ContributionRow:
+    """One term at one index set. The term itself is terms[term_id]."""
+    term_id: int
+    motif: ResonanceMotif
+    params: ParameterSet
+    location: 'ResLocPoint'
+    coeff: float
 
 
-    def __hash__(self):
-        return hash((self.res_motif, self.term_ids, self.states_parameters))
+class ContributionTable:
+    def __init__(self, rows: Iterable[ContributionRow]):
+        self._rows = tuple(rows)
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, TermParametersChoice)
-            and self.res_motif == other.res_motif
-            and self.term_ids == other.term_ids
-            and self.states_parameters == other.states_parameters
-        )
+    def __iter__(self):
+        return iter(self._rows)
 
-    def __lt__(self, other):
-        if not isinstance(other, TermParametersChoice):
-            return NotImplemented
-        
-        # 1. Compare lengths of term_ids
-        if len(self.term_ids) != len(other.term_ids):
-            return len(self.term_ids) < len(other.term_ids)
-        
-        # 2. Compare term_ids values (lexicographical)
-        if self.term_ids != other.term_ids:
-            return self.term_ids < other.term_ids
-            
-        # 3. Compare the sequences of ParameterSets
-        # Python will compare self.states_parameters[0] < other.states_parameters[0], etc.
-        return self.states_parameters < other.states_parameters
-    
-    @classmethod
-    def check_states_parameters(cls, coll_tparamchoices: tuple['TermParametersChoice', ...]) -> dict[str, str|int] | None:
-        """
-        across a collection of TermParametersChoice - extract a single dict of parameter choices if possible
-        """
-        all_unique_configs = set()
+    def __len__(self):
+        return len(self._rows)
 
-        for tpc in coll_tparamchoices:
-            for i in tpc.states_parameters:
-                # 1. Convert dict to a hashable tuple
-                d = i.to_dict()
-                hashable_dict = tuple(sorted(d.items()))
-                
-                # 2. Add to our master set of unique configurations
-                all_unique_configs.add(hashable_dict)
-        
-        # 3. If there is exactly one unique configuration across everything
-        if len(all_unique_configs) == 1:
-            # Convert the tuple back into a dict to return it
-            # We use pop() to get the only item out of the set
-            return dict(all_unique_configs.pop())
-        elif len(all_unique_configs) == 0:
-            return None
-        else:
-            raise ValueError(f'Found {len(all_unique_configs)} different parameter choices; expected 1.')
+    # the two general tools
+    def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
+        return ContributionTable(r for r in self._rows if keep(r))
+
+    def group_by(self, key: Callable[[ContributionRow], K]) -> dict[K, 'ContributionTable']:
+        groups = defaultdict(list)
+        for r in self._rows:
+            groups[key(r)].append(r)
+        return {k: ContributionTable(v) for k, v in groups.items()}
+
+    # named shortcuts for frequent questions
+    def by_params(self):
+        return self.group_by(lambda r: r.params)
+
+    def by_motif(self):
+        return self.group_by(lambda r: r.motif)
+
+    def by_location(self, tol_cm: float = 0.01):
+        return self.group_by(lambda r: tuple((ax, round(v / tol_cm)) for ax, v in r.location.coordinates))
+
+    def axis_range(self, axis):
+        vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
+        return min(vals), max(vals)
 
 
 @dataclass
 class SpectralFeature:
+    """
+    One peak: the rows of one motif at one location (made by features_from_rows).
+    Same motif + same point -> same peak shape, so the coefficients of the rows add.
+    location and lineshape_parameter are in cm-1.
+    """
     location: 'ResLocPoint'
-    term_contributions: tuple[TermParametersChoice] | tuple = () # grouped by res_motif
-    term_contrib_by_id: dict | None = None
-    lineshape_parameter: float | None = None # will be by this time of init in the unit of cm-1
-    amplitude_coeff: float | None = None
+    rows: tuple[ContributionRow, ...] = ()
+    lineshape_parameter: float | None = None
+    scale: float = 1.0      # normalize_coeffs_to_max changes this, never the rows
     feat_type: str | None = None
     feat_box: Box | None = None
-    _param_set: dict | None = None
-    _res_motif: str | None = None # FIXME: never set; the motifs live in term_contributions[i].res_motif. Remove or fill.
 
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
@@ -135,18 +130,40 @@ class SpectralFeature:
                                     halfwidth=self.lineshape_parameter)[0]
             self.feat_box = Box(bounds)
 
+    @property
+    def amplitude_coeff(self) -> float | None:
+        """scale * sum of the row coefficients; None for a feature without rows."""
+        if not self.rows:
+            return None
+        return self.scale * sum(r.coeff for r in self.rows)
+
+    @property
+    def motif(self) -> ResonanceMotif | None:
+        motifs = {r.motif for r in self.rows}
+        if len(motifs) > 1:
+            raise ValueError(f'Expected one motif per feature, got {len(motifs)}')
+        return next(iter(motifs), None)
+
+    @property
+    def param_sets(self) -> tuple[ParameterSet, ...]:
+        """Index sets of the rows, each once, in row order."""
+        return tuple(dict.fromkeys(r.params for r in self.rows))
+
+    @property
+    def term_ids(self) -> tuple[int, ...]:
+        """term_id of the rows, each once, in row order."""
+        return tuple(dict.fromkeys(r.term_id for r in self.rows))
+
     def __hash__(self) -> int:
-        if self.term_contributions:
-            return hash((self.term_contributions[0].res_motif, self.term_contributions[0].states_parameters, self.location))
-        else:
-            return hash(self.location)
+        return hash((self.location, self.lineshape_parameter, self.rows, self.scale))
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SpectralFeature):
             return False
-        return (self.location == other.location 
-                and self.lineshape_parameter == other.lineshape_parameter 
-                and self.term_contributions == other.term_contributions)
+        return (self.location == other.location
+                and self.lineshape_parameter == other.lineshape_parameter
+                and self.rows == other.rows
+                and self.scale == other.scale)
 
     def __lt__(self, other: 'SpectralFeature') -> bool:
         if not isinstance(other, SpectralFeature):
@@ -156,73 +173,30 @@ class SpectralFeature:
         else:
             raise ValueError("cannot compare amplitude_coeff of features")
 
-    @property
-    def param_set(self):
-        # 1. Check if a manual value was set first
-        if self._param_set is not None:
-            return self._param_set
-            
-        # 2. Fallback to calculation logic
-        if self.term_contributions:
-            params = TermParametersChoice.check_states_parameters(self.term_contributions)
-            if params is not None:
-                params.pop('zero', None)
-                return params
-        
-        return None
-    
-    @param_set.setter
-    def param_set(self, value):
-        self._param_set = value
-    
-    def anharm_contributions(self, term_map: dict):
-        if self.term_contrib_by_id is None:
-            return {}
-        
-        result = {}
-        for term_key, val in self.term_contrib_by_id.items():
-            if term_map[term_key].anharmonicity not in result:
-                result[term_map[term_key].anharmonicity] = {term_key: val[0]}
-            else:
-                result[term_map[term_key].anharmonicity][term_key] = val[0]
-        return {k: sum(list(v.values())) for k,v in result.items()}
-    
-    def __repr__(self) -> str:
+    def anharm_contributions(self, terms) -> dict:
         """
-        Returns a string representation showing type and coordinates.
-        """        
-        return f'SpectralFeature(location={self.location}, params={self.param_set}, amplitude_coeff={self.amplitude_coeff})'
+        amplitude_coeff split by terms[term_id].anharmonicity; the parts add up to amplitude_coeff.
+        terms - indexable by term_id, e.g. the VibPerturbedTerm list the CompiledTerms were made from
+        """
+        result = defaultdict(float)
+        for r in self.rows:
+            result[terms[r.term_id].anharmonicity] += self.scale * r.coeff
+        return dict(result)
+
+    def __repr__(self) -> str:
+        return f'SpectralFeature(location={self.location}, rows={len(self.rows)}, amplitude_coeff={self.amplitude_coeff})'
 
     @classmethod
     def sort_by_params(cls, features: list['SpectralFeature']):
         """
-        Sort features by their term group. Needs exactly one term group per feature.
+        Sort features by their sorted index sets.
         """
-        for f in features:
-            if len(f.term_contributions) != 1:
-                raise ValueError(f'Expected exactly 1 term group per feature, got {len(f.term_contributions)} for {f}')
-
-        return sorted(
-                features, 
-                key=lambda f: f.term_contributions[0]
-            )
-
-    @classmethod
-    def sort_by_el_or_mech(cls, features: list['SpectralFeature']):
-        """
-        unfinished
-        """
-        # FIXME: unfinished - raises before the loop, and `terms` below is never used. Finish or remove.
-        raise NotImplementedError()
-        sorted_dict = {}
-        for f in features:
-            terms = f.term_contrib_by_id
-        return sorted_dict
+        return sorted(features, key=lambda f: tuple(sorted(f.param_sets)))
 
     @classmethod
     def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float | None = None):
         """
-        returns a new list
+        returns a new list; each copy gets scale / |max|, the rows stay as they are
 
         external_max - can take external input for max , instead of finding max of the given list
         """
@@ -234,13 +208,9 @@ class SpectralFeature:
         return_feats = copy.deepcopy(features)
 
         for f in return_feats:
-            if max_feat_coeff is not None and f.amplitude_coeff is not None:
-                f.amplitude_coeff = f.amplitude_coeff / abs(max_feat_coeff)
-            elif f.amplitude_coeff is None:
+            if f.amplitude_coeff is None:
                 raise ValueError(f'feature {f} has no amplitude_coeff')
-            else:
-                print('max_feat_coeff', max_feat_coeff, 'f.amplitude_coeff', f.amplitude_coeff)
-                raise ValueError('max_feat_coeff is None')
+            f.scale = f.scale / abs(max_feat_coeff) # type: ignore
         return return_feats
 
     @classmethod
@@ -249,24 +219,8 @@ class SpectralFeature:
         e.g.:
             params = {'a': 0, 'b': 1}
         """
-        res = []
-        for f in features:
-            if f.term_contributions and ParameterSet(params) in f.term_contributions[0].states_parameters:
-                res.append(f)
-        return res
-
-    # UNUSED
-    @classmethod
-    def share_location(cls, features: list['SpectralFeature']):
-        if len(features)<2:
-            raise ValueError("Can't compare 1 feature location")
-        
-        loc0 = features[0].location
-        for f in features[1:]:
-            if f.location != loc0:
-                return False
-        return True
-
+        target = ParameterSet(params)
+        return [f for f in features if target in f.param_sets]
 
     def _check_same_axes(self, box: Box):
         if self.location.axes != box.axes:
@@ -312,27 +266,6 @@ class SpectralFeature:
         return contributing and not self.is_inside(box)
 
     
-    def union(self, other: 'SpectralFeature'):
-        if self.location == other.location and self.lineshape_parameter == other.lineshape_parameter:
-            if self.amplitude_coeff is None:
-                raise ValueError("This SpectralFeature doesn't have `amplitude_coeff`")
-            if other.amplitude_coeff is None:
-                raise ValueError("Other SpectralFeature doesn't have `amplitude_coeff`")
-
-            t1 = self.term_contributions if self.term_contributions is not None else ()
-            t2 = other.term_contributions if other.term_contributions is not None else ()
-            term_contributions = t1 + t2
-            if self.lineshape_parameter == other.lineshape_parameter:
-                linshpar = self.lineshape_parameter
-            else:
-                linshpar = None
-            return SpectralFeature(location=self.location,
-                                   term_contributions=term_contributions,
-                                   amplitude_coeff=self.amplitude_coeff+other.amplitude_coeff,
-                                   lineshape_parameter=linshpar)
-        else:
-            raise ValueError('Union is possible only when both location and lineshape_parameter are the same')
-
     @classmethod
     def filter_to_spec_window(cls, spec_features: list['SpectralFeature'],
                               spec_window: 'SpectralWindow'):
@@ -356,40 +289,6 @@ class SpectralFeature:
         upd_spec_window.contrib_features = contrib_features
 
         return upd_spec_window
-
-    # UNUSED
-    @classmethod
-    def find_clusters_by_distance(cls, spec_features: list['SpectralFeature'],
-                                  distance_thresholds: dict,
-                                  linkage: str = 'single'):
-        # FIXME: imports from the old amplitudes package - port find_points_clusters_by_distance or remove.
-        # FIXME: features at the same location share one dict key below, so all but the last one are lost.
-
-        features_locs = {feature.location.values: feature for feature in spec_features}
-        from wilson_suite.wilson_intensities.amplitudes import domains
-
-        clusters = domains.find_points_clusters_by_distance(res_locations=list(features_locs.keys()),
-                                                            distance_thresholds=distance_thresholds,
-                                                            linkage=linkage)
-        rec_windows_dict = {}
-
-        for g in clusters:
-            rec_windows_dict[g] = RectangularDomain.from_features([features_locs[i] for i in clusters[g]])
-
-        return rec_windows_dict
-
-    # UNUSED
-    def get_res_motifs(self) -> list[ResonanceMotif]:
-        if self.term_contributions:
-            return [i.res_motif for i in self.term_contributions]
-        else:
-            return []
-
-    # def get_res_motif_str(self) -> str:
-    #     q: list[ResonanceMotif] = [i.res_motif for i in self.term_contributions]
-    #     if len(set(q)) != 1:
-    #         raise ValueError('several different motifs contribute to this feature')
-    #     return next(iter(set(q))).motif_str()
 
     @classmethod
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],
@@ -425,23 +324,18 @@ class SpectralFeature:
     def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
         """
         ! Assumption: lineshape_parameter is homogeneous/ universal over spectral dimensions
-        intensity will be returned in au
+        lineshape_parameter is in cm-1; intensity will be returned in au
         """
-        
+
         if self.amplitude_coeff is None or self.lineshape_parameter is None:
             raise ValueError('this feature has no amplitude_coeff and/or lineshape_parameter')
         if self.lineshape_parameter <= 0:
             raise ValueError(f'lineshape_parameter must be > 0, got {self.lineshape_parameter}')
 
         if intensity_expr == 'abs()**2':
-           N = len(self.location.axes)
-
-           if linewidth_cm_or_au(self.lineshape_parameter) == 'au':
-                return abs(self.amplitude_coeff / (-1j*self.lineshape_parameter)**N)**2
-           elif linewidth_cm_or_au(self.lineshape_parameter) == 'cm-1':
-                return abs(self.amplitude_coeff / (-1j*convNu2Ene(self.lineshape_parameter))**N)**2
-           else:
-               raise ValueError('unsupported lineshape_parameter unit')
+            N = len(self.location.axes)
+            gamma_au = convNu2Ene(self.lineshape_parameter)
+            return abs(self.amplitude_coeff / (-1j*gamma_au)**N)**2
         else:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
@@ -604,8 +498,20 @@ class SpectralFeature:
     def print_list_features(cls, features: list['SpectralFeature']):
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
-            print('term_contributions', feat.term_contributions)
-            print('term_contrib_by_id', feat.term_contrib_by_id)
+            for r in feat.rows:
+                print('   ', r)
+
+
+def features_from_rows(table: ContributionTable, lineshape_parameter: float | None = None) -> list[SpectralFeature]:
+    """
+    One feature per (motif, location). Same motif + same point -> same peak shape, so the
+    coefficients add. Rows of different motifs at one point stay separate features;
+    the grid adds them up as complex numbers.
+    """
+    groups = table.group_by(lambda r: (r.motif, r.location))
+    return [SpectralFeature(location=location, rows=tuple(g), lineshape_parameter=lineshape_parameter)
+            for (_, location), g in groups.items()]
+
 
 def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['SpectralFeature']]:
     """
@@ -753,76 +659,3 @@ class RectangularDomain:
             box=Box.union(feats),
             full_features=features
         )
-
-
-
-## -------------------------------------------------------------------------------
-##          Complete data computation: from terms to contributions to features
-## -------------------------------------------------------------------------------
-
-"""
-CompiledTerm list
-  │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
-  v
-(term, params) pairs
-  │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
-  │    skip the pair if coeff == 0
-  │ 3. location: solve_LSE_motif, once per (motif, params)            ← VibStatesData
-  v
-ContributionRow(term_id, motif, params, location, coeff)   "why" layer
-  │ 4. group by rounded location, add the coeffs
-  v
-SpectralFeature(location, rows)                            "what" layer
-  │ 5. add peak width, filter to the spectral window
-  v
-grid.py → spectrum array                                   the picture
-
-"""
-
-@dataclass(frozen=True)
-class ContributionRow:
-    """One term at one index set. The term itself is terms[term_id]."""
-    term_id: int
-    motif: ResonanceMotif
-    params: ParameterSet
-    location: 'ResLocPoint'
-    coeff: float
-
-
-class ContributionTable:
-    def __init__(self, rows: Iterable[ContributionRow]):
-        self._rows = tuple(rows)
-
-    def __iter__(self):
-        return iter(self._rows)
-
-    def __len__(self):
-        return len(self._rows)
-
-    # the two general tools
-    def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
-        return ContributionTable(r for r in self._rows if keep(r))
-
-    def group_by(self, key: Callable[[ContributionRow], Hashable]) -> dict[Hashable, 'ContributionTable']:
-        groups = defaultdict(list)
-        for r in self._rows:
-            groups[key(r)].append(r)
-        return {k: ContributionTable(v) for k, v in groups.items()}
-
-    # named shortcuts for frequent questions
-    def by_params(self):
-        return self.group_by(lambda r: r.params)
-
-    def by_motif(self):
-        return self.group_by(lambda r: r.motif)
-
-    def by_location(self, tol_cm: float = 0.01):
-        return self.group_by(lambda r: tuple((ax, round(v / tol_cm)) for ax, v in r.location.coordinates))
-
-    def axis_range(self, axis):
-        vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
-        return min(vals), max(vals)
-
-
-
-

@@ -1,5 +1,5 @@
 """
-features.py — term groups, spectral features, windows and domains. Runs with zero molecular data.
+features.py — contribution rows, spectral features, windows and domains. Runs with zero molecular data.
 
 Tests marked xfail(strict=True) pin known bugs: they start passing (and so fail the run) once the bug is fixed,
 which is the reminder to drop the marker.
@@ -11,16 +11,18 @@ import numpy as np
 import pytest
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionTable,
     RectangularDomain,
     SpectralFeature,
     SpectralWindow,
-    TermParametersChoice,
+    features_from_rows,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
+    ResLocPoint,
     ResonanceMotif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
@@ -30,60 +32,11 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     coords,
     cube,
     feat,
-    tpc,
+    row,
 )
 
 CM_TO_AU = 4.556335e-6  # 1 cm-1 in Hartree
-OTHER_MOTIF = ResonanceMotif.from_tuples((((('a',), ()), ('A',)),))  # tpc() uses the empty motif
-
-
-## TermParametersChoice -----------------------------------------------------
-
-def test_tpc_equality_and_hash_use_motif_term_ids_and_parameters():
-    t1 = tpc(term_ids=(1,), a=0)
-
-    assert t1 == tpc(term_ids=(1,), a=0)
-    assert hash(t1) == hash(tpc(term_ids=(1,), a=0))
-    assert t1 != TermParametersChoice(OTHER_MOTIF, (ParameterSet({'a': 0}),), (1,))
-    assert t1 != tpc(term_ids=(2,), a=0)
-    assert t1 != tpc(term_ids=(1,), a=1)
-
-
-def test_tpc_is_not_equal_or_ordered_with_other_types():
-    assert tpc() != (0,)
-    assert tpc().__lt__((0,)) is NotImplemented
-
-
-def test_tpc_orders_by_term_count_then_term_ids_then_parameters():
-    assert tpc(term_ids=(9,), a=5) < tpc(term_ids=(0, 1), a=0)
-    assert tpc(term_ids=(0,), a=5) < tpc(term_ids=(1,), a=0)
-    assert tpc(term_ids=(0,), a=0) < tpc(term_ids=(0,), a=1)
-
-
-def test_tpc_sort_parameters_returns_sorted_copy():
-    unsorted = TermParametersChoice(ResonanceMotif(()), (ParameterSet({'a': 2}), ParameterSet({'a': 0})), (0,))
-
-    result = unsorted.sort_parameters()
-
-    assert result.states_parameters == (ParameterSet({'a': 0}), ParameterSet({'a': 2}))
-    assert unsorted.states_parameters[0] == ParameterSet({'a': 2})
-
-
-def test_check_states_parameters_returns_the_single_shared_choice():
-    result = TermParametersChoice.check_states_parameters((tpc(term_ids=(0,), a=0, b=1),
-                                                           tpc(term_ids=(1,), a=0, b=1)))
-
-    assert result == {'a': 0, 'b': 1, 'zero': 'zero'}
-
-
-def test_check_states_parameters_returns_none_for_no_choices():
-    assert TermParametersChoice.check_states_parameters(()) is None
-
-
-def test_check_states_parameters_rejects_different_choices():
-    with pytest.raises(ValueError, match='2 different'):
-        TermParametersChoice.check_states_parameters((tpc(a=0), tpc(a=1)))
-
+OTHER_MOTIF = ResonanceMotif.from_tuples((((('a',), ()), ('A',)),))  # row() uses the empty motif
 
 
 ## SpectralFeature: basics --------------------------------------------------
@@ -92,26 +45,56 @@ def test_feature_without_gamma_has_no_box():
     assert feat(A=100., gamma=None).feat_box is None
 
 
-def test_feature_equality_ignores_amplitude():
-    assert feat(A=1., amp=1.) == feat(A=1., amp=5.)
+def test_feature_amplitude_is_scale_times_sum_of_row_coeffs():
+    f = feat(A=0., rows=(row(0.3, a=0), row(-0.12, a=1)))
+
+    assert f.amplitude_coeff == pytest.approx(0.18)
+    f.scale = 2.
+    assert f.amplitude_coeff == pytest.approx(0.36)
+
+
+def test_feature_without_rows_has_no_amplitude():
+    assert feat(A=0., amp=None).amplitude_coeff is None
+
+
+def test_feature_motif_param_sets_and_term_ids_come_from_rows():
+    f = feat(A=0., rows=(row(term_id=0, motif=OTHER_MOTIF, a=0),
+                         row(term_id=1, motif=OTHER_MOTIF, a=0),
+                         row(term_id=0, motif=OTHER_MOTIF, a=1)))
+
+    assert f.motif == OTHER_MOTIF
+    assert f.param_sets == (ParameterSet({'a': 0}), ParameterSet({'a': 1}))
+    assert f.term_ids == (0, 1)
+
+
+def test_feature_without_rows_has_no_motif_param_sets_or_term_ids():
+    f = feat(A=0., amp=None)
+
+    assert (f.motif, f.param_sets, f.term_ids) == (None, (), ())
+
+
+def test_feature_motif_rejects_rows_of_two_motifs():
+    f = feat(A=0., rows=(row(a=0), row(motif=OTHER_MOTIF, a=0)))
+
+    with pytest.raises(ValueError, match='one motif per feature'):
+        _ = f.motif
+
+
+def test_feature_equality_uses_location_gamma_rows_and_scale():
+    scaled = feat(A=1.)
+    scaled.scale = 2.
+
+    assert feat(A=1.) == feat(A=1.)
     assert feat(A=1.) != feat(A=2.)
     assert feat(A=1., gamma=1.) != feat(A=1., gamma=2.)
-    assert feat(A=1.) != feat(A=1., terms=(tpc(a=1),))
-
-
-def test_feature_equality_includes_term_motif():
-    f1 = feat(A=0., terms=(tpc(term_ids=(1,), a=0),))
-    f2 = feat(A=0., terms=(TermParametersChoice(OTHER_MOTIF, (ParameterSet({'a': 0}),), (1,)),))
-
-    assert f1 != f2
-    assert len({f1, f2}) == 2
+    assert feat(A=1., amp=1.) != feat(A=1., amp=5.)         # rows differ in coeff
+    assert feat(A=1., rows=(row(a=0),)) != feat(A=1., rows=(row(motif=OTHER_MOTIF, a=0),))
+    assert scaled != feat(A=1.)
 
 
 def test_feature_hash_matches_equality():
-    # equal features must hash equal: amplitude is ignored, and features without terms work too
-    assert hash(feat(A=1., amp=1.)) == hash(feat(A=1., amp=5.))
-    assert hash(feat(A=1., terms=())) == hash(feat(A=1., terms=()))
-    assert len({feat(A=1.), feat(A=1.), feat(A=2.)}) == 2
+    assert hash(feat(A=1.)) == hash(feat(A=1.))
+    assert len({feat(A=1.), feat(A=1.), feat(A=2.), feat(A=1., amp=5.)}) == 3
 
 
 def test_feature_is_not_equal_or_ordered_with_other_types():
@@ -133,61 +116,79 @@ def test_feature_order_accepts_zero_amplitude():
     assert feat(A=0., amp=0.) < feat(A=1., amp=1.)
 
 
-def test_feature_param_set_comes_from_terms_without_zero():
-    assert feat(A=0., terms=(tpc(a=0, b=1),)).param_set == {'a': 0, 'b': 1}
-
-
-def test_feature_param_set_is_none_without_terms():
-    assert feat(A=0., terms=()).param_set is None
-
-
-def test_feature_param_set_needs_one_shared_choice():
-    f = feat(A=0., terms=(tpc(a=0), tpc(a=1)))
-
-    with pytest.raises(ValueError, match='different parameter choices'):
-        _ = f.param_set
-
-
-def test_feature_param_set_setter_overrides_terms():
-    f = feat(A=0., terms=(tpc(a=0),))
-
-    f.param_set = {'a': 7}
-
-    assert f.param_set == {'a': 7}
-
-
 def test_feature_anharm_contributions_sums_per_anharmonicity():
-    term_map = {'t1': SimpleNamespace(anharmonicity='mech'),
-                't2': SimpleNamespace(anharmonicity='mech'),
-                't3': SimpleNamespace(anharmonicity='el')}
-    f = feat(A=0.)
-    f.term_contrib_by_id = {'t1': (1.,), 't2': (2.,), 't3': (5.,)}
+    terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='mech'),
+             SimpleNamespace(anharmonicity='el')]
+    f = feat(A=0., rows=(row(1., term_id=0, a=0), row(2., term_id=1, a=0), row(5., term_id=2, a=0)))
 
-    assert f.anharm_contributions(term_map) == {'mech': 3., 'el': 5.}
+    assert f.anharm_contributions(terms) == {'mech': 3., 'el': 5.}
 
 
-def test_feature_anharm_contributions_is_empty_without_term_contributions():
-    assert feat(A=0.).anharm_contributions({}) == {}
+def test_feature_anharm_contributions_add_up_to_the_scaled_amplitude():
+    terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='el')]
+    f = feat(A=0., rows=(row(1., term_id=0, a=0), row(3., term_id=1, a=0)))
+    f.scale = 0.5
+
+    parts = f.anharm_contributions(terms)
+
+    assert parts == {'mech': 0.5, 'el': 1.5}
+    assert sum(parts.values()) == f.amplitude_coeff
 
 
-def test_feature_get_res_motifs_lists_one_motif_per_term_group():
-    assert feat(A=0., terms=(tpc(a=0), tpc(a=1))).get_res_motifs() == [ResonanceMotif(()), ResonanceMotif(())]
-    assert feat(A=0., terms=()).get_res_motifs() == []
+def test_feature_anharm_contributions_is_empty_without_rows():
+    assert feat(A=0., amp=None).anharm_contributions([]) == {}
+
+
+## features_from_rows -------------------------------------------------------
+
+LOC_1650 = ResLocPoint({'A': 1650.})
+
+
+def test_features_from_rows_adds_rows_of_one_motif_at_one_location():
+    rows = (row(0.30, term_id=0, location=LOC_1650, a=0), row(-0.12, term_id=1, location=LOC_1650, a=0))
+
+    [f] = features_from_rows(ContributionTable(rows))
+
+    assert f.location == LOC_1650
+    assert f.rows == rows
+    assert f.amplitude_coeff == pytest.approx(0.18)
+
+
+def test_features_from_rows_keeps_motifs_apart_at_one_location():
+    """Same point, different motif -> different peak shape: two features."""
+    rows = (row(0.30, location=LOC_1650, a=0), row(0.20, motif=OTHER_MOTIF, location=LOC_1650, a=0))
+
+    features = features_from_rows(ContributionTable(rows))
+
+    assert [f.motif for f in features] == [ResonanceMotif(()), OTHER_MOTIF]
+    assert [f.amplitude_coeff for f in features] == [0.30, 0.20]
+
+
+def test_features_from_rows_keeps_locations_apart():
+    loc_1651 = ResLocPoint({'A': 1651.})
+    rows = (row(location=LOC_1650, a=0), row(location=loc_1651, a=1))
+
+    assert [f.location for f in features_from_rows(ContributionTable(rows))] == [LOC_1650, loc_1651]
+
+
+def test_features_from_rows_gives_every_feature_the_lineshape_parameter():
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_parameter=5.)
+
+    assert f.lineshape_parameter == 5.
+    assert f.feat_box == Box({'A': (1645., 1655.)})
+
+
+def test_features_from_rows_of_empty_table_is_empty():
+    assert features_from_rows(ContributionTable([])) == []
 
 
 ## SpectralFeature: list helpers --------------------------------------------
 
-def test_sort_by_params_orders_by_first_term_group():
-    f_high = feat(A=0., terms=(tpc(a=1),))
-    f_low = feat(A=1., terms=(tpc(a=0),))
+def test_sort_by_params_orders_by_sorted_index_sets():
+    f_high = feat(A=0., rows=(row(a=1),))
+    f_low = feat(A=1., rows=(row(a=2), row(a=0)))
 
     assert SpectralFeature.sort_by_params([f_high, f_low]) == [f_low, f_high]
-
-
-def test_sort_by_params_needs_exactly_one_term_group_per_feature():
-    # counts [0, 2] add up to the number of features, which the old assert let through
-    with pytest.raises(ValueError, match='exactly 1 term group'):
-        SpectralFeature.sort_by_params([feat(A=0., terms=()), feat(A=1., terms=(tpc(a=0), tpc(a=1)))])
 
 
 def test_normalize_coeffs_divides_by_largest_absolute_amplitude():
@@ -197,6 +198,7 @@ def test_normalize_coeffs_divides_by_largest_absolute_amplitude():
 
     assert [f.amplitude_coeff for f in result] == [0.5, -1.]
     assert [f.amplitude_coeff for f in feats] == [2., -4.]
+    assert [f.rows for f in result] == [f.rows for f in feats]      # only scale changes
 
 
 def test_normalize_coeffs_uses_external_max():
@@ -221,66 +223,15 @@ def test_normalize_coeffs_rejects_all_zero_amplitudes():
         SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=0.), feat(A=1., amp=0.)])
 
 
-def test_get_feats_with_params_matches_first_term_group():
-    f0 = feat(A=0., terms=(tpc(a=0, b=1),))
-    f1 = feat(A=1., terms=(tpc(a=1, b=1),))
+def test_get_feats_with_params_matches_any_row():
+    f0 = feat(A=0., rows=(row(a=0, b=1), row(a=1, b=0)))
+    f1 = feat(A=1., rows=(row(a=1, b=1),))
 
-    assert SpectralFeature.get_feats_with_params([f0, f1], {'a': 0, 'b': 1}) == [f0]
-
-
-def test_get_feats_with_params_skips_features_without_terms():
-    assert SpectralFeature.get_feats_with_params([feat(A=0., terms=())], {'a': 0}) == []
+    assert SpectralFeature.get_feats_with_params([f0, f1], {'a': 1, 'b': 0}) == [f0]
 
 
-def test_share_location():
-    assert SpectralFeature.share_location([feat(A=1., amp=1.), feat(A=1., amp=2.)])
-    assert not SpectralFeature.share_location([feat(A=1.), feat(A=2.)])
-    with pytest.raises(ValueError):
-        SpectralFeature.share_location([feat(A=1.)])
-
-
-## SpectralFeature: union ---------------------------------------------------
-
-def test_feature_union_adds_amplitudes_and_joins_terms():
-    f1 = feat(A=1., amp=1., terms=(tpc(term_ids=(0,), a=0),))
-    f2 = feat(A=1., amp=2., terms=(tpc(term_ids=(1,), a=0),))
-
-    merged = f1.union(f2)
-
-    assert merged.location == f1.location
-    assert merged.amplitude_coeff == 3.
-    assert merged.term_contributions == f1.term_contributions + f2.term_contributions
-
-
-@pytest.mark.parametrize('other', [feat(A=2.), feat(A=1., gamma=3.)])
-def test_feature_union_needs_same_location_and_gamma(other):
-    with pytest.raises(ValueError, match='Union'):
-        feat(A=1.).union(other)
-
-
-def test_feature_union_needs_amplitudes():
-    with pytest.raises(ValueError, match='amplitude_coeff'):
-        feat(A=1., amp=None).union(feat(A=1.))
-
-
-def test_feature_union_needs_amplitude_of_the_other_feature():
-    with pytest.raises(ValueError, match='Other'):
-        feat(A=1.).union(feat(A=1., amp=None))
-
-
-def test_feature_union_keeps_lineshape_parameter():
-    merged = feat(A=1., gamma=2.).union(feat(A=1., gamma=2.))
-
-    assert merged.lineshape_parameter == 2.
-    assert merged.feat_box is not None
-
-
-def test_feature_union_does_not_change_inputs():
-    f1, f2 = feat(A=1., amp=1.), feat(A=1., amp=2.)
-
-    f1.union(f2)
-
-    assert (f1.amplitude_coeff, f2.amplitude_coeff) == (1., 2.)
+def test_get_feats_with_params_skips_features_without_rows():
+    assert SpectralFeature.get_feats_with_params([feat(A=0., amp=None)], {'a': 0}) == []
 
 
 ## SpectralFeature: relation to a box ---------------------------------------
@@ -357,9 +308,9 @@ def test_filter_to_spec_window_does_not_change_input_features():
 ## SpectralFeature: intensity -----------------------------------------------
 
 @pytest.mark.parametrize('location, gamma, expected', [
-    ({'A': 100.}, 5., 4. / (5. * CM_TO_AU) ** 2),             # gamma > 1e-5 is cm-1 and gets converted
+    ({'A': 100.}, 5., 4. / (5. * CM_TO_AU) ** 2),             # gamma is in cm-1 and gets converted
     ({'A': 100., 'B': 200.}, 5., 4. / (5. * CM_TO_AU) ** 4),  # one 1/gamma factor per axis
-    ({'A': 100.}, 1e-6, 4. / 1e-6 ** 2),                      # gamma <= 1e-5 is taken as au
+    ({'A': 100.}, 1e-6, 4. / (1e-6 * CM_TO_AU) ** 2),         # a small gamma is still cm-1
 ])
 def test_intensity_is_abs_squared_of_amplitude_over_gamma_power(location, gamma, expected):
     assert feat(amp=2., gamma=gamma, **location).get_intensity() == pytest.approx(expected, rel=1e-6)
@@ -485,7 +436,6 @@ def test_dress_does_not_change_input_features():
     assert f.feat_box == Box({'A': (-5., 5.)})
 
 
-@pytest.mark.xfail(strict=True, reason='list.remove() drops the first *equal* feature, and equality ignores amplitude')
 def test_dress_drops_the_weak_one_of_two_equal_features():
     strong, weak = feat(A=0., amp=1.), feat(A=0., amp=1e-3)  # same location, gamma and terms
     top = strong.get_intensity()
