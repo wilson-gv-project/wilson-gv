@@ -1,12 +1,20 @@
 import dataclasses
+import itertools
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    getGeneralPolarizationAveragingExpression,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    PrecalculatedData,
     _make_func_to_compute_avrg,
+    calculate_avrg_tensor,
+    eval_avrg_per_indexdict,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
 )
@@ -216,3 +224,70 @@ def test_evaluate_term():
         evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None,
                                     molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
 
+
+
+## Term 8, averaged properties on the fly, with the formaldehyde data ---------------------
+# Term 8 averages polgrad[b] (ops 0, 3) * dipgrad[a] (op 1) * dipgrad[c] (op 2) over four cartesian
+# slots: for polarization key (i, j, k, l), polgrad reads (i, l), the first dipgrad j, the second k.
+
+ISO4 = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=(1., 1., 1.))
+ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(6), repeat=3)]
+
+
+@pytest.fixture(scope='module')
+def term8():
+    """Term 8 and its MolSystemData from the formaldehyde file."""
+    term = cmpl_terms[8]
+    calc_dataorigin = DataOriginInfo(source_type='gaussian',
+                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
+    request.update(_sys_info_request(calc_dataorigin))
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
+    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request))
+
+
+def evv_props(polgrad, dipgrad) -> MolPropsCollection:
+    return MolPropsCollection([MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={}),
+                               MolecularProperty(trivial_name='dipgrad', vals=dipgrad, extra_data={})])
+
+
+def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
+    """Every index set: sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k]."""
+    term, molsys = term8
+    assert [(tuple(o.o for o in p.ops), p.inds) for p in term.avrg_props] == [((0, 3), ['b']), ((1,), ['a']), ((2,), ['c'])]
+    polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
+    C = np.zeros((3,) * 4)
+    for key, coeff in ISO4.items():
+        C[key] = coeff
+    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+
+    for idx in ALL_ABC:
+        expected = np.einsum('ijkl,il,j,k->', C, polgrad[idx['b']], dipgrad[idx['a']], dipgrad[idx['c']])
+        assert func(idx, molsys.mol_props) == pytest.approx(expected)
+
+
+def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(term8):
+    """Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged."""
+    term, molsys = term8
+    polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
+    ca, sa, cb, sb = np.cos(0.7), np.sin(0.7), np.cos(1.9), np.sin(1.9)
+    R = np.array([[1., 0., 0.], [0., cb, -sb], [0., sb, cb]]) @ np.array([[ca, -sa, 0.], [sa, ca, 0.], [0., 0., 1.]])
+    rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, polgrad), np.einsum('ip,np->ni', R, dipgrad))
+    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+
+    values = [func(idx, molsys.mol_props) for idx in ALL_ABC]
+    assert any(v != 0. for v in values)
+    assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values)
+
+
+@pytest.mark.xfail(strict=True, reason=('calculate_avrg_tensor stores alphabetical axes (a, b, c), but '
+                                        '_get_ind_tuple_from_base reads term 8 in expression order (b, a, c)'))
+def test_term8_precalculated_tensor_gives_the_on_the_fly_value(term8):
+    term, molsys = term8
+    expr = term.avrg_props
+    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=ISO4)
+    pre = PrecalculatedData(avrg_tensors={expr: calculate_avrg_tensor(expr, molsys.mol_props, 6, ISO4)},
+                            avrg_expr_tensor_mapping={expr: expr})
+
+    assert ([eval_avrg_per_indexdict(expr, idx, precalculated_data=pre) for idx in ALL_ABC]
+            == pytest.approx([eval_avrg_per_indexdict(expr, idx, avrg_func=func, molsys_data=molsys) for idx in ALL_ABC]))

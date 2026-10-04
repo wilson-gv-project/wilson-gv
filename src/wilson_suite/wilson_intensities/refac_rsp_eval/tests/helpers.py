@@ -1,7 +1,11 @@
 """
-Small hand-built objects shared by the unit tests of plan.py, evaluate.py, system_data.py, grid.py and features.py.
-No VibPerturbedTerm, no data files.
+Small hand-built objects shared by the unit tests of plan.py, evaluate.py, system_data.py, grid.py, features.py
+and pipeline.py. No VibPerturbedTerm, no data files.
 """
+
+from dataclasses import replace
+
+import numpy as np
 
 from wilson_suite.wilson_derive.abstractions import (
     HarmOscStateSymbolic,
@@ -63,6 +67,35 @@ def toy_term() -> CompiledTerm:
         idx_summ=('b', 'c'),
         idx_nonsumm=('a',),
     )
+
+
+# --- resonance motifs (evaluate.py, pipeline.py) ---
+# A motif is a set of resonance conditions  E_left - E_right = sum_j s_j * w_j , one per
+# ResCondKey: `diff` names the two states by quanta labels, `pf` the frequency axes w_j with
+# sign s_j ('-B' -> s = -1). Fixing the mode labels (a, b, ...) to modes turns the motif into
+# a linear system  LHS @ w = RHS  whose solution is where on the axes the term resonates.
+#
+# The four motifs below are the ones used for the pre-refactor amplitudes/resonances.py.
+# With toy_states() and a=0, b=1:  E_a = E0, E_b = E1, E_ab = E01, E_0 = 0.
+
+MOTIF_AB = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))        # one axis per condition
+MOTIF_A = (((('a', 'b'), ('a',)), ('A',)),)                                    # single condition
+MOTIF_MIXED = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))             # A - B in one condition
+MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           # two conditions, one axis
+
+
+# --- toy molecule data and a term with resonance labels a, b (build_contributions, compute_features) ---
+# The fixtures `states`, `molsys` and `pre_a1_zero` (conftest.py) are built from these.
+
+CFF = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.   # cff[a, b, c] = 1 + 4a + 2b + c
+
+PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
+PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})
+
+
+def ab_term(motif=MOTIF_AB) -> CompiledTerm:
+    """toy_term() with resonance labels a, b (fixed by the index sets) and summation label c."""
+    return replace(toy_term(), cmp_resmotf=ResonanceMotif.from_tuples(motif), idx_summ=('c',), idx_nonsumm=('a', 'b'))
 
 
 # --- spectral features (grid.py, features.py) ---

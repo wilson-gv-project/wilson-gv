@@ -18,6 +18,8 @@ def points_to_bounds(points: list[dict[str,float]],
                      halfwidth: float) -> list[dict[str,tuple[float,float]]]:
     # FIXME should know combination of states to get the Gamma; now it's using a single value everywhere
     # halfwidth - doesn't have to be simply Gamma, shouldn't...
+    # TODO: maybe this should be a Box method, or a Box constructor from points and halfwidth
+    # TODO: make a better box construction... BUG??
 
     return [
         {axis: (p[axis]-halfwidth, p[axis]+halfwidth) for axis in p}
