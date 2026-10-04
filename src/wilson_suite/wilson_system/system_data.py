@@ -234,22 +234,9 @@ class VibDiff:
                     index_dict: dict,
                     vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
-        # Get state labels from symbolic term
-        left_label, right_label = _make_vibdiff_key(vibdiff_term_symb, index_dict)
-        # Look up states in vibstates_data
-        left_state = (
-            VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
-            if left_label == 'zero'
-            else vibstates_data.get_state_by_label(left_label)
-        )
         
-        right_state = (
-            VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.0)
-            if right_label == 'zero'
-            else vibstates_data.get_state_by_label(right_label)
-        )
-
-        return cls(left=left_state, right=right_state)
+        return cls.from_quanta(vibdiff_term_symb.sl.q, vibdiff_term_symb.sr.q, 
+                               index_dict, vibstates_data)
 
     @classmethod
     def from_quanta(cls, left_q, right_q, index_dict, vibstates_data: 'VibStatesData') -> 'VibDiff':

@@ -10,6 +10,7 @@ from wilson_suite.wilson_derive.abstractions import ResonanceCondition
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
+    ParameterSet,
     PropsCollection,
     ResCondKey,
     ResonanceMotif,
@@ -36,6 +37,7 @@ from wilson_suite.wilson_system.system_data import (
     _make_vibdiff_key,
     _sys_info_request,
     build_data_request_for_term,
+    make_state_label,
 )
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -148,6 +150,68 @@ def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
     # a=1, b=0:  E_ab - E_a = E01 - E1 ,  E_b - E_a = E0 - E1
     assert [VibDiff.from_quanta(*k.diff, index_dict, states).energy_difference() for k in motif] \
         == pytest.approx([E01 - E1, E0 - E1])
+
+
+## Ground state ('zero') -----------------------------------------------------
+# The ground state has no quanta. Its label is 'zero' (make_state_label of no modes); VibStatesData
+# always holds it with energy 0; VibDiff counts it as energy 0. Mode 0 is something else:
+# label '0', the first excited state of mode 0.
+
+# -- the label
+
+@pytest.mark.parametrize('modes', [(), [], iter(())])
+def test_make_state_label_of_no_modes_is_zero(modes):
+    assert make_state_label(modes) == 'zero'
+
+
+def test_mode_0_is_not_the_ground_state(states):
+    assert make_state_label([0]) == '0'
+    assert states.get_state_by_label('0').energy == E0
+    assert states.get_state_by_label('zero').energy == 0.
+
+
+# -- VibStatesData
+
+def test_vibstatesdata_ground_state_energy_is_zero_even_if_the_data_says_otherwise():
+    """Energies are measured from the ground state: a 'zero' entry in the data is overridden with energy 0."""
+    data = VibStatesData(allstates=(state('zero', 5.), state('0', E0)))
+
+    assert data.get_state_by_label('zero').energy == 0.
+
+
+# -- VibDiff
+
+def test_vibdiff_counts_a_zero_labelled_state_as_energy_zero():
+    """is_zero_state goes by the label, so the energy field of a 'zero' state is ignored."""
+    odd_zero = state('zero', 5.)
+
+    assert VibDiff(state('0', E0), odd_zero).energy_difference() == E0
+    assert VibDiff(odd_zero, state('0', E0)).energy_difference() == -E0
+
+
+@pytest.mark.parametrize('left, right, expected', [
+    ('a', '', E0),        # excited -> ground:      E_a - 0
+    ('', 'a', -E0),       # ground -> excited:      0 - E_a
+    ('ab', '', E01),      # combination -> ground:  E_ab - 0
+    ('', '', 0.),         # ground -> ground
+])
+def test_vibdiff_from_symbolic_and_from_quanta_agree_on_the_ground_state(left, right, expected, states):
+    """from_symbolic builds its own ground state, from_quanta looks it up in VibStatesData (todo A11)."""
+    index_dict = {'a': 0, 'b': 1}
+
+    symb = VibDiff.from_symbolic(vibdiff(sl=left, sr=right), index_dict, states)
+    quanta = VibDiff.from_quanta(tuple(left), tuple(right), index_dict, states)
+
+    assert symb == quanta
+    assert symb.energy_difference() == pytest.approx(expected)
+    assert symb.energy_difference(au=True) == pytest.approx(convNu2Ene(expected))
+
+
+def test_from_quanta_works_with_the_zero_entry_of_a_parameter_set(states):
+    """get_RHS_motif passes ParameterSet.to_dict(), which carries 'zero': 'zero' next to the mode labels."""
+    index_dict = ParameterSet({'a': 0}).to_dict()
+
+    assert VibDiff.from_quanta(('a',), (), index_dict, states).energy_difference() == E0
 
 
 ## MolPropsCollection / MolSystemData ---------------------------------------

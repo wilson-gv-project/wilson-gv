@@ -259,6 +259,17 @@ def test_parameterset_injects_zero_and_maps_empty_label():
     assert len(ps) == 3
 
 
+def test_parameterset_zero_entry_is_hidden_from_repr_but_kept_in_to_dict():
+    """The 'zero' entry is always there: giving it explicitly changes nothing, and pickling keeps it."""
+    ps = ParameterSet({'a': 0})
+
+    assert repr(ps) == "ParameterSet({'a': 0})"
+    assert ps.to_dict() == {'a': 0, 'zero': 'zero'}
+    assert ps == ParameterSet({'a': 0, 'zero': 'zero'})
+    assert hash(ps) == hash(ParameterSet({'a': 0, 'zero': 'zero'}))
+    assert pickle.loads(pickle.dumps(ps)).to_dict() == {'a': 0, 'zero': 'zero'}
+
+
 def test_parameterset_rejects_non_mapping():
     with pytest.raises(TypeError):
         ParameterSet([('a', 0)]) # type: ignore
