@@ -10,7 +10,7 @@ Order of work
 1. Small fixes: A10, A12, A13.
 2. B1: make the old pipeline run again. It is the reference for correct numbers.
 3. B4 + C2: prove new numbers = old numbers, term by term.        <- most important
-4. E3: load all data in one call; real-data pipeline test.
+4. E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
 5. E2: grid.py.
 6. C3: whole spectrum, old vs new.
 7. D4, E4: one data model, one README; delete the old code.
@@ -76,10 +76,19 @@ D. Data model
 E. Pipeline
 -----------
 [ ] E2  grid.py: draw each feature as amplitude x shape(motif, location), the shape once per feature.
-[ ] E3  Entry point. Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
-        Left: - load_molsys_data(compiled, data_origin): merge the data requests of all terms, fetch once.
-              - real-data test: 504 (term, params) pairs = 340 rows + 164 zero + 0 failed.
-              - adapter from wilson_main; replace rps_evaluation.py.
+[ ] E3  Entry point: terms + data file + experiment settings -> features.
+        Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
+        Left, in order:
+        1. load_molsys_data(compiled, data_origin, states_choice) -> one MolSystemData for all terms:
+           merge the terms' requests (build_data_request_for_term), each property once
+           (term 8 alone lists dipgrad twice), one wilson_data_obtainer call, one from_datadict.
+        2. Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero + 0 failed,
+           number of features, a few amplitudes.
+        3. Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
+           the terms (4 for EVV); raise if terms disagree (TODO in CompiledTerm).
+        4. One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
+        5. wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
+        6. Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
 [ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
 
 
