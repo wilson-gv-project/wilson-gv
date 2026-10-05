@@ -88,7 +88,7 @@ def assert_equal(a, b):
         assert a == b
 
 
-def test_save_wilsonsim():
+def test_save_wilsonsim(tmp_path):
     from ...fixtures import evv_experiment
 
     evv_exp = evv_experiment()
@@ -122,7 +122,8 @@ def test_save_wilsonsim():
     # save this sim to pickle in the sim workflow run directory
     sim.save_to_pkl(filename='sim0.pkl')
 
-    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_for_tests/data_file.pkl')
+    # tmp_path: a fresh pytest folder per run, so the test writes nothing into the repo
+    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl', save_to_dir=str(tmp_path))
 
     vib_ana.set_include_modes_list()
     

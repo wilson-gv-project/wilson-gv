@@ -314,7 +314,7 @@ def test_full_integration__EVV_axes_with_apply_exp_magn_conditions():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -396,7 +396,7 @@ def test_full_integration_EVV_axes_dress_these_with_boxes_minimum_box_padding():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -556,7 +556,7 @@ def test_integration_evv_experiment_until_after_evaluation():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
                                                      lvl_theory='B3LYP',
                                                      basis_set='cc-pVQZ',
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)

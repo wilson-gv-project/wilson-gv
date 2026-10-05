@@ -19,7 +19,7 @@ def test_build_experiment_context():
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
                                                      lvl_theory='B3LYP', 
                                                      basis_set='cc-pVQZ', 
-                                                     base_file_loc=SUITE_ROOT+'/../data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+                                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
