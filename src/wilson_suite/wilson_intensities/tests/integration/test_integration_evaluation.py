@@ -278,7 +278,7 @@ def test_full_integration_EVV_axes():
     sim.evaluate()
 
     print(len(sim._workflow.feat_result.features))
-    assert len(sim._workflow.feat_result.features) == 60
+    assert len(sim._workflow.feat_result.features) == 68 # 68 since 3c837a1: zero check is |x| <= 1e-18 (was |x| < ~1e-8 -> 60)
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -360,7 +360,7 @@ def test_full_integration__EVV_axes_with_apply_exp_magn_conditions():
     sim.evaluate()
     
     print(len(sim._workflow.feat_result.features))
-    assert len(sim._workflow.feat_result.features) == 60
+    assert len(sim._workflow.feat_result.features) == 68 # 68 since 3c837a1: zero check is |x| <= 1e-18 (was |x| < ~1e-8 -> 60)
 
     np.set_printoptions(linewidth=280, precision=1)
 
@@ -439,7 +439,7 @@ def test_full_integration_EVV_axes_dress_these_with_boxes_minimum_box_padding():
     sim.evaluate()
 
     print(len(sim._workflow.feat_result.features))
-    assert len(sim._workflow.feat_result.features) == 60 # all of them now
+    assert len(sim._workflow.feat_result.features) == 68 # all of them now; 68 since 3c837a1: zero check is |x| <= 1e-18 (was |x| < ~1e-8 -> 60)
 
     np.set_printoptions(linewidth=280, precision=1)
 
