@@ -576,33 +576,15 @@ def test_window_bounds_ndim_and_widths():
     assert window.widths == {'A': 10., 'B': 4.}
 
 
-def test_sample_grid_shapes_and_ij_indexing():
-    window = SpectralWindow(Box({'A': (0., 10.), 'B': (100., 200.)}))
+def test_sample_grid_is_the_box_grid():
+    box = Box({'A': (0., 10.), 'B': (100., 200.)})
 
-    axes, grid = window.sample_grid({'A': 5, 'B': 3})
+    axes, grid = SpectralWindow(box).sample_grid({'A': 5, 'B': 3})
+    box_axes, box_grid = box.make_grid({'A': 5, 'B': 3})
 
-    assert (len(axes['A']), len(axes['B'])) == (5, 3)
-    assert grid['A'].shape == grid['B'].shape == (5, 3)
-    np.testing.assert_array_equal(grid['A'][:, 0], axes['A'])
-    np.testing.assert_array_equal(grid['B'][0, :], axes['B'])
-
-
-def test_sample_grid_runs_from_min_to_max_with_both_edges():
-    window = SpectralWindow(Box({'A': (0., 10.), 'B': (100., 200.)}))
-
-    axes, _ = window.sample_grid({'A': 11, 'B': 5})
-
-    np.testing.assert_allclose(axes['A'], [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10.])
-    np.testing.assert_allclose(axes['B'], [100., 125., 150., 175., 200.])
-
-
-@pytest.mark.parametrize('dim_sizes', [
-    {'A': 5, 'B': 5},  # one axis too many
-    {'B': 5},          # same number of axes, other name
-])
-def test_sample_grid_needs_one_size_per_window_axis(dim_sizes):
-    with pytest.raises(ValueError, match='one grid size per window axis'):
-        SpectralWindow(Box({'A': (0., 10.)})).sample_grid(dim_sizes)
+    for ax in ('A', 'B'):
+        np.testing.assert_array_equal(axes[ax], box_axes[ax])
+        np.testing.assert_array_equal(grid[ax], box_grid[ax])
 
 
 def test_window_dress_with_featboxes_keeps_box_and_drops_weak_features():
@@ -763,19 +745,4 @@ def test_nd_window_find_clusters_by_featboxes(ndim):
 
     assert [d.box for d in domains] == [cube(ndim, -1., 2.5), f2.feat_box]
     assert [d.full_features for d in domains] == [[f0, f1], [f2]]
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_sample_grid_has_both_edges_and_ij_indexing(ndim):
-    window = SpectralWindow(cube(ndim, 0., 10.))
-
-    axes, grid = window.sample_grid({ax: 3 for ax in AXES[:ndim]})
-
-    assert list(axes) == list(AXES[:ndim])
-    for i, ax in enumerate(AXES[:ndim]):
-        np.testing.assert_allclose(axes[ax], [0., 5., 10.])
-        assert grid[ax].shape == (3,) * ndim
-        for j in range(ndim):
-            # ij indexing: grid[ax] steps by 5 along its own array dimension i and is constant along the others
-            np.testing.assert_allclose(np.diff(grid[ax], axis=j), 5. if j == i else 0.)
 

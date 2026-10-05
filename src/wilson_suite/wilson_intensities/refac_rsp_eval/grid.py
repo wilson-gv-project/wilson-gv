@@ -2,7 +2,7 @@
 Pure geometry: bounds, boxes and box clustering. No physics, no SpectralFeature logic.
 
   in:  points or (min, max) bounds per named axis
-  out: Box, box adjacency matrix, clusters of boxes
+  out: Box, regular grid over a Box, box adjacency matrix, clusters of boxes
 
   holds: points_to_bounds, Box, compute_box_adjacency, connected_components_from_adjacency
 
@@ -166,8 +166,26 @@ class Box:
             inside &= (points[..., i] >= mn) & (points[..., i] <= mx)
         return inside
 
-    def make_grid(self):
-        return
+    def make_grid(self, dim_sizes: dict[str, int]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+        """
+        Generate a regular grid of points spanning the box.
+        Each axis gets dim_sizes[ax] points from min to max, both edges included: step = (max - min) / (n - 1).
+        Returns (1D coords per axis, meshgrid per axis); meshgrids use ij indexing, array dimension i = self.axes[i].
+        """
+
+        if set(dim_sizes) != set(self.axes):
+            raise ValueError(f"Expected one grid size per box axis {self.axes}, got sizes for {tuple(sorted(dim_sizes))}")
+        axes = {}
+        for ax in self.bounds:
+            mn, mx = self.bounds[ax]
+            axes[ax] = np.linspace(mn, mx, dim_sizes[ax])
+
+        coords_vectors = list(axes.values())
+        grid = np.meshgrid(*coords_vectors, indexing="ij")
+        grid_d = {ax: grid[i] for i, ax in enumerate(axes)}
+        
+        return axes, grid_d
+
 
 def compute_box_adjacency(
                             boxes: list["Box"],

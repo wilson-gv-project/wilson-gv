@@ -149,6 +149,37 @@ def test_box_contains_points_needs_one_coord_per_axis():
         Box({'A': (0., 1.)}).contains(np.array([[0.5, 0.5]]))
 
 
+## Box: grid ----------------------------------------------------------------
+
+def test_make_grid_shapes_and_ij_indexing():
+    box = Box({'A': (0., 10.), 'B': (100., 200.)})
+
+    axes, grid = box.make_grid({'A': 5, 'B': 3})
+
+    assert (len(axes['A']), len(axes['B'])) == (5, 3)
+    assert grid['A'].shape == grid['B'].shape == (5, 3)
+    np.testing.assert_array_equal(grid['A'][:, 0], axes['A'])
+    np.testing.assert_array_equal(grid['B'][0, :], axes['B'])
+
+
+def test_make_grid_runs_from_min_to_max_with_both_edges():
+    box = Box({'A': (0., 10.), 'B': (100., 200.)})
+
+    axes, _ = box.make_grid({'A': 11, 'B': 5})
+
+    np.testing.assert_allclose(axes['A'], [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10.])
+    np.testing.assert_allclose(axes['B'], [100., 125., 150., 175., 200.])
+
+
+@pytest.mark.parametrize('dim_sizes', [
+    {'A': 5, 'B': 5},  # one axis too many
+    {'B': 5},          # same number of axes, other name
+])
+def test_make_grid_needs_one_size_per_box_axis(dim_sizes):
+    with pytest.raises(ValueError, match='one grid size per box axis'):
+        Box({'A': (0., 10.)}).make_grid(dim_sizes)
+
+
 ## Box: N dimensions (1 to 4 axes) ------------------------------------------
 
 @pytest.mark.parametrize('ndim', NDIMS)
@@ -188,6 +219,32 @@ def test_nd_box_contains_points_with_edges_included(ndim):
                        [0.5] * (ndim - 1) + [2.]])  # outside on the last axis only
 
     np.testing.assert_array_equal(cube(ndim, 0., 1.).contains(points), [True, True, False])
+
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_nd_make_grid_has_both_edges_and_ij_indexing(ndim):
+    # same bounds (0, 10) on every axis, e.g. ndim=2 -> Box({'A': (0., 10.), 'B': (0., 10.)})
+    box = cube(ndim, 0., 10.)
+
+    # 3 points per axis: step = (10 - 0) / (3 - 1) = 5
+    axes, grid = box.make_grid({ax: 3 for ax in AXES[:ndim]})
+
+    # axes come back in sorted order A, B, C, D
+    assert list(axes) == list(AXES[:ndim])
+    for i, ax in enumerate(AXES[:ndim]):
+        # both box edges are grid points: 0 (min) and 10 (max)
+        np.testing.assert_allclose(axes[ax], [0., 5., 10.])
+        # one meshgrid per axis, 3 points along every array dimension: ndim=2 -> (3, 3), ndim=3 -> (3, 3, 3)
+        assert grid[ax].shape == (3,) * ndim
+        # ij indexing: array dimension i belongs to axis i, so spectrum[i, j] sits at A=axes['A'][i], B=axes['B'][j].
+        # ndim=2:  grid['A'] = [[ 0,  0,  0],     grid['B'] = [[0, 5, 10],
+        #                       [ 5,  5,  5],                  [0, 5, 10],
+        #                       [10, 10, 10]]                  [0, 5, 10]]
+        # np.diff (difference between neighbours) along dimension j:
+        #   5 along the axis's own dimension (j == i), 0 along all others.
+        # numpy's default indexing='xy' swaps the first two dimensions, so this check catches it.
+        for j in range(ndim):
+            np.testing.assert_allclose(np.diff(grid[ax], axis=j), 5. if j == i else 0.)
 
 
 ## Box clustering -----------------------------------------------------------

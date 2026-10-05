@@ -7,8 +7,7 @@ Spectral features, and the windows and domains that hold them.
   holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, features_to_clusters,
          SpectralWindow, RectangularDomain
 
-Takes Box and box clustering from grid.py; grid.py never imports from here.
-Note: SpectralWindow.sample_grid is pure geometry and could move to grid.py later.
+Takes Box, box grids and box clustering from grid.py; grid.py never imports from here.
 """
 import copy
 from collections import defaultdict
@@ -554,26 +553,11 @@ class SpectralWindow:
         # return tuple(mx - mn for mn, mx in self.bounds)
         return {k: (v[1]-v[0]) for k, v in self.bounds.items()}
 
-
-# tuple[list[np.ndarray], dict[str, np.ndarray]]
-    def sample_grid(self, dim_sizes: dict) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    def sample_grid(self, dim_sizes: dict[str, int]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
         """
-        Generate a regular grid of points spanning the window.
-        Each axis gets dim_sizes[ax] points from min to max, both edges included: step = (max - min) / (n - 1).
+        Regular grid over the window box, see Box.make_grid.
         """
-
-        if set(dim_sizes) != set(self.box.axes):
-            raise ValueError(f"Expected one grid size per window axis {self.box.axes}, got sizes for {tuple(sorted(dim_sizes))}")
-        axes = {}
-        for ax in self.bounds:
-            mn, mx = self.bounds[ax]
-            axes[ax] = np.linspace(mn, mx, dim_sizes[ax])
-
-        coords_vectors = list(axes.values())
-        grid = np.meshgrid(*coords_vectors, indexing="ij")
-        grid_d = {ax: grid[i] for i, ax in enumerate(axes)}
-        
-        return axes, grid_d
+        return self.box.make_grid(dim_sizes)
 
 
     def find_clusters_by_featboxes(self) -> tuple['RectangularDomain', ...]:
