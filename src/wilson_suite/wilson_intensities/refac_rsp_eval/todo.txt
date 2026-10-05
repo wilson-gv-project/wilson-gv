@@ -1,13 +1,13 @@
 refac_rsp_eval — TODO
-updated 2026-10-04
+updated 2026-10-05
 
-Tests: refac_rsp_eval 343 pass, 2 xfail (B6, pinned on purpose).
-       Old suite (everything else): 31 fail, 18 of them because of B1.
+Tests: refac_rsp_eval 345 pass, 2 xfail (B6, pinned on purpose).
+       Old suite (everything else): 27 fail, 18 of them because of B1.
 
 
 Order of work
 -------------
-1. Small fixes: A10, A12, A13.
+1. [x] Small fixes: A10, A12, A13.
 2. B1: make the old pipeline run again. It is the reference for correct numbers.
 3. B4 + C2: prove new numbers = old numbers, term by term.        <- most important
 4. E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
@@ -23,12 +23,12 @@ A. Small fixes
         Why: resonance labels decide where the peak sits. Summing over one adds peaks at different
         positions into one number. e.g. labels a, b resonance, c summed:
             {'a': 0, 'b': 1} -> sums c;   {'a': 0} -> ValueError
-[ ] A10 Outdated text:
+[x] A10 Outdated text:
         - system_data.py make_state_label: the docstring example still calls it `state_label(...)`.
         - "resets values, because props ..." (system_data.py, 2x; test_integration.py): from_datadict
           fills an empty_copy now, nothing is reset.
-[ ] A12 test_evaluate.py test_evaluate_term_coeffs_result_shape: unused variable `ps`.
-[ ] A13 system_data.py _make_vibdiff_key: only tests use it now (from_symbolic calls from_quanta).
+[x] A12 test_evaluate.py test_evaluate_term_coeffs_result_shape: unused variable `ps`.
+[x] A13 system_data.py _make_vibdiff_key: only tests use it now (from_symbolic calls from_quanta).
         Delete it; test_state_labels_agree_for_mode_10 can use make_state_label instead.
 
 

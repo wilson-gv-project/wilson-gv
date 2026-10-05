@@ -156,23 +156,11 @@ def make_state_label(modes) -> str:
     """
     (10, 2) -> '2,10';  ('1', '0') -> '0,1';  () -> 'zero'
     
-    assert state_label(('10', '2')) == state_label([2, 10]) == '2,10'
+    assert make_state_label(('10', '2')) == make_state_label([2, 10]) == '2,10'
 
     modes is Sequence[int | str]
     """
     return ','.join(str(m) for m in sorted(int(m) for m in modes)) or 'zero'
-
-
-def _make_vibdiff_key(vibdiff_term: 'VibDiffTerm', index_dict: dict) -> tuple[str, str]:
-    """
-    Non-sorted key for VibDiffBank_cache
-
-    returns keys for vibdiff bank for vib states expression and choice of indices
-    """
-
-    return (make_state_label(index_dict[q] for q in vibdiff_term.sl.q), # type: ignore
-            make_state_label(index_dict[q] for q in vibdiff_term.sr.q)) # type: ignore
-
 
 
 @dataclass
@@ -235,7 +223,7 @@ class VibDiff:
                     vibstates_data: 'VibStatesData') -> 'VibDiff':
         """Construct VibDiff from symbolic representation."""
         
-        return cls.from_quanta(vibdiff_term_symb.sl.q, vibdiff_term_symb.sr.q, 
+        return cls.from_quanta(vibdiff_term_symb.sl.q, vibdiff_term_symb.sr.q,  # type: ignore
                                index_dict, vibstates_data)
 
     @classmethod
@@ -287,7 +275,6 @@ class MolSystemData:
         data_dict: dict - {data_name: values}
 
         """
-        # resets values, because props in collection shold be from the same source
         
         mol_props = mol_props.empty_copy()
         mol_props.fill_from(data_dict)

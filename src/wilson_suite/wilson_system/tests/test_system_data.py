@@ -34,7 +34,6 @@ from wilson_suite.wilson_system.system_data import (
     VibState,
     VibStatesData,
     _make_hq_states_from_datadict,
-    _make_vibdiff_key,
     _sys_info_request,
     build_data_request_for_term,
     make_state_label,
@@ -92,12 +91,13 @@ def test_make_hq_states_from_datadict_joins_quanta_labels():
 
 ## VibDiff ------------------------------------------------------------------
 
-def test_make_vibdiff_key_maps_symbols_sorts_and_names_ground():
-    key = _make_vibdiff_key(vibdiff(sl='ab', sr=''), {'a': 1, 'b': 0})
-    assert key == ('0,1', 'zero')
+def test_from_quanta_maps_symbols_sorts_and_names_ground(states):
+    s01, zero = states.get_state_by_label('0,1'), states.get_state_by_label('zero')
 
-    key = _make_vibdiff_key(vibdiff(sl='', sr='abc'), {'a': 1, 'b': 0, 'c': 2})
-    assert key == ('zero', '0,1,2')
+    # a=1, b=0 -> '0,1'; no quanta -> 'zero'
+    assert VibDiff.from_quanta(('a', 'b'), (), {'a': 1, 'b': 0}, states) == VibDiff(s01, zero)
+    assert VibDiff.from_quanta((), ('b', 'a'), {'a': 1, 'b': 0}, states) == VibDiff(zero, s01)
+
 
 def test_vibdiff_normalized_puts_ground_left_then_label_order():
     zero, s0, s1 = state('zero', 0.), state('0', E0), state('1', E1)
@@ -130,7 +130,7 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
 
 def test_state_labels_agree_for_mode_10():
     harm, _ = _make_hq_states_from_datadict({'harmonic_states': {('10', '2'): 1.}})
-    assert harm[0].state_label == _make_vibdiff_key(vibdiff(sl='ab'), {'a': 10, 'b': 2})[0] == '2,10'
+    assert harm[0].state_label == make_state_label([10, 2]) == '2,10'
 
 
 def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):

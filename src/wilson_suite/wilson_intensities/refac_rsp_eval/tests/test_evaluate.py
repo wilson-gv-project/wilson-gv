@@ -846,7 +846,6 @@ def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
     Currently: {ParameterSet(idx_dict): (total, {ParameterSet(full idx): contribs})}, one key only.
     """
     term, pre = term_and_precalc
-    ps = ParameterSet({'a': 0, 'b': 0})
 
     result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, precalculated_data=pre)
 

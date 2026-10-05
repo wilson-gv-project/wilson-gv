@@ -135,7 +135,6 @@ def test_eval_molsys_data():
     assert list(datadict.keys()) != list(request.keys())
 
     # finally, putting data in -- requires empty MolPropsCollection and dict with data
-    # also, resets values, because props in collection shold be from the same source
     molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
     print(molsys)
 
