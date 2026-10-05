@@ -2,13 +2,13 @@ refac_rsp_eval — TODO
 updated 2026-10-05
 
 Tests: refac_rsp_eval 345 pass, 2 xfail (B6, pinned on purpose).
-       Old suite (everything else): 27 fail, 18 of them because of B1.
+       Old suite (everything else): 9 fail, none because of B1.
 
 
 Order of work
 -------------
 1. [x] Small fixes: A10, A12, A13.
-2. B1: make the old pipeline run again. It is the reference for correct numbers.
+2. [x] B1: make the old pipeline run again. It is the reference for correct numbers.
 3. B4 + C2: prove new numbers = old numbers, term by term.        <- most important
 4. E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
 5. E2: grid.py.
@@ -34,7 +34,7 @@ A. Small fixes
 
 B. Correctness
 --------------
-[ ] B1  The old pipeline cannot load data. Two DataOriginInfo classes exist (wilson_main/abstractions.py,
+[x] B1  The old pipeline cannot load data. Two DataOriginInfo classes exist (wilson_main/abstractions.py,
         system_data.py); wilson_data_obtainer accepts only the system_data one, the old code passes the
         wilson_main one -> TypeError. Keep one class and import it from there everywhere.
 [ ] B4  generate_LHS_motif: sign convention marked FIXME???. Check locations against old resonances.py.
