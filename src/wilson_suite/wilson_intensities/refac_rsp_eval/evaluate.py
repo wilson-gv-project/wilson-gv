@@ -580,7 +580,16 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     return ContributionTable(rows), zero, failed
 
 
-def eval_resmotif(motif: 'ResonanceMotif', parameters: ParameterSet, vibstates_data: 'VibStatesData'):
+def lineshape(parameters: ParameterSet):
+    """
+    """
+
+    return
+
+
+def eval_resmotif(motif: 'ResonanceMotif', 
+                  parameters: ParameterSet, 
+                  vibstates_data: 'VibStatesData'):
     """
     Motifs from features: [feature.rows.motif for feature in feats].
     Single feature could technically have several different motifs contributing (same res location).
@@ -601,15 +610,7 @@ def eval_resmotif(motif: 'ResonanceMotif', parameters: ParameterSet, vibstates_d
 
     return
 
-def lineshape(parameters: ParameterSet):
-    """
-    """
 
-    return
-
-def make_box_grid():
-    
-    return
 
 def eval_feature_on_grid(feature: 'SpectralFeature'):
     """
