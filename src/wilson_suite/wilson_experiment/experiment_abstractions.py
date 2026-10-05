@@ -178,16 +178,22 @@ class EmPulse:
     cf: float: (Infrared-range) carrier frequency
     dev: float: Deviation parameter (e.g. broadness of Gaussian pulse). An impulsive-like pulse can be considered as the
     dev -> 0.0 limit of a Gaussian pulse. A "continuous-wave"-like pulse can be considered as the dev -> infty limit of
-    a Gaussian pulse.
+    a Gaussian pulse. For a Gaussian pulse of the form A * e^( -(t- tc)**2 / (2 sigma^2)), dev = sigma
     wv: floats: Unit wavevector propagation direction with respect to laboratory axes
     pol: floats: Polarization: Unit vector describing polarization direction with respect to laboratory axes
         - Must be orthogonal to wavevector
         - Only linear polarization currently supported (no phase difference between orthogonal components of
         polarization vector in plane of polarization)
         - Default: (1.0, 0.0, 0.0)
+
+    pol_comp: Tuple of tuples of floats: Polarizations under pulse compounding. Assumed ordering is same ordering
+    as id_comp
+
     overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse. Currently enforced as (1.0, 0.0)
 
     id: integer: Pulse ID label
+
+    id_comp: Tuple: Pulse ID label(s) (used for pulse compounding)
     """
 
     env: str
@@ -200,9 +206,11 @@ class EmPulse:
 
     wv: tuple[float] = (0.0, 0.0, 1.0)
     pol: tuple[float] = (1.0, 0.0, 0.0)
+    pol_comp:  tuple[tuple[float]] = None
     overall_phase: complex = 1.0 + 0.0j
 
     id: int = None
+    id_comp: tuple = None
 
     def __post_init__(self):
         
@@ -392,10 +400,11 @@ class ElectricField:
             signed_pulses[i.id] = copy.deepcopy(i)
 
             # Negative component
-            # FIXME: What happens to the polarization and overall phase? kept same for now but is it flipped?
+            # FIXME: I think the polarization and overall phase are complex conjugated here, should verify this
             signed_pulses[-1 * i.id] = EmPulse(i.env, i.tc, -1 * i.cf, i.dev, i.maxstr,
                                                tuple([-1.0*j for j in i.wv]),
-                                               i.pol, i.overall_phase, -1 * i.id)
+                                               tuple([j.real - j.imag for j in i.pol]),
+                                               i.overall_phase.real - i.overall_phase.imag, -1 * i.id)
 
             self.signed_pulses = signed_pulses
 
@@ -483,9 +492,9 @@ class ElectricField:
         duplicates are fine.
 
         tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses): Each pulse's
-        "region of influence" is taken as +/- tol_n_dev * the pulse's deviation parameter.
-        A tuple of pulses is ruled to have overlapping temporal envelope if the intersection
-        of all relevant pulse regions is nonempty.
+        "region of influence" is taken as its arg(time envelope max) +/- tol_n_dev * the pulse's
+        time-domain deviation parameter. A tuple of pulses is ruled to have overlapping temporal
+        envelope if the intersection of all relevant pulse regions is nonempty.
 
         Returns: A tuple of tuples. Each "inner" tuple is a tuple of pulse IDs ruled to be
         overlapping in time. Any tuple not in the return data was ruled to not overlap in time.
@@ -554,6 +563,75 @@ class ElectricField:
                         valid_intersections.append(tuple(i))
 
         return valid_intersections
+
+
+    def all_resonance_screened_compound_pulses(self, cand_pulse_tuples: list[tuple[int]], thres_freq:float=0.04556335, tol_n_dev: float | int = 5.0) -> dict[tuple, EmPulse]:
+        """
+        Take a list of candidate pulse tuples and decide if a compound pulse created from them
+        can produce resonance in the IR region as judged by whether the compound's frequency components
+        (with a cutoff) has a bandwidth that to a non-zero extent intersects with frequency components
+        falling beneath a threshold, returning all such valid candidates as a {pulse tuple:EmPulse instance} dictionary
+        This routine currently only supports Gaussian-envelope pulses.
+
+        cand_pulse_tuples: A list of pulse tuples specified by (signed) pulse IDs. The main intended origin of this list
+        is to have it be those tuples that were found to have sufficiently large time-domain intersections
+        as judged by overlapping_pulses_for_interaction_pattern().
+
+        thres_freq: A threshold (default: 0.04556335 hartree or 10000 cm^-1) below which it is deemed that resonance in
+        the vibrational manifold can take place. To be given in units of hartree.
+
+        tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses) (default: 5 units): Each pulse's frequency-domain
+        bandwidth is taken as arg(freq domain max) +/- tol_n_dev * the pulse's frequency-domain deviation parameter.
+        """
+
+        screened_compound_pulses = {}
+
+        # Loop over candidate tuples
+        for c in cand_pulse_tuples:
+
+            n_pulse = self.signed_pulses[c[0]]
+            if not n_pulse.env == 'gaussian':
+                raise ValueError('Only Gaussian pulses are currently supported for compounding')
+
+            # Take the first pulse reference and represent it as an EmPulse in "compounding" mode
+            comp_pulse = EmPulse(env = n_pulse.env, tc = n_pulse.tc, cf = n_pulse.cf, dev = n_pulse.dev,
+                                    maxstr = n_pulse.maxstr, wv = n_pulse.wv, pol_comp = (n_pulse.pol,),
+                                    overall_phase= n_pulse.overall_phase, id_comp=(n_pulse.id,))
+
+            # Form compound pulse iteratively with any further pulse refs in tuple
+            for p in range(1, len(c)):
+                n_pulse = self.signed_pulses[c[p]]
+
+                if not n_pulse.env == 'gaussian':
+                    raise ValueError('Only Gaussian pulses are currently supported for compounding')
+
+                # Here using the fact that the product of Gaussians is another Gaussian with specific expressions for
+                # the new means and variances
+                npdsq = (n_pulse.dev)**2
+                cpdsq = (comp_pulse.dev) ** 2
+                ncpdsq = npdsq + cpdsq
+
+                new_tc = (comp_pulse.tc * npdsq + n_pulse.tc * cpdsq) / ncpdsq
+
+                new_cf = comp_pulse.cf + n_pulse.cf
+
+                new_dev = (npdsq * cpdsq / ncpdsq)**0.5
+
+                new_maxstr = comp_pulse.maxstr*n_pulse.maxstr
+
+                new_wv = [comp_pulse.wv[j] + n_pulse.wv[j] for j in range(3)]
+
+                # new pol_comp as new added tuple
+                # new overall phase as sum of phases (AND ADD TO EmPulse that phase is understood as e^i(phase))
+                # new id_comp as extended tuple
+
+            # Determine bandwidth and check if any of it falls inside the threshold range
+
+            pass
+
+
+
+        pass
 
 @dataclass
 class VibExperiment:

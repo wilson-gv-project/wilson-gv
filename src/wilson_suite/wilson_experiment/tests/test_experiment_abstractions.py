@@ -385,7 +385,6 @@ def test_electric_field():
                            (-1, 1, 1), (-1, 1, 3), (1, 1, 3), (-5, -1, -1, 1), (-5, -1, 1, 1), (-1, -1, 1, 1),
                            (-1, -1, 1, 3), (-1, 1, 1, 3), (-5, -1, -1, 1, 1), (-1, -1, 1, 1, 3)  ])
 
-
     # Testing wavevector matching routine
     matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -2, 3, -4), filter='same_order')
 
