@@ -31,6 +31,7 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
+    from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         CompiledTerm,
         FreqTermsCollection,
@@ -577,6 +578,48 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
                     continue
             rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
     return ContributionTable(rows), zero, failed
+
+
+def eval_resmotif(motif: 'ResonanceMotif', parameters: ParameterSet, vibstates_data: 'VibStatesData'):
+    """
+    Motifs from features: [feature.rows.motif for feature in feats].
+    Single feature could technically have several different motifs contributing (same res location).
+    
+    One motif consists of resonance conditions from a single term.
+
+    """
+    result = 1.
+
+    for res_cond_key in motif:
+        res_cond_key.pf
+
+        vib_diff_w_value = VibDiff.from_quanta(*res_cond_key.diff, parameters.to_dict(), vibstates_data)
+        
+        # 1/ rescond1 / rescond2 / rescond3
+
+        result /= ((-1)*vib_diff_w_value.energy_difference(au=True)-1j*lineshape())
+
+    return
+
+def lineshape(parameters: ParameterSet):
+    """
+    """
+
+    return
+
+def make_box_grid():
+    
+    return
+
+def eval_feature_on_grid(feature: 'SpectralFeature'):
+    """
+    evaluate motif and multiply by coeff
+    """
+    feature.feat_box
+    feature.rows.motif
+    
+    return
+
 
 
 """

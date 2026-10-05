@@ -1,3 +1,75 @@
+# Cross imports
+
+All paths below are under `wilson_suite.`. "type-only" means the import sits inside `if TYPE_CHECKING:` and
+does not run at runtime. "lazy" means the import is inside a function body.
+
+## Between modules of `refac_rsp_eval`
+
+```
+grid.py      <- (nothing)
+plan.py      <- (nothing)
+features.py  <- grid, plan
+evaluate.py  <- features, plan
+pipeline.py  <- evaluate, features, plan
+```
+
+| importer | from | names |
+|---|---|---|
+| `features.py` | `refac_rsp_eval.grid` | `Box`, `compute_box_adjacency`, `connected_components_from_adjacency`, `points_to_bounds`; type-only: `Dim_bounds` |
+| `features.py` | `refac_rsp_eval.plan` | `ParameterSet`, `ResonanceMotif`; type-only: `ResLocPoint` |
+| `evaluate.py` | `refac_rsp_eval.features` | `ContributionRow`, `ContributionTable` |
+| `evaluate.py` | `refac_rsp_eval.plan` | `ParameterSet`, `ResLocPoint`; type-only: `CompiledTerm`, `FreqTermsCollection`, `PropsCollection`, `ResonanceMotif` |
+| `pipeline.py` | `refac_rsp_eval.evaluate` | `PrecalculatedData`, `build_contributions` |
+| `pipeline.py` | `refac_rsp_eval.features` | `ContributionTable`, `SpectralFeature`, `features_from_rows` |
+| `pipeline.py` | `refac_rsp_eval.plan` | `ParameterSet`; type-only: `CompiledTerm` |
+
+## Outgoing: `refac_rsp_eval` -> other `wilson_suite` packages
+
+| importer | from | names |
+|---|---|---|
+| `grid.py` | — | numpy only |
+| `plan.py` | `wilson_derive.abstractions` | `PolProp`, `ResonanceCondition`, `VibDiffTerm` |
+| `plan.py` | `wilson_utils.prop_trivname` | `prop_trivname` |
+| `plan.py` | `wilson_derive.response_terms` | type-only: `VibPerturbedTerm` |
+| `plan.py` | `wilson_system.system_data` | type-only: `DataOriginInfo` |
+| `features.py` | `wilson_utils.unit_convertor` | `convNu2Ene` |
+| `evaluate.py` | `wilson_system.system_data` | `MolecularProperty`, `MolPropsCollection`, `MolSystemData`, `VibDiff`; type-only: `VibStatesData` |
+| `evaluate.py` | `wilson_utils.prop_trivname` | `prop_trivname` (also re-imported lazily in one function) |
+| `evaluate.py` | `wilson_utils.unit_convertor` | `convNu2Ene` |
+| `evaluate.py` | `wilson_intensities.amplitudes.utils` | lazy: `generate_index_choices_general` |
+| `pipeline.py` | `wilson_system.system_data` | `MolSystemData` |
+| `rps_evaluation.py` (old code) | `wilson_experiment.indep_vars_and_axes` | `SpectralAxisSet` |
+| `rps_evaluation.py` | `wilson_derive.response_terms` | `VibPerturbedTerm` |
+| `rps_evaluation.py` | `wilson_main.abstractions` | `MolPropsCollection` |
+| `rps_evaluation.py` | `wilson_utils.unit_convertor` | `convNu2Ene` |
+| `rps_evaluation.py` | `wilson_intensities.amplitudes.*` | `SpectralFeature` (`spectrum_composition`), `VibDiffCache` (`vibene_differences`), `EvaluationDataAndConfigs`, `VibStatesData` (`term_parts`), `process_resonance_motifs`, `evaluate_terms_coeffs`, `get_features_to_draw` (`evaluators`), `precalculate_unique_coeff_parts`, `identify_precalc_unique_coeff_parts` (`full_amplitude_coeff`), `GridManager` (`grid_manager_evaluator`), `evaluate_region` (`evaluation_wf`) |
+
+`rps_evaluation.py` is imported by nothing inside `refac_rsp_eval`. It is the only file here that depends on
+`wilson_main`, `wilson_experiment`, and (apart from one lazy helper in `evaluate.py`) on `amplitudes`.
+
+## Incoming: other packages -> `refac_rsp_eval`
+
+| importer | from | names |
+|---|---|---|
+| `wilson_system/system_data.py` | `refac_rsp_eval.plan` | type-only: `CompiledTerm` |
+| `wilson_system/tests/test_system_data.py` | `refac_rsp_eval.plan` | `CompiledTerm`, `FreqTermsCollection`, `ParameterSet`, `PropsCollection`, `ResCondKey`, `ResonanceMotif` |
+| `wilson_system/tests/test_system_data.py` | `refac_rsp_eval.tests.helpers` | `E0`, `E01`, `E1`, `polprop`, `state`, `toy_states`, `toy_term`, ... |
+
+Cycle note: `plan.py` <-> `wilson_system.system_data` import each other, but both directions are type-only.
+`evaluate.py` -> `system_data` is a real import; `system_data` -> `plan` is type-only, so there is no runtime cycle.
+
+## Tests (`tests/`)
+
+Besides the package's own modules and `tests.helpers`, tests import:
+`wilson_derive.abstractions` (`ResonanceCondition`, `HarmOscStateSymbolic`, `PolProp`, `QOperator`, `VibDiffTerm`),
+`wilson_derive.term_var_translate`, `wilson_derive.response_terms.VibPerturbedTerm`,
+`wilson_intensities.amplitudes.averaging.getGeneralPolarizationAveragingExpression`,
+`wilson_system.system_data` (`MolecularProperty`, `MolPropsCollection`, `MolSystemData`, `VibState`, `VibStatesData`,
+`DataOriginInfo`, `_sys_info_request`), and `wilson_utils` (`builders.make_SpectralAxisSet`, `paths.SUITE_ROOT`,
+`prop_trivname`, `unit_convertor.convNu2Ene`, `wilson_data_obtainer`).
+
+---
+
 The data then passes through these steps:
 
 ```

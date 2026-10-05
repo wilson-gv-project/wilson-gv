@@ -166,6 +166,8 @@ class Box:
             inside &= (points[..., i] >= mn) & (points[..., i] <= mx)
         return inside
 
+    def make_grid(self):
+        return
 
 def compute_box_adjacency(
                             boxes: list["Box"],
