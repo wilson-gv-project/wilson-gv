@@ -373,7 +373,7 @@ def test_electric_field():
     assert v_int_gen_b == [(1,), (2,), (3,), (4,), (5,), (6,), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6),
                          (2, 5), (3, 6), (1, 2, 5), (1, 3, 6) ]
 
-    # A couple more test cases for less "basic" interaction patternss
+    # A couple more test cases for less "basic" interaction patterns
     v_int_gen_b = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, -2, 3, 4, -5, 6), tol_n_dev=2.0)
     assert v_int_gen_b == [ (-5,), (-2,), (1,), (3,), (4,), (6,), (-5, -2), (-5, 1), (-2, 1), (1, 3), (1, 4), (1, 6),
                             (3, 6), (-5, -2, 1), (1, 3, 6)]
@@ -404,10 +404,22 @@ def test_electric_field():
                            (-6, 2, 5), (-2, 5, 6), (-4, 4, 5), (-6, 5, 6), (5, 5, 5), (-5, 5, 5)]
 
 
-    # TODO: Make tests for resonance screening
+    pulse_gen_a = EmPulse(env='gaussian', tc=0.0, dev=20.0, cf=9000., id=1, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    pulse_gen_b = EmPulse(env='gaussian', tc=400.0, dev=100.0, cf=15000., id=2, wv=(-1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    pulse_gen_c = EmPulse(env='gaussian', tc=500.0, dev=30.0, cf=1500., id=3, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    pulse_gen_d = EmPulse(env='gaussian', tc=800., dev=40.0, cf=20000., id=4, wv=(0.0, 2.0, 0.0), pol=(0.0, 0.0, 1.0))
 
+    field_gen = ElectricField((pulse_gen_a, pulse_gen_b, pulse_gen_c, pulse_gen_d))
 
+    ovl_pulses = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, -2, 3, 4))
+    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -2, 3, 4), filter='same_order')
 
+    screened_compound_pulses = field_gen.all_resonance_screened_compound_pulses(ovl_pulses)
+
+    print('ovl pulses', ovl_pulses)
+    print('matching_wv', matching_wv)
+
+    print('screened compound pulses', screened_compound_pulses.keys())
 
 def test_vib_experiment():
 

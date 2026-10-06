@@ -4,6 +4,7 @@ from typing import Optional, Iterable
 from operator import itemgetter
 import copy
 from math import inf as infinity
+from math import exp as exp
 
 # TODO: Expand functionality according to below TODOs
 
@@ -49,7 +50,7 @@ class SpecDetector:
     interaction_filter: Optional[list[list]] = None
     ignore_collinear: bool = True
 
-    overall_phase: complex = 1.0 + 0.0j
+    overall_phase: float = 0.0
 
     def __post_init__(self):
         if self.detection_method not in {'time', 'freq', 'int'}:
@@ -62,7 +63,7 @@ class SpecDetector:
         if self.detection_range is not None:
             self.dlen = len(self.detection_range)
 
-        if not self.overall_phase == 1.0 + 0.0j:
+        if not self.overall_phase == 0.0:
             raise ValueError('Detector overall phase currently restricted to zero shift')
 
         # Will currently not be reach because of restriction to zero shift, but will be relevant when that is lifted
@@ -169,16 +170,21 @@ class SpecScan:
 @dataclass
 class EmPulse:
     """
-    Class to represent an electromagnetic pulse
+    Class to represent an electromagnetic pulse.
+
+    Conventions: In other functions using this class with Gaussian envelopes, parameters with dimensions of time are
+    assumed to be given in units of fs, and parameters with dimensions of frequency (energy) are asseumed
+    to be given in units of cm^-1.
     
     ----
     env: String: Pulse time-domain envelope type: The only current valid choice is "gaussian".
     maxstr: Float: Pulse amplitude at maximum of envelope. Default: Zero strength
     tc: Float: Point in time at which pulse envelope is at maximum
-    cf: float: (Infrared-range) carrier frequency
-    dev: float: Deviation parameter (e.g. broadness of Gaussian pulse). An impulsive-like pulse can be considered as the
-    dev -> 0.0 limit of a Gaussian pulse. A "continuous-wave"-like pulse can be considered as the dev -> infty limit of
-    a Gaussian pulse. For a Gaussian pulse of the form A * e^( -(t- tc)**2 / (2 sigma^2)), dev = sigma
+    cf: float: Carrier (angular) frequency
+    dev: float: Time deviation parameter (e.g. time-domain sqrt(variance) of Gaussian pulse: In other functions using
+    this class with Gaussian envelopes, dev = sigma in A * e^( -(t- tc)**2 / (2 sigma^2)).
+    An impulsive-like pulse can be considered as the dev -> 0.0 limit of a Gaussian pulse.
+    "continuous-wave"-like pulse can be considered as the dev -> infty limit of a Gaussian pulse.
     wv: floats: Unit wavevector propagation direction with respect to laboratory axes
     pol: floats: Polarization: Unit vector describing polarization direction with respect to laboratory axes
         - Must be orthogonal to wavevector
@@ -189,8 +195,9 @@ class EmPulse:
     pol_comp: Tuple of tuples of floats: Polarizations under pulse compounding. Assumed ordering is same ordering
     as id_comp
 
-    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse.
-    Currently enforced as (1.0, 0.0)
+    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse, expressed as a
+    float and understood as the exponent theta of e^(i theta)
+    Currently enforced as 0.0
 
     id: integer: Pulse ID label
 
@@ -208,7 +215,7 @@ class EmPulse:
     wv: tuple[float] = (0.0, 0.0, 1.0)
     pol: tuple[float] = (1.0, 0.0, 0.0)
     pol_comp:  tuple[tuple[float]] = None
-    overall_phase: complex = 1.0 + 0.0j
+    overall_phase: complex = 0.0
 
     id: int = None
     id_comp: tuple = None
@@ -245,27 +252,29 @@ class EmPulse:
 
         # Polarization: Specify the polarization of the pulse
         # Currently supports unit linear polarization
-        if isinstance(self.pol, tuple):
-            if len(self.pol) == 3:
-                if all([isinstance(i, float) for i in self.pol]):
-                    pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
-                    if not pol_len == 1.0:
-                        print('Polarization vector was normalized')
-                    self.pol = tuple([i/pol_len for i in self.pol])
+        # Checks disregarded for compound polarization
+        if self.pol_comp is None:
+            if isinstance(self.pol, tuple):
+                if len(self.pol) == 3:
+                    if all([isinstance(i, float) for i in self.pol]):
+                        pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
+                        if not pol_len == 1.0:
+                            print('Polarization vector was normalized')
+                        self.pol = tuple([i/pol_len for i in self.pol])
 
-                    wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
+                        wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
 
-                    if not(wv_pol_dot == 0.0):
-                        raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
+                        if not(wv_pol_dot == 0.0):
+                            raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
 
+                    else:
+                        raise AssertionError('The polarization vector must be a len 3 tuple of floats')
                 else:
                     raise AssertionError('The polarization vector must be a len 3 tuple of floats')
             else:
-                raise AssertionError('The polarization vector must be a len 3 tuple of floats')
-        else:
-            raise AssertionError('The polarization must be a len 3 tuple of floats')
+                raise AssertionError('The polarization must be a len 3 tuple of floats')
 
-        if not self.overall_phase == 1.0 + 0.0j:
+        if not self.overall_phase == 0.0:
             raise AssertionError('Overall phase currently restricted to zero shift')
 
         if not((abs(self.overall_phase) - 1.0) < 1e-10):
@@ -395,10 +404,10 @@ class ElectricField:
 
             # Negative component
             # FIXME: I think the polarization and overall phase are complex conjugated here, should verify this
-            signed_pulses[-1 * i.id] = EmPulse(i.env, i.tc, -1 * i.cf, i.dev, i.maxstr,
-                                               tuple([-1.0*j for j in i.wv]),
-                                               tuple([j.real - j.imag for j in i.pol]),
-                                               i.overall_phase.real - i.overall_phase.imag, -1 * i.id)
+            signed_pulses[-1 * i.id] = EmPulse(env = i.env, tc = i.tc, cf = -1 * i.cf, dev = i.dev, maxstr = i.maxstr,
+                                               wv = tuple([-1.0*j for j in i.wv]),
+                                               pol = tuple([j.real - j.imag for j in i.pol]),
+                                               overall_phase = -1 * i.overall_phase, id = -1 * i.id)
 
             self.signed_pulses = signed_pulses
 
@@ -422,6 +431,7 @@ class ElectricField:
         from itertools import combinations_with_replacement as combs
 
         valid_filters = ['same_order', 'up_to_order']
+
 
         if not filter in valid_filters:
             raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
@@ -449,6 +459,10 @@ class ElectricField:
         elif filter == 'up_to_order':
             ord_start = 1
             ord_end = len(sorted_ids) + 1
+
+        else:
+            raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
+
 
         all_ids = self.signed_pulses.keys()
 
@@ -559,7 +573,8 @@ class ElectricField:
         return valid_intersections
 
 
-    def all_resonance_screened_compound_pulses(self, cand_pulse_tuples: list[tuple[int]], thres_freq:float=0.04556335, tol_n_dev: float | int = 5.0) -> dict[tuple, EmPulse]:
+    def all_resonance_screened_compound_pulses(self, cand_pulse_tuples: list[tuple[int]], thres_freq:float | int=8000.,
+                                               tol_n_dev: float | int = 5.0) -> dict[tuple, EmPulse]:
         """
         Take a list of candidate pulse tuples and decide if a compound pulse created from them
         can produce resonance in the IR region as judged by whether the compound's frequency components
@@ -571,8 +586,8 @@ class ElectricField:
         is to have it be those tuples that were found to have sufficiently large time-domain intersections
         as judged by overlapping_pulses_for_interaction_pattern().
 
-        thres_freq: A threshold (default: 0.04556335 hartree or 10000 cm^-1) below which it is deemed that resonance in
-        the vibrational manifold can take place. To be given in units of hartree.
+        thres_freq: A threshold (default: 8000 cm^-1) below which it is deemed that resonance in
+        the vibrational manifold can take place. To be given in units of cm^-1.
 
         tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses) (default: 5 units): Each pulse's frequency-domain
         bandwidth is taken as arg(freq domain max) +/- tol_n_dev * the pulse's frequency-domain deviation parameter.
@@ -580,6 +595,7 @@ class ElectricField:
         Returns: screened_compound_pulses: A dictionary of those {pulse tuple:EmPulse instance} pairs describing the
         cand_pulse_tuples candidates that satisfy the requirement
         """
+        from wilson_suite.wilson_utils.unit_convertor import per_cm_x_fs
 
         screened_compound_pulses = {}
 
@@ -592,7 +608,7 @@ class ElectricField:
 
             # Take the first pulse reference and represent it as an EmPulse in "compounding" mode
             comp_pulse = EmPulse(env = n_pulse.env, tc = n_pulse.tc, cf = n_pulse.cf, dev = n_pulse.dev,
-                                    maxstr = n_pulse.maxstr, wv = n_pulse.wv, pol_comp = (n_pulse.pol,),
+                                    maxstr = n_pulse.maxstr, wv = n_pulse.wv, pol = None, pol_comp = (n_pulse.pol,),
                                     overall_phase= n_pulse.overall_phase, id_comp=(n_pulse.id,))
 
             # Form compound pulse iteratively with any further pulse refs in tuple
@@ -613,25 +629,34 @@ class ElectricField:
                 new_cf = comp_pulse.cf + n_pulse.cf
                 new_dev = (npdsq * cpdsq / ncpdsq)**0.5
 
-                new_maxstr = comp_pulse.maxstr*n_pulse.maxstr
-                new_wv = [comp_pulse.wv[j] + n_pulse.wv[j] for j in range(3)]
+                new_maxstr = comp_pulse.maxstr*n_pulse.maxstr * exp(-1 * ( ( comp_pulse.tc - n_pulse.tc)**2 ) / (2 * ncpdsq) )
+
+                new_wv = tuple([comp_pulse.wv[j] + n_pulse.wv[j] for j in range(3)])
 
                 # Extending tuple
-                new_pol_comp = tuple(list(comp_pulse.pol_comp).extend(n_pulse.pol))
+                lcppc = list(comp_pulse.pol_comp)
+                lcppc.append(n_pulse.pol)
+                new_pol_comp = tuple(lcppc)
 
                 # New phase is sum
                 new_overall_phase = comp_pulse.overall_phase + n_pulse.overall_phase
 
                 # Extending tuple
-                new_id_comp = tuple(list(comp_pulse.id_comp).extend(n_pulse.id))
+                nic = list(comp_pulse.id_comp)
+                nic.append(n_pulse.id)
+                new_id_comp = tuple(nic)
 
                 # Update compounded pulse
-                comp_pulse = EmPulse(tc = new_tc, cf = new_cf, dev = new_dev, maxstr = new_maxstr, wv = new_wv,
-                                     pol_comp = new_pol_comp, overall_phase = new_overall_phase, id_comp = new_id_comp)
+                comp_pulse = EmPulse(env='gaussian', tc = new_tc, cf = new_cf, dev = new_dev, maxstr = new_maxstr,
+                                     wv = new_wv, pol=None, pol_comp = new_pol_comp, overall_phase = new_overall_phase,
+                                     id_comp = new_id_comp)
 
             # Determine bandwidth and check if any of it falls inside the threshold range
-            # FIXME: Clean up units incl any factors of 2 pi
-            w_range = [comp_pulse.cf - tol_n_dev * (1.0/comp_pulse.dev), comp_pulse.cf + tol_n_dev * (1.0/comp_pulse.dev)]
+
+            w_range = [comp_pulse.cf - tol_n_dev * (per_cm_x_fs/comp_pulse.dev),
+                       comp_pulse.cf + tol_n_dev * (per_cm_x_fs/comp_pulse.dev)]
+
+            print('compound', c, 'bandwidth', w_range, 'dev', comp_pulse.dev)
 
             # If upper limit of bandwidth is >= lower threshold and lower limit of bandwith is <= upper threshold
             # then this compound pulse is deemed in range
