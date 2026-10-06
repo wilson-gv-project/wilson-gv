@@ -445,7 +445,8 @@ def generate_LHS_motif(motif: 'ResonanceMotif',
         coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in r_cond_key.pf}
 
         for alpha_label, coefficient in coeffs.items():
-             # Reverse the sign (FIXME???) and place it in the correct position
+             # minus the axis sign: 'A' -> -1, '-B' -> +1. With get_RHS_motif's -E the row reads
+             # -(signed sum of pf) = -E, i.e. E - (signed sum of pf) = 0 (derive's convention)
              coeff_matrix[i, col[alpha_label]] = -1 * np.sign(coefficient)
 
     return coeff_matrix, all_axes
