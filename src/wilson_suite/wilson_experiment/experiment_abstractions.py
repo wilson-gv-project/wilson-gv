@@ -189,7 +189,8 @@ class EmPulse:
     pol_comp: Tuple of tuples of floats: Polarizations under pulse compounding. Assumed ordering is same ordering
     as id_comp
 
-    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse. Currently enforced as (1.0, 0.0)
+    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse.
+    Currently enforced as (1.0, 0.0)
 
     id: integer: Pulse ID label
 
@@ -293,13 +294,6 @@ class EmPulse:
             return False
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
-
-def make_gaussian_product_pulse(p1, p2):
-
-    if not(p1.env == 'gaussian' and p2.env == 'gaussian'):
-        raise AttributeError('Both pulses combining to form a Gaussian product pulse must themselves be Gaussian')
-
-    return EmPulse()
 
 # FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
 def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
@@ -582,6 +576,9 @@ class ElectricField:
 
         tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses) (default: 5 units): Each pulse's frequency-domain
         bandwidth is taken as arg(freq domain max) +/- tol_n_dev * the pulse's frequency-domain deviation parameter.
+
+        Returns: screened_compound_pulses: A dictionary of those {pulse tuple:EmPulse instance} pairs describing the
+        cand_pulse_tuples candidates that satisfy the requirement
         """
 
         screened_compound_pulses = {}
@@ -605,6 +602,7 @@ class ElectricField:
                 if not n_pulse.env == 'gaussian':
                     raise ValueError('Only Gaussian pulses are currently supported for compounding')
 
+                # Combining attributes of comp_pulse and the new n_pulse
                 # Here using the fact that the product of Gaussians is another Gaussian with specific expressions for
                 # the new means and variances
                 npdsq = (n_pulse.dev)**2
@@ -612,26 +610,36 @@ class ElectricField:
                 ncpdsq = npdsq + cpdsq
 
                 new_tc = (comp_pulse.tc * npdsq + n_pulse.tc * cpdsq) / ncpdsq
-
                 new_cf = comp_pulse.cf + n_pulse.cf
-
                 new_dev = (npdsq * cpdsq / ncpdsq)**0.5
 
                 new_maxstr = comp_pulse.maxstr*n_pulse.maxstr
-
                 new_wv = [comp_pulse.wv[j] + n_pulse.wv[j] for j in range(3)]
 
-                # new pol_comp as new added tuple
-                # new overall phase as sum of phases (AND ADD TO EmPulse that phase is understood as e^i(phase))
-                # new id_comp as extended tuple
+                # Extending tuple
+                new_pol_comp = tuple(list(comp_pulse.pol_comp).extend(n_pulse.pol))
+
+                # New phase is sum
+                new_overall_phase = comp_pulse.overall_phase + n_pulse.overall_phase
+
+                # Extending tuple
+                new_id_comp = tuple(list(comp_pulse.id_comp).extend(n_pulse.id))
+
+                # Update compounded pulse
+                comp_pulse = EmPulse(tc = new_tc, cf = new_cf, dev = new_dev, maxstr = new_maxstr, wv = new_wv,
+                                     pol_comp = new_pol_comp, overall_phase = new_overall_phase, id_comp = new_id_comp)
 
             # Determine bandwidth and check if any of it falls inside the threshold range
+            # FIXME: Clean up units incl any factors of 2 pi
+            w_range = [comp_pulse.cf - tol_n_dev * (1.0/comp_pulse.dev), comp_pulse.cf + tol_n_dev * (1.0/comp_pulse.dev)]
 
-            pass
+            # If upper limit of bandwidth is >= lower threshold and lower limit of bandwith is <= upper threshold
+            # then this compound pulse is deemed in range
+            if not(w_range[1] < -1*thres_freq) and not(w_range[0] > thres_freq):
+                screened_compound_pulses[c] = copy.deepcopy(comp_pulse)
 
+        return screened_compound_pulses
 
-
-        pass
 
 @dataclass
 class VibExperiment:

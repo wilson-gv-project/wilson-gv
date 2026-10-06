@@ -403,6 +403,12 @@ def test_electric_field():
     assert matching_wv == [(-3, 1, 5), (5,), (5, 5), (-3, 3, 5), (-1, 3, 5), (-1, 1, 5), (-2, 2, 5),
                            (-6, 2, 5), (-2, 5, 6), (-4, 4, 5), (-6, 5, 6), (5, 5, 5), (-5, 5, 5)]
 
+
+    # TODO: Make tests for resonance screening
+
+
+
+
 def test_vib_experiment():
 
     pulse_ir_1 = make_impulsive_gaussian_pulse(tc=50.0, cf=0.0, cf_uv=0.0,
