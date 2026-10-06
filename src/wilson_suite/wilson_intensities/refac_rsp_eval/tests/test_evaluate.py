@@ -20,21 +20,30 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     calculate_avrg_tensor,
     eval_avrg_per_indexdict,
+    eval_feature_on_grid,
     eval_non_avrg_per_indexdict,
+    eval_rescond_resloc,
+    eval_resonance_factor,
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     generate_LHS_motif,
     get_RHS_motif,
     harmonic_denom,
+    lorentzian_propagator,
     otf_vibdiffdenom,
     solve_LSE_motif,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionRow,
+    SpectralFeature,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ParameterSet,
     PropsCollection,
+    ResCondKey,
     ResLocPoint,
     ResonanceMotif,
 )
@@ -62,6 +71,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
 from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolPropsCollection,
+    VibDiff,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -993,3 +1003,205 @@ def test_build_contributions_needs_eigenvals(molsys, pre_a1_zero):
     """The number of modes comes from molsys_data.eigenvals."""
     with pytest.raises(ValueError, match='eigenvals'):
         build_contributions([ab_term()], replace(molsys, eigenvals=None), precalculated_data=pre_a1_zero)
+
+
+## Resonance factors on the grid -----------------------------------------------
+# One condition is the denominator  E_left - E_right - sum_j s_j w_j - i*gamma  (derive's convention).
+# eval_rescond_resloc and eval_resonance_factor take grids in Eh; eval_feature_on_grid takes cm-1.
+# resonance_residuals (top of this file) writes  E_left - E_right - sum_j s_j w_j  out independently.
+#
+# Only the lorentzian_propagator tests and the get_intensity test use the Lorentzian.
+# The other tests pass a RecordingPropagator, so they hold for any propagator.
+
+G_CM = 5.                   # lineshape parameter, cm-1
+G_AU = convNu2Ene(G_CM)
+
+
+def grid_around(location: dict[str, float], step: float) -> dict[str, np.ndarray]:
+    """3 points per axis (v - step, v, v + step), ij meshgrid: index (1, 1, ...) is `location`."""
+    axes = sorted(location)
+    mesh = np.meshgrid(*(location[ax] + np.array([-step, 0., step]) for ax in axes), indexing='ij')
+    return dict(zip(axes, mesh))
+
+
+def to_au(grid: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    return {ax: convNu2Ene(v) for ax, v in grid.items()}
+
+
+def feature_at_solved_location(motif, params: ParameterSet, states, coeffs=(0.3,)) -> SpectralFeature:
+    """One feature, one row per coeff, at the location solve_LSE_motif finds (cm-1); width G_CM."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+    location = solve_LSE_motif(res_motif, params, states, unit='cm-1')
+    rows = tuple(ContributionRow(term_id=i, motif=res_motif, params=params, location=location, coeff=c)
+                 for i, c in enumerate(coeffs))
+    return SpectralFeature(location=location, rows=rows, lineshape_parameter=G_CM)
+
+
+class RecordingPropagator:
+    """Stands in for any propagator: stores each (resloc, gamma) it gets, returns resloc + i*gamma (not a Lorentzian)."""
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, resloc, gamma):
+        self.calls.append((resloc, gamma))
+        return resloc + 1j * gamma
+
+
+# -- lorentzian_propagator ------------------------------------------------------
+
+def test_lorentzian_propagator_at_resonance_is_i_over_gamma():
+    assert lorentzian_propagator(0., 0.5) == pytest.approx(1. / (-1j * 0.5))
+
+
+def test_lorentzian_propagator_imaginary_part():
+    """-i*gamma: Im = gamma / (x^2 + gamma^2) > 0, Re = x / (x^2 + gamma^2)"""
+    x, gamma = np.linspace(-3., 3., 7), 0.5
+
+    value = lorentzian_propagator(x, gamma)
+
+    np.testing.assert_allclose(value.imag, gamma / (x**2 + gamma**2))  # type: ignore
+    np.testing.assert_allclose(value.real, x / (x**2 + gamma**2))      # type: ignore
+
+
+# -- eval_rescond_resloc --------------------------------------------------------
+
+def test_eval_rescond_resloc_sign_is_E_minus_freq(states):
+    """Condition ((a,), ()) on A, a=0: E = E0. At A = 0 the result is +E0, not -E0."""
+    key = ResCondKey(diff=(('a',), ()), pf=('A',))
+    vd = VibDiff.from_quanta(*key.diff, {'a': 0}, states)
+
+    assert eval_rescond_resloc(key, vd, {'A': 0.}) == pytest.approx(convNu2Ene(E0))         # type: ignore
+    assert eval_rescond_resloc(key, vd, {'A': convNu2Ene(E0)}) == pytest.approx(0.)          # type: ignore
+
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_rescond_resloc_matches_the_independent_residuals(motif, params_obj, states):
+    """Every condition, on a 2D grid in Eh; '-B' enters the sum with -1 (MOTIF_MIXED)."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
+
+    expected = resonance_residuals(res_motif, grid, params_obj.to_dict(), states)  # type: ignore
+
+    for key, exp in zip(res_motif, expected):
+        vd = VibDiff.from_quanta(*key.diff, params_obj.to_dict(), states)
+        np.testing.assert_allclose(eval_rescond_resloc(key, vd, grid), exp)
+
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_rescond_resloc_is_zero_at_the_solved_location(motif, params_obj, states):
+    """Same equation as solve_LSE_motif: every condition is met at the point it finds."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+    location = solve_LSE_motif(res_motif, params_obj, states).as_dict()     # Eh
+
+    for key in res_motif:
+        vd = VibDiff.from_quanta(*key.diff, params_obj.to_dict(), states)
+        assert eval_rescond_resloc(key, vd, location) == pytest.approx(0., abs=1e-15)  # type: ignore
+
+
+# -- eval_resonance_factor ------------------------------------------------------
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_resonance_factor_calls_the_propagator_once_per_condition_with_E_minus_freq(motif, params_obj, states):
+    """
+    e.g. MOTIF_AB, a=0, b=1 (in cm-1): two calls, with resloc 1600 - A and 500 - B.
+    Checked on a 3x3 grid in Eh against resonance_residuals.
+    """
+    res_motif = ResonanceMotif.from_tuples(motif)
+    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
+    propagator = RecordingPropagator()
+
+    eval_resonance_factor(res_motif, params_obj, states, grid, propagator, lambda _vd: G_AU)
+
+    residuals = resonance_residuals(res_motif, grid, params_obj.to_dict(), states)  # type: ignore
+    assert len(propagator.calls) == len(res_motif)
+    for (resloc, _), expected in zip(propagator.calls, residuals):
+        np.testing.assert_allclose(resloc, expected)
+
+
+def test_eval_resonance_factor_gives_each_condition_its_own_gamma(params_obj, states):
+    """
+    gamma(vd) is asked once per condition, so a width per pair of states is possible.
+    Here gamma returns the condition's own E (cm-1). At freq = 0, resloc is E in Eh,
+    so each call must get resloc == convNu2Ene(gamma).
+    """
+    propagator = RecordingPropagator()
+
+    eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, {'A': 0., 'B': 0.},  # type: ignore
+                          propagator, gamma=lambda vd: vd.energy_difference())
+
+    assert sorted(g for _, g in propagator.calls) == pytest.approx(sorted([E01 - E0, E1 - E0]))
+    for resloc, g in propagator.calls:
+        assert resloc == pytest.approx(convNu2Ene(g))
+
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_resonance_factor_multiplies_the_propagator_values(motif, params_obj, states):
+    """e.g. MOTIF_AB: propagator(resloc_1, gamma) * propagator(resloc_2, gamma), at every grid point."""
+    res_motif = ResonanceMotif.from_tuples(motif)
+    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
+    propagator = RecordingPropagator()
+
+    value = eval_resonance_factor(res_motif, params_obj, states, grid, propagator, lambda _vd: G_AU)
+
+    np.testing.assert_allclose(value, np.prod([r + 1j * g for r, g in propagator.calls], axis=0))
+
+
+# -- eval_feature_on_grid -------------------------------------------------------
+
+@pytest.mark.parametrize('ps', [PS_01, PS_10])
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif, ps, states):
+    """
+    Grid and lineshape_parameter go in as cm-1. The propagator must get E_i - freq_i and gamma in Eh.
+    The states come from the feature's own params: a=0, b=1 and a=1, b=0 resonate at different places.
+    """
+    f = feature_at_solved_location(motif, ps, states)
+    grid_cm = grid_around(f.location.as_dict(), G_CM)
+    propagator = RecordingPropagator()
+
+    eval_feature_on_grid(f, states, grid_cm, propagator)
+
+    residuals = resonance_residuals(ResonanceMotif.from_tuples(motif), to_au(grid_cm), ps.to_dict(), states)  # type: ignore
+    assert len(propagator.calls) == len(motif)
+    for (resloc, gamma), expected in zip(propagator.calls, residuals):
+        np.testing.assert_allclose(resloc, expected, atol=1e-15)   # atol: the centre point is 0
+        assert gamma == pytest.approx(G_AU)
+
+
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, states):
+    """
+    Lorentzian only. get_intensity (features.py) assumes the peak is |amplitude / (-i*gamma)^N|^2
+    and sizes the feature boxes with it. The default propagator must give the same peak.
+    """
+    f = feature_at_solved_location(motif, params_obj, states)
+
+    value = eval_feature_on_grid(f, states, f.location.as_dict())  # type: ignore
+
+    assert abs(value) ** 2 == pytest.approx(f.get_intensity())
+
+
+def test_eval_feature_on_grid_uses_the_summed_and_scaled_amplitude(params_obj, states):
+    """Rows add up before the resonance factor, which is applied once per feature (not once per row,
+    see C3 in todo.txt). scale (normalize_coeffs_to_max) multiplies too."""
+    one = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(1.,))
+    two = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(0.3, 0.5))
+    grid = grid_around(one.location.as_dict(), G_CM)
+    base = eval_feature_on_grid(one, states, grid)
+
+    np.testing.assert_allclose(eval_feature_on_grid(two, states, grid), 0.8 * base)
+    np.testing.assert_allclose(eval_feature_on_grid(replace(two, scale=0.5), states, grid), 0.4 * base)
+
+
+def test_eval_feature_on_grid_needs_a_lineshape_parameter(params_obj, states):
+    f = replace(feature_at_solved_location(MOTIF_A, params_obj, states), lineshape_parameter=None)
+
+    with pytest.raises(ValueError, match='lineshape_parameter'):
+        eval_feature_on_grid(f, states, {'A': np.zeros(3)})
+
+
+def test_eval_feature_on_grid_needs_rows(states):
+    f = SpectralFeature(location=ResLocPoint({'A': 0.}), lineshape_parameter=G_CM)
+
+    with pytest.raises(ValueError, match='no motif'):
+        eval_feature_on_grid(f, states, {'A': np.zeros(3)})

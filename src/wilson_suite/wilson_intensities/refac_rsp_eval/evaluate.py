@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         CompiledTerm,
         FreqTermsCollection,
         PropsCollection,
+        ResCondKey,
         ResonanceMotif,
     )
     from wilson_suite.wilson_system.system_data import VibStatesData
@@ -580,52 +581,101 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     return ContributionTable(rows), zero, failed
 
 
-def lineshape(parameters: ParameterSet):
-    """
-    """
+## -----------------------------------------------------------------------------
+##          evaluating resonance conditions (resonance factors) on the grid
+## -----------------------------------------------------------------------------
 
-    return
+## evaluating func(resloc, parameter) for each resonance condition in a motif, then multiplying them together
 
 
-def eval_resmotif(motif: 'ResonanceMotif', 
-                  parameters: ParameterSet, 
-                  vibstates_data: 'VibStatesData'):
+def lorentzian_propagator(resloc: float | np.ndarray, gamma: float) -> np.ndarray | complex:
     """
-    Motifs from features: [feature.rows.motif for feature in feats].
-    Single feature could technically have several different motifs contributing (same res location).
-    
+    1 / (resloc - i*gamma); gamma in the same units as resloc.
+    With resloc = E - freq (eval_rescond_resloc) this is 1 / (E - freq - i*gamma).
+    """
+    return 1 / (resloc - 1j * gamma)
+
+
+# evaluating resloc for, e.g., 1 / (resloc - i*gamma) - lorentzian propagator
+def eval_rescond_resloc(res_cond_key: 'ResCondKey',
+                         vib_diff: VibDiff,
+                         grid: dict[str, np.ndarray]) -> float | np.ndarray:
+    """
+    Distance from resonance of one condition at every grid point: E - freq, in Eh.
+        E    = vib_diff.energy_difference(au=True) = E_left - E_right
+        freq = signed sum of the grid axes in res_cond_key.pf, e.g. ('-A', 'B') -> B - A
+    Zero where freq = E: the same point solve_LSE_motif finds. grid must be in Eh.
+
+    Sign: E - freq, because derive defines a resonance condition that way.
+      - ResonanceCondition (wilson_derive/abstractions.py): "perturbing frequencies to be subtracted".
+        VibPerturbedTerm.to_str prints each condition as (<sl sr> - pf - iG).
+        So one condition is the denominator (E_sl - E_sr) - (signed sum of pf).
+      - pf signs: '-A' means axis A enters that sum with -1. The sign comes from the pulse
+        interaction (+w or -w, dressWithPulseInteractions) and from the axis choice
+        (e.g. B = -w1 + w2, term_var_translate).
+      - The term coefficients from derive are made for this denominator, e.g. the -1 / +1 of the
+        D1 / D2 terms in vib_rsp_sos. freq - E would flip every condition: an extra (-1)^N for
+        a motif with N conditions, which the coefficients do not know about.
+      - -i*gamma is not fixed by derive (no damping there). +i*gamma gives the complex conjugate
+        everywhere, so |amplitude|^2 stays the same. -i*gamma matches to_str and the old code
+        (amplitudes/evaluators.py, evaluate_resonance_motif).
+    """
+    freq = sum((-1 if ax.startswith('-') else 1) * grid[ax.lstrip('-')] for ax in res_cond_key.pf)
+    return vib_diff.energy_difference(au=True) - freq
+
+
+# evaluating full resonance factor, e.g., 1 / (resloc1 - i*gamma1) / ...
+def eval_resonance_factor(motif: 'ResonanceMotif',
+                          parameters: ParameterSet,
+                          vibstates_data: 'VibStatesData',
+                          grid: dict[str, np.ndarray],
+                          propagator: Callable[[float|np.ndarray, float], complex],
+                          gamma: Callable[[VibDiff], float]) -> complex | np.ndarray:
+    """
     One motif consists of resonance conditions from a single term.
 
+    propagator - function that takes (resloc, parameter) and returns the resonance factor, e.g., lorentzian_propagator
     """
     result = 1.
 
     for res_cond_key in motif:
-        res_cond_key.pf
 
-        vib_diff_w_value = VibDiff.from_quanta(*res_cond_key.diff, parameters.to_dict(), vibstates_data)
-        
-        # 1/ rescond1 / rescond2 / rescond3
+        vd = VibDiff.from_quanta(*res_cond_key.diff, index_dict=parameters.to_dict(), vibstates_data=vibstates_data)
 
-        result /= ((-1)*vib_diff_w_value.energy_difference(au=True)-1j*lineshape())
+        resloc = eval_rescond_resloc(res_cond_key, vd, grid)
 
-    return
+        result *= propagator(resloc, gamma(vd))
 
+    return result
 
 
-def eval_feature_on_grid(feature: 'SpectralFeature'):
+# feature is one amplitude (the sum of the row coefficients) times one resonance factor
+def eval_feature_on_grid(feature: 'SpectralFeature',
+                         vibstates_data: 'VibStatesData',
+                         grid_cm: dict[str, np.ndarray],
+                         propagator: Callable=lorentzian_propagator) -> complex | np.ndarray:
     """
-    evaluate motif and multiply by coeff
+    amplitude_coeff * resonance factor of the feature's motif. grid in cm-1, result in au.
     """
-    feature.feat_box
-    feature.rows.motif
+    if feature.lineshape_parameter is None:
+        raise ValueError(f'feature {feature} has no lineshape_parameter')
     
-    return
+    if feature.motif is None:
+        raise ValueError(f'feature {feature} has no motif')
+    
+    if feature.amplitude_coeff is None:
+        raise ValueError(f'feature {feature} has no amplitude_coeff')
+    
+    grid_au = {ax: convNu2Ene(v) for ax, v in grid_cm.items()}
+    gamma_au = convNu2Ene(feature.lineshape_parameter)
+    
+    resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
+                                             grid_au, propagator, gamma=lambda _vd: gamma_au)
+
+    return feature.amplitude_coeff * resonance_factor
+    # return np.asarray(feature.amplitude_coeff * resonance_factor)
 
 
-
-"""
-coefficient should be attached to resonance with the same ParameterSet
-"""
 
 """
 1. compiled terms
@@ -642,6 +692,10 @@ ResonanceMotif + ParameterSet + VibStatesData ==> ResLocPoint
 iterate over:
     1. Sequence[ResonanceMotif]
     2. Sequence[ParameterSet] for one ResonanceMotif
+
+-----
+
+coefficient should be attached to resonance with the same ParameterSet
 
 """
 
