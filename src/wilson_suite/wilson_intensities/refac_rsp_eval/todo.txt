@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-05
+updated 2026-10-06
 
-Tests: refac_rsp_eval 345 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 373 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -76,6 +76,8 @@ D. Data model
 E. Pipeline
 -----------
 [ ] E2  grid.py: draw each feature as amplitude x shape(motif, location), the shape once per feature.
+        Done: sign fixed (E - freq, derive's convention); eval_feature_on_grid (one feature, grid in cm-1).
+        Left: add up all features on one window grid.
 [ ] E3  Entry point: terms + data file + experiment settings -> features.
         Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
         Left, in order:
