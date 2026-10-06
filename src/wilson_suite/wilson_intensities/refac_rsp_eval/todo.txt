@@ -10,11 +10,11 @@ Order of work
 1. [x] Small fixes: A10, A12, A13.
 2. [x] B1: make the old pipeline run again. It is the reference for correct numbers.
 3. [x] B4: sign convention of the resonance locations.
-4. C2: prove new numbers = old numbers, term by term.        <- most important
-5. E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
-6. E2: grid.py.
-7. C3: whole spectrum, old vs new.
-8. D4, E4: one data model, one README; delete the old code.
+4. [ ] C2: prove new numbers = old numbers, term by term.    <- most important
+5. [ ] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
+6. [ ] E2: grid.py.
+7. [ ] C3: whole spectrum, old vs new.
+8. [ ] D4, [ ] E4: one data model, one README; delete the old code.
 Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, F1.
 
 
@@ -56,11 +56,10 @@ B. Correctness
 
 C. Old vs new
 -------------
-[ ] C2  Term by term, the 14 formaldehyde EVV terms: coefficients (old evaluate_single_index_dict vs
-        new evaluate_full_index_dict) and locations (old resonances.solve_LSE_motif vs new). Needs B1.
-        Every difference must be deliberate and named in the test (harmonic 1/w fix, double-count fix).
-        Expected location differences: one-axis motif on B (old: IndexError); no single point
-        (old: prints and returns None; new: LinAlgError -> `failed`).
+[ ] C2  Term by term, the 14 formaldehyde EVV terms: 
+        [ ] coefficients (old evaluate_single_index_dict vs new evaluate_full_index_dict) and locations (old resonances.solve_LSE_motif vs new). Needs B1.
+        [ ] Every difference must be deliberate and named in the test (harmonic 1/w fix, double-count fix).
+        [ ] Expected location differences: one-axis motif on B (old: IndexError); no single point (old: prints and returns None; new: LinAlgError -> `failed`).
 [ ] C3  Whole spectrum. Needs E2.
         Expected difference: old evaluate_feature multiplies the summed amplitude by one shape per
         parameter set, so a peak with n parameter sets comes out n times too large in the old code.
