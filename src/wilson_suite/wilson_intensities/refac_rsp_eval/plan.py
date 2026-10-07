@@ -474,7 +474,6 @@ class CompiledTerm:
     full = 1.num_fact * 2.(avrg_props * nonavrg_props) * 3.freq_denom * 4.res_motf
         cmp_props = (avrg_props * nonavrg_props)
     
-    TODO: RAISE ERROR IF RES MOTIFS HAVE VARYING NUMBER OF VARIABLES(AXES)
     """
     avrg_props: PropsCollection
     non_avrg_props: PropsCollection

@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-07
 
-Tests: refac_rsp_eval 405 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 417 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -149,8 +149,13 @@ E. Pipeline
            each feature = one motif at one (a, b), with the stored rows of evv_reference.json;
            every amplitude = sum of the stored coefficients; strongest feature a = b = 4 at
            A = 2682.765 cm-1 (harmonic: 2933.526), the mode-5 numbers in the .out file.
-        3. [ ] Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
-           the terms (4 for EVV); raise if terms disagree (TODO in CompiledTerm).
+        3. [x] Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
+           the terms (4 for EVV); raise if terms disagree.
+           Done: pipeline.averaging_rank (slots op.o of the averaged part; raises if terms differ or the
+           slots are not 0 .. rank-1) and pipeline.make_polarization_linear_comb (also raises if laser_pol
+           does not fit the rank: getGeneralPolarizationAveragingExpression alone ignores extra numbers).
+           make_evv_reference.py and test_pipeline.py use it; evv_reference.json unchanged.
+           Not switched: tests/c2_variations.py, tests/c2_leaves.py (they record C2 as it ran).
         4. [ ] One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
         6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.

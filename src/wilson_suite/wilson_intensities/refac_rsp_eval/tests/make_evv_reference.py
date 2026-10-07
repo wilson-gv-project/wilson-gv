@@ -15,11 +15,11 @@ from pathlib import Path
 
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
-    getGeneralPolarizationAveragingExpression,
-)
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    load_molsys_data,
+    make_polarization_linear_comb,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     ParameterSet,
@@ -34,7 +34,7 @@ REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 TERMS_FILE = 'wilson_intensities/refac_rsp_eval/tests/test_terms.json'   # relative to SUITE_ROOT
 AXES = {'A': [1], 'B': [-1, 2]}
 LASER_POL = (1., 1., 1.)
-RANK = 4
+RANK = 4     # recorded in the file; the recipe takes the rank from the terms (test_pipeline checks both agree)
 DATA_FILES = {'formaldehyde': 'data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out',
               'water': 'data_for_tests/g16_h2o_HF_STO3G.out',
               'co': 'data_for_tests/g16_co_HF_STO3G.out'}
@@ -59,7 +59,7 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
     molsys = load_molsys_data(compiled, data_origin(molecule), states_choice)
-    pol = getGeneralPolarizationAveragingExpression(rank=RANK, laser_pol=LASER_POL)
+    pol = make_polarization_linear_comb(compiled, LASER_POL)
     table, zero, failed = build_contributions(compiled, molsys, pol)
     rows = list(table)
     return {

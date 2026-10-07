@@ -16,11 +16,16 @@ SpectralFeature(location, rows)                            "what" layer   featur
   v
 grid.py → spectrum array                                   E2, not built yet
 """
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    get_iso_f,
+    getGeneralPolarizationAveragingExpression,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     PrecalculatedData,
     build_contributions,
@@ -92,5 +97,50 @@ def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOrigin
     
     return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict,
                                        states_choice=states_choice)
+
+
+def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
+    """
+    Rank of the orientation average: the number of Cartesian slots (op.o) in a term's averaged part.
+        e.g. polhess[0,3] * dipgrad[1] * dipgrad[2] -> slots 0, 1, 2, 3 -> rank 4 (all 14 EVV terms)
+
+    compute_features uses one recipe for every term, so all terms must have the same slots.
+    The recipe puts slot i at position i, so the slots must be 0 .. rank-1, each once.
+    """
+    if not compiled:
+        raise ValueError('no terms: no averaging rank')
+
+    term_ids_by_slots = defaultdict(list)
+    for term_id, term in enumerate(compiled):
+        term_ids_by_slots[tuple(sorted(term.avrg_props.get_cart_axes()))].append(term_id)
+
+    if len(term_ids_by_slots) > 1:
+        raise ValueError(f'terms differ in their averaged slots, one recipe cannot serve them all; '
+                         f'slots: term ids {dict(term_ids_by_slots)}')
+    (slots,) = term_ids_by_slots
+    if slots != tuple(range(len(slots))):
+        raise ValueError(f'averaged slots must be 0 .. {len(slots) - 1}, each once; got {slots}')
+    return len(slots)
+
+
+def make_polarization_linear_comb(compiled: Sequence['CompiledTerm'],
+                                  laser_pol: Sequence[float]) -> dict[tuple, float]:
+    """
+    The orientation-average recipe {(x/y/z per slot): coefficient} that compute_features takes,
+    from getGeneralPolarizationAveragingExpression with the rank of the terms (averaging_rank).
+
+    laser_pol: the experiment's polarization_avg_vector. Its length is fixed by the rank
+    (rank 4 -> 3 numbers, e.g. (1, 1, 1) when all pulses and the detector are along x).
+    getGeneralPolarizationAveragingExpression would ignore extra numbers without an error.
+    """
+    rank = averaging_rank(compiled)
+    if not 2 <= rank <= 6:
+        raise ValueError(f'orientation averaging supports rank 2 to 6, the terms have rank {rank}')
+
+    n_expected = len(get_iso_f(rank))
+    if len(laser_pol) != n_expected:
+        raise ValueError(f'rank {rank} needs laser_pol with {n_expected} numbers, got {len(laser_pol)}: {laser_pol}')
+
+    return getGeneralPolarizationAveragingExpression(rank=rank, laser_pol=tuple(laser_pol))
 
  

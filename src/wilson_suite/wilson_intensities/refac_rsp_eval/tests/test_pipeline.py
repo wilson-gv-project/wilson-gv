@@ -29,11 +29,14 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
+    averaging_rank,
     compute_features,
     load_molsys_data,
+    make_polarization_linear_comb,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
+    PropsCollection,
     ResonanceMotif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
@@ -49,6 +52,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     PS_10,
     PS_11,
     ab_term,
+    polprop,
+    toy_term,
 )
 
 
@@ -142,6 +147,64 @@ def test_feature_result_is_frozen(molsys, pre_a1_zero):
         result.table = ContributionTable([])  # type: ignore
 
 
+## polarization recipe: averaging_rank, make_polarization_linear_comb ----------
+# The rank counts the Cartesian slots (op.o) of a term's averaged part.
+# toy_term(): <polgrad> with slots 0, 1 -> rank 2.
+
+def term_with_slots(*ops: tuple[int, ...]) -> CompiledTerm:
+    """toy_term() whose averaged part has one property per ops tuple"""
+    return replace(toy_term(), avrg_props=PropsCollection([polprop(ops=o, inds='a') for o in ops]))
+
+
+RANK_4_TERM = term_with_slots((0, 3), (1,), (2,))      # like EVV term 0: polhess[0,3] dipgrad[1] dipgrad[2]
+
+
+def test_averaging_rank_counts_the_slots_of_the_averaged_part():
+    assert averaging_rank([toy_term()]) == 2
+    assert averaging_rank([RANK_4_TERM]) == 4
+
+
+def test_averaging_rank_of_terms_with_the_same_slots():
+    assert averaging_rank([toy_term(), replace(toy_term(), frac_factor=2.)]) == 2
+
+
+def test_averaging_rank_raises_if_terms_differ():
+    """compute_features uses one recipe for all terms: rank 2 and rank 4 cannot share it"""
+    with pytest.raises(ValueError, match='terms differ'):
+        averaging_rank([toy_term(), RANK_4_TERM])
+
+
+def test_averaging_rank_raises_if_a_slot_is_missing():
+    """slots 0, 2: the recipe puts slot i at position i, and a rank-2 recipe has no position 2"""
+    with pytest.raises(ValueError, match=r'0 \.\. 1'):
+        averaging_rank([term_with_slots((0, 2))])
+
+
+def test_averaging_rank_raises_without_terms():
+    with pytest.raises(ValueError, match='no terms'):
+        averaging_rank([])
+
+
+@pytest.mark.parametrize('term, rank, laser_pol', [(toy_term(), 2, (1.,)), (RANK_4_TERM, 4, (1., 0., 1.))],
+                         ids=['rank 2', 'rank 4'])
+def test_make_polarization_linear_comb_uses_the_rank_of_the_terms(term, rank, laser_pol):
+    expected = getGeneralPolarizationAveragingExpression(rank=rank, laser_pol=laser_pol)
+
+    assert make_polarization_linear_comb([term], laser_pol) == expected
+
+
+@pytest.mark.parametrize('laser_pol', [(1., 1.), (1., 1., 1., 1.)], ids=['too short', 'too long'])
+def test_make_polarization_linear_comb_raises_if_laser_pol_does_not_fit_the_rank(laser_pol):
+    """rank 4 needs 3 numbers. getGeneralPolarizationAveragingExpression alone ignores a 4th number without an error."""
+    with pytest.raises(ValueError, match='rank 4 needs laser_pol with 3 numbers'):
+        make_polarization_linear_comb([RANK_4_TERM], laser_pol)
+
+
+def test_make_polarization_linear_comb_raises_for_rank_above_6():
+    with pytest.raises(ValueError, match='rank 2 to 6'):
+        make_polarization_linear_comb([term_with_slots(tuple(range(7)))], (1.,))
+
+
 ## real data: 14 EVV terms + formaldehyde -------------------------------------
 # load_molsys_data -> compute_features on the real data file; the settings and the stored rows are
 # the ones of evv_reference.json (make_evv_reference.py).
@@ -165,7 +228,7 @@ class EvvRun:
 def evv_formaldehyde(request) -> EvvRun:
     compiled = ref.compiled_evv_terms()
     molsys = load_molsys_data(compiled, ref.data_origin('formaldehyde'), states_choice=request.param)
-    polarization = getGeneralPolarizationAveragingExpression(rank=ref.RANK, laser_pol=ref.LASER_POL)
+    polarization = make_polarization_linear_comb(compiled, ref.LASER_POL)
 
     stored = next(b for b in json.loads(ref.REFERENCE_FILE.read_text())['results']
                   if (b['molecule'], b['states']) == ('formaldehyde', request.param))
@@ -189,6 +252,10 @@ def test_real_data_the_14_terms_have_2_motifs(evv_formaldehyde):
 
     motifs = dict.fromkeys(t.cmp_resmotf for t in compiled)
     assert tuple(tuple(i for i, t in enumerate(compiled) if t.cmp_resmotf == m) for m in motifs) == EVV_MOTIF_TERMS
+
+
+def test_real_data_averaging_rank_is_the_one_stored_in_the_reference_file(evv_formaldehyde):
+    assert averaging_rank(evv_formaldehyde.compiled) == ref.RANK == 4
 
 
 def test_real_data_504_pairs_340_rows_164_zero_0_failed(evv_formaldehyde):
