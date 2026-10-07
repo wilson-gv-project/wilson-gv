@@ -41,10 +41,14 @@ DATA_FILES = {'formaldehyde': 'data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out'
 STATES_CHOICES = ('anharmonic', 'harmonic')
 
 
+def evv_terms() -> list[VibPerturbedTerm]:
+    """the 14 terms as derive writes them, in pulse IDs (not yet in axes)"""
+    return VibPerturbedTerm.load_many_from_json(f'{SUITE_ROOT}/{TERMS_FILE}')
+
+
 def compiled_evv_terms() -> list[CompiledTerm]:
-    terms = VibPerturbedTerm.load_many_from_json(f'{SUITE_ROOT}/{TERMS_FILE}')
     axes = make_SpectralAxisSet(AXES)  # type: ignore
-    return compile_terms(terms=term_var_translate.translate_terms_to_axis_variables(terms, axes))
+    return compile_terms(terms=term_var_translate.translate_terms_to_axis_variables(evv_terms(), axes))
 
 
 def data_origin(molecule: str) -> DataOriginInfo:

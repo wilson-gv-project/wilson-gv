@@ -31,6 +31,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     averaging_rank,
     compute_features,
+    compute_features_from_terms,
     load_molsys_data,
     make_polarization_linear_comb,
 )
@@ -39,7 +40,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     PropsCollection,
     ResonanceMotif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
+    make_evv_reference as ref,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0,
     E00,
@@ -55,6 +58,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     polprop,
     toy_term,
 )
+from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 
 def two_terms_one_motif():
@@ -317,3 +321,55 @@ def test_real_data_strongest_feature(evv_formaldehyde):
     assert strongest.term_ids == (0, 3, 6)
     assert strongest.location.as_dict() == pytest.approx(location)
     assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
+
+
+## compute_features_from_terms: the one top function ---------------------------
+# Same settings as evv_reference.json, formaldehyde, anharmonic states. The evv_formaldehyde fixture
+# runs the same steps one by one, so equal results mean the top function passes every setting to
+# the right step. One run (top_run) serves all tests but the reverse-order one.
+
+def from_terms(terms, **kwargs) -> FeatureResult:
+    return compute_features_from_terms(terms, axes=make_SpectralAxisSet(ref.AXES),  # type: ignore
+                                       data_origin=ref.data_origin('formaldehyde'),
+                                       states_choice='anharmonic', laser_pol=ref.LASER_POL, **kwargs)
+
+
+@dataclass(frozen=True)
+class TopRun:
+    terms: list             # the input terms, after the run
+    terms_before: list      # their to_str, before the run
+    result: FeatureResult
+
+
+@pytest.fixture(scope='module')
+def top_run() -> TopRun:
+    terms = ref.evv_terms()
+    before = [t.to_str() for t in terms]
+    return TopRun(terms, before, from_terms(terms, lineshape_parameter=4.7))
+
+
+@pytest.mark.parametrize('evv_formaldehyde', ['anharmonic'], indirect=True)
+def test_compute_features_from_terms_equals_the_steps_one_by_one(top_run, evv_formaldehyde):
+    result, by_steps = top_run.result, evv_formaldehyde.result
+
+    assert list(result.table) == list(by_steps.table)
+    assert result.zero == by_steps.zero
+    assert result.failed == by_steps.failed
+
+
+def test_compute_features_from_terms_term_id_is_the_index_in_the_input_list(top_run):
+    """terms in reverse order: the row of term i comes back with term_id 13 - i, same params and coeff"""
+    backward = from_terms(ref.evv_terms()[::-1])
+
+    last = len(top_run.terms) - 1
+    assert ({(last - r.term_id, r.params, r.coeff) for r in backward.table}
+            == {(r.term_id, r.params, r.coeff) for r in top_run.result.table})
+
+
+def test_compute_features_from_terms_leaves_the_input_terms_as_they_are(top_run):
+    """the translation to axes works on copies: the caller's terms keep their pulse IDs"""
+    assert [t.to_str() for t in top_run.terms] == top_run.terms_before
+
+
+def test_compute_features_from_terms_gives_every_feature_the_lineshape_parameter(top_run):
+    assert all(f.lineshape_parameter == 4.7 and f.feat_box is not None for f in top_run.result.features)

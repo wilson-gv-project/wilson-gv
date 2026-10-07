@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-07
 
-Tests: refac_rsp_eval 417 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 421 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -11,7 +11,7 @@ Order of work
 2. [x] B1: make the old pipeline run again. It is the reference for correct numbers.
 3. [x] B4: sign convention of the resonance locations.
 4. [x] C2: prove new numbers = old numbers, term by term.
-5. [ ] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
+5. [x] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
 6. [ ] B7: motif rule (one resonance point per term), checked when compiling.
 7. [ ] E2: grid.py, including locations without every spectrum axis.
 8. [ ] C3: whole spectrum, old vs new.
@@ -156,7 +156,13 @@ E. Pipeline
            does not fit the rank: getGeneralPolarizationAveragingExpression alone ignores extra numbers).
            make_evv_reference.py and test_pipeline.py use it; evv_reference.json unchanged.
            Not switched: tests/c2_variations.py, tests/c2_leaves.py (they record C2 as it ran).
-        4. [ ] One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
+        4. [x] One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
+           Done: pipeline.compute_features_from_terms(terms, *, axes, data_origin, states_choice,
+           laser_pol, lineshape_parameter=None) -> FeatureResult. terms in pulse IDs; axes a
+           SpectralAxisSet; laser_pol the experiment's polarization_avg_vector. No precalculated tables.
+           Tests (test_pipeline.py): same result as the steps one by one; term_id = index in the input
+           list (reverse-order run); the caller's terms stay unchanged; lineshape_parameter reaches
+           every feature.
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
         6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
 [ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.

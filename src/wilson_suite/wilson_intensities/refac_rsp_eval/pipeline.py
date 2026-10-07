@@ -1,6 +1,9 @@
 """
 Entry point: compiled terms + molecular data -> spectral features.
 
+compute_features_from_terms does everything from the terms derive writes (in pulse IDs):
+translate to axes -> compile_terms -> load_molsys_data -> make_polarization_linear_comb -> compute_features.
+
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
@@ -22,6 +25,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     get_iso_f,
     getGeneralPolarizationAveragingExpression,
@@ -35,7 +39,10 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralFeature,
     features_from_rows,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ParameterSet
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    ParameterSet,
+    compile_terms,
+)
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
     MolecularProperty,
@@ -46,6 +53,8 @@ from wilson_suite.wilson_system.system_data import (
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
 
 
@@ -142,5 +151,32 @@ def make_polarization_linear_comb(compiled: Sequence['CompiledTerm'],
         raise ValueError(f'rank {rank} needs laser_pol with {n_expected} numbers, got {len(laser_pol)}: {laser_pol}')
 
     return getGeneralPolarizationAveragingExpression(rank=rank, laser_pol=tuple(laser_pol))
+
+
+def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
+                                axes: 'SpectralAxisSet',
+                                data_origin: DataOriginInfo,
+                                states_choice: str,
+                                laser_pol: Sequence[float],
+                                lineshape_parameter: float | None = None) -> FeatureResult:
+    """
+    Terms as derive writes them (in pulse IDs) + data file + experiment settings -> features.
+        1. translate the terms to the chosen axes          term_var_translate (copies, keeps the order)
+        2. compile                                         compile_terms
+        3. load the data for all terms, each property once  load_molsys_data
+        4. orientation-average recipe, rank from the terms  make_polarization_linear_comb
+        5. rows, zero / failed pairs, features             compute_features
+
+    axes                 e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
+    states_choice        must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
+    laser_pol            the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
+    lineshape_parameter  cm-1
+    row.term_id is the index in `terms`.
+    """
+    translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
+    compiled = compile_terms(translated)
+    molsys = load_molsys_data(compiled, data_origin, states_choice)
+    polarization = make_polarization_linear_comb(compiled, laser_pol)
+    return compute_features(compiled, molsys, polarization, lineshape_parameter=lineshape_parameter)
 
  
