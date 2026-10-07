@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-07
 
-Tests: refac_rsp_eval 393 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 405 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -68,12 +68,12 @@ B. Correctness
         Such a term is malformed, not a physical case.
         Now: build_contributions puts these pairs in `failed`; they leave the spectrum without an error.
         To do:
-        - check the rule once per motif in compile_terms (plan.py); no data needed:
+        - [ ] check the rule once per motif in compile_terms (plan.py); no data needed:
           number of conditions = number of axes = rank of the condition matrix (generate_LHS_motif).
           Raise with the term's to_str.
-        - to check: may a motif have more conditions than axes? Then a single point exists only if
+        - [ ] to check: may a motif have more conditions than axes? Then a single point exists only if
           the energies agree: it depends on the data, not on the motif alone.
-        - then decide what happens to `failed` (raise, or keep the list). Update build_contributions,
+        - [ ] then decide what happens to `failed` (raise, or keep the list). Update build_contributions,
           its 2 `failed` tests and the test_evv_reference.py docstring.
         All 14 EVV terms follow the rule, for all 3 axis choices of C2 (checked 2026-10-07).
 
@@ -134,21 +134,26 @@ E. Pipeline
 [ ] E3  Entry point: terms + data file + experiment settings -> features.
         Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
         Left, in order:
-        1. load_molsys_data(compiled, data_origin, states_choice) -> one MolSystemData for all terms:
+        1. [x] load_molsys_data(compiled, data_origin, states_choice) -> one MolSystemData for all terms:
            merge the terms' requests (build_data_request_for_term), each property once
            (term 8 alone lists dipgrad twice), one wilson_data_obtainer call, one from_datadict.
-           Stand-in: make_evv_reference.load_molsys. Move it here; the script and the test import it.
+           Done: pipeline.load_molsys_data. make_evv_reference.py (so also test_evv_reference.py) and
+           test_pipeline.py use it; the old copy load_molsys is gone. evv_reference.json unchanged.
            states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic ->
            harmonic. from_datadict defaults to harmonic. Make states_choice required (no default):
            the wrong choice changes 272 of 340 formaldehyde coefficients without any error.
-        2. Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero + 0 failed,
+        2. [x] Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero + 0 failed,
            number of features, a few amplitudes.
-           Done: pair counts (test_evv_reference.py). Left: number of features, a few amplitudes.
-        3. Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
+           Done: test_pipeline.py, "real data" section, harmonic and anharmonic states:
+           load_molsys_data -> compute_features; 2 motifs; 340 / 164 / 0; 68 features (36 + 32);
+           each feature = one motif at one (a, b), with the stored rows of evv_reference.json;
+           every amplitude = sum of the stored coefficients; strongest feature a = b = 4 at
+           A = 2682.765 cm-1 (harmonic: 2933.526), the mode-5 numbers in the .out file.
+        3. [ ] Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
            the terms (4 for EVV); raise if terms disagree (TODO in CompiledTerm).
-        4. One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
-        5. wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
-        6. Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
+        4. [ ] One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
+        5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
+        6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
 [ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
 
 

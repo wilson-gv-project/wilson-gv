@@ -19,21 +19,15 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     ParameterSet,
     compile_terms,
 )
-from wilson_suite.wilson_system.system_data import (
-    DataOriginInfo,
-    MolecularProperty,
-    MolPropsCollection,
-    MolSystemData,
-    build_data_request_for_term,
-)
+from wilson_suite.wilson_system.system_data import DataOriginInfo
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 
@@ -53,21 +47,8 @@ def compiled_evv_terms() -> list[CompiledTerm]:
     return compile_terms(terms=term_var_translate.translate_terms_to_axis_variables(terms, axes))
 
 
-def load_molsys(compiled: list[CompiledTerm], data_file: str, states_choice: str) -> MolSystemData:
-    """
-    One MolSystemData for all terms, each property once.
-    Stand-in until E3 step 1 (load_molsys_data).
-    """
-    origin = DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{data_file}')
-    request, props = {}, {}
-    for term in compiled:
-        request.update(build_data_request_for_term(term, origin))
-        for p in term.all_props:
-            mp = MolecularProperty.from_polprop(p)
-            props.setdefault(mp.trivial_name, mp)
-    datadict = wilson_data_obtainer(requested_data_dict=request)
-    return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict,
-                                       states_choice=states_choice)
+def data_origin(molecule: str) -> DataOriginInfo:
+    return DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{DATA_FILES[molecule]}')
 
 
 def _params(ps: ParameterSet) -> dict[str, int]:
@@ -77,7 +58,7 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
-    molsys = load_molsys(compiled, DATA_FILES[molecule], states_choice)
+    molsys = load_molsys_data(compiled, data_origin(molecule), states_choice)
     pol = getGeneralPolarizationAveragingExpression(rank=RANK, laser_pol=LASER_POL)
     table, zero, failed = build_contributions(compiled, molsys, pol)
     rows = list(table)

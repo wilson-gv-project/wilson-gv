@@ -1,5 +1,6 @@
 """
-pipeline.py — compute_features end to end on the toy molecule (helpers.py, conftest.py).
+pipeline.py — compute_features end to end on the toy molecule (helpers.py, conftest.py),
+then load_molsys_data + compute_features on real data (14 EVV terms + formaldehyde).
 
 The steps have their own tests (build_contributions in test_evaluate.py, features_from_rows in
 test_features.py). Here: the steps are joined right, and FeatureResult keeps the table as its source.
@@ -9,17 +10,33 @@ have coeff 0: per term, 2 rows (a=0) at 2 different locations and 2 zero pairs (
 """
 
 import dataclasses
-from dataclasses import replace
+import json
+from collections import defaultdict
+from dataclasses import dataclass, replace
 
 import pytest
 
+from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    getGeneralPolarizationAveragingExpression,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     evaluate_term_coeff_sumover,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import ContributionTable
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import compute_features
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ResonanceMotif
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionTable,
+    SpectralFeature,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    FeatureResult,
+    compute_features,
+    load_molsys_data,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    CompiledTerm,
+    ResonanceMotif,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0,
     E00,
@@ -123,3 +140,113 @@ def test_feature_result_is_frozen(molsys, pre_a1_zero):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.table = ContributionTable([])  # type: ignore
+
+
+## real data: 14 EVV terms + formaldehyde -------------------------------------
+# load_molsys_data -> compute_features on the real data file; the settings and the stored rows are
+# the ones of evv_reference.json (make_evv_reference.py).
+# The 14 terms have 2 motifs: terms 0, 2-7 and terms 1, 8-13. Both fix a and b: 6 modes -> 36 (a, b)
+# pairs per motif. Every pair has its own location, so here one feature = one motif at one (a, b),
+# holding that pair's rows from all terms of the motif.
+
+EVV_MOTIF_TERMS = ((0, 2, 3, 4, 5, 6, 7), (1, 8, 9, 10, 11, 12, 13))
+ALL_AB = {(a, b) for a in range(6) for b in range(6)}
+
+
+@dataclass(frozen=True)
+class EvvRun:
+    states: str
+    compiled: list[CompiledTerm]
+    result: FeatureResult
+    stored: dict            # the evv_reference.json block for formaldehyde and these states
+
+
+@pytest.fixture(scope='module', params=ref.STATES_CHOICES)
+def evv_formaldehyde(request) -> EvvRun:
+    compiled = ref.compiled_evv_terms()
+    molsys = load_molsys_data(compiled, ref.data_origin('formaldehyde'), states_choice=request.param)
+    polarization = getGeneralPolarizationAveragingExpression(rank=ref.RANK, laser_pol=ref.LASER_POL)
+
+    stored = next(b for b in json.loads(ref.REFERENCE_FILE.read_text())['results']
+                  if (b['molecule'], b['states']) == ('formaldehyde', request.param))
+    return EvvRun(request.param, compiled, compute_features(compiled, molsys, polarization), stored)
+
+
+def _ab(feature: SpectralFeature) -> tuple[int, int]:
+    """(a, b) of a feature that holds one index set"""
+    (ps,) = feature.param_sets
+    return ps['a'], ps['b']
+
+
+def _motif_terms(feature: SpectralFeature) -> tuple[int, ...]:
+    """the EVV_MOTIF_TERMS group that the feature's terms belong to"""
+    (group,) = [g for g in EVV_MOTIF_TERMS if set(feature.term_ids) <= set(g)]
+    return group
+
+
+def test_real_data_the_14_terms_have_2_motifs(evv_formaldehyde):
+    compiled = evv_formaldehyde.compiled
+
+    motifs = dict.fromkeys(t.cmp_resmotf for t in compiled)
+    assert tuple(tuple(i for i, t in enumerate(compiled) if t.cmp_resmotf == m) for m in motifs) == EVV_MOTIF_TERMS
+
+
+def test_real_data_504_pairs_340_rows_164_zero_0_failed(evv_formaldehyde):
+    result = evv_formaldehyde.result
+
+    assert (len(result.table), len(result.zero), len(result.failed)) == (340, 164, 0)
+
+
+def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
+    """Motif of terms 1, 8-13 has no feature at (3, 4), (3, 5), (4, 3), (5, 3): all its 7 terms give coeff 0 there."""
+    features = evv_formaldehyde.result.features
+
+    ab_per_motif = defaultdict(set)
+    for f in features:
+        ab_per_motif[_motif_terms(f)].add(_ab(f))
+
+    assert len(features) == 68
+    assert ab_per_motif[EVV_MOTIF_TERMS[0]] == ALL_AB
+    assert ALL_AB - ab_per_motif[EVV_MOTIF_TERMS[1]] == {(3, 4), (3, 5), (4, 3), (5, 3)}
+
+
+def test_real_data_each_feature_holds_the_stored_rows_of_its_motif_and_index_set(evv_formaldehyde):
+    """features_from_rows groups by (motif, location); the expected groups here come from (motif, params)"""
+    compiled, result, stored = evv_formaldehyde.compiled, evv_formaldehyde.result, evv_formaldehyde.stored
+
+    expected = defaultdict(set)
+    for r in stored['rows']:
+        expected[(compiled[r['term']].cmp_resmotf, (r['params']['a'], r['params']['b']))].add(r['term'])
+
+    assert {(f.motif, _ab(f)): set(f.term_ids) for f in result.features} == dict(expected)
+    assert sum(len(f.rows) for f in result.features) == len(stored['rows'])     # each term once per feature
+
+
+def test_real_data_amplitude_is_the_sum_of_the_stored_coefficients(evv_formaldehyde):
+    result, stored = evv_formaldehyde.result, evv_formaldehyde.stored
+    stored_coeff = {(r['term'], (r['params']['a'], r['params']['b'])): r['coeff'] for r in stored['rows']}
+
+    for f in result.features:
+        expected = sum(stored_coeff[(t, _ab(f))] for t in f.term_ids)
+        assert f.amplitude_coeff == pytest.approx(expected, rel=1e-12), f
+
+
+# states choice: location in cm-1, amplitude in au
+STRONGEST = {'anharmonic': ({'A': 2682.765, 'B': 0.}, -5.0513e-4),
+             'harmonic':   ({'A': 2933.526, 'B': 0.}, -4.7346e-4)}
+
+
+def test_real_data_strongest_feature(evv_formaldehyde):
+    """
+    a = b = 4, motif of terms 0, 2-7; terms 3 and 6 add to term 0, the other 4 terms give coeff 0.
+    A = E(1_4) - E(0): Gaussian mode 5 in the .out file, 2682.765 (anharmonic fundamental) or
+    2933.526 (harmonic) cm-1. B = E(1_b) - E(1_a) = 0, since a = b.
+    """
+    location, amplitude = STRONGEST[evv_formaldehyde.states]
+
+    strongest = max(evv_formaldehyde.result.features, key=lambda f: abs(f.amplitude_coeff))
+
+    assert _ab(strongest) == (4, 4)
+    assert strongest.term_ids == (0, 3, 6)
+    assert strongest.location.as_dict() == pytest.approx(location)
+    assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
