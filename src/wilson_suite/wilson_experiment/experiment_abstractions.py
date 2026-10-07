@@ -5,6 +5,7 @@ from operator import itemgetter
 import copy
 from math import inf as infinity
 from math import exp as exp
+import numpy as np
 
 # TODO: Expand functionality according to below TODOs
 
@@ -30,6 +31,7 @@ class SpecDetector:
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
 
+    # FIXME: Turn back into wavevector filter?
     interaction_filter: List of interaction patterns as lists: Filter signal to include only this/these
     (signed) interaction patterns. Note that any ordering here is not taken as a causal interaction order requirement
     and also note that while this parameter can be thought of as close to a phase-matching filter, it is not exactly the
@@ -44,12 +46,14 @@ class SpecDetector:
     detector_location: Optional[tuple[float]] = None
     
     detection_polarization: Optional[tuple[float]] = None
-    
-    # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
+
+    # FIXME: Rework to upper/lower bounds and (possibly) granularity?
     detection_range: Optional[list[float]] = None
+
     interaction_filter: Optional[list[list]] = None
     ignore_collinear: bool = True
 
+    # FIXME: Unsure if this is a relevant attribute
     overall_phase: float = 0.0
 
     def __post_init__(self):
@@ -81,7 +85,7 @@ class ScanObject:
     """
     Class to represent some attribute of the experiment which could be scanned. Currently not in use.
 
-    category: String: The (main) category of the object to be scanned, e.g. "pulse" or "detector"
+    category: String: The (main) category of the object to be scanned, e.g. "pulse"
     subcategory: String: The subcategory of the object to be scanned, e.g. "cf" (carrier frequency)
     id: Integer: An integer identifier for the specific instance of the main category, e.g. if 'category' is "pulse"
         (of which there are typically several, labelled by integer indices), then the present 'id' attribute
@@ -100,12 +104,11 @@ class ScanObject:
 
     def __post_init__(self):
 
-        # Testing against currently recognized scan categories/subcategories.
-        # Presence in these lists is required but not sufficient to
+        # Checking against currently recognized scan categories/subcategories.
+        # Presence in these lists is not sufficient to
         # indicate actual support for a specific scan.
-
-        valid_scan_objs = ['pulse', 'detector']
-        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev', 'pol'], 'detector': ['detection_range']}
+        valid_scan_objs = ['pulse']
+        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev']}
 
         if not self.category in valid_scan_objs:
             raise ValueError('Scan category not supported')
@@ -121,16 +124,9 @@ class ScanObject:
         if self.category == 'pulse':
             if self.subcategory in ['cf', 'tc', 'dev']:
                 self.scan_affects = 'integration'
-            elif self.subcategory in ['pol']:
-                self.scan_affects = 'response'
-
-        elif self.category == 'detector':
-            if self.subcategory in ['detection_range']:
-                self.scan_affects = 'integration'
 
         if self.scan_affects == None:
             raise ValueError('Scan subcategory domain of effect is indeterminate')
-
 
 
 @dataclass
@@ -138,7 +134,7 @@ class SpecScan:
     """
     Class to represent a spectral scan (adding to the dimensionality of a spectrum)
 
-    scan_objs: Tuple of ScanObject instances: Tells what this scan will vary
+    scan_objs: Tuple of ScanObject instances: Tells what this scan will vary. Their IDs must be different
 
     range: Iterable over which scan objects are varied (scaled by their multipliers as represented by
     their 'coeff' attributes)
@@ -665,6 +661,46 @@ class ElectricField:
 
         return screened_compound_pulses
 
+    def new_field_with_changes(self, scans: tuple[SpecScan], index: tuple[int]):
+        """
+        Take a list of changes and return a new ElectricField instance corresponding to these changes
+        applied to self.
+
+        scans: The scans under which changes are to be made
+
+        index: A tuple of integers specifying the index of each scan's range to be applied
+
+        returns: A new ElectricField instance with the requested changes
+        """
+
+        pulse_dict = {i.id: copy.deepcopy(i) for i in self.pulses}
+
+        for i in range(len(scans)):
+            scan_base_val = scans[i].range[index[i]]
+
+            for j in scans[i].scan_objs:
+
+                if not (j.category == 'pulse'):
+                    raise ValueError('Only pulse attributes may be changed')
+
+                if not j.id in pulse_dict:
+                    raise ValueError('Pulse ID not found in field')
+
+                if j.subcategory == 'cf':
+                    pulse_dict[j.id].cf += j.coeff * scan_base_val
+
+                elif j.subcategory == 'tc':
+                    pulse_dict[j.id].tc += j.coeff * scan_base_val
+
+                elif j.subcategory == 'dev':
+                    pulse_dict[j.id].dev += j.coeff * scan_base_val
+
+                else:
+                    raise ValueError('Invalid scan subcategory')
+
+        return ElectricField(tuple(copy.deepcopy(pulse_dict.values())))
+
+
 
 @dataclass
 class VibExperiment:
@@ -689,7 +725,7 @@ class VibExperiment:
 
     field: ElectricField
     detector: SpecDetector
-    scans: tuple[SpecScan] = None
+    scans: tuple[SpecScan] = ()
     magn_conditions: tuple[tuple] = None
 
     def __post_init__(self):
@@ -713,6 +749,25 @@ class VibExperiment:
             for i in self.magn_conditions:
                 if not isinstance(i, tuple):
                     raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
+
+        self.dim = self.findDimensionality()
+
+        # Make scan grid with fields under scanning
+        # (NOTE: Currently, field attributes are the only attributes whose scanning is supported and so,
+        # a grid of (scanned) fields manifests all the scans' changes to the experiment)
+        grid_dims = tuple([len(i.range) for i in self.scans])
+        self.field_scan_grid = np.empty(grid_dims, dtype=object)
+
+        if len(self.scans) > 0:
+            for scan_elem in np.ndindex(scan_grid.shape):
+                self.field_scan_grid[scan_elem] = self.field.new_field_with_changes(self.scans, scan_elem)
+
+        # With no scans, the scan grid is just the "scalar" base field
+        else:
+            self.field_scan_grid[()] = self.field
+
+        # NOTE: Below code to be reworked or rmd
+
 
 
         from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
@@ -784,30 +839,10 @@ class VibExperiment:
         # - Construct fields_under_scan attribute
         # - Handle better the discretization of scans
         # - Handle separation/combination of response-side/integration-side scans
-        # - Handle making compound pulses (with delay param for nonzero el relaxation?
-        #   not to begin with I think but can "leave room" for it)
-        #       - Compounding should be a simple product and for Gaussians, is another Gaussian
-        #       - Either here or as part of ElectricField: Handle superset of compoundings (can even inform
-        #         if nonresonant "full electronic" terms are likely to contribute)
-        #   - Also consider and maybe handle phase question between "differently-compounding" features here
-        # - Likely do away with cfuv stuff and handle these attributes explicitly
+        #  - Also consider and maybe handle phase question between "differently-compounding" features here
 
 
 
-        # FIXME: Replace with try...except in case not sufficient data specified
-        try:
-            self.dim = self.findDimensionality()
-        except AssertionError:
-            self.dim = None
-
-        # Determine pulse "epochs" - i.e. disjoint (or taken to be disjoint) time partitions of the pulses
-        self.epochs = find_epochs(self.field)
-
-        # Determine which interaction orderings are causally possible
-        self.int_sequences = self.findInteractionSequences()
-
-        # Register UV/VIS range carrier frequencies of field for convenience
-        self.cfuv = get_carrier_freqs_uv(self.field.pulses)
 
         # Find valid choices of independent variables
         self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
