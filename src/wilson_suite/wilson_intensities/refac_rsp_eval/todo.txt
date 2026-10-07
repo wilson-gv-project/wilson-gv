@@ -56,10 +56,13 @@ B. Correctness
 
 C. Old vs new
 -------------
-[ ] C2  Term by term, the 14 formaldehyde EVV terms: 
+[x] C2  Term by term, the 14 formaldehyde EVV terms: 
         [ ] coefficients (old evaluate_single_index_dict vs new evaluate_full_index_dict) and locations (old resonances.solve_LSE_motif vs new). Needs B1.
         [ ] Every difference must be deliberate and named in the test (harmonic 1/w fix, double-count fix).
-        [ ] Expected location differences: one-axis motif on B (old: IndexError); no single point (old: prints and returns None; new: LinAlgError -> `failed`).
+        [ ] Expected location differences: one-axis motif on B (old: IndexError);
+        no single point (new: LinAlgError -> `failed`):
+        conditions contradict each other (old: prints and returns None),
+        one condition on A + B, a line (old: ValueError).
 [ ] C3  Whole spectrum. Needs E2.
         Expected difference: old evaluate_feature multiplies the summed amplitude by one shape per
         parameter set, so a peak with n parameter sets comes out n times too large in the old code.
