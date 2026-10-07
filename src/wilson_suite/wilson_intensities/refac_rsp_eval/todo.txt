@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-06
+updated 2026-10-07
 
-Tests: refac_rsp_eval 373 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 393 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -10,11 +10,16 @@ Order of work
 1. [x] Small fixes: A10, A12, A13.
 2. [x] B1: make the old pipeline run again. It is the reference for correct numbers.
 3. [x] B4: sign convention of the resonance locations.
-4. [ ] C2: prove new numbers = old numbers, term by term.    <- most important
+4. [x] C2: prove new numbers = old numbers, term by term.
 5. [ ] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
-6. [ ] E2: grid.py.
-7. [ ] C3: whole spectrum, old vs new.
-8. [ ] D4, [ ] E4: one data model, one README; delete the old code.
+6. [ ] B7: motif rule (one resonance point per term), checked when compiling.
+7. [ ] E2: grid.py, including locations without every spectrum axis.
+8. [ ] C3: whole spectrum, old vs new.
+9. [ ] C4: special motifs, old vs new location solvers, actually run.
+10. [ ] D4, [ ] E4: one data model, one README; delete the old code,
+       and with it tests/c2_variations.py and tests/c2_leaves.py.
+       Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
+Any time: G1–G7 (checks beyond old = new), G1 first.
 Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, F1.
 
 
@@ -46,26 +51,62 @@ B. Correctness
         one tensor.
 [ ] B5  eval_vibenedenom (precalculated) looks up a SET of labels: 1/w_a twice becomes 1/w_a once.
         harmonic_denom (on the fly) keeps both factors.
+        The old code has the same set lookup (term_parts.py). No EVV term has a label twice there (C2).
+        Careful when reading to_str: harmonic 1/w_a and the energy difference E(1_a) - E(0) both
+        print as <['a'],[]>. Terms 2, 5, 11, 12 have one of each, not 1/w_a twice; is_pert_wf_diff
+        tells them apart.
 [ ] B6  Precalculated averaged tensors are read in the wrong axis order for some terms.
         calculate_avrg_tensor stores axes alphabetically (a, b, c); _get_ind_tuple_from_base reads
         distinct labels in expression order. Term 8 (polgrad[b] dipgrad[a] dipgrad[c]) reads (b, a, c).
         Pinned by 2 strict-xfail tests (test_precalculated_tensor_gives_the_on_the_fly_value,
         test_term8_precalculated_tensor_gives_the_on_the_fly_value). Fix, then remove the markers.
         B3, B5, B6: only once precalculated tables are built again. The on-the-fly path is correct.
+[ ] B7  Rule (2026-10-07): each term's motif has exactly one resonance point, in the n axes the
+        motif uses. n may differ between the terms of one collection.
+        e.g. conditions on A and on B -> a point in 2D; one condition on B only -> a point in 1D (fine).
+        Breaks the rule: one condition on A + B (a line), or conditions that contradict each other.
+        Such a term is malformed, not a physical case.
+        Now: build_contributions puts these pairs in `failed`; they leave the spectrum without an error.
+        To do:
+        - check the rule once per motif in compile_terms (plan.py); no data needed:
+          number of conditions = number of axes = rank of the condition matrix (generate_LHS_motif).
+          Raise with the term's to_str.
+        - to check: may a motif have more conditions than axes? Then a single point exists only if
+          the energies agree: it depends on the data, not on the motif alone.
+        - then decide what happens to `failed` (raise, or keep the list). Update build_contributions,
+          its 2 `failed` tests and the test_evv_reference.py docstring.
+        All 14 EVV terms follow the rule, for all 3 axis choices of C2 (checked 2026-10-07).
 
 
 C. Old vs new
 -------------
-[x] C2  Term by term, the 14 formaldehyde EVV terms: 
-        [ ] coefficients (old evaluate_single_index_dict vs new evaluate_full_index_dict) and locations (old resonances.solve_LSE_motif vs new). Needs B1.
-        [ ] Every difference must be deliberate and named in the test (harmonic 1/w fix, double-count fix).
-        [ ] Expected location differences: one-axis motif on B (old: IndexError);
-        no single point (new: LinAlgError -> `failed`):
-        conditions contradict each other (old: prints and returns None),
-        one condition on A + B, a line (old: ValueError).
+[x] C2  Term by term, the 14 EVV terms (test_terms.json): old = new, no differences.
+        Checked 2026-10-07 (largest relative difference 2e-15):
+        - formaldehyde, water, CO; GVPT2 and harmonic. Formaldehyde also: VPT2, 2 more axis choices,
+          4 more polarizations.
+        - formaldehyde: 2664 full label sets, factor by factor (old evaluate_single_index_dict =
+          new evaluate_full_index_dict); 504 coefficients; 504 locations.
+        - control: old GVPT2 vs new harmonic states differs (the check can fail).
+        Kept in the repo: evv_reference.json + test_evv_reference.py lock the new numbers; the
+        test docstring records the old-vs-new result. tests/c2_variations.py (coefficients,
+        locations) and tests/c2_leaves.py (factor by factor) rerun old vs new; they need the old code.
+        Differences exist only for motifs none of the 14 terms has (named in the test docstring):
+        - one condition on B only: old IndexError; new gives a 1D point (correct by B7).
+        - contradicting conditions, one condition on A + B: both break B7.
+        The old behaviour was found by reading the code only; C4 runs it.
+        B5 cannot show on these terms (see B5). The double-count fix shows only in C3.
 [ ] C3  Whole spectrum. Needs E2.
         Expected difference: old evaluate_feature multiplies the summed amplitude by one shape per
         parameter set, so a peak with n parameter sets comes out n times too large in the old code.
+        (evaluators.py evaluate_feature, numerical_abstractions.py compile_feature; read, not run.)
+        e.g. 3 rows at one location, coeffs c1, c2, c3: old (c1+c2+c3)*3*L, right (c1+c2+c3)*L.
+[ ] C4  Special motifs, actually run. Hand-build the motifs; call old resonances.solve_LSE_motif
+        and new solve_LSE_motif on toy states:
+        - B only, A only (fine by B7): old IndexError for B only? Same point as new for A only?
+        - one condition on A + B (breaks B7): old ValueError?
+        - contradicting conditions (break B7): old prints and returns None. What does the old
+          pipeline do with None afterwards?
+        Needs the old code: before D4/E4.
 
 
 D. Data model
@@ -86,14 +127,23 @@ E. Pipeline
 [ ] E2  grid.py: draw each feature as amplitude x shape(motif, location), the shape once per feature.
         Done: sign fixed (E - freq, derive's convention); eval_feature_on_grid (one feature, grid in cm-1).
         Left: add up all features on one window grid.
+        Left: locations without every spectrum axis. e.g. a motif on B only in an (A, B) spectrum has
+        location {'B': E}; on an (A, B) grid its shape does not depend on A (a ridge along A).
+        Should be fine, but not sure every case is. Check each: which box for the missing axis
+        (the whole window range?), get_intensity, dress_these_with_boxes, eval_feature_on_grid.
 [ ] E3  Entry point: terms + data file + experiment settings -> features.
         Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
         Left, in order:
         1. load_molsys_data(compiled, data_origin, states_choice) -> one MolSystemData for all terms:
            merge the terms' requests (build_data_request_for_term), each property once
            (term 8 alone lists dipgrad twice), one wilson_data_obtainer call, one from_datadict.
+           Stand-in: make_evv_reference.load_molsys. Move it here; the script and the test import it.
+           states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic ->
+           harmonic. from_datadict defaults to harmonic. Make states_choice required (no default):
+           the wrong choice changes 272 of 340 formaldehyde coefficients without any error.
         2. Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero + 0 failed,
            number of features, a few amplitudes.
+           Done: pair counts (test_evv_reference.py). Left: number of features, a few amplitudes.
         3. Polarization helper: getGeneralPolarizationAveragingExpression(rank, laser_pol), rank taken from
            the terms (4 for EVV); raise if terms disagree (TODO in CompiledTerm).
         4. One top function: translate -> compile -> load_molsys_data -> polarization -> compute_features.
@@ -106,6 +156,32 @@ F. Later, only when needed
 --------------------------
 [ ] F1  einsum for the averaged part, then maybe for the whole sum over summation labels.
         Only if a large molecule is measurably too slow.
+
+
+G. Checks beyond old = new
+--------------------------
+C2 only checks code that differs between old and new. Both share: the terms from derive,
+term_var_translate, wilson_data_obtainer (file reading, units, state energies), the averaging
+weights (getGeneralPolarizationAveragingExpression) and the polarization vector (C2 gave the old
+value to the new side). An error there looks the same on both sides. These checks use no wilson
+code on the checking side.
+[ ] G1  Hand calculation: CO (1 mode), term 0, a = b = 0. Raw numbers from the data dict, the term's
+        formula (to_str), textbook isotropic average, numpy only. Compare with evv_reference.json.
+        Covers prefactor, averaging, 1/w, units.
+[ ] G2  Raw data vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental,
+        one dipgrad value, one polgrad value.
+[ ] G3  Rotation test: rotate all property tensors by one random rotation; every averaged value
+        must stay the same.
+[ ] G4  Averaging weights by brute force: average over many random orientations for the 5
+        polarization setups of C2; compare with getGeneralPolarizationAveragingExpression.
+[ ] G5  Polarization vector by hand for 2-3 setups (e.g. all along x -> [1, 1, 1]): what each entry means.
+[ ] G6  Near-zero energy differences: smallest |E| in VIBDIFF_TERMS per term and molecule.
+        A value near zero makes a term huge; otf_vibdiffdenom raises only at exactly zero.
+[ ] G7  More terms: every term file in the repo holds (some of) the same 14 terms, all with motif
+        (-A), (B). Generate terms with derive for other experiments (pulse order, more pulses,
+        axis choices). Run the B7 check on them, then old vs new with tests/c2_variations.py and
+        tests/c2_leaves.py (TERMS, MOLECULES, VARIATIONS at the top; old code: before D4/E4).
+        Which experiments: to pick.
 
 
 Done on this branch
