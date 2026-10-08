@@ -5,6 +5,7 @@ Tests marked xfail(strict=True) pin known bugs: they start passing (and so fail 
 which is the reminder to drop the marker.
 """
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -28,10 +29,10 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
     NDIMS,
-    box_halfwidth,
     coords,
     cube,
     feat,
+    get_box_extent,
     row,
 )
 
@@ -112,8 +113,21 @@ def test_table_axis_range_needs_a_row_with_the_axis():
 
 ## SpectralFeature: basics --------------------------------------------------
 
-def test_feature_without_gamma_has_no_box():
-    assert feat(A=100., gamma=None).feat_box is None
+def test_feature_has_no_box_until_dressed():
+    f = feat(A=100., gamma=5.)
+    top = f.get_intensity()
+
+    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101)
+
+    assert f.feat_box is None
+    assert dressed.feat_box is not None
+
+
+def test_replace_keeps_the_box():
+    """dataclasses.replace runs __post_init__ again; that used to reset a dressed box to location +- gamma."""
+    dressed = feat(A=100., box_extent=50.)
+
+    assert replace(dressed, scale=0.5).feat_box == Box({'A': (50., 150.)})
 
 
 def test_feature_amplitude_is_scale_times_sum_of_row_coeffs():
@@ -264,7 +278,7 @@ def test_features_from_rows_gives_every_feature_the_lineshape_parameter():
     [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_parameter=5.)
 
     assert f.lineshape_parameter == 5.
-    assert f.feat_box == Box({'A': (1645., 1655.)})
+    assert f.feat_box is None   # boxes come later, from dress_these_with_boxes
 
 
 def test_features_from_rows_of_empty_table_is_empty():
@@ -343,13 +357,13 @@ def test_feature_is_inside_includes_edges(a, inside):
 def test_feature_box_overlaps_excludes_touching_edges():
     box = Box({'A': (0., 10.)})
 
-    assert feat(A=10.5, gamma=1.).feat_box_overlaps(box)
-    assert not feat(A=11., gamma=1.).feat_box_overlaps(box)  # boxes only touch
+    assert feat(A=10.5, box_extent=1.).feat_box_overlaps(box)
+    assert not feat(A=11., box_extent=1.).feat_box_overlaps(box)  # boxes only touch
 
 
 def test_feature_box_overlaps_needs_a_feature_box():
     with pytest.raises(ValueError, match='Need to add a box'):
-        feat(A=5., gamma=None).feat_box_overlaps(Box({'A': (0., 10.)}))
+        feat(A=5.).feat_box_overlaps(Box({'A': (0., 10.)}))
 
 
 @pytest.mark.parametrize('a, contributing', [
@@ -453,7 +467,7 @@ def test_max_intensity_feat_rejects_features_that_all_have_zero_intensity():
 # A Lorentzian drops to 1/dynrange of its peak at distance gamma*sqrt(dynrange - 1).
 # dynrange = 101 -> 10*gamma ; dynrange = 26 -> 5*gamma
 
-def test_dress_box_halfwidth_is_gamma_times_sqrt_dynrange_minus_one():
+def test_dress_box_extent_is_gamma_times_sqrt_dynrange_minus_one():
     f = feat(A=100., gamma=5.)
     top = f.get_intensity()
 
@@ -468,7 +482,7 @@ def test_dress_safety_margin_widens_the_box():
 
     [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.1)
 
-    assert box_halfwidth(dressed) == pytest.approx(55.)
+    assert get_box_extent(dressed) == pytest.approx(55.)
 
 
 def test_dress_drops_features_below_min_intensity():
@@ -487,7 +501,7 @@ def test_dress_minimum_padding_keeps_weak_features_and_sets_a_floor():
                                                     scale_wrt_max_intensity=True,
                                                     minimum_box_padding=20.)
 
-    assert [box_halfwidth(f) for f in result] == pytest.approx([50., 20.])
+    assert [get_box_extent(f) for f in result] == pytest.approx([50., 20.])
 
 
 def test_dress_scaled_boxes_shrink_for_weaker_features():
@@ -499,8 +513,8 @@ def test_dress_scaled_boxes_shrink_for_weaker_features():
                                                       scale_wrt_max_intensity=True)
     [unscaled] = SpectralFeature.dress_these_with_boxes([f], top, top / 52, box_range_safety_margin=0.)
 
-    assert box_halfwidth(scaled) == pytest.approx(25.)
-    assert box_halfwidth(unscaled) == pytest.approx(5. * 51 ** 0.5)
+    assert get_box_extent(scaled) == pytest.approx(25.)
+    assert get_box_extent(unscaled) == pytest.approx(5. * 51 ** 0.5)
 
 
 def test_dress_needs_lineshape_parameter():
@@ -522,7 +536,7 @@ def test_dress_does_not_change_input_features():
 
     SpectralFeature.dress_these_with_boxes([f], top, top / 101)
 
-    assert f.feat_box == Box({'A': (-5., 5.)})
+    assert f.feat_box is None
 
 
 def test_dress_drops_the_weak_one_of_two_equal_features():
@@ -598,7 +612,7 @@ def test_window_dress_with_featboxes_keeps_box_and_drops_weak_features():
     assert dressed.box == window.box
     assert dressed.full_features == [strong]
     assert dressed.contrib_features == [near]
-    assert box_halfwidth(dressed.full_features[0]) == pytest.approx(5. * 10. * 1.1)
+    assert get_box_extent(dressed.full_features[0]) == pytest.approx(5. * 10. * 1.1)
 
 
 def test_window_dress_with_featboxes_allows_a_stronger_contributing_feature():
@@ -614,7 +628,7 @@ def test_window_dress_with_featboxes_allows_a_stronger_contributing_feature():
 
 def test_window_find_clusters_by_featboxes_includes_contributing_features():
     # boxes (8.5, 10.5) and (10, 12) overlap
-    inside, near = feat(A=9.5), feat(A=11.)
+    inside, near = feat(A=9.5, box_extent=1.), feat(A=11., box_extent=1.)
     window = SpectralWindow(Box({'A': (0., 10.)}), full_features=[inside], contrib_features=[near])
 
     [domain] = window.find_clusters_by_featboxes()
@@ -625,7 +639,7 @@ def test_window_find_clusters_by_featboxes_includes_contributing_features():
 ## RectangularDomain --------------------------------------------------------
 
 def test_domain_from_features_spans_feature_boxes():
-    f0, f1 = feat(A=0.), feat(A=5.)
+    f0, f1 = feat(A=0., box_extent=1.), feat(A=5., box_extent=1.)
 
     domain = RectangularDomain.from_features([f0, f1])
 
@@ -635,13 +649,13 @@ def test_domain_from_features_spans_feature_boxes():
 
 def test_domain_from_features_needs_feature_boxes():
     with pytest.raises(ValueError, match='feat_box'):
-        RectangularDomain.from_features([feat(A=0., gamma=None)])
+        RectangularDomain.from_features([feat(A=0.)])
 
 
 def test_equal_domains_have_equal_hashes():
     # the old GridManager uses domains as dict keys
-    d1 = RectangularDomain.from_features([feat(A=0.)])
-    d2 = RectangularDomain.from_features([feat(A=0.)])
+    d1 = RectangularDomain.from_features([feat(A=0., box_extent=1.)])
+    d2 = RectangularDomain.from_features([feat(A=0., box_extent=1.)])
 
     assert d1 == d2
     assert hash(d1) == hash(d2)
@@ -665,14 +679,6 @@ def test_domain_add_methods_append_features():
 # The same checks for every spectrum dimensionality in NDIMS. `last` is the highest axis, e.g. 'C' for ndim=3.
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_feature_box_is_location_plus_minus_gamma(ndim):
-    # a different value on each axis: A=10, B=20, ...
-    location = {ax: 10. * (i + 1) for i, ax in enumerate(AXES[:ndim])}
-
-    assert feat(location, gamma=2.).feat_box == Box({ax: (v - 2., v + 2.) for ax, v in location.items()})
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_feature_is_inside_only_when_every_axis_is_inside(ndim):
     box, last = cube(ndim, 0., 10.), AXES[ndim - 1]
 
@@ -680,7 +686,7 @@ def test_nd_feature_is_inside_only_when_every_axis_is_inside(ndim):
     assert feat(coords(ndim, 10.)).is_inside(box)  # corner
     for ax in AXES[:ndim]:
         assert not feat(coords(ndim, 5., **{ax: 11.})).is_inside(box)
-    assert feat(coords(ndim, 5., **{last: 10.5}), gamma=1.).feat_box_overlaps(box)
+    assert feat(coords(ndim, 5., **{last: 10.5}), box_extent=1.).feat_box_overlaps(box)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
@@ -702,13 +708,13 @@ def test_nd_intensity_has_one_gamma_factor_per_axis(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_dress_box_halfwidth_is_the_same_on_every_axis(ndim):
+def test_nd_dress_box_extent_is_the_same_on_every_axis(ndim):
     f = feat(coords(ndim, 100.), gamma=5.)
     top = f.get_intensity()
 
     [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.)
 
-    assert [box_halfwidth(dressed, ax) for ax in AXES[:ndim]] == pytest.approx([50.] * ndim)
+    assert [get_box_extent(dressed, ax) for ax in AXES[:ndim]] == pytest.approx([50.] * ndim)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
@@ -731,14 +737,14 @@ def test_nd_window_dress_with_featboxes_drops_weak_features(ndim):
     dressed = window.dress_with_featboxes(dynrange=101.)
 
     assert dressed.full_features == [strong]
-    assert [box_halfwidth(dressed.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
+    assert [get_box_extent(dressed.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_window_find_clusters_by_featboxes(ndim):
-    # f0 and f1 boxes overlap on every axis; f2 sits on f0, except far away on the last axis
-    f0, f1 = feat(coords(ndim, 0.)), feat(coords(ndim, 1.5))
-    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}))
+    # boxes: f0 (-1, 1) and f1 (0.5, 2.5) overlap on every axis; f2 sits on f0, except (9, 11) on the last axis
+    f0, f1 = feat(coords(ndim, 0.), box_extent=1.), feat(coords(ndim, 1.5), box_extent=1.)
+    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}), box_extent=1.)
     window = SpectralWindow(cube(ndim, -5., 15.), full_features=[f0, f1, f2])
 
     domains = window.find_clusters_by_featboxes()

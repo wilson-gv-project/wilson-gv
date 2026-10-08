@@ -112,9 +112,9 @@ def test_compute_features_gives_every_feature_the_lineshape_parameter(molsys, pr
     result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=5.)
 
     assert len(result.features) == 2
-    assert all(f.lineshape_parameter == 5. and f.feat_box is not None for f in result.features)
-    # boxes are built from the lineshape parameter when feature is initialized, so they should be present
-    assert all(f.feat_box is not None for f in result.features)
+    assert all(f.lineshape_parameter == 5. for f in result.features)
+    # no boxes yet: they come later, from dress_these_with_boxes
+    assert all(f.feat_box is None for f in result.features)
 
 
 ## FeatureResult ------------------------------------------------------------
@@ -372,4 +372,4 @@ def test_compute_features_from_terms_leaves_the_input_terms_as_they_are(top_run)
 
 
 def test_compute_features_from_terms_gives_every_feature_the_lineshape_parameter(top_run):
-    assert all(f.lineshape_parameter == 4.7 and f.feat_box is not None for f in top_run.result.features)
+    assert all(f.lineshape_parameter == 4.7 for f in top_run.result.features)

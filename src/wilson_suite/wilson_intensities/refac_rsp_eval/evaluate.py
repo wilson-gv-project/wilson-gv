@@ -692,6 +692,25 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     # return np.asarray(feature.amplitude_coeff * resonance_factor)
 
 
+# every feature on every grid point: no boxes, no domains
+def draw_all(features: Iterable['SpectralFeature'],
+             vibstates_data: 'VibStatesData',
+             coords_cm: dict[str, np.ndarray]) -> np.ndarray:
+    """
+    Sum of eval_feature_on_grid over all features, each on the whole grid. Nothing is cut off, so this is
+    the reference for the drawing by domains (draw_window, not built yet). Slow for many features on big grids.
+
+    coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid.
+    Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm (ij indexing),
+    e.g. coords_cm A with 5 points, B with 3 -> shape (5, 3). intensity = abs(amplitude)**2
+    """
+    mesh = dict(zip(coords_cm, np.meshgrid(*coords_cm.values(), indexing='ij')))
+    total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
+    for feature in features:
+        total += eval_feature_on_grid(feature, vibstates_data, mesh)
+    return total
+
+
 
 """
 1. compiled terms

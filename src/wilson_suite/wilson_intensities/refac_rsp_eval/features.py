@@ -21,7 +21,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
     compute_box_adjacency,
     connected_components_from_adjacency,
-    points_to_bounds,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
@@ -116,6 +115,7 @@ class SpectralFeature:
     One peak: the rows of one motif at one location (made by features_from_rows).
     Same motif + same point -> same peak shape, so the coefficients of the rows add.
     location and lineshape_parameter are in cm-1.
+    feat_box: None until dress_these_with_boxes sets it, so clustering an undressed feature raises.
     """
     location: 'ResLocPoint'
     rows: tuple[ContributionRow, ...] = ()
@@ -123,13 +123,6 @@ class SpectralFeature:
     scale: float = 1.0      # normalize_coeffs_to_max changes this, never the rows
     feat_type: str | None = None
     feat_box: Box | None = None
-
-    def __post_init__(self):
-        # making boxes around the points for features using the lineshape_parameter
-        if self.lineshape_parameter is not None:
-            bounds = points_to_bounds(points=[self.location.as_dict()],
-                                    halfwidth=self.lineshape_parameter)[0]
-            self.feat_box = Box(bounds)
 
     @property
     def amplitude_coeff(self) -> float | None:

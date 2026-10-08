@@ -1,5 +1,5 @@
 """
-grid.py — bounds, boxes and box clustering. Runs with zero molecular data.
+grid.py — bounds, boxes, box slices and box clustering. Runs with zero molecular data.
 
 The last tests cover features_to_clusters (features.py), the feature-level wrapper of the box clustering.
 """
@@ -12,9 +12,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
+    box_slices,
     compute_box_adjacency,
     connected_components_from_adjacency,
-    points_to_bounds,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
@@ -23,13 +23,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     cube,
     feat,
 )
-
-## points_to_bounds ---------------------------------------------------------
-
-def test_points_to_bounds_makes_one_bounds_dict_per_point():
-    assert points_to_bounds([{'A': 0.}, {'A': 5.}], halfwidth=1.) == [{'A': (-1., 1.)}, {'A': (4., 6.)}]
-    assert points_to_bounds([], halfwidth=1.) == []
-
 
 ## Box: construction --------------------------------------------------------
 
@@ -180,18 +173,64 @@ def test_make_grid_needs_one_size_per_box_axis(dim_sizes):
         Box({'A': (0., 10.)}).make_grid(dim_sizes)
 
 
-## Box: N dimensions (1 to 4 axes) ------------------------------------------
+## box_slices ---------------------------------------------------------------
+
+POINTS_0_TO_9 = {'A': np.arange(10.)}
+
+
+@pytest.mark.parametrize('bounds, expected', [
+    ((2.5, 4.5), slice(2, 6)),    # one more point on each side: 2 and 5
+    ((3., 4.), slice(3, 5)),      # edges on grid points: nothing extra
+    ((3., 3.), slice(3, 4)),      # zero width
+    ((-5., 0.5), slice(0, 2)),    # cut at the low grid edge
+    ((8.5, 20.), slice(8, 10)),   # cut at the high grid edge
+    ((9., 12.), slice(9, 10)),    # touches the grid edge: point 9 lies in the box
+    ((-3., 0.), slice(0, 1)),
+])
+def test_box_slices_smallest_range_that_covers_the_box(bounds, expected):
+    assert box_slices(Box({'A': bounds}), POINTS_0_TO_9) == (expected,)
+
+
+@pytest.mark.parametrize('bounds', [(12., 15.), (9.5, 12.), (-5., -0.5)])
+def test_box_slices_of_a_box_outside_the_grid_is_none(bounds):
+    assert box_slices(Box({'A': bounds}), POINTS_0_TO_9) is None
+
+
+def test_box_slices_is_none_when_outside_on_one_axis_only():
+    coords = {'A': np.arange(10.), 'B': np.arange(10.)}
+
+    assert box_slices(Box({'A': (2., 4.), 'B': (20., 30.)}), coords) is None
+
+
+def test_box_slices_follow_the_axis_order_of_coords():
+    """One slice per array dimension of the grid, so the order of coords counts, not the box's sorted axes."""
+    coords = {'B': np.arange(10.), 'A': np.arange(100., 110.)}
+
+    assert box_slices(Box({'A': (101., 102.), 'B': (5., 7.)}), coords) == (slice(5, 8), slice(1, 3))
+
+
+@pytest.mark.parametrize('coords', [{'A': np.arange(10.), 'B': np.arange(10.)}, {'B': np.arange(10.)}])
+def test_box_slices_needs_the_grid_axes_of_the_box(coords):
+    with pytest.raises(ValueError, match='do not match grid axes'):
+        box_slices(Box({'A': (2., 4.)}), coords)
+
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_points_to_bounds_pads_every_axis_by_halfwidth(ndim):
-    # a different value on each axis: A=10, B=20, ...
-    point = {ax: 10. * (i + 1) for i, ax in enumerate(AXES[:ndim])}
+def test_nd_box_slices_one_slice_per_axis(ndim):
+    """
+    Grid points 0, 1, ..., 9 on every axis. Box (2.5, 4.5) on every axis, except (6., 6.5) on the last one:
+        (2.5, 4.5)  ->  points 2, 3, 4, 5  ->  slice(2, 6)
+        (6., 6.5)   ->  points 6, 7        ->  slice(6, 8)
+    e.g. ndim=2: box {'A': (2.5, 4.5), 'B': (6., 6.5)}  ->  (slice(2, 6), slice(6, 8))
+    """
+    coords = {ax: np.arange(10.) for ax in AXES[:ndim]}
+    box = cube(ndim, 2.5, 4.5, **{AXES[ndim - 1]: (6., 6.5)})
 
-    [bounds] = points_to_bounds([point], halfwidth=2.)
+    expected = (slice(2, 6),) * (ndim - 1) + (slice(6, 8),)
+    assert box_slices(box, coords) == expected
 
-    assert bounds == {ax: (v - 2., v + 2.) for ax, v in point.items()}
-    assert Box(bounds).ndim == ndim
 
+## Box: N dimensions (1 to 4 axes) ------------------------------------------
 
 @pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_box_intersect_union_and_contains_box(ndim):
@@ -314,7 +353,7 @@ def test_connected_components_of_nothing_is_empty():
 
 def test_features_to_clusters_joins_touching_boxes():
     # boxes: (-1, 1) and (1, 3) touch at 1
-    f0, f1 = feat(A=0.), feat(A=2.)
+    f0, f1 = feat(A=0., box_extent=1.), feat(A=2., box_extent=1.)
 
     assert list(features_to_clusters([f0, f1]).values()) == [[f0, f1]]
 
@@ -322,15 +361,16 @@ def test_features_to_clusters_joins_touching_boxes():
 @pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_features_to_clusters_needs_overlap_on_every_axis(ndim):
     # boxes: f0 (-1, 1) and f1 (0.5, 2.5) on every axis; f2 sits on f0, except (9, 11) on the last axis
-    f0, f1 = feat(coords(ndim, 0.)), feat(coords(ndim, 1.5))
-    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}))
+    f0, f1 = feat(coords(ndim, 0.), box_extent=1.), feat(coords(ndim, 1.5), box_extent=1.)
+    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}), box_extent=1.)
 
     assert list(features_to_clusters([f0, f1, f2]).values()) == [[f0, f1], [f2]]
 
 
 def test_features_to_clusters_needs_feature_boxes():
+    """A feature that was never dressed has no box: clustering it raises."""
     with pytest.raises(ValueError, match='feature box'):
-        features_to_clusters([feat(A=0.), feat(A=1., gamma=None)])
+        features_to_clusters([feat(A=0., box_extent=1.), feat(A=1.)])
 
 
 def test_features_to_clusters_of_no_features_is_empty():

@@ -108,19 +108,24 @@ def row(coeff: float = 1., term_id: int = 0, motif: ResonanceMotif = ResonanceMo
 
 
 def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0, amp: float | None = 1.0,
-         rows: tuple | None = None, **coords: float) -> SpectralFeature:
+         rows: tuple | None = None, box_extent: float | None = None, **coords: float) -> SpectralFeature:
     """
-    A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1; its box is location +- gamma.
+    A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1.
     The dict form is for N-dimensional tests: feat(coords(3, 100.)).
     Without `rows`, the feature gets one row with coeff=amp and a=0 (amp=None -> no rows, so no amplitude).
+    No box, as before dress_these_with_boxes. box_extent gives it the box location +- box_extent on every axis
+    (box_extent as in dress_these_with_boxes: from the location to each box face), e.g. feat(A=0., box_extent=1.)
+    has the box (-1, 1).
     """
     loc = ResLocPoint({**(location or {}), **coords})
     if rows is None:
         rows = () if amp is None else (row(amp, location=loc, a=0),)
-    return SpectralFeature(location=loc, rows=rows, lineshape_parameter=gamma)
+    box = None if box_extent is None else Box({ax: (v - box_extent, v + box_extent) for ax, v in loc.coordinates})
+    return SpectralFeature(location=loc, rows=rows, lineshape_parameter=gamma, feat_box=box)
 
 
-def box_halfwidth(f: SpectralFeature, axis: str = 'A') -> float:
+def get_box_extent(f: SpectralFeature, axis: str = 'A') -> float:
+    """From the feature's location to each face of its box on `axis` (box_extent in dress_these_with_boxes)."""
     mn, mx = f.feat_box.bounds[axis] # type: ignore
     return (mx - mn) / 2
 

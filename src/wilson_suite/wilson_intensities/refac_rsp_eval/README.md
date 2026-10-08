@@ -15,7 +15,7 @@ pipeline.py  <- evaluate, features, plan
 
 | importer | from | names |
 |---|---|---|
-| `features.py` | `refac_rsp_eval.grid` | `Box`, `compute_box_adjacency`, `connected_components_from_adjacency`, `points_to_bounds`; type-only: `Dim_bounds` |
+| `features.py` | `refac_rsp_eval.grid` | `Box`, `compute_box_adjacency`, `connected_components_from_adjacency`; type-only: `Dim_bounds` |
 | `features.py` | `refac_rsp_eval.plan` | `ParameterSet`, `ResonanceMotif`; type-only: `ResLocPoint` |
 | `evaluate.py` | `refac_rsp_eval.features` | `ContributionRow`, `ContributionTable` |
 | `evaluate.py` | `refac_rsp_eval.plan` | `ParameterSet`, `ResLocPoint`; type-only: `CompiledTerm`, `FreqTermsCollection`, `PropsCollection`, `ResonanceMotif` |

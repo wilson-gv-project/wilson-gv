@@ -19,6 +19,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     _make_func_to_compute_avrg,
     build_contributions,
     calculate_avrg_tensor,
+    draw_all,
     eval_avrg_per_indexdict,
     eval_feature_on_grid,
     eval_non_avrg_per_indexdict,
@@ -1361,3 +1362,52 @@ def test_eval_feature_on_grid_needs_rows(states):
 
     with pytest.raises(ValueError, match='no motif'):
         eval_feature_on_grid(f, states, {'A': np.zeros(3)})
+
+
+# -- draw_all -------------------------------------------------------------------
+# Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1600, B = 500.  With a=1, b=0 (PS_10): MOTIF_A at A = 1100,
+# a ridge along B.
+
+def test_draw_all_is_the_sum_of_the_features_on_the_whole_grid(states):
+    peak = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    ridge = feature_at_solved_location(MOTIF_A, PS_10, states)
+    coords = {'A': np.array([1100., 1600.]), 'B': np.array([495., 500., 505.])}
+    mesh = dict(zip(coords, np.meshgrid(*coords.values(), indexing='ij')))
+
+    value = draw_all([peak, ridge], states, coords)
+
+    expected = eval_feature_on_grid(peak, states, mesh) + eval_feature_on_grid(ridge, states, mesh)
+    np.testing.assert_allclose(value, expected)
+
+
+def test_draw_all_index_i_j_is_the_point_A_i_B_j(states):
+    """ij indexing: value[i, j] belongs to A = coords['A'][i], B = coords['B'][j]; A has 5 points, B has 3."""
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    coords = {'A': 1600. + np.array([-10., -5., 0., 5., 10.]), 'B': 500. + np.array([-5., 0., 5.])}
+
+    value = draw_all([f], states, coords)
+
+    assert value.shape == (5, 3)
+    for i, a in enumerate(coords['A']):
+        for j, b in enumerate(coords['B']):
+            assert value[i, j] == pytest.approx(eval_feature_on_grid(f, states, {'A': a, 'B': b}))  # type: ignore
+
+
+def test_draw_all_adds_amplitudes_so_opposite_features_cancel(states):
+    """
+    Same place, same shape, coefficients +0.3 and -0.3: the amplitudes cancel everywhere.
+    Adding intensities instead would give twice the intensity of one feature.
+    """
+    plus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(0.3,))
+    minus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(-0.3,))
+    coords = {'A': np.array([1595., 1600.]), 'B': np.array([500., 505.])}
+
+    np.testing.assert_allclose(draw_all([plus, minus], states, coords), 0.)
+
+
+def test_draw_all_without_features_is_zero_on_the_grid(states):
+    value = draw_all([], states, {'A': np.zeros(4), 'B': np.zeros(2)})
+
+    assert value.shape == (4, 2)
+    assert value.dtype == complex
+    assert not value.any()

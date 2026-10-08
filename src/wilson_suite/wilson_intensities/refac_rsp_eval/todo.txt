@@ -126,7 +126,18 @@ E. Pipeline
 -----------
 [ ] E2  grid.py: draw each feature as amplitude x shape(motif, location), the shape once per feature.
         Done: sign fixed (E - freq, derive's convention); eval_feature_on_grid (one feature, grid in cm-1).
-        Left: add up all features on one window grid.
+        Done: draw_all (evaluate.py): every feature on the whole grid, the reference for draw_window;
+              box_slices (grid.py): where a box sits in a grid, None outside. Replaces cut_grid_to_domains_nd.
+        Left: add up all features on one window grid, by domains. The grid is an argument, not on the window.
+          1. [x] no ±Γ default box in SpectralFeature.__post_init__: no box until dressed, so clustering
+                 undressed features raises (features_to_clusters already does on None). Tests give a box with
+                 feat(..., box_extent=...). Also fixed: dataclasses.replace no longer resets a dressed box.
+          2. [ ] SpectralWindow.from_features(box, features, dynrange): boxes from Γ and dynrange, keep features
+                 whose box overlaps the window, then drop weak ones. Replaces filter_to_spec_window
+                 (location ± 2Γ, before boxes exist) and dress_with_featboxes.
+          3. [ ] draw_window(window, coords, states) (evaluate.py): for each domain, total[slices] += each
+                 feature on the domain grid. Returns the amplitude.
+          4. [ ] tests: draw_window ≈ draw_all; a weak peak just past a strong peak's box edge.
         Left: locations without every spectrum axis. e.g. a motif on B only in an (A, B) spectrum has
         location {'B': E}; on an (A, B) grid its shape does not depend on A (a ridge along A).
         Should be fine, but not sure every case is. Check each: which box for the missing axis

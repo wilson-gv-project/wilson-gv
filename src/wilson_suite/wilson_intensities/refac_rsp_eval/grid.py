@@ -1,10 +1,10 @@
 """
 Pure geometry: bounds, boxes and box clustering. No physics, no SpectralFeature logic.
 
-  in:  points or (min, max) bounds per named axis
-  out: Box, regular grid over a Box, the part of a grid that covers a Box, box adjacency matrix, clusters of boxes
+  in:  (min, max) bounds per named axis
+  out: Box, regular grid over a Box, the part of a grid that covers a Box (slices), box adjacency matrix, clusters of boxes
 
-  holds: points_to_bounds, Box, box_slices, compute_box_adjacency, connected_components_from_adjacency
+  holds: Box, compute_box_adjacency, connected_components_from_adjacency, box_slices
 
 features.py imports from this module, never the other way around.
 """
@@ -12,20 +12,6 @@ import numbers
 from dataclasses import dataclass
 
 import numpy as np
-
-
-def points_to_bounds(points: list[dict[str,float]], 
-                     halfwidth: float) -> list[dict[str,tuple[float,float]]]:
-    # FIXME should know combination of states to get the Gamma; now it's using a single value everywhere
-    # halfwidth - doesn't have to be simply Gamma, shouldn't...
-    # TODO: maybe this should be a Box method, or a Box constructor from points and halfwidth
-    # TODO: make a better box construction... BUG??
-
-    return [
-        {axis: (p[axis]-halfwidth, p[axis]+halfwidth) for axis in p}
-        for p in points
-    ]
-
 
 # type aliases
 Min_bound = float
@@ -261,60 +247,31 @@ def connected_components_from_adjacency(adjacency: np.ndarray, box_objects: list
 
 
 
-def cut_grid_to_domains_nd(full_meshgrids: dict[str, np.ndarray], 
-                            axis_coords: dict[str, np.ndarray], 
-                            domains: list['RectangularDomain']) -> dict['RectangularDomain', dict]:
+def box_slices(box: Box, coords: dict[str, np.ndarray]) -> tuple[slice, ...] | None:
     """
-    General N-dimensional version.
-    
-    Given:
-        grid: dict mapping axis names (e.g., 'A', 'B', 'C') to np.ndarray grids of identical shape
-        domains: list of objects, each with .box.bounds dict {axis_name: (min, max)}
+    Where `box` sits in a grid: one slice per axis, in the order of `coords` (the grid's array dimensions).
+    The smallest index range that covers the box: the last grid point at or below min to the first at or above
+    max, so the cut-out grid holds the whole box. Cut at the grid edges. None if the box lies outside the grid.
 
-    Returns:
-        subgrids: dict mapping each domain.box -> {
-            "grid": {axis_name: subarray},
-            "indices": tuple(slice_i, slice_j, ...)
-        }
+    coords - one ascending 1D array per axis, e.g. the first output of Box.make_grid; same axes as the box.
+
+    e.g. grid points A = 0, 1, ..., 9:
+        box (2.5, 4.5)  ->  slice(2, 6)   points 2, 3, 4, 5
+        box (3., 4.)    ->  slice(3, 5)   points 3, 4: edges on grid points, nothing extra
+        box (-5., 0.5)  ->  slice(0, 2)   cut at the grid edge
+        box (9., 12.)   ->  slice(9, 10)  touches the grid edge: point 9 lies in the box
+        box (12., 15.)  ->  None
     """
-    axes = list(full_meshgrids.keys())
+    if set(coords) != set(box.axes):
+        raise ValueError(f'box axes {box.axes} do not match grid axes {tuple(coords)}')
 
-    shapes = {v.shape for v in full_meshgrids.values()}
-    if len(shapes) != 1:
-        raise ValueError("Meshgrids must have same shape")
-
-    subgrids = {}
-
-    for domain in domains:
-        bounds = domain.box.bounds
-
-        grid_axes = set(full_meshgrids.keys())
-        domain_axes = set(bounds.keys())
-
-        if grid_axes != domain_axes:
-            raise ValueError(
-                f"Domain axes {domain_axes} do not match grid axes {grid_axes}"
-            )
-
-        slices = []
-
-        for ax in axes:
-            coords = axis_coords[ax]    # <-- use provided 1D coords
-            mn, mx = bounds[ax]
-
-            i_min = np.searchsorted(coords, mn, side="right") - 1
-            i_max = np.searchsorted(coords, mx, side="left")
-
-            i_min = max(i_min, 0)
-            i_max = min(i_max, len(coords) - 1)
-
-            slices.append(slice(i_min, i_max + 1))
-
-        # slice the subgrids - prep subgrids from slices
-        subgrid = {ax: full_meshgrids[ax][tuple(slices)] for ax in axes}
-        
-        subgrids[domain] = {"grid": subgrid, "indices": tuple(slices), "result": None}
-
-    return subgrids
-
+    slices = []
+    for ax, points in coords.items():
+        mn, mx = box.bounds[ax]
+        if mx < points[0] or mn > points[-1]:
+            return None
+        i_min = max(int(np.searchsorted(points, mn, side='right')) - 1, 0)
+        i_max = min(int(np.searchsorted(points, mx, side='left')), len(points) - 1)
+        slices.append(slice(i_min, i_max + 1))
+    return tuple(slices)
 
