@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-08
+updated 2026-10-09
 
-Tests: refac_rsp_eval 435 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 449 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -13,14 +13,16 @@ Order of work
 4. [x] C2: prove new numbers = old numbers, term by term.
 5. [x] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
 6. [ ] B7: motif rule (one resonance point per term), checked when compiling.
-7. [ ] E2: grid.py, including locations without every spectrum axis.
+7. [x] E2: add up all features on one window grid, by domains (draw_window).
+       Locations without every spectrum axis: moved to Later.
 8. [ ] C3: whole spectrum, old vs new.
 9. [ ] C4: special motifs, old vs new location solvers, actually run.
-10. [ ] D4, [ ] E4: one data model, one README; delete the old code,
+10. [ ] D4, [ ] E4: one data model, one README; delete the old code (not amplitudes/averaging.py, see D4),
        and with it tests/c2_variations.py and tests/c2_leaves.py.
        Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
 Any time: G1–G7 (checks beyond old = new), G1 first.
-Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1.
+Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1,
+       E2 locations without every spectrum axis.
 
 
 A. Small fixes
@@ -124,6 +126,28 @@ D. Data model
         each other, but both only for type hints (inside `if TYPE_CHECKING:`). evaluate.py and pipeline.py
         import system_data for real. So there is no import cycle when the code runs. Moving the data model
         must keep it that way.
+        Before the old code can go: code outside refac_rsp_eval still imports it (checked 2026-10-09).
+        e.g. delete amplitudes/ today -> importing pipeline.py fails (ModuleNotFoundError).
+        What may change (2026-10-09): wilson_experiment, wilson_derive: no. wilson_main: only carefully.
+        Everything else: yes.
+        Real imports (break at once):
+        - [ ] amplitudes/averaging.py stays, at this path: wilson_experiment/experiment_abstractions.py imports
+              get_pol_laser from it, and wilson_experiment does not change. averaging.py needs only numpy.
+              pipeline.py keeps its import from there (getGeneralPolarizationAveragingExpression, get_iso_f).
+        - [ ] amplitudes/__init__.py: Python runs it before averaging.py, and it imports spectrum_composition,
+              evaluation_wf, evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
+              wilson_intensities/__init__.py imports amplitudes too.
+        - [ ] evaluate.py (inside a function): amplitudes/utils.py. Move it next to the new code, or keep it.
+        - [ ] wilson_analysis/render/plot_regions.py: GridRegion from amplitudes/grid_manager_evaluator.py.
+              The plots need the new types (SpectralWindow, domains, draw_window output) instead.
+        - [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and the old VibState.
+              E3.5 (the adapter) replaces EvaluationWorkflow here.
+        Type hints only (no crash, but they point at deleted classes):
+        - wilson_derive/response_terms.py: the old MolecularProperty, in VibPertTermsCollection.required_data.
+          Do not change (wilson_derive). Deleting the old class breaks nothing at run time;
+          the hint then points at a class that no longer exists.
+        - [ ] wilson_analysis/render/base.py: EvaluatedResult, SealedSetup from wilson_main/abstractions.py.
+              Already wrong now: both classes live in wilson_main/workflow_abstractions_updated.py.
 
 
 E. Pipeline
@@ -190,8 +214,9 @@ E. Pipeline
            Tests (test_pipeline.py): same result as the steps one by one; term_id = index in the input
            list (reverse-order run); the caller's terms stay unchanged; lineshape_parameter reaches
            every feature.
-        5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
-        6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
+        5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2 (both done).
+        6. [ ] Delete rps_evaluation.py. Nothing imports it, and E2 does not use its SpectralGrid/BoxParams
+               (checked 2026-10-09).
 [ ] E4  README: removed 2026-10-09; it described older designs the code does not follow (old text: git history,
         e.g. git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md).
         Write a new one once D4 settles the data model: the pipeline (pipeline.py docstring), the drawing
