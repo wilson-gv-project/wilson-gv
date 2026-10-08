@@ -1,5 +1,5 @@
 """
-plan.py — the compile stage. Runs with zero molecular data (README rule R5).
+plan.py — the compile stage. Runs with zero molecular data.
 """
 
 import pickle

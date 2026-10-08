@@ -503,7 +503,8 @@ class SpectralWindow:
         e.g. gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * 10 * 1.1 = 55 cm-1. For `box` A (0, 10),
         a feature at A = 60 is kept (its box starts at 5), a feature at A = 70 is not (its box starts at 15).
 
-        dynrange: strongest intensity / weakest intensity that still counts.
+        dynrange: strongest intensity / weakest intensity that still counts. A bigger dynrange gives bigger
+        boxes, so fewer tails are cut off when drawing (size of the cut: see evaluate.draw_window).
         Returns copies with boxes; the input features stay as they are. Every feature needs a lineshape_parameter.
         """
         if dynrange <= 1.:

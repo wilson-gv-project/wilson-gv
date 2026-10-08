@@ -17,6 +17,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     ContributionTable,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocPoint,
@@ -31,7 +32,10 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature
+    from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+        SpectralFeature,
+        SpectralWindow,
+    )
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         CompiledTerm,
         FreqTermsCollection,
@@ -698,7 +702,7 @@ def draw_all(features: Iterable['SpectralFeature'],
              coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
     Sum of eval_feature_on_grid over all features, each on the whole grid. Nothing is cut off, so this is
-    the reference for the drawing by domains (draw_window, not built yet). Slow for many features on big grids.
+    the reference for the drawing by domains (draw_window). Slow for many features on big grids.
 
     coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid.
     Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm (ij indexing),
@@ -708,6 +712,39 @@ def draw_all(features: Iterable['SpectralFeature'],
     total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
     for feature in features:
         total += eval_feature_on_grid(feature, vibstates_data, mesh)
+    return total
+
+
+# the window's features by domain: each domain on its own part of the grid
+def draw_window(window: 'SpectralWindow',
+                vibstates_data: 'VibStatesData',
+                coords_cm: dict[str, np.ndarray]) -> np.ndarray:
+    """
+    Domains: clusters of overlapping feature boxes (window.find_clusters_by_featboxes). Each domain is
+    draw_all of its features on its part of the grid (box_slices), and the domains add up into one array.
+    So inside a domain every feature is on the whole domain box: a strong feature's tail is also computed
+    under its weak neighbours. Outside its domain a feature is left out.
+
+    Size of the cut. A box ends where the feature's intensity is down to about 1/dynrange of its own peak
+    (SpectralWindow.from_features). So the error is small next to the strongest peak, but not always next
+    to a weak peak in another domain. Measured against draw_all, dynrange 101: strong peak at A = 1100,
+    weak peak at A = 950 with 1 % of its intensity, boxes (1045, 1155) and (895, 1005), two domains:
+        whole grid:        intensity error 0.9 % of the strong peak (about 1/dynrange)
+        at the weak peak:  12 % of the weak peak's intensity (up to 36 % on its sides): the strong tail is cut off
+    With dynrange 1001 the two boxes overlap: one domain, no error. To check a case, compare with draw_all.
+    (test_draw_window_cut_is_small_for_the_strongest_peak_not_for_a_weak_neighbour)
+
+    window    - e.g. from SpectralWindow.from_features, so every feature has its box
+    coords_cm - one 1D array per window axis, cm-1, e.g. the first output of window.sample_grid
+    Returns the complex amplitude in au, laid out as in draw_all. A domain outside the grid adds nothing.
+    """
+    total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
+    for domain in window.find_clusters_by_featboxes():
+        slices = box_slices(domain.box, coords_cm)
+        if slices is None:
+            continue
+        domain_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
+        total[slices] += draw_all(domain.full_features + domain.contrib_features, vibstates_data, domain_coords)
     return total
 
 

@@ -20,6 +20,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     calculate_avrg_tensor,
     draw_all,
+    draw_window,
     eval_avrg_per_indexdict,
     eval_feature_on_grid,
     eval_non_avrg_per_indexdict,
@@ -38,7 +39,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     SpectralFeature,
+    SpectralWindow,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
@@ -65,6 +68,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0_eigval,
     E1_eigval,
     ab_term,
+    get_box_extent,
     polprop,
     toy_term,
     vibdiff,
@@ -1409,5 +1413,104 @@ def test_draw_all_without_features_is_zero_on_the_grid(states):
     value = draw_all([], states, {'A': np.zeros(4), 'B': np.zeros(2)})
 
     assert value.shape == (4, 2)
+    assert value.dtype == complex
+    assert not value.any()
+
+
+# -- draw_window ----------------------------------------------------------------
+# MOTIF_A (one condition, on A) peaks: a=0, b=0 (PS_00) at A = 950; PS_10 at 1100; PS_01 at 1600.
+# Width G_CM = 5 cm-1. dynrange 101 -> box_extent 5 * sqrt(101 - 1) * 1.1 = 55 (SpectralWindow.from_features).
+
+def test_draw_window_one_feature_is_draw_all_inside_its_box_and_zero_outside(states):
+    """
+    MOTIF_AB peak at A = 1600, B = 500: box (1545, 1655) x (445, 555).
+    Grid A = 1500 ... 1700 (201 points), B = 300 ... 700 (401 points): the box covers a different part of each axis.
+    """
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    window = SpectralWindow.from_features(Box({'A': (1500., 1700.), 'B': (300., 700.)}), [f], dynrange=101.)
+    coords, _ = window.sample_grid({'A': 201, 'B': 401})
+
+    value = draw_window(window, states, coords)
+
+    inside = np.zeros(value.shape, dtype=bool)
+    inside[box_slices(window.full_features[0].feat_box, coords)] = True  # type: ignore
+    np.testing.assert_allclose(value[inside], draw_all([f], states, coords)[inside])
+    assert not value[~inside].any()
+
+
+def test_draw_window_features_in_one_domain_are_drawn_on_the_whole_domain(states):
+    """
+    A weak peak next to a strong one: PS_00 at A = 950 (coeff 0.03), PS_10 at A = 1100 (coeff 0.3).
+    dynrange 10001 -> box_extent 5 * 100 * 1.1 = 550: boxes (400, 1500) and (550, 1650) overlap, one domain.
+    The grid A = 900 ... 1150 lies inside that domain, so nothing is cut off: the result is draw_all's,
+    the strong peak's tail under the weak peak included.
+    """
+    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
+    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
+    window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], dynrange=10001.)
+    coords, _ = window.sample_grid({'A': 251})
+
+    value = draw_window(window, states, coords)
+
+    assert len(window.find_clusters_by_featboxes()) == 1
+    np.testing.assert_allclose(value, draw_all([weak, strong], states, coords))
+
+
+def test_draw_window_two_domains_differ_from_draw_all_only_by_the_cut_off_tails(states):
+    """
+    Peaks at A = 1100 and 1600, boxes (1045, 1155) and (1545, 1655): two domains.
+    draw_window leaves each feature out beyond its box, draw_all does not. A Lorentzian only gets smaller
+    further out, so the difference is at most the sum of the two features' values at their box edges.
+    """
+    features = [feature_at_solved_location(MOTIF_A, PS_10, states), feature_at_solved_location(MOTIF_A, PS_01, states)]
+    window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), features, dynrange=101.)
+    coords, _ = window.sample_grid({'A': 701})
+
+    difference = draw_window(window, states, coords) - draw_all(features, states, coords)
+
+    at_box_edge = [abs(eval_feature_on_grid(f, states, {'A': f.location['A'] + get_box_extent(f)}))  # type: ignore
+                   for f in window.full_features]
+    assert len(window.find_clusters_by_featboxes()) == 2
+    assert 0. < np.abs(difference).max() <= sum(at_box_edge)
+
+
+def test_draw_window_cut_is_small_for_the_strongest_peak_not_for_a_weak_neighbour(states):
+    """
+    The numbers in the draw_window docstring. Strong peak at A = 1100 (coeff 0.3), weak peak at A = 950
+    (coeff 0.03: 1 % of the strong intensity). dynrange 101: boxes (1045, 1155) and (895, 1005), two domains,
+    so the strong peak's tail is cut off under the weak peak. Intensity error against draw_all:
+        whole grid:        0.9 % of the strong peak (below 1/dynrange)
+        at the weak peak:  12 % of the weak peak
+    """
+    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
+    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
+    window = SpectralWindow.from_features(Box({'A': (850., 1200.)}), [strong, weak], dynrange=101.)
+    coords, _ = window.sample_grid({'A': 351})       # A = 850, 851, ..., 1200
+
+    intensity = abs(draw_window(window, states, coords)) ** 2
+    reference = abs(draw_all([strong, weak], states, coords)) ** 2
+    error = abs(intensity - reference)
+    at_weak_peak = np.isclose(coords['A'], 950.)
+
+    assert len(window.find_clusters_by_featboxes()) == 2
+    assert error.max() / reference.max() == pytest.approx(0.009, abs=0.001)
+    assert error[at_weak_peak] / reference[at_weak_peak] == pytest.approx(0.12, abs=0.01)
+
+
+def test_draw_window_skips_a_domain_outside_the_grid(states):
+    """The grid covers only A = 1000 ... 1200 of the window; the peak at 1600 (box 1545 ... 1655) adds nothing."""
+    f = feature_at_solved_location(MOTIF_A, PS_01, states)
+    window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), [f], dynrange=101.)
+
+    value = draw_window(window, states, {'A': np.linspace(1000., 1200., 201)})
+
+    assert value.shape == (201,)
+    assert not value.any()
+
+
+def test_draw_window_without_features_is_zero_on_the_grid(states):
+    value = draw_window(SpectralWindow(Box({'A': (0., 10.)})), states, {'A': np.linspace(0., 10., 11)})
+
+    assert value.shape == (11,)
     assert value.dtype == complex
     assert not value.any()
