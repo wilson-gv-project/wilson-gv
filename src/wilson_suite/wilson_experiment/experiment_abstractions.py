@@ -32,9 +32,8 @@ class SpecDetector:
     detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
     in either t/E space as relevant the data is collected
 
-    # FIXME: Turn back into wavevector filter?
     interaction_filter: List of interaction patterns as lists: Filter signal to include only this/these
-    (signed) interaction patterns. Note that any ordering here is not taken as a causal interaction order requirement
+    (signed) interaction pattern(s). Note that any ordering here is not taken as a causal interaction order requirement
     and also note that while this parameter can be thought of as close to a phase-matching filter, it is not exactly the
     same (VibExperiment setup may further consider other signals in the same phase-matching direction(s) or isolate
     specific interaction sequences)
@@ -52,9 +51,6 @@ class SpecDetector:
     detection_range: Optional[list[float]] = None
 
     interaction_filter: Optional[list[list]] = None
-
-    # FIXME: rm this attribute?
-    ignore_collinear: bool = True
 
     # FIXME: Unsure if this is a relevant attribute
     overall_phase: float = 0.0
@@ -80,9 +76,6 @@ class SpecDetector:
         if self.interaction_filter is not None:
             raise NotImplementedError('Non-specification of detector interaction pattern filter')
 
-        if not(self.ignore_collinear):
-            raise NotImplementedError('Non-ignorance of effects collinear to specified condition(s) is currently not implemented')
-
 @dataclass
 class ScanObject:
     """
@@ -106,6 +99,10 @@ class ScanObject:
     coeff: float = 1.0
 
     def __post_init__(self):
+
+        # TODO: Consider reintroducing detector range as allowed scanning attribute
+        #  The intent is to allow shifting the detector range in lockstep with scanning freq/time maxima if that
+        #  facilitates data organization
 
         # Checking against currently recognized scan categories/subcategories.
         # Presence in these lists is not sufficient to
@@ -147,6 +144,9 @@ class SpecScan:
 
     TODO: Support several ranges and link each to a scan object for situations where attributes to be scanned
      simultaneously don't live in the same space (e.g. polarization (vector) and carrier frequency (scalar))
+
+    TODO: Consider allowing detector range as a scan object when combined with a relevant attribute (for
+     having detector results "lockstep" with such scan if that facilitates data organization)
     """
 
     scan_objs: tuple[ScanObject]
@@ -849,6 +849,11 @@ class FieldAnalysis:
 
     def __post_init__(self):
 
+        # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
+        # TODO: Possibly introduce a phase shift to partly account for "non-ideally-Placzek" effects?
+        # TODO: If reintroducing magnitude conditions, have them follow from the field and manage them here (with
+        #  determination offloaded to external routine)
+
         from itertools import permutations as permutations
 
         # Dividing larger pieces of code into helper methods, incorporate all the processing leading to the
@@ -872,7 +877,6 @@ class FieldAnalysis:
 
             # Get all wavevectors matching the direction of a max order interaction in the filter with the
             # 'up_to_order' flag; the returned set must contain all requested interaction patterns
-
             maxlen = 0
             for i in range(len(self.interaction_filter)):
                 if len(self.interaction_filter[i]) > maxlen:
@@ -887,6 +891,7 @@ class FieldAnalysis:
 
             self.valid_int_patterns = valid_int_patterns
 
+        # Additionally compile information about which orders of interaction are represented in the interaction patterns
         int_pattern_orders = []
 
         for i in self.valid_int_patterns:
@@ -966,7 +971,6 @@ class FieldAnalysis:
                 int_patterns_by_order[len(i)] = [[i]]
 
         # The "master" loop: Evaluate all available interaction sequences at all valid compounding patterns
-
         int_sequences_by_order = {}
 
         # For each valid order of interaction pattern
@@ -1039,7 +1043,8 @@ class FieldAnalysis:
                         if not comp_valid:
                             continue
 
-                        # Time-ordering enforcement screening
+                        # Time-ordering enforcement screening: If also passing this criterion, register this
+                        # interaction sequence as valid
                         if pulse_time_ordering_valid(c_pulses):
                             int_sequences_by_order[ord][c].append(tuple(c_pulse_inds))
 
@@ -1054,21 +1059,11 @@ class VibExperiment:
     detector: SpecDetector instance: The detector for this experiment
 
     scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
-
-    magn_conditions: Tuple of tuples: Magnitude conditions for use in identifying terms that will not become
-    fully resononant in this experiment. Format: Outer tuple collects magnitude conditions. Each inner tuple is
-    a magnitude condition and consists of signed pulse references (NOTE: Currently not using the SignedPulseTuple class)
-    where the sum of the associated frequencies are understood to be significantly > 0, where "significantly > 0" means
-    "never close to zero".
-    Example: ( (-1, 2), (2, 3, -4) ) denotes two magnitude conditions:
-        a) -w1 + w2 is always significantly > 0,
-        b) w2 + w3 - w4 is always significantly > 0
     """
 
     field: ElectricField
     detector: SpecDetector
     scans: tuple[SpecScan] = ()
-    magn_conditions: tuple[tuple] = None
 
     def __post_init__(self):
 
@@ -1085,14 +1080,16 @@ class VibExperiment:
                 if not isinstance(i, SpecScan):
                     raise TypeError('The scans attribute, if specified, must be a tuple of SpecScan instances')
 
-        if self.magn_conditions is not None:
-            if not isinstance(self.magn_conditions, tuple):
-                raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
-            for i in self.magn_conditions:
-                if not isinstance(i, tuple):
-                    raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
-
         self.dim = self.findDimensionality()
+
+        # TODO: Inspection of requested scans against field
+        #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
+        #  attributes are valid (scanning time centerpoint is then less meaningful)
+        #  - If the experiment is an ideal time-domain experiment, then also limit scan attribute validity
+        #  (scanning carrier frequency is then less meaningful)
+        #  - Maybe take tc resp. cf (for freq.-ideal resp. time-ideal) as "sleeping" parameters but need specification
+        #  if scanning time spread? Then may need some inverse stuff for one case (touch/depart from infinity)
+        #  (could also handle this more practically but less elegantly with large number instead of infty throughout)
 
         # Make scan grid with field analyses under scanning
         # (NOTE: Currently, field attributes are the only attributes whose scanning is supported and so,
@@ -1104,92 +1101,18 @@ class VibExperiment:
 
         if len(self.scans) > 0:
             for scan_elem in np.ndindex(self.field_analyses.shape):
-                self.field_analyses[scan_elem] = self.field.new_field_with_changes(self.scans, scan_elem)
+                self.field_analyses[scan_elem] = FieldAnalysis(
+                    self.field.new_field_with_changes(self.scans, scan_elem),
+                    self.detector.interaction_filter)
 
         # With no scans, the analysis is only done with respect to the base field
         else:
-            self.field_analyses[()] = self.field
+            self.field_analyses[()] = FieldAnalysis(self.field, self.detector.interaction_filter)
 
-
-
-
-
-
-        # NOTE: Below code to be reworked or rmd
-
+        # NOTE: From here to end of method: Code to be reworked or removed
         from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
                                                                         find_indep_exp_variables, find_valid_axes,
                                                                         find_canonical_axes)
-
-        # Establishes an assumption: The order is the same as the number of pulses in the field
-        # It is furthermore (but not strictly from this) assumed that in the experiment, the system will interact
-        # once with each pulse
-        self.order = len(self.field.pulses)
-
-        # Determine which phase-matching condition(s) will come under consideration in this experiment
-        relevant_phasematch = []
-
-        # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
-        if self.detector.interaction_filter is None:
-
-            from itertools import product as iter_prod
-            k = 0
-
-            for i in iter_prod([1, -1], repeat=len(self.field.pulses)):
-
-                new_phasematch = []
-
-                for j in range(len(self.field.pulses)):
-                    new_phasematch.append(self.field.pulses[j].id * i[j])
-
-                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
-                k += 1
-
-        # Otherwise, registered only that/those specified for the detector
-        else:
-
-            k = 0
-
-            for i in range(len(self.detector.interaction_filter)):
-
-                new_phasematch = []
-
-                for j in self.detector.interaction_filter[i]:
-                    new_phasematch.append(j * self.detector.interaction_filter[i][j])
-
-                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
-                k += 1
-
-        self.relevant_phasematch = relevant_phasematch
-
-        # Do first:
-        # - For (and indexed by) relevant phase-matching conditions (as determined above):
-        #   -  Generate a new field with the appropriate pulses (and possibly resultant wavevector)
-        #       - Will need to lift pos. carrier freq condition on pulse for this
-        # - For all lower- or same-order phase-matching conditions:
-        #   - At least determine resultant wavevectors and determine if they are parallel to any of those of the
-        #     relevant phase-matching conditions
-        #   - (FOR LATER) Generate the corresponding fields/scans
-        #   - For now, only warn if other cascading (collinear) effects may intrude on the signal if ignore_collinear is not set to True
-        # - Take pulse with scans and
-
-
-        # Here do:
-        #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
-        #  attributes are valid (scanning time centerpoint is then less meaningful)
-        #  - If the experiment is an ideal time-domain experiment, then also limit scan attribute validity
-        #  (scanning carrier frequency is then less meaningful)
-        # - Maybe take tc resp. cf (for freq.-ideal resp. time-ideal) as "sleeping" parameters but need specification
-        #  if scanning time spread? Then may need some inverse stuff for one case (touch/depart from infinity)
-        #  (could also handle this more practically but less elegantly with large number instead of infty throughout)
-
-        # - Construct fields_under_scan attribute
-        # - Handle better the discretization of scans
-        # - Handle separation/combination of response-side/integration-side scans
-        #  - Also consider and maybe handle phase question between "differently-compounding" features here
-
-
-
 
         # Find valid choices of independent variables
         self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
@@ -1203,6 +1126,9 @@ class VibExperiment:
         except ValueError:
             self.canonical_axes = None
 
+        # NOTE: Having the polarization handling can be done like this (and done here) if that pulse attribute
+        # (and wavevectors?) remain(s) unchanged over the scan.
+
         # Register all polarization vectors (associated with the detector and pulses) for convenience
         # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
         # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
@@ -1214,39 +1140,9 @@ class VibExperiment:
                 if j.id == i + 1:
                     all_polarizations.append(copy.deepcopy(j.pol))
 
-        self.all_polarizations = all_polarizations
-
         # Determine the macroscopic orientational average polarization vector
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-        self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
-
-    def tell_axis_options(self):
-
-        for i in range(len(self.valid_axis_combs)):
-            self.valid_axis_combs[i].present_spectral_axis_choices(from_exp_index = i)
-
-    def is_axis_set_by_ref_valid(self, ref: dict):
-        """
-        TODO: Take a reference describing an axis set choice in terms of
-        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
-        and return True if it's a valid choice for this experiment (TODO: ...phase-matching combination, indep var choice?)
-        or False if it's not
-
-        Sketch: Similar to choose_axis_set_by_ref
-
-        """
-        pass
-
-    def choose_axis_set_by_ref(self, ref: dict):
-        """
-        TODO: Take a reference describing an axis set choice in terms of
-        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
-        and return the corresponding SpectralAxisSet instance
-
-        Sketch: Look through self.valid_axis_choices and find out if any of the registered valid choices
-        match: If yes, return that SpectralAxisSet instance - otherwise raise an error
-        """
-        pass
+        self.polarization_avg_vector = get_pol_laser(all_polarizations)
 
     def findDimensionality(self) -> int:
         """
@@ -1276,145 +1172,3 @@ class VibExperiment:
             raise AssertionError('Cannot determine dimensionality: Unrecognized detection method')
 
         return d
-    
-    def findInteractionSequences(self) -> list:
-        """
-        Based on the experiment information, find out if there must be a specific sequence/sequences of interactions with pulses
-
-        Returns a list [[{sequence 1 interaction 1: pulse i}, {seq. 1 int. 2: pulse j}, ...],
-                        [{seq. 2 int. 1: pulse k}, ... ], ...]
-        """
-
-        def interactionRecurse(res: list, curr_int: list, rem_wv: dict, curr_epoch: int, epochs: list):
-            """
-            Tail-recursive routine for finding interaction sequences
-
-            res: List of lists: Results accumulator
-            curr_int: List of dictionaries: Result currently being assembled
-            rem_wv: Dictionary: One wavevector filter dictionary
-            curr_epoch: Epoch counter
-            epochs: List of epochs as determined by ElectricField.findEpochs
-            """
-
-
-            # Termination condition
-            # If this interaction sequence satisfied the wavevector filter, append it
-            if rem_wv == {}:
-                res.append(tuple(curr_int))
-
-            # Recursion
-            else:
-                # Can one or more pulses in requested wv be found at the current or later epoch?
-                # If so, make all combinations, update rem wv and recurse further at same epoch
-
-                for t in range(curr_epoch, len(epochs)):
-                    for i in rem_wv:
-
-                        if i in epochs[t]:
-
-                            new_rem_wv = copy.deepcopy(rem_wv)
-                            new_int = copy.deepcopy(curr_int)
-                            new_int.append({i: new_rem_wv[i]})
-
-                            del new_rem_wv[i]
-
-                            interactionRecurse(res, new_int, new_rem_wv, t, epochs)
-
-
-
-        if self.detector.interaction_filter is None:
-            raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')
-
-        if len(self.detector.interaction_filter) > 1:
-            raise AssertionError('Interaction sequence determination currently not supported for more than one phase-matching direction')
-
-        int_sequences = []
-        int_seed = []
-
-        for i in self.detector.interaction_filter:
-
-            interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
-
-        return int_sequences
-
-
-def get_carrier_freqs_uv(pulses) -> dict:
-    """
-    Get dictionary of UV/VIS-range part of carrier frequencies
-
-    Returns: Dictionary {pulse 1: UV/VIS carrier freq., ...}
-    """
-    cfuv_dict = {}
-    for i in pulses:
-        cfuv_dict[i.id] = i.cf_uv
-
-    return cfuv_dict
-
-def find_epochs(field, tol: float=0.0) -> list:
-    """
-    Divide field into epochs with either zero or finite tolerance
-    Currently only supported for a field consisting of ideal or impulsive pulses
-
-    tol: Float: Tolerance for non-temporal coincidence (currently not supported)
-    # TODO: Add support for tolerance
-
-    Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
-    """
-
-    if not(tol == 0.0):
-        raise ValueError('Non-zero tolerance not yet supported in find_epochs')
-
-    for i in field.pulses:
-        if not i.tendsImpulsive():
-            raise AssertionError('Can currently only determine epochs for fields with impulsive-tending pulses')
-        if i.id is None:
-            raise AssertionError('All pulses must have IDs for valid epoch determination')
-
-    times_ids = sorted([(i.tc, i.id) for i in field.pulses], key=itemgetter(0))
-    epochs = [[]]
-    epoch = 0
-    curr_time = times_ids[0][0]
-
-    for i in times_ids:
-        if not(i[0] == curr_time):
-            epochs.append([])
-            epoch += 1
-            curr_time = i[0]
-        epochs[epoch].append(i[1])
-
-    sorted_epochs = []
-
-    for i in epochs:
-        sorted_epochs.append(sorted(i))
-
-    return sorted_epochs
-
-def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=1e-10) -> bool:
-    """
-    Do the UV/VIS frequency components of this collection of pulses cancel?
-
-    coll: tuple: (Signed) pulse ID references
-    cfs_uv: dictionary {non-signed pulse ID: non-signed UV/VIS frequency component, ...}
-    tol: Tolerance: If the magnitude of the requested combination of freq components is beneath tol,
-    then accept as cancelling
-
-    return: True if cancellation was determined, False otherwise
-
-    # FIXME: This routine is a bit confusingly made but should
-    """
-
-
-    if tol < 0.0:
-        raise ValueError('The tolerance must be a nonnegative number')
-
-    acc = 0.0
-
-    for i in coll:
-
-        sgn = (i > 0) - (i < 0)
-
-        acc += sgn * cfs_uv[sgn * i]
-
-    sgnacc = (acc > 0) - (acc < 0)
-
-    return ((sgnacc * acc) <= tol)
