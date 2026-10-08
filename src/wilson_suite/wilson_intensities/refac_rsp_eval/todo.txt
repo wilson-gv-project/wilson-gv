@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-07
+updated 2026-10-08
 
-Tests: refac_rsp_eval 421 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 435 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
 
 
@@ -20,7 +20,7 @@ Order of work
        and with it tests/c2_variations.py and tests/c2_leaves.py.
        Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
 Any time: G1–G7 (checks beyond old = new), G1 first.
-Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, F1.
+Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1.
 
 
 A. Small fixes
@@ -166,6 +166,17 @@ E. Pipeline
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
         6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
 [ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
+[ ] E5  Width of the drawn peak vs width of its box (added 2026-10-08).
+        eval_feature_on_grid takes an optional propagator_param: the width in cm-1, per condition, or per
+        grid point if the function reads the grid itself. But SpectralFeature's feat_box, contributes_to,
+        get_intensity and dress_these_with_boxes still use feature.lineshape_parameter.
+        If the two differ, the box and the intensity do not match the drawn peak. e.g. width 10 cm-1
+        drawn, lineshape_parameter 5 cm-1: the box is too small and part of the peak is cut off.
+        Now: nothing passes propagator_param, so every peak uses lineshape_parameter (no mismatch).
+        To decide when needed: one source for the width (e.g. the feature carries the width function
+        and the box uses its largest value), or a check that the two agree.
+        Also: propagator_param gets only the VibDiff. If it ever needs the condition's axes, pass the
+        ResCondKey too (the FIXME in eval_resonance_factor).
 
 
 F. Later, only when needed
