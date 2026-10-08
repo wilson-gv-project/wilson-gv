@@ -706,8 +706,6 @@ class ElectricField:
             w_range = [comp_pulse.cf - tol_n_dev * (per_cm_x_fs/comp_pulse.dev),
                        comp_pulse.cf + tol_n_dev * (per_cm_x_fs/comp_pulse.dev)]
 
-            print('compound', c, 'bandwidth', w_range, 'dev', comp_pulse.dev)
-
             # If upper limit of bandwidth is >= lower threshold and lower limit of bandwith is <= upper threshold
             # then this compound pulse is deemed in range
             if not(w_range[1] < -1*thres_freq) and not(w_range[0] > thres_freq):
