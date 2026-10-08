@@ -2,9 +2,9 @@
 Pure geometry: bounds, boxes and box clustering. No physics, no SpectralFeature logic.
 
   in:  points or (min, max) bounds per named axis
-  out: Box, regular grid over a Box, box adjacency matrix, clusters of boxes
+  out: Box, regular grid over a Box, the part of a grid that covers a Box, box adjacency matrix, clusters of boxes
 
-  holds: points_to_bounds, Box, compute_box_adjacency, connected_components_from_adjacency
+  holds: points_to_bounds, Box, box_slices, compute_box_adjacency, connected_components_from_adjacency
 
 features.py imports from this module, never the other way around.
 """
@@ -258,4 +258,63 @@ def connected_components_from_adjacency(adjacency: np.ndarray, box_objects: list
             clusters[label_counter] = members
             label_counter += 1
     return clusters
+
+
+
+def cut_grid_to_domains_nd(full_meshgrids: dict[str, np.ndarray], 
+                            axis_coords: dict[str, np.ndarray], 
+                            domains: list['RectangularDomain']) -> dict['RectangularDomain', dict]:
+    """
+    General N-dimensional version.
+    
+    Given:
+        grid: dict mapping axis names (e.g., 'A', 'B', 'C') to np.ndarray grids of identical shape
+        domains: list of objects, each with .box.bounds dict {axis_name: (min, max)}
+
+    Returns:
+        subgrids: dict mapping each domain.box -> {
+            "grid": {axis_name: subarray},
+            "indices": tuple(slice_i, slice_j, ...)
+        }
+    """
+    axes = list(full_meshgrids.keys())
+
+    shapes = {v.shape for v in full_meshgrids.values()}
+    if len(shapes) != 1:
+        raise ValueError("Meshgrids must have same shape")
+
+    subgrids = {}
+
+    for domain in domains:
+        bounds = domain.box.bounds
+
+        grid_axes = set(full_meshgrids.keys())
+        domain_axes = set(bounds.keys())
+
+        if grid_axes != domain_axes:
+            raise ValueError(
+                f"Domain axes {domain_axes} do not match grid axes {grid_axes}"
+            )
+
+        slices = []
+
+        for ax in axes:
+            coords = axis_coords[ax]    # <-- use provided 1D coords
+            mn, mx = bounds[ax]
+
+            i_min = np.searchsorted(coords, mn, side="right") - 1
+            i_max = np.searchsorted(coords, mx, side="left")
+
+            i_min = max(i_min, 0)
+            i_max = min(i_max, len(coords) - 1)
+
+            slices.append(slice(i_min, i_max + 1))
+
+        # slice the subgrids - prep subgrids from slices
+        subgrid = {ax: full_meshgrids[ax][tuple(slices)] for ax in axes}
+        
+        subgrids[domain] = {"grid": subgrid, "indices": tuple(slices), "result": None}
+
+    return subgrids
+
 
