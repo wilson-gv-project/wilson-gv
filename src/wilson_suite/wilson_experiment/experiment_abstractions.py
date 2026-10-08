@@ -1109,29 +1109,12 @@ class VibExperiment:
         else:
             self.field_analyses[()] = FieldAnalysis(self.field, self.detector.interaction_filter)
 
-        # NOTE: From here to end of method: Code to be reworked or removed
-        from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
-                                                                        find_indep_exp_variables, find_valid_axes,
-                                                                        find_canonical_axes)
-
-        # Find valid choices of independent variables
-        self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
-
-        # Find valid choices of spectral axes given the choices of independent variables determined above
-        self.valid_axis_combs = find_valid_axes(self.indep_vars)
-
-        # If no canonical axes can be determined, set to None
-        try:
-            self.canonical_axes = find_canonical_axes(self.indep_vars)
-        except ValueError:
-            self.canonical_axes = None
-
-        # NOTE: Having the polarization handling can be done like this (and done here) if that pulse attribute
-        # (and wavevectors?) remain(s) unchanged over the scan.
+        # TODO: Probably move this inside FieldAnalysis since this is interaction-pattern dependent
 
         # Register all polarization vectors (associated with the detector and pulses) for convenience
         # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
         # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
+
         all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
 
         # Could probably be done more elegantly but works
