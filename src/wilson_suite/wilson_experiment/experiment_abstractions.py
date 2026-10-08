@@ -754,14 +754,71 @@ class ElectricField:
 
         return ElectricField(tuple(copy.deepcopy(pulse_dict.values())))
 
+def compounding_patterns_at_order(n):
+    """
+    Generate all compounding patterns at a given order
+
+    n: The order to be considered
+
+    Returns: A list of tuples: Each tuple is a compounding pattern at this order
+    """
+
+    def compounding_patterns_recurse(n, curr, acc):
+        """
+        Tail-recursive routine to accumulate compounding patterns
+        """
+
+        # Termination condition
+        if n == 0:
+            if not tuple(curr) in acc:
+                acc.append(tuple(curr))
+
+        else:
+
+            # Add 1 to all in curr and recurse
+            for i in curr:
+
+                new_curr = copy.deepcopy(curr)
+                new_curr[i] += 1
+                compounding_patterns_recurse(n-1, new_curr, acc)
+
+            # Extend curr by 1 and recurse
+            new_curr = copy.deepcopy(curr)
+            new_curr.append(1)
+            compounding_patterns_recurse(n - 1, new_curr, acc)
+
+        return
+
+    # Initialize results, seed holder
+    comp_patterns = []
+    seed = []
+
+    compounding_patterns_recurse(n, seed, comp_patterns)
+
+    return comp_patterns
+
 @dataclass
 class FieldAnalysis:
     """
-    Class to represent analysis done on a field
+    Class to carry out and hold results from analysis done on a field
+
+    field: Electric field instance on which the analysis is to be made
+
+    interaction_filter: A list of interaction pattern(s) (each a list of signed integers referring to pulse IDs with
+    the sign specifying the freq/wavevector parity) to be considered
+
+    tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse time overlap
+
+    tol_n_dev_w: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse ability to create vibrational resonance
+
+    wavevector_filter: String: Speficies regime under which matching wavevectors to that/those of the interaction
+    will be searched for/included
     """
 
     field: ElectricField
-    interaction_filter: list[list]
+    interaction_filter: list[list[int]]
     tol_n_dev_t: float | int = 5.0
     tol_n_dev_w: float | int = 5.0
     thres_freq: float | int = 8000.0
@@ -805,6 +862,14 @@ class FieldAnalysis:
 
             self.valid_int_patterns = valid_int_patterns
 
+        int_pattern_orders = []
+
+        for i in self.valid_int_patterns:
+            if not len(i) in int_pattern_orders:
+                int_pattern_orders.append(i)
+
+        self.int_pattern_orders = sorted(int_pattern_orders)
+
         # Initialize result holders
         time_ovl_tuples = []
         res_and_time_ovl_tuples = []
@@ -828,9 +893,43 @@ class FieldAnalysis:
             if not(i in res_and_time_ovl_tuples):
                 time_not_res_compound_pulses[i] = compound_pulses_in_list([self.field.signed_pulses[j] for j in i])
 
+        self.time_ovl_tuples = time_ovl_tuples
+        self.res_and_time_ovl_tuples = res_and_time_ovl_tuples
+        self.res_and_time_comp_pulses = res_and_time_compound_pulses
+        self.time_not_res_comp_pulses = time_not_res_compound_pulses
+
+        time_ovl_comp_lvls = []
+        for i in self.time_ovl_tuples:
+            if not len(i) in time_ovl_comp_lvls:
+                time_ovl_comp_lvls.append(len(i))
+
+
         # Generate valid compounding patterns at all relevant orders
-        # Can already screen and rule out compounding patterns here based on occurrence of
-        # valid orders in valid_compound_pulses
+        comp_patterns_at_order = {}
+
+        for i in self.int_pattern_orders:
+
+            # Generate candidate patterns (all patterns but will be screened)
+            candidate_patterns_at_order = compounding_patterns_at_order(i)
+
+            # Screen based on occurrence of valid orders in time_ovl_tuples
+            # (if no pulse tuple of a compounding level required in a compounding pattern can exist,
+            # then that compounding pattern can already here be disregarded)
+            for j in candidate_patterns_at_order:
+
+                screened_patterns = []
+                pattern_supported_by_tuples = True
+
+                for k in j:
+                    if not k in time_ovl_comp_lvls:
+                        pattern_supported_by_tuples = False
+
+                if pattern_supported_by_tuples:
+                    screened_patterns.append(j)
+
+            comp_patterns_at_order[i] = copy.deepcopy(screened_patterns)
+
+        self.comp_patterns_at_order = comp_patterns_at_order
 
         # Make a master permutation list for each unique order in the valid interaction patterns
 
@@ -841,6 +940,8 @@ class FieldAnalysis:
         #           Carry out time-ordering enforcement screening: If passing, add this (ordered) permutation of interactions
         #           at this compounding pattern to the list of such valid permutations of interactions for this
         #           compounding pattern
+        #           Before/during/after this: Also screen by whether the generated pulse tuples are valid w.r.t.
+        #           time overlap and resonance possibility (all but last interaction), or just time overlap (last interaction)
 
         # After this, add test cases where now missing, do cleanup of the rest of wilson-experiment (code and tests) and
         # move to adaptation of wilson-derive (where one such change is the in-/exclusion of compounding patterns)
