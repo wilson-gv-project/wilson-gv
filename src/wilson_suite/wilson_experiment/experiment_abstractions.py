@@ -754,7 +754,7 @@ class ElectricField:
 
         return ElectricField(tuple(copy.deepcopy(pulse_dict.values())))
 
-def compounding_patterns_at_order(n):
+def compounding_patterns_at_order(n) -> list[tuple]:
     """
     Generate all compounding patterns at a given order
 
@@ -797,6 +797,22 @@ def compounding_patterns_at_order(n):
 
     return comp_patterns
 
+def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000.) -> bool:
+    """
+    Take an ordered sequence of (compounded) pulses and determine
+    """
+
+    # Singleton sequences are trivially valid
+    if len(pulses) == 1:
+        return True
+
+    for i in range(len(pulses) - 1):
+        if (pulses[i + 1].tc - pulses[i].tc) > thres_waiting_time:
+            return False
+
+    return True
+
+
 @dataclass
 class FieldAnalysis:
     """
@@ -808,10 +824,16 @@ class FieldAnalysis:
     the sign specifying the freq/wavevector parity) to be considered
 
     tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
-    deciding (compound) pulse time overlap
+    deciding (compound) pulse time overlap. Default: 5.
 
     tol_n_dev_w: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
-    deciding (compound) pulse ability to create vibrational resonance
+    deciding (compound) pulse ability to create vibrational resonance. Default: 5.
+
+    thres_freq: A threshold: (compound) pulses whose no frequency components fall within the range
+     [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
+
+    thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
+    distant to produce an appreciable signal. Default: 1500.0 (units: fs).
 
     wavevector_filter: String: Speficies regime under which matching wavevectors to that/those of the interaction
     will be searched for/included
@@ -822,9 +844,12 @@ class FieldAnalysis:
     tol_n_dev_t: float | int = 5.0
     tol_n_dev_w: float | int = 5.0
     thres_freq: float | int = 8000.0
+    thres_waiting_time: float | int = 1500.0
     wavevector_filter: str = 'same_order'
 
     def __post_init__(self):
+
+        from itertools import permutations as permutations
 
         # Dividing larger pieces of code into helper methods, incorporate all the processing leading to the
         # information that's needed for an integrator:
@@ -872,12 +897,12 @@ class FieldAnalysis:
 
         # Initialize result holders
         time_ovl_tuples = []
+        time_not_res_compound_pulses = {}
         res_and_time_ovl_tuples = []
         res_and_time_compound_pulses = {}
-        time_not_res_compound_pulses = {}
 
         # For all valid interaction patterns:
-        for i in valid_int_patterns:
+        for i in self.valid_int_patterns:
 
             # Accumulate all valid and relevant time-overlapping tuples (compounding and non-compounding)
             time_ovl_tuples = list(set(time_ovl_tuples).union(self.field.overlapping_pulses_for_interaction_pattern(i, self.tol_n_dev_t)))
@@ -903,19 +928,18 @@ class FieldAnalysis:
             if not len(i) in time_ovl_comp_lvls:
                 time_ovl_comp_lvls.append(len(i))
 
-
         # Generate valid compounding patterns at all relevant orders
         comp_patterns_at_order = {}
 
         for i in self.int_pattern_orders:
 
             # Generate candidate patterns (all patterns but will be screened)
-            candidate_patterns_at_order = compounding_patterns_at_order(i)
+            candidate_compounding_patterns_at_order = compounding_patterns_at_order(i)
 
             # Screen based on occurrence of valid orders in time_ovl_tuples
             # (if no pulse tuple of a compounding level required in a compounding pattern can exist,
             # then that compounding pattern can already here be disregarded)
-            for j in candidate_patterns_at_order:
+            for j in candidate_compounding_patterns_at_order:
 
                 screened_patterns = []
                 pattern_supported_by_tuples = True
@@ -931,22 +955,93 @@ class FieldAnalysis:
 
         self.comp_patterns_at_order = comp_patterns_at_order
 
-        # Make a master permutation list for each unique order in the valid interaction patterns
+        int_patterns_by_order = {}
 
-        # For each valid interaction pattern:
-        #   For each permutation of this pattern (appropriate master permutation list)
-        #       Permute the pulses to that ordering
-        #       For each compounding pattern at this interaction pattern's order:
-        #           Carry out time-ordering enforcement screening: If passing, add this (ordered) permutation of interactions
-        #           at this compounding pattern to the list of such valid permutations of interactions for this
-        #           compounding pattern
-        #           Before/during/after this: Also screen by whether the generated pulse tuples are valid w.r.t.
-        #           time overlap and resonance possibility (all but last interaction), or just time overlap (last interaction)
+        for i in valid_int_patterns:
 
-        # After this, add test cases where now missing, do cleanup of the rest of wilson-experiment (code and tests) and
-        # move to adaptation of wilson-derive (where one such change is the in-/exclusion of compounding patterns)
+            if len(i) in int_patterns_by_order:
+                int_patterns_by_order[len(i)].append(i)
 
-        pass
+            else:
+                int_patterns_by_order[len(i)] = [[i]]
+
+        # The "master" loop: Evaluate all available interaction sequences at all valid compounding patterns
+
+        int_sequences_by_order = {}
+
+        # For each valid order of interaction pattern
+        for ord in int_patterns_by_order:
+
+            int_sequences_by_order[ord] = {}
+
+            for c in comp_patterns_at_order[ord]:
+                int_sequences_by_order[ord][c] = []
+
+            # For each permutation of indices at this order
+            for p in permutations(range(ord)):
+
+                # For each interaction pattern at this order
+                for i in int_patterns_by_order[ord]:
+
+                    p_pattern = []
+
+                    # Permute the pulses to that ordering
+                    for j in range(len(i)):
+                        p_pattern.append(i[p[j]])
+
+                    # For each compounding pattern at this interaction pattern's order:
+                    for c in comp_patterns_at_order[ord]:
+
+                        # FIXME: There should be several optimization opportunities here if needed:
+                        #  - Precalculate motifs of compounding patterns for time-overlap/resonance criteria
+                        #  - Precalculate motifs of time-enforcement patterns
+                        #  - Preassemble some compound pulse index motifs?
+                        #  - Also pre-solve for some permutation subsets in an outer loop?
+
+                        # First test if this permutation contains all valid (compound) pulses
+                        comp_valid = True
+                        c_ctr = 0
+
+                        c_pulse_inds = []
+                        c_pulses = []
+
+                        # For each compounding pattern element
+                        for c_elem in range(len(c)):
+
+                            # Generate the candidate (compound) pulse tuple
+                            c_elem_len = len(c_elem)
+                            c_pulse_ind = tuple(sorted(p_pattern[c_ctr: c_ctr + c_elem_len]))
+
+                            # If this is not the last interaction, the candidate pulse tuple must
+                            # be both time-overlapping and potentially able to make vibrational resonance
+                            if c_elem + 1 < len(c):
+
+                                if not c_pulse_ind in self.res_and_time_ovl_tuples:
+                                    comp_valid = False
+                                    break
+
+                                c_pulses.append(self.res_and_time_comp_pulses[c_pulse_ind])
+                                c_pulse_inds.append(c_pulse_ind)
+
+                            # If this is the last interaction, only the time-overlapping criterion applies
+                            else:
+
+                                if not c_pulse_ind in self.time_ovl_tuples:
+                                    comp_valid = False
+                                    break
+
+                                c_pulses.append(self.time_not_res_comp_pulses[c_pulse_ind])
+                                c_pulse_inds.append(c_pulse_ind)
+
+                            c_ctr += c_elem_len
+
+                        # Cycle if any (compound) pulse was invalid
+                        if not comp_valid:
+                            continue
+
+                        # Time-ordering enforcement screening
+                        if pulse_time_ordering_valid(c_pulses):
+                            int_sequences_by_order[ord][c].append(tuple(c_pulse_inds))
 
 
 @dataclass
