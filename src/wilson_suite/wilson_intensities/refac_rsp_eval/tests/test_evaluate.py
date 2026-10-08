@@ -1010,11 +1010,12 @@ def test_build_contributions_needs_eigenvals(molsys, pre_a1_zero):
 # eval_rescond_resloc and eval_resonance_factor take grids in Eh; eval_feature_on_grid takes cm-1.
 # resonance_residuals (top of this file) writes  E_left - E_right - sum_j s_j w_j  out independently.
 #
-# Only the lorentzian_propagator tests and the get_intensity test use the Lorentzian.
-# The other tests pass a RecordingPropagator, so they hold for any propagator.
+# The lorentzian_propagator tests, the get_intensity test and the hand-worked values (eval_resonance_factor,
+# eval_feature_on_grid) use the Lorentzian. The other tests pass a RecordingPropagator, so they hold for any propagator.
 
 G_CM = 5.                   # lineshape parameter, cm-1
 G_AU = convNu2Ene(G_CM)
+CM1_PER_EH = 219474.6313632  # 1 Eh in cm-1 (CODATA), written out so the hand-worked values don't use convNu2Ene
 
 
 def grid_around(location: dict[str, float], step: float) -> dict[str, np.ndarray]:
@@ -1127,7 +1128,7 @@ def test_eval_resonance_factor_gives_each_condition_its_own_gamma(params_obj, st
     propagator = RecordingPropagator()
 
     eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, {'A': 0., 'B': 0.},  # type: ignore
-                          propagator, gamma=lambda vd: vd.energy_difference())
+                          propagator, propagator_param=lambda vd: vd.energy_difference())
 
     assert sorted(g for _, g in propagator.calls) == pytest.approx(sorted([E01 - E0, E1 - E0]))
     for resloc, g in propagator.calls:
@@ -1144,6 +1145,25 @@ def test_eval_resonance_factor_multiplies_the_propagator_values(motif, params_ob
     value = eval_resonance_factor(res_motif, params_obj, states, grid, propagator, lambda _vd: G_AU)
 
     np.testing.assert_allclose(value, np.prod([r + 1j * g for r, g in propagator.calls], axis=0))
+
+
+def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(params_obj, states):
+    """
+    eval_feature_on_grid always gives every condition the same width; here they differ.
+    MOTIF_AB, a=0, b=1, width = E / 100: 16 cm-1 for the A condition (E = 1600), 5 cm-1 for B (E = 500).
+        1 / ((1600 - A - 16i) * (500 - B - 5i))   in cm-1, times CM1_PER_EH**2
+    Peak: (i/16) * (i/5) = -1/80. One width off the peak on either axis gives the same value,
+        (1584, 500):  (1 + i)/32 * i/5  =  (-1 + i) / 160
+        (1600, 495):  i/16 * (1 + i)/10 =  (-1 + i) / 160
+    which only holds if each condition gets its own width (swapped widths give different values).
+    """
+    grid = to_au({'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])})
+
+    value = eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, grid,
+                                  lorentzian_propagator, lambda vd: vd.energy_difference(au=True) / 100)
+
+    expected = [-0.0125, -0.00625 + 0.00625j, -0.00625 + 0.00625j]
+    np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
 
 
 # -- eval_feature_on_grid -------------------------------------------------------
@@ -1193,7 +1213,143 @@ def test_eval_feature_on_grid_uses_the_summed_and_scaled_amplitude(params_obj, s
     np.testing.assert_allclose(eval_feature_on_grid(replace(two, scale=0.5), states, grid), 0.4 * base)
 
 
-def test_eval_feature_on_grid_needs_a_lineshape_parameter(params_obj, states):
+# Hand-worked values, default Lorentzian, coeff 0.3, gamma 5 cm-1. One condition is
+#     0.3 / (E - freq - i*gamma)  in Eh  =  CM1_PER_EH * 0.3 / (E - freq - i*gamma)  in cm-1,
+# so a motif with N conditions picks up CM1_PER_EH**N. The numbers below are the cm-1 part.
+# Grid centres are written out (not taken from solve_LSE_motif).
+
+@pytest.mark.parametrize('ps, centre', [(PS_01, 1600.),     # E_ab - E_a = E01 - E0
+                                        (PS_10, 1100.)])    # E01 - E1
+def test_eval_feature_on_grid_values_one_condition(ps, centre, states):
+    """
+    MOTIF_A: 0.3 / (centre - A - 5i) at A = centre -10, -5, 0, +5, +10 cm-1, e.g.
+        A = centre - 5:  0.3 / (5 - 5i) = 0.3 * (5 + 5i) / 50 = 0.03 + 0.03i
+    At A = centre +- gamma, |value|^2 is half the peak (0.0018 vs 0.0036): full width 2*gamma.
+    """
+    f = feature_at_solved_location(MOTIF_A, ps, states)
+    grid = {'A': centre + np.array([-10., -5., 0., 5., 10.])}
+
+    value = eval_feature_on_grid(f, states, grid)
+
+    expected = [0.024 + 0.012j, 0.03 + 0.03j, 0.06j, -0.03 + 0.03j, -0.024 + 0.012j]
+    assert np.shape(value) == (5,)
+    np.testing.assert_allclose(value, CM1_PER_EH * np.array(expected))
+
+
+def test_eval_feature_on_grid_values_two_conditions(states):
+    """
+    MOTIF_AB, a=0, b=1: 0.3 / ((1600 - A - 5i) * (500 - B - 5i)), one factor per axis.
+    3x3 grid, A = 1600 +- 5 (rows), B = 500 +- 5 (columns). Per axis, 1 / (x - 5i) is
+        x = +5: 0.1 + 0.1i      x = 0: 0.2i      x = -5: -0.1 + 0.1i
+    and each entry is 0.3 times the product of the two, e.g. the peak 0.3 * (0.2i)^2 = -0.012.
+    """
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    grid = grid_around({'A': 1600., 'B': 500.}, 5.)
+
+    value = eval_feature_on_grid(f, states, grid)
+
+    expected = [[0.006j,          -0.006 + 0.006j, -0.006],
+                [-0.006 + 0.006j, -0.012,          -0.006 - 0.006j],
+                [-0.006,          -0.006 - 0.006j, -0.006j]]
+    assert np.shape(value) == (3, 3)
+    np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
+
+
+def test_eval_feature_on_grid_values_with_a_minus_axis(states):
+    """
+    MOTIF_MIXED, a=0: conditions on B and on A - B, both with E = 0 - E0 = -1000:
+        0.3 / ((-1000 - B - 5i) * (-1000 - (A - B) - 5i))
+    3x3 grid, A = -2000 +- 5 (rows), B = -1000 +- 5 (columns). B is in both conditions, so this
+    is not one factor per axis, e.g.
+        A = -2005, B = -995:  0.3 / ((-5 - 5i) * (10 - 5i)) = 0.3 / (-75 - 25i) = -0.0036 + 0.0012i
+    On the diagonal (A and B move together) the A - B condition stays at resonance.
+    """
+    f = feature_at_solved_location(MOTIF_MIXED, PS_01, states)
+    grid = grid_around({'A': -2000., 'B': -1000.}, 5.)
+
+    value = eval_feature_on_grid(f, states, grid)
+
+    expected = [[-0.006 + 0.006j,   -0.006 + 0.006j, -0.0036 + 0.0012j],
+                [-0.006,            -0.012,          -0.006],
+                [-0.0036 - 0.0012j, -0.006 - 0.006j, -0.006 - 0.006j]]
+    assert np.shape(value) == (3, 3)
+    np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
+
+
+def test_eval_feature_on_grid_axis_outside_the_motif_changes_nothing(states):
+    """MOTIF_A only has a condition on A. On an A x B grid every column is the 1D result: a ridge along B."""
+    f = feature_at_solved_location(MOTIF_A, PS_01, states)
+    grid = grid_around({'A': 1600., 'B': 0.}, 5.)
+
+    value = eval_feature_on_grid(f, states, grid)
+
+    expected = [[0.03 + 0.03j] * 3,
+                [0.06j] * 3,
+                [-0.03 + 0.03j] * 3]
+    assert np.shape(value) == (3, 3)
+    np.testing.assert_allclose(value, CM1_PER_EH * np.array(expected))
+
+
+@pytest.mark.parametrize('motif, gamma, expected_cm1', [
+    (MOTIF_A,     5.,  0.06j),      # 0.3 / (-5i)    =  0.3i / 5
+    (MOTIF_A,     10., 0.03j),
+    (MOTIF_AB,    5.,  -0.012),     # 0.3 / (-5i)^2  = -0.3 / 25
+    (MOTIF_AB,    10., -0.003),
+    (MOTIF_MIXED, 5.,  -0.012),
+])
+def test_eval_feature_on_grid_peak_is_coeff_times_i_over_gamma_to_the_N(motif, gamma, expected_cm1, params_obj, states):
+    """
+    At resonance every condition gives 1 / (-i*gamma) = i / gamma, so the peak is 0.3 * (i / gamma)^N:
+    on the imaginary axis for one condition, real and negative for two. Wider line -> lower peak.
+    get_intensity only checks |peak|^2; this also checks the phase (the -i*gamma sign).
+    """
+    f = replace(feature_at_solved_location(motif, params_obj, states), lineshape_parameter=gamma)
+
+    value = eval_feature_on_grid(f, states, f.location.as_dict())  # type: ignore
+
+    assert value == pytest.approx(CM1_PER_EH ** len(motif) * expected_cm1)
+
+
+def test_eval_feature_on_grid_propagator_param_replaces_lineshape_parameter(states):
+    """
+    Same points and widths as the eval_resonance_factor test above (16 cm-1 on A, 5 cm-1 on B), but the
+    width function is in cm-1 and the feature's own lineshape_parameter (5 cm-1) is not used.
+    Values are 0.3 times that test's: -0.0125 -> -0.00375, (-1 + i)/160 -> -0.001875 + 0.001875i.
+    """
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    grid_cm = {'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])}
+
+    value = eval_feature_on_grid(f, states, grid_cm, propagator_param=lambda vd: vd.energy_difference() / 100)
+
+    expected = [-0.00375, -0.001875 + 0.001875j, -0.001875 + 0.001875j]
+    np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
+
+
+def test_eval_feature_on_grid_propagator_param_does_not_need_lineshape_parameter(states):
+    """lineshape_parameter=None is fine when propagator_param is given. MOTIF_A peak, 5 cm-1: 0.3 / (-5i) = 0.06i."""
+    f = replace(feature_at_solved_location(MOTIF_A, PS_01, states), lineshape_parameter=None)
+
+    value = eval_feature_on_grid(f, states, {'A': np.array([1600.])}, propagator_param=lambda _vd: 5.)
+
+    np.testing.assert_allclose(value, CM1_PER_EH * np.array([0.06j]))
+
+
+def test_eval_feature_on_grid_propagator_param_can_depend_on_the_grid(states):
+    """
+    propagator_param only gets the condition, but it can read the grid itself and return one value per
+    grid point. Here width = A - 1595 cm-1: 5 at A = 1600, 10 at A = 1605. MOTIF_A, peak at 1600:
+        A = 1600:  0.3 / (-5i)       = 0.06i
+        A = 1605:  0.3 / (-5 - 10i)  = 0.3 * (-5 + 10i) / 125 = -0.012 + 0.024i
+    """
+    f = feature_at_solved_location(MOTIF_A, PS_01, states)
+    grid_cm = {'A': np.array([1600., 1605.])}
+
+    value = eval_feature_on_grid(f, states, grid_cm, propagator_param=lambda _vd: grid_cm['A'] - 1595.)
+
+    np.testing.assert_allclose(value, CM1_PER_EH * np.array([0.06j, -0.012 + 0.024j]))
+
+
+def test_eval_feature_on_grid_needs_a_lineshape_parameter_or_a_propagator_param(params_obj, states):
     f = replace(feature_at_solved_location(MOTIF_A, params_obj, states), lineshape_parameter=None)
 
     with pytest.raises(ValueError, match='lineshape_parameter'):

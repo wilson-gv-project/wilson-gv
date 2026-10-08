@@ -589,9 +589,9 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
 ## evaluating func(resloc, parameter) for each resonance condition in a motif, then multiplying them together
 
 
-def lorentzian_propagator(resloc: float | np.ndarray, gamma: float) -> np.ndarray | complex:
+def lorentzian_propagator(resloc: float | np.ndarray, gamma: float | np.ndarray) -> np.ndarray | complex:
     """
-    1 / (resloc - i*gamma); gamma in the same units as resloc.
+    1 / (resloc - i*gamma); gamma in the same units as resloc, one number or one per grid point.
     With resloc = E - freq (eval_rescond_resloc) this is 1 / (E - freq - i*gamma).
     """
     return 1 / (resloc - 1j * gamma)
@@ -630,8 +630,8 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
                           parameters: ParameterSet,
                           vibstates_data: 'VibStatesData',
                           grid: dict[str, np.ndarray],
-                          propagator: Callable[[float|np.ndarray, float], complex],
-                          gamma: Callable[[VibDiff], float]) -> complex | np.ndarray:
+                          propagator: Callable[[float|np.ndarray, float|np.ndarray], complex],
+                          propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray: # FIXME change VibDiff to any or smth
     """
     One motif consists of resonance conditions from a single term.
 
@@ -645,7 +645,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 
         resloc = eval_rescond_resloc(res_cond_key, vd, grid)
 
-        result *= propagator(resloc, gamma(vd))
+        result *= propagator(resloc, propagator_param(vd))
 
     return result
 
@@ -654,13 +654,29 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 def eval_feature_on_grid(feature: 'SpectralFeature',
                          vibstates_data: 'VibStatesData',
                          grid_cm: dict[str, np.ndarray],
-                         propagator: Callable=lorentzian_propagator) -> complex | np.ndarray:
+                         propagator: Callable=lorentzian_propagator,
+                         propagator_param: Callable[[VibDiff], float | np.ndarray] | None = None) -> complex | np.ndarray:
     """
     amplitude_coeff * resonance factor of the feature's motif. grid in cm-1, result in au.
+
+    propagator_param - the propagator's parameter for each condition, in cm-1 (converted to Eh here),
+                       e.g. lambda vd: 5. for a 5 cm-1 width on every condition.
+                       None -> feature.lineshape_parameter on every condition.
+                       For a parameter that depends on the frequencies, read grid_cm inside the function
+                       and return an array of the grid's shape, e.g. lambda vd: 0.01 * grid_cm['A'].
+
+    FIXME (todo.txt E5): feat_box and get_intensity use feature.lineshape_parameter, not propagator_param.
+          A propagator_param with another width (or one that changes over the grid) gives a peak they do
+          not match, e.g. a box too small for a wider peak.
     """
-    if feature.lineshape_parameter is None:
-        raise ValueError(f'feature {feature} has no lineshape_parameter')
-    
+    if propagator_param is None:
+        if feature.lineshape_parameter is None:
+            raise ValueError(f'feature {feature} has no lineshape_parameter and no propagator_param was given')
+        gamma_au = convNu2Ene(feature.lineshape_parameter)
+        param_au = lambda _vd: gamma_au
+    else:
+        param_au = lambda vd: convNu2Ene(propagator_param(vd))
+
     if feature.motif is None:
         raise ValueError(f'feature {feature} has no motif')
     
@@ -668,10 +684,9 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
         raise ValueError(f'feature {feature} has no amplitude_coeff')
     
     grid_au = {ax: convNu2Ene(v) for ax, v in grid_cm.items()}
-    gamma_au = convNu2Ene(feature.lineshape_parameter)
-    
+
     resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
-                                             grid_au, propagator, gamma=lambda _vd: gamma_au)
+                                             grid_au, propagator, propagator_param=param_au)
 
     return feature.amplitude_coeff * resonance_factor
     # return np.asarray(feature.amplitude_coeff * resonance_factor)
