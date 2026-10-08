@@ -1,3 +1,4 @@
+from code import interact
 from dataclasses import dataclass
 from itertools import cycle
 from typing import Optional, Iterable
@@ -51,6 +52,8 @@ class SpecDetector:
     detection_range: Optional[list[float]] = None
 
     interaction_filter: Optional[list[list]] = None
+
+    # FIXME: rm this attribute?
     ignore_collinear: bool = True
 
     # FIXME: Unsure if this is a relevant attribute
@@ -198,6 +201,8 @@ class EmPulse:
     id: integer: Pulse ID label
 
     id_comp: Tuple: Pulse ID label(s) (used for pulse compounding)
+
+    is_compound: Boolean: Is this a compound pulse?
     """
 
     env: str
@@ -208,13 +213,14 @@ class EmPulse:
 
     maxstr: float = 0.0
 
-    wv: tuple[float] = (0.0, 0.0, 1.0)
-    pol: tuple[float] = (1.0, 0.0, 0.0)
+    wv: tuple[float] = None
+    pol: tuple[float] = None
     pol_comp:  tuple[tuple[float]] = None
     overall_phase: complex = 0.0
 
     id: int = None
     id_comp: tuple = None
+    is_compound = False
 
     def __post_init__(self):
         
@@ -311,7 +317,7 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, ma
     Required arguments: tc, cf, dev.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, maxstr = maxstr, wv = wv,
                    pol = pol, overall_phase = overall_phase, id = id)
 
 
@@ -327,7 +333,7 @@ def make_impulsive_gaussian_pulse(tc: float, cf: float = None, cf_uv: float = 0.
     Required arguments: tc. All other arguments optional.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, maxstr = maxstr, wv = wv,
                    pol = pol, overall_phase = overall_phase, id = id)
 
 def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
@@ -343,8 +349,102 @@ def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxs
     other make_..._pulse functions because of this optionality.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, maxstr = maxstr, wv = wv,
                    pol = pol, overall_phase = overall_phase, id = id)
+
+def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
+    """
+    Make a compound Gaussian pulse from two EmPulse instances.
+
+    p1, p2: The EmPulse instances to be compounded (p2 is optional)
+
+    Returns: An EmPulse instance representing the compounded pulse
+    """
+
+    if not p1.env == 'gaussian':
+        raise ValueError('Pulses to be compounded must be Gaussian')
+
+    if p2 is None:
+
+
+
+        comp_pulse = copy.deepcopy(p1)
+
+        comp_pulse.pol_comp = (copy.deepcopy(p1.pol),)
+        comp_pulse.pol = None
+
+        comp_pulse.id_comp = (copy.deepcopy(p1.id),)
+        comp_pulse.id = None
+
+        return comp_pulse
+
+    else:
+
+        if not p2.env == 'gaussian':
+            raise ValueError('Pulses to be compounded must be Gaussian')
+
+        # Combining attributes of p1 and p2
+        # Here using the fact that the product of Gaussians is another Gaussian with specific expressions for
+        # the new means and variances
+        p1dsq = (p1.dev) ** 2
+        p2dsq = (p2.dev) ** 2
+        p12dsq = p1dsq + p2dsq
+
+        # New time maximum, carrier frequency, deviation, overall coefficient
+        new_tc = (p1.tc * p1dsq + p2.tc * p2dsq) / p12dsq
+        new_cf = p1.cf + p2.cf
+        new_dev = (p1dsq * p2dsq / p12dsq) ** 0.5
+        new_maxstr = p1.maxstr * p2.maxstr * exp(-1 * ((p1.tc - p2.tc) ** 2) / (2 * p12dsq))
+
+        # New wavevector as sum
+        new_wv = tuple([p1.wv[j] + p2.wv[j] for j in range(3)])
+
+        # Update polarization
+        if p1.is_compound:
+            lcppc = list(p1.pol_comp)
+        else:
+            lccpc = [p1.pol]
+
+        if p2.is_compound:
+            lcppc.extend(p2.pol_comp)
+        else:
+            lcppc.append(p2.pol)
+
+        new_pol_comp = tuple(lcppc)
+
+        # New phase is sum
+        new_overall_phase = p1.overall_phase + p2.overall_phase
+
+        # Update ID
+        if p1.is_compound:
+            nic = list(p1.id_comp)
+        else:
+            nic = [p1.id]
+
+        if p2.is_compound:
+            nic.extend(p2.id_comp)
+        else:
+            nic.append(p2.id)
+
+        new_id_comp = tuple(nic)
+
+        # Make compound pulse
+        return EmPulse(env='gaussian', tc=new_tc, cf=new_cf, dev=new_dev, maxstr=new_maxstr,
+                       wv=new_wv, pol=None, pol_comp=new_pol_comp, overall_phase=new_overall_phase,
+                       id=None, id_comp=new_id_comp, is_compound=True)
+
+
+def compound_pulses_in_list(pulses: list[EmPulse]) -> EmPulse:
+
+    if not all([i.env == 'gaussian' for i in pulses]):
+        raise ValueError('Pulses to be compounded must be Gaussian')
+
+    comp_acc = make_compound_gaussian_pulse(p1 = pulses[0])
+
+    for i in pulses[1:]:
+        comp_acc = make_compound_gaussian_pulse(p1 = comp_acc, p2 = i)
+
+    return comp_acc
 
 # The field consists of a collection of pulses
 @dataclass
@@ -426,8 +526,7 @@ class ElectricField:
         """
         from itertools import combinations_with_replacement as combs
 
-        valid_filters = ['same_order', 'up_to_order']
-
+        valid_filters = ['same_order', 'up_to_order', 'only_specified']
 
         if not filter in valid_filters:
             raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
@@ -447,8 +546,10 @@ class ElectricField:
         # The input interaction pattern trivially matches
         matching_wv = [tuple(sorted_ids)]
 
+        if filter == 'only_specified':
+            return matching_wv
 
-        if filter == 'same_order':
+        elif filter == 'same_order':
             ord_start = len(sorted_ids)
             ord_end = len(sorted_ids) + 1
 
@@ -573,17 +674,17 @@ class ElectricField:
                                                tol_n_dev: float | int = 5.0) -> dict[tuple, EmPulse]:
         """
         Take a list of candidate pulse tuples and decide if a compound pulse created from them
-        can produce resonance in the IR region as judged by whether the compound's frequency components
+        can produce resonance in the vibrational as judged by whether the compound's frequency components
         (with a cutoff) has a bandwidth that to a non-zero extent intersects with frequency components
-        falling beneath a threshold, returning all such valid candidates as a {pulse tuple:EmPulse instance} dictionary
+        falling beneath a threshold, returning all such valid candidates as a {pulse ID tuple:EmPulse instance} dictionary
         This routine currently only supports Gaussian-envelope pulses.
 
         cand_pulse_tuples: A list of pulse tuples specified by (signed) pulse IDs. The main intended origin of this list
         is to have it be those tuples that were found to have sufficiently large time-domain intersections
         as judged by overlapping_pulses_for_interaction_pattern().
 
-        thres_freq: A threshold (default: 8000 cm^-1) below which it is deemed that resonance in
-        the vibrational manifold can take place. To be given in units of cm^-1.
+        thres_freq: A threshold (default: +/-8000 cm^-1) outside which no resonance in
+        the vibrational manifold is considered. To be given in units of cm^-1.
 
         tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses) (default: 5 units): Each pulse's frequency-domain
         bandwidth is taken as arg(freq domain max) +/- tol_n_dev * the pulse's frequency-domain deviation parameter.
@@ -598,57 +699,10 @@ class ElectricField:
         # Loop over candidate tuples
         for c in cand_pulse_tuples:
 
-            n_pulse = self.signed_pulses[c[0]]
-            if not n_pulse.env == 'gaussian':
-                raise ValueError('Only Gaussian pulses are currently supported for compounding')
-
-            # Take the first pulse reference and represent it as an EmPulse in "compounding" mode
-            comp_pulse = EmPulse(env = n_pulse.env, tc = n_pulse.tc, cf = n_pulse.cf, dev = n_pulse.dev,
-                                    maxstr = n_pulse.maxstr, wv = n_pulse.wv, pol = None, pol_comp = (n_pulse.pol,),
-                                    overall_phase= n_pulse.overall_phase, id_comp=(n_pulse.id,))
-
-            # Form compound pulse iteratively with any further pulse refs in tuple
-            for p in range(1, len(c)):
-                n_pulse = self.signed_pulses[c[p]]
-
-                if not n_pulse.env == 'gaussian':
-                    raise ValueError('Only Gaussian pulses are currently supported for compounding')
-
-                # Combining attributes of comp_pulse and the new n_pulse
-                # Here using the fact that the product of Gaussians is another Gaussian with specific expressions for
-                # the new means and variances
-                npdsq = (n_pulse.dev)**2
-                cpdsq = (comp_pulse.dev) ** 2
-                ncpdsq = npdsq + cpdsq
-
-                new_tc = (comp_pulse.tc * npdsq + n_pulse.tc * cpdsq) / ncpdsq
-                new_cf = comp_pulse.cf + n_pulse.cf
-                new_dev = (npdsq * cpdsq / ncpdsq)**0.5
-
-                new_maxstr = comp_pulse.maxstr*n_pulse.maxstr * exp(-1 * ( ( comp_pulse.tc - n_pulse.tc)**2 ) / (2 * ncpdsq) )
-
-                new_wv = tuple([comp_pulse.wv[j] + n_pulse.wv[j] for j in range(3)])
-
-                # Extending tuple
-                lcppc = list(comp_pulse.pol_comp)
-                lcppc.append(n_pulse.pol)
-                new_pol_comp = tuple(lcppc)
-
-                # New phase is sum
-                new_overall_phase = comp_pulse.overall_phase + n_pulse.overall_phase
-
-                # Extending tuple
-                nic = list(comp_pulse.id_comp)
-                nic.append(n_pulse.id)
-                new_id_comp = tuple(nic)
-
-                # Update compounded pulse
-                comp_pulse = EmPulse(env='gaussian', tc = new_tc, cf = new_cf, dev = new_dev, maxstr = new_maxstr,
-                                     wv = new_wv, pol=None, pol_comp = new_pol_comp, overall_phase = new_overall_phase,
-                                     id_comp = new_id_comp)
+            # Create compounded pulse instance
+            comp_pulse = compound_pulses_in_list([self.signed_pulses[i] for i in c])
 
             # Determine bandwidth and check if any of it falls inside the threshold range
-
             w_range = [comp_pulse.cf - tol_n_dev * (per_cm_x_fs/comp_pulse.dev),
                        comp_pulse.cf + tol_n_dev * (per_cm_x_fs/comp_pulse.dev)]
 
@@ -700,6 +754,98 @@ class ElectricField:
 
         return ElectricField(tuple(copy.deepcopy(pulse_dict.values())))
 
+@dataclass
+class FieldAnalysis:
+    """
+    Class to represent analysis done on a field
+    """
+
+    field: ElectricField
+    interaction_filter: list[list]
+    tol_n_dev_t: float | int = 5.0
+    tol_n_dev_w: float | int = 5.0
+    thres_freq: float | int = 8000.0
+    wavevector_filter: str = 'same_order'
+
+    def __post_init__(self):
+
+        # Dividing larger pieces of code into helper methods, incorporate all the processing leading to the
+        # information that's needed for an integrator:
+
+        if not len(self.interaction_filter) > 0:
+            raise ValueError('Interaction filter must have nonzero length')
+
+        # Find wavevector-matching interaction patterns
+        if self.wavevector_filter in ['same_order', 'up_to_order']:
+            if not len(self.interaction_filter) == 1:
+                raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+
+            self.valid_int_patterns = self.field.wavevectors_matching_ids(self.interaction_filter[0], filter = self.wavevector_filter)
+
+        elif self.wavevector_filter == 'only_specified':
+
+            valid_int_patterns = [tuple(sorted(list(i))) for i in self.interaction_filter]
+
+            # Check if all wavevectors in interaction filter point in the same direction; if not, raise error
+
+            # Get all wavevectors matching the direction of a max order interaction in the filter with the
+            # 'up_to_order' flag; the returned set must contain all requested interaction patterns
+
+            maxlen = 0
+            for i in range(len(self.interaction_filter)):
+                if len(self.interaction_filter[i]) > maxlen:
+                    maxlen = len(self.interaction_filter[i])
+                    arg_max = i
+
+            test_int_patterns = self.field.wavevectors_matching_ids(self.interaction_filter[arg_max], filter = 'up_to_order')
+
+            for i in valid_int_patterns:
+                if not i in test_int_patterns:
+                    raise ValueError('Not all requested interaction patterns correspond to the same wavevector')
+
+            self.valid_int_patterns = valid_int_patterns
+
+        # Initialize result holders
+        time_ovl_tuples = []
+        res_and_time_ovl_tuples = []
+        res_and_time_compound_pulses = {}
+        time_not_res_compound_pulses = {}
+
+        # For all valid interaction patterns:
+        for i in valid_int_patterns:
+
+            # Accumulate all valid and relevant time-overlapping tuples (compounding and non-compounding)
+            time_ovl_tuples = list(set(time_ovl_tuples).union(self.field.overlapping_pulses_for_interaction_pattern(i, self.tol_n_dev_t)))
+
+        # Screen these according to resonance possibility (obtaining compound pulse instances)
+        res_and_time_compound_pulses = self.field.all_resonance_screened_compound_pulses(time_ovl_tuples, self.thres_freq, self.tol_n_dev_w)
+
+        # Take keys of prev results as overview of both resonance and time-overlap screened tuples
+        res_and_time_ovl_tuples = copy.deepcopy(res_and_time_compound_pulses.keys())
+
+        # Obtain remaining compound pulses (time-overlapping but not resonance-possible) (they apply for the last interaction)
+        for i in time_ovl_tuples:
+            if not(i in res_and_time_ovl_tuples):
+                time_not_res_compound_pulses[i] = compound_pulses_in_list([self.field.signed_pulses[j] for j in i])
+
+        # Generate valid compounding patterns at all relevant orders
+        # Can already screen and rule out compounding patterns here based on occurrence of
+        # valid orders in valid_compound_pulses
+
+        # Make a master permutation list for each unique order in the valid interaction patterns
+
+        # For each valid interaction pattern:
+        #   For each permutation of this pattern (appropriate master permutation list)
+        #       Permute the pulses to that ordering
+        #       For each compounding pattern at this interaction pattern's order:
+        #           Carry out time-ordering enforcement screening: If passing, add this (ordered) permutation of interactions
+        #           at this compounding pattern to the list of such valid permutations of interactions for this
+        #           compounding pattern
+
+        # After this, add test cases where now missing, do cleanup of the rest of wilson-experiment (code and tests) and
+        # move to adaptation of wilson-derive (where one such change is the in-/exclusion of compounding patterns)
+
+        pass
 
 
 @dataclass
@@ -752,23 +898,28 @@ class VibExperiment:
 
         self.dim = self.findDimensionality()
 
-        # Make scan grid with fields under scanning
+        # Make scan grid with field analyses under scanning
         # (NOTE: Currently, field attributes are the only attributes whose scanning is supported and so,
         # a grid of (scanned) fields manifests all the scans' changes to the experiment)
         grid_dims = tuple([len(i.range) for i in self.scans])
-        self.field_scan_grid = np.empty(grid_dims, dtype=object)
+
+        # To hold instances of FieldAnalysis
+        self.field_analyses = np.empty(grid_dims, dtype=object)
 
         if len(self.scans) > 0:
-            for scan_elem in np.ndindex(scan_grid.shape):
-                self.field_scan_grid[scan_elem] = self.field.new_field_with_changes(self.scans, scan_elem)
+            for scan_elem in np.ndindex(self.field_analyses.shape):
+                self.field_analyses[scan_elem] = self.field.new_field_with_changes(self.scans, scan_elem)
 
-        # With no scans, the scan grid is just the "scalar" base field
+        # With no scans, the analysis is only done with respect to the base field
         else:
-            self.field_scan_grid[()] = self.field
+            self.field_analyses[()] = self.field
+
+
+
+
+
 
         # NOTE: Below code to be reworked or rmd
-
-
 
         from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
                                                                         find_indep_exp_variables, find_valid_axes,
