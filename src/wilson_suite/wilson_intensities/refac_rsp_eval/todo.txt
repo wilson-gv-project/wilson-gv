@@ -120,6 +120,10 @@ D. Data model
 [ ] D4  Two copies of DataOriginInfo, VibState, MolecularProperty, MolPropsCollection
         (wilson_main/abstractions.py, system_data.py), plus a third MolSystemData in rps_evaluation.py.
         Decide who owns the data model. B1 is the first step.
+        Imports now (from the old README, checked 2026-10-09): plan.py <-> wilson_system.system_data import
+        each other, but both only for type hints (inside `if TYPE_CHECKING:`). evaluate.py and pipeline.py
+        import system_data for real. So there is no import cycle when the code runs. Moving the data model
+        must keep it that way.
 
 
 E. Pipeline
@@ -128,7 +132,7 @@ E. Pipeline
         Done: sign fixed (E - freq, derive's convention); eval_feature_on_grid (one feature, grid in cm-1).
         Done: draw_all (evaluate.py): every feature on the whole grid, the reference for draw_window;
               box_slices (grid.py): where a box sits in a grid, None outside. Replaces cut_grid_to_domains_nd.
-        Left: add up all features on one window grid, by domains. The grid is an argument, not on the window.
+        Done: add up all features on one window grid, by domains. The grid is an argument, not on the window.
           1. [x] no ±Γ default box in SpectralFeature.__post_init__: no box until dressed, so clustering
                  undressed features raises (features_to_clusters already does on None). Tests give a box with
                  feat(..., box_extent=...). Also fixed: dataclasses.replace no longer resets a dressed box.
@@ -139,12 +143,20 @@ E. Pipeline
                  Known limit: every box has the same size for one Γ (no scale_wrt_max_intensity). A feature far
                  stronger than the window's max, but further away than its box, is dropped although its tail
                  can be above max / dynrange inside the window. Fix only if a real spectrum needs it.
-          3. [ ] draw_window(window, coords, states) (evaluate.py): for each domain, total[slices] += each
-                 feature on the domain grid. Returns the amplitude.
-          4. [ ] tests: draw_window ≈ draw_all; a weak peak just past a strong peak's box edge.
-        Left: locations without every spectrum axis. e.g. a motif on B only in an (A, B) spectrum has
+          3. [x] draw_window(window, vibstates_data, coords_cm) (evaluate.py): each domain is draw_all of its
+                 features on its part of the grid (box_slices); the domains add up. Returns the amplitude.
+          4. [x] tests: one domain = draw_all exactly (weak peak next to a strong one included); two domains
+                 differ from draw_all only by the cut-off tails.
+                 Size of the cut: documented in the draw_window docstring, pinned by
+                 test_draw_window_cut_is_small_for_the_strongest_peak_not_for_a_weak_neighbour.
+                 dynrange 101, strong peak + weak peak (1 % of it) in two domains: intensity error 0.9 % of
+                 the strong peak over the whole grid, but 12 % of the weak peak at its own peak (36 % on its
+                 sides). dynrange 1001: one domain, no error. To decide for real spectra: which dynrange,
+                 checked against draw_all.
+        Later: locations without every spectrum axis. e.g. a motif on B only in an (A, B) spectrum has
         location {'B': E}; on an (A, B) grid its shape does not depend on A (a ridge along A).
-        Should be fine, but not sure every case is. Check each: which box for the missing axis
+        Now: SpectralWindow.from_features raises for such a feature (feat_box_overlaps: axes differ).
+        Enough for now (2026-10-09). When needed, check each: which box for the missing axis
         (the whole window range?), get_intensity, dress_these_with_boxes, eval_feature_on_grid.
 [ ] E3  Entry point: terms + data file + experiment settings -> features.
         Done: pipeline.compute_features (compiled terms + MolSystemData -> FeatureResult).
@@ -180,7 +192,10 @@ E. Pipeline
            every feature.
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2.
         6. [ ] Replace rps_evaluation.py (nothing imports it): keep SpectralGrid/BoxParams if E2 uses them.
-[ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
+[ ] E4  README: removed 2026-10-09; it described older designs the code does not follow (old text: git history,
+        e.g. git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md).
+        Write a new one once D4 settles the data model: the pipeline (pipeline.py docstring), the drawing
+        (SpectralWindow.from_features, domains, draw_window; draw_all as reference; the size of the cut).
 [ ] E5  Width of the drawn peak vs width of its box (added 2026-10-08).
         eval_feature_on_grid takes an optional propagator_param: the width in cm-1, per condition, or per
         grid point if the function reads the grid itself. But get_intensity, dress_these_with_boxes and
@@ -224,6 +239,30 @@ code on the checking side.
         axis choices). Run the B7 check on them, then old vs new with tests/c2_variations.py and
         tests/c2_leaves.py (TERMS, MOLECULES, VARIATIONS at the top; old code: before D4/E4).
         Which experiments: to pick.
+
+
+H. Rules (kept from the old README, removed 2026-10-09)
+--------------------------------------------------------
+H1  Prefer deleting to designing. A new type, cache or optimization needs a measured reason.
+    e.g. draw_all came first; draw_window came with a test that measures how far it is from draw_all.
+H2  Make an abstraction on the second real use, not the first. Code that looks shared stays with its one
+    user until a second user exists. No base classes, no registries, no second orchestrator next to
+    WilsonSimulation. Delete code instead of commenting it out.
+H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from the size
+    of a number.
+H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
+    e.g. the ±Γ box that SpectralFeature.__post_init__ used to build: dataclasses.replace rebuilt it and
+    threw away the dressed box (removed in E2).
+    Now not frozen: Box, SpectralFeature, SpectralWindow, RectangularDomain, PrecalculatedData.
+H5  Validate when an object is built; check types only at entry points.
+H6  plan.py runs, and its output can be checked, with zero molecular data. Now: test_plan.py.
+H7  Never change derive's objects (VibPerturbedTerm and its parts). Now: test_pipeline.py checks that the
+    caller's terms stay unchanged.
+H8  One module imports wilson_derive. Now broken: plan.py, and pipeline.py (term_var_translate);
+    plan.py's docstring still says "ONLY importer". No test checks it. To decide: move the translation
+    into plan.py, or drop the rule.
+
+Open question from the old README: is single-component Cartesian selection a wanted feature?
 
 
 Done on this branch
