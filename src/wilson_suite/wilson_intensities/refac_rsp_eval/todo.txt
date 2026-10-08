@@ -132,9 +132,13 @@ E. Pipeline
           1. [x] no ±Γ default box in SpectralFeature.__post_init__: no box until dressed, so clustering
                  undressed features raises (features_to_clusters already does on None). Tests give a box with
                  feat(..., box_extent=...). Also fixed: dataclasses.replace no longer resets a dressed box.
-          2. [ ] SpectralWindow.from_features(box, features, dynrange): boxes from Γ and dynrange, keep features
-                 whose box overlaps the window, then drop weak ones. Replaces filter_to_spec_window
-                 (location ± 2Γ, before boxes exist) and dress_with_featboxes.
+          2. [x] SpectralWindow.from_features(box, features, dynrange): boxes from Γ and dynrange, keep features
+                 whose box overlaps the window, then drop weak ones (max over the kept features). Replaces
+                 filter_to_spec_window (location ± 2Γ, before boxes exist), dress_with_featboxes,
+                 contributes_to and feat_type.
+                 Known limit: every box has the same size for one Γ (no scale_wrt_max_intensity). A feature far
+                 stronger than the window's max, but further away than its box, is dropped although its tail
+                 can be above max / dynrange inside the window. Fix only if a real spectrum needs it.
           3. [ ] draw_window(window, coords, states) (evaluate.py): for each domain, total[slices] += each
                  feature on the domain grid. Returns the amplitude.
           4. [ ] tests: draw_window ≈ draw_all; a weak peak just past a strong peak's box edge.
@@ -179,8 +183,8 @@ E. Pipeline
 [ ] E4  README: one design. Remove the "tried and dropped" claims that contradict plan.py.
 [ ] E5  Width of the drawn peak vs width of its box (added 2026-10-08).
         eval_feature_on_grid takes an optional propagator_param: the width in cm-1, per condition, or per
-        grid point if the function reads the grid itself. But SpectralFeature's feat_box, contributes_to,
-        get_intensity and dress_these_with_boxes still use feature.lineshape_parameter.
+        grid point if the function reads the grid itself. But get_intensity, dress_these_with_boxes and
+        SpectralWindow.from_features (the boxes) still use feature.lineshape_parameter.
         If the two differ, the box and the intensity do not match the drawn peak. e.g. width 10 cm-1
         drawn, lineshape_parameter 5 cm-1: the box is too small and part of the peak is cut off.
         Now: nothing passes propagator_param, so every peak uses lineshape_parameter (no mismatch).

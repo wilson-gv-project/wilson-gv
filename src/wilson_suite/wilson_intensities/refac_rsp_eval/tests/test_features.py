@@ -339,7 +339,7 @@ def test_get_feats_with_params_skips_features_without_rows():
 
 ## SpectralFeature: relation to a box ---------------------------------------
 
-@pytest.mark.parametrize('method', ['is_inside', 'feat_box_overlaps', 'contributes_to'])
+@pytest.mark.parametrize('method', ['is_inside', 'feat_box_overlaps'])
 def test_feature_box_relations_need_the_box_axes(method):
     box = Box({'A': (0., 10.)})
 
@@ -364,48 +364,6 @@ def test_feature_box_overlaps_excludes_touching_edges():
 def test_feature_box_overlaps_needs_a_feature_box():
     with pytest.raises(ValueError, match='Need to add a box'):
         feat(A=5.).feat_box_overlaps(Box({'A': (0., 10.)}))
-
-
-@pytest.mark.parametrize('a, contributing', [
-    (5., False),    # inside -> a full feature, not a contributing one
-    (11., True),    # outside, within 2*gamma
-    (12., True),    # exactly 2*gamma away
-    (12.5, False),  # beyond 2*gamma
-    (-2., True),
-])
-def test_feature_contributes_to_box_when_outside_but_within_two_gamma(a, contributing):
-    assert feat(A=a, gamma=1.).contributes_to(Box({'A': (0., 10.)})) == contributing
-
-
-def test_feature_contributes_to_needs_lineshape_parameter():
-    with pytest.raises(ValueError, match='lineshape_parameter'):
-        feat(A=11., gamma=None).contributes_to(Box({'A': (0., 10.)}))
-
-
-## SpectralFeature: filter_to_spec_window -----------------------------------
-
-def test_filter_to_spec_window_splits_full_and_contributing_features():
-    window = SpectralWindow(Box({'A': (0., 10.)}))
-    inside, near, far = feat(A=5.), feat(A=11.), feat(A=50.)
-
-    result = SpectralFeature.filter_to_spec_window([inside, near, far], window)
-
-    assert result.full_features == [inside]
-    assert result.contrib_features == [near]
-    assert result.full_features[0].feat_type == 'full'
-    assert result.contrib_features[0].feat_type == 'contributing'
-    assert window.full_features == [] and window.contrib_features == []
-
-
-def test_filter_to_spec_window_does_not_change_input_features():
-    f = feat(A=11.)
-
-    first = SpectralFeature.filter_to_spec_window([f], SpectralWindow(Box({'A': (0., 10.)})))
-    second = SpectralFeature.filter_to_spec_window([f], SpectralWindow(Box({'A': (10.5, 20.)})))
-
-    assert f.feat_type is None
-    assert first.contrib_features[0].feat_type == 'contributing'
-    assert second.full_features[0].feat_type == 'full'
 
 
 ## SpectralFeature: intensity -----------------------------------------------
@@ -601,31 +559,6 @@ def test_sample_grid_is_the_box_grid():
         np.testing.assert_array_equal(grid[ax], box_grid[ax])
 
 
-def test_window_dress_with_featboxes_keeps_box_and_drops_weak_features():
-    strong = feat(A=5., amp=1., gamma=5.)
-    weak = feat(A=6., amp=1e-3, gamma=5.)
-    near = feat(A=12., amp=0.5, gamma=5.)
-    window = SpectralWindow(Box({'A': (0., 10.)}), full_features=[strong, weak], contrib_features=[near])
-
-    dressed = window.dress_with_featboxes(dynrange=101.)
-
-    assert dressed.box == window.box
-    assert dressed.full_features == [strong]
-    assert dressed.contrib_features == [near]
-    assert get_box_extent(dressed.full_features[0]) == pytest.approx(5. * 10. * 1.1)
-
-
-def test_window_dress_with_featboxes_allows_a_stronger_contributing_feature():
-    weak_inside = feat(A=5., amp=0.1, gamma=5.)
-    strong_near = feat(A=12., amp=1., gamma=5.)
-    window = SpectralWindow(Box({'A': (0., 10.)}), full_features=[weak_inside], contrib_features=[strong_near])
-
-    dressed = window.dress_with_featboxes(dynrange=101.)
-
-    assert dressed.full_features == [weak_inside]
-    assert dressed.contrib_features == [strong_near]
-
-
 def test_window_find_clusters_by_featboxes_includes_contributing_features():
     # boxes (8.5, 10.5) and (10, 12) overlap
     inside, near = feat(A=9.5, box_extent=1.), feat(A=11., box_extent=1.)
@@ -634,6 +567,109 @@ def test_window_find_clusters_by_featboxes_includes_contributing_features():
     [domain] = window.find_clusters_by_featboxes()
 
     assert domain.box == Box({'A': (8.5, 12.)})
+
+
+## SpectralWindow.from_features ---------------------------------------------
+# Window A (0, 10). gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * sqrt(101 - 1) * 1.1 = 55.
+# Intensity goes with amp**2, e.g. amp 0.1 -> 1/100 of amp 1 (kept, above 1/101), amp 0.09 -> 1/123 (dropped).
+
+WINDOW_0_10 = Box({'A': (0., 10.)})
+
+
+def test_window_from_features_keeps_features_whose_box_overlaps_the_window():
+    """
+    A = 60: box (5, 115) overlaps the window -> contrib_features.  A = 70: box (15, 125) does not -> dropped.
+    (The old rule, location within 2 * gamma of the window, dropped A = 60 too.)
+    """
+    inside, near, far = feat(A=5., gamma=5.), feat(A=60., gamma=5.), feat(A=70., gamma=5.)
+
+    window = SpectralWindow.from_features(WINDOW_0_10, [inside, near, far], dynrange=101.)
+
+    assert window.box == WINDOW_0_10
+    assert window.full_features == [inside]
+    assert window.contrib_features == [near]
+
+
+def test_window_from_features_box_extent_is_gamma_times_sqrt_dynrange_minus_one_plus_margin():
+    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.)
+    no_margin = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.,
+                                             box_range_safety_margin=0.)
+
+    assert get_box_extent(window.full_features[0]) == pytest.approx(55.)
+    assert get_box_extent(no_margin.full_features[0]) == pytest.approx(50.)
+
+
+def test_window_from_features_boxes_are_the_dress_these_with_boxes_boxes():
+    f = feat(A=5., gamma=5.)
+    top = f.get_intensity()
+
+    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101)
+    window = SpectralWindow.from_features(WINDOW_0_10, [f], dynrange=101.)
+
+    assert window.full_features[0].feat_box == dressed.feat_box
+
+
+def test_window_from_features_drops_features_weaker_than_max_over_dynrange():
+    strong, kept, dropped = feat(A=5., amp=1., gamma=5.), feat(A=6., amp=0.1, gamma=5.), feat(A=7., amp=0.09, gamma=5.)
+
+    window = SpectralWindow.from_features(WINDOW_0_10, [strong, kept, dropped], dynrange=101.)
+
+    assert window.full_features == [strong, kept]
+
+
+def test_window_from_features_max_includes_a_strong_feature_outside_the_window():
+    """The strong feature at A = 12 is kept (its box overlaps) and sets the max: the inside one, 1/123 of it, goes."""
+    strong_outside, weak_inside = feat(A=12., amp=1., gamma=5.), feat(A=5., amp=0.09, gamma=5.)
+
+    window = SpectralWindow.from_features(WINDOW_0_10, [strong_outside, weak_inside], dynrange=101.)
+
+    assert window.full_features == []
+    assert window.contrib_features == [strong_outside]
+
+
+def test_window_from_features_max_ignores_features_far_from_the_window():
+    """The strong feature at A = 500 is dropped first (no box overlap), so it does not set the max: the weak one stays."""
+    strong_far, weak_inside = feat(A=500., amp=1., gamma=5.), feat(A=5., amp=0.01, gamma=5.)
+
+    window = SpectralWindow.from_features(WINDOW_0_10, [strong_far, weak_inside], dynrange=101.)
+
+    assert window.full_features == [weak_inside]
+    assert window.contrib_features == []
+
+
+@pytest.mark.parametrize('features', [[], [feat(A=500., gamma=5.)]])
+def test_window_from_features_without_features_near_the_window_is_empty(features):
+    window = SpectralWindow.from_features(WINDOW_0_10, features, dynrange=101.)
+
+    assert window.full_features == [] and window.contrib_features == []
+
+
+def test_window_from_features_does_not_change_input_features():
+    f = feat(A=5., gamma=5.)
+
+    SpectralWindow.from_features(WINDOW_0_10, [f], dynrange=101.)
+
+    assert f.feat_box is None
+
+
+def test_window_from_features_can_be_clustered_right_away():
+    """inside: box (-50, 60), near: box (5, 115). They overlap, so one domain spans both."""
+    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.), feat(A=60., gamma=5.)], dynrange=101.)
+
+    [domain] = window.find_clusters_by_featboxes()
+
+    assert domain.box.bounds['A'] == pytest.approx((-50., 115.))
+
+
+@pytest.mark.parametrize('dynrange', [1., 0.5])
+def test_window_from_features_needs_dynrange_above_one(dynrange):
+    with pytest.raises(ValueError, match='dynrange'):
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.)], dynrange=dynrange)
+
+
+def test_window_from_features_needs_lineshape_parameter():
+    with pytest.raises(ValueError, match='lineshape_parameter'):
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], dynrange=101.)
 
 
 ## RectangularDomain --------------------------------------------------------
@@ -690,17 +726,6 @@ def test_nd_feature_is_inside_only_when_every_axis_is_inside(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_feature_contributes_to_box_within_two_gamma_on_every_axis(ndim):
-    box = cube(ndim, 0., 10.)
-
-    assert not feat(coords(ndim, 5.), gamma=1.).contributes_to(box)  # inside
-    assert feat(coords(ndim, 11.), gamma=1.).contributes_to(box)  # outside on every axis (corner), within 2*gamma
-    for ax in AXES[:ndim]:
-        assert feat(coords(ndim, 5., **{ax: 11.5}), gamma=1.).contributes_to(box)
-        assert not feat(coords(ndim, 5., **{ax: 12.5}), gamma=1.).contributes_to(box)
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_intensity_has_one_gamma_factor_per_axis(ndim):
     f = feat(coords(ndim, 100.), amp=2., gamma=5.)
 
@@ -718,26 +743,21 @@ def test_nd_dress_box_extent_is_the_same_on_every_axis(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_filter_to_spec_window_splits_full_and_contributing_features(ndim):
-    window = SpectralWindow(cube(ndim, 0., 10.))
-    inside, far = feat(coords(ndim, 5.)), feat(coords(ndim, 50.))
-    near = feat(coords(ndim, 5., **{AXES[ndim - 1]: 11.}))
+def test_nd_window_from_features_needs_box_overlap_on_every_axis(ndim):
+    """
+    Window (0, 10) on every axis; gamma 5, dynrange 101 -> box_extent 55 on every axis.
+    near and far sit on `inside`, except on the last axis: near at 60 (box from 5: overlaps), far at 70 (from 15: no).
+    """
+    last = AXES[ndim - 1]
+    inside = feat(coords(ndim, 5.), gamma=5.)
+    near = feat(coords(ndim, 5., **{last: 60.}), gamma=5.)
+    far = feat(coords(ndim, 5., **{last: 70.}), gamma=5.)
 
-    result = SpectralFeature.filter_to_spec_window([inside, near, far], window)
+    window = SpectralWindow.from_features(cube(ndim, 0., 10.), [inside, near, far], dynrange=101.)
 
-    assert result.full_features == [inside]
-    assert result.contrib_features == [near]
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_window_dress_with_featboxes_drops_weak_features(ndim):
-    strong, weak = feat(coords(ndim, 5.), amp=1., gamma=5.), feat(coords(ndim, 6.), amp=1e-3, gamma=5.)
-    window = SpectralWindow(cube(ndim, 0., 10.), full_features=[strong, weak])
-
-    dressed = window.dress_with_featboxes(dynrange=101.)
-
-    assert dressed.full_features == [strong]
-    assert [get_box_extent(dressed.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
+    assert window.full_features == [inside]
+    assert window.contrib_features == [near]
+    assert [get_box_extent(window.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)

@@ -12,7 +12,7 @@ Takes Box, box grids and box clustering from grid.py; grid.py never imports from
 import copy
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
@@ -121,7 +121,6 @@ class SpectralFeature:
     rows: tuple[ContributionRow, ...] = ()
     lineshape_parameter: float | None = None
     scale: float = 1.0      # normalize_coeffs_to_max changes this, never the rows
-    feat_type: str | None = None
     feat_box: Box | None = None
 
     @property
@@ -241,49 +240,6 @@ class SpectralFeature:
             raise ValueError('Need to add a box for this feature')
         return box.overlaps(self.feat_box)
 
-    def contributes_to(self, box: Box) -> bool:
-        """
-        Return boolean for whether this feature lies outside `box` but still adds intensity inside it:
-            within 2*lineshape_parameter of `box` on every axis.
-        """
-        self._check_same_axes(box)
-
-        if self.lineshape_parameter is None:
-            raise ValueError("Expected SpectralFeature with `lineshape_parameter` attribute")
-
-        contributing = True
-        for ax, (mn, mx) in box.bounds.items():
-            Gamma = self.lineshape_parameter
-            # FIXME??   2*Gamma ??
-            # in place ADDition
-            contributing &= (self.location[ax] >= mn-2*Gamma) & (self.location[ax] <= mx+2*Gamma)
-        return contributing and not self.is_inside(box)
-
-    
-    @classmethod
-    def filter_to_spec_window(cls, spec_features: list['SpectralFeature'],
-                              spec_window: 'SpectralWindow'):
-        """
-        return spectral window with sorted features which are going to be evaluated in it.
-        Creates a deep copy of spec_features.
-        """
-        cp_spec_features = copy.deepcopy(spec_features)
-        full_features = []
-        contrib_features = []
-
-        for feature in cp_spec_features:
-            if feature.is_inside(spec_window.box):
-                feature.feat_type = 'full'
-                full_features.append(feature)
-            if feature.contributes_to(spec_window.box):
-                feature.feat_type = 'contributing'
-                contrib_features.append(feature)
-        upd_spec_window = copy.deepcopy(spec_window)
-        upd_spec_window.full_features = full_features
-        upd_spec_window.contrib_features = contrib_features
-
-        return upd_spec_window
-
     @classmethod
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],
                           intensity_expr: str | None = 'abs()**2') -> 'SpectralFeature':
@@ -394,29 +350,6 @@ class SpectralFeature:
             - minimum_box_padding: Low but positive number (2-10 * lineshape parameter)
 
         """
-
-
-        def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
-            """
-            Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
-            L(w) = | A / ((w - w_0) - i*gamma) |^2
-            after applying absolute square for intensity,
-            at which radius (units same as gamma) must an n-dimensional sphere be drawn around the
-            resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
-            maximum's intensity everywhere outside the sphere?
-
-            Found by evaluating L(x - x_0)/L(x_0) = k, with L from the above expression, and solving for the x that
-            gives the desired k (where k = 1/dynrange)
-            """
-
-            # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
-            # to a negative box size (and the default formula will return NaN) - therefore return 0.0 instead
-            if dynrange < 1.0:
-                return 0.0
-
-            else:
-                return ( (gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange) ) ** 0.5
-
         import copy
 
         # Defining here an implied dynamic range based on the max/min specified intensity ratio
@@ -521,16 +454,79 @@ def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['S
 
     return connected_components_from_adjacency(adjacency, features)
 
+
+def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
+    """
+    Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
+    L(w) = | A / ((w - w_0) - i*gamma) |^2
+    after applying absolute square for intensity,
+    at which radius (units same as gamma) must an n-dimensional sphere be drawn around the
+    resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
+    maximum's intensity everywhere outside the sphere?
+
+    Found by evaluating L(x - x_0)/L(x_0) = k, with L from the above expression, and solving for the x that
+    gives the desired k (where k = 1/dynrange)
+    """
+
+    # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
+    # to a negative box size (and the default formula will return NaN) - therefore return 0.0 instead
+    if dynrange < 1.0:
+        return 0.0
+
+    else:
+        return ( (gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange) ) ** 0.5
+
+
 @dataclass
 class SpectralWindow:
     """
-    The full spectrum range (a Box) with the features evaluated in it.
+    The full spectrum range (a Box) with the features evaluated in it (made by from_features).
         full_features: location inside the box
-        contrib_features: location outside the box, but close enough to add intensity inside it
+        contrib_features: location outside the box, but the feature's box overlaps it
     """
     box: 'Box'
     full_features: list['SpectralFeature'] = field(default_factory=list)
     contrib_features: list['SpectralFeature'] = field(default_factory=list)
+
+    @classmethod
+    def from_features(cls, box: Box, features: list['SpectralFeature'], dynrange: float,
+                      box_range_safety_margin: float = 0.1) -> 'SpectralWindow':
+        """
+        The window over `box` with the features that add amplitude inside it, each with its box. In this order:
+          1. a box around every feature: box_extent = gamma * sqrt(dynrange - 1) * (1 + box_range_safety_margin)
+             on every axis, as dress_these_with_boxes without scale_wrt_max_intensity. Needs no max intensity.
+          2. keep the features whose box overlaps `box` (touching edges excluded):
+             location inside `box` -> full_features, outside -> contrib_features
+          3. drop the features weaker than max / dynrange; max over the kept features,
+             so a strong feature just outside `box` counts too
+
+        e.g. gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * 10 * 1.1 = 55 cm-1. For `box` A (0, 10),
+        a feature at A = 60 is kept (its box starts at 5), a feature at A = 70 is not (its box starts at 15).
+
+        dynrange: strongest intensity / weakest intensity that still counts.
+        Returns copies with boxes; the input features stay as they are. Every feature needs a lineshape_parameter.
+        """
+        if dynrange <= 1.:
+            raise ValueError(f'dynrange must be > 1, got {dynrange}')
+
+        dressed = []
+        for f in features:
+            if f.lineshape_parameter is None:
+                raise ValueError(f'feature {f} has no lineshape_parameter, so no box size')
+            box_extent = (lorentzian_distance_to_dynrange_weaker_than_max(f.lineshape_parameter, dynrange)
+                          * (1. + box_range_safety_margin))
+            feat_box = Box({k: (v - box_extent, v + box_extent) for k, v in f.location.as_dict().items()})
+            dressed.append(replace(f, feat_box=feat_box))
+
+        kept = [f for f in dressed if f.feat_box_overlaps(box)]
+        if not kept:
+            return cls(box)
+        min_intensity = max(f.get_intensity() for f in kept) / dynrange
+        kept = [f for f in kept if f.get_intensity() >= min_intensity]
+
+        return cls(box,
+                   full_features=[f for f in kept if f.is_inside(box)],
+                   contrib_features=[f for f in kept if not f.is_inside(box)])
 
     @property
     def bounds(self) -> dict[str, 'Dim_bounds']:
@@ -562,25 +558,6 @@ class SpectralWindow:
             RectangularDomain.from_features(clusters[c])
             for c in clusters
         )
-
-    def dress_with_featboxes(self, dynrange):
-        """
-
-        making SpectralFeature.feat_box attribute value
-            as a concequence, can rm features that are outside of the range 
-        
-        !warning: it is posssibly late to do this for a window when it has identified full_features and contrib_features
-        """
-        feat = SpectralFeature.get_max_intensity_feat(self.full_features+self.contrib_features)
-        max_intensity_in_window = feat.get_intensity()
-        min_intensity_in_window = max_intensity_in_window / dynrange
-
-        new_full_features = SpectralFeature.dress_these_with_boxes(self.full_features, max_intensity_in_window, min_intensity_in_window)
-        new_contrib_features = SpectralFeature.dress_these_with_boxes(self.contrib_features, max_intensity_in_window, min_intensity_in_window)
-
-        return SpectralWindow(box=self.box, 
-                              full_features=new_full_features, 
-                              contrib_features=new_contrib_features)
 
 
 @dataclass
