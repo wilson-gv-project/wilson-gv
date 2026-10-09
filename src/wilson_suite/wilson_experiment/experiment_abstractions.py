@@ -21,11 +21,6 @@ class SpecDetector:
     If detection_method is "integrated", then the detection data is a scalar
     Currently, only "freq" (frequency-range) detection is supported.
 
-    detector_location: List of floats: Taking the system to be positioned at the origin,
-    this parameter is the (unit) vector describing the direction along which the detector is located (i.e., the
-    detector is located along this vector from the system and facing the opposite direction).
-    Default: [0.0, 0.0, 1.0].
-
     detection_polarization: List of floats: Detect only light with this specific polarization vector. Default:
     [1.0, 0.0, 0.0].
 
@@ -37,20 +32,14 @@ class SpecDetector:
     and also note that while this parameter can be thought of as close to a phase-matching filter, it is not exactly the
     same (VibExperiment setup may further consider other signals in the same phase-matching direction(s) or isolate
     specific interaction sequences)
-
-    ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
-    Currently not used.
     """
+
     detection_method: str
-    
-    detector_location: Optional[tuple[float]] = None
-    
-    detection_polarization: Optional[tuple[float]] = None
+    detection_polarization: tuple[float]
+    interaction_filter: list[list]
 
     # FIXME: Rework to upper/lower bounds and (possibly) granularity?
     detection_range: Optional[list[float]] = None
-
-    interaction_filter: Optional[list[list]] = None
 
     # FIXME: Unsure if this is a relevant attribute
     overall_phase: float = 0.0
@@ -818,6 +807,8 @@ class FieldAnalysis:
 
     field: Electric field instance on which the analysis is to be made
 
+    polarization_filter: A tuple specifying the polarization filter of the detector
+
     interaction_filter: A list of interaction pattern(s) (each a list of signed integers referring to pulse IDs with
     the sign specifying the freq/wavevector parity) to be considered
 
@@ -838,6 +829,7 @@ class FieldAnalysis:
     """
 
     field: ElectricField
+    polarization_filter: tuple[float | int]
     interaction_filter: list[list[int]]
     tol_n_dev_t: float | int = 5.0
     tol_n_dev_w: float | int = 5.0
@@ -847,12 +839,15 @@ class FieldAnalysis:
 
     def __post_init__(self):
 
+        # TODO: Consider breaking this routine into a few smaller steps
         # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
         # TODO: Possibly introduce a phase shift to partly account for "non-ideally-Placzek" effects?
         # TODO: If reintroducing magnitude conditions, have them follow from the field and manage them here (with
         #  determination offloaded to external routine)
+        # FIXME: Organize interactions after polarization categories?
 
         from itertools import permutations as permutations
+        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 
         # Dividing larger pieces of code into helper methods, incorporate all the processing leading to the
         # information that's needed for an integrator:
@@ -960,7 +955,7 @@ class FieldAnalysis:
 
         int_patterns_by_order = {}
 
-        for i in valid_int_patterns:
+        for i in self.valid_int_patterns:
 
             if len(i) in int_patterns_by_order:
                 int_patterns_by_order[len(i)].append(i)
@@ -968,16 +963,21 @@ class FieldAnalysis:
             else:
                 int_patterns_by_order[len(i)] = [[i]]
 
-        # The "master" loop: Evaluate all available interaction sequences at all valid compounding patterns
-        int_sequences_by_order = {}
+        # Initializing macroscopic orientational average polarization vector "bank"
+        pol_avg_vector_bank = {}
+        pol_avg_vector_bank_ctr = 0
+
+        # The "master" loop: Evaluate all available interaction sequences,
+        # group by order, pulse compounding and polarization
+        int_sequences_by_order_comp_pol = {}
 
         # For each valid order of interaction pattern
         for ord in int_patterns_by_order:
 
-            int_sequences_by_order[ord] = {}
+            int_sequences_by_order_comp_pol[ord] = {}
 
             for c in comp_patterns_at_order[ord]:
-                int_sequences_by_order[ord][c] = []
+                int_sequences_by_order_comp_pol[ord][c] = {}
 
             # For each permutation of indices at this order
             for p in permutations(range(ord)):
@@ -991,8 +991,44 @@ class FieldAnalysis:
                     for j in range(len(i)):
                         p_pattern.append(i[p[j]])
 
+                    # Determine orientational avg polarization vector
+                    all_polarizations = [copy.deepcopy(self.polarization_filter)]
+
+                    # Could probably be done more elegantly but works
+                    for j in p_pattern:
+                        all_polarizations.append(copy.deepcopy(self.field.signed_pulses[j].pol))
+
+                    pol_avg_vector = get_pol_laser(all_polarizations)
+
+                    # FIXME: May need to introduce tolerances here
+                    # Check if pol avg vector is nonzero
+                    if not sum([abs[j] for j in pol_avg_vector]) == 0.0:
+
+                        #  Check against bank; determine bank index or make new bank entry
+                        found_in_bank = False
+
+                        for j in pol_avg_vector_bank:
+                            pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector[j][k]) for k in pol_avg_vector_bank])
+
+                            if pol_diff == 0.0:
+                                found_in_bank = True
+                                pol_bank_ind = j
+                                break
+
+                        if not found_in_bank:
+                            pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
+                            pol_bank_ind = pol_avg_vector_bank_ctr
+                            pol_avg_vector_bank_ctr += 1
+
+                    #  Otherwise cycle
+                    else:
+                        continue
+
                     # For each compounding pattern at this interaction pattern's order:
                     for c in comp_patterns_at_order[ord]:
+
+                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
+                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
 
                         # FIXME: There should be several optimization opportunities here if needed:
                         #  - Precalculate motifs of compounding patterns for time-overlap/resonance criteria
@@ -1044,7 +1080,32 @@ class FieldAnalysis:
                         # Time-ordering enforcement screening: If also passing this criterion, register this
                         # interaction sequence as valid
                         if pulse_time_ordering_valid(c_pulses):
-                            int_sequences_by_order[ord][c].append(tuple(c_pulse_inds))
+
+                            # FIXME: With any compounding, some permutations will be revisited here
+                            #  Checking for uniqueness here and will account for this as part of the overall
+                            #  permutations--coefficient question for these cases
+                            if not tuple(c_pulse_inds) in int_sequences_by_order_comp_pol[ord][c][pol_bank_ind]:
+                                int_sequences_by_order_comp_pol[ord][c][pol_bank_ind].append(tuple(c_pulse_inds))
+
+        # Prune int_sequences_by_order_comp_pol over empty pol bank ind entries, empty compounding
+        # patterns, empty orders, then assign as attribute
+        for ord in int_sequences_by_order_comp_pol:
+            for comp in int_sequences_by_order_comp_pol[ord]:
+                for pol in int_sequences_by_order_comp_pol[ord][comp]:
+
+                    # If this polarization setup gave nothing, delete the reference to it
+                    if int_sequences_by_order_comp_pol[ord][comp][pol] == []:
+                        del int_sequences_by_order_comp_pol[ord][c][pol]
+
+                # If no polarization setups remain for this compounding pattern, delete the reference to it
+                if int_sequences_by_order_comp_pol[ord][comp] == {}:
+                    del int_sequences_by_order_comp_pol[ord][comp]
+
+            # If no compounding patterns remain for this order, delete the reference to it
+            if int_sequences_by_order_comp_pol[ord] == {}:
+                del int_sequences_by_order_comp_pol[ord]
+
+        self.int_sequences_by_order_comp_pol = copy.deepcopy(int_sequences_by_order_comp_pol)
 
 
 @dataclass
@@ -1097,33 +1158,27 @@ class VibExperiment:
         # To hold instances of FieldAnalysis
         self.field_analyses = np.empty(grid_dims, dtype=object)
 
+        any_field_analysis_nonempty = False
+
         if len(self.scans) > 0:
             for scan_elem in np.ndindex(self.field_analyses.shape):
                 self.field_analyses[scan_elem] = FieldAnalysis(
                     self.field.new_field_with_changes(self.scans, scan_elem),
                     self.detector.interaction_filter)
 
+                if not(self.field_analyses[scan_elem].int_sequences_by_order_comp_pol == {}):
+                    any_field_analysis_nonempty = True
+
         # With no scans, the analysis is only done with respect to the base field
         else:
             self.field_analyses[()] = FieldAnalysis(self.field, self.detector.interaction_filter)
 
-        # TODO: Probably move this inside FieldAnalysis since this is interaction-pattern dependent
+            if not (self.field_analyses[()].int_sequences_by_order_comp_pol == {}):
+                any_field_analysis_nonempty = True
 
-        # Register all polarization vectors (associated with the detector and pulses) for convenience
-        # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
-        # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
+        if not any_field_analysis_nonempty:
+            raise AssertionError('This experiment will give a zero signal as set up and/or with the present tolerances/thresholds ')
 
-        all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
-
-        # Could probably be done more elegantly but works
-        for i in range(len(self.field.pulses)):
-            for j in self.field.pulses:
-                if j.id == i + 1:
-                    all_polarizations.append(copy.deepcopy(j.pol))
-
-        # Determine the macroscopic orientational average polarization vector
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-        self.polarization_avg_vector = get_pol_laser(all_polarizations)
 
     def findDimensionality(self) -> int:
         """
