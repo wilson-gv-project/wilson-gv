@@ -22,7 +22,7 @@ Order of work
    [-] C4: dropped 2026-10-09 (see C4).
 
 Next (order rewritten 2026-10-09 after a review). Steps 9-15 may use the old code; step 16 deletes it.
-9.  [ ] E3.6: delete rps_evaluation.py. Nothing imports it.
+9.  [x] E3.6: delete rps_evaluation.py. Nothing imports it.
 10. [ ] G1: hand calculation, CO. C2 and C3 show old = new; G1 is the only check that the numbers are right.
 11. [-] G7: postponed 2026-10-09 (choosing the experiments comes later). Risk of going on without it: see G7.
 12. [ ] E3.5: wilson_main adapter. Returns the states (draw_window needs them), decides the magnitude-condition
