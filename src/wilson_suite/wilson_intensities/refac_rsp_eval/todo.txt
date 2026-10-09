@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-09
 
-Tests: refac_rsp_eval 456 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 467 pass, 2 xfail (B6, pinned on purpose).
        Old suite (pytest src without refac_rsp_eval, 2026-10-09): 9 fail, 280 pass, 3 skip.
        None because of B1; the same 9 before and after B7.
        In a fresh checkout (e.g. a git worktree) about 18 more fail: some tests read files that git
@@ -19,13 +19,26 @@ Order of work
 7. [x] E2: add up all features on one window grid, by domains (draw_window).
        Locations without every spectrum axis: moved to Later.
 8. [x] C3: whole spectrum, old vs new.
-9. [ ] C4: special motifs, old vs new location solvers, actually run.
-10. [ ] D4, [ ] E4: one data model, one README; delete the old code (not amplitudes/averaging.py, see D4),
-       and with it tests/c2_variations.py, tests/c2_leaves.py and tests/c3_spectrum.py.
-       Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
-Any time: G1–G7 (checks beyond old = new), G1 first.
-Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1,
-       E2 locations without every spectrum axis,
+   [-] C4: dropped 2026-10-09 (see C4).
+
+Next (order rewritten 2026-10-09 after a review). Steps 9-15 may use the old code; step 16 deletes it.
+9.  [ ] E3.6: delete rps_evaluation.py. Nothing imports it.
+10. [ ] G1: hand calculation, CO. C2 and C3 show old = new; G1 is the only check that the numbers are right.
+11. [-] G7: postponed 2026-10-09 (choosing the experiments comes later). Risk of going on without it: see G7.
+12. [ ] E3.5: wilson_main adapter. Returns the states (draw_window needs them), decides the magnitude-condition
+        filter, and checks old vs new end to end through WilsonSimulation (C3 called the new functions directly).
+13. [ ] Port wilson_analysis/render to the new output (D4 sub-item): it reads the old types.
+14. [ ] Runtime on a bigger molecule, through the adapter. Decides B3, B5, B6 and F1: fix them, or delete the
+        precalculated path (H1).
+15. [ ] D4 with D3: one data model; ParameterSet without the hidden 'zero' entry.
+16. [ ] Delete the old code, in the order of the D4 sub-items (amplitudes/averaging.py stays), and with it
+        tests/c2_variations.py, tests/c2_leaves.py and tests/c3_spectrum.py.
+        G7 is postponed: this step also ends its old-vs-new part. Decide here: wait for G7, or do G7 later
+        without old vs new (B7 check and the new pipeline only).
+17. [ ] E4: README.
+Any time: G2–G6; H8 (keep or drop the rule); the default dynrange (E2 step 4).
+Later, only when needed: G7 (choose the experiments), D1, D2, E5, F1 (unless step 14 needs it),
+       E2 locations without every spectrum axis (derive gives such terms, see G7: needed once that setup matters),
        terms without resonance conditions (e.g. averaged tensors only): a path for them (see B7).
 
 
@@ -67,11 +80,16 @@ B. Correctness
         Pinned by 2 strict-xfail tests (test_precalculated_tensor_gives_the_on_the_fly_value,
         test_term8_precalculated_tensor_gives_the_on_the_fly_value). Fix, then remove the markers.
         B3, B5, B6: only once precalculated tables are built again. The on-the-fly path is correct.
+        compute_features_from_terms uses no precalculated tables. Order of work step 14 decides: fix B3, B5, B6,
+        or delete the precalculated path (H1). Deleting costs test rework: many tests set values through
+        pre_a1_zero (a PrecalculatedData).
 [x] B7  Rule (2026-10-07): each term's motif has exactly one resonance point, in the n axes the
         motif uses. n may differ between the terms of one collection.
         e.g. conditions on A and on B -> a point in 2D; one condition on B only -> a point in 1D (fine).
         Breaks the rule: one condition on A + B (a line), or conditions that contradict each other.
-        Such a term is malformed, not a physical case.
+        Such a term is not supported: no single point. Was written here as "malformed, not a physical case";
+        G7's first look (2026-10-09) found a real term with one condition on A + B: pulses 1 and 2 at the same
+        time, a Raman-like term, a line in 2D. Contradicting conditions (no point anywhere) stay malformed.
         Was: build_contributions put these pairs in `failed`; they left the spectrum without an error.
         Done (2026-10-09):
         - [x] check the rule in CompiledTerm.from_VibPertTerm (plan.py; not in __post_init__: tests build
@@ -91,8 +109,7 @@ B. Correctness
           (test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run).
           evv_reference.json rewritten: only the empty 'failed' entries went, no number changed.
           c2_variations.py updated and rerun: same result as C2 (old = new, the 2 mismatch controls differ).
-          solve_LSE_motif keeps its own checks: hand-built terms skip from_VibPertTerm, and C4 calls it on
-          broken motifs on purpose.
+          solve_LSE_motif keeps its own checks: hand-built terms skip from_VibPertTerm.
         All 14 EVV terms follow the rule, for all 3 axis choices of C2 (checked 2026-10-07; rechecked with
         compile_terms 2026-10-09).
 
@@ -112,7 +129,7 @@ C. Old vs new
         Differences exist only for motifs none of the 14 terms has (named in the test docstring):
         - one condition on B only: old IndexError; new gives a 1D point (correct by B7).
         - contradicting conditions, one condition on A + B: both break B7.
-        The old behaviour was found by reading the code only; C4 runs it.
+        The old behaviour was found by reading the code only (C4, to run it, was dropped).
         B5 cannot show on these terms (see B5). The double-count fix shows only in C3.
 [x] C3  Whole spectrum, old vs new: tests/c3_spectrum.py (needs the old code). Run 2026-10-09:
         14 EVV terms, axes A = w1, B = -w1 + w2, dynrange 100, gamma 4.7 cm-1, one grid for both (step 2 cm-1).
@@ -138,13 +155,14 @@ C. Old vs new
           (1: none, 0: the rows cancel); FeatureResult.cancelling(rel_tol) lists features with net_fraction
           <= rel_tol. Zero pairs are never in it. Formaldehyde, GVPT2: no exact cancellation; net_fraction
           <= 1 %: 2 of 68 features (a, b = 2, 0 and 0, 2; 7 rows each), <= 10 %: 12, <= 50 %: 43.
-[ ] C4  Special motifs, actually run. Hand-build the motifs; call old resonances.solve_LSE_motif
-        and new solve_LSE_motif on toy states:
-        - B only, A only (fine by B7): old IndexError for B only? Same point as new for A only?
-        - one condition on A + B (breaks B7): old ValueError?
-        - contradicting conditions (break B7): old prints and returns None. What does the old
-          pipeline do with None afterwards?
-        Needs the old code: before D4/E4.
+        - Open: old results had the double count wherever parameter sets share a location (degenerate modes,
+          or terms where swapping labels gives the same state). Which past runs does that affect?
+[-] C4  Dropped 2026-10-09. Was: run the old and new location solvers on special motifs (B only, A only,
+        one condition on A + B, contradicting conditions).
+        Why dropped: B7 now rejects the last two when compiling. B only and A only give features without
+        every spectrum axis, which old and new both refuse to draw (old, read not run: IndexError in the solver
+        for B only, ValueError in the window filter; new: from_features raises). Running C4 would only confirm that, on
+        code that is about to go. If G7 finds terms with such motifs, check them there.
 
 
 D. Data model
@@ -157,7 +175,8 @@ D. Data model
         D1–D3 no longer block anything: rows store term_id and motif, not the CompiledTerm.
 [ ] D4  Two copies of DataOriginInfo, VibState, MolecularProperty, MolPropsCollection
         (wilson_main/abstractions.py, system_data.py), plus a third MolSystemData in rps_evaluation.py.
-        Decide who owns the data model. B1 is the first step.
+        Decide who owns the data model. B1 is the first step. Order of work step 15 (with D3); the deletion
+        below is step 16, the render port step 13.
         Imports now (from the old README, checked 2026-10-09): plan.py <-> wilson_system.system_data import
         each other, but both only for type hints (inside `if TYPE_CHECKING:`). evaluate.py and pipeline.py
         import system_data for real. So there is no import cycle when the code runs. Moving the data model
@@ -255,10 +274,12 @@ E. Pipeline
            list (reverse-order run); the caller's terms stay unchanged; lineshape_parameter reaches
            every feature.
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2 (both done).
-               Found in C3:
+               Order of work step 12. Found in C3:
                - compute_features_from_terms returns no states, but draw_window needs them (molsys.states).
                - the old magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default):
                  SpectralFeature.apply_magn_cond_filter exists, but only rps_evaluation.py calls it (E3.6).
+               Check: the same spectrum as EvaluationWorkflow.evaluate, run through WilsonSimulation. Needs the
+               old code, so before step 16. Expect the old double count only where parameter sets share a location.
         6. [ ] Delete rps_evaluation.py. Nothing imports it, and E2 does not use its SpectralGrid/BoxParams
                (checked 2026-10-09).
 [ ] E4  README: removed 2026-10-09; it described older designs the code does not follow (old text: git history,
@@ -281,7 +302,7 @@ E. Pipeline
 F. Later, only when needed
 --------------------------
 [ ] F1  einsum for the averaged part, then maybe for the whole sum over summation labels.
-        Only if a large molecule is measurably too slow.
+        Only if a large molecule is measurably too slow: order of work step 14 measures it.
 
 
 G. Checks beyond old = new
@@ -306,8 +327,26 @@ code on the checking side.
 [ ] G7  More terms: every term file in the repo holds (some of) the same 14 terms, all with motif
         (-A), (B). Generate terms with derive for other experiments (pulse order, more pulses,
         axis choices). Run the B7 check on them, then old vs new with tests/c2_variations.py and
-        tests/c2_leaves.py (TERMS, MOLECULES, VARIATIONS at the top; old code: before D4/E4).
-        Which experiments: to pick.
+        tests/c2_leaves.py (TERMS, MOLECULES, VARIATIONS at the top; old code: before order of work step 16).
+        Also look for motifs of the dropped C4 kind, and for parameter sets that share a location.
+        Which experiments: to pick. Postponed 2026-10-09 (order of work step 11).
+        "Experiment" = a VibExperiment (wilson_experiment): pulses (how many, when, IR or UV/vis), detector,
+        magnitude conditions. derive turns one into terms (VibExperiment.derive_terms).
+        Risk of going on without G7: it can change the adapter and the data model (steps 12, 15). It looks for
+        terms that break B7, features without every spectrum axis (E2, Later), mixed averaging ranks
+        (averaging_rank raises), parameter sets that share a location (the old double count, C3).
+        First look, 2026-10-09 (derive on the 3 setups in fixtures.py; no numbers, no old vs new):
+        - evv_experiment: 14 terms, 1 motif; all 4 valid axis choices pass B7, averaging rank 4.
+        - evv_experiment_pulse_1_and_2_coincident: 44 terms, 4 motifs. 2 Raman-like terms have one condition:
+              -1/2 * polgrad_(a) * polgrad_(a) / <['a'],[]> / (E_a - (-w1 + w2) - iG)
+          One condition in a 2D spectrum: a line, not a point.
+            axes A = -w1 or w2, B = -w1 + w2: condition on B only, a line along A -> from_features raises (E2, Later)
+            axes A = -w1, B = w2 (or swapped): condition on A + B, a diagonal line -> B7 rejects the term
+          So B7's "malformed" is wrong for these terms: they are real, just not points (see B7).
+        - experiment_beta_alpha_cars: 12 terms, one condition each, 1 axis (a 1D spectrum), averaging rank 5.
+          Needs 'hypgrad' (hyperpolarizability gradient); nothing in wilson_utils or wilson_system reads it.
+        - derive's anharmonicity limits add no EVV terms: (2, 1, 1) and (2, 2, 1) give the same 14;
+          (2, 2, 2) raises NotImplementedError (mechanical order 2) in dbl_pert_expansion.
 
 
 H. Rules (kept from the old README, removed 2026-10-09)
