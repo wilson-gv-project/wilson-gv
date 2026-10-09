@@ -2,8 +2,10 @@ refac_rsp_eval — TODO
 updated 2026-10-09
 
 Tests: refac_rsp_eval 456 pass, 2 xfail (B6, pinned on purpose).
-       Old suite (everything else): 9 fail, none because of B1.
-       pytest src without refac_rsp_eval (2026-10-09): 28 fail, the same 28 before and after B7.
+       Old suite (pytest src without refac_rsp_eval, 2026-10-09): 9 fail, 280 pass, 3 skip.
+       None because of B1; the same 9 before and after B7.
+       In a fresh checkout (e.g. a git worktree) about 18 more fail: some tests read files that git
+       ignores (e.g. src/wilson_suite/terms_fuller_flat.json), so a fresh checkout does not have them.
 
 
 Order of work
@@ -112,7 +114,7 @@ C. Old vs new
         - contradicting conditions, one condition on A + B: both break B7.
         The old behaviour was found by reading the code only; C4 runs it.
         B5 cannot show on these terms (see B5). The double-count fix shows only in C3.
-[ ] C3  Whole spectrum. Needs E2.
+[ ] C3  Whole spectrum. Needs E2 (done: draw_window).
         Expected difference: old evaluate_feature multiplies the summed amplitude by one shape per
         parameter set, so a peak with n parameter sets comes out n times too large in the old code.
         (evaluators.py evaluate_feature, numerical_abstractions.py compile_feature; read, not run.)
@@ -208,10 +210,11 @@ E. Pipeline
            states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic ->
            harmonic. from_datadict defaults to harmonic. Make states_choice required (no default):
            the wrong choice changes 272 of 340 formaldehyde coefficients without any error.
-        2. [x] Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero + 0 failed,
+        2. [x] Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero,
            number of features, a few amplitudes.
            Done: test_pipeline.py, "real data" section, harmonic and anharmonic states:
-           load_molsys_data -> compute_features; 2 motifs; 340 / 164 / 0; 68 features (36 + 32);
+           load_molsys_data -> compute_features; 2 motifs; 340 rows / 164 zero (`failed`: gone since B7);
+           68 features (36 + 32);
            each feature = one motif at one (a, b), with the stored rows of evv_reference.json;
            every amplitude = sum of the stored coefficients; strongest feature a = b = 4 at
            A = 2682.765 cm-1 (harmonic: 2933.526), the mode-5 numbers in the .out file.
