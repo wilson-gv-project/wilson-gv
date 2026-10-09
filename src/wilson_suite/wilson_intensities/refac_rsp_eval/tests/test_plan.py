@@ -5,6 +5,7 @@ plan.py — the compile stage. Runs with zero molecular data.
 import pickle
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition
@@ -17,9 +18,14 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ResLocPoint,
     ResonanceMotif,
     compile_terms,
+    generate_LHS_motif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
+    MOTIF_A,
+    MOTIF_AB,
+    MOTIF_B_TWICE,
+    MOTIF_MIXED,
     NDIMS,
     coords,
     polprop,
@@ -247,6 +253,46 @@ def test_resonance_motif_pickle_roundtrip():
     assert hash(restored) == hash(motif)
 
 
+## generate_LHS_motif ---------------------------------------------------------
+# Row i <-> condition i of the motif (conditions are kept sorted), column j <-> j-th of the
+# motif's distinct axes, sorted. Entry is -s_j: the equation is written as
+# -sum_j s_j w_j = -(E_left - E_right).
+
+@pytest.mark.parametrize('motif, expected, expected_axes', [
+    (MOTIF_AB,      [[-1., 0.], [0., -1.]], ('A', 'B')),
+    (MOTIF_A,       [[-1.]],                ('A',)),
+    (MOTIF_MIXED,   [[-1., 1.], [0., -1.]], ('A', 'B')),   # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
+    (MOTIF_B_TWICE, [[-1.], [-1.]],         ('B',)),       # two conditions, one axis -> 2x1
+])
+def test_generate_LHS_motif(motif, expected, expected_axes):
+    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(motif))
+
+    assert axes == expected_axes
+    assert lhs.shape == np.shape(expected)
+    np.testing.assert_array_equal(lhs, expected)
+
+
+def test_generate_LHS_motif_extra_axes_get_zero_columns():
+    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_A), axes=('C', 'A', 'B'))
+
+    assert axes == ('A', 'B', 'C')
+    np.testing.assert_array_equal(lhs, [[-1., 0., 0.]])
+
+
+def test_generate_LHS_motif_axes_must_cover_the_motif():
+    with pytest.raises(ValueError):
+        generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), axes=('A',))
+
+
+def test_generate_LHS_motif_ignores_states():
+    """Only pf enters the LHS; which states resonate is the RHS's business.
+    (States do fix the row order, so both motifs here sort the ('A', '-B') condition first.)"""
+    one = ResonanceMotif.from_tuples(((((), ('a',)), ('A', '-B')), ((('b',), ()), ('B',))))
+    other = ResonanceMotif.from_tuples(((((), ('b',)), ('A', '-B')), ((('a', 'b'), ('a',)), ('B',))))
+
+    np.testing.assert_array_equal(generate_LHS_motif(one)[0], generate_LHS_motif(other)[0])
+
+
 ## ParameterSet -------------------------------------------------------------
 
 def test_parameterset_injects_zero_and_maps_empty_label():
@@ -358,14 +404,16 @@ def test_res_loc_point_as_dict_returns_a_new_dict():
 
 ## CompiledTerm -------------------------------------------------------------
 
-def _fake_vibpert_term():
-    """Only the attributes CompiledTerm.from_VibPertTerm reads."""
+def _fake_vibpert_term(res=(('a', '', ('1',)),)):
+    """Only the attributes CompiledTerm.from_VibPertTerm reads.
+    res: one (left quanta, right quanta, pf) per resonance condition."""
     return SimpleNamespace(
         coeff=0.5,
         props=[polprop(ops=(0, 1), inds='a'), polprop(inds='ab')],
         freqterms=[vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)],
-        res=[ResonanceCondition(diff=vibdiff(sl='a'), pf=['1'])],
+        res=[ResonanceCondition(diff=vibdiff(sl=sl, sr=sr), pf=list(pf)) for sl, sr, pf in res],
         tellNonSummSummIndices=lambda: (('a',), ('b',)),
+        to_str=lambda *_: 'the fake term',
     )
 
 
@@ -390,3 +438,45 @@ def test_compile_terms_one_compiled_per_term():
 
     assert len(compiled) == 2
     assert all(isinstance(c, CompiledTerm) for c in compiled)
+
+
+# B7: a term's resonance conditions must fix exactly one point, in the axes the term uses.
+# number of conditions = number of axes = rank of the condition matrix. No data needed.
+
+@pytest.mark.parametrize('res', [
+    pytest.param((('a', '', ('-A',)), ('b', '', ('B',))),        id='-A and B (EVV): point in 2D'),
+    pytest.param((('a', '', ('A',)),),                           id='A only: point in 1D'),
+    pytest.param((('b', '', ('B',)),),                           id='B only: point in 1D'),
+    pytest.param((('', 'a', ('A', '-B')), ('', 'a', ('B',))),    id='A - B and B: point in 2D'),
+])
+def test_compiled_term_conditions_fixing_one_point_pass(res):
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term(res)) # type: ignore
+
+    assert len(ct.cmp_resmotf) == len(res)
+
+
+@pytest.mark.parametrize('res', [
+    pytest.param((('a', '', ('A', 'B')),),                                  id='one condition on A + B: a line'),
+    pytest.param((('a', '', ('B',)), ('b', 'a', ('B',))),                   id='B twice: 2 conditions, 1 axis'),
+    pytest.param((('a', '', ('A', 'B')), ('b', '', ('-A', '-B'))),          id='2 conditions, 2 axes, rank 1'),
+    pytest.param((('a', '', ('A',)), ('b', '', ('B',)), ('ab', '', ('A', 'B'))),
+                                                                            id='3 conditions, 2 axes'),
+])
+def test_compiled_term_conditions_not_fixing_one_point_raise(res):
+    with pytest.raises(ValueError, match='do not fix one point') as err:
+        CompiledTerm.from_VibPertTerm(_fake_vibpert_term(res)) # type: ignore
+    assert 'the fake term' in str(err.value)        # the message shows the term's to_str
+
+
+def test_compiled_term_without_conditions_passes():
+    """No place on the spectrum (solve_LSE_motif raises there), but the other parts can still be computed."""
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term(res=())) # type: ignore
+
+    assert ct.cmp_resmotf == ResonanceMotif(())
+
+
+def test_compile_terms_raises_if_one_term_does_not_fix_one_point():
+    bad = _fake_vibpert_term(res=(('a', '', ('A', 'B')),))
+
+    with pytest.raises(ValueError, match='do not fix one point'):
+        compile_terms([_fake_vibpert_term(), bad]) # type: ignore

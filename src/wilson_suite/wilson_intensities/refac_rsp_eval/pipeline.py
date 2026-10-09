@@ -9,7 +9,7 @@ CompiledTerm list
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
   │    zero coeff -> `zero`, no row
   │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states
-  │    no single point -> `failed`
+  │    always one point: compile_terms checked the motif (B7)
   v
 ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evaluate.build_contributions
   │ 4. group by (motif, location), add the coeffs
@@ -62,7 +62,6 @@ if TYPE_CHECKING:
 class FeatureResult:
     table: ContributionTable                          # all rows: the source
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
-    failed: list[tuple[int, ParameterSet, float]]     # pairs with no single resonance point
     lineshape_parameter: float | None = None          # cm-1
 
     @cached_property
@@ -79,8 +78,8 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     One SpectralFeature per (motif, location). lineshape_parameter in cm-1.
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     """
-    table, zero, failed = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data)
-    return FeatureResult(table, zero, failed, lineshape_parameter)
+    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data)
+    return FeatureResult(table, zero, lineshape_parameter)
 
 
 def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo,
@@ -165,7 +164,7 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
         2. compile                                         compile_terms
         3. load the data for all terms, each property once  load_molsys_data
         4. orientation-average recipe, rank from the terms  make_polarization_linear_comb
-        5. rows, zero / failed pairs, features             compute_features
+        5. rows, zero pairs, features                      compute_features
 
     axes                 e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
     states_choice        must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'

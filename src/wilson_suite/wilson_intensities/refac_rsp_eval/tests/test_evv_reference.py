@@ -1,7 +1,7 @@
 """
 Term-level evaluation of the 14 EVV terms, against evv_reference.json (written by make_evv_reference.py).
 For every pair (term, fixed resonance labels): the coefficient and the resonance location,
-and which pairs are zero or failed. Formaldehyde, water and CO; anharmonic and harmonic states.
+and which pairs are zero. Formaldehyde, water and CO; anharmonic and harmonic states.
 Features and the spectrum are not checked here (C3).
 
 C2, checked 2026-10-07: these numbers equal the old pipeline's (relative difference below 1e-12), for all
@@ -12,10 +12,12 @@ test_full_integration_EVV_axes. Formaldehyde, GVPT2:
     - 504 coefficients per (term, fixed labels): old evaluate_term_coeffs = new evaluate_term_coeff_sumover
     - 504 locations: old resonances.solve_LSE_motif = new solve_LSE_motif
 On these 14 terms the old and new pipelines do not differ at all.
-They differ only for motifs none of the 14 terms has (new side tested in test_evaluate.py):
-    - one condition, on B only: the old code raises IndexError, the new one gives the location.
-    - conditions that contradict each other: the old code prints and returns None, the new one puts the pair in `failed`.
-    - one condition on A + B (a line, not a point): the old code raises ValueError, the new one puts the pair in `failed`.
+They differ only for motifs none of the 14 terms has:
+    - one condition, on B only: the old code raises IndexError, the new one gives the location (test_evaluate.py).
+    - conditions that contradict each other: the old code prints and returns None; the new compile_terms raises
+      (B7, test_plan.py).
+    - one condition on A + B (a line, not a point): the old code raises ValueError; the new compile_terms raises
+      (B7, test_plan.py).
 
 A deliberate change of numbers: rerun make_evv_reference.py, check the diff, name the change above.
 """
@@ -57,30 +59,29 @@ def test_reference_file_has_the_settings_of_the_script():
     assert sorted(CASES) == sorted((m, s) for m in ref.DATA_FILES for s in ref.STATES_CHOICES)
 
 
-def test_formaldehyde_has_504_pairs_340_rows_164_zero_0_failed():
+def test_formaldehyde_has_504_pairs_340_rows_164_zero():
     for states in ref.STATES_CHOICES:
         (block,) = [b for b in REFERENCE['results'] if (b['molecule'], b['states']) == ('formaldehyde', states)]
-        assert block['counts'] == {'rows': 340, 'zero': 164, 'failed': 0}
+        assert block['counts'] == {'rows': 340, 'zero': 164}
 
 
-def test_same_pairs_are_rows_zero_and_failed(stored_and_now):
+def test_same_pairs_are_rows_and_zero(stored_and_now):
     stored, now = stored_and_now
 
     assert now['n_modes'] == stored['n_modes']
     assert now['counts'] == stored['counts']
-    for kind in ('rows', 'zero', 'failed'):
+    for kind in ('rows', 'zero'):
         assert _by_pair(now[kind]).keys() == _by_pair(stored[kind]).keys(), kind
 
 
 def test_coefficients_match_the_reference(stored_and_now):
     stored, now = stored_and_now
 
-    for kind in ('rows', 'failed'):
-        now_by_pair = _by_pair(now[kind])
-        wrong = [(pair, e['coeff'], now_by_pair[pair]['coeff'])
-                 for pair, e in _by_pair(stored[kind]).items()
-                 if pair in now_by_pair and now_by_pair[pair]['coeff'] != pytest.approx(e['coeff'], rel=REL)]
-        assert wrong == [], f'{kind}: (pair, stored, now)'
+    now_by_pair = _by_pair(now['rows'])
+    wrong = [(pair, e['coeff'], now_by_pair[pair]['coeff'])
+             for pair, e in _by_pair(stored['rows']).items()
+             if pair in now_by_pair and now_by_pair[pair]['coeff'] != pytest.approx(e['coeff'], rel=REL)]
+    assert wrong == [], '(pair, stored, now)'
 
 
 def test_locations_match_the_reference(stored_and_now):

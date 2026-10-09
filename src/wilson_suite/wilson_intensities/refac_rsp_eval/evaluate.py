@@ -21,6 +21,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.grid import box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocPoint,
+    generate_LHS_motif,
 )
 from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
@@ -424,38 +425,6 @@ def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_da
 ## ----------------------------------------------------------------
 
 
-def generate_LHS_motif(motif: 'ResonanceMotif',
-                       axes: Iterable[str] | None = None) -> tuple[np.ndarray, tuple[str, ...]]:
-    """
-    motif is a tuple/collection of res_conditions
-        res_conditions is a tuple of (vib_difference, axes)
-            vib_difference is a tuple of states indices
-
-    returns (coeff_matrix, axes): one row per condition, one column per axis in `axes`
-    (sorted; defaults to the distinct axes of the motif). Axes the motif does not
-    mention get an all-zero column.
-    """
-    motif_axes = motif.get_max_different_freq_axes()
-    all_axes = tuple(sorted(motif_axes if axes is None else set(axes)))
-    if not motif_axes <= set(all_axes):
-        raise ValueError(f"axes {all_axes} do not cover the axes of {motif}: {sorted(motif_axes)}")
-    
-    col = {ax: j for j, ax in enumerate(all_axes)}
-
-    coeff_matrix = np.zeros((len(motif), len(all_axes)))
-
-    for i, r_cond_key in enumerate(motif):
-        # ('A', '-B') --> {'A': 1, 'B': -1}
-        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in r_cond_key.pf}
-
-        for alpha_label, coefficient in coeffs.items():
-             # minus the axis sign: 'A' -> -1, '-B' -> +1. With get_RHS_motif's -E the row reads
-             # -(signed sum of pf) = -E, i.e. E - (signed sum of pf) = 0 (derive's convention)
-             coeff_matrix[i, col[alpha_label]] = -1 * np.sign(coefficient)
-
-    return coeff_matrix, all_axes
-
-
 def get_RHS_motif(motif: 'ResonanceMotif',
             parameters: ParameterSet, vibstates_data: 'VibStatesData',
             unit: str='Eh'):
@@ -499,6 +468,8 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 
     raises np.linalg.LinAlgError if the location is not a point (fewer independent conditions
     than axes, e.g. a single condition on A + B) or the conditions are inconsistent.
+    Compiled terms always pass (CompiledTerm.from_VibPertTerm checks the motif, B7); these
+    checks guard motifs built by hand.
     """
     if len(motif) == 0:
         raise ValueError('motif has no resonance conditions: no resonance location')
@@ -543,22 +514,25 @@ def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
 
 def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemData,
                         polarization_linear_comb=None, precalculated_data=None
-                        ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]], list[tuple[int, ParameterSet, float]]]:
+                        ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]]]:
     """
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
     resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
     The number of modes comes from molsys_data.eigenvals, the state energies from molsys_data.states.
 
-    returns (rows, zero, failed), so that len(rows) + len(zero) + len(failed) == number of pairs:
+    returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
-        failed - (term_id, params, coeff) with no single resonance point (LinAlgError)
+
+    Every nonzero pair gets a location: CompiledTerm.from_VibPertTerm checks that the motif fixes
+    one point (B7). A term built by hand skips that check; if its motif has no single point,
+    solve_LSE_motif raises and the run stops.
     """
     if molsys_data.eigenvals is None:
         raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
     n_modes = len(molsys_data.eigenvals)
 
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
-    rows, zero, failed = [], [], []
+    rows, zero = [], []
     for term_id, term in enumerate(terms):
         motif = term.cmp_resmotf
         for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
@@ -571,19 +545,12 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
                 zero.append((term_id, ps))
                 continue
             key = (motif, ps)
-            
+
             # one solve per (motif, params)
             if key not in locations:
-                try:
-                    locations[key] = solve_LSE_motif(motif, ps, molsys_data.states, unit='cm-1')
-                
-                # Case 1: the resonance is a line, not a point. 
-                # Case 2: the resonance conditions are inconsistent, no solution.
-                except np.linalg.LinAlgError:
-                    failed.append((term_id, ps, coeff))
-                    continue
+                locations[key] = solve_LSE_motif(motif, ps, molsys_data.states, unit='cm-1')
             rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
-    return ContributionTable(rows), zero, failed
+    return ContributionTable(rows), zero
 
 
 ## -----------------------------------------------------------------------------

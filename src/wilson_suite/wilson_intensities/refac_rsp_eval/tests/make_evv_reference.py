@@ -64,23 +64,22 @@ def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: st
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
     molsys = load_molsys_data(compiled, data_origin(molecule), states_choice)
     pol = make_polarization_linear_comb(compiled, LASER_POL)
-    table, zero, failed = build_contributions(compiled, molsys, pol)
+    table, zero = build_contributions(compiled, molsys, pol)
     rows = list(table)
     return {
         'molecule': molecule,
         'data_file': DATA_FILES[molecule],
         'states': states_choice,
         'n_modes': len(molsys.eigenvals),  # type: ignore
-        'counts': {'rows': len(rows), 'zero': len(zero), 'failed': len(failed)},
+        'counts': {'rows': len(rows), 'zero': len(zero)},
         'rows': [{'term': r.term_id, 'params': _params(r.params), 'coeff': r.coeff,
                   'location': r.location.as_dict()} for r in rows],
         'zero': [{'term': t, 'params': _params(ps)} for t, ps in zero],
-        'failed': [{'term': t, 'params': _params(ps), 'coeff': c} for t, ps, c in failed],
     }
 
 
 def _to_json_text(header: dict, blocks: list[dict]) -> str:
-    """json with one row (zero, failed entry) per line: short diffs, easy to read"""
+    """json with one row (zero entry) per line: short diffs, easy to read"""
     def json_list(name: str, items: list, last: bool) -> list[str]:
         lines = [f'     "{name}": [']
         lines += ['      ' + json.dumps(x) + (',' if i < len(items) - 1 else '') for i, x in enumerate(items)]
@@ -90,11 +89,10 @@ def _to_json_text(header: dict, blocks: list[dict]) -> str:
     lines += [f'  {json.dumps(k)}: {json.dumps(v)},' for k, v in header.items()]
     lines.append('  "results": [')
     for i, b in enumerate(blocks):
-        info = {k: v for k, v in b.items() if k not in ('rows', 'zero', 'failed')}
+        info = {k: v for k, v in b.items() if k not in ('rows', 'zero')}
         lines.append('    {' + json.dumps(info)[1:-1] + ',')
         lines += json_list('rows', b['rows'], last=False)
-        lines += json_list('zero', b['zero'], last=False)
-        lines += json_list('failed', b['failed'], last=True)
+        lines += json_list('zero', b['zero'], last=True)
         lines.append('    }' + (',' if i < len(blocks) - 1 else ''))
     lines += ['  ]', '}', '']
     return '\n'.join(lines)

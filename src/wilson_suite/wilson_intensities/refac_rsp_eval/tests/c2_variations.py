@@ -149,14 +149,14 @@ def run_new(v: Variation, laser_pol):
                                          data_dict=wilson_data_obtainer(requested_data_dict=request),
                                          states_choice=v.new_states)
     iso = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=tuple(laser_pol))
-    table, zero, failed = build_contributions(compiled, molsys, polarization_linear_comb=iso)
-    return compiled, molsys, table, zero, failed
+    table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso)
+    return compiled, molsys, table, zero
 
 
 def compare(v: Variation) -> dict:
     sim, bound = run_old(v)
     laser_pol = sim.exp.polarization_avg_vector
-    compiled, molsys, table, zero, failed = run_new(v, laser_pol)
+    compiled, molsys, table, zero = run_new(v, laser_pol)
     old_terms = bound.axes.terms
 
     new_coeff = {i: {} for i in range(len(compiled))}
@@ -164,12 +164,10 @@ def compare(v: Variation) -> dict:
         new_coeff[r.term_id][key(r.params)] = r.coeff
     for i, ps in zero:
         new_coeff[i][key(ps)] = 0.
-    for i, ps, c in failed:
-        new_coeff[i][key(ps)] = c
 
     out = dict(old_states=tuple(sorted((s.state_label, round(s.energy, 3)) for s in sim.vib_ana_setup.states)),
                pol=[round(x, 4) for x in laser_pol], n_modes=len(molsys.eigenvals), terms=len(compiled),
-               rows=len(table), zero=len(zero), failed=len(failed), sets_mismatch=0,
+               rows=len(table), zero=len(zero), sets_mismatch=0,
                coeff_diff=0, coeff_max_rel=0., zero_both=0, loc_diff=0, loc_max=0., old_none=0, per_term=[])
     for i, (old_t, new_t) in enumerate(zip(old_terms, compiled)):
         old_c = {key(ps): val[0] for ps, val in bound.coefficients[old_t].items()}
@@ -219,14 +217,14 @@ def main():
             traceback.print_exc()
 
     print('\n\n==================== SUMMARY ====================')
-    print(f'{"variation":<36} {"pol vector":<22} {"modes":>5} {"pairs":>5} {"rows":>4} {"zero":>4} {"fail":>4} | '
+    print(f'{"variation":<36} {"pol vector":<22} {"modes":>5} {"pairs":>5} {"rows":>4} {"zero":>4} | '
           f'{"coeff diff":>10} {"max rel":>8} | {"loc diff":>8} {"max cm-1":>8} {"old None":>8}')
     for v, r, err in results:
         if err:
             print(f'{v.name:<36} ERROR  {err}')
             continue
-        pairs = r['rows'] + r['zero'] + r['failed']
-        print(f'{v.name:<36} {str(r["pol"]):<22} {r["n_modes"]:>5} {pairs:>5} {r["rows"]:>4} {r["zero"]:>4} {r["failed"]:>4} | '
+        pairs = r['rows'] + r['zero']
+        print(f'{v.name:<36} {str(r["pol"]):<22} {r["n_modes"]:>5} {pairs:>5} {r["rows"]:>4} {r["zero"]:>4} | '
               f'{r["coeff_diff"]:>10} {r["coeff_max_rel"]:>8.1e} | {r["loc_diff"]:>8} {r["loc_max"]:>8.2f} {r["old_none"]:>8}'
               + (f'   (index sets only on one side: {r["sets_mismatch"]})' if r['sets_mismatch'] else ''))
 

@@ -1,8 +1,9 @@
 refac_rsp_eval — TODO
 updated 2026-10-09
 
-Tests: refac_rsp_eval 449 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 456 pass, 2 xfail (B6, pinned on purpose).
        Old suite (everything else): 9 fail, none because of B1.
+       pytest src without refac_rsp_eval (2026-10-09): 28 fail, the same 28 before and after B7.
 
 
 Order of work
@@ -12,7 +13,7 @@ Order of work
 3. [x] B4: sign convention of the resonance locations.
 4. [x] C2: prove new numbers = old numbers, term by term.
 5. [x] E3 steps 1-4: load all data in one call, real-data test, polarization, one top function.
-6. [ ] B7: motif rule (one resonance point per term), checked when compiling.
+6. [x] B7: motif rule (one resonance point per term), checked when compiling.
 7. [x] E2: add up all features on one window grid, by domains (draw_window).
        Locations without every spectrum axis: moved to Later.
 8. [ ] C3: whole spectrum, old vs new.
@@ -22,7 +23,8 @@ Order of work
        Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
 Any time: G1–G7 (checks beyond old = new), G1 first.
 Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1,
-       E2 locations without every spectrum axis.
+       E2 locations without every spectrum axis,
+       terms without resonance conditions (e.g. averaged tensors only): a path for them (see B7).
 
 
 A. Small fixes
@@ -63,21 +65,34 @@ B. Correctness
         Pinned by 2 strict-xfail tests (test_precalculated_tensor_gives_the_on_the_fly_value,
         test_term8_precalculated_tensor_gives_the_on_the_fly_value). Fix, then remove the markers.
         B3, B5, B6: only once precalculated tables are built again. The on-the-fly path is correct.
-[ ] B7  Rule (2026-10-07): each term's motif has exactly one resonance point, in the n axes the
+[x] B7  Rule (2026-10-07): each term's motif has exactly one resonance point, in the n axes the
         motif uses. n may differ between the terms of one collection.
         e.g. conditions on A and on B -> a point in 2D; one condition on B only -> a point in 1D (fine).
         Breaks the rule: one condition on A + B (a line), or conditions that contradict each other.
         Such a term is malformed, not a physical case.
-        Now: build_contributions puts these pairs in `failed`; they leave the spectrum without an error.
-        To do:
-        - [ ] check the rule once per motif in compile_terms (plan.py); no data needed:
-          number of conditions = number of axes = rank of the condition matrix (generate_LHS_motif).
-          Raise with the term's to_str.
-        - [ ] to check: may a motif have more conditions than axes? Then a single point exists only if
-          the energies agree: it depends on the data, not on the motif alone.
-        - [ ] then decide what happens to `failed` (raise, or keep the list). Update build_contributions,
-          its 2 `failed` tests and the test_evv_reference.py docstring.
-        All 14 EVV terms follow the rule, for all 3 axis choices of C2 (checked 2026-10-07).
+        Was: build_contributions put these pairs in `failed`; they left the spectrum without an error.
+        Done (2026-10-09):
+        - [x] check the rule in CompiledTerm.from_VibPertTerm (plan.py; not in __post_init__: tests build
+          CompiledTerm by hand with an empty motif); no data needed:
+          number of conditions = number of axes = rank of the condition matrix. Raises with the term's to_str.
+          generate_LHS_motif moved to plan.py (it reads only pf; evaluate.py imports plan.py, not the reverse).
+          Tests: test_plan.py.
+        - [x] more conditions than axes: not allowed (strict rule, decided 2026-10-09). A point would exist
+          only if the energies agree, so it would depend on the data. derive adds one condition per order
+          (vib_rsp_sos.py), independent in pulse IDs; fewer axes than pulses can give more conditions than
+          axes. Loosen the rule only if G7 finds a real term like that.
+        - [x] a term without conditions passes from_VibPertTerm: no spectrum (solve_LSE_motif raises
+          ValueError, build_contributions lets it through), but its other parts can be computed.
+        - [x] `failed` deleted: it was always empty for compiled terms (square, invertible matrix: one point
+          for any energies). build_contributions returns (rows, zero), no try/except; no FeatureResult.failed.
+          A term built by hand with a broken motif: solve_LSE_motif raises, the run stops
+          (test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run).
+          evv_reference.json rewritten: only the empty 'failed' entries went, no number changed.
+          c2_variations.py updated and rerun: same result as C2 (old = new, the 2 mismatch controls differ).
+          solve_LSE_motif keeps its own checks: hand-built terms skip from_VibPertTerm, and C4 calls it on
+          broken motifs on purpose.
+        All 14 EVV terms follow the rule, for all 3 axis choices of C2 (checked 2026-10-07; rechecked with
+        compile_terms 2026-10-09).
 
 
 C. Old vs new

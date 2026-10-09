@@ -29,7 +29,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
-    generate_LHS_motif,
     get_RHS_motif,
     harmonic_denom,
     lorentzian_propagator,
@@ -107,46 +106,6 @@ def resonance_residuals(motif: ResonanceMotif,
     return [energy(c.left) - energy(c.right)
             - sum((-1. if ax.startswith('-') else 1.) * location[ax.strip('-')] for ax in c.pf)  # type: ignore
             for c in motif]
-
-
-## generate_LHS_motif ---------------------------------------------------------
-# Row i <-> condition i of the motif (conditions are kept sorted), column j <-> j-th of the
-# motif's distinct axes, sorted. Entry is -s_j: the equation is written as
-# -sum_j s_j w_j = -(E_left - E_right).
-
-@pytest.mark.parametrize('motif, expected, expected_axes', [
-    (MOTIF_AB,      [[-1., 0.], [0., -1.]], ('A', 'B')),
-    (MOTIF_A,       [[-1.]],                ('A',)),
-    (MOTIF_MIXED,   [[-1., 1.], [0., -1.]], ('A', 'B')),   # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
-    (MOTIF_B_TWICE, [[-1.], [-1.]],         ('B',)),       # two conditions, one axis -> 2x1
-])
-def test_generate_LHS_motif(motif, expected, expected_axes):
-    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(motif))
-
-    assert axes == expected_axes
-    assert lhs.shape == np.shape(expected)
-    np.testing.assert_array_equal(lhs, expected)
-
-
-def test_generate_LHS_motif_extra_axes_get_zero_columns():
-    lhs, axes = generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_A), axes=('C', 'A', 'B'))
-
-    assert axes == ('A', 'B', 'C')
-    np.testing.assert_array_equal(lhs, [[-1., 0., 0.]])
-
-
-def test_generate_LHS_motif_axes_must_cover_the_motif():
-    with pytest.raises(ValueError):
-        generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), axes=('A',))
-
-
-def test_generate_LHS_motif_ignores_states():
-    """Only pf enters the LHS; which states resonate is the RHS's business.
-    (States do fix the row order, so both motifs here sort the ('A', '-B') condition first.)"""
-    one = ResonanceMotif.from_tuples(((((), ('a',)), ('A', '-B')), ((('b',), ()), ('B',))))
-    other = ResonanceMotif.from_tuples(((((), ('b',)), ('A', '-B')), ((('a', 'b'), ('a',)), ('B',))))
-
-    np.testing.assert_array_equal(generate_LHS_motif(one)[0], generate_LHS_motif(other)[0])
 
 
 ## get_RHS_motif --------------------------------------------------------------
@@ -879,55 +838,31 @@ def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
 # 2 zero pairs (a=1). a=b=1 needs state '1,1', which `states` lacks, so solving any a=1 pair would
 # raise: these tests also show that zero pairs never reach solve_LSE_motif.
 
-# -- what becomes a row: rows, zero pairs, failed pairs --------------------------
+# -- what becomes a row: rows, zero pairs ------------------------------------------
 
 def test_build_contributions_one_row_per_nonzero_pair(molsys, pre_a1_zero):
-    rows, zero, failed = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+    rows, zero = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
 
     assert {r.params for r in rows} == {PS_00, PS_01}
     assert all(r.term_id == 0 and r.motif == ResonanceMotif.from_tuples(MOTIF_AB) for r in rows)
     assert zero == [(0, PS_10), (0, PS_11)]
-    assert failed == []
-    assert len(rows) + len(zero) + len(failed) == 4          # every (a, b) pair exactly once
+    assert len(rows) + len(zero) == 4          # every (a, b) pair exactly once
 
 
-def test_build_contributions_no_single_point_goes_to_failed(molsys, pre_a1_zero):
-    """MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair."""
-    rows, zero, failed = build_contributions([ab_term(MOTIF_B_TWICE)], molsys,
-                                             precalculated_data=pre_a1_zero)
-
-    assert len(rows) == 0
-    assert [(term_id, ps) for term_id, ps, _ in failed] == [(0, PS_00), (0, PS_01)]
-    assert all(coeff != 0. for _, _, coeff in failed)        # failed pairs would have added to the spectrum
-    assert zero == [(0, PS_10), (0, PS_11)]
-
-
-def test_build_contributions_failed_pairs_are_listed_per_term(molsys, pre_a1_zero):
-    """A failed solve is not cached: the next term with the same motif solves again and gets its own entries."""
-    term = ab_term(MOTIF_B_TWICE)
-
-    rows, _, failed = build_contributions([term, replace(term, frac_factor=2.)], molsys,
-                                          precalculated_data=pre_a1_zero)
-
-    assert len(rows) == 0
-    assert [(term_id, ps) for term_id, ps, _ in failed] == [(0, PS_00), (0, PS_01), (1, PS_00), (1, PS_01)]
-    assert failed[2][2] == pytest.approx(4 * failed[0][2])   # each entry keeps its own term's coeff
-
-
-def test_build_contributions_lets_other_solve_errors_through(molsys, pre_a1_zero, monkeypatch):
-    """Only LinAlgError (no single point) goes to `failed`. Any other error means a bug or missing data: the run stops."""
-    def broken_solve(*args, **kwargs):
-        raise ValueError('not a LinAlgError')
-    monkeypatch.setattr(evaluate_mod, 'solve_LSE_motif', broken_solve)
-
-    with pytest.raises(ValueError, match='not a LinAlgError'):
-        build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+def test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run(molsys, pre_a1_zero):
+    """
+    MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair.
+    A compiled term cannot have this motif (B7: CompiledTerm.from_VibPertTerm raises);
+    a term built by hand can, and then the run stops instead of dropping the pair.
+    """
+    with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
+        build_contributions([ab_term(MOTIF_B_TWICE)], molsys, precalculated_data=pre_a1_zero)
 
 
 def test_build_contributions_without_terms_is_empty(molsys):
-    rows, zero, failed = build_contributions([], molsys)
+    rows, zero = build_contributions([], molsys)
 
-    assert (len(rows), zero, failed) == (0, [], [])
+    assert (len(rows), zero) == (0, [])
 
 
 # -- the numbers in a row: coeff and location --------------------------------------
@@ -935,7 +870,7 @@ def test_build_contributions_without_terms_is_empty(molsys):
 def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys, pre_a1_zero):
     term = ab_term()
 
-    rows, _, _ = build_contributions([term], molsys, precalculated_data=pre_a1_zero)
+    rows, _ = build_contributions([term], molsys, precalculated_data=pre_a1_zero)
 
     for r in rows:
         expected, _ = evaluate_term_coeff_sumover(term, {'a': r.params['a'], 'b': r.params['b']}, molsys,
@@ -954,9 +889,9 @@ def test_build_contributions_polarization_path_matches_precalculated(molsys, pre
     props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
     with_polgrad = replace(molsys, mol_props=props)
 
-    precalc_rows, precalc_zero, _ = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
-    otf_rows, otf_zero, _ = build_contributions([ab_term()], with_polgrad,
-                                                polarization_linear_comb={(0, 0): 1., (1, 1): 2.})
+    precalc_rows, precalc_zero = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+    otf_rows, otf_zero = build_contributions([ab_term()], with_polgrad,
+                                             polarization_linear_comb={(0, 0): 1., (1, 1): 2.})
 
     assert [(r.params, r.location) for r in otf_rows] == [(r.params, r.location) for r in precalc_rows]
     assert [r.coeff for r in otf_rows] == pytest.approx([r.coeff for r in precalc_rows])
@@ -964,7 +899,7 @@ def test_build_contributions_polarization_path_matches_precalculated(molsys, pre
 
 
 def test_build_contributions_locations_are_in_cm1(molsys, pre_a1_zero):
-    rows, _, _ = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+    rows, _ = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
 
     location = {r.params: r.location for r in rows}
     assert location[PS_01].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # 1600, 500 cm-1
@@ -983,8 +918,8 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero,
     monkeypatch.setattr(evaluate_mod, 'solve_LSE_motif', counting_solve)
     term = ab_term()
 
-    rows, _, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys,
-                                     precalculated_data=pre_a1_zero)
+    rows, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys,
+                                  precalculated_data=pre_a1_zero)
 
     assert sorted(solved) == [PS_00, PS_01]
     row = {(r.term_id, r.params): r for r in rows}
@@ -995,7 +930,7 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero,
 
 def test_build_contributions_cache_keeps_motifs_apart(molsys, pre_a1_zero):
     """Same index sets, different motifs: each motif gets its own location. A cache keyed by params alone fails this."""
-    rows, _, _ = build_contributions([ab_term(MOTIF_AB), ab_term(MOTIF_A)], molsys, precalculated_data=pre_a1_zero)
+    rows, _ = build_contributions([ab_term(MOTIF_AB), ab_term(MOTIF_A)], molsys, precalculated_data=pre_a1_zero)
 
     location = {(r.term_id, r.params): r.location for r in rows}
     assert location[(0, PS_01)].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # MOTIF_AB: axes A, B

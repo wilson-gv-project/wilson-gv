@@ -49,7 +49,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E01,
     E1,
     MOTIF_AB,
-    MOTIF_B_TWICE,
     PS_00,
     PS_01,
     PS_10,
@@ -97,15 +96,6 @@ def test_compute_features_reports_zero_pairs(molsys, pre_a1_zero):
     result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero)
 
     assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
-    assert result.failed == []
-
-
-def test_compute_features_without_a_single_point_gives_failed_pairs_and_no_features(molsys, pre_a1_zero):
-    """MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair."""
-    result = compute_features([ab_term(MOTIF_B_TWICE)], molsys, precalculated_data=pre_a1_zero)
-
-    assert result.features == []
-    assert [(term_id, ps) for term_id, ps, _ in result.failed] == [(0, PS_00), (0, PS_01)]
 
 
 def test_compute_features_gives_every_feature_the_lineshape_parameter(molsys, pre_a1_zero):
@@ -124,7 +114,7 @@ def test_feature_result_table_is_what_build_contributions_returns(molsys, pre_a1
     
     # compute_features calls build_contributions, so this is a bit redundant, but it checks that the table is preserved
     result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
-    table, _, _ = build_contributions(terms, molsys, precalculated_data=pre_a1_zero)
+    table, _ = build_contributions(terms, molsys, precalculated_data=pre_a1_zero)
 
     assert list(result.table) == list(table)
 
@@ -262,10 +252,10 @@ def test_real_data_averaging_rank_is_the_one_stored_in_the_reference_file(evv_fo
     assert averaging_rank(evv_formaldehyde.compiled) == ref.RANK == 4
 
 
-def test_real_data_504_pairs_340_rows_164_zero_0_failed(evv_formaldehyde):
+def test_real_data_504_pairs_340_rows_164_zero(evv_formaldehyde):
     result = evv_formaldehyde.result
 
-    assert (len(result.table), len(result.zero), len(result.failed)) == (340, 164, 0)
+    assert (len(result.table), len(result.zero)) == (340, 164)
 
 
 def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
@@ -354,7 +344,6 @@ def test_compute_features_from_terms_equals_the_steps_one_by_one(top_run, evv_fo
 
     assert list(result.table) == list(by_steps.table)
     assert result.zero == by_steps.zero
-    assert result.failed == by_steps.failed
 
 
 def test_compute_features_from_terms_term_id_is_the_index_in_the_input_list(top_run):

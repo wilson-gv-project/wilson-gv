@@ -39,10 +39,12 @@ MagnConditions = tuple[tuple[int|str, ...], ...]
 """
 
 import copy
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from wilson_suite.wilson_derive.abstractions import (
     PolProp,  # here and term_parts
@@ -319,6 +321,40 @@ class ResonanceMotif:
         return f'{self.conditions}'
 
 
+def generate_LHS_motif(motif: ResonanceMotif,
+                       axes: Iterable[str] | None = None) -> tuple[np.ndarray, tuple[str, ...]]:
+    """
+    motif is a tuple/collection of res_conditions
+        res_conditions is a tuple of (vib_difference, axes)
+            vib_difference is a tuple of states indices
+
+    returns (coeff_matrix, axes): one row per condition, one column per axis in `axes`
+    (sorted; defaults to the distinct axes of the motif). Axes the motif does not
+    mention get an all-zero column.
+    Reads only the axes (pf) of the conditions, no states: here, not in evaluate.py,
+    so that CompiledTerm.from_VibPertTerm can check the motif without data.
+    """
+    motif_axes = motif.get_max_different_freq_axes()
+    all_axes = tuple(sorted(motif_axes if axes is None else set(axes)))
+    if not motif_axes <= set(all_axes):
+        raise ValueError(f"axes {all_axes} do not cover the axes of {motif}: {sorted(motif_axes)}")
+
+    col = {ax: j for j, ax in enumerate(all_axes)}
+
+    coeff_matrix = np.zeros((len(motif), len(all_axes)))
+
+    for i, r_cond_key in enumerate(motif):
+        # ('A', '-B') --> {'A': 1, 'B': -1}
+        coeffs = {var.strip('-') : 1 if '-' not in var else -1 for var in r_cond_key.pf}
+
+        for alpha_label, coefficient in coeffs.items():
+             # minus the axis sign: 'A' -> -1, '-B' -> +1. With get_RHS_motif's -E the row reads
+             # -(signed sum of pf) = -E, i.e. E - (signed sum of pf) = 0 (derive's convention)
+             coeff_matrix[i, col[alpha_label]] = -1 * np.sign(coefficient)
+
+    return coeff_matrix, all_axes
+
+
 """
 ParameterSet has a type that lies. Declared Mapping[str, int], but __init__ injects params['zero'] = 'zero' (a str value) and __getitem__ remaps '' → 'zero'; __lt__ hardcodes the alphabet ('a'..'h'). A generic index-assignment type that secretly knows vibrational-state labelling conventions. Decide which it is: if generic, the zero sentinel and ordering are policy living in a labelling module; if domain, name it (IndexAssignment) and make the conventions explicit and tested. The ground state currently spelled three ways ('', 'zero', state_label == 'zero') is that ambiguity leaking.
 """
@@ -490,11 +526,25 @@ class CompiledTerm:
         """
         VibPerturbedTerm - in axes.
 
+        raises ValueError if the term's resonance conditions do not fix exactly one point
+        (B7): as many conditions as axes, all independent (rank). Checked here, without data:
+        the condition matrix needs only the axes, not the energies.
+        e.g. conditions on A and on B -> a point in 2D; on B only -> a point in 1D (fine);
+             one condition on A + B -> a line; two conditions on B only -> no point or the same one twice.
+        A term without conditions passes: it has no place on the spectrum (solve_LSE_motif raises
+        if it gets there), but its other parts can still be computed.
+
         TODO: enable possibility of missing parts
         """
         frac_factor = float(term.coeff)
         freq_denom = FreqTermsCollection(term.freqterms) # states
         res_conds = ResonanceMotif.from_conditions(term.res) # states
+        if len(res_conds) > 0:
+            lhs, axes = generate_LHS_motif(res_conds)
+            rank = int(np.linalg.matrix_rank(lhs))
+            if not len(res_conds) == len(axes) == rank:
+                raise ValueError(f"resonance conditions do not fix one point: {len(res_conds)} conditions, "
+                                 f"axes {axes}, rank {rank}\n{term.to_str()}")
         idx_nonsumm, idx__summ = term.tellNonSummSummIndices()
 
         properties = PropsCollection(term.props)
