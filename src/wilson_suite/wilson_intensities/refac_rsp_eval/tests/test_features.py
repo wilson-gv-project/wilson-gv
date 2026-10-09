@@ -142,6 +142,22 @@ def test_feature_without_rows_has_no_amplitude():
     assert feat(A=0., amp=None).amplitude_coeff is None
 
 
+@pytest.mark.parametrize('coeffs, expected', [((0.5, -0.4), 0.1 / 0.9),
+                                              ((0.5, -0.5), 0.),
+                                              ((0.3, 0.5), 1.),
+                                              ((-0.3,), 1.)])
+def test_feature_net_fraction_is_abs_sum_over_sum_of_abs(coeffs, expected):
+    f = feat(A=0., rows=tuple(row(c, term_id=i, a=0) for i, c in enumerate(coeffs)))
+
+    assert f.net_fraction == pytest.approx(expected)
+    assert replace(f, scale=3.).net_fraction == pytest.approx(expected)
+
+
+@pytest.mark.parametrize('rows', [(), (row(0., a=0), row(0., term_id=1, a=0))])
+def test_feature_net_fraction_is_none_without_rows_or_with_only_zero_rows(rows):
+    assert feat(A=0., rows=rows).net_fraction is None
+
+
 def test_feature_motif_param_sets_and_term_ids_come_from_rows():
     f = feat(A=0., rows=(row(term_id=0, motif=OTHER_MOTIF, a=0),
                          row(term_id=1, motif=OTHER_MOTIF, a=0),
@@ -571,7 +587,7 @@ def test_window_find_clusters_by_featboxes_includes_contributing_features():
 
 ## SpectralWindow.from_features ---------------------------------------------
 # Window A (0, 10). gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * sqrt(101 - 1) * 1.1 = 55.
-# Intensity goes with amp**2, e.g. amp 0.1 -> 1/100 of amp 1 (kept, above 1/101), amp 0.09 -> 1/123 (dropped).
+# Intensity goes with amp**2, e.g. amp 0.09 -> 1/123 of amp 1.
 
 WINDOW_0_10 = Box({'A': (0., 10.)})
 
@@ -609,32 +625,29 @@ def test_window_from_features_boxes_are_the_dress_these_with_boxes_boxes():
     assert window.full_features[0].feat_box == dressed.feat_box
 
 
-def test_window_from_features_drops_features_weaker_than_max_over_dynrange():
-    strong, kept, dropped = feat(A=5., amp=1., gamma=5.), feat(A=6., amp=0.1, gamma=5.), feat(A=7., amp=0.09, gamma=5.)
+def test_window_from_features_keeps_weak_features():
+    """No feature is dropped for being weak, inside or outside the window: 1/123 and 1e-12 of the strong intensity stay."""
+    strong = feat(A=5., amp=1., gamma=5.)
+    weak, weakest, weak_outside = feat(A=6., amp=0.09, gamma=5.), feat(A=7., amp=1e-6, gamma=5.), feat(A=12., amp=1e-6, gamma=5.)
 
-    window = SpectralWindow.from_features(WINDOW_0_10, [strong, kept, dropped], dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, [strong, weak, weakest, weak_outside], dynrange=101.)
 
-    assert window.full_features == [strong, kept]
-
-
-def test_window_from_features_max_includes_a_strong_feature_outside_the_window():
-    """The strong feature at A = 12 is kept (its box overlaps) and sets the max: the inside one, 1/123 of it, goes."""
-    strong_outside, weak_inside = feat(A=12., amp=1., gamma=5.), feat(A=5., amp=0.09, gamma=5.)
-
-    window = SpectralWindow.from_features(WINDOW_0_10, [strong_outside, weak_inside], dynrange=101.)
-
-    assert window.full_features == []
-    assert window.contrib_features == [strong_outside]
+    assert window.full_features == [strong, weak, weakest]
+    assert window.contrib_features == [weak_outside]
 
 
-def test_window_from_features_max_ignores_features_far_from_the_window():
-    """The strong feature at A = 500 is dropped first (no box overlap), so it does not set the max: the weak one stays."""
-    strong_far, weak_inside = feat(A=500., amp=1., gamma=5.), feat(A=5., amp=0.01, gamma=5.)
+def test_window_from_features_keeps_a_feature_whose_rows_cancel():
+    """Rows that cancel (0.5 - 0.5): amplitude 0, but the feature stays with its rows, as a record."""
+    loc = {'A': 6.}
+    cancelling = feat(loc, gamma=5., rows=(row(0.5, location=ResLocPoint(loc), a=0),
+                                           row(-0.5, location=ResLocPoint(loc), a=1)))
+    other = feat(A=5., gamma=5.)
 
-    window = SpectralWindow.from_features(WINDOW_0_10, [strong_far, weak_inside], dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, [other, cancelling], dynrange=101.)
 
-    assert window.full_features == [weak_inside]
-    assert window.contrib_features == []
+    assert window.full_features[1].amplitude_coeff == 0.
+    assert window.full_features[1].rows == cancelling.rows
+    assert len(window.full_features) == 2
 
 
 @pytest.mark.parametrize('features', [[], [feat(A=500., gamma=5.)]])
@@ -670,6 +683,11 @@ def test_window_from_features_needs_dynrange_above_one(dynrange):
 def test_window_from_features_needs_lineshape_parameter():
     with pytest.raises(ValueError, match='lineshape_parameter'):
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], dynrange=101.)
+
+
+def test_window_from_features_needs_rows():
+    with pytest.raises(ValueError, match='no rows'):
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., amp=None)], dynrange=101.)
 
 
 ## RectangularDomain --------------------------------------------------------

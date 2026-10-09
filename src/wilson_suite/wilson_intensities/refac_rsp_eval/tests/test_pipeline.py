@@ -38,6 +38,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     PropsCollection,
+    ResLocPoint,
     ResonanceMotif,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
@@ -55,6 +56,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     PS_11,
     ab_term,
     polprop,
+    row,
     toy_term,
 )
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
@@ -139,6 +141,38 @@ def test_feature_result_is_frozen(molsys, pre_a1_zero):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.table = ContributionTable([])  # type: ignore
+
+
+def two_rows_at(a_cm: float, c0: float, c1: float):
+    """Terms 0 and 1 at one index set and one location: one feature with two rows."""
+    loc = ResLocPoint({'A': a_cm})
+    return [row(c0, term_id=0, location=loc, a=0), row(c1, term_id=1, location=loc, a=0)]
+
+
+def test_feature_result_cancelling_lists_the_features_whose_rows_cancel():
+    """
+    A = 0:  0.5 - 0.5    net_fraction 0        exact
+    A = 1:  0.5 - 0.495  net_fraction 0.005    nearly
+    A = 2:  0.3 + 0.5    net_fraction 1        no cancellation
+    """
+    table = ContributionTable(two_rows_at(0., 0.5, -0.5) + two_rows_at(1., 0.5, -0.495) + two_rows_at(2., 0.3, 0.5))
+    result = FeatureResult(table, zero=[])
+
+    assert [f.location['A'] for f in result.cancelling(0.)] == [0.]
+    assert [f.location['A'] for f in result.cancelling(0.01)] == [0., 1.]
+
+
+def test_feature_result_cancelling_leaves_out_zero_pairs():
+    """A term with coefficient 0 is in `zero`, not a row: no feature, so no cancellation. One row never cancels."""
+    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[(1, PS_00), (2, PS_01)])
+
+    assert result.cancelling(0.5) == []
+
+
+@pytest.mark.parametrize('rel_tol', [-0.1, 1., 2.])
+def test_feature_result_cancelling_needs_rel_tol_from_0_to_below_1(rel_tol):
+    with pytest.raises(ValueError, match='rel_tol'):
+        FeatureResult(ContributionTable([]), zero=[]).cancelling(rel_tol)
 
 
 ## polarization recipe: averaging_rank, make_polarization_linear_comb ----------

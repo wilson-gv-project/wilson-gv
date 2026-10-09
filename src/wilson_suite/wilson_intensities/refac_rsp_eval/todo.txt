@@ -18,10 +18,10 @@ Order of work
 6. [x] B7: motif rule (one resonance point per term), checked when compiling.
 7. [x] E2: add up all features on one window grid, by domains (draw_window).
        Locations without every spectrum axis: moved to Later.
-8. [ ] C3: whole spectrum, old vs new.
+8. [x] C3: whole spectrum, old vs new.
 9. [ ] C4: special motifs, old vs new location solvers, actually run.
 10. [ ] D4, [ ] E4: one data model, one README; delete the old code (not amplitudes/averaging.py, see D4),
-       and with it tests/c2_variations.py and tests/c2_leaves.py.
+       and with it tests/c2_variations.py, tests/c2_leaves.py and tests/c3_spectrum.py.
        Needs C3 and C4 first (they run the old code); G7 too, if it compares old vs new.
 Any time: G1–G7 (checks beyond old = new), G1 first.
 Later, only when needed: B3, B5, B6 (precalculated tables), D1–D3, E5, F1,
@@ -114,11 +114,30 @@ C. Old vs new
         - contradicting conditions, one condition on A + B: both break B7.
         The old behaviour was found by reading the code only; C4 runs it.
         B5 cannot show on these terms (see B5). The double-count fix shows only in C3.
-[ ] C3  Whole spectrum. Needs E2 (done: draw_window).
-        Expected difference: old evaluate_feature multiplies the summed amplitude by one shape per
-        parameter set, so a peak with n parameter sets comes out n times too large in the old code.
-        (evaluators.py evaluate_feature, numerical_abstractions.py compile_feature; read, not run.)
-        e.g. 3 rows at one location, coeffs c1, c2, c3: old (c1+c2+c3)*3*L, right (c1+c2+c3)*L.
+[x] C3  Whole spectrum, old vs new: tests/c3_spectrum.py (needs the old code). Run 2026-10-09:
+        14 EVV terms, axes A = w1, B = -w1 + w2, dynrange 100, gamma 4.7 cm-1, one grid for both (step 2 cm-1).
+        - formaldehyde, GVPT2 / anharmonic: 68 = 68 features, matched by location. Old = new: amplitudes,
+          each feature on the grid, the whole spectrum without a cut (1e-15), and the cut by domains
+          (68 = 68 features drawn, 30 = 30 domains, 1e-16). Cut vs no cut: 1.05 % of the max intensity, old
+          and new alike (the strongest peak's tail at its box edge).
+        - The old double count, now run: old evaluate_feature multiplies the summed amplitude by one shape
+          per parameter set at the location (evaluators.py evaluate_feature, numerical_abstractions.py
+          compile_feature). A peak with n parameter sets comes out n times too large, n^2 in intensity.
+          e.g. 2 parameter sets at one location, coeffs c1, c2: old (c1+c2)*2*L, right (c1+c2)*L.
+          n counts parameter sets, not rows: rows of several terms with one parameter set give n = 1.
+          Formaldehyde: n = 1 for every feature, so no effect there. n > 1 needs two parameter sets at one
+          point, e.g. degenerate modes. Degenerate toy (mode 5 given the harmonic frequency of mode 3, the same
+          data for both): n = 1 (32 features), 2 (16), 4 (2); old = n * new for every feature (1e-14);
+          whole spectrum 5.7 % of the max intensity off; old with each feature / n = new (5e-16).
+        - Changed after the first run (decided 2026-10-09): SpectralWindow.from_features dropped features
+          weaker than max / dynrange (formaldehyde: kept 8 of 68, old vs new 0.6 % of the max intensity).
+          Now no feature is dropped for its amplitude, as in the old code (minimum_box_padding > 0). A term with
+          coefficient 0 never becomes a row (`zero`); a feature whose rows cancel (amplitude 0) stays, as a
+          record. The numbers above are after the change.
+        - Record of cancellation (added 2026-10-09): SpectralFeature.net_fraction = |sum coeffs| / sum |coeffs|
+          (1: none, 0: the rows cancel); FeatureResult.cancelling(rel_tol) lists features with net_fraction
+          <= rel_tol. Zero pairs are never in it. Formaldehyde, GVPT2: no exact cancellation; net_fraction
+          <= 1 %: 2 of 68 features (a, b = 2, 0 and 0, 2; 7 rows each), <= 10 %: 12, <= 50 %: 43.
 [ ] C4  Special motifs, actually run. Hand-build the motifs; call old resonances.solve_LSE_motif
         and new solve_LSE_motif on toy states:
         - B only, A only (fine by B7): old IndexError for B only? Same point as new for A only?
@@ -178,12 +197,14 @@ E. Pipeline
                  undressed features raises (features_to_clusters already does on None). Tests give a box with
                  feat(..., box_extent=...). Also fixed: dataclasses.replace no longer resets a dressed box.
           2. [x] SpectralWindow.from_features(box, features, dynrange): boxes from Γ and dynrange, keep features
-                 whose box overlaps the window, then drop weak ones (max over the kept features). Replaces
-                 filter_to_spec_window (location ± 2Γ, before boxes exist), dress_with_featboxes,
+                 whose box overlaps the window. No feature is dropped for its amplitude: weak ones and ones whose
+                 rows cancel stay (changed 2026-10-09 after C3; before, features weaker than max / dynrange were
+                 dropped).
+                 Replaces filter_to_spec_window (location ± 2Γ, before boxes exist), dress_with_featboxes,
                  contributes_to and feat_type.
-                 Known limit: every box has the same size for one Γ (no scale_wrt_max_intensity). A feature far
-                 stronger than the window's max, but further away than its box, is dropped although its tail
-                 can be above max / dynrange inside the window. Fix only if a real spectrum needs it.
+                 Known limit: every box has the same size for one Γ (no scale_wrt_max_intensity). A strong
+                 feature further away than its box is left out, although its tail inside the window can still
+                 matter next to weak features there. Fix only if a real spectrum needs it.
           3. [x] draw_window(window, vibstates_data, coords_cm) (evaluate.py): each domain is draw_all of its
                  features on its part of the grid (box_slices); the domains add up. Returns the amplitude.
           4. [x] tests: one domain = draw_all exactly (weak peak next to a strong one included); two domains
@@ -193,7 +214,8 @@ E. Pipeline
                  dynrange 101, strong peak + weak peak (1 % of it) in two domains: intensity error 0.9 % of
                  the strong peak over the whole grid, but 12 % of the weak peak at its own peak (36 % on its
                  sides). dynrange 1001: one domain, no error. To decide for real spectra: which dynrange,
-                 checked against draw_all.
+                 checked against draw_all. C3, formaldehyde, dynrange 100: cut 1.05 % of the max intensity
+                 (all 68 features drawn, 30 domains).
         Later: locations without every spectrum axis. e.g. a motif on B only in an (A, B) spectrum has
         location {'B': E}; on an (A, B) grid its shape does not depend on A (a ridge along A).
         Now: SpectralWindow.from_features raises for such a feature (feat_box_overlaps: axes differ).
@@ -233,6 +255,10 @@ E. Pipeline
            list (reverse-order run); the caller's terms stay unchanged; lineshape_parameter reaches
            every feature.
         5. [ ] wilson_main adapter: a new evaluate path next to EvaluationWorkflow. Needs B1 and E2 (both done).
+               Found in C3:
+               - compute_features_from_terms returns no states, but draw_window needs them (molsys.states).
+               - the old magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default):
+                 SpectralFeature.apply_magn_cond_filter exists, but only rps_evaluation.py calls it (E3.6).
         6. [ ] Delete rps_evaluation.py. Nothing imports it, and E2 does not use its SpectralGrid/BoxParams
                (checked 2026-10-09).
 [ ] E4  README: removed 2026-10-09; it described older designs the code does not follow (old text: git history,

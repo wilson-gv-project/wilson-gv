@@ -131,6 +131,19 @@ class SpectralFeature:
         return self.scale * sum(r.coeff for r in self.rows)
 
     @property
+    def net_fraction(self) -> float | None:
+        """
+        How much of the rows is left in their sum: |sum of coeffs| / sum of |coeffs|. scale does not change it.
+            1: no cancellation (one row, or rows of one sign);  0: the rows cancel
+            e.g. rows 0.5, -0.4 -> 0.1 / 0.9 = 0.11;  rows 0.5, -0.5 -> 0
+        None without rows, or if every row is 0 (nothing cancels there).
+        """
+        total = sum(abs(r.coeff) for r in self.rows)
+        if total == 0.:
+            return None
+        return abs(sum(r.coeff for r in self.rows)) / total
+
+    @property
     def motif(self) -> ResonanceMotif | None:
         motifs = {r.motif for r in self.rows}
         if len(motifs) > 1:
@@ -497,15 +510,19 @@ class SpectralWindow:
              on every axis, as dress_these_with_boxes without scale_wrt_max_intensity. Needs no max intensity.
           2. keep the features whose box overlaps `box` (touching edges excluded):
              location inside `box` -> full_features, outside -> contrib_features
-          3. drop the features weaker than max / dynrange; max over the kept features,
-             so a strong feature just outside `box` counts too
+          No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):
+            - a weak feature stays, however weak
+            - a term with coefficient 0 never becomes a row (build_contributions puts it in `zero`)
+            - a feature whose rows cancel (amplitude 0) stays as a record of it; it draws nothing
 
         e.g. gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * 10 * 1.1 = 55 cm-1. For `box` A (0, 10),
         a feature at A = 60 is kept (its box starts at 5), a feature at A = 70 is not (its box starts at 15).
 
-        dynrange: strongest intensity / weakest intensity that still counts. A bigger dynrange gives bigger
-        boxes, so fewer tails are cut off when drawing (size of the cut: see evaluate.draw_window).
-        Returns copies with boxes; the input features stay as they are. Every feature needs a lineshape_parameter.
+        dynrange: sets the box size only. A box ends where its feature's intensity is down to 1/dynrange of the
+        feature's own peak. A bigger dynrange gives bigger boxes, so fewer tails are cut off when drawing
+        (size of the cut: see evaluate.draw_window).
+        Returns copies with boxes; the input features stay as they are. Every feature needs rows and a
+        lineshape_parameter.
         """
         if dynrange <= 1.:
             raise ValueError(f'dynrange must be > 1, got {dynrange}')
@@ -514,16 +531,14 @@ class SpectralWindow:
         for f in features:
             if f.lineshape_parameter is None:
                 raise ValueError(f'feature {f} has no lineshape_parameter, so no box size')
+            if f.amplitude_coeff is None:
+                raise ValueError(f'feature {f} has no rows, so no amplitude')
             box_extent = (lorentzian_distance_to_dynrange_weaker_than_max(f.lineshape_parameter, dynrange)
                           * (1. + box_range_safety_margin))
             feat_box = Box({k: (v - box_extent, v + box_extent) for k, v in f.location.as_dict().items()})
             dressed.append(replace(f, feat_box=feat_box))
 
         kept = [f for f in dressed if f.feat_box_overlaps(box)]
-        if not kept:
-            return cls(box)
-        min_intensity = max(f.get_intensity() for f in kept) / dynrange
-        kept = [f for f in kept if f.get_intensity() >= min_intensity]
 
         return cls(box,
                    full_features=[f for f in kept if f.is_inside(box)],

@@ -69,6 +69,16 @@ class FeatureResult:
         """One feature per (motif, location), built from the table on first use."""
         return features_from_rows(self.table, self.lineshape_parameter)
 
+    def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
+        """
+        The features whose rows (nearly) cancel: net_fraction <= rel_tol.
+            e.g. rel_tol 0.01: the sum keeps at most 1 % of the summed |coeffs|;  rel_tol 0: exact cancellation only
+        Only rows count. A term with coefficient 0 is in `zero` and never a row, so it is no cancellation.
+        """
+        if not 0. <= rel_tol < 1.:
+            raise ValueError(f'rel_tol must be at least 0 and below 1, got {rel_tol}')
+        return [f for f in self.features if f.net_fraction is not None and f.net_fraction <= rel_tol]
+
 
 def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
                      polarization_linear_comb: dict | None = None,
