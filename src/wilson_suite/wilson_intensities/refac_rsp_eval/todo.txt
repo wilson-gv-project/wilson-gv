@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-09
 
-Tests: refac_rsp_eval 467 pass, 2 xfail (B6, pinned on purpose).
+Tests: refac_rsp_eval 473 pass, 2 xfail (B6, pinned on purpose).
        Old suite (pytest src without refac_rsp_eval, 2026-10-09): 9 fail, 280 pass, 3 skip.
        None because of B1; the same 9 before and after B7.
        In a fresh checkout (e.g. a git worktree) about 18 more fail: some tests read files that git
@@ -23,7 +23,7 @@ Order of work
 
 Next (order rewritten 2026-10-09 after a review). Steps 9-15 may use the old code; step 16 deletes it.
 9.  [x] E3.6: delete rps_evaluation.py. Nothing imports it.
-10. [ ] G1: hand calculation, CO. C2 and C3 show old = new; G1 is the only check that the numbers are right.
+10. [x] G1: hand calculation, water. C2 and C3 show old = new; G1 is the only check that the numbers are right.
 11. [-] G7: postponed 2026-10-09 (choosing the experiments comes later). Risk of going on without it: see G7.
 12. [ ] E3.5: wilson_main adapter. Returns the states (draw_window needs them), decides the magnitude-condition
         filter, and checks old vs new end to end through WilsonSimulation (C3 called the new functions directly).
@@ -313,9 +313,28 @@ term_var_translate, wilson_data_obtainer (file reading, units, state energies), 
 weights (getGeneralPolarizationAveragingExpression) and the polarization vector (C2 gave the old
 value to the new side). An error there looks the same on both sides. These checks use no wilson
 code on the checking side.
-[ ] G1  Hand calculation: CO (1 mode), term 0, a = b = 0. Raw numbers from the data dict, the term's
+[x] G1  Hand calculation (planned: CO, term 0, a = b = 0; done: water, see below). Raw numbers from the data dict, the term's
         formula (to_str), textbook isotropic average, numpy only. Compare with evv_reference.json.
         Covers prefactor, averaging, 1/w, units.
+        Done 2026-10-10: tests/test_hand_calculation.py, terms 0 and 12, harmonic and anharmonic states.
+        Water, not CO, in the end (3 modes: every (a, b) pair, and term 12's sum over c has 3 entries).
+        The data dict is read with wilson_data_obtainer (input side); a change in the reader would still show
+        against the stored numbers.
+        - term 0: -1/4 * dipgrad_a * dipgrad_b * polhess_ab / w_a / w_b. Both denominators are w (Hessian
+          eigenvalue), so both states choices give the same number.
+        - term 12: 1/16 * polgrad_b * dipgrad_a * dipgrad_b * cff_acc / (E(1_a) - E(0)) / w_a / w_b / w_c, summed
+          over c. Adds cff (not averaged), a summed label, and the two kinds of denominator: to_str prints both
+          as <['a'],[]>, derive's is_pert_wf_diff says the first is a state energy difference.
+          Rule (user, 2026-10-10): w is always the Hessian eigenvalue; an energy difference always uses the
+          chosen states (harmonic or anharmonic). The code follows it: harmonic_denom vs otf_vibdiffdenom.
+        - Match: term 0, 9 pairs, 5.4e-13; term 12, 6 pairs, 1.07e-12, and its 3 pairs with a = 2 exactly 0, as
+          stored (cff_(2,c,c) = 0, mode 2 antisymmetric). All from the cm-1 per Eh constant (wilson's value vs
+          CODATA 2018: 2.7e-13 per energy factor). Controls: w in place of E(1) - E(0) is off by E(1_a) / w_a
+          (2 to 3 % for water, term 12); E(1) - E(0) in place of w is off by 2 % or more (term 0).
+        - Found on the way: pytest.approx's default abs=1e-12 made test_evv_reference.py's coefficient check
+          (and one amplitude check in test_pipeline.py) up to 6e-5 relative for small coefficients; 270 of 912
+          looser than 1e-6. Now abs=0; the stored numbers still match exactly.
+        Not covered: the data dict vs the .out file (G2), other polarizations (G4, G5).
 [ ] G2  Raw data vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental,
         one dipgrad value, one polgrad value.
 [ ] G3  Rotation test: rotate all property tensors by one random rotation; every averaged value

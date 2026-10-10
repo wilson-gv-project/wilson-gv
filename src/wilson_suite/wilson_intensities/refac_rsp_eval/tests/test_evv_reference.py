@@ -31,7 +31,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_refere
 REFERENCE = json.loads(ref.REFERENCE_FILE.read_text())
 CASES = [(b['molecule'], b['states']) for b in REFERENCE['results']]
 
-# same code, same data: only float rounding may differ between machines
+# same code, same data: only float rounding may differ between machines.
+# Coefficients need abs=0: pytest.approx's default abs=1e-12 would allow up to 6e-5 relative on the smallest
+# stored coefficient (1.6e-8). Locations (cm-1, some 0.) keep a small abs.
 REL = 1e-12
 
 
@@ -80,7 +82,7 @@ def test_coefficients_match_the_reference(stored_and_now):
     now_by_pair = _by_pair(now['rows'])
     wrong = [(pair, e['coeff'], now_by_pair[pair]['coeff'])
              for pair, e in _by_pair(stored['rows']).items()
-             if pair in now_by_pair and now_by_pair[pair]['coeff'] != pytest.approx(e['coeff'], rel=REL)]
+             if pair in now_by_pair and now_by_pair[pair]['coeff'] != pytest.approx(e['coeff'], rel=REL, abs=0)]
     assert wrong == [], '(pair, stored, now)'
 
 

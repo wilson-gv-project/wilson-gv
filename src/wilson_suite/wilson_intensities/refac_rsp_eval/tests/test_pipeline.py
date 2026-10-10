@@ -323,7 +323,7 @@ def test_real_data_amplitude_is_the_sum_of_the_stored_coefficients(evv_formaldeh
 
     for f in result.features:
         expected = sum(stored_coeff[(t, _ab(f))] for t in f.term_ids)
-        assert f.amplitude_coeff == pytest.approx(expected, rel=1e-12), f
+        assert f.amplitude_coeff == pytest.approx(expected, rel=1e-12, abs=0), f   # abs=0: amplitudes are ~1e-8 .. 1e-4
 
 
 # states choice: location in cm-1, amplitude in au
