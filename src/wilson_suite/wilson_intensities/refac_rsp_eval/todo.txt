@@ -174,7 +174,7 @@ D. Data model
 [ ] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
         D1–D3 no longer block anything: rows store term_id and motif, not the CompiledTerm.
 [ ] D4  Two copies of DataOriginInfo, VibState, MolecularProperty, MolPropsCollection
-        (wilson_main/abstractions.py, system_data.py), plus a third MolSystemData in rps_evaluation.py.
+        (wilson_main/abstractions.py, system_data.py). (A third MolSystemData went with rps_evaluation.py.)
         Decide who owns the data model. B1 is the first step. Order of work step 15 (with D3); the deletion
         below is step 16, the render port step 13.
         Imports now (from the old README, checked 2026-10-09): plan.py <-> wilson_system.system_data import
@@ -277,11 +277,12 @@ E. Pipeline
                Order of work step 12. Found in C3:
                - compute_features_from_terms returns no states, but draw_window needs them (molsys.states).
                - the old magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default):
-                 SpectralFeature.apply_magn_cond_filter exists, but only rps_evaluation.py calls it (E3.6).
+                 SpectralFeature.apply_magn_cond_filter exists, but only its tests call it (its one caller,
+                 rps_evaluation.py, is gone). Keep it for the adapter, or delete it.
                Check: the same spectrum as EvaluationWorkflow.evaluate, run through WilsonSimulation. Needs the
                old code, so before step 16. Expect the old double count only where parameter sets share a location.
-        6. [ ] Delete rps_evaluation.py. Nothing imports it, and E2 does not use its SpectralGrid/BoxParams
-               (checked 2026-10-09).
+        6. [x] Delete rps_evaluation.py. Done 2026-10-10: nothing imported it, and E2 did not use its
+               SpectralGrid/BoxParams.
 [ ] E4  README: removed 2026-10-09; it described older designs the code does not follow (old text: git history,
         e.g. git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md).
         Write a new one once D4 settles the data model: the pipeline (pipeline.py docstring), the drawing
