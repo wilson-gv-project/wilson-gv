@@ -49,6 +49,11 @@ class VibPerturbedTerm:
         # Hash (currently indeterminate)
         self.hsh = None
 
+        # to have info about the term in it
+        self.anharmonicity = None
+
+        self.note = None
+
     def __repr__(self):
         return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
@@ -267,6 +272,35 @@ class VibPerturbedTerm:
 
         return self.hsh
 
+    def __hash__(self, also_sort: bool=False, nm_inds: list=None) -> int:
+        """
+        Hashing function
+
+        also_sort: Also sort term before hash is calculated?
+        nm_inds: List of normal mode indices if sorting
+        """
+
+        if not(self.was_sorted) and not(also_sort):
+            raise AssertionError('Term for which hash was requested has not been sorted')
+
+        if also_sort:
+            self.sort(nm_inds)
+
+        # Getting hashes of constituent parts
+        props_h = tuple([hash(i) for i in self.props])
+        ft_h = tuple([i.h() for i in self.freqterms])
+        res_h = tuple([i.h() for i in self.res])
+
+        # Combine constituent hashes for collective hash for this term
+        self.hsh = hash((props_h, ft_h, res_h))
+
+        return self.hsh
+
+    def __eq__(self, other):
+        if isinstance(other, VibPerturbedTerm):
+            return hash(self) == hash(other)
+        return False
+
     def full_enhancement_possible(self, magn_conditions=None) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
@@ -408,6 +442,27 @@ class VibPerturbedTerm:
             ],
             "was_sorted": self.was_sorted
         }
+
+    
+    def to_str(self, nm_inds_for_sort=None):
+        """
+        Make a string identifyer - insteead of hash()
+
+        """
+        if not self.was_sorted:
+            self.sort(nm_inds_for_sort)
+
+        coeff = f'{self.coeff.numerator}/{self.coeff.denominator}'
+        
+        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+        props = [f'{prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)}_({','.join(prop.inds)})' for prop in self.props]
+
+        freqterms = [f"<{ft.sl.q},{ft.sr.q}>" for ft in self.freqterms]
+
+        res = [f'(<{r.diff.sl.q}{r.diff.sr.q}> - {r.pf} -iG)' for r in self.res]
+
+        return coeff + ' * ' + ' * '.join(props) + ' / ' + ' / '.join(freqterms) + ' / ' + ' / '.join(res)
+
 
     @classmethod
     def from_dict(cls, data: dict) -> 'VibPerturbedTerm':
@@ -592,3 +647,80 @@ class VibContribTerm:
 
         print('')
 
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.term_var_translate import SpectralAxisSet
+    from wilson_suite.wilson_experiment.experiment_abstractions import VibExperiment
+    from wilson_suite.wilson_main.abstractions import MolecularProperty
+
+@dataclass
+class VibPertTermsCollection:
+    """
+    term_dict -- as orriginally derived terms - from ws.derive.derive.get_fully_enhanced_terms() or a list already
+    experiment -- provenance of these terms
+    axes_choice -- tracking if translated to axes choice, and which ones
+    """
+    term_dict: dict[int, dict[tuple, VibPerturbedTerm]]
+    experiment: 'VibExperiment'
+    axes_choice: 'SpectralAxisSet' = None
+    magn_conditions: tuple = None
+
+    def show_as(self, format: str='latex', part: str | None = None):
+        """
+        format - latex, str
+        """
+        if isinstance(self.term_dict, dict):
+            flat_terms_dict = self.make_flat(self.term_dict)
+        elif isinstance(self.term_dict, list):
+            flat_terms_dict = self.term_dict
+
+        if format=='latex':
+
+            for id, term in flat_terms_dict.items():
+                print('&'+term.to_latex(part=part) + rf' \\ % term_id {id}')
+        
+        elif format =='str':
+        
+            for id, term in flat_terms_dict.items():
+                print(term.to_str())
+
+        else:
+            raise NotImplementedError('This format is no implemented for VibPertTermsCollection.show_as()')
+
+
+    def make_flat(self, as_list=False) -> dict[str, VibPerturbedTerm] | list[VibPerturbedTerm]:
+        """
+        returns flat either dict or list, not a VibPertTermsCollection
+        """
+        from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
+        return derived_terms_flat(self.term_dict, as_list)
+
+
+    def required_data(self, freqs: str='static') -> tuple[int, list['MolecularProperty']]:
+        """
+        find_props here returns a list of MolecularProperty objects - is it too much at this point?
+        """
+        from wilson_suite.wilson_main.main_functions import find_max_state_lvl, find_props
+
+        return find_props(self.term_dict, freqs), find_max_state_lvl(self.term_dict)
+    
+
+    def available_axes_choices(self):
+        self.experiment.tell_axis_options()
+
+    
+    def translate_to_ax_choice(self, axes_choice, magn_conditions_translated=None) -> 'VibPertTermsCollection':
+        """
+        returns a new VibPertTermsCollection object
+
+        should have some default axes_choice?
+        """
+
+        from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
+        return VibPertTermsCollection(translate_terms_to_axis_variables(self.term_dict, axes_choice), 
+                                      experiment=self.experiment,
+                                      axes_choice=axes_choice,
+                                      magn_conditions=magn_conditions_translated)

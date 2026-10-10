@@ -182,10 +182,11 @@ epochs = ws.experiment.abstractions.find_epochs(field_a)
 
 
 
-terms = ws.derive.main.get_fully_enhanced_terms(experiment=experiment_a)
+terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
 
 print(experiment_a.valid_axis_combs)
 
+flat_terms = ws.utils.termdict_from_symb_term.derived_terms_flat(terms, tolist=True)
 
 translated_terms = ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[((-1,), (2,))][3])
 
@@ -265,8 +266,7 @@ style_config = PlotConfig(
 
 evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                       'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
-rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
-                                                      'dynamic_range': 500,
+rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'dynamic_range': 500,
                                                       'num_levels': 15,
                                                       'reference_max': None,
                                                       'spec_data_operations': 'abs()**2',
@@ -296,4 +296,4 @@ intensities_spec = np.abs(sim.spec) ** 2
 
 hist, bin_edges = np.histogram(intensities_spec, bins=10)
 
-sim.render(renderer=ws.analysis.render.render_spectrum)
+sim.render(renderer=ws.wilson_analysis.render.render_spectrum)

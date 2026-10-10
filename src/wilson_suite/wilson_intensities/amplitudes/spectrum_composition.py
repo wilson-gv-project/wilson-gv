@@ -267,10 +267,13 @@ class ResLocGeoObject:
 class SpectralFeature:
     location: 'ResLocGeoObject'
     term_contributions: tuple[TermParametersChoice] = None # grouped by res_motif
+    term_contrib_by_id: dict = None
     lineshape_parameter: float = None # will be by this time of init in the unit of cm-1
     amplitude_coeff: float = None
     feat_type: str = None
     feat_box: Box = None
+    _param_set: dict = None
+    _res_motif: str = None
     
     def __post_init__(self):
         # making boxes around the points for features using the lineshape_parameter
@@ -280,8 +283,8 @@ class SpectralFeature:
             self.feat_box = Box(bounds)
 
     def __hash__(self) -> int:
-        # return hash((self.location, self.term_contributions))
-        return hash(self.location)
+        return hash((self.term_contributions[0].res_motif, self.term_contributions[0].states_parameters))
+        # return hash(self.location)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SpectralFeature):
@@ -289,6 +292,100 @@ class SpectralFeature:
         return (self.location == other.location 
                 and self.lineshape_parameter == other.lineshape_parameter 
                 and self.term_contributions == other.term_contributions)
+
+    def __lt__(self, other: 'SpectralFeature') -> bool:
+        if not isinstance(other, SpectralFeature):
+            return NotImplemented
+        return abs(self.amplitude_coeff) < abs(other.amplitude_coeff)
+
+    @property
+    def param_set(self):
+        # 1. Check if a manual value was set first
+        if self._param_set is not None:
+            return self._param_set
+            
+        # 2. Fallback to calculation logic
+        if self.term_contributions:
+            d = TermParametersChoice.check_states_parameters(self.term_contributions)
+            params = dict(d)
+            params.pop('zero', None)
+            return params
+            
+        return None
+    
+    @param_set.setter
+    def param_set(self, value):
+        self._param_set = value
+    
+    def anharm_contributions(self, term_map: dict):
+        if self.term_contrib_by_id is None:
+            return {}
+        
+        result = {}
+        for term_key, val in self.term_contrib_by_id.items():
+            if term_map[term_key].anharmonicity not in result:
+                result[term_map[term_key].anharmonicity] = {term_key: val[0]}
+            else:
+                result[term_map[term_key].anharmonicity][term_key] = val[0]
+        return {k: sum(list(v.values())) for k,v in result.items()}
+    
+    def __repr__(self) -> str:
+        """
+        Returns a string representation showing type and coordinates.
+        """        
+        return f'SpectralFeature(location={self.location}, params={self.param_set}, amplitude_coeff={self.amplitude_coeff})'
+
+    @classmethod
+    def sort_by_params(cls, features: list['SpectralFeature']):
+        params_lens = [len(i.term_contributions) for i in features]
+        assert len(params_lens) == sum(params_lens)
+
+        return sorted(
+                features, 
+                key=lambda f: f.term_contributions[0]
+            )
+
+    @classmethod
+    def sort_by_el_or_mech(cls, features: list['SpectralFeature']):
+        """
+        unfinished
+        """
+        raise NotImplementedError()
+        sorted_dict = {}
+        for f in features:
+            terms = f.term_contrib_by_id
+        return sorted_dict
+
+    @classmethod
+    def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float = None):
+        """
+        returns a new list
+
+        external_max - can take external input for max , instead of finding max of the given list
+        """
+        if external_max is None:
+            max_feat_coeff = cls.get_max_intensity_feat(features, intensity_expr=None).amplitude_coeff
+        else:
+            max_feat_coeff = external_max
+
+        return_feats = copy.deepcopy(features)
+
+        for f in return_feats:
+            f.amplitude_coeff = f.amplitude_coeff/abs(max_feat_coeff)
+        return return_feats
+
+    @classmethod
+    def get_feats_with_params(cls, features: list['SpectralFeature'], params: dict):
+        """
+        e.g.:
+            params = {'a': 0, 'b': 1}
+        """
+        from wilson_suite.wilson_intensities.amplitudes.term_parts import ParameterSet
+        res = []
+        for f in features:
+            if ParameterSet(params) in f.term_contributions[0].states_parameters:
+                res.append(f)
+        return res
 
     # UNUSED
     @classmethod
@@ -364,6 +461,12 @@ class SpectralFeature:
     def get_res_motifs(self) -> list[ResonanceMotif]:
         return [i.res_motif for i in self.term_contributions]
 
+    def get_res_motif_str(self) -> str:
+        q: list[ResonanceMotif] = [i.res_motif for i in self.term_contributions]
+        if len(set(q)) != 1:
+            raise ValueError('several different motifs contribute to this feature')
+        return list(set(q))[0].motif_str()
+
     @classmethod
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],
                           intensity_expr: str = 'abs()**2') -> 'SpectralFeature':
@@ -371,13 +474,21 @@ class SpectralFeature:
         amplitude of a feature is given by: amplitude_coeff / lineshape_parameter**2
         """
         result = None
-        intensity_result = 0
+        num_result = 0
 
         for feat in features:
             
-            if feat.get_intensity(intensity_expr) > intensity_result:
-                result = feat
-                intensity_result = feat.get_intensity(intensity_expr)
+            if intensity_expr is not None:
+
+                if feat.get_intensity(intensity_expr) > num_result:
+                    result = feat
+                    num_result = feat.get_intensity(intensity_expr)
+            
+            else:
+
+                if abs(feat.amplitude_coeff) > num_result:
+                    result = feat
+                    num_result = abs(feat.amplitude_coeff)
         
         return result
 
@@ -517,18 +628,52 @@ class SpectralFeature:
                 else:
                     delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange)
 
+                # gamma = feat.lineshape_parameter
+                # c = feat.amplitude_coeff
                 box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
-
+                # print('box_extent', box_extent, np.abs(c/(box_extent-1j*gamma)/(box_extent-1j*gamma)), np.abs(c/(-1j*gamma)/(-1j*gamma)), feat.amplitude_coeff)
+                
                 feat.feat_box = Box({k: (v - box_extent,
                                          v + box_extent)
                                      for k,v in feat.location._coord_dict.items()})
 
         return res_features
 
+    
+    @classmethod
+    def apply_magn_cond_filter(cls, features: list['SpectralFeature'],
+                               magn_conditions: tuple,
+                               magn_conditions_margin: float):
+        """
+        magn_conditions:
+            (('-A', 'B',),) -- when w1,w2
+            (('B',),) -- when w1,w2-w1
+
+        if None - just returns back features from input
+        """
+        if magn_conditions is None:
+            return features
+        
+        res_features = []
+
+        for feat in features:
+            if magn_conditions == (('B',),):
+                if feat.location._coord_dict['B'] > (0+magn_conditions_margin):
+                    res_features.append(feat)
+            elif magn_conditions == (('-A', 'B',),):
+                if feat.location._coord_dict['B'] - feat.location._coord_dict['A'] > (0+magn_conditions_margin):
+                    res_features.append(feat)
+            # FIXME(!): raise error on else
+        return res_features
+
+    
     @classmethod
     def print_list_features(cls, features: list['SpectralFeature']):
         for feat in features:
-            print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box)
+            print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
+            print('term_contributions', feat.term_contributions)
+            print('term_contrib_by_id', feat.term_contrib_by_id)
+
 
 @dataclass
 class SpectralWindow:

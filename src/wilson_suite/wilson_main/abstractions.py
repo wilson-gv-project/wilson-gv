@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict, is_dataclass, InitVar
 from typing import Callable, Any, Optional
-
+from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 import logging
 
@@ -54,43 +54,43 @@ class MolecularSystem:
 
 
 
-@dataclass(frozen=True)
-class DataOriginInfo:
-	"""
-	Class to represent computational setups for properties obtained external to Wilson
-	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
-	"get from file"
+# @dataclass(frozen=True)
+# class DataOriginInfo:
+# 	"""
+# 	Class to represent computational setups for properties obtained external to Wilson
+# 	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
+# 	"get from file"
 
-	----
-	source_type: String: Options: gaussian, cfour, wilson
-	lvl_theory: String: Level of theory
-	basis_set: String: Basis set
-	base_file_loc: String: path to the base file
-	"""
-	# Strings
-	source_type: str = ''
+# 	----
+# 	source_type: String: Options: gaussian, cfour, wilson
+# 	lvl_theory: String: Level of theory
+# 	basis_set: String: Basis set
+# 	base_file_loc: String: path to the base file
+# 	"""
+# 	# Strings
+# 	source_type: str = ''
 	
-	lvl_theory: str = ''
-	basis_set: str = ''
+# 	lvl_theory: str = ''
+# 	basis_set: str = ''
 
-	base_file_loc: str = ''
+# 	base_file_loc: str = ''
 
 
-	def __hash__(self):
-		def to_tuple(x):
-			return tuple(sorted(x.items())) if isinstance(x, dict) else x
-		return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
+# 	def __hash__(self):
+# 		def to_tuple(x):
+# 			return tuple(sorted(x.items())) if isinstance(x, dict) else x
+# 		return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
 
-	def __eq__(self, other):
-		if not isinstance(other, DataOriginInfo):
-			return False
+# 	def __eq__(self, other):
+# 		if not isinstance(other, DataOriginInfo):
+# 			return False
 		
-		return (
-            self.source_type == other.source_type and
-            self.lvl_theory == other.lvl_theory and
-            self.basis_set == other.basis_set and
-			self.base_file_loc == other.base_file_loc
-		)
+# 		return (
+#             self.source_type == other.source_type and
+#             self.lvl_theory == other.lvl_theory and
+#             self.basis_set == other.basis_set and
+# 			self.base_file_loc == other.base_file_loc
+# 		)
 
 
 @dataclass
@@ -193,11 +193,89 @@ class MolPropsCollection:
 	properties: list[MolecularProperty]
 
 	def get(self, trivial_name: str):
-		# d = {prop.trivial_name: prop for prop in self.properties}
 		d = {prop.trivial_name: prop for prop in self.properties}
 		if trivial_name not in d:
 			raise ValueError(f'trivial_name {trivial_name} is not in MolPropsCollection')
 		return d.get(trivial_name)
+
+
+	def __getitem__(self, trivial_name):
+		"""Allow coll[name] syntax."""
+		return self.get(trivial_name)
+
+	def __contains__(self, trivial_name: str) -> bool:
+		"""Allow `name in coll` syntax."""
+		return any(p.trivial_name == trivial_name for p in self.properties)
+
+	def __iter__(self):
+		"""Allow `for p in coll` syntax."""
+		return iter(self.properties)
+
+	def __len__(self) -> int:
+		return len(self.properties)
+
+	def names(self) -> list[str]:
+		"""All trivial names."""
+		return [p.trivial_name for p in self.properties if p.trivial_name is not None]
+
+	def filter(self, predicate: Callable[[MolecularProperty], bool]) -> 'MolPropsCollection':
+		return MolPropsCollection([p for p in self.properties if predicate(p)])
+
+	def without_values(self) -> 'MolPropsCollection':
+		"""Properties still awaiting data — useful for finding what's missing."""
+		return self.filter(lambda p: p.vals is None)
+
+	def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
+		"""All properties computed with a given setup."""
+		return self.filter(lambda p: p.calc_setup == origin)
+
+	def of_order(self, order: int) -> 'MolPropsCollection':
+		"""Properties of a specific differentiation order, e.g. 1 for dipole, 2 for polarizability."""
+		return self.filter(lambda p: sum([1 for i in p.prop_spec['ops'] if i=='g']) == order)
+
+	def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
+		"""Bucket properties by which setup they use. For batching QC jobs."""
+		from collections import defaultdict
+		groups = defaultdict(list)
+		for p in self.properties:
+			groups[p.calc_setup].append(p)
+		return {k: MolPropsCollection(v) for k, v in groups.items()}
+
+	def dress(self, uniform: DataOriginInfo | None = None, 
+			by_name: dict[str, DataOriginInfo] | None = None):
+		"""Attach DataOriginInfo to each property. 
+		by_name takes precedence; uniform is the fallback."""
+		if uniform is None and by_name is None:
+			raise ValueError("Provide `uniform` or `by_name` (or both).")
+		
+		for p in self.properties:
+			if by_name and p.trivial_name in by_name:
+				p.addCalcSetup(by_name[p.trivial_name])
+			elif uniform is not None:
+				p.addCalcSetup(uniform)
+			else:
+				raise ValueError(f"No setup for property {p}")
+
+	@property
+	def are_dressed(self) -> bool:
+		return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
+
+	def build_request_dict(self) -> dict[str, DataOriginInfo]:
+		"""Build a {name: DataOriginInfo} shopping list."""
+		if not self.are_dressed:
+			raise RuntimeError("Collection must be dressed before requesting data.")
+		return {p.trivial_name: p.calc_setup for p in self.properties}
+
+	def fill_from(self, data_dict: dict):
+		"""Load obtained data into each property's .vals."""
+		for p in self.properties:
+			if p.trivial_name in data_dict:
+				p.vals = data_dict[p.trivial_name]
+
+	@property
+	def is_filled(self) -> bool:
+		return all(p.vals is not None for p in self.properties)
+
 
 
 @dataclass
@@ -251,6 +329,11 @@ class VibState:
 			return NotImplemented
 		return self.state_label < other.state_label
 	
+	@classmethod
+	def get_1q_states(cls, states: list['VibState']):
+		return [s for s in states if len(s.state_label.split(','))==1]
+
+
 # FIXMEs: Improved handling of mode exclusion; possibly methods changes
 @dataclass
 class VibAnaSetup:
@@ -346,8 +429,8 @@ class VibAnaSetup:
 		"""
 		if self.nc_sqrt_eigval is not None and self.has_all_states:
 			return True
-		print('\nself.nc_sqrt_eigval is not None', self.nc_sqrt_eigval is not None)
-		print('self.has_all_states', self.has_all_states, '\n')
+		print('\nself.nc_sqrt_eigval is not None:', self.nc_sqrt_eigval is not None)
+		print('self.has_all_states:', self.has_all_states, '\n')
 		return False
 	
 	def setStates(self, states: list[VibState]):

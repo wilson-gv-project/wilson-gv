@@ -1,4 +1,5 @@
 from ..latex_rendering import get_plt_latex
+import os
 
 def test_plt_latex():
     expr1 = r'\frac{1}{4}\frac{1}{(\omega_{a+b,a} -A)(\omega_{b,a} -B)}'
@@ -22,6 +23,7 @@ def test_saved():
     latex_strs = [t.to_latex() for t in terms_fuller_flat]
     for n, t_latex in enumerate(latex_strs):
         get_plt_latex(t_latex, savename=f'term{n}.svg')
+        os.remove(f'term{n}.svg')
 
 def test_terms_custom_saved():
     from ...wilson_intensities.tests.unit.test_resonances import generate_only_res_cond_evv_term_selection
@@ -30,3 +32,4 @@ def test_terms_custom_saved():
 
     for n, t_latex in enumerate(latex_strs):
         get_plt_latex(t_latex, savename=f'term_custom{n}.svg')
+        os.remove(f'term_custom{n}.svg')

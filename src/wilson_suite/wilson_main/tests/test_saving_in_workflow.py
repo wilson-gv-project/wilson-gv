@@ -14,7 +14,8 @@ def test_saving_obtained_data():
     from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -87,11 +88,12 @@ def assert_equal(a, b):
         assert a == b
 
 
-def test_save_wilsonsim():
+def test_save_wilsonsim(tmp_path):
     from ...fixtures import evv_experiment
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
 
     sim = ws.main.workflow_abstractions.WilsonSimulation()
     sim.addExperiment(evv_exp)
@@ -120,11 +122,12 @@ def test_save_wilsonsim():
     # save this sim to pickle in the sim workflow run directory
     sim.save_to_pkl(filename='sim0.pkl')
 
-    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
+    # tmp_path: a fresh pytest folder per run, so the test writes nothing into the repo
+    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl', save_to_dir=str(tmp_path))
 
     vib_ana.set_include_modes_list()
     
-    from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+    from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
     axes_choice = make_SpectralAxisSet({'A': [2], 'B': [-1, 2]})
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
@@ -142,7 +145,8 @@ def test_save_wilsonsim():
     sim.save_to_pkl(filename='sim1.pkl')
 
     # save EvaluationInputs for evaluation workflow
-    sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
+    sim.evaluate()
+    # sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
 
     sim.save_to_pkl(filename='configs.pkl', configs_only=True)
 

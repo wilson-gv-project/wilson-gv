@@ -1,6 +1,9 @@
 import wilson_suite as ws
 import os
 import numpy as np
+
+from wilson_suite.wilson_utils.paths import SUITE_ROOT, ANALYSIS_ROOT
+
 np.set_printoptions(linewidth=280, precision=1)
 from importlib.resources import files
 data_dir = files('wilson_suite').joinpath('data_for_tests')
@@ -9,10 +12,10 @@ data_dir = files('wilson_suite').joinpath('data_for_tests')
 def test_full_integration():
     print()
     from ...fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     # ?? why no other axes choice works?
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     print()
@@ -69,8 +72,8 @@ def test_full_integration():
     print(f"Standard Deviation: {np.std(np.abs(sim.spec)**2):.3e}")
     print(f"Minimum Value: {np.min(np.abs(sim.spec)**2):.3e}")
     print(f"Maximum Value: {np.max(np.abs(sim.spec)**2):.3e}")
-
-    sim.render(renderer=ws.analysis.render.render_spectrum)
+    print('ANALYSIS_ROOT', ANALYSIS_ROOT)
+    sim.render(renderer=ws.wilson_analysis.render.render_spectrum)
 
     from matplotlib.testing.compare import compare_images
     # returns None when images are considered the same (within tolerance)
@@ -91,7 +94,8 @@ def test_full_integration_other_axes_choice():
     from ...fixtures import evv_experiment
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     # ?? why no other axes choice works?
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[0] # {'A': [(2,)], 'B': [(-1,), (2,)]}
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian', 
@@ -138,22 +142,16 @@ def test_full_integration_other_axes_choice():
     import pytest
     with pytest.raises(ValueError) as error:
         sim.evaluate()
-    assert str(error.value) == "Failed at 'place_in_specwindow': This SpectralWindow does not contain any features. Change the bounds of the window or use different terms. EvaluationWorkflow instanse was saved to `eval_wf.pkl`."
-
-
-def test_smth():
-    from wilson_suite.wilson_utils.serialization import unpickle_smth_from
-    wf: ws.intensities.amplitudes.evaluation_wf.EvaluationWorkflow = unpickle_smth_from('eval_wf.pkl')
-    print(wf.artifacts.features)
+    assert str(error.value) == "No features in this spec window"
 
 
 def test_full_integration_H2O_molecule():
     print()
     from ...fixtures import evv_experiment
-    from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
     evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    # terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
+    terms = evv_exp.derive_terms()
     axes_choice = evv_exp.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
 
     calc_setup = ws.main.abstractions.DataOriginInfo(source_type='gaussian',
@@ -208,7 +206,7 @@ def test_full_integration_H2O_molecule():
     print(f"Minimum Value: {np.min(np.abs(sim.spec)**2):.3e}")
     print(f"Maximum Value: {np.max(np.abs(sim.spec)**2):.3e}")
 
-    sim.render(renderer=ws.analysis.render.render_spectrum)
+    sim.render(renderer=ws.wilson_analysis.render.render_spectrum)
 
     from matplotlib.testing.compare import compare_images
     # returns None when images are considered the same (within tolerance)

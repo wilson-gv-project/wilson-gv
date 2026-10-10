@@ -375,34 +375,12 @@ def get_iso_mat(n):
 
         raise ValueError('Unsupported get_iso_mat order:', n)
 
-def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
-    """
-    Now is set for the EVV experiment and for ZZZZ polarization.
-
-    pol_g is a list of lists of 2 lists where the second one is empty
-          but first one contains the lists of interest
-
-    :param num_f: number of pulses
-    :return: array_of_4greekIndices - an array of arrays of 4 greek indices for second hyperpolarizability :
-             [alpha, beta, gamma, delta]
-    """
-    pol_g = get_iso_f(num_f)
-    array_of_4greekIndices = np.array([pol[0] for pol in pol_g], dtype='object').reshape(-1, num_f)
-    return array_of_4greekIndices
 
 
-def getPolarizationAveragingExpression(num_pulses: int, polarization: str):
-    """
-    Get the arrays of indices to be summed and a prefactor of the averaging expression
+from collections.abc import Sequence
 
-    """
-    if len(polarization) != num_pulses:
-        raise ValueError("Polarization choice string should have the length of 'num_pulses'")
-    if num_pulses==4:
-        if polarization=="ZZZZ":
-            return get_AlphaBetaGammaDelta_indices(num_f=num_pulses), 1./15
 
-def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
+def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: Sequence[float]) -> dict[tuple,float]:
     """
     Get the arrays of indices to be summed and a prefactor of the averaging expression
     Functioning for non-electric dipole polarization properties not investigated/supported

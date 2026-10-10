@@ -152,8 +152,7 @@ def run():
 
     evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'freq_variables': eval_vars_meshgrids,
                                                  'Gamma': 4.7, 'Gamma_unit': 'cm-1'})
-    rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'intensity_normalization_type': NormalizationType.LOG_RATIO,
-                                                 'dynamic_range': 500, 
+    rndi = ws.main.spectrum_abstractions.RenderingInfo(**{'dynamic_range': 500, 
                                                  'num_levels': 15, 
                                                  'reference_max': None,
                                                  'spec_data_operations': 'abs()**2',
@@ -229,7 +228,7 @@ def run():
         logger.debug('\n=====================================================')
         logger.info('\n  >>> And now rendering...\n')
 
-        sim.render(renderer=ws.analysis.render.render_spectrum)
+        sim.render(renderer=ws.wilson_analysis.render.render_spectrum)
 
         logger.info('  >>> Saving to files now...\n')
 

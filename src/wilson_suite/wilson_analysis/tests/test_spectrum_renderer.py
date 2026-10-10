@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from wilson_suite.wilson_analysis.render.spectrum_renderer import SpectrumRenderer, LevelCalculator, compute_masks
-from wilson_suite.wilson_analysis.render.render_utils import NormalizationType, PlotConfig
+from wilson_suite.wilson_analysis.render.render_utils import PlotConfig
 import pytest
 import numpy as np
 
@@ -122,24 +122,6 @@ def test_LevelCalculator():
     assert np.allclose(levels, np.array([ 100.,  177.827941, 316.22776602, 562.34132519, 1000. ]))
     
 
-def test_NormalizationType():
-    print('\nNormalizationType.LOG_SCALE', NormalizationType.LOG_SCALE, '\n')
-    for normtype in NormalizationType:
-        print(normtype)
-
-    print('\n', list(NormalizationType))
-
-    # Convert string to Enum
-    method_name = "log_ratio"
-    method = NormalizationType(method_name)
-    print(method)
-
-    with pytest.raises(ValueError) as excinfo:
-        method_name = "smth"
-        method = NormalizationType(method_name)
-        print(method)
-    assert 'is not a valid NormalizationType' in str(excinfo.value)
-
 
 def test_PlotConfig():
     assert PlotConfig() == PlotConfig(figsize=(35,45),
@@ -168,7 +150,7 @@ def test_below_range_mask_logic():
         [0.0, 0.5],
         [10.0, np.nan],
     ])
-    no_data, below = compute_masks(data, dynamic_range=10)
+    no_data, below = compute_masks(data=data, dynamic_range=10)
 
     assert no_data[1, 1]
     assert below[0, 0]

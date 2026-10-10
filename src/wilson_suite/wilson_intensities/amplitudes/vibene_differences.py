@@ -137,15 +137,16 @@ def get_vibdiff_motif(vibdiff_symb: tuple[tuple],
         raise NotImplementedError('This unit of energy is not supported')
 
 def calculate_vibenedenom_tensor(vibenedenom_inds: tuple, 
-                                 vibstates_data: 'VibStatesData'):
-    """
-    should be using harmonic uncorrected vib ene levels!!!
+                                 nc_sqrt_eigval: dict):
+    """    
+    nc_sqrt_eigval -- contains harmonic uncorrected vib ene levels
     """
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     
-    vector = np.zeros((vibstates_data.number_of_nmodes,))
-    for i in vibstates_data.harmonic_osc_states_labels:
-        vector[i] = convNu2Ene(vibstates_data.get_harmonic_osc_states()[i])
+    vector = np.zeros((len(nc_sqrt_eigval),))
+
+    for i in nc_sqrt_eigval:
+        vector[i] = convNu2Ene(nc_sqrt_eigval[i])
     
     # 'i,j,k->ijk'
     letters = ['i', 'j', 'k', 'l', 'n', 'n', 'o', 'p']
@@ -158,14 +159,14 @@ def calculate_vibenedenom_tensor(vibenedenom_inds: tuple,
 
 
 def calculate_vibenedenoms(unique_vibenedenoms: list[set], 
-                           vibstates_data: 'VibStatesData'):
+                           nc_sqrt_eigval: dict):
     """
     can be done as vector multiplication
     """
     results = {}
     
     for u_vediff in unique_vibenedenoms:
-        results[tuple(sorted(u_vediff))] = calculate_vibenedenom_tensor(u_vediff, vibstates_data)
+        results[tuple(sorted(u_vediff))] = calculate_vibenedenom_tensor(u_vediff, nc_sqrt_eigval)
     
     return results
 

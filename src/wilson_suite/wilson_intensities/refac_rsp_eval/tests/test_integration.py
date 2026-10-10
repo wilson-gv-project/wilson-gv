@@ -1,0 +1,292 @@
+import dataclasses
+import itertools
+from typing import TYPE_CHECKING
+
+import numpy as np
+import pytest
+
+from wilson_suite.wilson_derive import term_var_translate
+from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    getGeneralPolarizationAveragingExpression,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    PrecalculatedData,
+    _make_func_to_compute_avrg,
+    calculate_avrg_tensor,
+    eval_avrg_per_indexdict,
+    evaluate_full_index_dict,
+    evaluate_term_coeff_sumover,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    CompiledTerm,
+    compile_terms,
+)
+from wilson_suite.wilson_system.system_data import (
+    DataOriginInfo,
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+    _sys_info_request,
+)
+from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
+from wilson_suite.wilson_utils.paths import SUITE_ROOT
+from wilson_suite.wilson_utils.prop_trivname import prop_trivname
+from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+
+if TYPE_CHECKING:
+    from wilson_suite.wilson_derive.abstractions import ResonanceCondition
+
+
+def res_to_str(res: 'ResonanceCondition'):
+    """
+    ResonanceCondition to str for printing
+    """
+    upd_pf_sign = ['-'+ax if '-' not in ax else '+'+ax.strip('-') for ax in res.pf]
+    pf_string = ''.join(upd_pf_sign)
+    zip_res = f'w_[{res.diff.to_latex()}] {pf_string} -iG'
+    return zip_res
+
+def term_to_str(term: VibPerturbedTerm):
+    """
+    VibPerturbedTerm to str for printing
+    """
+    ft = ' '.join([f'w_[{i.to_latex()}]' for i in term.freqterms])
+    res = ' / '.join([f'( {res_to_str(i)} )' for i in term.res])
+    p_names = [(prop_trivname(ord_geo=len(i.inds), ord_el=len(i.ops)),i.inds, i.ops) for i in term.props] # type: ignore
+    pp = ' '.join([f'{i[0]}[{",".join([f"{j.o}" for j in i[2]])};{",".join([f"{k}" for k in i[1]])}]' for i in p_names]) # type: ignore
+    return f"{float(term.coeff)} * ( {pp} ) / ( {ft} ) / {res}"
+
+
+# loading EVV terms from json file
+evv_terms = VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/wilson_intensities/refac_rsp_eval/tests/test_terms.json')
+
+axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}) # type: ignore
+translated_terms = term_var_translate.translate_terms_to_axis_variables(evv_terms, axis_choice)
+cmpl_terms = compile_terms(terms=translated_terms)
+
+
+def test_plan_compiled_term():
+    """
+    CompiledTerm for EVV
+    """
+    print('\n\n')
+
+    assert isinstance(cmpl_terms[0], CompiledTerm)
+
+    print(f"{term_to_str(translated_terms[0])}\n")
+    assert cmpl_terms[0].max_state_lvl == 1
+    assert cmpl_terms[0].frac_factor == -0.25
+
+    print(f"{term_to_str(translated_terms[8])}\n")
+    assert cmpl_terms[8].max_state_lvl == 2
+    assert cmpl_terms[8].frac_factor == -0.125
+
+    print(f"{term_to_str(translated_terms[13])}\n")
+    assert cmpl_terms[13].max_state_lvl == 3
+    assert cmpl_terms[13].frac_factor == 0.125
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        cmpl_terms[8].frac_factor = 0.5 # type: ignore
+
+    freqdenom_idx = sorted([freqt.to_latex() for freqt in cmpl_terms[8].cmp_freqdenom])
+    assert freqdenom_idx == sorted(['a', 'b', 'c', 'a+b,c'])
+
+
+def test_compiled_terms():
+    """
+    CompiledTerm for EVV
+    """
+    print('\n\n')
+
+    u = {term.cmp_resmotf for term in cmpl_terms}
+    print(f"unique resonance conditions: {len(u)}\n")
+    for i in u:
+        print(i)
+
+
+def test_eval_molsys_data():
+    """
+    getting data into MolPropsCollection (MolecularProperty instances hold values)
+    """
+    term0_el = cmpl_terms[0]
+
+    # property collection from term0_el
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term0_el.all_props])
+
+    
+    calc_dataorigin = DataOriginInfo(source_type='gaussian',
+                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    # request dict is built from PropsCollection
+    request = term0_el.all_props.build_request_dict(calc_setup=calc_dataorigin)
+
+    # base info about system, including vib states
+    request.update(_sys_info_request(calc_dataorigin))
+    # obtainer is using DataOriginInfo to parse sources with CQCParse
+    datadict = wilson_data_obtainer(requested_data_dict=request)
+
+    assert set(request.keys()) == {'dipgrad', 'polhess',
+                                   'anharmonic_states', 'harmonic_states',
+                                   'nc_sqrt_eigval', 'normal_modes',
+                                   'atoms', 'equilibrium_geometry'}
+    assert set(datadict.keys()) == {'equilibrium_geometry', 'atoms', 'normal_modes',
+                                    'anharmonic_states', 'harmonic_states',
+                                    'nc_sqrt_eigval', 'dipgrad', 'polhess', 'reindex_modes'}
+    assert list(datadict.keys()) != list(request.keys())
+
+    # finally, putting data in -- requires empty MolPropsCollection and dict with data
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    print(molsys)
+
+    import numpy as np
+    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04, -0.,  0., -0.17,  0., -0.,  0.7, -0., -0., 0.7,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
+    assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
+
+    # with empty datadict
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={})
+    assert molsys.eigenvals is None
+    assert molsys.eigenvecs is None
+    assert molsys.natoms == 0
+    assert molsys.geo is None
+    assert molsys.linear == False
+    assert molsys.data_origin is None
+    assert molsys.data_filled == False
+
+    assert molsys.mol_props.is_filled == False
+    assert len(molsys.mol_props) == 3
+
+    assert molsys.states.harmonic_osc_states_labels == ()
+    assert molsys.states.number_of_nmodes == 0
+
+
+def test_evaluate_term():
+    print()
+
+    term = cmpl_terms[2]
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
+    calc_dataorigin = DataOriginInfo(source_type='gaussian',
+                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
+    request.update(_sys_info_request(calc_dataorigin))
+    datadict = wilson_data_obtainer(requested_data_dict=request)
+
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    
+    from wilson_suite.wilson_intensities.amplitudes.averaging import (
+        getGeneralPolarizationAveragingExpression,
+    )
+    polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
+    avrg_func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=polarization_linear_comb)
+
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
+                                                 molsys_data=molsys,
+                                                 avrg_func=avrg_func,
+                                                 precalculated_data=None, 
+                                                 zero_tol=1e-18)
+    print(value)
+    print(contribs)
+
+    import numpy as np
+
+    from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+    
+    w = {m: convNu2Ene(e) for m, e in datadict['nc_sqrt_eigval'].items()}      # harmonic omega, Eh
+
+    assert contribs['NON_AVRG'] == datadict['cff'][0, 1, 1]                      # cff[a, c, c]
+    assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[0])                  # E_a - E_0
+    assert contribs['VIBENE_DENOM'] == pytest.approx(1 / (w[0] * w[1] * w[1]))   # 1/(w_a w_b w_c)
+    assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
+
+    with pytest.raises(ValueError, match='term has indices that do not have values'):
+        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func)
+
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
+                                                 molsys_data=molsys,
+                                                 avrg_func=avrg_func,
+                                                 precalculated_data=None, 
+                                                 zero_tol=1e-18)
+    print(value)
+    print(contribs)
+
+    # term 2: resonance labels a, b are fixed; summation label c runs over every mode
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, precalculated_data=None,
+                                                molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
+    n_modes = len(molsys.eigenvals) # type: ignore
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_func=avrg_func)[0]
+                  for c in range(n_modes))
+    assert by_hand != 0.
+    assert total == pytest.approx(by_hand)
+    assert len(leaves) == n_modes
+
+    # b is a resonance label: summing over b would add peaks at different positions
+    with pytest.raises(ValueError, match=r"resonance labels \['b'\] must be fixed"):
+        evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None,
+                                    molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
+
+
+
+## Term 8, averaged properties on the fly, with the formaldehyde data ---------------------
+# Term 8 averages polgrad[b] (ops 0, 3) * dipgrad[a] (op 1) * dipgrad[c] (op 2) over four cartesian
+# slots: for polarization key (i, j, k, l), polgrad reads (i, l), the first dipgrad j, the second k.
+
+ISO4 = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=(1., 1., 1.))
+ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(6), repeat=3)]
+
+
+@pytest.fixture(scope='module')
+def term8():
+    """Term 8 and its MolSystemData from the formaldehyde file."""
+    term = cmpl_terms[8]
+    calc_dataorigin = DataOriginInfo(source_type='gaussian',
+                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
+    request.update(_sys_info_request(calc_dataorigin))
+    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
+    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request))
+
+
+def evv_props(polgrad, dipgrad) -> MolPropsCollection:
+    return MolPropsCollection([MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={}),
+                               MolecularProperty(trivial_name='dipgrad', vals=dipgrad, extra_data={})])
+
+
+def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
+    """Every index set: sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k]."""
+    term, molsys = term8
+    assert [(tuple(o.o for o in p.ops), p.inds) for p in term.avrg_props] == [((0, 3), ['b']), ((1,), ['a']), ((2,), ['c'])]
+    polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
+    C = np.zeros((3,) * 4)
+    for key, coeff in ISO4.items():
+        C[key] = coeff
+    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+
+    for idx in ALL_ABC:
+        expected = np.einsum('ijkl,il,j,k->', C, polgrad[idx['b']], dipgrad[idx['a']], dipgrad[idx['c']])
+        assert func(idx, molsys.mol_props) == pytest.approx(expected)
+
+
+def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(term8):
+    """Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged."""
+    term, molsys = term8
+    polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
+    ca, sa, cb, sb = np.cos(0.7), np.sin(0.7), np.cos(1.9), np.sin(1.9)
+    R = np.array([[1., 0., 0.], [0., cb, -sb], [0., sb, cb]]) @ np.array([[ca, -sa, 0.], [sa, ca, 0.], [0., 0., 1.]])
+    rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, polgrad), np.einsum('ip,np->ni', R, dipgrad))
+    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+
+    values = [func(idx, molsys.mol_props) for idx in ALL_ABC]
+    assert any(v != 0. for v in values)
+    assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values)
+
+
+@pytest.mark.xfail(strict=True, reason=('calculate_avrg_tensor stores alphabetical axes (a, b, c), but '
+                                        '_get_ind_tuple_from_base reads term 8 in expression order (b, a, c)'))
+def test_term8_precalculated_tensor_gives_the_on_the_fly_value(term8):
+    term, molsys = term8
+    expr = term.avrg_props
+    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=ISO4)
+    pre = PrecalculatedData(avrg_tensors={expr: calculate_avrg_tensor(expr, molsys.mol_props, 6, ISO4)},
+                            avrg_expr_tensor_mapping={expr: expr})
+
+    assert ([eval_avrg_per_indexdict(expr, idx, precalculated_data=pre) for idx in ALL_ABC]
+            == pytest.approx([eval_avrg_per_indexdict(expr, idx, avrg_func=func, molsys_data=molsys) for idx in ALL_ABC]))

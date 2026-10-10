@@ -1,6 +1,6 @@
-from enum import Enum
-from typing import Optional, Tuple, Dict, Any
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 
 class NormalizationType(Enum):
@@ -29,12 +29,15 @@ class NormalizationType(Enum):
     PERCENTAGE = "percent"
     LOG_SCALE = "log_scale"
 
+
 @dataclass
 class PlotConfig:
     """Configuration for plot styling"""
-    figsize: Tuple[int, int] = (35, 45)
+    figsize: tuple[int, int] = (35, 45)
     label_fontsize: int = 25
-    font_dict: Dict[str, Any] = field(default_factory=lambda: {'size': 20})
+    cb_tick_label_fontsize: int = 15
+    tick_label_fontsize: int = 15
+    font_dict: dict[str, Any] = field(default_factory=lambda: {'size': 20})
     colormap: str = 'magma'  # Better contrast colormap
     saturation_color: str = '#FF00FF'
     dpi: int = 250
@@ -45,16 +48,17 @@ class PlotConfig:
     below_range_color: str = '#F8F8F8'  # Very light gray
     data_edge_color: str = 'black'
     data_edge_width: float = 0.75
-    x_min: Optional[float] = None
-    x_max: Optional[float] = None
-    y_min: Optional[float] = None
-    y_max: Optional[float] = None
+    x_min: float | None = None
+    x_max: float | None = None
+    y_min: float | None = None
+    y_max: float | None = None
     colorbar_main_label: str = "Intensity"
     colorbar_padding: float = 0.01  # Padding between colorbar and plot
     show_top_ticks: bool = False
     show_right_ticks: bool = False
     x_tick_rotation: float = 45  # Add this line for configurable rotation
     colormap_spacing: str = "log"  # Options: "log", "linear"
+    axes_limits: dict = None
 
     def __post_init__(self):
         if not isinstance(self.figsize, tuple):
