@@ -6,22 +6,41 @@ Tests  refac_rsp_eval: 473 pass, 2 xfail (B6, on purpose).
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
+[outside] marks work that is not the evaluator's job. The evaluator (refac_rsp_eval) takes two inputs as given:
+the data dict, from the reader (wilson_data_obtainer -> CQCParse, a separate repo), and the formulas, from
+derive (not changed in this refactor). Errors in either one need a check on that side.
+
+
+Status (2026-10-11)
+-------------------
+The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
+agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
+README. Only E6 is a big job.
+
 
 Order of work
 -------------
-Steps 1-6 may use the old code; step 7 deletes it.
-1. [ ] D5 coordinates: which normal coordinates the data dict's derivatives use, and whether derive's formulas
-       assume the same.
-2. [ ] F2: runtime on a bigger molecule. Before E6: if too slow, E6 needs the precalculated path (B3, B5, B6) or F1.
-3. [ ] D4: decide who owns the data model. Before E6, which sits between wilson_main and the new code.
-4. [ ] E6: wilson_main adapter. The most important step: until it exists, nothing uses the new code.
-5. [ ] E7: port wilson_analysis/render to the new output.
-6. [ ] D4 code move, with D3 and D5 (write down the data-dict contract).
-7. [ ] E9: delete the old code. Before: decide about G7's old-vs-new part (see E9).
-8. [ ] E4: README.
-Any time: A14; G3 (rest); G4 and G5 (before polarizations other than all along x are used); G6; H8.
-Later, only when needed: G7, E8 (line features), D1, D2, E5, F1; B3, B5, B6 unless F2 needs them.
-Outside the refactor: G2.
+Needed to finish the refactor. Steps 1-5 may use the old code; step 6 deletes it.
+1. [ ] F2  Speed test on a bigger molecule. Small. Decides whether the precalculated path is needed at all.
+2. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
+3. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
+           a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
+4. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
+5. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
+6. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
+7. [ ] E4  README, with the data-dict contract (D5).
+
+Decided by F2:
+- B3, B5, B6: bugs in the precalculated path. If the new code is fast enough, delete the path (H1); the three
+  bugs go with it.
+- F1: einsum speed-up, only if the new code is too slow.
+Small, any time: A14 (one-line docstring); H8 (keep or drop a rule); G6 (smallest energy differences).
+Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x are used).
+Later, only when needed: D1, D2, E5, E8 (line features), G7 (other experiments).
+Outside the refactor [outside]: G2, G8 (reader checks).
+No item yet:
+- The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
+- From the old README: is single-component Cartesian selection a wanted feature?
 
 
 Decisions and known limits
@@ -75,27 +94,24 @@ D. Data model
         wilson_system/system_data.py. Decide who owns them; the other side imports. (DataOriginInfo is one
         class since B1.) Keep the imports free of cycles: plan.py and system_data.py import each other only for
         type hints (if TYPE_CHECKING); evaluate.py and pipeline.py import system_data for real.
-[ ] D5  Data-dict contract: what the evaluator assumes about the data dict. Old and new assume the same, so
-        C2, C3 and G1 cannot catch a mismatch. Write it down (E4); check the cheap parts when loading (H5).
-        - [ ] names: properties under prop_trivname names (dipgrad, polgrad, polhess, diphess, cff, ...);
-              frequencies under 'nc_sqrt_eigval'; states under 'harmonic_states' and 'anharmonic_states'.
-        - [ ] index order: mode indices first, in the order of the term's labels, then Cartesian (x, y, z = 0, 1, 2),
-              e.g. polhess[a, b, x, y] (_make_func_to_compute_avrg).
-        - [ ] full tensors: every order of mode indices is filled, e.g. cff[a, c, c] is read as written, not sorted.
-              A reader that filled one triangle only would give zeros.
-        - [ ] modes: 0 .. n-1, n = len(nc_sqrt_eigval); every array has n entries per mode axis, in that order.
-        - [ ] units: properties in au, used as they are; nc_sqrt_eigval and state energies in cm-1, converted to Eh.
-              Coefficients come out in au.
-        - [ ] coordinates: a derivative such as dipgrad depends on how the vibration coordinate is measured, e.g.
-              mass-weighted or dimensionless (the two differ by a factor sqrt(w)). Open: which one the data dict
-              uses, and whether derive's 1/w factors assume the same. A mismatch puts every coefficient off by
-              powers of sqrt(w), and C2, C3 and G1 cannot notice (old and new read the same dict).
-        - [ ] state energies: relative to the ground state (0, no zero-point energy); keys are tuples of mode
-              labels, e.g. ('0', '0') = 2 quanta in mode 0; every fundamental is in 'harmonic_states'
-              (from_datadict takes the mode labels from there, also for anharmonic states).
-        - [ ] zero threshold: |value| < 1e-18 counts as 0 (zero_tol in eval_avrg_per_indexdict,
-              eval_non_avrg_per_indexdict). A fixed number, so it assumes au and these sizes: rounding noise about
-              1e-19, real averaged values 1e-9 or more (formaldehyde).
+[ ] D5  Data-dict contract: what the evaluator expects in the data dict.
+        Old and new code read the same dict, so comparing them cannot find a wrong dict.
+        To do: write the list below into the README; add the load checks named in it.
+        Delivering a dict that fits is the reader's job [outside] (see "Outside the refactor").
+        - names: properties as dipgrad, polgrad, polhess, diphess, cff, ...; frequencies as 'nc_sqrt_eigval';
+          states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there.
+        - layout: mode indices first, then x, y, z, e.g. polhess[a, b, x, y]. Modes are 0 .. n-1, with
+          n = number of frequencies. Load check: shapes, e.g. polhess is (n, n, 3, 3).
+        - full tensors: every index order is filled, e.g. cff[a, c, c] and cff[c, a, c]. Load check: each
+          tensor is symmetric in its mode indices.
+        - units: properties in au; frequencies and state energies in cm-1 (converted to Eh inside).
+        - coordinates [outside]: plain derivatives in mass-weighted coordinates, in au. derive's formulas
+          (1/(2w) per mode pair, Taylor factors 1/2 and 1/6) fit only this form. No load check is possible.
+          Gaussian reader: fits (checked 2026-10-11). CFOUR reader: not checked.
+        - state energies: relative to the ground state (0). Key ('0', '0') = 2 quanta in mode 0. Every
+          fundamental is in 'harmonic_states'. Load check: the fundamentals are there.
+        - zero: |value| < 1e-18 counts as 0. Fits au: rounding noise is about 1e-19, real values 1e-9 or more
+          (formaldehyde).
 
 
 E. Pipeline
@@ -112,7 +128,7 @@ E. Pipeline
         condition's axes, pass the ResCondKey too (the FIXME in eval_resonance_factor).
 [ ] E6  wilson_main adapter: a new evaluate path in WilsonSimulation, next to EvaluationWorkflow (wilson_main:
         carefully). Until it exists, the old pipeline runs, double count included (C3). Decide first:
-        - [ ] where states_choice comes from (the old pipeline: the regime; see Decisions)
+        - [x] where states_choice comes from: the vib analysis regime (see Decisions); the adapter reads it
         - [ ] old settings without a new counterpart: minimum_box_padding, scale_wrt_max_intensity
         - [ ] grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges)
         - [ ] data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
@@ -203,41 +219,64 @@ H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipelin
 H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do, and plan.py's docstring still
     says "ONLY importer". No test checks it. Decide: move the translation into plan.py, or drop the rule.
 
-Open, from the old README: is single-component Cartesian selection a wanted feature?
 
-
-Outside the refactor
---------------------
+Outside the refactor [outside]
+------------------------------
+Not the evaluator's job: these items check or fix the reader. Old and new read the same data dict, so C2, C3
+and G1 would all miss a reader error. They matter for the final spectra.
 [ ] G2  Data reader vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental, one dipgrad
-        value, one polgrad value. It checks the reader (wilson_data_obtainer), not the evaluator: old and new read
-        the same data dict, so C2, C3 and G1 would all miss a reader error. It matters for the final spectra.
+        value, one polgrad value.
+        Done by hand 2026-10-11, water (a scratch script, not a test). From the reader's values, Gaussian's own
+        printed numbers come out right to print precision: harmonic frequencies (nc_sqrt_eigval), IR intensities
+        (dipgrad), Raman activities (polgrad), reduced cubic constants (cff), and the "ELECTRIC" rows of the
+        2-quanta transition moments (diphess). The match holds only for mass-weighted derivatives (D5 coordinates).
+        Left: one anharmonic fundamental; polhess (the same check as diphess, with the .out's
+        "Polarizability tensor [Alpha(0,0)] : 2 quanta" rows). Make it a test only if the reader changes.
+[ ] G8  CFOUR reader: not checked. It turns dimensionless derivatives into mass-weighted ones (times sqrt(w)).
+        Found 2026-10-11: qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass
+        factor; getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
 
 
 Done
 ----
 Details in the named files, or in git history.
-A0-A4, A6-A13  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples, harmonic_denom reads eigenvals,
-               asserts instead of prints, dead code, outdated docstrings. A4: evaluate_term_coeff_sumover raises if
-               a resonance label is missing (summing over one would add peaks at different places into one number).
-               A11: VibDiff.from_symbolic calls from_quanta, one way to find a state.
-B1   One DataOriginInfo (system_data.py); the old pipeline runs again.
+
+Built: the new evaluator
+E1   From terms to features: build_contributions makes one row per term and index set; features_from_rows
+     groups the rows into features (FeatureResult).
+E2   Drawing: eval_feature_on_grid draws one feature; draw_window adds all features on one window grid, box by
+     box; draw_all draws every feature on the whole grid and serves as the reference.
+E3   One entry point, compute_features_from_terms: translate the terms, compile them, load the data in one
+     call, set the polarization, make the features. Tested on real data (test_pipeline.py).
+     rps_evaluation.py deleted.
+B7   One resonance point per term, checked when compiling (see Decisions). The `failed` list is gone: it was
+     always empty.
+
+Checked: the numbers are right
+C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).
+C2   Same numbers as the old code, term by term: 14 EVV terms; formaldehyde, water, CO; harmonic and anharmonic
+     states; for formaldehyde also more axis choices and polarizations. Largest difference 2e-15. Record: the
+     test_evv_reference.py docstring; evv_reference.json stores the numbers.
+C3   Same whole spectrum as the old code, cut into boxes included (formaldehyde, 1e-16). Found on the way: the
+     old code draws a peak n times too large (n^2 in intensity) when n parameter sets share one location, e.g.
+     degenerate modes. Shown with a toy molecule (record: tests/c3_spectrum.py docstring). Formaldehyde has
+     n = 1 everywhere, so its old spectra are right.
+G1   Hand calculation with numpy only: water, terms 0 and 12, every (a, b) pair, both state choices; matches to
+     1e-12 (test_hand_calculation.py). Found on the way: pytest.approx's default abs=1e-12 had let the reference
+     test pass small coefficients that were up to 6e-5 off; now abs=0.
+D5   Coordinates part only (2026-10-11): the data dict fits derive's formulas, see D5. [outside]
+
+Fixed
+A0-A4, A6-A13  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples, harmonic_denom reads the
+     eigenvalues, asserts instead of prints, dead code, outdated docstrings. Two of them change behaviour:
+     evaluate_term_coeff_sumover raises if a resonance label is missing (summing over one would add peaks at
+     different places into one number); VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
+B1   One DataOriginInfo class (system_data.py); the old pipeline runs again.
 B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
-B7   The motif rule is checked when compiling (see Decisions). `failed` is gone: it was always empty.
-C1   Placeholder tests filled; on-the-fly tests for averaging and denominators (they found B6).
-C2   Old = new, term by term: 14 EVV terms; formaldehyde, water, CO; harmonic and anharmonic states; for
-     formaldehyde also more axis choices and polarizations. Largest difference 2e-15. Record: the
-     test_evv_reference.py docstring; evv_reference.json locks the numbers.
-C3   Old = new for the whole spectrum, cut by domains included (formaldehyde, 1e-16). The old code draws a peak
-     with n parameter sets at one location n times too large (n^2 in intensity), shown with a degenerate toy
-     molecule (record: tests/c3_spectrum.py docstring). So spectra made with the old code are too large wherever
-     parameter sets share a location (degenerate modes, or terms where swapping labels gives the same state).
-     Formaldehyde has n = 1 everywhere.
-C4   Dropped: B7 rejects two of its motifs, and old and new both refuse the other two (E8).
-E1   Rows -> features: build_contributions, ContributionTable, features_from_rows, FeatureResult.
-E2   Drawing: eval_feature_on_grid, draw_all (the reference), SpectralWindow.from_features, draw_window, box_slices.
-E3   Entry point: compute_features_from_terms (translate, compile, load_molsys_data, polarization recipe,
-     features); real-data test (test_pipeline.py). rps_evaluation.py deleted.
-G1   Hand calculation: water, terms 0 and 12, every (a, b) pair, both state choices; matches to 1e-12
-     (test_hand_calculation.py). On the way: pytest.approx's default abs=1e-12 had made the reference test up to
-     6e-5 loose for small coefficients; now abs=0.
-Misc ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
+-    from_datadict has no default states_choice (2026-10-11); the caller passes it (see Decisions).
+-    ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
+
+Dropped
+C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code
+     both refuse to draw the other two, peaks without every spectrum axis (E8). Running it would only confirm
+     that, on code that is about to go.
