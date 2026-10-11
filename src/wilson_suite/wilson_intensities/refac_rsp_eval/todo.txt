@@ -21,25 +21,43 @@ Order of work
 8. [x] C3: whole spectrum, old vs new.
    [-] C4: dropped 2026-10-09 (see C4).
 
-Next (order rewritten 2026-10-09 after a review). Steps 9-15 may use the old code; step 16 deletes it.
+Next (order rewritten 2026-10-09, updated 2026-10-11 after a second review). Steps 9-15 may use the old code;
+step 16 deletes it.
 9.  [x] E3.6: delete rps_evaluation.py. Nothing imports it.
 10. [x] G1: hand calculation, water. C2 and C3 show old = new; G1 is the only check that the numbers are right.
+    [x] from_datadict: states_choice has no default (2026-10-11, E3 step 1). Before, 'harmonic' was picked
+        without anyone deciding; now the caller decides.
 11. [-] G7: postponed 2026-10-09 (choosing the experiments comes later). Risk of going on without it: see G7.
-12. [ ] E3.5: wilson_main adapter. Returns the states (draw_window needs them), decides the magnitude-condition
-        filter, and checks old vs new end to end through WilsonSimulation (C3 called the new functions directly).
-13. [ ] Port wilson_analysis/render to the new output (D4 sub-item): it reads the old types.
+12. [ ] E3.5: wilson_main adapter. The most important step left: until it exists nothing uses the new code, and
+        users run the old pipeline, double count included (C3). Decide first, then build (details: E3 step 5):
+        - where states_choice comes from (a WilsonSimulation setting? the old pipeline takes it from the regime)
+        - old settings without a new counterpart: minimum_box_padding, scale_wrt_max_intensity
+        - grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges)
+        - data: reuse what WilsonSimulation loaded, or load again with load_molsys_data
+        - the magnitude-condition filter: keep or drop
+        - return the states (draw_window needs them)
+        - the default dynrange, matched to the plot's dynamic range: the cut is 12-36 % at a weak peak next to a
+          strong one in another domain (E2 step 4), and log-scale plots (the renderer's default) show weak peaks
+        - nothing that assumes point features only: real terms with line features exist (G7, first look)
+        Check: old vs new end to end through WilsonSimulation (C3 called the new functions directly).
+13. [ ] Port wilson_analysis/render to the new output (D4 sub-item). Only plot_regions reads an old type
+        (GridRegion); the main renderer reads arrays (sim.spec and the grid).
 14. [ ] Runtime on a bigger molecule, through the adapter. Decides B3, B5, B6 and F1: fix them, or delete the
-        precalculated path (H1).
-15. [ ] D4 with D3: one data model; ParameterSet without the hidden 'zero' entry.
+        precalculated path (H1). Estimate 2026-10-11: build_contributions grows about as n_modes^3 (3 modes
+        0.04 s, 6 modes 0.28 s), so about 40 modes take 1-2 minutes for the 14 EVV terms. Not measured.
+15. [ ] D4 with D3: one data model; ParameterSet without the hidden 'zero' entry; write down the data-dict
+        contract (D4), including which normal coordinates the derivatives are taken with respect to.
 16. [ ] Delete the old code, in the order of the D4 sub-items (amplitudes/averaging.py stays), and with it
         tests/c2_variations.py, tests/c2_leaves.py and tests/c3_spectrum.py.
         G7 is postponed: this step also ends its old-vs-new part. Decide here: wait for G7, or do G7 later
         without old vs new (B7 check and the new pipeline only).
 17. [ ] E4: README.
-Any time: G3–G6; H8 (keep or drop the rule); the default dynrange (E2 step 4).
+Any time: G3–G6 (G4 and G5 before anyone uses polarizations other than all along x: only (1, 1, 1) has an
+       independent check, G1); H8 (keep or drop the rule).
 Later, only when needed: G7 (choose the experiments), D1, D2, E5, F1 (unless step 14 needs it),
        E2 locations without every spectrum axis (derive gives such terms, see G7: needed once that setup matters),
        terms without resonance conditions (e.g. averaged tensors only): a path for them (see B7).
+Outside the refactor: G2 (data reader vs .out file); which past runs had the old double count (C3, open).
 
 
 A. Small fixes
@@ -271,9 +289,10 @@ E. Pipeline
            test_pipeline.py use it; the old copy load_molsys is gone. evv_reference.json unchanged.
            states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic ->
            harmonic. The wrong choice changes 272 of 340 formaldehyde coefficients without any error.
-           Done 2026-10-11: from_datadict's states_choice is keyword-only, no default (was 'harmonic');
-           test_from_datadict_needs_an_explicit_states_choice. The 6 test calls that used the default pass
-           'harmonic' now. Still open for the adapter (E3.5): map the regime to states_choice explicitly.
+           Done 2026-10-11: from_datadict's states_choice is keyword-only, no default (was 'harmonic', picked
+           without anyone deciding); test_from_datadict_needs_an_explicit_states_choice. The 6 test calls that
+           used the default pass 'harmonic' now. Both choices are valid (user, 2026-10-11): the caller decides.
+           Still open for the adapter (E3.5): where the choice comes from (the old pipeline: the regime).
         2. [x] Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero,
            number of features, a few amplitudes.
            Done: test_pipeline.py, "real data" section, harmonic and anharmonic states:

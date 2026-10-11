@@ -251,7 +251,7 @@ def test_from_datadict_does_not_share_mol_props():
 
 
 def test_from_datadict_needs_an_explicit_states_choice():
-    """No default: a wrong choice gives no error later, it only changes the state energy differences."""
+    """No default: the caller decides between harmonic and anharmonic states; nothing is picked silently."""
     template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
     with pytest.raises(TypeError, match='states_choice'):
         MolSystemData.from_datadict(template, {})  # type: ignore[call-arg]
