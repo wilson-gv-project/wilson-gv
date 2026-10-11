@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-11
 
 Tests  refac_rsp_eval: 473 pass, 2 xfail (B6, on purpose).
-       Rest of src: 9 fail, 281 pass, 3 skip; the same 9 fail before and after B7.
+       Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -34,8 +34,10 @@ Decided by F2:
 - B3, B5, B6: bugs in the precalculated path. If the new code is fast enough, delete the path (H1); the three
   bugs go with it.
 - F1: einsum speed-up, only if the new code is too slow.
-Small, any time: A14 (one-line docstring); H8 (keep or drop a rule); G6 (smallest energy differences).
-Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x are used).
+Small, any time: A14 (one-line docstring); A15 (polarization order, one line); A16 (abs=0 in two tests);
+H8 (keep or drop a rule); G6 (smallest energy differences).
+Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
+are used).
 Later, only when needed: D1, D2, E5, E8 (line features), G7 (other experiments).
 Outside the refactor [outside]: G2, G8 (reader checks).
 No item yet:
@@ -58,6 +60,10 @@ Decisions and known limits
 - No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak features stay, and so do
   features whose rows cancel (a record: FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0
   never becomes a row (FeatureResult.zero).
+- Linear polarization only (2026-10-11): get_pol_laser stores into a real array. A complex vector (circular light)
+  loses its imaginary part with only a ComplexWarning, e.g. (1, i, 0)/sqrt(2) on all four slots gives (0, 0, 0).
+  No complex conjugate for the detected field either. Before circular light is used: raise on complex input, then
+  add the conjugates.
 - Drawing by domains cuts each feature at its box (draw_window docstring). Formaldehyde, dynrange 100: 1.05 % of
   the max intensity. A weak peak next to a strong one in another domain can be 12-36 % off. The old code cuts
   the same way (C3).
@@ -66,6 +72,22 @@ Decisions and known limits
 A. Small fixes
 --------------
 [ ] A14 pipeline.py module docstring still says "grid.py -> spectrum array: E2, not built yet". E2 is done.
+[ ] A15 get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
+        reverse order: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector,
+        k = pulse k (dressWithPulseInteractions, response_terms.py); the experiment lists all_polarizations in the
+        same order. e.g. get_pol_laser([x, y, z]) gives [-1.0]; epsilon_xyz = +1.
+        Effect: rank 2 and 4 none (their f elements map onto themselves under reversal), so the 14 EVV terms are
+        right. Rank 3: the sign flips. Rank 5 and mixed rank 6: wrong values (rank 5, xyzxx: exact -0.292,
+        code -0.238). test_pol_laser tests rank 4 only, so it cannot see the reversal.
+        Fix, checked 2026-10-11 in memory against the exact average (G4), ranks 2-6; rank 4 old vs fixed 4e-15:
+            return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
+        Pinned by 14 strict-xfail tests in wilson_intensities/tests/unit/test_averaging_pol_order.py (2026-10-12):
+        the product A slot by slot, get_pol_laser for [x, y, z] and [x, y, z, x, x], and the whole recipe against
+        the exact orientation average (the G4 method), ranks 2-6. 13 more tests there pass before and after the fix.
+        Checked with the fix applied in memory: all 27 pass with the marks ignored; test_averaging.py, the experiment
+        tests and refac_rsp_eval (473 pass, 2 xfail) do not change. Fix, then unmark them.
+[ ] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
+        averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
 
 
 B. Correctness of the precalculated path
@@ -171,9 +193,28 @@ E. Pipeline
 F. Performance
 --------------
 [ ] F1  einsum for the averaged part, then maybe for the whole sum over summation labels. Only if F2 shows a need.
+        Measured 2026-10-11 (random polgrad and dipgrad, rank 4, laser_pol (1, 1, 1)):
+        - On the fly: 62 us per index set, for any number of modes. build_contributions asks for 12 n^3 + 2 n^2
+          averages (14 EVV terms): 6 modes 0.17 s, 20 modes 6 s, 40 modes 50 s, 80 modes 6.4 min
+          (time per call x number of calls).
+        - One einsum per averaged expression, the whole n^3 tensor: 0.06 ms (6 modes), 0.12 ms (40), 0.44 ms (80).
+          Memory n^3 x 8 bytes: 0.5 MB at 40 modes. On formaldehyde it gives the on-the-fly values (all 14 terms,
+          every index set, 3 polarizations) to 4e-16 of the largest value.
+        - Why slow: per call, 21 recipe entries x 3 properties = 63 Python steps. Each step calls prop_trivname,
+          searches MolPropsCollection one by one and reads one numpy element. The checks and an import inside the
+          closure run on every call too.
+        - Repeated work: terms 2-13 average the same product, polgrad (slots 0, 3) x dipgrad (1) x dipgrad (2), only
+          with other labels (term 3 reads T[c, a, b], term 8 T[b, a, c]). One n^3 tensor could serve 12 terms.
+          Terms 2, 4, 5, 7, 9-12 have an average without c, yet it is computed again for every c.
+        - Averaging is about 70 % of build_contributions. The rest is about 27 us per index set, so about 20 s at
+          40 modes. Its largest part is the deepcopy in FreqTermsCollection.__post_init__ (get_vibenedenom and
+          get_pert_wf_diff build a new collection on every index set).
+        Tests if F1 is done: einsum = on-the-fly value for every EVV term, every index set, 3 polarizations
+        (rel 1e-12, abs 0); each term reads the tensor with its own labels (term 8: T[b, a, c], the B6 trap).
 [ ] F2  Runtime on a bigger molecule, e.g. ACAC in wilson_intensities/tests/test_database (check first that the
         reader can read it). Estimate: build_contributions grows about as n_modes^3 (3 modes 0.04 s, 6 modes
         0.28 s), so about 40 modes take 1-2 minutes for the 14 EVV terms. Decides B3, B5, B6 and F1.
+        The averaging alone at 40 modes: about 50 s (F1, random data). A real molecule is still to run.
 
 
 G. Checks beyond old = new
@@ -184,8 +225,23 @@ checking side.
 [ ] G3  Rotation: rotate the property tensors; every averaged value must stay the same. Done for term 8
         (test_integration.py: polgrad and dipgrad, formaldehyde, all 216 index sets, to 2e-15). Left: the
         properties of the other terms (polhess, diphess), if wanted.
+        Limit (2026-10-11): a rotation test cannot catch wrong weights. Any mix of isotropic tensors stays the same
+        under rotation, e.g. laser_pol (0.3, -1.2, 2.0), which no setup of unit vectors gives, passes too
+        (test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
 [ ] G4  Averaging weights by brute force: average over many random orientations for the 5 polarization setups
         of C2; compare with getGeneralPolarizationAveragingExpression.
+        Exact instead of random (scratch check 2026-10-11): Euler angles z-y-z; alpha and gamma 8 even steps,
+        cos(beta) 8 Gauss-Legendre points: 512 rotations. Exact for products of up to 7 rotation-matrix elements,
+        so for ranks 2-6. Average of A . (R x ... x R) T over the grid, with A = pol[0] x pol[1] x ... and T a random
+        molecular tensor; compare with the sum of recipe[k] * T[k]. Numpy only on the checking side.
+        Found: the weights are right; ranks 3, 5 and 6 read the polarizations in reverse order (A15).
+        Partly a test since 2026-10-12: test_averaging_pol_order.py (A15) has exact_average, two textbook values
+        that check exact_average itself (rank 2 <mu_Z mu_Z> = |mu|^2 / 3; rank 4 Raman, zzzz and zxzx), and the
+        recipe against the exact average for ranks 2-6 (all parallel, crossed pairs, random vectors).
+        Left:
+        - the 5 polarization setups of C2
+        - M x Gram(f) = identity for ranks 2-6, Gram(f)[r, s] = sum over all indices of f_r * f_s. Guards the
+          typed-in M tables; passes now (4e-16).
 [ ] G5  Polarization vector by hand for 2-3 setups (e.g. all along x -> (1, 1, 1)): what each entry means.
 [ ] G6  Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a term
         huge; otf_vibdiffdenom raises only at exactly zero.
