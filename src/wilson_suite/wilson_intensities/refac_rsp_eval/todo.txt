@@ -1,5 +1,5 @@
 refac_rsp_eval — TODO
-updated 2026-10-11
+updated 2026-10-12
 
 Tests  refac_rsp_eval: 473 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
@@ -16,30 +16,32 @@ Status (2026-10-11)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
+Speed (2026-10-12): the on-the-fly averaging is the slowest part, about 50 s at 40 modes on random data (F1).
+F2 measures a real 42-mode molecule first; F1 follows if needed.
 
 
 Order of work
 -------------
-Needed to finish the refactor. Steps 1-5 may use the old code; step 6 deletes it.
-1. [ ] F2  Speed test on a bigger molecule. Small. Decides whether the precalculated path is needed at all.
-2. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
-3. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
+Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it.
+1. [ ] F2  Speed test on ACDM (42 modes). Small; steps in F2.
+2. [ ] F1  einsum for the averaged part, only if F2 shows a need (expected: about 55 s of averaging at 42 modes).
+           F3 too, if the rest is slow.
+           F2 also decides B3, B5, B6 (bugs in the precalculated path): fast enough -> delete the path (H1),
+           and the three bugs go with it.
+3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
+4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
            a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
-4. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
-5. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
-6. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
-7. [ ] E4  README, with the data-dict contract (D5).
+5. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
+6. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
+7. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
+8. [ ] E4  README, with the data-dict contract (D5).
 
-Decided by F2:
-- B3, B5, B6: bugs in the precalculated path. If the new code is fast enough, delete the path (H1); the three
-  bugs go with it.
-- F1: einsum speed-up, only if the new code is too slow.
 Small, any time: A14 (one-line docstring); A15 (polarization order, one line); A16 (abs=0 in two tests);
 H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
 Later, only when needed: D1, D2, E5, E8 (line features), G7 (other experiments).
-Outside the refactor [outside]: G2, G8 (reader checks).
+Outside the refactor [outside]: G2, G8 (reader checks); the normal_modes read error (F2).
 No item yet:
 - The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
 - From the old README: is single-component Cartesian selection a wanted feature?
@@ -211,10 +213,25 @@ F. Performance
           get_pert_wf_diff build a new collection on every index set).
         Tests if F1 is done: einsum = on-the-fly value for every EVV term, every index set, 3 polarizations
         (rel 1e-12, abs 0); each term reads the tensor with its own labels (term 8: T[b, a, c], the B6 trap).
-[ ] F2  Runtime on a bigger molecule, e.g. ACAC in wilson_intensities/tests/test_database (check first that the
-        reader can read it). Estimate: build_contributions grows about as n_modes^3 (3 modes 0.04 s, 6 modes
-        0.28 s), so about 40 modes take 1-2 minutes for the 14 EVV terms. Decides B3, B5, B6 and F1.
-        The averaging alone at 40 modes: about 50 s (F1, random data). A real molecule is still to run.
+[ ] F2  Runtime on a real bigger molecule. Decides F1 and F3.
+        Molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git):
+            wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out
+        (ACAC is acetic acid, 18 modes: too small.)
+        Reader (checked 2026-10-12) [outside]: load_molsys_data fails on ACDM and ACAC at normal_modes ("cannot
+        reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. Workaround: request only the
+        terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states; then MolSystemData.from_datadict.
+        ACDM loads so in 6 s.
+        Steps:
+        1. A script, not a test (e.g. tests/f2_speed.py): ACDM as above, the 14 EVV terms, axes {'A': [1],
+           'B': [-1, 2]}, laser_pol (1, 1, 1), states 'anharmonic'.
+        2. Time build_contributions under cProfile: the total, the averaging (compute_for_idx_choice) and the
+           deepcopy (FreqTermsCollection.__post_init__).
+        3. Time the rest: features_from_rows, SpectralWindow.from_features, draw_window on one grid.
+        4. Write the numbers here. Expected: averaging about 55 s (12 x 42^3 calls x 62 us), the rest up to 25 s.
+        5. Decide: is the total fine for normal use? If not: F1 (averaging to < 1 ms), then F3.
+[ ] F3  get_vibenedenom and get_pert_wf_diff build (and deepcopy) a new FreqTermsCollection on every index set
+        (evaluate_full_index_dict): 28 % of build_contributions under cProfile, formaldehyde. Call them once per
+        term (build_contributions) and pass the results down. Only if F2 shows a need.
 
 
 G. Checks beyond old = new
