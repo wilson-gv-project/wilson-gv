@@ -135,7 +135,7 @@ def test_eval_molsys_data():
     assert list(datadict.keys()) != list(request.keys())
 
     # finally, putting data in -- requires empty MolPropsCollection and dict with data
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict, states_choice='harmonic')
     print(molsys)
 
     import numpy as np
@@ -143,7 +143,7 @@ def test_eval_molsys_data():
     assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
 
     # with empty datadict
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={})
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={}, states_choice='harmonic')
     assert molsys.eigenvals is None
     assert molsys.eigenvecs is None
     assert molsys.natoms == 0
@@ -170,7 +170,7 @@ def test_evaluate_term():
     request.update(_sys_info_request(calc_dataorigin))
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict, states_choice='harmonic')
     
     from wilson_suite.wilson_intensities.amplitudes.averaging import (
         getGeneralPolarizationAveragingExpression,
@@ -242,7 +242,8 @@ def term8():
     request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
     request.update(_sys_info_request(calc_dataorigin))
     molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
-    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request))
+    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request),
+                                             states_choice='harmonic')
 
 
 def evv_props(polgrad, dipgrad) -> MolPropsCollection:

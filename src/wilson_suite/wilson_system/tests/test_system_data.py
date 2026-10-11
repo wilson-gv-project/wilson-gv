@@ -244,10 +244,21 @@ def test_molpropscollection_fill_from_and_is_filled(props):
 
 def test_from_datadict_does_not_share_mol_props():
     template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
-    m1 = MolSystemData.from_datadict(template, {'cff': np.ones(2)})
-    m2 = MolSystemData.from_datadict(template, {})
+    m1 = MolSystemData.from_datadict(template, {'cff': np.ones(2)}, states_choice='harmonic')
+    m2 = MolSystemData.from_datadict(template, {}, states_choice='harmonic')
     assert m1.data_filled and not m2.data_filled
     assert template['cff'].vals is None
+
+
+def test_from_datadict_needs_an_explicit_states_choice():
+    """No default: a wrong choice gives no error later, it only changes the state energy differences."""
+    template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
+    with pytest.raises(TypeError, match='states_choice'):
+        MolSystemData.from_datadict(template, {})  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        MolSystemData.from_datadict(template, {}, 'harmonic')  # type: ignore[misc]  # keyword only
+    with pytest.raises(ValueError, match='states_choice'):
+        MolSystemData.from_datadict(template, {}, states_choice='GVPT2')
 
 
 ## Data request -------------------------------------------------------------

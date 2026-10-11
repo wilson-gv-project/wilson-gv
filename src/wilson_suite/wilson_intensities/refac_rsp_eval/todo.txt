@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-09
 
 Tests: refac_rsp_eval 473 pass, 2 xfail (B6, pinned on purpose).
-       Old suite (pytest src without refac_rsp_eval, 2026-10-09): 9 fail, 280 pass, 3 skip.
+       Old suite (pytest src without refac_rsp_eval, 2026-10-11): 9 fail, 281 pass, 3 skip.
        None because of B1; the same 9 before and after B7.
        In a fresh checkout (e.g. a git worktree) about 18 more fail: some tests read files that git
        ignores (e.g. src/wilson_suite/terms_fuller_flat.json), so a fresh checkout does not have them.
@@ -36,7 +36,7 @@ Next (order rewritten 2026-10-09 after a review). Steps 9-15 may use the old cod
         G7 is postponed: this step also ends its old-vs-new part. Decide here: wait for G7, or do G7 later
         without old vs new (B7 check and the new pipeline only).
 17. [ ] E4: README.
-Any time: G2–G6; H8 (keep or drop the rule); the default dynrange (E2 step 4).
+Any time: G3–G6; H8 (keep or drop the rule); the default dynrange (E2 step 4).
 Later, only when needed: G7 (choose the experiments), D1, D2, E5, F1 (unless step 14 needs it),
        E2 locations without every spectrum axis (derive gives such terms, see G7: needed once that setup matters),
        terms without resonance conditions (e.g. averaged tensors only): a path for them (see B7).
@@ -203,6 +203,27 @@ D. Data model
           the hint then points at a class that no longer exists.
         - [ ] wilson_analysis/render/base.py: EvaluatedResult, SealedSetup from wilson_main/abstractions.py.
               Already wrong now: both classes live in wilson_main/workflow_abstractions_updated.py.
+        Data-dict contract (added 2026-10-11): what the evaluator assumes about the data dict, written down
+        nowhere so far. Old and new assume the same, so C2, C3 and G1 cannot catch a mismatch. Write it down
+        in D4/E4; check cheap parts when loading (H5).
+        - [ ] key names: property arrays under prop_trivname names (dipgrad, polgrad, polhess, diphess, cff, ...);
+              frequencies under 'nc_sqrt_eigval'; states under 'harmonic_states', 'anharmonic_states'.
+        - [ ] index order: mode indices first, in the order of the term's labels, then Cartesian (x, y, z = 0, 1, 2):
+              vals[(*modes, *cartesian)], e.g. polhess[a, b, x, y] (evaluate.py _make_func_to_compute_avrg).
+        - [ ] full tensors: every order of mode indices filled, e.g. cff[a, c, c] read as written, no sorting.
+              Water and formaldehyde: symmetric in the dict. A reader that filled one triangle only would give zeros.
+        - [ ] modes: 0 .. n-1, n = len(nc_sqrt_eigval); every array has n entries per mode axis, in that order.
+              The number of modes comes from the eigenvalues only (evaluate.py evaluate_term_coeff_sumover).
+        - [ ] units: properties in au, used as they are; nc_sqrt_eigval and state energies in cm-1, converted to Eh
+              (harmonic_denom, VibDiff.energy_difference). Coefficients come out in au.
+        - [ ] which normal coordinates the derivatives are taken with respect to, so that they fit the 1/w
+              factors in derive's formulas. Not known from the code: to decide, then write down.
+        - [ ] state energies: relative to the ground state (ground state = 0, no zero-point energy); keys are tuples
+              of mode labels, e.g. ('0', '0') = 2 quanta in mode 0; every fundamental is in 'harmonic_states'
+              (from_datadict takes the mode labels from there, also for anharmonic states).
+        - [ ] zero threshold: |value| < 1e-18 counts as exactly 0 (zero_tol in eval_avrg_per_indexdict,
+              eval_non_avrg_per_indexdict). An absolute number, so it assumes au and these magnitudes: symmetry noise
+              about 1e-19, real averaged values 1e-9 or more (formaldehyde).
 
 
 E. Pipeline
@@ -249,8 +270,10 @@ E. Pipeline
            Done: pipeline.load_molsys_data. make_evv_reference.py (so also test_evv_reference.py) and
            test_pipeline.py use it; the old copy load_molsys is gone. evv_reference.json unchanged.
            states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic ->
-           harmonic. from_datadict defaults to harmonic. Make states_choice required (no default):
-           the wrong choice changes 272 of 340 formaldehyde coefficients without any error.
+           harmonic. The wrong choice changes 272 of 340 formaldehyde coefficients without any error.
+           Done 2026-10-11: from_datadict's states_choice is keyword-only, no default (was 'harmonic');
+           test_from_datadict_needs_an_explicit_states_choice. The 6 test calls that used the default pass
+           'harmonic' now. Still open for the adapter (E3.5): map the regime to states_choice explicitly.
         2. [x] Real-data test, 14 EVV terms + formaldehyde: 504 pairs = 340 rows + 164 zero,
            number of features, a few amplitudes.
            Done: test_pipeline.py, "real data" section, harmonic and anharmonic states:
@@ -335,8 +358,7 @@ code on the checking side.
           (and one amplitude check in test_pipeline.py) up to 6e-5 relative for small coefficients; 270 of 912
           looser than 1e-6. Now abs=0; the stored numbers still match exactly.
         Not covered: the data dict vs the .out file (G2), other polarizations (G4, G5).
-[ ] G2  Raw data vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental,
-        one dipgrad value, one polgrad value.
+[-] G2  Moved to "Outside the refactor" (2026-10-11): it checks the data reader, not the evaluator.
 [ ] G3  Rotation test: rotate all property tensors by one random rotation; every averaged value
         must stay the same.
 [ ] G4  Averaging weights by brute force: average over many random orientations for the 5
@@ -391,6 +413,17 @@ H8  One module imports wilson_derive. Now broken: plan.py, and pipeline.py (term
     into plan.py, or drop the rule.
 
 Open question from the old README: is single-component Cartesian selection a wanted feature?
+
+
+Outside the refactor
+--------------------
+[ ] G2  Data reader vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental, one dipgrad
+        value, one polgrad value. Moved here 2026-10-11.
+        What G2 checks: that the data reader (wilson_data_obtainer) turns the .out file into the right numbers.
+        Not the evaluator: the evaluator takes the data dict as input, the refactor did not change how it is made,
+        and old and new read the same dict. C2, C3 and G1 all start from that dict, so a reader error (units,
+        a wrong frequency, a wrong sign) would pass all three. It matters for "are the final spectra right".
+        The evaluator's side of the boundary: the data-dict contract under D4.
 
 
 Done on this branch
