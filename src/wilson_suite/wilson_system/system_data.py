@@ -274,10 +274,10 @@ class MolSystemData:
         loading data into self.props (and optionally to self.vib_ana_setup)
 
         data_dict: dict - {data_name: values}
-        states_choice: 'harmonic' or 'anharmonic', which state energies to use. Both are valid; the caller
-            decides, so there is no default (it used to be 'harmonic', picked without anyone deciding).
-            The two give different state energy differences, e.g. 272 of 340 formaldehyde coefficients of the
-            14 EVV terms differ. (The old pipeline takes the choice from the vib analysis regime.)
+        states_choice: 'harmonic' or 'anharmonic', which state energies to use. It must follow the vib analysis
+            regime (GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'). This method does not know the regime,
+            so the caller passes the choice; no default (it used to be 'harmonic', whatever the regime).
+            The two differ, e.g. in 272 of 340 formaldehyde coefficients of the 14 EVV terms.
         """
         
         mol_props = mol_props.empty_copy()
