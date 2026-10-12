@@ -16,18 +16,17 @@ Status (2026-10-11)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
-Speed (2026-10-12): the on-the-fly averaging is the slowest part, about 50 s at 40 modes on random data (F1).
-F2 measures a real 42-mode molecule first; F1 follows if needed.
+Speed (2026-10-12, F2): ACDM (42 modes) takes 80 s per spectrum. build_contributions takes 78 s of it: averaging
+47 s, deepcopy 16 s. F1 and F3 would remove about 63 s. Open: is 80 s fine?
 
 
 Order of work
 -------------
 Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it.
-1. [ ] F2  Speed test on ACDM (42 modes). Small; steps in F2.
-2. [ ] F1  einsum for the averaged part, only if F2 shows a need (expected: about 55 s of averaging at 42 modes).
-           F3 too, if the rest is slow.
-           F2 also decides B3, B5, B6 (bugs in the precalculated path): fast enough -> delete the path (H1),
-           and the three bugs go with it.
+1. [x] F2  Speed test on ACDM (42 modes), 2026-10-12: 80 s per spectrum (averaging 47 s, deepcopy 16 s).
+2. [ ] F1  einsum for the averaged part (47 s at 42 modes), and F3 (16 s). Decide first: is 80 s fine?
+           The same decision settles B3, B5, B6 (bugs in the precalculated path): fast enough -> delete the path
+           (H1), and the three bugs go with it.
 3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
 4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
            a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
@@ -213,22 +212,31 @@ F. Performance
           get_pert_wf_diff build a new collection on every index set).
         Tests if F1 is done: einsum = on-the-fly value for every EVV term, every index set, 3 polarizations
         (rel 1e-12, abs 0); each term reads the tensor with its own labels (term 8: T[b, a, c], the B6 trap).
-[ ] F2  Runtime on a real bigger molecule. Decides F1 and F3.
+[x] F2  Runtime on a real bigger molecule. Decides F1 and F3.
         Molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git):
             wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out
         (ACAC is acetic acid, 18 modes: too small.)
         Reader (checked 2026-10-12) [outside]: load_molsys_data fails on ACDM and ACAC at normal_modes ("cannot
         reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. Workaround: request only the
         terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states; then MolSystemData.from_datadict.
-        ACDM loads so in 6 s.
-        Steps:
-        1. A script, not a test (e.g. tests/f2_speed.py): ACDM as above, the 14 EVV terms, axes {'A': [1],
-           'B': [-1, 2]}, laser_pol (1, 1, 1), states 'anharmonic'.
-        2. Time build_contributions under cProfile: the total, the averaging (compute_for_idx_choice) and the
-           deepcopy (FreqTermsCollection.__post_init__).
-        3. Time the rest: features_from_rows, SpectralWindow.from_features, draw_window on one grid.
-        4. Write the numbers here. Expected: averaging about 55 s (12 x 42^3 calls x 62 us), the rest up to 25 s.
-        5. Decide: is the total fine for normal use? If not: F1 (averaging to < 1 ms), then F3.
+        ACDM loads so in 4 s.
+        Script: tests/f2_speed.py. The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states
+        'anharmonic'. Drawing as in examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700
+        points, gamma 4.7 cm-1, dynrange 500.
+        Measured 2026-10-12 (one run):
+        - load 4 s
+        - build_contributions 78 s: 17101 rows, 7595 zero.
+          Averaging (compute_for_idx_choice) 47 s: 892584 calls (12 x 42^3 + 2 x 42^2), 53 us per call.
+          Deepcopy (FreqTermsCollection.__post_init__) 16 s. The rest of build_contributions 15 s.
+          The two parts are cProfile's shares (61 %, 21 %) times the time of the run without cProfile.
+        - In the rest: np.isclose, 1.7 million calls, 11 % under cProfile. It is the zero check of each averaged
+          and non-averaged value (eval_avrg_per_indexdict, eval_non_avrg_per_indexdict). For one number,
+          abs(x) <= zero_tol gives the same result.
+        - features_from_rows 0.02 s (3524 features); SpectralWindow.from_features 0.02 s (1780 features near the
+          window); draw_window 2.5 s (6 domains).
+        - Total without load: 80 s. Expected: averaging about 55 s, the rest up to 25 s. Close.
+        Each new polarization, states choice or axis choice runs build_contributions again: 78 s each time.
+        Open: is 80 s fine for normal use? If not: F1 (47 s -> < 1 ms), then F3 (16 s).
 [ ] F3  get_vibenedenom and get_pert_wf_diff build (and deepcopy) a new FreqTermsCollection on every index set
         (evaluate_full_index_dict): 28 % of build_contributions under cProfile, formaldehyde. Call them once per
         term (build_contributions) and pass the results down. Only if F2 shows a need.
