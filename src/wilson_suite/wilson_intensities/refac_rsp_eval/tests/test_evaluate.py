@@ -490,6 +490,24 @@ def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero(molsys):
     assert value(1e-17) == 1e-17
 
 
+@pytest.mark.parametrize('v, expected', [(1e-18, 0.), (-1e-18, 0.), (1.0000001e-18, 1.0000001e-18), (-2e-18, -2e-18)],
+                         ids=['+zero_tol', '-zero_tol', 'just above', 'below -zero_tol'])
+def test_eval_avrg_per_indexdict_zero_tol_itself_counts_as_zero(v, expected, molsys):
+    """|v| <= zero_tol is 0, as np.isclose(v, 0, atol=zero_tol, rtol=0) gave before F3"""
+    assert eval_avrg_per_indexdict(AVRG_A, {'a': 0}, avrg_func=lambda idx, props: v,
+                                   molsys_data=molsys, zero_tol=1e-18) == expected
+
+
+@pytest.mark.parametrize('v, expected', [(1e-20, 0.), (-1e-20, 0.), (1e-18, 0.), (-1e-18, 0.),
+                                         (2e-18, 2e-18), (-2e-18, -2e-18)])
+def test_eval_non_avrg_turns_values_up_to_zero_tol_into_zero(v, expected, molsys):
+    """|v| <= zero_tol is 0, as np.isclose(v, 0, atol=zero_tol, rtol=0) gave before F3"""
+    molsys.mol_props['cff'].vals = np.full((2, 2, 2), v)
+
+    assert eval_non_avrg_per_indexdict(PropsCollection([polprop(inds='abc')]), {'a': 0, 'b': 0, 'c': 0},
+                                       molsys, zero_tol=1e-18) == expected
+
+
 # -- calculate_avrg_tensor: the on-the-fly value for every index set ----------------
 
 def test_calculate_avrg_tensor_holds_the_on_the_fly_values_on_alphabetical_axes():
@@ -771,6 +789,27 @@ def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeyp
     assert len(made) == 2
     assert len(passed) == 2 * 4                              # 2 terms x 4 index sets (a, b over 2 modes)
     assert all(t is made[0] for t in passed[:4]) and all(t is made[1] for t in passed[4:])
+
+
+def test_build_contributions_splits_the_denominators_once_per_term(molsys, pre_a1_zero, monkeypatch):
+    """
+    F3: the split into 1/omega and energy-difference denominators is made once per term and kept
+    (CompiledTerm.freq_vibenedenom, freq_pert_wf_diff), not once per index set. Each split builds a new
+    FreqTermsCollection with a deepcopy: per index set, that was 11 of 22 s of build_contributions on ACDM.
+    Here: per term, a = 0 with b, c over 2 modes gives 4 index sets that reach the denominators.
+    """
+    calls = {'get_vibenedenom': 0, 'get_pert_wf_diff': 0}
+    for name in calls:
+        original = getattr(FreqTermsCollection, name)
+
+        def counting(self, _name=name, _original=original):
+            calls[_name] += 1
+            return _original(self)
+        monkeypatch.setattr(FreqTermsCollection, name, counting)
+
+    build_contributions([ab_term(), ab_term()], molsys, precalculated_data=pre_a1_zero)
+
+    assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
 
 ## One term end to end -------------------------------------------------------

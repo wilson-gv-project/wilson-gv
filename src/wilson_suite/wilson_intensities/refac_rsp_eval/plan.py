@@ -41,6 +41,7 @@ MagnConditions = tuple[tuple[int|str, ...], ...]
 import copy
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -557,6 +558,19 @@ class CompiledTerm:
     def all_props(self) -> PropsCollection:
         """avrg + non-avrg props together, e.g. for building the data request"""
         return PropsCollection([*self.avrg_props, *self.non_avrg_props])
+
+    # The two kinds of denominator, split once per term and kept (todo.txt F3).
+    # evaluate_full_index_dict reads them for every index set; splitting there made a new FreqTermsCollection,
+    # with a deepcopy, each time: 11 of 22 s of build_contributions on ACDM (42 modes).
+    @cached_property
+    def freq_vibenedenom(self) -> FreqTermsCollection:
+        """the 1/omega denominators (is_pert_wf_diff False), e.g. 1/omega_a: omega from the Hessian eigenvalues"""
+        return self.cmp_freqdenom.get_vibenedenom()
+
+    @cached_property
+    def freq_pert_wf_diff(self) -> FreqTermsCollection:
+        """the energy-difference denominators (is_pert_wf_diff True), e.g. 1/(E_ab - E_a): from the chosen states"""
+        return self.cmp_freqdenom.get_pert_wf_diff()
 
     @property
     def max_state_lvl(self):

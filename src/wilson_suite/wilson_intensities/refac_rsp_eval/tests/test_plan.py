@@ -433,6 +433,22 @@ def test_compiled_term_from_vibpert_term():
     assert sorted(set(ct.idx_summ+ct.idx_nonsumm)) == sorted(indices)
 
 
+def test_compiled_term_splits_its_denominators_by_pert_wf_diff():
+    """freqterms of _fake_vibpert_term: 1/omega_a (False) and 1/(E_ab - E_a) (True)"""
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
+
+    assert vibdiff_keys(ct.freq_vibenedenom) == [(('a',), (), False)]
+    assert vibdiff_keys(ct.freq_pert_wf_diff) == [(('a', 'b'), ('a',), True)]
+
+
+def test_compiled_term_split_is_made_once_and_kept():
+    """F3: evaluate_full_index_dict reads the split for every index set; it must not be made again each time"""
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
+
+    assert ct.freq_vibenedenom is ct.freq_vibenedenom
+    assert ct.freq_pert_wf_diff is ct.freq_pert_wf_diff
+
+
 def test_compile_terms_one_compiled_per_term():
     compiled = compile_terms([_fake_vibpert_term(), _fake_vibpert_term()]) # type: ignore
 

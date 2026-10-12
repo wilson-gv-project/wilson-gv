@@ -168,13 +168,13 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     if NON_AVRG == 0.0:
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
 
-    # Evaluate VIBDIFF_TERMS
-    extra_freqterms = compl_term.cmp_freqdenom.get_pert_wf_diff()
+    # Evaluate VIBDIFF_TERMS (split once per term, not per index set: todo.txt F3)
+    extra_freqterms = compl_term.freq_pert_wf_diff
 
     VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
 
     # Evaluate VIBENE_DENOM
-    freqterms = compl_term.cmp_freqdenom.get_vibenedenom()
+    freqterms = compl_term.freq_vibenedenom
 
     if precalculated_data is None or not precalculated_data.vibenedenoms_tensors:
 
@@ -219,7 +219,8 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         prop: MolecularProperty = molsys_data.mol_props[triv_name]
         NON_AVRG = prop.vals[na_prop_inds]
 
-        if np.isclose(NON_AVRG, 0.0, atol=zero_tol, rtol=0.0):
+        # = np.isclose(NON_AVRG, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call (F3)
+        if abs(NON_AVRG) <= zero_tol:
             return 0.
         else:
             product_all *= NON_AVRG
@@ -271,7 +272,8 @@ def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
     else:
         raise ValueError('avrg_expr not in precalculated_data and no avrg_func/molsys_data given')
 
-    return 0. if np.isclose(result, 0.0, atol=zero_tol, rtol=0.0) else result
+    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call (F3)
+    return 0. if abs(result) <= zero_tol else result
 
 
 def _make_func_to_compute_avrg(*,

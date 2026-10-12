@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 547 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 560 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -16,8 +16,8 @@ Status (2026-10-11)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
-Speed (2026-10-12): ACDM (42 modes) took 80 s per spectrum (F2); with the einsum averaging (F1) it takes 24 s.
-Of the 22 s in build_contributions, the deepcopy takes 11 s (F3).
+Speed (2026-10-12): ACDM (42 modes) took 80 s per spectrum (F2); with the einsum averaging (F1) 24 s; with the
+denominators split once per term (F3) 6.5 s: build_contributions 3.9 s, drawing 2.5 s.
 
 
 Order of work
@@ -25,7 +25,7 @@ Order of work
 Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it.
 1. [x] F2  Speed test on ACDM (42 modes), 2026-10-12: 80 s per spectrum (averaging 47 s, deepcopy 16 s).
 2. [x] F1  einsum for the averaged part, 2026-10-12: averaging 47 s -> 0.3 s; ACDM 80 s -> 24 s per spectrum.
-   [ ] F3  deepcopy: 11 s of the 22 s left in build_contributions.
+   [x] F3  denominators split once per term, 2026-10-12: build_contributions 22 s -> 3.9 s; ACDM 24 s -> 6.5 s.
    [ ] B   Open: delete the precalculated path (H1), or fix B3, B5, B6. Its reason was speed; the einsum tensor now
            gives that speed, with the polarization as an input (B3) and the labels kept with the values (B6).
 3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
@@ -253,11 +253,23 @@ F. Performance
           window); draw_window 2.5 s (6 domains).
         - Total without load: 80 s. Expected: averaging about 55 s, the rest up to 25 s. Close.
         Each new polarization, states choice or axis choice runs build_contributions again: 78 s each time.
-        Followed by F1 (2026-10-12): 24 s in total.
-[ ] F3  get_vibenedenom and get_pert_wf_diff build (and deepcopy) a new FreqTermsCollection on every index set
-        (evaluate_full_index_dict): 28 % of build_contributions under cProfile, formaldehyde. Call them once per
-        term (build_contributions) and pass the results down, as F1 does with the averaged tensor.
-        ACDM after F1: 11 s of the 22 s in build_contributions (53 % under cProfile).
+        Followed by F1 (2026-10-12): 24 s in total. Then F3 (2026-10-12): 6.5 s in total.
+[x] F3  The denominators split once per term. Done 2026-10-12.
+        Before: get_vibenedenom and get_pert_wf_diff built (and deepcopied) a new FreqTermsCollection on every
+        index set (evaluate_full_index_dict). ACDM after F1: 11 s of the 22 s in build_contributions.
+        Now CompiledTerm keeps the two parts: freq_vibenedenom and freq_pert_wf_diff (cached_property, plan.py),
+        made on first use, once per term. Not passed down from build_contributions as F1 does: the split needs
+        only the term, not the data.
+        With it, in evaluate.py, the zero checks: abs(x) <= zero_tol instead of np.isclose(x, 0, atol=zero_tol,
+        rtol=0). The same for one number (NaN included: False both ways); 1.7 million calls on ACDM.
+        Tests: the split is made once (test_plan.py); build_contributions splits 2 times for 2 terms (8 times
+        without F3, test_evaluate.py); the zero checks at and around zero_tol.
+        Speed, ACDM (f2_speed.py, two runs): build_contributions 22 s -> 3.9 s; total 24 s -> 6.5 s. Rows and zero
+        pairs unchanged (17101, 7595). Each part, measured in memory first: the split 23.5 s -> 13.5 s, then the
+        zero checks -> 4.5 s.
+        Left, not needed, per index set: build_contributions builds the leaves (one ParameterSet per summed index
+        set) and drops them, 0.6 s; evaluate_full_index_dict checks that every label has a value, 0.56 s. Inside
+        the pipeline that check cannot fail: sum_over fills every label.
 
 
 G. Checks beyond old = new

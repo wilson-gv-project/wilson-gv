@@ -14,6 +14,8 @@ Steps:
 Result 2026-10-12 (also todo.txt F2): load 4 s; build_contributions 78 s (averaging 47 s, deepcopy 16 s, the rest
 15 s); features, window and draw_window 2.5 s. Total without load: 80 s.
 After F1, the same day (todo.txt F1): build_contributions 22 s (averaging 0.3 s, deepcopy 11 s). Total: 24 s.
+After F3, the same day (todo.txt F3): build_contributions 3.9 s (no deepcopy per index set: the split is made
+once per term). Total: 6.5 s. The deepcopy line shows 0 calls: the timed run before the profile made the splits.
 
 A script, not a test: it runs for minutes.
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed
