@@ -14,11 +14,13 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    AvrgTensor,
     PrecalculatedData,
     _get_ind_tuple_from_base,
     _make_func_to_compute_avrg,
     build_contributions,
     calculate_avrg_tensor,
+    calculate_avrg_tensor_einsum,
     draw_all,
     draw_window,
     eval_avrg_per_indexdict,
@@ -32,6 +34,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     get_RHS_motif,
     harmonic_denom,
     lorentzian_propagator,
+    make_avrg_einsum_subscripts,
     otf_vibdiffdenom,
     solve_LSE_motif,
 )
@@ -520,6 +523,138 @@ def test_calculate_avrg_tensor_rejects_modes_beyond_the_mode_count():
         calculate_avrg_tensor(evv_avrg_expr(), evv_props(), 2, ISO4, modes_to_fill=[0, 2])
 
 
+# -- make_avrg_einsum_subscripts: the symbolic averaged part as one einsum (todo.txt F1) ---------
+# One operand per property: its mode labels, then the slot letter of each Cartesian axis (I, J, K, L = slot 0, 1, 2, 3),
+# as the data is laid out (modes first, then x, y, z). Then W: the slot letters in slot order.
+# Output: the distinct mode labels, alphabetical. No data needed.
+
+@pytest.mark.parametrize('expr, subscripts', [
+    (evv_avrg_expr('bac'), 'bIL,aJ,cK,IJKL->abc'),
+    (evv_avrg_expr('cab'), 'cIL,aJ,bK,IJKL->abc'),
+    (evv_avrg_expr('bab'), 'bIL,aJ,bK,IJKL->ab'),
+    (evv_avrg_expr('baa'), 'bIL,aJ,aK,IJKL->ab'),
+    (PropsCollection([polprop(ops=(0, 3), inds='ab'), polprop(ops=(1,), inds='a'), polprop(ops=(2,), inds='b')]),
+     'abIL,aJ,bK,IJKL->ab'),
+    (PropsCollection([polprop(ops=(0, 1), inds='aa')]), 'aaIJ,IJ->a'),
+    (PropsCollection([polprop(ops=(1, 0))]), 'JI,IJ->'),
+], ids=['term 8: polgrad[b] dipgrad[a] dipgrad[c]',
+        'terms 3, 6: polgrad[c] dipgrad[a] dipgrad[b]',
+        'terms 2, 7, 9, 12: no c, so no c axis',
+        'terms 10, 11: dipgrad[a] twice',
+        'term 0: polhess[a, b] dipgrad[a] dipgrad[b]',
+        'a label twice in one property: its diagonal',
+        'no mode label; slots in reverse order'])
+def test_avrg_einsum_subscripts_follow_the_expression(expr, subscripts):
+    assert make_avrg_einsum_subscripts(expr) == subscripts
+
+
+def test_avrg_einsum_subscripts_need_slots_0_to_rank_minus_1():
+    with pytest.raises(ValueError, match=r'0 \.\. 1, each once; got \[0, 2\]'):
+        make_avrg_einsum_subscripts(PropsCollection([polprop(ops=(0, 2), inds='a')]))
+
+
+def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
+    """upper case is for the slots: a mode label 'I' would be summed with slot 0"""
+    with pytest.raises(ValueError, match='one lowercase letter'):
+        make_avrg_einsum_subscripts(PropsCollection([polprop(ops=(0, 1), inds='I')]))
+
+
+# -- calculate_avrg_tensor_einsum: every index set at once = the on-the-fly loop -------------
+
+# 5 expressions (labels) x 3 recipes (laser_pol) = 15 cases.
+# Expected in each case: the einsum tensor equals the on-the-fly loop at all 27 index sets (a, b, c each over
+# modes 0, 1, 2), to rel 1e-12, abs 0. The data is random (POLGRAD_3, DIPGRAD_3): no symmetry, no zeros. So
+# reading a wrong mode, a wrong slot or the polgrad axes in the wrong order gives another number.
+#
+# labels -> evv_avrg_expr(labels) = polgrad[labels[0]] (slots 0, 3) * dipgrad[labels[1]] (slot 1) * dipgrad[labels[2]] (slot 2)
+#   'bac'  terms 8, 13        expression order b, a, c; tensor axes a, b, c (alphabetical, tensor.labels).
+#                             Right: read with tensor.labels, as AvrgTensor.at does:
+#                                 {'a': 0, 'b': 1, 'c': 2} -> values[0, 1, 2]
+#                             Wrong: read in expression order (b, a, c), as the precalculated path does (B6):
+#                                 {'a': 0, 'b': 1, 'c': 2} -> values[1, 0, 2], the value of a=1, b=0, c=2.
+#   'abc'  no EVV term        expression order = axis order: the plain case.
+#   'cab'  terms 3, 6         polgrad read at c, the last axis.
+#   'bab'  terms 2, 7, 9, 12  no c: a tensor with 2 axes (a, b). ALL_ABC still runs over c; einsum (AvrgTensor.at)
+#                             and the loop both ignore it.
+#   'baa'  terms 10, 11       both dipgrads read at mode a: one mode, two slot letters (J, K).
+#   Not here: 'aab' (terms 4, 5); terms 0 and 1 (polhess, diphess). test_integration.py checks all 14 terms.
+#
+# laser_pol -> the rank-4 recipe (getGeneralPolarizationAveragingExpression). With e_k the polarization of slot k,
+# the 3 numbers are ((e_0.e_1)(e_2.e_3), (e_0.e_2)(e_1.e_3), (e_0.e_3)(e_1.e_2)).
+#   (1, 1, 1)         all four fields along x. This recipe treats every slot alike, so wrong slots give the same
+#                     numbers: this case alone cannot catch a slot mix-up.
+#   (1, 0, 0)         slots 0, 1 along one axis, slots 2, 3 along another, e.g. (x, x, y, y). Catches a swap of
+#                     slots 1 and 2, or of the two polgrad axes; not a swap of slots 0 and 1 (the same pair).
+#   (0.3, -1.2, 2.0)  no setup of unit vectors gives these numbers. Each pairing has its own weight, so every
+#                     slot mix-up changes the value.
+#   Checked 2026-10-12 by giving term 8 wrong slots on purpose: (1, 1, 1) gives the same values (to 2e-16);
+#   (1, 0, 0) and (0.3, -1.2, 2.0) differ by about 1.
+@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
+@pytest.mark.parametrize('labels', ['bac', 'abc', 'cab', 'bab', 'baa'])
+def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels, laser_pol):
+    pol = getGeneralPolarizationAveragingExpression(4, laser_pol)
+    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(labels), polarization_linear_comb=pol)
+
+    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(labels), evv_props(), pol)
+
+    for idx in ALL_ABC:
+        assert tensor.at(idx) == pytest.approx(func(idx, evv_props()), rel=1e-12, abs=0)
+
+
+def test_avrg_tensor_einsum_term8_axes_are_a_b_c_not_the_expression_order():
+    """
+    Term 8, polgrad[b] dipgrad[a] dipgrad[c]: values[0, 1, 2] is a=0, b=1, c=2, so polgrad is read at mode 1 (b),
+    the dipgrads at modes 0 (a) and 2 (c). The sum is written out here, without einsum and without the loop.
+    """
+    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr('bac'), evv_props(), ISO4)
+
+    W = dense(ISO4)
+    by_hand = sum(W[i, j, k, l] * POLGRAD_3[1, i, l] * DIPGRAD_3[0, j] * DIPGRAD_3[2, k]
+                  for i, j, k, l in itertools.product(range(3), repeat=4))
+    assert tensor.labels == ('a', 'b', 'c')
+    assert tensor.values.shape == (N_MODES,) * 3
+    assert tensor.values[0, 1, 2] == pytest.approx(by_hand, rel=1e-12, abs=0)
+    assert tensor.at({'a': 0, 'b': 1, 'c': 2}) == tensor.values[0, 1, 2]
+    assert tensor.values[1, 0, 2] != pytest.approx(by_hand)      # read as (b, a, c): another number (B6)
+
+
+def test_avrg_tensor_einsum_without_c_has_no_c_axis():
+    """terms 2, 7, 9, 12: polgrad[b] dipgrad[a] dipgrad[b]: one value per (a, b), the same for every c"""
+    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr('bab'), evv_props(), ISO4)
+
+    assert (tensor.labels, tensor.values.shape) == (('a', 'b'), (N_MODES, N_MODES))
+    assert tensor.at({'a': 2, 'b': 1, 'c': 0}) == tensor.at({'a': 2, 'b': 1, 'c': 2}) == tensor.values[2, 1]
+
+
+def test_avrg_tensor_einsum_reads_the_diagonal_for_a_label_twice_in_one_property():
+    """polhess[a, a] (slots 0, 1): values[a] = sum over I, J of W[I, J] * polhess[a, a, I, J]"""
+    polhess = np.random.default_rng(11).normal(size=(N_MODES, N_MODES, 3, 3))
+    props = MolPropsCollection([MolecularProperty(trivial_name='polhess', vals=polhess, extra_data={})])
+    expr = PropsCollection([polprop(ops=(0, 1), inds='aa')])
+    pol = {(0, 0): 1., (1, 2): 3.}
+    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=pol)
+
+    tensor = calculate_avrg_tensor_einsum(expr, props, pol)
+
+    assert tensor.labels == ('a',)
+    for a in range(N_MODES):
+        assert tensor.at({'a': a}) == pytest.approx(polhess[a, a, 0, 0] + 3. * polhess[a, a, 1, 2], rel=1e-12, abs=0)
+        assert tensor.at({'a': a}) == pytest.approx(func({'a': a}, props), rel=1e-12, abs=0)
+
+
+def test_avrg_tensor_einsum_without_polarization_entries_is_zero():
+    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {})
+
+    assert tensor.values.shape == (N_MODES,) * 3
+    assert not tensor.values.any()
+
+
+def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
+    """a rank-2 key for a rank-4 expression would fill a whole 3 x 3 block of W without an error"""
+    with pytest.raises(ValueError, match=r'\(0, 0\) has 2 entries, the averaged part has 4 slots'):
+        calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {(0, 0): 1.})
+
+
 # -- both paths together: a tensor from calculate_avrg_tensor, read back as precalculated data --
 
 @pytest.mark.parametrize('labels', [
@@ -606,6 +741,38 @@ def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_state
     assert (value, contribs) == (0., {'AVRG': 0.})
 
 
+def test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given(molsys):
+    """No polarization: the average must come from the given tensor, not from a new einsum."""
+    given = AvrgTensor(('a', 'b', 'c'), np.full((2, 2, 2), 7.))
+
+    _, leaves = evaluate_term_coeff_sumover(term8_like(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given)
+
+    assert [contribs['AVRG'] for contribs in leaves.values()] == [7., 7.]
+
+
+def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeypatch):
+    """One einsum per term, passed to every index set of that term; not one einsum per index set."""
+    made, passed = [], []
+    einsum = evaluate_mod.calculate_avrg_tensor_einsum
+
+    def counting_einsum(*args):
+        made.append(einsum(*args))
+        return made[-1]
+
+    def stub_coeff(*_, avrg_tensor=None):
+        passed.append(avrg_tensor)
+        return 0., {}
+
+    monkeypatch.setattr(evaluate_mod, 'calculate_avrg_tensor_einsum', counting_einsum)
+    monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', stub_coeff)
+
+    build_contributions([term8_like(), term8_like()], with_evv_props(molsys), ISO4)
+
+    assert len(made) == 2
+    assert len(passed) == 2 * 4                              # 2 terms x 4 index sets (a, b over 2 modes)
+    assert all(t is made[0] for t in passed[:4]) and all(t is made[1] for t in passed[4:])
+
+
 ## One term end to end -------------------------------------------------------
 
 @pytest.fixture
@@ -674,8 +841,8 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict',
                         lambda term, idx, *_: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
-    # the stub term has no averaged props, so the avrg factory is stubbed out too
-    monkeypatch.setattr(evaluate_mod, '_make_func_to_compute_avrg', lambda **_: None)
+    # the stub term has no averaged props, so the avrg tensor is stubbed out too
+    monkeypatch.setattr(evaluate_mod, 'calculate_avrg_tensor_einsum', lambda *_: None)
     # Only the index split is read from the term here; molsys has 2 modes, so each missing index runs over {0, 1}.
     term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
                         idx_summ=('b', 'c'), idx_nonsumm=('a',))
@@ -1100,7 +1267,7 @@ def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(para
     grid = to_au({'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])})
 
     value = eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, grid,
-                                  lorentzian_propagator, lambda vd: vd.energy_difference(au=True) / 100)
+                                  lorentzian_propagator, lambda vd: vd.energy_difference(au=True) / 100) # type: ignore
 
     expected = [-0.0125, -0.00625 + 0.00625j, -0.00625 + 0.00625j]
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))

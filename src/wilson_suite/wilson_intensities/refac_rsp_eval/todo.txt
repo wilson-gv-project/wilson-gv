@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 473 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 547 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -16,17 +16,18 @@ Status (2026-10-11)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
-Speed (2026-10-12, F2): ACDM (42 modes) takes 80 s per spectrum. build_contributions takes 78 s of it: averaging
-47 s, deepcopy 16 s. F1 and F3 would remove about 63 s. Open: is 80 s fine?
+Speed (2026-10-12): ACDM (42 modes) took 80 s per spectrum (F2); with the einsum averaging (F1) it takes 24 s.
+Of the 22 s in build_contributions, the deepcopy takes 11 s (F3).
 
 
 Order of work
 -------------
 Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it.
 1. [x] F2  Speed test on ACDM (42 modes), 2026-10-12: 80 s per spectrum (averaging 47 s, deepcopy 16 s).
-2. [ ] F1  einsum for the averaged part (47 s at 42 modes), and F3 (16 s). Decide first: is 80 s fine?
-           The same decision settles B3, B5, B6 (bugs in the precalculated path): fast enough -> delete the path
-           (H1), and the three bugs go with it.
+2. [x] F1  einsum for the averaged part, 2026-10-12: averaging 47 s -> 0.3 s; ACDM 80 s -> 24 s per spectrum.
+   [ ] F3  deepcopy: 11 s of the 22 s left in build_contributions.
+   [ ] B   Open: delete the precalculated path (H1), or fix B3, B5, B6. Its reason was speed; the einsum tensor now
+           gives that speed, with the polarization as an input (B3) and the labels kept with the values (B6).
 3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
 4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
            a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
@@ -94,8 +95,8 @@ A. Small fixes
 B. Correctness of the precalculated path
 ----------------------------------------
 The on-the-fly path is correct, and compute_features_from_terms uses no precalculated tables.
-F2 decides: fix B3, B5, B6, or delete the precalculated path (H1). Deleting costs test rework: many tests set
-values through pre_a1_zero, a PrecalculatedData.
+Open: fix B3, B5, B6, or delete the precalculated path (H1). Since F1 the on-the-fly path is fast too (one einsum
+tensor per term). Deleting costs test rework: many tests set values through pre_a1_zero, a PrecalculatedData.
 [ ] B3  PrecalculatedData: the averaged-tensor key has no polarization, so two polarizations would share one tensor.
 [ ] B5  eval_vibenedenom looks up a set of labels: 1/w_a twice becomes 1/w_a once (harmonic_denom keeps both).
         The old code does the same (term_parts.py). No EVV term has a label twice.
@@ -193,7 +194,25 @@ E. Pipeline
 
 F. Performance
 --------------
-[ ] F1  einsum for the averaged part, then maybe for the whole sum over summation labels. Only if F2 shows a need.
+[x] F1  einsum for the averaged part. Done 2026-10-12.
+        calculate_avrg_tensor_einsum (evaluate.py): one einsum per term gives the averaged part for every index set.
+        make_avrg_einsum_subscripts writes the einsum from the symbolic expression: each property gets its mode
+        labels, then one letter per Cartesian slot (I, J, K, L = slot 0, 1, 2, 3); W (the recipe) gets the slot
+        letters; the output gets the distinct mode labels, alphabetical. e.g. term 8: 'bIL,aJ,cK,IJKL->abc'.
+        AvrgTensor keeps the labels with the values, so each term reads the tensor with its own labels (no B6).
+        build_contributions makes one tensor per term and passes it down (evaluate_term_coeff_sumover, avrg_tensor).
+        The loop (_make_func_to_compute_avrg) stays as the reference in the tests; calculate_avrg_tensor uses it.
+        Tests: test_evaluate.py: the subscripts of 7 shapes; einsum = loop for every index set (5 shapes x 3
+        polarizations, rel 1e-12, abs 0); term 8 summed by hand; a label twice in one property (diagonal); errors;
+        one tensor per term. test_integration.py: the 14 EVV subscripts; einsum = loop for every index set, 14 terms
+        x 3 polarizations, formaldehyde (rel 1e-12, abs 1e-18 = zero_tol). The stored reference rows (C2) and G1
+        pass unchanged through the einsum path.
+        Agreement: formaldehyde rel at most 7e-14; where the loop gives 0, einsum gives at most 4e-19. ACDM, 14000
+        random index sets: rel at most 8e-14. ACDM rows and zero pairs are the same as with the loop (17101, 7595).
+        Speed, ACDM (f2_speed.py): averaging 47 s -> 0.3 s (14 einsums + 892584 lookups); build_contributions 78 s ->
+        22 s; total 80 s -> 24 s.
+        Not done: einsum for the whole sum over summation labels (with cff and the denominators).
+        Size: n_modes ** (number of distinct labels). 3 labels at 42 modes: 0.6 MB; 5 labels would be 1 GB.
         Measured 2026-10-11 (random polgrad and dipgrad, rank 4, laser_pol (1, 1, 1)):
         - On the fly: 62 us per index set, for any number of modes. build_contributions asks for 12 n^3 + 2 n^2
           averages (14 EVV terms): 6 modes 0.17 s, 20 modes 6 s, 40 modes 50 s, 80 modes 6.4 min
@@ -210,8 +229,6 @@ F. Performance
         - Averaging is about 70 % of build_contributions. The rest is about 27 us per index set, so about 20 s at
           40 modes. Its largest part is the deepcopy in FreqTermsCollection.__post_init__ (get_vibenedenom and
           get_pert_wf_diff build a new collection on every index set).
-        Tests if F1 is done: einsum = on-the-fly value for every EVV term, every index set, 3 polarizations
-        (rel 1e-12, abs 0); each term reads the tensor with its own labels (term 8: T[b, a, c], the B6 trap).
 [x] F2  Runtime on a real bigger molecule. Decides F1 and F3.
         Molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git):
             wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out
@@ -236,10 +253,11 @@ F. Performance
           window); draw_window 2.5 s (6 domains).
         - Total without load: 80 s. Expected: averaging about 55 s, the rest up to 25 s. Close.
         Each new polarization, states choice or axis choice runs build_contributions again: 78 s each time.
-        Open: is 80 s fine for normal use? If not: F1 (47 s -> < 1 ms), then F3 (16 s).
+        Followed by F1 (2026-10-12): 24 s in total.
 [ ] F3  get_vibenedenom and get_pert_wf_diff build (and deepcopy) a new FreqTermsCollection on every index set
         (evaluate_full_index_dict): 28 % of build_contributions under cProfile, formaldehyde. Call them once per
-        term (build_contributions) and pass the results down. Only if F2 shows a need.
+        term (build_contributions) and pass the results down, as F1 does with the averaged tensor.
+        ACDM after F1: 11 s of the 22 s in build_contributions (53 % under cProfile).
 
 
 G. Checks beyond old = new

@@ -14,10 +14,13 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     PrecalculatedData,
     _make_func_to_compute_avrg,
     calculate_avrg_tensor,
+    calculate_avrg_tensor_einsum,
     eval_avrg_per_indexdict,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
+    make_avrg_einsum_subscripts,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     compile_terms,
@@ -291,3 +294,44 @@ def test_term8_precalculated_tensor_gives_the_on_the_fly_value(term8):
 
     assert ([eval_avrg_per_indexdict(expr, idx, precalculated_data=pre) for idx in ALL_ABC]
             == pytest.approx([eval_avrg_per_indexdict(expr, idx, avrg_func=func, molsys_data=molsys) for idx in ALL_ABC]))
+
+
+## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde (todo.txt F1) ----------------
+# Each term reads the tensor with its own labels, e.g. term 8: 'bIL,aJ,cK,IJKL->abc', read at {'a', 'b', 'c'}.
+# Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). Measured 2026-10-12:
+# rel at most 7e-14 (a value of 6e-13 next to values of 5e-6); where the loop gives 0, einsum gives at most 4e-19.
+
+EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc',
+                  'aIL,aJ,bK,IJKL->ab', 'aIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc', 'bIL,aJ,bK,IJKL->ab',
+                  'bIL,aJ,cK,IJKL->abc', 'bIL,aJ,bK,IJKL->ab', 'bIL,aJ,aK,IJKL->ab', 'bIL,aJ,aK,IJKL->ab',
+                  'bIL,aJ,bK,IJKL->ab', 'bIL,aJ,cK,IJKL->abc']
+
+
+@pytest.fixture(scope='module')
+def evv_molsys() -> MolSystemData:
+    """all properties of the 14 terms; the states do not enter the average"""
+    origin = DataOriginInfo(source_type='gaussian', base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
+    return load_molsys_data(cmpl_terms, origin, states_choice='harmonic')
+
+
+def test_evv_einsum_subscripts():
+    """
+    term 0:  polhess[a, b] (slots 0, 3) dipgrad[a] (1) dipgrad[b] (2)      'abIL,aJ,bK,IJKL->ab'
+    term 1:  polgrad[b] (0, 3) dipgrad[a] (1) diphess[a, b] (2)            'bIL,aJ,abK,IJKL->ab'
+    term 8:  polgrad[b] (0, 3) dipgrad[a] (1) dipgrad[c] (2)               'bIL,aJ,cK,IJKL->abc'
+    """
+    assert [make_avrg_einsum_subscripts(t.avrg_props) for t in cmpl_terms] == EVV_SUBSCRIPTS
+
+
+@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
+@pytest.mark.parametrize('term_id', range(14))
+def test_evv_einsum_tensor_is_the_on_the_fly_average_for_every_index_set(term_id, laser_pol, evv_molsys):
+    term = cmpl_terms[term_id]
+    pol = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=laser_pol)
+    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=pol)
+
+    tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_molsys.mol_props, pol)
+
+    on_the_fly = [func(idx, evv_molsys.mol_props) for idx in ALL_ABC]
+    assert any(abs(v) > 1e-12 for v in on_the_fly)
+    assert [tensor.at(idx) for idx in ALL_ABC] == pytest.approx(on_the_fly, rel=1e-12, abs=1e-18)

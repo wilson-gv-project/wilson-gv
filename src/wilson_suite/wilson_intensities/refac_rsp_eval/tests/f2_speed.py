@@ -6,12 +6,14 @@ Steps:
   1. load: only the terms' properties + frequencies + states. The reader fails on ACDM at normal_modes
      (todo.txt F2, [outside]); the evaluator does not use normal_modes.
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
-     (compute_for_idx_choice) and of the deepcopy (FreqTermsCollection.__post_init__).
+     (before F1 the loop, compute_for_idx_choice; since F1 calculate_avrg_tensor_einsum + AvrgTensor.at) and of
+     the deepcopy (FreqTermsCollection.__post_init__).
   3. the rest: features_from_rows, SpectralWindow.from_features, draw_window on one grid.
      Window, grid, gamma and dynrange as in examples/quick_start.ipynb.
 
 Result 2026-10-12 (also todo.txt F2): load 4 s; build_contributions 78 s (averaging 47 s, deepcopy 16 s, the rest
 15 s); features, window and draw_window 2.5 s. Total without load: 80 s.
+After F1, the same day (todo.txt F1): build_contributions 22 s (averaging 0.3 s, deepcopy 11 s). Total: 24 s.
 
 A script, not a test: it runs for minutes.
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed
@@ -84,7 +86,7 @@ def profile_build_contributions(compiled, molsys, pol) -> dict:
     prof.enable()
     build_contributions(compiled, molsys, pol)
     prof.disable()
-    stats = pstats.Stats(prof).stats       # (file, line, name) -> (primitive calls, calls, own s, cumulative s, ...)
+    stats = pstats.Stats(prof).stats       # type: ignore # (file, line, name) -> (primitive calls, calls, own s, cumulative s, ...)
 
     def cum(name: str, file_end: str, line: int | None = None) -> tuple[float, int]:
         hits = [(v[3], v[1]) for (file, ln, fn), v in stats.items()
@@ -93,7 +95,9 @@ def profile_build_contributions(compiled, molsys, pol) -> dict:
 
     post_init = FreqTermsCollection.__post_init__.__code__
     out = {'total': cum('build_contributions', 'evaluate.py'),
-           'averaging': cum('compute_for_idx_choice', 'evaluate.py'),
+           'averaging, loop (before F1)': cum('compute_for_idx_choice', 'evaluate.py'),
+           'averaging, einsum (F1)': cum('calculate_avrg_tensor_einsum', 'evaluate.py'),
+           'averaging, lookup (F1)': cum('at', 'evaluate.py'),
            'deepcopy': cum('__post_init__', post_init.co_filename, post_init.co_firstlineno)}
     print('\nbuild_contributions under cProfile, top 15 by own time:')
     pstats.Stats(prof).sort_stats('tottime').print_stats(15)
@@ -115,10 +119,10 @@ def main():
 
     prof = profile_build_contributions(compiled, molsys, pol)
     total = prof['total'][0]
-    for part in ('averaging', 'deepcopy'):
-        t, n = prof[part]
-        print(f'  {part:<10} {t:7.1f} s of {total:.1f} s under cProfile ({t / total:4.0%}), {n} calls, '
-              f'scaled to the plain run: {t / total * t_build:.1f} s')
+    for part, (t, n) in prof.items():
+        if part != 'total':
+            print(f'  {part:<28} {t:7.2f} s of {total:.1f} s under cProfile ({t / total:4.0%}), {n} calls, '
+                  f'scaled to the plain run: {t / total * t_build:.2f} s')
 
     # 3. the rest
     features, t_feat = timed(features_from_rows, table, GAMMA_CM)
