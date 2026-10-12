@@ -80,7 +80,8 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          polarization_linear_comb: dict | None = None,
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18,
-                         avrg_tensor: 'AvrgTensor | None' = None) -> tuple[float, dict]:
+                         avrg_tensor: 'AvrgTensor | None' = None,
+                         keep_leaves: bool = True) -> tuple[float, dict | None]:
     """
     Coefficient of one term at one resonance location.
 
@@ -96,7 +97,11 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         None -> made here from polarization_linear_comb, unless precalculated_data has the averaged part.
         build_contributions makes it once per term, so it is not made again for every resonance index set.
 
-    returns (total, leaves): leaves maps each full index set to its factors
+    returns (total, leaves): leaves maps each full index set to its factors, e.g. for a = 0, b = 1, 2 modes:
+        {ParameterSet({'a': 0, 'b': 1, 'c': 0}): {'NON_AVRG': ..., 'AVRG': ..., 'VIBDIFF_TERMS': ..., 'VIBENE_DENOM': ...},
+         ParameterSet({'a': 0, 'b': 1, 'c': 1}): {...}}
+    keep_leaves False -> leaves is None. build_contributions does not keep them: every row's leaves would take
+        357 MB for ACDM (42 modes). FeatureResult.leaves computes one row's leaves again when they are asked for.
     """
     not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
@@ -113,20 +118,21 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
               else _avrg_tensor_for(compl_term, molsys_data, polarization_linear_comb, precalculated_data))
     avrg_func = None if tensor is None else (lambda index_dict, _props_data: tensor.at(index_dict))
 
-    def sum_over(index_dict: dict, remaining: list, leaves: dict) -> float:
+    def sum_over(index_dict: dict, remaining: list, leaves: dict | None) -> float:
         if not remaining:
             value, contribs = evaluate_full_index_dict(compl_term, index_dict, 
                                                        molsys_data,
                                                        avrg_func,
                                                        precalculated_data,
                                                        zero_tol)
-            leaves[ParameterSet(index_dict)] = contribs
+            if leaves is not None:
+                leaves[ParameterSet(index_dict)] = contribs
             return value
         current, rest = remaining[0], remaining[1:]
         return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
     
     missing = [i for i in term_idx_all if i not in idx_dict]
-    leaves = {}
+    leaves = {} if keep_leaves else None
     return sum_over(idx_dict, missing, leaves), leaves
 
 
@@ -712,9 +718,10 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
         for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
             ps = ParameterSet(idxset)
 
+            # no leaves: FeatureResult.leaves computes a row's leaves again when asked
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data,
                                                    polarization_linear_comb, precalculated_data,
-                                                   avrg_tensor=avrg_tensor)
+                                                   avrg_tensor=avrg_tensor, keep_leaves=False)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))

@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 560 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 571 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -17,7 +17,8 @@ The new evaluator is built and checked: the same numbers as the old code (to 2e-
 agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
 Speed (2026-10-12): ACDM (42 modes) took 80 s per spectrum (F2); with the einsum averaging (F1) 24 s; with the
-denominators split once per term (F3) 6.5 s: build_contributions 3.9 s, drawing 2.5 s.
+denominators split once per term (F3) 6.5 s; without leaves in build_contributions (leaves on demand, see Done)
+5.9 s: build_contributions 3.3 s, drawing 2.5 s.
 
 
 Order of work
@@ -29,7 +30,7 @@ Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it
    [ ] B   Open: delete the precalculated path (H1), or fix B3, B5, B6. Its reason was speed; the einsum tensor now
            gives that speed, with the polarization as an input (B3) and the labels kept with the values (B6).
 3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
-4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 7 open decisions first, then
+4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 6 open decisions first, then
            a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
 5. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
 6. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
@@ -158,7 +159,7 @@ E. Pipeline
         - [ ] data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
         - [ ] the magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
               SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
-        - [ ] return the states: compute_features_from_terms does not, but draw_window needs them
+        - [x] return the states: FeatureResult.molsys.states (2026-10-12, with the leaves on demand, see Done)
         - [ ] the default dynrange, matched to the plot's dynamic range (log scale is the renderer's default;
               see the cut in Decisions)
         - [ ] nothing that assumes point features only (E8)
@@ -253,7 +254,8 @@ F. Performance
           window); draw_window 2.5 s (6 domains).
         - Total without load: 80 s. Expected: averaging about 55 s, the rest up to 25 s. Close.
         Each new polarization, states choice or axis choice runs build_contributions again: 78 s each time.
-        Followed by F1 (2026-10-12): 24 s in total. Then F3 (2026-10-12): 6.5 s in total.
+        Followed by F1 (2026-10-12): 24 s in total. Then F3 (2026-10-12): 6.5 s in total. Then the leaves on
+        demand (build_contributions builds no leaves, 2026-10-12): 5.9 s in total.
 [x] F3  The denominators split once per term. Done 2026-10-12.
         Before: get_vibenedenom and get_pert_wf_diff built (and deepcopied) a new FreqTermsCollection on every
         index set (evaluate_full_index_dict). ACDM after F1: 11 s of the 22 s in build_contributions.
@@ -267,9 +269,10 @@ F. Performance
         Speed, ACDM (f2_speed.py, two runs): build_contributions 22 s -> 3.9 s; total 24 s -> 6.5 s. Rows and zero
         pairs unchanged (17101, 7595). Each part, measured in memory first: the split 23.5 s -> 13.5 s, then the
         zero checks -> 4.5 s.
-        Left, not needed, per index set: build_contributions builds the leaves (one ParameterSet per summed index
-        set) and drops them, 0.6 s; evaluate_full_index_dict checks that every label has a value, 0.56 s. Inside
-        the pipeline that check cannot fail: sum_over fills every label.
+        Left, not needed: evaluate_full_index_dict checks on every index set that every label has a value, 0.56 s.
+        Inside the pipeline that check cannot fail: sum_over fills every label.
+        Gone since (2026-10-12, leaves on demand, see Done): the leaves that build_contributions built (one
+        ParameterSet per summed index set) and dropped; build_contributions 3.9 s -> 3.3 s.
 
 
 G. Checks beyond old = new
@@ -362,6 +365,15 @@ E3   One entry point, compute_features_from_terms: translate the terms, compile 
      rps_evaluation.py deleted.
 B7   One resonance point per term, checked when compiling (see Decisions). The `failed` list is gone: it was
      always empty.
+-    Leaves on demand (2026-10-12), for analysis: a row's leaves are its summed index sets, each with its four
+     factors (feature -> rows -> leaves). FeatureResult keeps what the rows were computed from (compiled, molsys,
+     polarization_linear_comb, precalculated_data: references, not copies; compare=False), and
+     FeatureResult.leaves(row) computes one row's leaves again: about 1 ms per row on ACDM. Keeping every row's
+     leaves would take 357 MB there (636000 leaves), so build_contributions builds none (keep_leaves=False in
+     evaluate_term_coeff_sumover): ACDM build_contributions 3.9 s -> 3.3 s.
+     Tests (test_pipeline.py, test_evaluate.py): the leaves add up to row.coeff (toy molecule, precalculated and
+     on the fly; all 340 formaldehyde rows, both state choices); build_contributions asks for no leaves.
+     FeatureResult.molsys.states is also the states that draw_window needs (E6).
 
 Checked: the numbers are right
 C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).

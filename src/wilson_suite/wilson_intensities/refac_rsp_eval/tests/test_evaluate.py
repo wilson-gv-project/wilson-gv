@@ -777,9 +777,9 @@ def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeyp
         made.append(einsum(*args))
         return made[-1]
 
-    def stub_coeff(*_, avrg_tensor=None):
+    def stub_coeff(*_, avrg_tensor=None, keep_leaves=True):
         passed.append(avrg_tensor)
-        return 0., {}
+        return 0., None
 
     monkeypatch.setattr(evaluate_mod, 'calculate_avrg_tensor_einsum', counting_einsum)
     monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', stub_coeff)
@@ -810,6 +810,21 @@ def test_build_contributions_splits_the_denominators_once_per_term(molsys, pre_a
     build_contributions([ab_term(), ab_term()], molsys, precalculated_data=pre_a1_zero)
 
     assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
+
+
+def test_build_contributions_keeps_no_leaves(molsys, pre_a1_zero, monkeypatch):
+    """The rows do not carry leaves; FeatureResult.leaves computes them again when asked (test_pipeline.py)."""
+    asked = []
+    sumover = evaluate_mod.evaluate_term_coeff_sumover
+
+    def recording(*args, **kwargs):
+        asked.append(kwargs['keep_leaves'])
+        return sumover(*args, **kwargs)
+    monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', recording)
+
+    build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero)
+
+    assert asked == [False] * 4                              # 4 index sets (a, b over 2 modes)
 
 
 ## One term end to end -------------------------------------------------------
@@ -1018,6 +1033,19 @@ def test_evaluate_term_coeffs_zero_avrg_leaves_are_kept(molsys):
     assert total == 0.
     assert len(leaves) == 4
     assert all(contribs == {'AVRG': 0.} for contribs in leaves.values())
+
+
+def test_evaluate_term_coeffs_without_leaves_gives_the_same_total(term_and_precalc, molsys):
+    """keep_leaves=False (build_contributions): no leaves, the same total to the last bit"""
+    term, pre = term_and_precalc
+
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, precalculated_data=pre)
+    total_only, no_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, precalculated_data=pre,
+                                                        keep_leaves=False)
+
+    assert no_leaves is None
+    assert len(leaves) == 4
+    assert total_only == total != 0.
 
 
 def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):

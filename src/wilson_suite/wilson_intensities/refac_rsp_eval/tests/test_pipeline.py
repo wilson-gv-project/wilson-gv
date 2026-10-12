@@ -14,6 +14,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass, replace
 
+import numpy as np
 import pytest
 
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
@@ -37,6 +38,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
+    ParameterSet,
     PropsCollection,
     ResLocPoint,
     ResonanceMotif,
@@ -59,6 +61,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     row,
     toy_term,
 )
+from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 
@@ -141,6 +144,87 @@ def test_feature_result_is_frozen(molsys, pre_a1_zero):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.table = ContributionTable([])  # type: ignore
+
+
+def leaf_value(term: CompiledTerm, contribs: dict) -> float:
+    """
+    One leaf's part of the row coefficient, from its factors, as evaluate_full_index_dict multiplies them.
+    A leaf that stopped early (average or non-averaged part 0) has fewer factors and gives 0.
+    """
+    if 'VIBENE_DENOM' not in contribs:
+        return 0.
+    return term.frac_factor * (contribs['NON_AVRG'] * contribs['AVRG'] * contribs['VIBDIFF_TERMS']
+                               * contribs['VIBENE_DENOM'])
+
+
+def test_feature_result_leaves_of_a_row_are_its_summed_index_sets(molsys, pre_a1_zero):
+    """ab_term fixes a, b and sums c over 2 modes: 2 leaves per row, the same as evaluate_term_coeff_sumover gives"""
+    terms = two_terms_one_motif()
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+
+    for r in result.table:
+        leaves = result.leaves(r)
+
+        _, expected = evaluate_term_coeff_sumover(terms[r.term_id], r.params.to_dict(), molsys,
+                                                  precalculated_data=pre_a1_zero)
+        assert set(leaves) == {ParameterSet({'a': r.params['a'], 'b': r.params['b'], 'c': c}) for c in (0, 1)}
+        assert leaves == expected
+
+
+def test_feature_result_leaves_add_up_to_the_row_coefficient(molsys, pre_a1_zero):
+    terms = two_terms_one_motif()
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+
+    for r in result.table:
+        total = sum(leaf_value(terms[r.term_id], contribs) for contribs in result.leaves(r).values())
+        assert total == pytest.approx(r.coeff, rel=1e-12, abs=0)
+
+
+def test_feature_result_leaves_use_the_polarization_of_the_result(molsys):
+    """
+    On the fly, no precalculated data: the leaves need the result's own recipe (without it, the average raises).
+    ab_term's <polgrad>[a] has slots 0, 1: rank 2. polgrad of mode 1 is 0, so a = 1 stops at the average,
+    as with pre_a1_zero: the toy states have no '1,1'.
+    """
+    terms = [ab_term()]
+    polgrad = np.zeros((2, 3, 3))
+    polgrad[0] = np.arange(9.).reshape(3, 3) + 1.
+    otf_molsys = replace(molsys, mol_props=MolPropsCollection(
+        [*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})]))
+    recipe = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
+
+    result = compute_features(terms, otf_molsys, recipe)
+
+    assert result.polarization_linear_comb is recipe
+    assert len(result.table) == 2                       # a = 0, b = 0 and 1
+    for r in result.table:
+        total = sum(leaf_value(terms[0], contribs) for contribs in result.leaves(r).values())
+        assert total == pytest.approx(r.coeff, rel=1e-12, abs=0) != 0.
+
+
+def test_feature_result_keeps_its_inputs_without_copying(molsys, pre_a1_zero):
+    terms = two_terms_one_motif()
+
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+
+    assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms))
+    assert result.molsys is molsys
+    assert result.precalculated_data is pre_a1_zero
+    assert result.polarization_linear_comb is None
+
+
+def test_feature_result_inputs_do_not_count_for_equality():
+    """two results with the same rows are equal, whatever they were computed from"""
+    table = ContributionTable([row(0.3, a=0)])
+
+    assert FeatureResult(table, zero=[]) == FeatureResult(table, zero=[], compiled=(toy_term(),))
+
+
+def test_feature_result_made_by_hand_has_no_leaves():
+    r = row(0.3, a=0)
+
+    with pytest.raises(ValueError, match='no terms or data'):
+        FeatureResult(ContributionTable([r]), zero=[]).leaves(r)
 
 
 def two_rows_at(a_cm: float, c0: float, c1: float):
@@ -347,6 +431,22 @@ def test_real_data_strongest_feature(evv_formaldehyde):
     assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
 
 
+def test_real_data_leaves_add_up_to_every_row_coefficient(evv_formaldehyde):
+    """
+    All 340 rows, on the fly (einsum average) with the result's recipe. One leaf per summed index set:
+    6 modes ** number of summation labels (term 0: none, 1 leaf; a term summing c: 6 leaves).
+    """
+    compiled, result = evv_formaldehyde.compiled, evv_formaldehyde.result
+
+    for r in result.table:
+        term = compiled[r.term_id]
+        leaves = result.leaves(r)
+
+        assert len(leaves) == 6 ** len(term.idx_summ)
+        total = sum(leaf_value(term, contribs) for contribs in leaves.values())
+        assert total == pytest.approx(r.coeff, rel=1e-12, abs=0), r
+
+
 ## compute_features_from_terms: the one top function ---------------------------
 # Same settings as evv_reference.json, formaldehyde, anharmonic states. The evv_formaldehyde fixture
 # runs the same steps one by one, so equal results mean the top function passes every setting to
@@ -396,3 +496,16 @@ def test_compute_features_from_terms_leaves_the_input_terms_as_they_are(top_run)
 
 def test_compute_features_from_terms_gives_every_feature_the_lineshape_parameter(top_run):
     assert all(f.lineshape_parameter == 4.7 for f in top_run.result.features)
+
+
+def test_compute_features_from_terms_keeps_what_drawing_and_leaves_need(top_run):
+    """the compiled terms, the data with its states (draw_window), the recipe: one row's leaves add up to its coeff"""
+    result = top_run.result
+
+    assert len(result.compiled) == len(top_run.terms)  # type: ignore
+    assert result.molsys.states is not None  # type: ignore
+    assert result.polarization_linear_comb is not None
+
+    r = max(result.table, key=lambda r: abs(r.coeff))
+    term = result.compiled[r.term_id]  # type: ignore
+    assert sum(leaf_value(term, c) for c in result.leaves(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)

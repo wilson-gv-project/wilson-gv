@@ -21,7 +21,7 @@ grid.py → spectrum array                                   E2, not built yet
 """
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -33,8 +33,10 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     PrecalculatedData,
     build_contributions,
+    evaluate_term_coeff_sumover,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    ContributionRow,
     ContributionTable,
     SpectralFeature,
     features_from_rows,
@@ -63,11 +65,37 @@ class FeatureResult:
     table: ContributionTable                          # all rows: the source
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     lineshape_parameter: float | None = None          # cm-1
+    # What the rows were computed from (compute_features fills them; None in a result made by hand).
+    # leaves() needs all four; drawing needs molsys.states. References only: nothing is copied.
+    # compare=False: two results are equal by their rows, not by their inputs.
+    compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
+    molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
+    polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
+    precalculated_data: PrecalculatedData | None = field(default=None, compare=False, repr=False)
 
     @cached_property
     def features(self) -> list[SpectralFeature]:
         """One feature per (motif, location), built from the table on first use."""
         return features_from_rows(self.table, self.lineshape_parameter)
+
+    def leaves(self, row: ContributionRow) -> dict:
+        """
+        The summed index sets behind one row, each with its factors: feature -> rows -> leaves.
+            e.g. a row of a term with resonance labels a, b and summation label c, at a = 0, b = 1, 42 modes:
+                 42 leaves, {ParameterSet({'a': 0, 'b': 1, 'c': 0}): {'NON_AVRG': ..., 'AVRG': ...,
+                 'VIBDIFF_TERMS': ..., 'VIBENE_DENOM': ...}, ...,  ParameterSet({'a': 0, 'b': 1, 'c': 41}): {...}}
+            An index set whose average or non-averaged part is 0 holds only the factors made before the stop,
+            e.g. {'AVRG': 0.}.
+        Computed again from row.term_id and row.params, with the terms, data and polarization of this result, so
+        the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions does not keep
+        them, since every row's leaves would take 357 MB there.
+        """
+        if self.compiled is None or self.molsys is None:
+            raise ValueError('this FeatureResult has no terms or data (made by hand?): compute_features keeps them, '
+                             'and leaves need them')
+        _, leaves = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
+                                                self.polarization_linear_comb, self.precalculated_data)
+        return leaves # type: ignore
 
     def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
         """
@@ -87,9 +115,12 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     """
     One SpectralFeature per (motif, location). lineshape_parameter in cm-1.
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
+    The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
     """
     table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data)
-    return FeatureResult(table, zero, lineshape_parameter)
+    return FeatureResult(table, zero, lineshape_parameter,
+                         compiled=tuple(compiled), molsys=molsys_data,
+                         polarization_linear_comb=polarization_linear_comb, precalculated_data=precalculated_data)
 
 
 def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo,
