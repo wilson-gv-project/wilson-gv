@@ -8,7 +8,7 @@ CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
   │    zero coeff -> `zero`, no row
-  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states
+  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states[states_choice]
   │    always one point: compile_terms checked the motif (B7)
   v
 ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evaluate.build_contributions
@@ -52,12 +52,14 @@ from wilson_suite.wilson_system.system_data import (
     MolSystemData,
     build_data_request_for_term,
 )
+from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
+    from wilson_suite.wilson_system.system_data import VibStatesData
 
 
 @dataclass(frozen=True)
@@ -66,17 +68,26 @@ class FeatureResult:
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     lineshape_parameter: float | None = None          # cm-1
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # leaves() needs all four; drawing needs molsys.states. References only: nothing is copied.
+    # leaves() needs all five; drawing needs the states (FeatureResult.states). References only: nothing is copied.
     # compare=False: two results are equal by their rows, not by their inputs.
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
     precalculated_data: PrecalculatedData | None = field(default=None, compare=False, repr=False)
+    states_choice: str | None = field(default=None, compare=False)
 
     @cached_property
     def features(self) -> list[SpectralFeature]:
         """One feature per (motif, location), built from the table on first use."""
         return features_from_rows(self.table, self.lineshape_parameter)
+
+    @property
+    def states(self) -> 'VibStatesData':
+        """The state set the rows were computed with, molsys.states[states_choice]: what draw_window needs."""
+        if self.molsys is None or self.states_choice is None:
+            raise ValueError('this FeatureResult has no data or states choice (made by hand?): compute_features '
+                             'keeps them')
+        return self.molsys.states[self.states_choice]
 
     def leaves(self, row: ContributionRow) -> dict:
         """
@@ -90,11 +101,12 @@ class FeatureResult:
         the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions does not keep
         them, since every row's leaves would take 357 MB there.
         """
-        if self.compiled is None or self.molsys is None:
+        if self.compiled is None or self.molsys is None or self.states_choice is None:
             raise ValueError('this FeatureResult has no terms or data (made by hand?): compute_features keeps them, '
                              'and leaves need them')
         _, leaves = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
-                                                self.polarization_linear_comb, self.precalculated_data)
+                                                self.polarization_linear_comb, self.precalculated_data,
+                                                states_choice=self.states_choice)
         return leaves # type: ignore
 
     def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
@@ -111,31 +123,29 @@ class FeatureResult:
 def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
                      polarization_linear_comb: dict | None = None,
                      precalculated_data: PrecalculatedData | None = None,
-                     lineshape_parameter: float | None = None) -> FeatureResult:
+                     lineshape_parameter: float | None = None,
+                     *,
+                     states_choice: str) -> FeatureResult:
     """
     One SpectralFeature per (motif, location). lineshape_parameter in cm-1.
+    states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
+        GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
-    The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
+    The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) in drawing.
     """
-    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data)
+    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data,
+                                      states_choice=states_choice)
     return FeatureResult(table, zero, lineshape_parameter,
                          compiled=tuple(compiled), molsys=molsys_data,
-                         polarization_linear_comb=polarization_linear_comb, precalculated_data=precalculated_data)
+                         polarization_linear_comb=polarization_linear_comb, precalculated_data=precalculated_data,
+                         states_choice=states_choice)
 
 
-def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo,
-                     states_choice: str) -> MolSystemData:
-                    #  vibstates_regime: str) -> MolSystemData:
+def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo) -> MolSystemData:
     """
     One MolSystemData for all terms, each property once: one wilson_data_obtainer call, one from_datadict.
-    states_choice must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'.
+    It holds every state set the source has; the evaluation chooses one (compute_features, states_choice).
     """
-    # if vibstates_regime not in ('harmonic', 'VPT2', 'GVPT2'):
-    #     raise ValueError(f'vibstates_regime must be "harmonic" or "VPT2" or "GVPT2", got {vibstates_regime}')
-    
-    if states_choice not in ('harmonic', 'anharmonic'):
-        raise ValueError(f'states_choice must be "harmonic" or "anharmonic", got {states_choice}')
-    
     request, props = {}, {}
     for term in compiled:
         request.update(build_data_request_for_term(term, data_origin))
@@ -143,9 +153,14 @@ def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOrigin
             mp = MolecularProperty.from_polprop(p)
             props.setdefault(mp.trivial_name, mp)
     datadict = wilson_data_obtainer(requested_data_dict=request)
-    
-    return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict,
-                                       states_choice=states_choice)
+
+    return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict)
+
+
+def prop_names(compiled: Sequence['CompiledTerm']) -> list[str]:
+    """Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: input of MolSystemData.load"""
+    return list(dict.fromkeys(prop_trivname(ord_geo=p.dord, ord_el=len(p.ops))
+                              for term in compiled for p in term.all_props))
 
 
 def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
@@ -215,8 +230,41 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
     """
     translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
     compiled = compile_terms(translated)
-    molsys = load_molsys_data(compiled, data_origin, states_choice)
+    molsys = load_molsys_data(compiled, data_origin)
     polarization = make_polarization_linear_comb(compiled, laser_pol)
-    return compute_features(compiled, molsys, polarization, lineshape_parameter=lineshape_parameter)
+    return compute_features(compiled, molsys, polarization, lineshape_parameter=lineshape_parameter,
+                            states_choice=states_choice)
 
- 
+PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) -> coefficient
+# origin: DataOriginInfo
+import numpy as np
+
+@dataclass(frozen=True)
+class EvalRspResult:
+    molsys_data: MolSystemData
+    polarization_linear_comb: PolarizationAveragingRecipe
+    states_choice: str  # 'harmonic' or 'anharmonic'
+    grid_axes: np.ndarray | None = None
+    grid_result: np.ndarray | None = None
+
+def evaluate_response_terms(compiled: Sequence['CompiledTerm'], # molsys: MolSystemData,
+                            origin: DataOriginInfo, states_choice: str,
+                            orient_avrg_recipe: 'PolarizationAveragingRecipe') -> EvalRspResult:
+    """
+    Load the data for all terms, each property once, and return a MolSystemData.
+    The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
+    """
+    request, props = {}, {}
+    for term in compiled:
+        request.update(build_data_request_for_term(term, origin))
+        for p in term.all_props:
+            mp = MolecularProperty.from_polprop(p)
+            props.setdefault(mp.trivial_name, mp)
+    datadict = wilson_data_obtainer(requested_data_dict=request)
+    # return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict, states_choice='harmonic')
+    molsys_data = MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict)
+    return EvalRspResult(
+        molsys_data=molsys_data,
+        polarization_linear_comb=orient_avrg_recipe,
+        states_choice=states_choice
+    )

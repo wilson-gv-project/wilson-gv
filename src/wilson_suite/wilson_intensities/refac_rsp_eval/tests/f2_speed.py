@@ -3,8 +3,8 @@ F2: runtime on a real bigger molecule (todo.txt F2). ACDM, the acetic acid dimer
 The 14 EVV terms, axes A = w1, B = -w1 + w2, laser_pol (1, 1, 1), anharmonic states (the file is a GVPT2 run).
 
 Steps:
-  1. load: only the terms' properties + frequencies + states. The reader fails on ACDM at normal_modes
-     (todo.txt F2, [outside]); the evaluator does not use normal_modes.
+  1. load: MolSystemData.load, only the terms' properties + frequencies + states. The reader fails on ACDM at
+     normal_modes (todo.txt F2, [outside]); the evaluator does not use normal_modes.
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
      (before F1 the loop, compute_for_idx_choice; since F1 calculate_avrg_tensor_einsum + AvrgTensor.at) and of
      the deepcopy (FreqTermsCollection.__post_init__).
@@ -39,6 +39,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     make_polarization_linear_comb,
+    prop_names,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import FreqTermsCollection
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
@@ -46,12 +47,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
 )
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
-    MolecularProperty,
-    MolPropsCollection,
     MolSystemData,
 )
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 DATA_FILE = 'wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out'
 STATES = 'anharmonic'
@@ -63,18 +61,9 @@ GRID = {'A': 700, 'B': 700}
 
 
 def load_acdm(compiled) -> MolSystemData:
-    """pipeline.load_molsys_data without normal_modes, atoms, equilibrium_geometry: the reader fails on ACDM there"""
+    """the terms' properties, frequencies, states; no normal_modes, atoms, geometry: the reader fails on ACDM there"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{DATA_FILE}')
-    request, props = {}, {}
-    for term in compiled:
-        request.update(term.avrg_props.build_request_dict(calc_setup=origin))
-        request.update(term.non_avrg_props.build_request_dict(calc_setup=origin))
-        for p in term.all_props:
-            mp = MolecularProperty.from_polprop(p)
-            props.setdefault(mp.trivial_name, mp)
-    request.update(dict.fromkeys(('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'), origin))
-    datadict = wilson_data_obtainer(requested_data_dict=request)
-    return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict, states_choice=STATES)
+    return MolSystemData.load(origin, prop_names(compiled))
 
 
 def timed(f, *args, **kwargs):
@@ -88,7 +77,7 @@ def profile_build_contributions(compiled, molsys, pol) -> dict:
     """build_contributions under cProfile: total, averaging, deepcopy (cumulative s, number of calls)"""
     prof = cProfile.Profile()
     prof.enable()
-    build_contributions(compiled, molsys, pol)
+    build_contributions(compiled, molsys, pol, states_choice=STATES)
     prof.disable()
     stats = pstats.Stats(prof).stats       # type: ignore # (file, line, name) -> (primitive calls, calls, own s, cumulative s, ...)
 
@@ -118,7 +107,7 @@ def main():
     print(f'ACDM: {n_modes} modes, {STATES} states, load {t_load:.1f} s')
 
     # 2. build_contributions
-    (table, zero), t_build = timed(build_contributions, compiled, molsys, pol)
+    (table, zero), t_build = timed(build_contributions, compiled, molsys, pol, states_choice=STATES)
     print(f'build_contributions: {t_build:.1f} s, {len(table)} rows, {len(zero)} zero')
 
     prof = profile_build_contributions(compiled, molsys, pol)
@@ -133,7 +122,7 @@ def main():
     window, t_window = timed(SpectralWindow.from_features, Box(dict(WINDOW)), features, DYNRANGE)
     (coords, _), t_grid = timed(window.sample_grid, GRID)
     domains, t_domains = timed(window.find_clusters_by_featboxes)
-    spec, t_draw = timed(draw_window, window, molsys.states, coords)
+    spec, t_draw = timed(draw_window, window, molsys.states[STATES], coords)
 
     n_in = len(window.full_features) + len(window.contrib_features)
     print(f'features_from_rows:          {t_feat:7.2f} s, {len(features)} features')

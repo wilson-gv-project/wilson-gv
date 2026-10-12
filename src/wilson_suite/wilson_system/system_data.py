@@ -1,5 +1,5 @@
 import copy
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -245,12 +245,17 @@ class MolSystemData:
     would be constructed outside of evaluation, and passed in to evaluation functions
 
     SHOULD HAVE DATA FILLED FOR EVALUATION (ALL ATTRIBUTES CONTAIN NUMBERS)
+
+    states: every state set the data has, by states choice, e.g. {'harmonic': ..., 'anharmonic': ...}.
+        The data holds no choice: the evaluation takes one (states_choice) and reads states[states_choice].
+        The choice must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'.
+        The two differ, e.g. in 272 of 340 formaldehyde coefficients of the 14 EVV terms.
     """
     name: str
     eigenvals: dict[int, float] | None
     eigenvecs: np.ndarray | None
     mol_props: 'MolPropsCollection'
-    states: 'VibStatesData'
+    states: dict[str, 'VibStatesData']
     natoms: int = 0
     geo: Any = None
     geo_extra: Any = None
@@ -262,39 +267,39 @@ class MolSystemData:
         """Check if all properties have values."""
         return self.mol_props.is_filled
 
+    def check_states_choice(self, states_choice: str) -> None:
+        """
+        raises ValueError if the data has no state set states_choice,
+            e.g. 'anharmonic' for data read from a file without anharmonic states, or a regime name like 'GVPT2'
+        """
+        if states_choice not in self.states:
+            raise ValueError(f'states_choice {states_choice!r}: the data has the state sets {sorted(self.states)}')
+
 
     @classmethod
     def from_datadict(cls,
                       mol_props: 'MolPropsCollection',  # to be filled with data
                       data_dict: dict,                  # data obtained from obtainer
                       *,
-                      states_choice: str,
                       name: str = 'from_data_dict'):
         """
         loading data into self.props (and optionally to self.vib_ana_setup)
 
         data_dict: dict - {data_name: values}
-        states_choice: 'harmonic' or 'anharmonic', which state energies to use. It must follow the vib analysis
-            regime (GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'). This method does not know the regime,
-            so the caller passes the choice; no default (it used to be 'harmonic', whatever the regime).
-            The two differ, e.g. in 272 of 340 formaldehyde coefficients of the 14 EVV terms.
+        states: one VibStatesData per state list in data_dict, by states choice:
+            'harmonic_states' -> states['harmonic'], 'anharmonic_states' -> states['anharmonic'].
+            A list that data_dict does not have gives no entry, e.g. {} for a data_dict without states.
+            Both sets get the modes of the harmonic fundamentals as harmonic_osc_states_labels.
         """
-        
+
         mol_props = mol_props.empty_copy()
         mol_props.fill_from(data_dict)
 
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
-        if states_choice == 'harmonic':
-            labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
-            states = VibStatesData(allstates=harm_states, harmonic_osc_states_labels=labels)
-
-        elif states_choice == 'anharmonic':
-            labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
-            states = VibStatesData(allstates=anharm_states, harmonic_osc_states_labels=labels)
-        else:
-            raise ValueError('states_choice can be harmonic or anharmonic.')
-        
-        # VibStatesData could be empty if no data
+        labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
+        states = {choice: VibStatesData(allstates=allstates, harmonic_osc_states_labels=labels)
+                  for choice, allstates in (('harmonic', harm_states), ('anharmonic', anharm_states))
+                  if allstates}
 
         geo = data_dict.get('geo', None)
         natoms = len(geo) if geo is not None else 0
@@ -309,6 +314,41 @@ class MolSystemData:
                    geo_extra=data_dict.get('geo_extra', None),
                    linear=data_dict.get('linear', False),
                    data_origin=data_dict.get('data_origin', None))
+
+    @classmethod
+    def load(cls, origin: DataOriginInfo, prop_names: Iterable[str], *,
+             obtainer: Callable[[dict], dict] | None = None,
+             name: str = 'loaded') -> 'MolSystemData':
+        """
+        Read the named properties from one source, in one obtainer call, and build a MolSystemData.
+        Also reads what every evaluation needs: the harmonic frequencies (nc_sqrt_eigval) and both state lists.
+            e.g. MolSystemData.load(origin, ['polgrad', 'dipgrad', 'cff'])
+                 -> request {'polgrad', 'dipgrad', 'cff', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'}
+        Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry, and the reader
+        fails on normal_modes for some files (ACDM, todo.txt F2).
+
+        prop_names  trivial names, e.g. pipeline.prop_names(compiled)
+        obtainer    request {name: DataOriginInfo} -> data dict; default wilson_data_obtainer.
+                    A test can pass a function that returns a dict, with no file.
+        raises ValueError if the source has no values for a requested property
+        """
+        if obtainer is None:
+            # imported here, not at the top: wilson_data_obtainer imports DataOriginInfo from this module
+            from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+            obtainer = wilson_data_obtainer
+
+        names = list(dict.fromkeys(prop_names))        # each name once, in the given order
+        request = dict.fromkeys([*names, 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'], origin)
+        data_dict = obtainer(request)
+
+        molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
+                                   data_dict, name=name)
+
+        # fill_from leaves vals None for a name the source lacks; without this check the run fails later, deep inside
+        missing = molsys.mol_props.without_values().names()
+        if missing:
+            raise ValueError(f'no values for {missing} in {origin}')
+        return molsys
 
 
 def _sys_info_request(data_origin: DataOriginInfo):

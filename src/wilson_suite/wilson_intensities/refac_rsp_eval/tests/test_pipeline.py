@@ -74,7 +74,7 @@ def two_terms_one_motif():
 ## compute_features ---------------------------------------------------------
 
 def test_compute_features_one_feature_per_location_holding_both_terms(molsys, pre_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     f00, f01 = result.features
     assert f00.location.as_dict() == pytest.approx({'A': E00 - E0, 'B': 0.})
@@ -88,23 +88,25 @@ def test_compute_features_one_feature_per_location_holding_both_terms(molsys, pr
 def test_compute_features_amplitude_adds_both_terms(molsys, pre_a1_zero):
     terms = two_terms_one_motif()
 
-    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     for f, idx in zip(result.features, ({'a': 0, 'b': 0}, {'a': 0, 'b': 1})):
-        single, _ = evaluate_term_coeff_sumover(terms[0], idx, molsys, precalculated_data=pre_a1_zero)
+        single, _ = evaluate_term_coeff_sumover(terms[0], idx, molsys, precalculated_data=pre_a1_zero,
+                                                states_choice='harmonic')
         assert single != 0.
         # 1x (term 0) + 4x (term 1) -- 0.5 and 2.0 frac_factor, so 5x single
         assert f.amplitude_coeff == pytest.approx(5 * single)
 
 
 def test_compute_features_reports_zero_pairs(molsys, pre_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
 
 
 def test_compute_features_gives_every_feature_the_lineshape_parameter(molsys, pre_a1_zero):
-    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=5.)
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=5.,
+                              states_choice='harmonic')
 
     assert len(result.features) == 2
     assert all(f.lineshape_parameter == 5. for f in result.features)
@@ -118,14 +120,14 @@ def test_feature_result_table_is_what_build_contributions_returns(molsys, pre_a1
     terms = two_terms_one_motif()
     
     # compute_features calls build_contributions, so this is a bit redundant, but it checks that the table is preserved
-    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
-    table, _ = build_contributions(terms, molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+    table, _ = build_contributions(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     assert list(result.table) == list(table)
 
 
 def test_feature_result_features_hold_every_row_of_the_table_once(molsys, pre_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(two_terms_one_motif(), molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     rows_in_features = [r for f in result.features for r in f.rows]
 
@@ -134,13 +136,13 @@ def test_feature_result_features_hold_every_row_of_the_table_once(molsys, pre_a1
 
 
 def test_feature_result_builds_features_once(molsys, pre_a1_zero):
-    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero)
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     assert result.features is result.features
 
 
 def test_feature_result_is_frozen(molsys, pre_a1_zero):
-    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero)
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.table = ContributionTable([])  # type: ignore
@@ -160,20 +162,20 @@ def leaf_value(term: CompiledTerm, contribs: dict) -> float:
 def test_feature_result_leaves_of_a_row_are_its_summed_index_sets(molsys, pre_a1_zero):
     """ab_term fixes a, b and sums c over 2 modes: 2 leaves per row, the same as evaluate_term_coeff_sumover gives"""
     terms = two_terms_one_motif()
-    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     for r in result.table:
         leaves = result.leaves(r)
 
         _, expected = evaluate_term_coeff_sumover(terms[r.term_id], r.params.to_dict(), molsys,
-                                                  precalculated_data=pre_a1_zero)
+                                                  precalculated_data=pre_a1_zero, states_choice='harmonic')
         assert set(leaves) == {ParameterSet({'a': r.params['a'], 'b': r.params['b'], 'c': c}) for c in (0, 1)}
         assert leaves == expected
 
 
 def test_feature_result_leaves_add_up_to_the_row_coefficient(molsys, pre_a1_zero):
     terms = two_terms_one_motif()
-    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     for r in result.table:
         total = sum(leaf_value(terms[r.term_id], contribs) for contribs in result.leaves(r).values())
@@ -193,7 +195,7 @@ def test_feature_result_leaves_use_the_polarization_of_the_result(molsys):
         [*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})]))
     recipe = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
 
-    result = compute_features(terms, otf_molsys, recipe)
+    result = compute_features(terms, otf_molsys, recipe, states_choice='harmonic')
 
     assert result.polarization_linear_comb is recipe
     assert len(result.table) == 2                       # a = 0, b = 0 and 1
@@ -205,7 +207,7 @@ def test_feature_result_leaves_use_the_polarization_of_the_result(molsys):
 def test_feature_result_keeps_its_inputs_without_copying(molsys, pre_a1_zero):
     terms = two_terms_one_motif()
 
-    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero)
+    result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
     assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms))
     assert result.molsys is molsys
@@ -339,12 +341,13 @@ class EvvRun:
 @pytest.fixture(scope='module', params=ref.STATES_CHOICES)
 def evv_formaldehyde(request) -> EvvRun:
     compiled = ref.compiled_evv_terms()
-    molsys = load_molsys_data(compiled, ref.data_origin('formaldehyde'), states_choice=request.param)
+    molsys = load_molsys_data(compiled, ref.data_origin('formaldehyde'))
     polarization = make_polarization_linear_comb(compiled, ref.LASER_POL)
 
     stored = next(b for b in json.loads(ref.REFERENCE_FILE.read_text())['results']
                   if (b['molecule'], b['states']) == ('formaldehyde', request.param))
-    return EvvRun(request.param, compiled, compute_features(compiled, molsys, polarization), stored)
+    return EvvRun(request.param, compiled,
+                  compute_features(compiled, molsys, polarization, states_choice=request.param), stored)
 
 
 def _ab(feature: SpectralFeature) -> tuple[int, int]:
@@ -503,7 +506,8 @@ def test_compute_features_from_terms_keeps_what_drawing_and_leaves_need(top_run)
     result = top_run.result
 
     assert len(result.compiled) == len(top_run.terms)  # type: ignore
-    assert result.molsys.states is not None  # type: ignore
+    assert result.states_choice == 'anharmonic'
+    assert result.states is result.molsys.states['anharmonic']  # type: ignore
     assert result.polarization_linear_comb is not None
 
     r = max(result.table, key=lambda r: abs(r.coeff))

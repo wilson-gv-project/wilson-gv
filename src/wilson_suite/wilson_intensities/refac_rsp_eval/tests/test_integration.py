@@ -138,7 +138,7 @@ def test_eval_molsys_data():
     assert list(datadict.keys()) != list(request.keys())
 
     # finally, putting data in -- requires empty MolPropsCollection and dict with data
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict, states_choice='harmonic')
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
     print(molsys)
 
     import numpy as np
@@ -146,7 +146,7 @@ def test_eval_molsys_data():
     assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
 
     # with empty datadict
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={}, states_choice='harmonic')
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={})
     assert molsys.eigenvals is None
     assert molsys.eigenvecs is None
     assert molsys.natoms == 0
@@ -158,8 +158,7 @@ def test_eval_molsys_data():
     assert molsys.mol_props.is_filled == False
     assert len(molsys.mol_props) == 3
 
-    assert molsys.states.harmonic_osc_states_labels == ()
-    assert molsys.states.number_of_nmodes == 0
+    assert molsys.states == {}                    # no state lists in the data dict: no state set
 
 
 def test_evaluate_term():
@@ -173,7 +172,7 @@ def test_evaluate_term():
     request.update(_sys_info_request(calc_dataorigin))
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict, states_choice='harmonic')
+    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
     
     from wilson_suite.wilson_intensities.amplitudes.averaging import (
         getGeneralPolarizationAveragingExpression,
@@ -185,7 +184,7 @@ def test_evaluate_term():
                                                  molsys_data=molsys,
                                                  avrg_func=avrg_func,
                                                  precalculated_data=None, 
-                                                 zero_tol=1e-18)
+                                                 zero_tol=1e-18, states_choice='harmonic')
     print(value)
     print(contribs)
 
@@ -201,21 +200,24 @@ def test_evaluate_term():
     assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
 
     with pytest.raises(ValueError, match='term has indices that do not have values'):
-        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func)
+        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func,
+                                 states_choice='harmonic')
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
                                                  molsys_data=molsys,
                                                  avrg_func=avrg_func,
                                                  precalculated_data=None, 
-                                                 zero_tol=1e-18)
+                                                 zero_tol=1e-18, states_choice='harmonic')
     print(value)
     print(contribs)
 
     # term 2: resonance labels a, b are fixed; summation label c runs over every mode
     total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, precalculated_data=None,
-                                                molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
+                                                molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
+                                                states_choice='harmonic')
     n_modes = len(molsys.eigenvals) # type: ignore
-    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_func=avrg_func)[0]
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_func=avrg_func,
+                                           states_choice='harmonic')[0]
                   for c in range(n_modes))
     assert by_hand != 0.
     assert total == pytest.approx(by_hand)
@@ -224,7 +226,8 @@ def test_evaluate_term():
     # b is a resonance label: summing over b would add peaks at different positions
     with pytest.raises(ValueError, match=r"resonance labels \['b'\] must be fixed"):
         evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None,
-                                    molsys_data=molsys, polarization_linear_comb=polarization_linear_comb)
+                                    molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
+                                    states_choice='harmonic')
 
 
 
@@ -245,8 +248,7 @@ def term8():
     request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
     request.update(_sys_info_request(calc_dataorigin))
     molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
-    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request),
-                                             states_choice='harmonic')
+    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request))
 
 
 def evv_props(polgrad, dipgrad) -> MolPropsCollection:
@@ -311,7 +313,7 @@ EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL-
 def evv_molsys() -> MolSystemData:
     """all properties of the 14 terms; the states do not enter the average"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    return load_molsys_data(cmpl_terms, origin, states_choice='harmonic')
+    return load_molsys_data(cmpl_terms, origin)
 
 
 def test_evv_einsum_subscripts():

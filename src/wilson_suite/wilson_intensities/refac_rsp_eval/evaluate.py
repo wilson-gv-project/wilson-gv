@@ -81,9 +81,13 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18,
                          avrg_tensor: 'AvrgTensor | None' = None,
-                         keep_leaves: bool = True) -> tuple[float, dict | None]:
+                         keep_leaves: bool = True,
+                         *,
+                         states_choice: str) -> tuple[float, dict | None]:
     """
     Coefficient of one term at one resonance location.
+    states_choice: which state set of molsys_data gives the energy differences, e.g. 'anharmonic';
+        no default (see MolSystemData.states).
 
     idx_dict must fix every resonance label (compl_term.idx_nonsumm): these labels decide where
     the peak sits. Every label left out is summed over all modes. The summed pieces all sit at
@@ -106,6 +110,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
     not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
         raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
+    molsys_data.check_states_choice(states_choice)
 
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
@@ -120,11 +125,12 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
 
     def sum_over(index_dict: dict, remaining: list, leaves: dict | None) -> float:
         if not remaining:
-            value, contribs = evaluate_full_index_dict(compl_term, index_dict, 
+            value, contribs = evaluate_full_index_dict(compl_term, index_dict,
                                                        molsys_data,
                                                        avrg_func,
                                                        precalculated_data,
-                                                       zero_tol)
+                                                       zero_tol,
+                                                       states_choice=states_choice)
             if leaves is not None:
                 leaves[ParameterSet(index_dict)] = contribs
             return value
@@ -141,9 +147,12 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                molsys_data: 'MolSystemData',
                                avrg_func: Callable | None = None,
                                precalculated_data: PrecalculatedData | None = None,
-                               zero_tol: float = 1e-18) -> tuple[float, dict]:
+                               zero_tol: float = 1e-18,
+                               *,
+                               states_choice: str) -> tuple[float, dict]:
     """
     Evaluate the term for a single index dictionary.
+    states_choice: the state set for the energy differences, molsys_data.states[states_choice]
     Parameters:
         (same as evaluate_term_coeffs)
     
@@ -177,7 +186,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     # Evaluate VIBDIFF_TERMS (split once per term, not per index set: todo.txt F3)
     extra_freqterms = compl_term.freq_pert_wf_diff
 
-    VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data)
+    VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
 
     # Evaluate VIBENE_DENOM
     freqterms = compl_term.freq_vibenedenom
@@ -567,14 +576,17 @@ def eval_vibenedenom(freqterms: 'FreqTermsCollection',
 
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
-def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData'):
+def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
+                     states_choice: str):
     """
     without precalculated data
+    energies from the state set molsys_data.states[states_choice]
     """
     product_all = 1.
+    states = molsys_data.states[states_choice]
 
     for vibdiff in freqterms:
-        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, molsys_data.states)
+        vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, states)
 
         if vib_diff_w_value.energy_difference(au=True) == 0.:
             raise ZeroDivisionError("VibDiff is zero - division by zero")
@@ -691,12 +703,13 @@ def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
 
 
 def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemData,
-                        polarization_linear_comb=None, precalculated_data=None
+                        polarization_linear_comb=None, precalculated_data=None, *, states_choice: str
                         ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]]]:
     """
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
     resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
-    The number of modes comes from molsys_data.eigenvals, the state energies from molsys_data.states.
+    The number of modes comes from molsys_data.eigenvals, the state energies from
+    molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
@@ -708,6 +721,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     if molsys_data.eigenvals is None:
         raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
     n_modes = len(molsys_data.eigenvals)
+    molsys_data.check_states_choice(states_choice)
+    states = molsys_data.states[states_choice]
 
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
     rows, zero = [], []
@@ -721,7 +736,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
             # no leaves: FeatureResult.leaves computes a row's leaves again when asked
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data,
                                                    polarization_linear_comb, precalculated_data,
-                                                   avrg_tensor=avrg_tensor, keep_leaves=False)
+                                                   avrg_tensor=avrg_tensor, keep_leaves=False,
+                                                   states_choice=states_choice)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))
@@ -730,7 +746,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
 
             # one solve per (motif, params)
             if key not in locations:
-                locations[key] = solve_LSE_motif(motif, ps, molsys_data.states, unit='cm-1')
+                locations[key] = solve_LSE_motif(motif, ps, states, unit='cm-1')
             rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
     return ContributionTable(rows), zero
 

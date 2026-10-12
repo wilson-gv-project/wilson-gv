@@ -244,21 +244,93 @@ def test_molpropscollection_fill_from_and_is_filled(props):
 
 def test_from_datadict_does_not_share_mol_props():
     template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
-    m1 = MolSystemData.from_datadict(template, {'cff': np.ones(2)}, states_choice='harmonic')
-    m2 = MolSystemData.from_datadict(template, {}, states_choice='harmonic')
+    m1 = MolSystemData.from_datadict(template, {'cff': np.ones(2)})
+    m2 = MolSystemData.from_datadict(template, {})
     assert m1.data_filled and not m2.data_filled
     assert template['cff'].vals is None
 
 
-def test_from_datadict_needs_an_explicit_states_choice():
-    """No default: the caller decides between harmonic and anharmonic states; nothing is picked silently."""
-    template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
-    with pytest.raises(TypeError, match='states_choice'):
-        MolSystemData.from_datadict(template, {})  # type: ignore[call-arg]
-    with pytest.raises(TypeError):
-        MolSystemData.from_datadict(template, {}, 'harmonic')  # type: ignore[misc]  # keyword only
-    with pytest.raises(ValueError, match='states_choice'):
-        MolSystemData.from_datadict(template, {}, states_choice='GVPT2')
+# The data holds every state set it has, by states choice; the evaluation picks one (states_choice).
+# Toy data: harmonic 0 -> E0, 0,1 -> E01; anharmonic: the same states, 10 cm-1 lower.
+STATE_LISTS = {'harmonic_states': {('0',): E0, ('0', '1'): E01},
+               'anharmonic_states': {('0',): E0 - 10., ('0', '1'): E01 - 10.}}
+
+
+def test_from_datadict_keeps_every_state_set_by_choice():
+    molsys = MolSystemData.from_datadict(MolPropsCollection([]), STATE_LISTS)
+
+    assert set(molsys.states) == {'harmonic', 'anharmonic'}
+    assert molsys.states['harmonic'].get_state_by_label('0,1').energy == E01
+    assert molsys.states['anharmonic'].get_state_by_label('0,1').energy == E01 - 10.
+
+
+def test_from_datadict_has_only_the_state_sets_of_the_data():
+    harmonic_only = MolSystemData.from_datadict(MolPropsCollection([]),
+                                                {'harmonic_states': STATE_LISTS['harmonic_states']})
+    none = MolSystemData.from_datadict(MolPropsCollection([]), {})
+
+    assert set(harmonic_only.states) == {'harmonic'}
+    assert none.states == {}
+
+
+def test_from_datadict_both_sets_get_the_harmonic_fundamentals_as_labels():
+    """harmonic_osc_states_labels: the modes with a fundamental among the harmonic states, for both sets"""
+    molsys = MolSystemData.from_datadict(MolPropsCollection([]), STATE_LISTS)
+
+    assert molsys.states['harmonic'].harmonic_osc_states_labels == (0,)
+    assert molsys.states['anharmonic'].harmonic_osc_states_labels == (0,)
+
+
+@pytest.mark.parametrize('choice', ['GVPT2', 'anharmonic'], ids=['a regime name', 'a set the data lacks'])
+def test_check_states_choice_names_the_sets_the_data_has(choice):
+    molsys = MolSystemData.from_datadict(MolPropsCollection([]), {'harmonic_states': STATE_LISTS['harmonic_states']})
+
+    molsys.check_states_choice('harmonic')
+    with pytest.raises(ValueError, match=r"the data has the state sets \['harmonic'\]"):
+        molsys.check_states_choice(choice)
+
+
+## MolSystemData.load: one obtainer call, only what the evaluation reads ------------------------
+
+ORIGIN = DataOriginInfo(source_type='gaussian', base_file_loc='toy.out')
+
+
+def fake_obtainer(data: dict, asked: list):
+    """stands in for wilson_data_obtainer: records the request, returns `data` (what the source has)"""
+    def obtainer(request: dict) -> dict:
+        asked.append(request)
+        return data
+    return obtainer
+
+
+def test_load_requests_the_properties_frequencies_and_both_state_lists_only():
+    asked = []
+    data = {'cff': np.ones((2, 2, 2)), 'dipgrad': np.ones((2, 3)), 'nc_sqrt_eigval': {0: 1100., 1: 1580.},
+            **STATE_LISTS}
+
+    MolSystemData.load(ORIGIN, ['cff', 'dipgrad', 'cff'], obtainer=fake_obtainer(data, asked))
+
+    (request,) = asked
+    assert list(request) == ['cff', 'dipgrad', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states']
+    assert all(origin is ORIGIN for origin in request.values())
+
+
+def test_load_fills_properties_frequencies_and_state_sets():
+    cff = np.arange(8.).reshape(2, 2, 2)
+    data = {'cff': cff, 'nc_sqrt_eigval': {0: 1100., 1: 1580.}, **STATE_LISTS}
+
+    molsys = MolSystemData.load(ORIGIN, ['cff'], obtainer=fake_obtainer(data, []))
+
+    assert molsys.mol_props['cff'].vals is cff
+    assert molsys.eigenvals == {0: 1100., 1: 1580.}
+    assert set(molsys.states) == {'harmonic', 'anharmonic'}
+
+
+def test_load_raises_for_a_property_the_source_lacks():
+    data = {'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1100., 1: 1580.}}
+
+    with pytest.raises(ValueError, match=r"no values for \['polgrad'\]"):
+        MolSystemData.load(ORIGIN, ['cff', 'polgrad'], obtainer=fake_obtainer(data, []))
 
 
 ## Data request -------------------------------------------------------------

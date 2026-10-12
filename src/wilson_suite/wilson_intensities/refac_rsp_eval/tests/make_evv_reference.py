@@ -62,9 +62,9 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
-    molsys = load_molsys_data(compiled, data_origin(molecule), states_choice)
+    molsys = load_molsys_data(compiled, data_origin(molecule))
     pol = make_polarization_linear_comb(compiled, LASER_POL)
-    table, zero = build_contributions(compiled, molsys, pol)
+    table, zero = build_contributions(compiled, molsys, pol, states_choice=states_choice)
     rows = list(table)
     return {
         'molecule': molecule,

@@ -126,16 +126,16 @@ def run_old(case: Case):
 
 
 def run_new(case: Case, laser_pol):
-    """new pipeline, the steps of compute_features_from_terms, keeping molsys for drawing"""
+    """new pipeline, the steps of compute_features_from_terms: (the chosen state set for drawing, the result)"""
     translated = term_var_translate.translate_terms_to_axis_variables(VibPerturbedTerm.load_many_from_json(c2.TERMS),
                                                                       make_SpectralAxisSet(AXES))
     compiled = compile_terms(translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=c2.MOLECULES['formaldehyde'][0])
     with mock.patch.object(pipeline, 'wilson_data_obtainer', case.obtainer):
-        molsys = pipeline.load_molsys_data(compiled, origin, case.new_states)
+        molsys = pipeline.load_molsys_data(compiled, origin)
     result = pipeline.compute_features(compiled, molsys, pipeline.make_polarization_linear_comb(compiled, laser_pol),
-                                       lineshape_parameter=GAMMA_CM)
-    return molsys, result
+                                       lineshape_parameter=GAMMA_CM, states_choice=case.new_states)
+    return result.states, result
 
 
 def loc_key(coord_dict: dict) -> tuple:
@@ -164,10 +164,10 @@ def intensity_rel(a: np.ndarray, b: np.ndarray) -> float:
 
 def compare(case: Case) -> dict:
     sim, wf = run_old(case)
-    molsys, result = run_new(case, sim.exp.polarization_avg_vector)
+    states, result = run_new(case, sim.exp.polarization_avg_vector)
     new_feats = result.features
     out = {'old_E3_E5': [s.energy for s in sim.vib_ana_setup.states if s.state_label in ('3', '5')],
-           'new_E3_E5': [molsys.states.get_energy_by_label(lbl) for lbl in ('3', '5')]}
+           'new_E3_E5': [states.get_energy_by_label(lbl) for lbl in ('3', '5')]}
 
     # window around every feature, grid from the old sample_grid
     bounds = {}
@@ -203,11 +203,11 @@ def compare(case: Case) -> dict:
     ratio_dev = 0.
     for k in common:
         old_grid = evaluate_feature(old_by_loc[k], qc.vibstates_data, qc.vibdiff_cache, gamma_au, mesh_au)
-        new_grid = eval_feature_on_grid(new_by_loc[k], molsys.states, mesh_cm)
+        new_grid = eval_feature_on_grid(new_by_loc[k], states, mesh_cm)
         ratio_dev = max(ratio_dev, rel(old_grid, n_of[k] * new_grid))
         old_all += old_grid
         old_fixed += old_grid / n_of[k]
-    new_all = draw_all(new_feats, molsys.states, coords)
+    new_all = draw_all(new_feats, states, coords)
     out.update(per_feature_old_vs_n_new=ratio_dev,
                nocut_old_vs_new_amp=rel(old_all, new_all),
                nocut_old_vs_new_intensity=intensity_rel(old_all, new_all),
@@ -215,7 +215,7 @@ def compare(case: Case) -> dict:
 
     # 4. cut by domains. Both keep every feature near the window, however weak (old: minimum_box_padding > 0)
     window = SpectralWindow.from_features(Box(dict(bounds)), new_feats, DYNRANGE, MARGIN)
-    new_cut = draw_window(window, molsys.states, coords)
+    new_cut = draw_window(window, states, coords)
     old_cut = old_spec.result
     out.update(window_feats_old_new=(sum(len(r.features) for r in wf.region_eval.regions),
                                      len(window.full_features) + len(window.contrib_features)),

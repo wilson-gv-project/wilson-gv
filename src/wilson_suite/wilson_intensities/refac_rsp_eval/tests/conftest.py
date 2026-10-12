@@ -30,7 +30,8 @@ def states() -> VibStatesData:
 @pytest.fixture
 def molsys(states) -> MolSystemData:
     props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=CFF, extra_data={})])
-    return MolSystemData(name='toy', eigenvals={0: E0_eigval, 1: E1_eigval}, eigenvecs=None, mol_props=props, states=states)
+    return MolSystemData(name='toy', eigenvals={0: E0_eigval, 1: E1_eigval}, eigenvecs=None, mol_props=props,
+                         states={'harmonic': states})
 
 
 @pytest.fixture

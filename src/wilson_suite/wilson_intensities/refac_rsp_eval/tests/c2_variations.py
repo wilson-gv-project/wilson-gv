@@ -146,10 +146,9 @@ def run_new(v: Variation, laser_pol):
             props.setdefault(mp.trivial_name, mp)
     request.update(_sys_info_request(origin))
     molsys = MolSystemData.from_datadict(mol_props=MolPropsCollection(properties=list(props.values())),
-                                         data_dict=wilson_data_obtainer(requested_data_dict=request),
-                                         states_choice=v.new_states)
+                                         data_dict=wilson_data_obtainer(requested_data_dict=request))
     iso = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=tuple(laser_pol))
-    table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso)
+    table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso, states_choice=v.new_states)
     return compiled, molsys, table, zero
 
 
@@ -189,7 +188,8 @@ def compare(v: Variation) -> dict:
             o = None if loc is None else dict(loc._coord_dict)
             for idxs in idxs_list:
                 try:
-                    n = solve_LSE_motif(new_t.cmp_resmotf, ParameterSet(dict(key(idxs))), molsys.states, unit='cm-1').as_dict()
+                    n = solve_LSE_motif(new_t.cmp_resmotf, ParameterSet(dict(key(idxs))), molsys.states[v.new_states],
+                                        unit='cm-1').as_dict()
                 except np.linalg.LinAlgError:
                     n = None
                 if o is None:

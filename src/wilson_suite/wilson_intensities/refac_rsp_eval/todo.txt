@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-12
 
 Tests  refac_rsp_eval: 571 pass, 2 xfail (B6, on purpose).
-       Rest of src: 9 fail, 294 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
+       Rest of src: 9 fail, 301 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -58,8 +58,12 @@ Decisions and known limits
   uses the chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); to_str prints
   both alike, e.g. <['a'],[]>.
 - states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic -> harmonic. The two
-  differ in 272 of 340 formaldehyde coefficients. from_datadict cannot know the regime, so it has no default
-  (2026-10-11): the caller passes the choice.
+  differ in 272 of 340 formaldehyde coefficients. The data cannot know the regime, so nothing has a default.
+  Since 2026-10-12 the data holds no choice: MolSystemData.states holds every state set the source has, by
+  choice (states['harmonic'], states['anharmonic']); the evaluation takes states_choice (compute_features,
+  build_contributions, evaluate_term_coeff_sumover, evaluate_full_index_dict, otf_vibdiffdenom) and reads
+  states[states_choice]. One loaded MolSystemData serves both choices. A choice the data lacks raises
+  (MolSystemData.check_states_choice), e.g. 'GVPT2' or 'anharmonic' without anharmonic states.
 - No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak features stay, and so do
   features whose rows cancel (a record: FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0
   never becomes a row (FeatureResult.zero).
@@ -124,7 +128,8 @@ D. Data model
         To do: write the list below into the README; add the load checks named in it.
         Delivering a dict that fits is the reader's job [outside] (see "Outside the refactor").
         - names: properties as dipgrad, polgrad, polhess, diphess, cff, ...; frequencies as 'nc_sqrt_eigval';
-          states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there.
+          states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there
+          (properties: in MolSystemData.load since 2026-10-12; frequencies, states: not yet).
         - layout: mode indices first, then x, y, z, e.g. polhess[a, b, x, y]. Modes are 0 .. n-1, with
           n = number of frequencies. Load check: shapes, e.g. polhess is (n, n, 3, 3).
         - full tensors: every index order is filled, e.g. cff[a, c, c] and cff[c, a, c]. Load check: each
@@ -159,7 +164,7 @@ E. Pipeline
         - [ ] data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
         - [ ] the magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
               SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
-        - [x] return the states: FeatureResult.molsys.states (2026-10-12, with the leaves on demand, see Done)
+        - [x] return the states: FeatureResult.states (2026-10-12, with the leaves on demand, see Done)
         - [ ] the default dynrange, matched to the plot's dynamic range (log scale is the renderer's default;
               see the cut in Decisions)
         - [ ] nothing that assumes point features only (E8)
@@ -235,8 +240,8 @@ F. Performance
             wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out
         (ACAC is acetic acid, 18 modes: too small.)
         Reader (checked 2026-10-12) [outside]: load_molsys_data fails on ACDM and ACAC at normal_modes ("cannot
-        reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. Workaround: request only the
-        terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states; then MolSystemData.from_datadict.
+        reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. MolSystemData.load requests only
+        the terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states (f2_speed.py uses it).
         ACDM loads so in 4 s.
         Script: tests/f2_speed.py. The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states
         'anharmonic'. Drawing as in examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700
@@ -373,7 +378,15 @@ B7   One resonance point per term, checked when compiling (see Decisions). The `
      evaluate_term_coeff_sumover): ACDM build_contributions 3.9 s -> 3.3 s.
      Tests (test_pipeline.py, test_evaluate.py): the leaves add up to row.coeff (toy molecule, precalculated and
      on the fly; all 340 formaldehyde rows, both state choices); build_contributions asks for no leaves.
-     FeatureResult.molsys.states is also the states that draw_window needs (E6).
+     FeatureResult.states (molsys.states[states_choice]) is also the state set that draw_window needs (E6).
+-    States by choice, and MolSystemData.load (2026-10-12). MolSystemData.states holds every state set the source
+     has, by choice; the evaluation takes states_choice (see Decisions). MolSystemData.load(origin, prop_names)
+     reads the named properties, the frequencies and both state lists in one obtainer call (the obtainer can be
+     passed in) and raises for a property the source lacks; pipeline.prop_names(compiled) lists what the terms
+     need. load_molsys_data still requests normal_modes, atoms and the geometry too.
+     Tests (test_system_data.py): the state sets by choice, only the sets the data has, check_states_choice,
+     load's request, filling and missing-property error. Same numbers: evv_reference.json, both choices;
+     ACDM 17101 rows, 7595 zero, as before.
 
 Checked: the numbers are right
 C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).
@@ -396,7 +409,8 @@ A0-A4, A6-A13  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples,
      different places into one number); VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
 B1   One DataOriginInfo class (system_data.py); the old pipeline runs again.
 B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
--    from_datadict has no default states_choice (2026-10-11); the caller passes it (see Decisions).
+-    from_datadict has no default states_choice (2026-10-11); since 2026-10-12 the evaluation takes the choice
+     (see Decisions).
 -    ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
 
 Dropped

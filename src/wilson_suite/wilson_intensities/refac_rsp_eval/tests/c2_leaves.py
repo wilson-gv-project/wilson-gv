@@ -52,7 +52,7 @@ def compare_leaves(v: c2.Variation) -> dict:
         for fixed, (_, dict_of_sum) in bound.coefficients[old_t].items():
             old = old_leaves(dict_of_sum)
             _, new_raw = evaluate_term_coeff_sumover(new_t, dict(c2.key(fixed)), molsys,
-                                                     polarization_linear_comb=iso)
+                                                     polarization_linear_comb=iso, states_choice=v.new_states)
             new = {c2.key(k): f for k, f in new_raw.items()}
 
             out['leaves'] += len(old)
