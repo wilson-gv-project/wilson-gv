@@ -47,12 +47,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 )
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
-    MolecularProperty,
-    MolPropsCollection,
     MolSystemData,
-    build_data_request_for_term,
 )
-from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 if TYPE_CHECKING:
@@ -143,24 +139,16 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
 
 def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo) -> MolSystemData:
     """
-    One MolSystemData for all terms, each property once: one wilson_data_obtainer call, one from_datadict.
+    One MolSystemData for all terms, each property once: MolSystemData.load with the terms' prop_names.
     It holds every state set the source has; the evaluation chooses one (compute_features, states_choice).
+    The obtainer is this module's wilson_data_obtainer, so a test can replace it here (c3_spectrum.py does).
     """
-    request, props = {}, {}
-    for term in compiled:
-        request.update(build_data_request_for_term(term, data_origin))
-        for p in term.all_props:
-            mp = MolecularProperty.from_polprop(p)
-            props.setdefault(mp.trivial_name, mp)
-    datadict = wilson_data_obtainer(requested_data_dict=request)
-
-    return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict)
+    return MolSystemData.load(data_origin, prop_names(compiled), obtainer=wilson_data_obtainer)
 
 
 def prop_names(compiled: Sequence['CompiledTerm']) -> list[str]:
     """Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: input of MolSystemData.load"""
-    return list(dict.fromkeys(prop_trivname(ord_geo=p.dord, ord_el=len(p.ops))
-                              for term in compiled for p in term.all_props))
+    return list(dict.fromkeys(name for term in compiled for name in term.prop_names))
 
 
 def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
@@ -247,22 +235,16 @@ class EvalRspResult:
     grid_axes: np.ndarray | None = None
     grid_result: np.ndarray | None = None
 
-def evaluate_response_terms(compiled: Sequence['CompiledTerm'], # molsys: MolSystemData,
-                            origin: DataOriginInfo, states_choice: str,
+def evaluate_response_terms(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
+                            # origin: DataOriginInfo, 
+                            states_choice: str,
                             orient_avrg_recipe: 'PolarizationAveragingRecipe') -> EvalRspResult:
     """
     Load the data for all terms, each property once, and return a MolSystemData.
     The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
     """
-    request, props = {}, {}
-    for term in compiled:
-        request.update(build_data_request_for_term(term, origin))
-        for p in term.all_props:
-            mp = MolecularProperty.from_polprop(p)
-            props.setdefault(mp.trivial_name, mp)
-    datadict = wilson_data_obtainer(requested_data_dict=request)
-    # return MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict, states_choice='harmonic')
-    molsys_data = MolSystemData.from_datadict(MolPropsCollection(list(props.values())), datadict)
+    # molsys_data = load_molsys_data(compiled, origin)
+    
     return EvalRspResult(
         molsys_data=molsys_data,
         polarization_linear_comb=orient_avrg_recipe,

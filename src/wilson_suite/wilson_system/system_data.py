@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import (
-        PolProp,
         VibDiffTerm,  # here and term_parts and vibene_differences
     )
-    from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
+
+# What every evaluation reads besides the properties: MolSystemData.load requests these from every source.
+EVALUATION_DATA_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states')
 
 
 @dataclass(frozen=True)
@@ -338,7 +338,7 @@ class MolSystemData:
             obtainer = wilson_data_obtainer
 
         names = list(dict.fromkeys(prop_names))        # each name once, in the given order
-        request = dict.fromkeys([*names, 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'], origin)
+        request = dict.fromkeys([*names, *EVALUATION_DATA_KEYS], origin)
         data_dict = obtainer(request)
 
         molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
@@ -350,17 +350,6 @@ class MolSystemData:
             raise ValueError(f'no values for {missing} in {origin}')
         return molsys
 
-
-def _sys_info_request(data_origin: DataOriginInfo):
-    keys = ['anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'normal_modes',
-            'atoms', 'equilibrium_geometry']
-    return dict.fromkeys(keys, data_origin)
-
-def build_data_request_for_term(term: 'CompiledTerm', data_origin: DataOriginInfo) -> dict:
-    request = term.avrg_props.build_request_dict(calc_setup=data_origin)
-    request.update(term.non_avrg_props.build_request_dict(calc_setup=data_origin))
-    request.update(_sys_info_request(data_origin))
-    return request
 
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
     """
@@ -405,30 +394,6 @@ class MolecularProperty:
             "trivial_name": self.trivial_name,
             "extra_data": self.extra_data,
         }
-
-    @classmethod
-    def from_polprop(cls, polprop: 'PolProp', 
-                     freqs: str = 'static') -> 'MolecularProperty':
-        """
-        Construct MolecularProperty from a PolProp instance.
-        """
-        ops = []
-
-        ord_geo = polprop.dord
-        for _ in range(ord_geo):
-            ops.append('g')
-
-        ord_el = len(polprop.ops)
-        for _ in range(ord_el):
-            ops.append('f')
-
-        if freqs == 'static':
-            pdict = {'ops': tuple(ops), 'freq': tuple([0.0 * k for k in range(len(ops))])}
-        else:
-            raise AssertionError('Managing electronic properties for non-static frequencies not yet implemented')
-
-        return cls(trivial_name=prop_trivname(ord_geo=ord_geo, ord_el=ord_el),
-                   extra_data=pdict)
 
 
 @dataclass

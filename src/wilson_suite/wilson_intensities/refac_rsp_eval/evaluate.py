@@ -30,7 +30,6 @@ from wilson_suite.wilson_system.system_data import (
     MolSystemData,
     VibDiff,
 )
-from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
@@ -61,12 +60,13 @@ class PrecalculatedData:
     polarization_vec: tuple = ()
 
 """
-The data then passes through these steps:
+The data then passes through these steps; the property name (PropsCollection.names) is the key all the way:
 
-1. build the request      "please fetch 'polgrad' from CFOUR"          plan.py:158
+1. build the request      "please fetch 'polgrad' from CFOUR"      MolSystemData.load, names from CompiledTerm.prop_names
 2. obtainer returns       data_dict = {'polgrad': array, ...}
-3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot   (slot name from from_polprop, evaluate.py:423)
-4. evaluate               read mol_props['polgrad'].vals[mode, i, j]   evaluate.py:725 (averaged)                                                                       evaluate.py:618 (non-averaged)
+3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot      MolSystemData.from_datadict
+4. evaluate               read mol_props['polgrad'].vals[mode, i, j]    calculate_avrg_tensor_einsum (averaged),
+                                                                        eval_non_avrg_per_indexdict (non-averaged)
 """
 
 ## ----------------------------------------------------
@@ -221,15 +221,14 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     """
     product_all = 1.
     
-    for non_avrg_prop in non_avrg_expr:
+    # names: made once per collection (PropsCollection.names), not once per index set
+    for non_avrg_prop, triv_name in zip(non_avrg_expr, non_avrg_expr.names):
         # accessing values for non-averaged properties from data
         if non_avrg_prop.inds is None or len(non_avrg_prop.inds) == 0:
             # If there are no indices, we assume it's a scalar property
             na_prop_inds = ()
         else:
             na_prop_inds = tuple([index_dict[i] for i in non_avrg_prop.inds])
-        
-        triv_name = prop_trivname(ord_el=len(non_avrg_prop.ops), ord_geo=non_avrg_prop.dord)
 
         prop: MolecularProperty = molsys_data.mol_props[triv_name]
         NON_AVRG = prop.vals[na_prop_inds]
@@ -302,6 +301,7 @@ def _make_func_to_compute_avrg(*,
     The pipeline uses calculate_avrg_tensor_einsum (every index set at once). This loop stays as its
     reference in the tests, and calculate_avrg_tensor uses it.
     """
+    props_and_names = tuple(zip(avrg_expression, avrg_expression.names))     # names once, not per call
 
     def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
         """
@@ -321,8 +321,6 @@ def _make_func_to_compute_avrg(*,
                 f"index_choices is missing required mode indices: {missing}"
             )
 
-        from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-
         total = 0.
 
         for cart_axes in polarization_linear_comb:
@@ -332,9 +330,7 @@ def _make_func_to_compute_avrg(*,
 
             product = 1.
 
-            for prop in avrg_expression:
-
-                prop_tuple_key = prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)
+            for prop, prop_tuple_key in props_and_names:
 
                 nm_inds = tuple([index_choices[i] for i in prop.inds]) # type: ignore
                 cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
@@ -456,7 +452,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
         1. subscripts from the expression (make_avrg_einsum_subscripts), e.g. term 8: 'bIL,aJ,cK,IJKL->abc'
         2. W: the recipe {(i_0, i_1, ...): coefficient} as a dense 3 x 3 x ... array, one axis per slot;
            0 where the recipe has no entry
-        3. one operand per property: its data array, found as the loop finds it (prop_trivname)
+        3. one operand per property: its data array, found by its name, as the loop finds it (PropsCollection.names)
         4. np.einsum: one axis per distinct mode label, alphabetical
     Size: n_modes ** (number of distinct labels), e.g. 42 modes, 3 labels: 74088 values, 0.6 MB.
 
@@ -484,13 +480,12 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
         W[key] = coeff
 
     # 3. One data array per property, in the order of the expression: the order of the operands in the string.
-    #    The name comes from the property's orders, as in the loop (prop_trivname):
+    #    The name comes from the property's orders (PropsCollection.names, as in the loop):
     #        1 Cartesian axis, 1 mode -> 'dipgrad' (n, 3)        2 Cartesian axes, 1 mode -> 'polgrad' (n, 3, 3)
     #        1 Cartesian axis, 2 modes -> 'diphess' (n, n, 3)    2 Cartesian axes, 2 modes -> 'polhess' (n, n, 3, 3)
     #    n = the number of modes. Mode axes first, then x, y, z: the layout the string assumes.
     #    term 8: [polgrad, dipgrad, dipgrad]. The same dipgrad array comes twice: once read at a, once at c.
-    operands = [np.asarray(props_data[prop_trivname(ord_el=len(prop.ops), ord_geo=prop.dord)].vals)
-                for prop in avrg_expression]
+    operands = [np.asarray(props_data[name].vals) for name in avrg_expression.names]
 
     # The output axes: the letters after '->', e.g. 'abc' -> ('a', 'b', 'c').
     # Read from the string, so the labels are the axis order that einsum really uses.

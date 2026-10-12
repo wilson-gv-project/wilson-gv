@@ -104,6 +104,16 @@ class PropsCollection:
         """
         return PropsCollection(props=[p for p in self.props if not p.ops])
     
+    @cached_property
+    def names(self) -> tuple[str, ...]:
+        """
+        The trivial name of each property, in order, one per property (a name twice if the property is there twice),
+            e.g. term 8's averaged part polgrad[b] * dipgrad[a] * dipgrad[c] -> ('polgrad', 'dipgrad', 'dipgrad')
+        The name picks the data array the property reads: geometric derivative order (dord) and number of field
+        operators (ops). Made once per collection: the evaluation reads the names for every index set.
+        """
+        return tuple(prop_trivname(ord_geo=p.dord, ord_el=len(p.ops)) for p in self.props)
+
     def get_cart_axes(self):
         return tuple(op.o for p in self.props for op in p.ops)
     def get_mode_indices(self):
@@ -136,14 +146,15 @@ class PropsCollection:
             return averaged
 
     """
-    Mutation after key insertion. sort() mutates self.props, returns self, and reassigns a list into a field __post_init__ had normalized to a tuple. A collection used as a key can be mutated after insertion. Frozen, with sorted() returning a new instance.
+    Left from a review: PropsCollection is not frozen, and it is used as a dict key (todo.txt D1).
+    sort() returns a new instance since 2026-10-12, so it no longer changes a collection after use (or its names).
     """
-    def sort(self):
+    def sort(self) -> 'PropsCollection':
         """
-        non-averaged props will be in the end of the tuple
+        A new collection, sorted by the Cartesian slot of each property's first operator;
+        non-averaged props will be in the end of the tuple. This collection stays as it is.
         """
-        self.props = sorted(self.props, key=lambda j: j.ops[0].o if j.ops else float('inf'))
-        return self
+        return PropsCollection(sorted(self.props, key=lambda j: j.ops[0].o if j.ops else float('inf')))
 
     def __repr__(self):
         inds_all = [len(p.inds) if p.inds else 0 for p in self.props]
@@ -154,12 +165,7 @@ class PropsCollection:
 
     def build_request_dict(self, calc_setup: 'DataOriginInfo') -> dict[str, 'DataOriginInfo']:
         """Build a {name: DataOriginInfo} shopping list."""
-
-        result: dict[str, DataOriginInfo] = {}
-        for p in self.props:
-            trivial_name = prop_trivname(ord_geo=p.dord, ord_el=len(p.ops))
-            result[trivial_name] = calc_setup
-        return result
+        return dict.fromkeys(self.names, calc_setup)
 
 
     # def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
@@ -554,10 +560,18 @@ class CompiledTerm:
 
         return cls(avrg_props, non_avrg_props, res_conds, freq_denom, frac_factor, tuple(idx__summ), tuple(idx_nonsumm)) # type: ignore
 
-    @property
+    @cached_property
     def all_props(self) -> PropsCollection:
-        """avrg + non-avrg props together, e.g. for building the data request"""
+        """
+        avrg + non-avrg props together, e.g. for building the data request.
+        Made once per term: a new PropsCollection deepcopies its props.
+        """
         return PropsCollection([*self.avrg_props, *self.non_avrg_props])
+
+    @cached_property
+    def prop_names(self) -> tuple[str, ...]:
+        """the trivial names of the term's properties, each once, e.g. term 8: ('polgrad', 'dipgrad', 'cff')"""
+        return tuple(dict.fromkeys(self.all_props.names))
 
     # The two kinds of denominator, split once per term and kept (todo.txt F3).
     # evaluate_full_index_dict reads them for every index set; splitting there made a new FreqTermsCollection,

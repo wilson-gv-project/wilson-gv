@@ -30,7 +30,6 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolPropsCollection,
     MolSystemData,
-    _sys_info_request,
 )
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
@@ -114,8 +113,8 @@ def test_eval_molsys_data():
     """
     term0_el = cmpl_terms[0]
 
-    # property collection from term0_el
-    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term0_el.all_props])
+    # property collection from term0_el: one empty property per name (dipgrad appears twice in the term, once here)
+    molprops = MolPropsCollection(properties=[MolecularProperty(trivial_name=n) for n in term0_el.prop_names])
 
     
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
@@ -123,8 +122,10 @@ def test_eval_molsys_data():
     # request dict is built from PropsCollection
     request = term0_el.all_props.build_request_dict(calc_setup=calc_dataorigin)
 
-    # base info about system, including vib states
-    request.update(_sys_info_request(calc_dataorigin))
+    # base info about system, including vib states, normal modes and geometry (MolSystemData.load asks only for
+    # the frequencies and the states: the evaluator reads no more)
+    request.update(dict.fromkeys(['anharmonic_states', 'harmonic_states', 'nc_sqrt_eigval', 'normal_modes',
+                                  'atoms', 'equilibrium_geometry'], calc_dataorigin))
     # obtainer is using DataOriginInfo to parse sources with CQCParse
     datadict = wilson_data_obtainer(requested_data_dict=request)
 
@@ -156,7 +157,7 @@ def test_eval_molsys_data():
     assert molsys.data_filled == False
 
     assert molsys.mol_props.is_filled == False
-    assert len(molsys.mol_props) == 3
+    assert len(molsys.mol_props) == 2                 # polhess, dipgrad
 
     assert molsys.states == {}                    # no state lists in the data dict: no state set
 
@@ -165,14 +166,9 @@ def test_evaluate_term():
     print()
 
     term = cmpl_terms[2]
-    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
-    request.update(_sys_info_request(calc_dataorigin))
-    datadict = wilson_data_obtainer(requested_data_dict=request)
-
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict=datadict)
+    molsys = MolSystemData.load(calc_dataorigin, term.prop_names)
     
     from wilson_suite.wilson_intensities.amplitudes.averaging import (
         getGeneralPolarizationAveragingExpression,
@@ -192,9 +188,9 @@ def test_evaluate_term():
 
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     
-    w = {m: convNu2Ene(e) for m, e in datadict['nc_sqrt_eigval'].items()}      # harmonic omega, Eh
+    w = {m: convNu2Ene(e) for m, e in molsys.eigenvals.items()}  # type: ignore   # harmonic omega, Eh
 
-    assert contribs['NON_AVRG'] == datadict['cff'][0, 1, 1]                      # cff[a, c, c]
+    assert contribs['NON_AVRG'] == molsys.mol_props['cff'].vals[0, 1, 1]        # cff[a, c, c]
     assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[0])                  # E_a - E_0
     assert contribs['VIBENE_DENOM'] == pytest.approx(1 / (w[0] * w[1] * w[1]))   # 1/(w_a w_b w_c)
     assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
@@ -245,10 +241,7 @@ def term8():
     term = cmpl_terms[8]
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    request = term.all_props.build_request_dict(calc_setup=calc_dataorigin)
-    request.update(_sys_info_request(calc_dataorigin))
-    molprops = MolPropsCollection(properties=[MolecularProperty.from_polprop(i) for i in term.all_props])
-    return term, MolSystemData.from_datadict(mol_props=molprops, data_dict=wilson_data_obtainer(requested_data_dict=request))
+    return term, MolSystemData.load(calc_dataorigin, term.prop_names)
 
 
 def evv_props(polgrad, dipgrad) -> MolPropsCollection:

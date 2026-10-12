@@ -17,6 +17,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 import pytest
 
+import wilson_suite.wilson_intensities.refac_rsp_eval.pipeline as pipeline_mod
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
@@ -35,6 +36,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     compute_features_from_terms,
     load_molsys_data,
     make_polarization_linear_comb,
+    prop_names,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -259,6 +261,26 @@ def test_feature_result_cancelling_leaves_out_zero_pairs():
 def test_feature_result_cancelling_needs_rel_tol_from_0_to_below_1(rel_tol):
     with pytest.raises(ValueError, match='rel_tol'):
         FeatureResult(ContributionTable([]), zero=[]).cancelling(rel_tol)
+
+
+## prop_names: what MolSystemData.load reads ---------------------------------------
+
+def test_prop_names_every_property_of_the_terms_each_once():
+    """toy_term: <polgrad>[a], cff[a, b, c]; a second term with dipgrad[a] and cff again"""
+    with_dipgrad = replace(toy_term(), avrg_props=PropsCollection([polprop(ops=(0,), inds='a')]))
+
+    assert prop_names([toy_term(), with_dipgrad, toy_term()]) == ['polgrad', 'cff', 'dipgrad']
+
+
+def test_load_molsys_data_props_are_the_prop_names(monkeypatch):
+    """one property per name, no matter how many terms use it; filled from the data dict"""
+    data = {'polgrad': np.ones((2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1., 1: 2.}}
+    monkeypatch.setattr(pipeline_mod, 'wilson_data_obtainer', lambda requested_data_dict: data)
+
+    molsys = load_molsys_data([toy_term(), toy_term()], data_origin=None)  # type: ignore
+
+    assert molsys.mol_props.names() == ['polgrad', 'cff']
+    assert molsys.data_filled
 
 
 ## polarization recipe: averaging_rank, make_polarization_linear_comb ----------

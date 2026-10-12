@@ -32,14 +32,9 @@ from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow as OldWindow
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif as OldMotif
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions, solve_LSE_motif
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ParameterSet, compile_terms
-from wilson_suite.wilson_system.system_data import (
-    DataOriginInfo,
-    MolecularProperty,
-    MolPropsCollection,
-    MolSystemData,
-    _sys_info_request,
-)
+from wilson_suite.wilson_system.system_data import DataOriginInfo
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
@@ -138,15 +133,7 @@ def run_new(v: Variation, laser_pol):
                                                                       make_SpectralAxisSet(v.axes))
     compiled = compile_terms(terms=translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=path)
-    request, props = {}, {}
-    for t in compiled:
-        request.update(t.all_props.build_request_dict(calc_setup=origin))
-        for p in t.all_props:
-            mp = MolecularProperty.from_polprop(p)
-            props.setdefault(mp.trivial_name, mp)
-    request.update(_sys_info_request(origin))
-    molsys = MolSystemData.from_datadict(mol_props=MolPropsCollection(properties=list(props.values())),
-                                         data_dict=wilson_data_obtainer(requested_data_dict=request))
+    molsys = load_molsys_data(compiled, origin)
     iso = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=tuple(laser_pol))
     table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso, states_choice=v.new_states)
     return compiled, molsys, table, zero

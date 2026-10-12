@@ -1,8 +1,8 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 571 pass, 2 xfail (B6, on purpose).
-       Rest of src: 9 fail, 301 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
+Tests  refac_rsp_eval: 584 pass, 2 xfail (B6, on purpose).
+       Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -121,8 +121,9 @@ D. Data model
         D1-D3 block nothing: rows store term_id and motif, not the CompiledTerm.
 [ ] D4  VibState, MolecularProperty and MolPropsCollection exist twice: wilson_main/abstractions.py and
         wilson_system/system_data.py. Decide who owns them; the other side imports. (DataOriginInfo is one
-        class since B1.) Keep the imports free of cycles: plan.py and system_data.py import each other only for
-        type hints (if TYPE_CHECKING); evaluate.py and pipeline.py import system_data for real.
+        class since B1.) Keep the imports free of cycles: plan.py imports system_data only for type hints
+        (if TYPE_CHECKING), system_data.py does not import plan.py (since 2026-10-12); evaluate.py and pipeline.py
+        import system_data for real.
 [ ] D5  Data-dict contract: what the evaluator expects in the data dict.
         Old and new code read the same dict, so comparing them cannot find a wrong dict.
         To do: write the list below into the README; add the load checks named in it.
@@ -241,7 +242,8 @@ F. Performance
         (ACAC is acetic acid, 18 modes: too small.)
         Reader (checked 2026-10-12) [outside]: load_molsys_data fails on ACDM and ACAC at normal_modes ("cannot
         reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. MolSystemData.load requests only
-        the terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states (f2_speed.py uses it).
+        the terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states. Since 2026-10-12
+        load_molsys_data, and so compute_features_from_terms, goes through it: ACDM runs end to end.
         ACDM loads so in 4 s.
         Script: tests/f2_speed.py. The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states
         'anharmonic'. Drawing as in examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700
@@ -383,7 +385,7 @@ B7   One resonance point per term, checked when compiling (see Decisions). The `
      has, by choice; the evaluation takes states_choice (see Decisions). MolSystemData.load(origin, prop_names)
      reads the named properties, the frequencies and both state lists in one obtainer call (the obtainer can be
      passed in) and raises for a property the source lacks; pipeline.prop_names(compiled) lists what the terms
-     need. load_molsys_data still requests normal_modes, atoms and the geometry too.
+     need. load_molsys_data calls load since the duplication cleanup (below).
      Tests (test_system_data.py): the state sets by choice, only the sets the data has, check_states_choice,
      load's request, filling and missing-property error. Same numbers: evv_reference.json, both choices;
      ACDM 17101 rows, 7595 zero, as before.
@@ -412,6 +414,24 @@ B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
 -    from_datadict has no default states_choice (2026-10-11); since 2026-10-12 the evaluation takes the choice
      (see Decisions).
 -    ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
+-    Property names made once (2026-10-12). PropsCollection.names: one trivial name per property, in order, made
+     once per collection. It replaces 4 prop_trivname calls: build_request_dict, eval_non_avrg_per_indexdict
+     (there per index set), the averaging loop (_make_func_to_compute_avrg) and the einsum operands.
+     CompiledTerm.all_props and CompiledTerm.prop_names (each name once) are made once per term; all_props was
+     a new PropsCollection, with a deepcopy, on every read. pipeline.prop_names and load_molsys_data use
+     prop_names. PropsCollection.sort returns a new collection; it used to change the collection itself.
+     Speed, ACDM: build_contributions 3.2-3.3 s, before 3.3-3.4 s: no change beyond run-to-run noise.
+-    One way to load, one way to name (2026-10-12). load_molsys_data is one line: MolSystemData.load with the
+     terms' prop_names and pipeline's wilson_data_obtainer (c3_spectrum.py replaces that obtainer). Before, it
+     built its own request and also asked for normal_modes, atoms and the geometry, which fail on ACDM; now
+     compute_features_from_terms gives ACDM's 17101 rows. Deleted: build_data_request_for_term and
+     _sys_info_request (system_data.py; MolSystemData.load builds the request, with EVALUATION_DATA_KEYS) and
+     MolecularProperty.from_polprop (its extra_data, ops and frequencies, was read by nothing; properties are
+     made from names). evaluate_response_terms and c2_variations.run_new load through load_molsys_data.
+     Tests: the request tests of test_system_data.py went; their checks live on in the load tests (request keys,
+     origin, no key collides with a property name) and in test_plan.py (one name per distinct property).
+     test_integration.py loads through MolSystemData.load; the one test that reads normal_modes asks for them
+     itself. Same numbers: evv_reference.json; c3 degenerate toy as recorded.
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

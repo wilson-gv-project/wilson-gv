@@ -71,6 +71,39 @@ def test_propscollection_sort_puts_non_averaged_last():
     assert [p.ops[0].o if p.ops else None for p in coll.sort()] == [1, 3, None]
 
 
+def test_propscollection_sort_returns_a_new_collection_and_leaves_this_one():
+    coll = PropsCollection([polprop(inds='abc'), polprop(ops=(3,), inds='a')])
+    names_before = coll.names
+
+    sorted_coll = coll.sort()
+
+    assert sorted_coll is not coll
+    assert coll.names == names_before == ('cff', 'dipgrad')
+    assert sorted_coll.names == ('dipgrad', 'cff')
+
+
+def test_propscollection_names_one_per_property_in_order():
+    """term 8's averaged part polgrad[b] * dipgrad[a] * dipgrad[c] + cff[a, b, c]: dipgrad is named twice"""
+    coll = PropsCollection([polprop(ops=(0, 3), inds='b'), polprop(ops=(1,), inds='a'), polprop(ops=(2,), inds='c'),
+                            polprop(inds='abc')])
+
+    assert coll.names == ('polgrad', 'dipgrad', 'dipgrad', 'cff')
+
+
+def test_propscollection_names_are_made_once():
+    """the evaluation reads the names for every index set"""
+    coll = PropsCollection([polprop(ops=(0, 1), inds='a')])
+
+    assert coll.names is coll.names
+
+
+def test_propscollection_request_dict_names_each_property_once():
+    origin = 'the data origin'      # passed through as it is; plan.py needs no DataOriginInfo
+    coll = PropsCollection([polprop(ops=(1,), inds='a'), polprop(ops=(2,), inds='c'), polprop(inds='abc')])
+
+    assert coll.build_request_dict(origin) == {'dipgrad': origin, 'cff': origin}
+
+
 def test_identify_avrg_motif_erases_inds_on_a_copy_only():
     coll = PropsCollection([polprop(ops=(0, 1), inds='a'), polprop(inds='ab')])
 
@@ -439,6 +472,38 @@ def test_compiled_term_splits_its_denominators_by_pert_wf_diff():
 
     assert vibdiff_keys(ct.freq_vibenedenom) == [(('a',), (), False)]
     assert vibdiff_keys(ct.freq_pert_wf_diff) == [(('a', 'b'), ('a',), True)]
+
+
+def test_compiled_term_all_props_is_made_once():
+    """a new PropsCollection deepcopies its props: all_props is built on first use and kept"""
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
+
+    assert ct.all_props is ct.all_props
+
+
+def test_compiled_term_prop_names_each_once_in_order():
+    """_fake_vibpert_term: polgrad[a] (averaged), cff-like 'ab' second derivative (non-averaged)"""
+    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
+
+    assert ct.prop_names == tuple(dict.fromkeys(ct.all_props.names)) == ('polgrad', 'hess')
+
+
+def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
+    """only properties: no motif, no denominators, no labels"""
+    return CompiledTerm(PropsCollection(list(avrg)), PropsCollection(list(non_avrg)),
+                        ResonanceMotif(()), FreqTermsCollection([]), 1., idx_summ=(), idx_nonsumm=())
+
+
+@pytest.mark.parametrize('avrg, non_avrg, expected', [
+    ((),                                      (polprop(inds='abc'), polprop(inds='abc')), ('cff',)),   # repeated
+    ((),                                      (polprop(inds='abc'), polprop(inds='ab')),  ('cff', 'hess')),
+    ((polprop(ops=(0, 1), inds='a'),),         (polprop(inds='a'),),                        ('polgrad', 'grad')),
+    ((polprop(ops=(0,)), polprop(ops=(0, 1))), (),                                          ('dip', 'pol')),  # dord 0
+    ((),                                      (),                                          ()),
+])
+def test_compiled_term_prop_names_one_per_distinct_trivial_name(avrg, non_avrg, expected):
+    """what MolSystemData.load requests for the term: each name once, averaged properties first"""
+    assert bare_term(avrg, non_avrg).prop_names == expected
 
 
 def test_compiled_term_split_is_made_once_and_kept():
