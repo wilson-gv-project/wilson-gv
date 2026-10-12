@@ -478,7 +478,6 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     # The output axes: the letters after '->', e.g. 'abc' -> ('a', 'b', 'c').
     # Read from the string, so the labels are the axis order that einsum really uses.
     labels = tuple(subscripts.split('->')[1])
-    print(f"Calculating averaged tensor for expression {avrg_expression} with subscripts {subscripts} and labels {labels}")
 
     # 4. One call gives every index set. numpy multiplies the operands and sums over each letter that is not
     #    in the output: the slot letters I, J, K, L. The mode letters a, b, c are in the output: not summed.
