@@ -223,9 +223,11 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
     return compute_features(compiled, molsys, polarization, lineshape_parameter=lineshape_parameter,
                             states_choice=states_choice)
 
+
 PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) -> coefficient
 # origin: DataOriginInfo
 import numpy as np
+
 
 @dataclass(frozen=True)
 class EvalRspResult:
@@ -235,16 +237,22 @@ class EvalRspResult:
     grid_axes: np.ndarray | None = None
     grid_result: np.ndarray | None = None
 
-def evaluate_response_terms(compiled: Sequence['CompiledTerm'], 
+
+def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
+                            axes,
                             molsys_data: MolSystemData,
                             states_choice: str,
                             orient_avrg_recipe: 'PolarizationAveragingRecipe') -> EvalRspResult:
     """
-    Load the data for all terms, each property once, and return a MolSystemData.
-    The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
-    """
-    # molsys_data = load_molsys_data(compiled, origin)
+    molsys = load_molsys_data(compiled, data_origin)
 
+    
+    """
+    translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
+    compiled = compile_terms(translated)
+    feat_result = compute_features(compiled, molsys_data, orient_avrg_recipe, 
+                                   lineshape_parameter=lineshape_parameter,
+                                   states_choice=states_choice)
     return EvalRspResult(
         molsys_data=molsys_data,
         polarization_linear_comb=orient_avrg_recipe,
