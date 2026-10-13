@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-13
 
-Tests  refac_rsp_eval: 593 pass (2026-10-13, after the precalculated path was deleted).
+Tests  refac_rsp_eval: 595 pass (2026-10-13, after the top functions were reshaped).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -157,6 +157,10 @@ E. Pipeline
         - [ ] the default dynrange, matched to the plot's dynamic range (log scale is the renderer's default;
               see the cut in Decisions)
         - [ ] nothing that assumes point features only (E8)
+        The new calls (since 2026-10-13): MolSystemData (load_molsys_data, or from WilsonSimulation's data),
+        evaluate_response_terms(sim.terms in pulse IDs, laser_pol = exp.polarization_avg_vector, ...), then
+        draw_spectrum. draw_spectrum already uses make_grid and dynrange 1000 by default; the two items above
+        decide whether to keep that.
         Check: the same spectrum as EvaluationWorkflow.evaluate, through WilsonSimulation (C3 called the new
         functions directly). Needs the old code. Expect differences only where parameter sets share a location.
         Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
@@ -358,7 +362,8 @@ E2   Drawing: eval_feature_on_grid draws one feature; draw_window adds all featu
      box; draw_all draws every feature on the whole grid and serves as the reference.
 E3   One entry point, compute_features_from_terms: translate the terms, compile them, load the data in one
      call, set the polarization, make the features. Tested on real data (test_pipeline.py).
-     rps_evaluation.py deleted.
+     rps_evaluation.py deleted. Replaced 2026-10-13 by load_molsys_data + evaluate_response_terms +
+     draw_spectrum (see Fixed, "Top functions").
 B7   One resonance point per term, checked when compiling (see Decisions). The `failed` list is gone: it was
      always empty.
 -    Leaves on demand (2026-10-12), for analysis: a row's leaves are its summed index sets, each with its four
@@ -452,6 +457,24 @@ B    Precalculated path deleted (2026-10-13, H1). Its reason was speed; since F1
 -    Cleanup (2026-10-13): commented-out code removed (plan.py, features.py, evaluate.py, H2); the module
      docstrings of evaluate.py and plan.py name what the modules hold; Box.overlaps lost its wrong "# UNUSED" mark
      (SpectralFeature.feat_box_overlaps calls it).
+-    Top functions (2026-10-13). Before: two top functions did the same first steps (H2).
+     compute_features_from_terms loaded the data on every call (4 s on ACDM); evaluate_response_terms took the
+     recipe from the caller and drew only with a window, so 4 fields of its result were None without one, and
+     dim_sizes without a window was ignored; its 6 settings were positional.
+     Now, three calls:
+         molsys = load_molsys_data(terms, data_origin)                                     once
+         result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
+                                          propagator_param=)                               FeatureResult
+         spec   = draw_spectrum(result, window, dim_sizes, dynrange=1000.)                 EvalRspResult
+     evaluate_response_terms takes laser_pol, not the recipe; every setting is keyword-only. It returns the
+     FeatureResult. draw_spectrum is the only drawing call; every EvalRspResult field is set. dynrange is
+     keyword-only. compute_features_from_terms deleted.
+     make_polarization_linear_comb makes the recipe once per (rank, laser_pol) (functools.cache on
+     _averaging_recipe) and returns a copy per call. Measured: a recipe takes 0.13 ms at rank 4, about 5 ms at
+     ranks 5 and 6; averaging_rank still runs on every call, 1 ms for the 14 EVV terms.
+     Tests (test_pipeline.py): the compute_features_from_terms tests run on evaluate_response_terms; the drawing
+     tests call draw_spectrum; positional settings raise; the recipe is made once and copied. Gone: the two
+     tests of the window-or-not mode. example_evaluate_response_terms.py uses the three calls (no None checks).
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

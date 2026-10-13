@@ -38,7 +38,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     averaging_rank,
     compute_features,
-    compute_features_from_terms,
     draw_spectrum,
     evaluate_response_terms,
     load_molsys_data,
@@ -70,7 +69,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     row,
     toy_term,
 )
-from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
+from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 
@@ -400,6 +399,33 @@ def test_make_polarization_linear_comb_raises_for_rank_above_6():
         make_polarization_linear_comb([term_with_slots(tuple(range(7)))], (1.,))
 
 
+def test_make_polarization_linear_comb_makes_the_recipe_once_per_rank_and_laser_pol(monkeypatch):
+    """the same rank and laser_pol again (other terms, a list instead of a tuple): no new recipe; another laser_pol: a new one"""
+    made = []
+
+    def counting(**kwargs):
+        made.append(kwargs)
+        return getGeneralPolarizationAveragingExpression(**kwargs)
+    monkeypatch.setattr(pipeline_mod, 'getGeneralPolarizationAveragingExpression', counting)
+    pipeline_mod._averaging_recipe.cache_clear()
+
+    first = make_polarization_linear_comb([RANK_4_TERM], (1., 0., 1.))
+    again = make_polarization_linear_comb([RANK_4_TERM, RANK_4_TERM], [1., 0., 1.])
+    other = make_polarization_linear_comb([RANK_4_TERM], (1., 1., 1.))
+
+    assert made == [{'rank': 4, 'laser_pol': (1., 0., 1.)}, {'rank': 4, 'laser_pol': (1., 1., 1.)}]
+    assert again == first != other
+
+
+def test_make_polarization_linear_comb_gives_each_call_its_own_copy():
+    """changing one result changes neither the kept recipe nor the next result"""
+    first = make_polarization_linear_comb([RANK_4_TERM], (1., 1., 1.))
+    first.clear()
+
+    assert make_polarization_linear_comb([RANK_4_TERM], (1., 1., 1.)) == \
+        getGeneralPolarizationAveragingExpression(rank=4, laser_pol=(1., 1., 1.))
+
+
 ## real data: 14 EVV terms + formaldehyde -------------------------------------
 # load_molsys_data -> compute_features on the real data file; the settings and the stored rows are
 # the ones of evv_reference.json (make_evv_reference.py).
@@ -531,15 +557,25 @@ def test_real_data_leaves_add_up_to_every_row_coefficient(evv_formaldehyde):
         assert total == pytest.approx(r.coeff, rel=1e-12, abs=0), r
 
 
-## compute_features_from_terms: the one top function ---------------------------
-# Same settings as evv_reference.json, formaldehyde, anharmonic states. The evv_formaldehyde fixture
-# runs the same steps one by one, so equal results mean the top function passes every setting to
-# the right step. One run (top_run) serves all tests but the reverse-order one.
+## evaluate_response_terms: the top function -----------------------------------
+# Same settings as evv_reference.json, formaldehyde, anharmonic states. The data is loaded once
+# (formaldehyde_molsys), from the terms as derive writes them (pulse IDs). The evv_formaldehyde fixture
+# runs the same steps one by one, so equal results mean evaluate_response_terms passes every setting to
+# the right step. One run (top_run) serves most tests.
 
-def from_terms(terms, **kwargs) -> FeatureResult:
-    return compute_features_from_terms(terms, axes=make_SpectralAxisSet(ref.AXES),  # type: ignore
-                                       data_origin=ref.data_origin('formaldehyde'),
-                                       states_choice='anharmonic', laser_pol=ref.LASER_POL, **kwargs)
+@pytest.fixture(scope='module')
+def formaldehyde_molsys() -> MolSystemData:
+    """loaded once, used by every run below"""
+    return load_molsys_data(ref.evv_terms(), ref.data_origin('formaldehyde'))
+
+
+def evaluate_formaldehyde(molsys, propagator_param, terms=None) -> FeatureResult:
+    return evaluate_response_terms(ref.evv_terms() if terms is None else terms,
+                                   axes=make_SpectralAxisSet(ref.AXES),  # type: ignore
+                                   molsys_data=molsys,
+                                   states_choice='anharmonic',
+                                   laser_pol=ref.LASER_POL,
+                                   propagator_param=propagator_param)
 
 
 @dataclass(frozen=True)
@@ -550,55 +586,61 @@ class TopRun:
 
 
 @pytest.fixture(scope='module')
-def top_run() -> TopRun:
+def top_run(formaldehyde_molsys) -> TopRun:
     terms = ref.evv_terms()
     before = [t.to_str() for t in terms]
-    return TopRun(terms, before, from_terms(terms, propagator_param=4.7))
+    return TopRun(terms, before, evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms))
 
 
 @pytest.mark.parametrize('evv_formaldehyde', ['anharmonic'], indirect=True)
-def test_compute_features_from_terms_equals_the_steps_one_by_one(top_run, evv_formaldehyde):
+def test_evaluate_response_terms_equals_the_steps_one_by_one(top_run, evv_formaldehyde):
     result, by_steps = top_run.result, evv_formaldehyde.result
 
     assert list(result.table) == list(by_steps.table)
     assert result.zero == by_steps.zero
 
 
-def test_compute_features_from_terms_term_id_is_the_index_in_the_input_list(top_run):
+def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run, formaldehyde_molsys):
     """terms in reverse order: the row of term i comes back with term_id 13 - i, same params and coeff"""
-    backward = from_terms(ref.evv_terms()[::-1])
+    backward = evaluate_formaldehyde(formaldehyde_molsys, 4.7, ref.evv_terms()[::-1])
 
     last = len(top_run.terms) - 1
     assert ({(last - r.term_id, r.params, r.coeff) for r in backward.table}
             == {(r.term_id, r.params, r.coeff) for r in top_run.result.table})
 
 
-def test_compute_features_from_terms_leaves_the_input_terms_as_they_are(top_run):
+def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
     """the translation to axes works on copies: the caller's terms keep their pulse IDs"""
     assert [t.to_str() for t in top_run.terms] == top_run.terms_before
 
 
-def test_compute_features_from_terms_gives_every_feature_the_propagator_param(top_run):
+def test_evaluate_response_terms_gives_every_feature_the_propagator_param(top_run):
     assert all(f.propagator_param == 4.7 for f in top_run.result.features)
 
 
-def test_compute_features_from_terms_keeps_what_drawing_and_leaves_need(top_run):
+def test_evaluate_response_terms_keeps_what_drawing_and_leaves_need(top_run, formaldehyde_molsys):
     """the compiled terms, the data with its states (draw_window), the recipe: one row's leaves add up to its coeff"""
     result = top_run.result
 
     assert len(result.compiled) == len(top_run.terms)  # type: ignore
+    assert result.molsys is formaldehyde_molsys
     assert result.states_choice == 'anharmonic'
-    assert result.states is result.molsys.states['anharmonic']  # type: ignore
-    assert result.polarization_linear_comb is not None
+    assert result.states is formaldehyde_molsys.states['anharmonic']
+    assert result.polarization_linear_comb == make_polarization_linear_comb(top_run.terms, ref.LASER_POL)
 
     r = max(result.table, key=lambda r: abs(r.coeff))
     term = result.compiled[r.term_id]  # type: ignore
     assert sum(leaf_value(term, c) for c in result.leaves(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
 
 
-## evaluate_response_terms: features and the spectrum on a grid ----------------
-# The caller loads the data and makes the recipe once, from the terms as derive writes them (pulse IDs);
-# evaluate_response_terms then takes the same terms. Formaldehyde, anharmonic.
+def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_molsys):
+    """positional settings raise: a swapped pair, e.g. states_choice and laser_pol, cannot slip through"""
+    with pytest.raises(TypeError, match='positional'):
+        evaluate_response_terms(ref.evv_terms(), make_SpectralAxisSet(ref.AXES), formaldehyde_molsys,  # type: ignore
+                                'anharmonic', ref.LASER_POL, 5.)
+
+
+## draw_spectrum: the features on a grid -------------------------------------
 # Strongest feature: A = 2682.765, B = 0 (test_real_data_strongest_feature). Its neighbours: A = 2726.8, B = 0
 # and A = 2682.8, B = 44 (and A = 2726.8, B = -44).
 
@@ -606,136 +648,107 @@ WINDOW_AROUND_STRONGEST = Box({'A': (2632.765, 2732.765), 'B': (-50., 50.)})   #
 STEPS_1_CM = {'A': 101, 'B': 101}                                               # 1 cm-1 steps, both edges included
 
 
-@pytest.fixture(scope='module')
-def formaldehyde_data() -> tuple:
-    """(molsys_data, orientation-average recipe): loaded once, used by every run below"""
-    terms = ref.evv_terms()
-    return (load_molsys_data(terms, ref.data_origin('formaldehyde')),
-            make_polarization_linear_comb(terms, ref.LASER_POL))
-
-
-def evaluate_formaldehyde(formaldehyde_data, propagator_param, **kwargs):
-    molsys, recipe = formaldehyde_data
-    return evaluate_response_terms(terms=ref.evv_terms(), 
-                                   axes=make_SpectralAxisSet(ref.AXES), 
-                                   molsys_data=molsys, 
-                                   states_choice='anharmonic',  # type: ignore
-                                   orient_avrg_recipe=recipe, 
-                                   propagator_param=propagator_param, **kwargs)
-
-
-def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formaldehyde_data, top_run):
+def test_draw_spectrum_with_a_width_function(formaldehyde_molsys, top_run):
     """
-    The whole use: terms + data + recipe + width + window -> features and the spectrum on a grid.
+    The whole use: terms + data + width -> features (evaluate_response_terms) -> the spectrum on a grid.
     Width: 3 cm-1 plus 0.2 % of the condition's |E|. The strongest feature's conditions have E = 2682.765 (on A)
     and E = 0 (on B, since a = b), so its widths are 3 + 5.366 = 8.366 and 3 cm-1.
     """
     width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
-    result = evaluate_formaldehyde(formaldehyde_data, width,
-                                   window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM, dynrange=1001.)
+    result = evaluate_formaldehyde(formaldehyde_molsys, width)
+    spec = draw_spectrum(result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, dynrange=1001.)
 
-    # features: the same rows as compute_features_from_terms; every feature has the width function
-    feature_result = result.feature_result
-    assert list(feature_result.table) == list(top_run.result.table)
-    assert len(feature_result.features) == 68
-    assert all(f.propagator_param is width for f in feature_result.features)
-    strongest = max(feature_result.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
+    # features: the same rows as top_run; every feature has the width function
+    assert spec.feature_result is result
+    assert list(result.table) == list(top_run.result.table)
+    assert len(result.features) == 68
+    assert all(f.propagator_param is width for f in result.features)
+    strongest = max(result.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     assert strongest.location.as_dict() == pytest.approx({'A': 2682.765, 'B': 0.})
     assert strongest.peak_widths() == pytest.approx((3. + 0.002 * 2682.765, 3.))
 
     # the grid: 101 points per axis, from edge to edge of the window
-    assert list(result.grid_axes) == ['A', 'B']  # type: ignore
+    assert list(spec.grid_axes) == ['A', 'B']
     for ax, (mn, mx) in WINDOW_AROUND_STRONGEST.bounds.items():
-        points = result.grid_axes[ax]  # type: ignore
+        points = spec.grid_axes[ax]
         assert (points[0], points[-1], len(points)) == pytest.approx((mn, mx, 101))
-    assert result.grid_result.shape == (101, 101)  # type: ignore
-    assert result.grid_result is not None
-    intensity = np.abs(result.grid_result) ** 2
+    assert spec.grid_result.shape == (101, 101)
+    intensity = np.abs(spec.grid_result) ** 2
 
     # at the strongest feature: its own peak height (get_intensity), plus about 2 % from its neighbours
-    i = np.argmin(np.abs(result.grid_axes['A'] - 2682.765))  # type: ignore
-    j = np.argmin(np.abs(result.grid_axes['B']))  # type: ignore
+    i = np.argmin(np.abs(spec.grid_axes['A'] - 2682.765))
+    j = np.argmin(np.abs(spec.grid_axes['B']))
     assert intensity[i, j] == pytest.approx(strongest.get_intensity(), rel=0.05)
 
     # drawn box by box (draw_window) vs every feature on the whole grid (draw_all): measured 0.3 % of the top
-    reference = np.abs(draw_all(feature_result.features, feature_result.states, result.grid_axes)) ** 2  # type: ignore
+    reference = np.abs(draw_all(result.features, result.states, spec.grid_axes)) ** 2
     assert np.max(np.abs(intensity - reference)) < 0.01 * reference.max()
 
 
-def test_evaluate_response_terms_width_function_of_a_constant_draws_as_the_number(formaldehyde_data):
+def test_draw_spectrum_width_function_of_a_constant_draws_as_the_number(formaldehyde_molsys):
     """propagator_param 5. and lambda vd, freqs: 5. give the same spectrum"""
-    number = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
-    function = evaluate_formaldehyde(formaldehyde_data, lambda vd, freqs: 5.,
-                                     window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    number = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    function = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
+                             WINDOW_AROUND_STRONGEST, STEPS_1_CM)
 
-    np.testing.assert_allclose(function.grid_result, number.grid_result)  # type: ignore
-
-
-def test_evaluate_response_terms_without_a_window_gives_the_features_only(formaldehyde_data):
-    result = evaluate_formaldehyde(formaldehyde_data, 5.)
-
-    assert len(result.feature_result.features) == 68
-    assert result.grid_axes is None and result.grid_result is None
-    assert result.grid_mesh is None and result.spectral_window is None
+    np.testing.assert_allclose(function.grid_result, number.grid_result)
 
 
-def test_evaluate_response_terms_window_needs_dim_sizes(formaldehyde_data):
-    with pytest.raises(ValueError, match='dim_sizes'):
-        evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST)
-
-
-def test_evaluate_response_terms_grid_mesh_holds_every_grid_point(formaldehyde_data):
+def test_draw_spectrum_grid_mesh_holds_every_grid_point(top_run):
     """grid_mesh['A'][i, j] = grid_axes['A'][i], grid_mesh['B'][i, j] = grid_axes['B'][j]: the form the renderer reads"""
-    result = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
-    mesh, points = result.grid_mesh, result.grid_axes
+    spec = draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    mesh, points = spec.grid_mesh, spec.grid_axes
 
-    assert list(mesh) == ['A', 'B']  # type: ignore
-    assert mesh['A'].shape == mesh['B'].shape == result.grid_result.shape == (101, 101)  # type: ignore
+    assert list(mesh) == ['A', 'B']
+    assert mesh['A'].shape == mesh['B'].shape == spec.grid_result.shape == (101, 101)
     for k in (0, 7, 100):
-        np.testing.assert_array_equal(mesh['A'][:, k], points['A'])  # type: ignore
-        np.testing.assert_array_equal(mesh['B'][k, :], points['B'])  # type: ignore
+        np.testing.assert_array_equal(mesh['A'][:, k], points['A'])
+        np.testing.assert_array_equal(mesh['B'][k, :], points['B'])
 
 
-def test_evaluate_response_terms_keeps_the_window_as_drawn(formaldehyde_data):
+def test_draw_spectrum_keeps_the_window_as_drawn(formaldehyde_molsys):
     """
-    The window's 4 features (example_evaluate_response_terms.py lists them), each with its box:
-    5 cm-1, dynrange 1000, margin 0.1 -> 5 * sqrt(999) * 1.1 = 173.8 cm-1 on each side. No feature outside
-    reaches in. The 4 boxes overlap, so draw_window drew them as one domain.
+    The window's 4 features, each with its box: 5 cm-1, dynrange 1000, margin 0.1 -> 5 * sqrt(999) * 1.1
+    = 173.8 cm-1 on each side. No feature outside reaches in. The 4 boxes overlap, so draw_window drew them
+    as one domain.
     """
-    result = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
-    window = result.spectral_window
+    spec = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    window = spec.spectral_window
 
-    assert window.box is WINDOW_AROUND_STRONGEST  # type: ignore
-    assert len(window.full_features) == 4 and window.contrib_features == []  # type: ignore
-    for f in window.full_features:  # type: ignore
+    assert window.box is WINDOW_AROUND_STRONGEST
+    assert len(window.full_features) == 4 and window.contrib_features == []
+    for f in window.full_features:
         mn, mx = f.feat_box.bounds['A']  # type: ignore
         assert (mx - mn) / 2 == pytest.approx(5. * 999 ** 0.5 * 1.1)
-    [domain] = window.find_clusters_by_featboxes()  # type: ignore
+    [domain] = window.find_clusters_by_featboxes()
     assert len(domain.full_features + domain.contrib_features) == 4
 
 
-## draw_spectrum: drawing again without computing the rows again --------------
-
-def test_draw_spectrum_with_a_new_width_reuses_the_rows(formaldehyde_data):
+def test_draw_spectrum_with_a_new_width_reuses_the_rows(formaldehyde_molsys):
     """replace(..., propagator_param=8.) keeps the table (no new rows) and draws what a new run with 8 cm-1 draws"""
-    first = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    first = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
-    wider = draw_spectrum(replace(first.feature_result, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    wider = draw_spectrum(replace(first, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
 
-    assert wider.feature_result.table is first.feature_result.table
+    assert wider.feature_result.table is first.table
     assert all(f.propagator_param == 8. for f in wider.feature_result.features)
-    new_run = evaluate_formaldehyde(formaldehyde_data, 8., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
-    np.testing.assert_allclose(wider.grid_result, new_run.grid_result)  # type: ignore
+    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    np.testing.assert_allclose(wider.grid_result, new_run.grid_result)
 
 
-def test_draw_spectrum_on_another_window_reuses_the_features(formaldehyde_data):
+def test_draw_spectrum_on_another_window_reuses_the_features(formaldehyde_molsys):
     """Same features, another window and grid: what a new run on that window draws"""
-    first = evaluate_formaldehyde(formaldehyde_data, 5.)
+    result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
     other, sizes = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
 
-    again = draw_spectrum(first.feature_result, other, sizes)
+    again = draw_spectrum(result, other, sizes)
 
-    assert again.feature_result is first.feature_result
-    new_run = evaluate_formaldehyde(formaldehyde_data, 5., window=other, dim_sizes=sizes)
-    np.testing.assert_allclose(again.grid_result, new_run.grid_result)  # type: ignore
+    assert again.feature_result is result
+    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), other, sizes)
+    np.testing.assert_allclose(again.grid_result, new_run.grid_result)
+
+
+def test_draw_spectrum_takes_dynrange_by_keyword(top_run):
+    with pytest.raises(TypeError, match='positional'):
+        draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, 1001.)  # type: ignore

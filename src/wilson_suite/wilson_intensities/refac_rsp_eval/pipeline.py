@@ -1,8 +1,12 @@
 """
-Entry point: compiled terms + molecular data -> spectral features.
+Entry point: terms + molecular data -> spectral features -> the spectrum on a grid.
 
-compute_features_from_terms does everything from the terms derive writes (in pulse IDs):
-translate to axes -> compile_terms -> load_molsys_data -> make_polarization_linear_comb -> compute_features.
+Three calls, from the terms derive writes (in pulse IDs):
+    molsys = load_molsys_data(terms, data_origin)                     once, for any number of runs
+    result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
+                                     propagator_param=...)            rows and features: FeatureResult
+    spec   = draw_spectrum(result, window, dim_sizes)                 the spectrum on a grid: EvalRspResult
+evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
 load_molsys_data and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
 
 CompiledTerm list
@@ -23,7 +27,7 @@ spectrum array on a grid                                   draw_spectrum (evalua
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cache, cached_property
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -63,6 +67,9 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
     from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
     from wilson_suite.wilson_system.system_data import VibStatesData
+
+
+PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) -> coefficient
 
 
 @dataclass(frozen=True)
@@ -192,7 +199,7 @@ def averaging_rank(terms: Sequence['VibPerturbedTerm']) -> int:
 
 
 def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
-                                  laser_pol: Sequence[float]) -> dict[tuple, float]:
+                                  laser_pol: Sequence[float]) -> PolarizationAveragingRecipe:
     """
     The orientation-average recipe {(x/y/z per slot): coefficient} that compute_features takes,
     from getGeneralPolarizationAveragingExpression with the rank of the terms (averaging_rank).
@@ -201,6 +208,11 @@ def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
     laser_pol: the experiment's polarization_avg_vector. Its length is fixed by the rank
     (rank 4 -> 3 numbers, e.g. (1, 1, 1) when all pulses and the detector are along x).
     getGeneralPolarizationAveragingExpression would ignore extra numbers without an error.
+
+    The recipe depends only on the rank and laser_pol: it is made once per (rank, laser_pol) and kept
+    (_averaging_recipe). Each call returns its own copy, so changing one copy changes no other result.
+    Measured 2026-10-13: making a recipe takes 0.13 ms at rank 4, about 5 ms at ranks 5 and 6;
+    averaging_rank (run on every call) 1 ms for the 14 EVV terms.
     """
     rank = averaging_rank(terms)
     if not 2 <= rank <= 6:
@@ -210,46 +222,51 @@ def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
     if len(laser_pol) != n_expected:
         raise ValueError(f'rank {rank} needs laser_pol with {n_expected} numbers, got {len(laser_pol)}: {laser_pol}')
 
-    return getGeneralPolarizationAveragingExpression(rank=rank, laser_pol=tuple(laser_pol))
+    return dict(_averaging_recipe(rank, tuple(laser_pol)))
 
 
-def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
-                                axes: 'SpectralAxisSet',
-                                data_origin: DataOriginInfo,
-                                states_choice: str,
-                                laser_pol: Sequence[float],
-                                propagator_param: PropagatorParam | None = None) -> FeatureResult:
+@cache
+def _averaging_recipe(rank: int, laser_pol: tuple[float, ...]) -> PolarizationAveragingRecipe:
+    """getGeneralPolarizationAveragingExpression, made once per (rank, laser_pol); make_polarization_linear_comb copies it"""
+    return getGeneralPolarizationAveragingExpression(rank=rank, laser_pol=laser_pol)
+
+
+def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
+                            axes: 'SpectralAxisSet',
+                            molsys_data: MolSystemData,
+                            states_choice: str,
+                            laser_pol: Sequence[float],
+                            propagator_param: PropagatorParam) -> FeatureResult:
     """
-    Terms as derive writes them (in pulse IDs) + data file + experiment settings -> features.
-        1. translate the terms to the chosen axes          term_var_translate (copies, keeps the order)
-        2. compile                                         compile_terms
-        3. load the data for all terms, each property once  load_molsys_data
-        4. orientation-average recipe, rank from the terms  make_polarization_linear_comb
-        5. rows, zero pairs, features                      compute_features
+    Terms as derive writes them (in pulse IDs) + data loaded before + experiment settings -> rows and features.
+        1. translate the terms to the chosen axes           term_var_translate (copies, keeps the order)
+        2. compile                                          compile_terms
+        3. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
+                                                            rank and laser_pol)
+        4. rows, zero pairs, features                       compute_features
+    The spectrum on a grid: draw_spectrum(result, window, dim_sizes), as often as needed; the rows stay.
 
-    axes                 e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
-    states_choice        must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
-    laser_pol            the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
+    axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
+    molsys_data       load_molsys_data(terms, data_origin): loaded once, for any number of runs
+    states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
+    laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.
-                         lambda vd, freqs: 0.01 * abs(vd.energy_difference())
+                      lambda vd, freqs: 0.01 * abs(vd.energy_difference())
+    Every argument after the terms is keyword-only: two swapped arguments raise a TypeError.
     row.term_id is the index in `terms`.
     """
     translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
     compiled = compile_terms(translated)
-    molsys = load_molsys_data(terms, data_origin)
-    polarization = make_polarization_linear_comb(terms, laser_pol)
-    return compute_features(compiled, molsys, polarization, propagator_param=propagator_param,
+    recipe = make_polarization_linear_comb(terms, laser_pol)
+    return compute_features(compiled, molsys_data, recipe, propagator_param=propagator_param,
                             states_choice=states_choice)
-
-
-PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) -> coefficient
 
 
 @dataclass(frozen=True)
 class EvalRspResult:
     """
+    The spectrum on a grid, made by draw_spectrum. Every field is set.
     feature_result   rows, features, and what they came from (molsys, polarization recipe, states_choice)
-    The drawing (draw_spectrum); None for features only:
     grid_axes        1D points per axis, cm-1, both window edges included, e.g. A and B with 201 points each
     grid_result      complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
                      grid_axes, e.g. shape (201, 201). intensity = abs(grid_result)**2
@@ -260,59 +277,27 @@ class EvalRspResult:
                      what the old EvaluatedSpectrum.axes held and the renderer reads
     """
     feature_result: FeatureResult
-    grid_axes: dict[str, np.ndarray] | None = None
-    grid_result: np.ndarray | None = None
-    spectral_window: SpectralWindow | None = None
+    grid_axes: dict[str, np.ndarray]
+    grid_result: np.ndarray
+    spectral_window: SpectralWindow
 
     @cached_property
-    def grid_mesh(self) -> dict[str, np.ndarray] | None:
-        if self.grid_axes is None:
-            return None
+    def grid_mesh(self) -> dict[str, np.ndarray]:
         return dict(zip(self.grid_axes, np.meshgrid(*self.grid_axes.values(), indexing='ij')))
-
-
-def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
-                            axes: 'SpectralAxisSet',
-                            molsys_data: MolSystemData,
-                            states_choice: str,
-                            orient_avrg_recipe: 'PolarizationAveragingRecipe',
-                            propagator_param: PropagatorParam,
-                            window: 'Box | None' = None,
-                            dim_sizes: dict[str, int] | None = None,
-                            dynrange: float = 1000.) -> EvalRspResult:
-    """
-    Terms as derive writes them (in pulse IDs) + data loaded before + recipe -> features, and with a window
-    the spectrum on a grid (draw_spectrum). Without a window: features only.
-    For another window, grid or width afterwards: draw_spectrum with result.feature_result. The rows are
-    kept, so only the drawing is done again.
-    molsys_data and orient_avrg_recipe can come from anywhere. From the same terms, still in pulse IDs:
-        molsys_data = load_molsys_data(terms, data_origin)
-        orient_avrg_recipe = make_polarization_linear_comb(terms, laser_pol)
-    """
-    if window is not None and dim_sizes is None:
-        raise ValueError('a window needs dim_sizes, the number of grid points per axis')
-
-    translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
-    compiled = compile_terms(translated)
-    feature_result = compute_features(compiled, molsys_data, orient_avrg_recipe,
-                                      propagator_param=propagator_param,
-                                      states_choice=states_choice)
-    if window is None:                  # features only, no drawing
-        return EvalRspResult(feature_result)
-    return draw_spectrum(feature_result, window, dim_sizes, dynrange)  # type: ignore
 
 
 def draw_spectrum(feature_result: FeatureResult,
                   window: 'Box',
                   dim_sizes: dict[str, int],
+                  *,
                   dynrange: float = 1000.) -> EvalRspResult:
     """
     The features of feature_result on a grid over `window`: boxes, grid, drawing. The rows are not computed
-    again (the slow part: build_contributions), so a new window, grid or width costs only the drawing:
-        again = draw_spectrum(result.feature_result, other_window, {'A': 401, 'B': 401})
-        wider = draw_spectrum(replace(result.feature_result, propagator_param=8.), window, dim_sizes)
+    again (the slow part: build_contributions), so a new window, grid or width runs only the drawing:
+        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401})
+        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
-    new width, on first use (cheap).
+    new width, on first use (features_from_rows: 0.02 s for 3524 features on ACDM, F2).
 
     window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
     dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}

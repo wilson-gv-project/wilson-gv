@@ -126,7 +126,7 @@ def run_old(case: Case):
 
 
 def run_new(case: Case, laser_pol):
-    """new pipeline, the steps of compute_features_from_terms: (the chosen state set for drawing, the result)"""
+    """new pipeline, load_molsys_data + the steps of evaluate_response_terms: (the chosen state set for drawing, the result)"""
     terms = VibPerturbedTerm.load_many_from_json(c2.TERMS)
     translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(AXES))
     compiled = compile_terms(translated)
