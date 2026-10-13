@@ -11,11 +11,8 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    PrecalculatedData,
     _make_func_to_compute_avrg,
-    calculate_avrg_tensor,
     calculate_avrg_tensor_einsum,
-    eval_avrg_per_indexdict,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     make_avrg_einsum_subscripts,
@@ -174,12 +171,11 @@ def test_evaluate_term():
         getGeneralPolarizationAveragingExpression,
     )
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
-    avrg_func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=polarization_linear_comb)
+    avrg_tensor = calculate_avrg_tensor_einsum(term.avrg_props, molsys.mol_props, polarization_linear_comb)
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
                                                  molsys_data=molsys,
-                                                 avrg_func=avrg_func,
-                                                 precalculated_data=None, 
+                                                 avrg_tensor=avrg_tensor,
                                                  zero_tol=1e-18, states_choice='harmonic')
     print(value)
     print(contribs)
@@ -196,23 +192,22 @@ def test_evaluate_term():
     assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
 
     with pytest.raises(ValueError, match='term has indices that do not have values'):
-        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_func=avrg_func,
+        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_tensor=avrg_tensor,
                                  states_choice='harmonic')
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
                                                  molsys_data=molsys,
-                                                 avrg_func=avrg_func,
-                                                 precalculated_data=None, 
+                                                 avrg_tensor=avrg_tensor,
                                                  zero_tol=1e-18, states_choice='harmonic')
     print(value)
     print(contribs)
 
     # term 2: resonance labels a, b are fixed; summation label c runs over every mode
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, precalculated_data=None,
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1},
                                                 molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                                 states_choice='harmonic')
     n_modes = len(molsys.eigenvals) # type: ignore
-    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_func=avrg_func,
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_tensor=avrg_tensor,
                                            states_choice='harmonic')[0]
                   for c in range(n_modes))
     assert by_hand != 0.
@@ -221,7 +216,7 @@ def test_evaluate_term():
 
     # b is a resonance label: summing over b would add peaks at different positions
     with pytest.raises(ValueError, match=r"resonance labels \['b'\] must be fixed"):
-        evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=None,
+        evaluate_term_coeff_sumover(term, {'a': 0},
                                     molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                     states_choice='harmonic')
 
@@ -276,19 +271,6 @@ def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(t
     values = [func(idx, molsys.mol_props) for idx in ALL_ABC]
     assert any(v != 0. for v in values)
     assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values)
-
-
-@pytest.mark.xfail(strict=True, reason=('calculate_avrg_tensor stores alphabetical axes (a, b, c), but '
-                                        '_get_ind_tuple_from_base reads term 8 in expression order (b, a, c)'))
-def test_term8_precalculated_tensor_gives_the_on_the_fly_value(term8):
-    term, molsys = term8
-    expr = term.avrg_props
-    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=ISO4)
-    pre = PrecalculatedData(avrg_tensors={expr: calculate_avrg_tensor(expr, molsys.mol_props, 6, ISO4)},
-                            avrg_expr_tensor_mapping={expr: expr})
-
-    assert ([eval_avrg_per_indexdict(expr, idx, precalculated_data=pre) for idx in ALL_ABC]
-            == pytest.approx([eval_avrg_per_indexdict(expr, idx, avrg_func=func, molsys_data=molsys) for idx in ALL_ABC]))
 
 
 ## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde (todo.txt F1) ----------------

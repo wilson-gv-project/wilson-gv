@@ -1,15 +1,17 @@
 """
+The numbers: term coefficients, resonance locations, and the spectrum on a grid.
 
-[] 
-[] 
----
+  in:  CompiledTerm list (plan.py), MolSystemData, the orientation-average recipe, a states choice
+  out: rows and zero pairs (build_contributions); the complex amplitude on a grid (draw_all, draw_window)
 
-==> list[SpectralFeature]
+  holds: the four factors of one index set (evaluate_full_index_dict), the sum over the summation labels
+         (evaluate_term_coeff_sumover), the averaged part as one einsum per term (AvrgTensor), the resonance
+         location (solve_LSE_motif), the resonance factors on the grid, the drawing
 """
 
 import string
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -47,18 +49,6 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_system.system_data import VibStatesData
 
 
-@dataclass
-class PrecalculatedData:
-    """
-    TODO/FIXME: avrg_tensors should carry polarization info.
-
-    if avrg_expr in pre.avrg_expr_tensor_mapping:
-    """
-    avrg_tensors: dict = field(default_factory=dict)
-    avrg_expr_tensor_mapping: dict = field(default_factory=dict)
-    vibenedenoms_tensors: dict = field(default_factory=dict)
-    polarization_vec: tuple = ()
-
 """
 The data then passes through these steps; the property name (PropsCollection.names) is the key all the way:
 
@@ -78,7 +68,6 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          idx_dict: dict,
                          molsys_data: 'MolSystemData',
                          polarization_linear_comb: dict | None = None,
-                         precalculated_data: PrecalculatedData | None = None,
                          zero_tol: float = 1e-18,
                          avrg_tensor: 'AvrgTensor | None' = None,
                          keep_leaves: bool = True,
@@ -98,7 +87,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         {'a': 0}          ->  ValueError: summing over b would add peaks at different positions
 
     avrg_tensor: the term's averaged part for every index set (calculate_avrg_tensor_einsum).
-        None -> made here from polarization_linear_comb, unless precalculated_data has the averaged part.
+        None -> made here from polarization_linear_comb, which is then required.
         build_contributions makes it once per term, so it is not made again for every resonance index set.
 
     returns (total, leaves): leaves maps each full index set to its factors, e.g. for a = 0, b = 1, 2 modes:
@@ -118,17 +107,17 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         n_modes = len(molsys_data.eigenvals)
     else: raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
 
-    # only needed when the avrg value isn't looked up from a precalculated tensor
-    tensor = (avrg_tensor if avrg_tensor is not None
-              else _avrg_tensor_for(compl_term, molsys_data, polarization_linear_comb, precalculated_data))
-    avrg_func = None if tensor is None else (lambda index_dict, _props_data: tensor.at(index_dict))
+    if avrg_tensor is None:
+        if polarization_linear_comb is None:
+            raise ValueError('polarization_linear_comb is required when no avrg_tensor is given')
+        avrg_tensor = calculate_avrg_tensor_einsum(compl_term.avrg_props, molsys_data.mol_props,
+                                                   polarization_linear_comb)
 
     def sum_over(index_dict: dict, remaining: list, leaves: dict | None) -> float:
         if not remaining:
             value, contribs = evaluate_full_index_dict(compl_term, index_dict,
                                                        molsys_data,
-                                                       avrg_func,
-                                                       precalculated_data,
+                                                       avrg_tensor,
                                                        zero_tol,
                                                        states_choice=states_choice)
             if leaves is not None:
@@ -145,13 +134,13 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: FULL INDEX SET
 def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                molsys_data: 'MolSystemData',
-                               avrg_func: Callable | None = None,
-                               precalculated_data: PrecalculatedData | None = None,
+                               avrg_tensor: 'AvrgTensor',
                                zero_tol: float = 1e-18,
                                *,
                                states_choice: str) -> tuple[float, dict]:
     """
     Evaluate the term for a single index dictionary.
+    avrg_tensor: the term's averaged part for every index set (calculate_avrg_tensor_einsum)
     states_choice: the state set for the energy differences, molsys_data.states[states_choice]
     Parameters:
         (same as evaluate_term_coeffs)
@@ -169,11 +158,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
 
 
     # Evaluate AVRG
-    AVRG = eval_avrg_per_indexdict(compl_term.avrg_props, index_dict,
-                                   avrg_func=avrg_func,
-                                   molsys_data=molsys_data, 
-                                   precalculated_data=precalculated_data,
-                                   zero_tol=zero_tol)
+    AVRG = eval_avrg_per_indexdict(avrg_tensor, index_dict, zero_tol)
 
     if AVRG == 0.0:
         return 0.0, {'AVRG': AVRG}
@@ -189,14 +174,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
 
     # Evaluate VIBENE_DENOM
-    freqterms = compl_term.freq_vibenedenom
-
-    if precalculated_data is None or not precalculated_data.vibenedenoms_tensors:
-
-        VIBENE_DENOM = harmonic_denom(freqterms, index_dict, molsys_data)
-    else:
-        VIBENE_DENOM = eval_vibenedenom(freqterms, index_dict, precalculated_data)
-
+    VIBENE_DENOM = harmonic_denom(compl_term.freq_vibenedenom, index_dict, molsys_data)
 
     # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
@@ -242,51 +220,19 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     return product_all
 
 
-def _get_ind_tuple_from_base(expr: 'PropsCollection', base_expr: 'PropsCollection', index_dict: dict):
-    """
-    Map expr to indices according to base expression's unique symbols.
-    
-    TODO: expand docs
-    """
-    base_unique = sorted(set(base_expr.get_mode_indices()))
-    expr_inds = expr.get_mode_indices()
-
-    if len(base_unique) < len(expr_inds):
-        # walk through only base_unique ind labels
-        return tuple(index_dict[sym] for sym in base_unique)
-    elif len(base_unique) == len(expr_inds):
-        # walk through all expr_inds labels, there are repeated labels
-        return tuple(index_dict[sym] for sym in expr_inds)
-    else:
-        # this should not be possible in the worflow
-        raise ValueError('This base_expr cannot be a base expression for this expr')
-
-
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET
-def eval_avrg_per_indexdict(avrg_expr: 'PropsCollection',
-                            index_dict: dict, *,
-                            avrg_func: Callable | None = None,
-                            molsys_data: MolSystemData | None = None,
-                            precalculated_data: PrecalculatedData | None = None,
-                            zero_tol: float = 1e-18):
+def eval_avrg_per_indexdict(avrg_tensor: 'AvrgTensor', index_dict: dict, zero_tol: float = 1e-18):
     """
-    if precalculated_data provided - use it;
-    otherwise - compute with molsys_data
+    The averaged part at one index set, read from the term's tensor (calculate_avrg_tensor_einsum).
+    |value| <= zero_tol counts as 0.
     ---
     Averaging papers
     https://pubs.aip.org/aip/jcp/article/67/11/5026/788630/On-three-dimensional-rotational-averages
     https://pubs.aip.org/aip/jcp/article/141/20/204103/193500/Rotational-averaging-of-multiphoton-absorption
     """
-    if precalculated_data is not None and avrg_expr in precalculated_data.avrg_expr_tensor_mapping:
-        avrg_tensor_expr = precalculated_data.avrg_expr_tensor_mapping[avrg_expr]
-        avrg_tensor = precalculated_data.avrg_tensors[avrg_tensor_expr]
-        result = avrg_tensor[_get_ind_tuple_from_base(avrg_expr, avrg_tensor_expr, index_dict)]
-    elif avrg_func is not None and molsys_data is not None:
-        result = avrg_func(index_dict, molsys_data.mol_props)
-    else:
-        raise ValueError('avrg_expr not in precalculated_data and no avrg_func/molsys_data given')
+    result = avrg_tensor.at(index_dict)
 
-    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call (F3)
+    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, and faster (F3)
     return 0. if abs(result) <= zero_tol else result
 
 
@@ -299,7 +245,7 @@ def _make_func_to_compute_avrg(*,
     compute average with given polarization setup for a choice of normal mode indices
 
     The pipeline uses calculate_avrg_tensor_einsum (every index set at once). This loop stays as its
-    reference in the tests, and calculate_avrg_tensor uses it.
+    reference in the tests.
     """
     props_and_names = tuple(zip(avrg_expression, avrg_expression.names))     # names once, not per call
 
@@ -338,9 +284,6 @@ def _make_func_to_compute_avrg(*,
 
                 # retrieve data for property (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
                 product *= props_data[prop_tuple_key].vals[all_inds]
-                
-            # if product != 0.:
-            #     logger.debug(f"Avrg prop contribution for indices {index_choices} and cart axes {cart_axes} with coefficient {polarization_linear_comb[cart_axes]}: {product}")
 
             total += product * polarization_linear_comb[cart_axes]
 
@@ -502,79 +445,11 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     return AvrgTensor(labels, np.einsum(subscripts, *operands, W, optimize=True))
 
 
-def _avrg_tensor_for(term: 'CompiledTerm', molsys_data: 'MolSystemData',
-                     polarization_linear_comb: dict | None,
-                     precalculated_data: PrecalculatedData | None) -> AvrgTensor | None:
-    """the einsum tensor of the term's averaged part; None if precalculated_data has the averaged part"""
-    if precalculated_data is not None and term.avrg_props in precalculated_data.avrg_expr_tensor_mapping:
-        return None
-    if polarization_linear_comb is None:
-        raise ValueError('polarization_vec is required when the avrg tensor is not precalculated')
-    return calculate_avrg_tensor_einsum(term.avrg_props, molsys_data.mol_props, polarization_linear_comb)
-
-
-# EVALUATION OF THE FULL AVRG TENSOR
-def calculate_avrg_tensor(avrg_expression: 'PropsCollection',
-                          props_data: 'MolPropsCollection',
-                          number_of_nmodes: int,
-                          polarization_linear_comb: dict | None = None,
-                          modes_to_fill: list[int] | None = None) -> np.ndarray:
-    """
-    Precalculating the full tensor for given avrg_expression
-
-    modes_to_fill - could be generated with for all normal modes with:
-        modes_to_fill: list[int] = list(range(number_of_nmodes))
-
-    """
-    if polarization_linear_comb is None:
-        polarization_linear_comb = {}
-    if modes_to_fill is None:
-        modes_to_fill = list(range(number_of_nmodes))
-    if max(modes_to_fill) >= number_of_nmodes:
-        raise ValueError(f"modes_to_fill contains indices exceeding number_of_nmodes ({number_of_nmodes})")
-    
-    # so indices are in alphabetical order in full_tensor below
-    mode_inds = sorted(set(avrg_expression.get_mode_indices()))  # list, deterministic order
-
-    from wilson_suite.wilson_intensities.amplitudes.utils import (
-        generate_index_choices_general,
-    )
-
-    ind_choices: list[dict[str, int]] = generate_index_choices_general(indlabels_in_motif=mode_inds, 
-                                                                       labels=modes_to_fill)
-
-    # Indicating generalized version for updating
-    func_general = _make_func_to_compute_avrg(avrg_expression=avrg_expression,
-                                              polarization_linear_comb=polarization_linear_comb)
-
-    full_tensor = np.zeros((number_of_nmodes,)*len(mode_inds))
-
-    for idx in ind_choices:
-        # so indices are in alphabetical order
-        full_tensor[tuple(idx[k] for k in mode_inds)] = func_general(idx, props_data)
-
-    return full_tensor
-
-
-# EVALUATION OF TERM PARTS FOR ONE INDEX SET - from precalculated_data
-def eval_vibenedenom(freqterms: 'FreqTermsCollection',
-                     index_dict: dict,
-                     precalculated_data: PrecalculatedData):
-    """
-    try without precalculated data
-    """
-    vibenedenoms_tensor = precalculated_data.vibenedenoms_tensors[freqterms.get_num_indices_vibenedenom()]
-
-    vibeneden_index_tuple = tuple([index_dict[i] for i in freqterms.get_num_indices_vibenedenom()])
-
-    return vibenedenoms_tensor[vibeneden_index_tuple]
-
-
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
 def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
                      states_choice: str):
     """
-    without precalculated data
+    product of 1/(E_left - E_right), in Eh
     energies from the state set molsys_data.states[states_choice]
     """
     product_all = 1.
@@ -698,13 +573,14 @@ def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
 
 
 def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemData,
-                        polarization_linear_comb=None, precalculated_data=None, *, states_choice: str
+                        polarization_linear_comb: dict, *, states_choice: str
                         ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]]]:
     """
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
     resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
     The number of modes comes from molsys_data.eigenvals, the state energies from
     molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
+    polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
@@ -724,13 +600,12 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     for term_id, term in enumerate(terms):
         motif = term.cmp_resmotf
         # the averaged part for every index set: one einsum per term, not one per index set
-        avrg_tensor = _avrg_tensor_for(term, molsys_data, polarization_linear_comb, precalculated_data)
+        avrg_tensor = calculate_avrg_tensor_einsum(term.avrg_props, molsys_data.mol_props, polarization_linear_comb)
         for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
             ps = ParameterSet(idxset)
 
             # no leaves: FeatureResult.leaves computes a row's leaves again when asked
-            coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data,
-                                                   polarization_linear_comb, precalculated_data,
+            coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, polarization_linear_comb,
                                                    avrg_tensor=avrg_tensor, keep_leaves=False,
                                                    states_choice=states_choice)
             # not saving 0 coeffs
@@ -853,7 +728,6 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
                                              grid_au, propagator, propagator_param=param_au)
 
     return feature.amplitude_coeff * resonance_factor
-    # return np.asarray(feature.amplitude_coeff * resonance_factor)
 
 
 # every feature on every grid point: no boxes, no domains
@@ -906,28 +780,4 @@ def draw_window(window: 'SpectralWindow',
         domain_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
         total[slices] += draw_all(domain.full_features + domain.contrib_features, vibstates_data, domain_coords)
     return total
-
-
-
-"""
-1. compiled terms
-2. data request dict
-3. molsys data
-4. evaluating `term coeff parts` per index set  [eval coeff]    [x]
-5. evaluating `term coeff full` per index set   [eval coeff]    [x]
-6. evaluating `term res cond - res location`    [res loc]       [x]
-7. evaluating `term res cond - on the grid`     [res loc]       []
-
----------
-ResonanceMotif + ParameterSet + VibStatesData ==> ResLocPoint
-
-iterate over:
-    1. Sequence[ResonanceMotif]
-    2. Sequence[ParameterSet] for one ResonanceMotif
-
------
-
-coefficient should be attached to resonance with the same ParameterSet
-
-"""
 

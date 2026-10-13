@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-12
+updated 2026-10-13
 
-Tests  refac_rsp_eval: 606 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 593 pass (2026-10-13, after the precalculated path was deleted).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -27,8 +27,7 @@ Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it
 1. [x] F2  Speed test on ACDM (42 modes), 2026-10-12: 80 s per spectrum (averaging 47 s, deepcopy 16 s).
 2. [x] F1  einsum for the averaged part, 2026-10-12: averaging 47 s -> 0.3 s; ACDM 80 s -> 24 s per spectrum.
    [x] F3  denominators split once per term, 2026-10-12: build_contributions 22 s -> 3.9 s; ACDM 24 s -> 6.5 s.
-   [ ] B   Open: delete the precalculated path (H1), or fix B3, B5, B6. Its reason was speed; the einsum tensor now
-           gives that speed, with the polarization as an input (B3) and the labels kept with the values (B6).
+   [x] B   Precalculated path deleted, 2026-10-13 (see Fixed). B3, B5, B6 went with it.
 3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
 4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 6 open decisions first, then
            a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
@@ -37,7 +36,7 @@ Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it
 7. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
 8. [ ] E4  README, with the data-dict contract (D5).
 
-Small, any time: A14 (one-line docstring); A15 (polarization order, one line); A16 (abs=0 in two tests);
+Small, any time: A15 (polarization order, one line); A16 (abs=0 in two tests);
 H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
@@ -78,7 +77,6 @@ Decisions and known limits
 
 A. Small fixes
 --------------
-[ ] A14 pipeline.py module docstring still says "grid.py -> spectrum array: E2, not built yet". E2 is done.
 [ ] A15 get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
         reverse order: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector,
         k = pulse k (dressWithPulseInteractions, response_terms.py); the experiment lists all_polarizations in the
@@ -97,25 +95,11 @@ A. Small fixes
         averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
 
 
-B. Correctness of the precalculated path
-----------------------------------------
-The on-the-fly path is correct, and compute_features_from_terms uses no precalculated tables.
-Open: fix B3, B5, B6, or delete the precalculated path (H1). Since F1 the on-the-fly path is fast too (one einsum
-tensor per term). Deleting costs test rework: many tests set values through pre_a1_zero, a PrecalculatedData.
-[ ] B3  PrecalculatedData: the averaged-tensor key has no polarization, so two polarizations would share one tensor.
-[ ] B5  eval_vibenedenom looks up a set of labels: 1/w_a twice becomes 1/w_a once (harmonic_denom keeps both).
-        The old code does the same (term_parts.py). No EVV term has a label twice.
-[ ] B6  Averaged tensors are read in the wrong axis order for some terms: calculate_avrg_tensor stores axes
-        alphabetically (a, b, c), _get_ind_tuple_from_base reads them in expression order. e.g. term 8
-        (polgrad[b] dipgrad[a] dipgrad[c]) reads (b, a, c). Pinned by 2 strict-xfail tests:
-        test_precalculated_tensor_gives_the_on_the_fly_value (test_evaluate.py),
-        test_term8_precalculated_tensor_gives_the_on_the_fly_value (test_integration.py). Fix, then unmark them.
-
-
 D. Data model
 -------------
 [ ] D1  PropsCollection.__eq__ only checks "every prop of A is in B", so [p1] == [p1, p2]. Make it frozen, with
-        __eq__ and __hash__ from one key. Delete identify_avrg_motif and _set_attr_for_all_props (only tests use them).
+        __eq__ and __hash__ from one key. Since the precalculated path went (2026-10-13), no code uses a
+        PropsCollection as a dict key; CompiledTerm's == still compares them.
 [ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
 [ ] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
         D1-D3 block nothing: rows store term_id and motif, not the CompiledTerm.
@@ -192,7 +176,7 @@ E. Pipeline
         - [ ] amplitudes/__init__.py: Python runs it before averaging.py, and it imports spectrum_composition,
               evaluation_wf, evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
               wilson_intensities/__init__.py imports amplitudes too.
-        - [ ] evaluate.py imports amplitudes/utils.py (inside a function): move it, or keep it.
+        - [x] evaluate.py imports amplitudes/utils.py: gone with calculate_avrg_tensor (2026-10-13).
         - [ ] wilson_analysis/render/plot_regions.py: E7.
         - [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState; E6 replaces them.
         - [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
@@ -212,7 +196,8 @@ F. Performance
         letters; the output gets the distinct mode labels, alphabetical. e.g. term 8: 'bIL,aJ,cK,IJKL->abc'.
         AvrgTensor keeps the labels with the values, so each term reads the tensor with its own labels (no B6).
         build_contributions makes one tensor per term and passes it down (evaluate_term_coeff_sumover, avrg_tensor).
-        The loop (_make_func_to_compute_avrg) stays as the reference in the tests; calculate_avrg_tensor uses it.
+        The loop (_make_func_to_compute_avrg) stays as the reference in the tests. Since 2026-10-13 the einsum
+        tensor is the only source of the averaged part (the precalculated path is gone, see Fixed).
         Tests: test_evaluate.py: the subscripts of 7 shapes; einsum = loop for every index set (5 shapes x 3
         polarizations, rel 1e-12, abs 0); term 8 summed by hand; a label twice in one property (diagonal); errors;
         one tensor per term. test_integration.py: the 14 EVV subscripts; einsum = loop for every index set, 14 terms
@@ -337,12 +322,12 @@ H2  Make an abstraction on the second real use, not the first. No base classes, 
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from the size of a number.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
-    Not frozen yet: Box, SpectralFeature, SpectralWindow, RectangularDomain, PrecalculatedData.
+    Not frozen yet: Box, SpectralFeature, SpectralWindow, RectangularDomain.
 H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.
-H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do, and plan.py's docstring still
-    says "ONLY importer". No test checks it. Decide: move the translation into plan.py, or drop the rule.
+H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do. plan.py's docstring says so
+    since 2026-10-13. No test checks it. Decide: move the translation into plan.py, or drop the rule.
 
 
 Outside the refactor [outside]
@@ -378,12 +363,12 @@ B7   One resonance point per term, checked when compiling (see Decisions). The `
      always empty.
 -    Leaves on demand (2026-10-12), for analysis: a row's leaves are its summed index sets, each with its four
      factors (feature -> rows -> leaves). FeatureResult keeps what the rows were computed from (compiled, molsys,
-     polarization_linear_comb, precalculated_data: references, not copies; compare=False), and
+     polarization_linear_comb, states_choice: references, not copies; compare=False), and
      FeatureResult.leaves(row) computes one row's leaves again: about 1 ms per row on ACDM. Keeping every row's
      leaves would take 357 MB there (636000 leaves), so build_contributions builds none (keep_leaves=False in
      evaluate_term_coeff_sumover): ACDM build_contributions 3.9 s -> 3.3 s.
-     Tests (test_pipeline.py, test_evaluate.py): the leaves add up to row.coeff (toy molecule, precalculated and
-     on the fly; all 340 formaldehyde rows, both state choices); build_contributions asks for no leaves.
+     Tests (test_pipeline.py, test_evaluate.py): the leaves add up to row.coeff (toy molecule; all 340
+     formaldehyde rows, both state choices); build_contributions asks for no leaves.
      FeatureResult.states (molsys.states[states_choice]) is also the state set that draw_window needs (E6).
 -    States by choice, and MolSystemData.load (2026-10-12). MolSystemData.states holds every state set the source
      has, by choice; the evaluation takes states_choice (see Decisions). MolSystemData.load(origin, prop_names)
@@ -446,6 +431,27 @@ B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
      Tests (test_pipeline.py): toy terms in pulse IDs, props only; prop_names of the 14 EVV terms in pulse IDs =
      those of the compiled terms. Same numbers: the old names and recipe give the same coeffs, bit for bit, on
      all 6 blocks of evv_reference.json.
+A14  The pipeline.py module docstring names the drawing (draw_spectrum, evaluate.draw_window); found done 2026-10-13.
+B    Precalculated path deleted (2026-10-13, H1). Its reason was speed; since F1 the einsum tensor (AvrgTensor)
+     does the same job, with the polarization as an input and the labels kept with the values. A 1/omega table
+     would save about 0.15 s of build_contributions' 3.2 s on ACDM (harmonic_denom's share under cProfile).
+     Deleted: PrecalculatedData, calculate_avrg_tensor, eval_vibenedenom, _get_ind_tuple_from_base, _avrg_tensor_for
+     (evaluate.py); PropsCollection.identify_avrg_motif and _set_attr_for_all_props, and
+     FreqTermsCollection.get_num_indices_vibenedenom (plan.py). B3, B5 and B6 went with them. B5 (1/w_a twice read
+     once) is also in the old code (term_parts.py); harmonic_denom keeps both.
+     The averaged part comes only from AvrgTensor now: build_contributions and compute_features take the recipe
+     as a required argument; evaluate_term_coeff_sumover takes the recipe or the tensor (avrg_tensor);
+     evaluate_full_index_dict and eval_avrg_per_indexdict take the tensor. evaluate.py no longer imports
+     amplitudes/utils.py (E9).
+     Tests: the toy tests take the averaged part from data. molsys_a1_zero (conftest.py) with helpers.TOY_RECIPE
+     gives <polgrad>[a] = (10, 0), as pre_a1_zero did; tests of one index set pass an AvrgTensor. 16 tests went
+     with the code, among them the 2 B6 xfails. Same numbers: evv_reference.json bit for bit; c3_spectrum.py and
+     c2_variations.py print the same output as before when run with PYTHONHASHSEED=0. Without a fixed seed, set
+     order changes the last digits and the listed examples from run to run, in the old code too.
+     ACDM 5.9 s per spectrum, as before.
+-    Cleanup (2026-10-13): commented-out code removed (plan.py, features.py, evaluate.py, H2); the module
+     docstrings of evaluate.py and plan.py name what the modules hold; Box.overlaps lost its wrong "# UNUSED" mark
+     (SpectralFeature.feat_box_overlaps calls it).
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

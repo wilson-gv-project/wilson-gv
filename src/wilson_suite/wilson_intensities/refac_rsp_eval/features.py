@@ -438,11 +438,8 @@ class SpectralFeature:
                 else:
                     delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(gamma, implied_dynrange)
 
-                # gamma = feat.propagator_param
-                # c = feat.amplitude_coeff
                 box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
-                # print('box_extent', box_extent, np.abs(c/(box_extent-1j*gamma)/(box_extent-1j*gamma)), np.abs(c/(-1j*gamma)/(-1j*gamma)), feat.amplitude_coeff)
-                
+
                 feat.feat_box = Box({k: (v - box_extent,
                                          v + box_extent)
                                      for k,v in feat.location.as_dict().items()})
@@ -668,16 +665,6 @@ class RectangularDomain:
     # UNUSED
     def add_a_contrib_feature(self, feature: 'SpectralFeature'):
         self.contrib_features.append(feature)
-
-    # UNUSED - so far? useful for analysis?
-    # def features_in_bounds(self) -> list['SpectralFeature']:
-    #     """Return features whose coordinates lie inside the domain's window."""
-    #     if not self.full_features:
-    #         return []
-    #     coords = np.array([f.location.as_array() for f in self.full_features])
-    #     mask = self.box.contains(coords)
-    #     return [f for f, m in zip(self.full_features, mask) if m]
-
 
     @classmethod
     def from_features(cls, features: list[SpectralFeature]):

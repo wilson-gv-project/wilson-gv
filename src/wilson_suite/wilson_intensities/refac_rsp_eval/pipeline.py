@@ -34,7 +34,6 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    PrecalculatedData,
     build_contributions,
     draw_window,
     evaluate_term_coeff_sumover,
@@ -72,12 +71,11 @@ class FeatureResult:
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # leaves() needs all five; drawing needs the states (FeatureResult.states). References only: nothing is copied.
-    # compare=False: two results are equal by their rows, not by their inputs.
+    # leaves() needs all four; drawing needs the states (FeatureResult.states). References only: nothing is copied.
+    # compare=False: == leaves them out.
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
-    precalculated_data: PrecalculatedData | None = field(default=None, compare=False, repr=False)
     states_choice: str | None = field(default=None, compare=False)
 
     @cached_property
@@ -110,12 +108,12 @@ class FeatureResult:
         the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions does not keep
         them, since every row's leaves would take 357 MB there.
         """
-        if self.compiled is None or self.molsys is None or self.states_choice is None:
+        if (self.compiled is None or self.molsys is None or self.polarization_linear_comb is None
+                or self.states_choice is None):
             raise ValueError('this FeatureResult has no terms or data (made by hand?): compute_features keeps them, '
                              'and leaves need them')
         _, leaves = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
-                                                self.polarization_linear_comb, self.precalculated_data,
-                                                states_choice=self.states_choice)
+                                                self.polarization_linear_comb, states_choice=self.states_choice)
         return leaves # type: ignore
 
     def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
@@ -130,13 +128,13 @@ class FeatureResult:
 
 
 def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
-                     polarization_linear_comb: dict | None = None,
-                     precalculated_data: PrecalculatedData | None = None,
+                     polarization_linear_comb: dict,
                      propagator_param: PropagatorParam | None = None,
                      *,
                      states_choice: str) -> FeatureResult:
     """
     One SpectralFeature per (motif, location).
+    polarization_linear_comb: the orientation-average recipe (make_polarization_linear_comb).
     propagator_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a width
         per condition and/or per frequency (features.PropagatorParam).
     states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
@@ -144,12 +142,10 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) in drawing.
     """
-    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data,
-                                      states_choice=states_choice)
+    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice)
     return FeatureResult(table, zero, propagator_param,
                          compiled=tuple(compiled), molsys=molsys_data,
-                         polarization_linear_comb=polarization_linear_comb, precalculated_data=precalculated_data,
-                         states_choice=states_choice)
+                         polarization_linear_comb=polarization_linear_comb, states_choice=states_choice)
 
 
 def load_molsys_data(terms: Sequence['VibPerturbedTerm'], data_origin: DataOriginInfo) -> MolSystemData:

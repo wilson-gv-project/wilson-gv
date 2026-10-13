@@ -1,24 +1,13 @@
 """
-ONLY importer of wilson_derive
-  
-  in:  terms IN axis choice -- as VibPertTermsCollection
-       magn_conds IN axis choice -- 
-                            -w1 + w2 is always > 0 ==> magn_conds = ((-1, 2),)
-                            MagnConditions = tuple[tuple[int|str, ...], ...]
+From derive's terms to compiled terms: the symbolic side, no molecular data (todo.txt H6).
 
-  
-  out: EvalPlan + WorkManifest
-  
-  holds: PropsCollection, FreqTermsCollection, ResonanceMotif,
-         parse_vibpert_term, index bookkeeping, motif keys
+  in:  terms (VibPerturbedTerm) in the chosen axes (term_var_translate)
+  out: list[CompiledTerm] (compile_terms)
 
----
+  holds: PropsCollection, FreqTermsCollection, ResCondKey, ResonanceMotif, generate_LHS_motif, ParameterSet,
+         ResLocPoint, split_props, CompiledTerm
 
-[] 
-[] 
----
-
-==> tuple[CompiledTerm]
+Imports wilson_derive; pipeline.py does too (term_var_translate), see todo.txt H8.
 """
 
 """
@@ -130,23 +119,9 @@ class PropsCollection:
     # UNUSED
     def get_total_difforder(self):
         return sum([p.dord for p in self.props])
-    
-    def _set_attr_for_all_props(self, attr, value):
-        for prop in self.props:
-            prop.__setattr__(attr, value)
-    
-    def identify_avrg_motif(self):
-        """
-        Averaged properties motif/ID - inds will be set to None.
-        Indices will be added later, when several terms with with avrg motifs are concidered
-        """
-        averaged = copy.deepcopy(self.get_averaged_props())
-        if averaged.props:
-            averaged._set_attr_for_all_props('inds', None)
-            return averaged
 
     """
-    Left from a review: PropsCollection is not frozen, and it is used as a dict key (todo.txt D1).
+    Left from a review: PropsCollection is not frozen, and its == is loose (todo.txt D1).
     sort() returns a new instance since 2026-10-12, so it no longer changes a collection after use (or its names).
     """
     def sort(self) -> 'PropsCollection':
@@ -166,39 +141,6 @@ class PropsCollection:
     def build_request_dict(self, calc_setup: 'DataOriginInfo') -> dict[str, 'DataOriginInfo']:
         """Build a {name: DataOriginInfo} shopping list."""
         return dict.fromkeys(self.names, calc_setup)
-
-
-    # def by_calc_setup(self, origin: DataOriginInfo) -> 'MolPropsCollection':
-    #     """All properties computed with a given setup."""
-    #     return self.filter(lambda p: p.calc_setup == origin)
-
-    # def group_by_calc_setup(self) -> dict[DataOriginInfo, 'MolPropsCollection']:
-    #     """Bucket properties by which setup they use. For batching QC jobs."""
-    #     from collections import defaultdict
-    #     groups = defaultdict(list)
-    #     for p in self.properties:
-    #         groups[p.calc_setup].append(p)
-    #     return {k: MolPropsCollection(v) for k, v in groups.items()}
-
-    # def dress(self, uniform: DataOriginInfo | None = None, 
-    #         by_name: dict[str, DataOriginInfo] | None = None):
-    #     """Attach DataOriginInfo to each property. 
-    #     by_name takes precedence; uniform is the fallback."""
-    #     if uniform is None and by_name is None:
-    #         raise ValueError("Provide `uniform` or `by_name` (or both).")
-        
-    #     for p in self.properties:
-    #         if by_name and p.trivial_name in by_name:
-    #             p.calc_setup = by_name[p.trivial_name]
-    #         elif uniform is not None:
-    #             p.calc_setup = uniform
-    #         else:
-    #             raise ValueError(f"No setup for property {p}")
-
-    # @property
-    # def are_dressed(self) -> bool:
-    #     return all(isinstance(p.calc_setup, DataOriginInfo) for p in self.properties)
-
 
 
 @dataclass
@@ -241,12 +183,6 @@ class FreqTermsCollection:
     
     def get_pert_wf_diff(self):
         return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if ft.is_pert_wf_diff])
-    
-    def get_num_indices_vibenedenom(self):
-        """
-        these vibdiffterms have only sl, sr is zero -- fixme? should it be this?
-        """
-        return tuple(sorted({i for vd in self.get_vibenedenom() for i in vd.sl.q})) # type: ignore
 
     def get_max_state_lvl(self):
         return max(max(len(vd.sl.q), len(vd.sr.q)) for vd in self.freqterms) # type: ignore
@@ -598,22 +534,6 @@ class CompiledTerm:
     @property
     def max_state_lvl(self):
         return max(self.cmp_freqdenom.get_max_state_lvl(), self.cmp_resmotf.get_max_state_lvl())
-
-    # @property
-    # def mode_indices(self):
-    #     self.cmp_freqdenom.get_num_indices_vibenedenom()
-    #     self.cmp_props.get_mode_indices()
-    #     self.cmp_resmotf.get_nm_indices()
-    #     return
-    
-    # def make_data_request(self):
-    #     pass
-
-    """
-    summation_indices: tuple[str, ...] | None  # from tellNonSummSummIndices
-    non_summation_indices: tuple[str, ...] | None
-    all_indices: tuple[str, ...] | None        # sorted union
-    """
 
 
 ## --------------------------------------------------------------------

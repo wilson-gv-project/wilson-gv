@@ -15,11 +15,8 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     AvrgTensor,
-    PrecalculatedData,
-    _get_ind_tuple_from_base,
     _make_func_to_compute_avrg,
     build_contributions,
-    calculate_avrg_tensor,
     calculate_avrg_tensor_einsum,
     draw_all,
     draw_window,
@@ -28,7 +25,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     eval_non_avrg_per_indexdict,
     eval_rescond_resloc,
     eval_resonance_factor,
-    eval_vibenedenom,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     get_RHS_motif,
@@ -68,6 +64,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     PS_01,
     PS_10,
     PS_11,
+    TOY_RECIPE,
     E0_eigval,
     E1_eigval,
     ab_term,
@@ -85,7 +82,7 @@ from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 ## Resonance location: shared motifs -------------------------------------------
 # MOTIF_AB, MOTIF_A, MOTIF_MIXED and MOTIF_B_TWICE are explained in helpers.py.
-# The fixtures `states`, `molsys` and `pre_a1_zero` come from conftest.py.
+# The fixtures `states`, `molsys` and `molsys_a1_zero` come from conftest.py.
 
 
 @pytest.fixture
@@ -245,35 +242,6 @@ def test_eval_non_avrg_missing_property_raises(molsys):
         eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0}, molsys)
 
 
-def test_get_ind_tuple_from_base_distinct_vs_repeated_base_labels():
-    """
-    `expr` is an averaged property product as it appears in one term, with that term's mode
-    labels. `base_expr` is the member of expr's motif whose tensor was actually computed
-    (avrg_expr_tensor_mapping[expr] -> base_expr); that tensor has one axis per UNIQUE base
-    label, in alphabetical order. get_ind_tuple_from_base returns the position in that tensor
-    holding expr's value for the mode assignment index_dict (keyed by expr's labels).
-
-    Two shapes of base:
-      - all base labels distinct -> one axis per slot; expr's labels are read slot by slot
-      - a base label repeats     -> fewer axes than slots; only the unique labels are read
-    A base with more unique labels than expr has slots cannot stand in for expr.
-    """
-    index_dict = {'a': 1, 'b': 0}
-
-    # all-distinct base: axes (a, b) <-> slots, so expr's labels are read slot by slot
-    base = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
-    expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')])
-    assert _get_ind_tuple_from_base(expr, base, index_dict) == (1, 0)
-
-    # repeated base label: 'a' fills both slots, the tensor has a single axis -> one index
-    repeated = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
-    assert _get_ind_tuple_from_base(repeated, PropsCollection([polprop(ops=(0, 1), inds='a')]), index_dict) == (1,)
-
-    # more unique base labels than expr has slots: base cannot represent expr
-    with pytest.raises(ValueError):
-        _get_ind_tuple_from_base(PropsCollection([polprop(ops=(0, 1), inds='a')]), base, index_dict)
-
-
 ## Energy denominators, on the fly ---------------------------------------------
 # otf_vibdiffdenom: 1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
 # harmonic_denom:   1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
@@ -321,15 +289,6 @@ def test_harmonic_denom_needs_one_mode_per_denominator(molsys):
 def test_harmonic_denom_needs_eigenvals(molsys):
     with pytest.raises(ValueError, match='eigenvals'):
         harmonic_denom(FreqTermsCollection([vibdiff(sl='a')]), {'a': 0}, replace(molsys, eigenvals=None))
-
-
-def test_eval_vibenedenom_reads_precomputed_tensor():
-    tensor = np.array([[1., 2.], [3., 4.]])
-    pre = PrecalculatedData(avrg_tensors={}, avrg_expr_tensor_mapping={},
-                            vibenedenoms_tensors={('a', 'b'): tensor})
-    freqterms = FreqTermsCollection([vibdiff(sl='b'), vibdiff(sl='a')])
-
-    assert eval_vibenedenom(freqterms, {'a': 1, 'b': 0}, pre) == 3.
 
 
 ## Averaged properties, on the fly ---------------------------------------------
@@ -450,42 +409,23 @@ def test_avrg_func_needs_every_property_in_the_data():
         func({'a': 0, 'b': 1, 'c': 2}, no_polgrad)
 
 
-# -- eval_avrg_per_indexdict: precalculated tensor first, otherwise on the fly ---------
+# -- eval_avrg_per_indexdict: the averaged part at one index set, from the term's tensor ---------
 
-AVRG_A = PropsCollection([polprop(ops=(0, 1), inds='a')])
-
-
-def test_eval_avrg_per_indexdict_on_the_fly_is_the_avrg_func_value(molsys):
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-    idx = {'a': 0, 'b': 1, 'c': 2}
-
-    value = eval_avrg_per_indexdict(evv_avrg_expr(), idx, avrg_func=func, molsys_data=replace(molsys, mol_props=evv_props()))
-
-    assert value == func(idx, evv_props())
+def one_value(v: float) -> AvrgTensor:
+    """the averaged part v at a = 0"""
+    return AvrgTensor(('a',), np.array([v]))
 
 
-def test_eval_avrg_per_indexdict_prefers_precalculated_data(molsys):
-    def must_not_run(*_):
-        raise AssertionError('avrg_func was called although the tensor is precalculated')
-    pre = PrecalculatedData(avrg_tensors={AVRG_A: np.array([10., 20.])}, avrg_expr_tensor_mapping={AVRG_A: AVRG_A})
+def test_eval_avrg_per_indexdict_reads_the_tensor_at_the_index_set():
+    """labels the tensor does not have (c) are ignored"""
+    tensor = AvrgTensor(('a', 'b'), np.array([[1., 2.], [3., 4.]]))
 
-    assert eval_avrg_per_indexdict(AVRG_A, {'a': 1}, avrg_func=must_not_run, molsys_data=molsys,
-                                   precalculated_data=pre) == 20.
+    assert eval_avrg_per_indexdict(tensor, {'a': 1, 'b': 0, 'c': 1}) == 3.
 
 
-def test_eval_avrg_per_indexdict_falls_back_to_avrg_func_when_expr_is_not_precalculated(molsys):
-    assert eval_avrg_per_indexdict(AVRG_A, {'a': 1}, avrg_func=lambda idx, props: 7., molsys_data=molsys,
-                                   precalculated_data=PrecalculatedData()) == 7.
-
-
-def test_eval_avrg_per_indexdict_needs_precalculated_data_or_avrg_func():
-    with pytest.raises(ValueError, match='no avrg_func'):
-        eval_avrg_per_indexdict(AVRG_A, {'a': 0})
-
-
-def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero(molsys):
+def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero():
     def value(v):
-        return eval_avrg_per_indexdict(AVRG_A, {'a': 0}, avrg_func=lambda idx, props: v, molsys_data=molsys, zero_tol=1e-18)
+        return eval_avrg_per_indexdict(one_value(v), {'a': 0}, zero_tol=1e-18)
 
     assert value(1e-20) == 0.
     assert value(-1e-20) == 0.
@@ -494,10 +434,9 @@ def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero(molsys):
 
 @pytest.mark.parametrize('v, expected', [(1e-18, 0.), (-1e-18, 0.), (1.0000001e-18, 1.0000001e-18), (-2e-18, -2e-18)],
                          ids=['+zero_tol', '-zero_tol', 'just above', 'below -zero_tol'])
-def test_eval_avrg_per_indexdict_zero_tol_itself_counts_as_zero(v, expected, molsys):
+def test_eval_avrg_per_indexdict_zero_tol_itself_counts_as_zero(v, expected):
     """|v| <= zero_tol is 0, as np.isclose(v, 0, atol=zero_tol, rtol=0) gave before F3"""
-    assert eval_avrg_per_indexdict(AVRG_A, {'a': 0}, avrg_func=lambda idx, props: v,
-                                   molsys_data=molsys, zero_tol=1e-18) == expected
+    assert eval_avrg_per_indexdict(one_value(v), {'a': 0}, zero_tol=1e-18) == expected
 
 
 @pytest.mark.parametrize('v, expected', [(1e-20, 0.), (-1e-20, 0.), (1e-18, 0.), (-1e-18, 0.),
@@ -508,39 +447,6 @@ def test_eval_non_avrg_turns_values_up_to_zero_tol_into_zero(v, expected, molsys
 
     assert eval_non_avrg_per_indexdict(PropsCollection([polprop(inds='abc')]), {'a': 0, 'b': 0, 'c': 0},
                                        molsys, zero_tol=1e-18) == expected
-
-
-# -- calculate_avrg_tensor: the on-the-fly value for every index set ----------------
-
-def test_calculate_avrg_tensor_holds_the_on_the_fly_values_on_alphabetical_axes():
-    """Axes follow the labels alphabetically (a, b, c), not their order in the expression (b, a, c)."""
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-
-    tensor = calculate_avrg_tensor(evv_avrg_expr(), evv_props(), N_MODES, ISO4)
-
-    assert tensor.shape == (N_MODES,) * 3
-    for idx in ALL_ABC:
-        assert tensor[idx['a'], idx['b'], idx['c']] == pytest.approx(func(idx, evv_props()))
-
-
-def test_calculate_avrg_tensor_has_one_axis_per_distinct_label():
-    """polgrad[b] * dipgrad[a] * dipgrad[b] (term 2): labels a, b -> a 2-axis tensor."""
-    assert calculate_avrg_tensor(evv_avrg_expr('bab'), evv_props(), N_MODES, ISO4).shape == (N_MODES, N_MODES)
-
-
-def test_calculate_avrg_tensor_fills_only_modes_to_fill():
-    full = calculate_avrg_tensor(evv_avrg_expr(), evv_props(), N_MODES, ISO4)
-
-    part = calculate_avrg_tensor(evv_avrg_expr(), evv_props(), N_MODES, ISO4, modes_to_fill=[0, 2])
-
-    filled = np.ix_([0, 2], [0, 2], [0, 2])
-    np.testing.assert_allclose(part[filled], full[filled])
-    assert np.count_nonzero(part) == 8                      # 2**3 filled entries, mode 1 stays 0
-
-
-def test_calculate_avrg_tensor_rejects_modes_beyond_the_mode_count():
-    with pytest.raises(ValueError, match='exceeding number_of_nmodes'):
-        calculate_avrg_tensor(evv_avrg_expr(), evv_props(), 2, ISO4, modes_to_fill=[0, 2])
 
 
 # -- make_avrg_einsum_subscripts: the symbolic averaged part as one einsum (todo.txt F1) ---------
@@ -590,7 +496,7 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 #   'bac'  terms 8, 13        expression order b, a, c; tensor axes a, b, c (alphabetical, tensor.labels).
 #                             Right: read with tensor.labels, as AvrgTensor.at does:
 #                                 {'a': 0, 'b': 1, 'c': 2} -> values[0, 1, 2]
-#                             Wrong: read in expression order (b, a, c), as the precalculated path does (B6):
+#                             Wrong: read in expression order (b, a, c), as the deleted precalculated path did (B6):
 #                                 {'a': 0, 'b': 1, 'c': 2} -> values[1, 0, 2], the value of a=1, b=0, c=2.
 #   'abc'  no EVV term        expression order = axis order: the plain case.
 #   'cab'  terms 3, 6         polgrad read at c, the last axis.
@@ -675,27 +581,6 @@ def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
         calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {(0, 0): 1.})
 
 
-# -- both paths together: a tensor from calculate_avrg_tensor, read back as precalculated data --
-
-@pytest.mark.parametrize('labels', [
-    'abc',                                    # labels in alphabetical order
-    'bab',                                    # term 2: a repeated label
-    pytest.param('bac', marks=pytest.mark.xfail(strict=True, reason=(
-        'term 8: calculate_avrg_tensor stores alphabetical axes (a, b, c), but _get_ind_tuple_from_base '
-        'reads distinct labels in expression order (b, a, c)'))),
-])
-def test_precalculated_tensor_gives_the_on_the_fly_value(labels, molsys):
-    expr = evv_avrg_expr(labels)
-    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=ISO4)
-    pre = PrecalculatedData(avrg_tensors={expr: calculate_avrg_tensor(expr, evv_props(), N_MODES, ISO4)},
-                            avrg_expr_tensor_mapping={expr: expr})
-    otf_molsys = replace(molsys, mol_props=evv_props())
-
-    for idx in ALL_ABC:
-        assert (eval_avrg_per_indexdict(expr, idx, precalculated_data=pre)
-                == pytest.approx(eval_avrg_per_indexdict(expr, idx, avrg_func=func, molsys_data=otf_molsys)))
-
-
 # -- one EVV-shaped term, every factor on the fly -------------------------------------
 
 def term8_like() -> CompiledTerm:
@@ -722,9 +607,9 @@ def with_evv_props(molsys):
 
 def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys):
     term = term8_like()
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+    tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 0}, with_evv_props(molsys), avrg_func=func,
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 0}, with_evv_props(molsys), tensor,
                                                states_choice='harmonic')
 
     # a=0, b=1, c=0: states ab = '0,1' and c = '0'; omegas from eigenvals
@@ -740,12 +625,12 @@ def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys)
 def test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes(molsys):
     term = term8_like()
     otf_molsys = with_evv_props(molsys)
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+    tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
     total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
                                                 states_choice='harmonic')
 
-    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, avrg_func=func,
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, tensor,
                                            states_choice='harmonic')[0] for c in (0, 1))
     assert set(leaves) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
     assert total == pytest.approx(by_hand) != 0.
@@ -757,9 +642,9 @@ def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_state
     dipgrad[1] = 0.
     otf_molsys = replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props(dipgrad=dipgrad)]))
     term = term8_like()
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+    tensor = calculate_avrg_tensor_einsum(term.avrg_props, otf_molsys.mol_props, ISO4)
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 1, 'b': 1, 'c': 0}, otf_molsys, avrg_func=func,
+    value, contribs = evaluate_full_index_dict(term, {'a': 1, 'b': 1, 'c': 0}, otf_molsys, tensor,
                                                states_choice='harmonic')
 
     assert (value, contribs) == (0., {'AVRG': 0.})
@@ -798,7 +683,7 @@ def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeyp
     assert all(t is made[0] for t in passed[:4]) and all(t is made[1] for t in passed[4:])
 
 
-def test_build_contributions_splits_the_denominators_once_per_term(molsys, pre_a1_zero, monkeypatch):
+def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zero, monkeypatch):
     """
     F3: the split into 1/omega and energy-difference denominators is made once per term and kept
     (CompiledTerm.freq_vibenedenom, freq_pert_wf_diff), not once per index set. Each split builds a new
@@ -814,12 +699,12 @@ def test_build_contributions_splits_the_denominators_once_per_term(molsys, pre_a
             return _original(self)
         monkeypatch.setattr(FreqTermsCollection, name, counting)
 
-    build_contributions([ab_term(), ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+    build_contributions([ab_term(), ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
 
-def test_build_contributions_keeps_no_leaves(molsys, pre_a1_zero, monkeypatch):
+def test_build_contributions_keeps_no_leaves(molsys_a1_zero, monkeypatch):
     """The rows do not carry leaves; FeatureResult.leaves computes them again when asked (test_pipeline.py)."""
     asked = []
     sumover = evaluate_mod.evaluate_term_coeff_sumover
@@ -829,7 +714,7 @@ def test_build_contributions_keeps_no_leaves(molsys, pre_a1_zero, monkeypatch):
         return sumover(*args, **kwargs)
     monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', recording)
 
-    build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+    build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     assert asked == [False] * 4                              # 4 index sets (a, b over 2 modes)
 
@@ -837,23 +722,18 @@ def test_build_contributions_keeps_no_leaves(molsys, pre_a1_zero, monkeypatch):
 ## One term end to end -------------------------------------------------------
 
 @pytest.fixture
-def term_and_precalc():
+def term_and_avrg():
     """
-    toy_term() plus its precalculated <polgrad>[a] tensor (see helpers.toy_term).
+    toy_term() and its averaged part <polgrad>[a] = POLGRAD_AVRG, given as the tensor (see helpers.toy_term).
     """
-    term = toy_term()
-    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])   # equal by value to term.avrg_props
-    pre = PrecalculatedData(avrg_tensors={avrg_key: POLGRAD_AVRG},
-                            avrg_expr_tensor_mapping={avrg_key: avrg_key},
-                            vibenedenoms_tensors=None)  # None -> harmonic denominator on the fly # type: ignore
-    return term, pre
+    return toy_term(), AvrgTensor(('a',), POLGRAD_AVRG)
 
 
-def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc, molsys):
-    term, pre = term_and_precalc
+def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_avrg, molsys):
+    term, avrg = term_and_avrg
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
-                                               molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18,
+                                               molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
                                                states_choice='harmonic')
 
     # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
@@ -863,12 +743,12 @@ def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_precalc
     assert contribs['AVRG'] == POLGRAD_AVRG[0]
 
 
-def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_precalc, molsys):
-    term, pre = term_and_precalc
+def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_avrg, molsys):
+    term, avrg = term_and_avrg
     molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
-                                               molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18,
+                                               molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
                                                states_choice='harmonic')
 
     assert value == 0.
@@ -914,7 +794,7 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
         getGeneralPolarizationAveragingExpression,
     )
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
-    total, leaves = evaluate_term_coeff_sumover(term, fixed, precalculated_data=None, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
+    total, leaves = evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                                 states_choice='harmonic')
 
     assert total == expected_total
@@ -939,7 +819,7 @@ def test_evaluate_term_coeffs_resonance_labels_must_be_fixed(fixed, not_fixed, m
     assert str(err.value) == f'resonance labels {not_fixed} must be fixed, not summed'
 
 
-def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_avrg, molsys):
     """
     Same summation, now with the real evaluate_single_index_dict and the fixture's toy term
     (0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a). Fix a=0 and let b, c run
@@ -953,12 +833,12 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     Leaves are keyed by ParameterSet, which adds a 'zero' sentinel entry, so
     {k: leaf[k] for k in 'abc'} recovers the plain (a, b, c) dict needed to re-evaluate a leaf.
     """
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys,
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
                                                 states_choice='harmonic')
 
-    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, precalculated_data=pre, zero_tol=1e-18,
+    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
                                                states_choice='harmonic')
                 for leaf in leaves}
     assert len(leaves) == 4             # b, c in {0, 1}
@@ -966,14 +846,14 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     assert leaves == {leaf: contribs for leaf, (_, contribs) in per_leaf.items()}
 
 
-def test_evaluate_term_coeffs_hand_computed_total(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_hand_computed_total(term_and_avrg, molsys):
     """
     a=0, sum over b, c of  0.5 * cff[0,b,c] * <polgrad>[0] * 1/(E_0b - E_0) * 1/omega_0 .
     c enters only cff, so the two c values are added first; b picks state '0,0' or '0,1'.
     """
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
 
-    total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, precalculated_data=pre, molsys_data=molsys,
+    total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
                                            states_choice='harmonic')
 
     by_b = ((CFF[0, 0, 0] + CFF[0, 0, 1]) / convNu2Ene(E00 - E0)
@@ -981,53 +861,52 @@ def test_evaluate_term_coeffs_hand_computed_total(term_and_precalc, molsys):
     assert total == pytest.approx(0.5 * POLGRAD_AVRG[0] / convNu2Ene(E0_eigval) * by_b)
 
 
-def test_evaluate_term_coeffs_on_the_fly_avrg_matches_precalculated(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_avrg, molsys):
     """
-    No precalculated tensor -> <polgrad>[a] is built from polarization_linear_comb and the raw
+    No tensor given -> <polgrad>[a] is built from polarization_linear_comb and the raw
     'polgrad' data:  <polgrad>[a] = sum over (i, j) of coeff_ij * polgrad[a, i, j] .
     polgrad is chosen so that this gives POLGRAD_AVRG again (4 + 2*3 = 10, 8 + 2*6 = 20);
     every other entry is 100, so reading a wrong cartesian slot changes the result.
     """
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
     polgrad = np.full((2, 3, 3), 100.)
     polgrad[:, 0, 0] = [4., 8.]
     polgrad[:, 1, 1] = [3., 6.]
     props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
     molsys = replace(molsys, mol_props=props)
 
-    precalc_total, precalc_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
-                                                                precalculated_data=pre, states_choice='harmonic')
-    otf_total, otf_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
-                                                        polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
-                                                        states_choice='harmonic')
+    given_total, given_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
+                                                            states_choice='harmonic')
+    recipe_total, recipe_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
+                                                              polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
+                                                              states_choice='harmonic')
 
-    assert otf_total == pytest.approx(precalc_total)
-    assert set(otf_leaves) == set(precalc_leaves)
-    assert all(otf_leaves[leaf]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for leaf in otf_leaves)
-
-
-@pytest.mark.parametrize('pre', [None, PrecalculatedData()], ids=['no precalculated data', 'avrg not in mapping'])
-def test_evaluate_term_coeffs_needs_polarization_when_avrg_not_precalculated(pre, molsys):
-    with pytest.raises(ValueError, match='polarization_vec is required'):
-        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, precalculated_data=pre, states_choice='harmonic')
+    assert recipe_total == pytest.approx(given_total)
+    assert set(recipe_leaves) == set(given_leaves)
+    assert all(recipe_leaves[leaf]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for leaf in recipe_leaves)
 
 
-def test_evaluate_term_coeffs_needs_eigenvals(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
+    with pytest.raises(ValueError, match='polarization_linear_comb is required when no avrg_tensor is given'):
+        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='harmonic')
+
+
+def test_evaluate_term_coeffs_needs_eigenvals(term_and_avrg, molsys):
     """The number of modes to sum over is len(eigenvals); without eigenvals there is nothing to sum over."""
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
 
     with pytest.raises(ValueError, match='eigenvals'):
-        evaluate_term_coeff_sumover(term, {'a': 0}, replace(molsys, eigenvals=None), precalculated_data=pre,
+        evaluate_term_coeff_sumover(term, {'a': 0}, replace(molsys, eigenvals=None), avrg_tensor=avrg,
                                     states_choice='harmonic')
 
 
-def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_precalc, molsys, monkeypatch):
+def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
     """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 leaves."""
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
     three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, precalculated_data=pre,
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
                                                 states_choice='harmonic')
 
     assert total == 9.
@@ -1039,12 +918,8 @@ def test_evaluate_term_coeffs_zero_avrg_leaves_are_kept(molsys):
     <polgrad>[1] = 0 -> every leaf with a=1 stops right after AVRG. The leaves are still recorded,
     with only the AVRG entry. The states a=1 would need ('1,1' is missing) are never looked up.
     """
-    term = toy_term()
-    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])
-    pre = PrecalculatedData(avrg_tensors={avrg_key: np.array([10., 0.])},
-                            avrg_expr_tensor_mapping={avrg_key: avrg_key})
-
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 1}, molsys, precalculated_data=pre,
+    total, leaves = evaluate_term_coeff_sumover(toy_term(), {'a': 1}, molsys,
+                                                avrg_tensor=AvrgTensor(('a',), np.array([10., 0.])),
                                                 states_choice='harmonic')
 
     assert total == 0.
@@ -1052,13 +927,13 @@ def test_evaluate_term_coeffs_zero_avrg_leaves_are_kept(molsys):
     assert all(contribs == {'AVRG': 0.} for contribs in leaves.values())
 
 
-def test_evaluate_term_coeffs_without_leaves_gives_the_same_total(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_without_leaves_gives_the_same_total(term_and_avrg, molsys):
     """keep_leaves=False (build_contributions): no leaves, the same total to the last bit"""
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, precalculated_data=pre,
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
                                                 states_choice='harmonic')
-    total_only, no_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, precalculated_data=pre,
+    total_only, no_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
                                                         keep_leaves=False, states_choice='harmonic')
 
     assert no_leaves is None
@@ -1066,14 +941,14 @@ def test_evaluate_term_coeffs_without_leaves_gives_the_same_total(term_and_preca
     assert total_only == total != 0.
 
 
-def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
+def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
     """
     Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print).
     Currently: {ParameterSet(idx_dict): (total, {ParameterSet(full idx): contribs})}, one key only.
     """
-    term, pre = term_and_precalc
+    term, avrg = term_and_avrg
 
-    result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, precalculated_data=pre,
+    result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, avrg_tensor=avrg,
                                          states_choice='harmonic')
 
     from pprint import pprint
@@ -1087,14 +962,25 @@ def test_evaluate_term_coeffs_result_shape(term_and_precalc, molsys):
 
 ## build_contributions --------------------------------------------------------
 # One row per (term, index set) with a nonzero coefficient. The toy term fixes a, b (its motif's
-# labels) and sums over c. <polgrad>[1] = 0, so every pair with a=1 has coeff 0: 2 rows (a=0) and
-# 2 zero pairs (a=1). a=b=1 needs state '1,1', which `states` lacks, so solving any a=1 pair would
-# raise: these tests also show that zero pairs never reach solve_LSE_motif.
+# labels) and sums over c. molsys_a1_zero with TOY_RECIPE gives <polgrad>[a] = (10, 0), so every pair
+# with a=1 has coeff 0: 2 rows (a=0) and 2 zero pairs (a=1). a=b=1 needs state '1,1', which `states`
+# lacks, so solving any a=1 pair would raise: these tests also show that zero pairs never reach solve_LSE_motif.
+
+def test_toy_polgrad_and_recipe_give_10_and_0(molsys_a1_zero):
+    """
+    The averaged part the build_contributions and compute_features tests use. polgrad is 100 outside the two
+    entries the recipe reads, so a wrong slot gives another number.
+    """
+    tensor = calculate_avrg_tensor_einsum(ab_term().avrg_props, molsys_a1_zero.mol_props, TOY_RECIPE)
+
+    assert tensor.labels == ('a',)
+    np.testing.assert_array_equal(tensor.values, [10., 0.])
+
 
 # -- what becomes a row: rows, zero pairs ------------------------------------------
 
-def test_build_contributions_one_row_per_nonzero_pair(molsys, pre_a1_zero):
-    rows, zero = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+def test_build_contributions_one_row_per_nonzero_pair(molsys_a1_zero):
+    rows, zero = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     assert {r.params for r in rows} == {PS_00, PS_01}
     assert all(r.term_id == 0 and r.motif == ResonanceMotif.from_tuples(MOTIF_AB) for r in rows)
@@ -1102,59 +988,37 @@ def test_build_contributions_one_row_per_nonzero_pair(molsys, pre_a1_zero):
     assert len(rows) + len(zero) == 4          # every (a, b) pair exactly once
 
 
-def test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run(molsys, pre_a1_zero):
+def test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run(molsys_a1_zero):
     """
     MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair.
     A compiled term cannot have this motif (B7: CompiledTerm.from_VibPertTerm raises);
     a term built by hand can, and then the run stops instead of dropping the pair.
     """
     with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
-        build_contributions([ab_term(MOTIF_B_TWICE)], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+        build_contributions([ab_term(MOTIF_B_TWICE)], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
 
 def test_build_contributions_without_terms_is_empty(molsys):
-    rows, zero = build_contributions([], molsys, states_choice='harmonic')
+    rows, zero = build_contributions([], molsys, TOY_RECIPE, states_choice='harmonic')
 
     assert (len(rows), zero) == (0, [])
 
 
 # -- the numbers in a row: coeff and location --------------------------------------
 
-def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys, pre_a1_zero):
+def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys_a1_zero):
     term = ab_term()
 
-    rows, _ = build_contributions([term], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+    rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     for r in rows:
-        expected, _ = evaluate_term_coeff_sumover(term, {'a': r.params['a'], 'b': r.params['b']}, molsys,
-                                                  precalculated_data=pre_a1_zero, states_choice='harmonic')
+        expected, _ = evaluate_term_coeff_sumover(term, {'a': r.params['a'], 'b': r.params['b']}, molsys_a1_zero,
+                                                  TOY_RECIPE, states_choice='harmonic')
         assert r.coeff == expected != 0.
 
 
-def test_build_contributions_polarization_path_matches_precalculated(molsys, pre_a1_zero):
-    """
-    No precalculated data: <polgrad>[a] = polgrad[a,0,0] + 2 * polgrad[a,1,1] from polarization_linear_comb.
-    polgrad gives (10, 0), the same as pre_a1_zero; every other entry is 100, so a wrong slot changes the result.
-    """
-    polgrad = np.full((2, 3, 3), 100.)
-    polgrad[:, 0, 0] = [4., 0.]
-    polgrad[:, 1, 1] = [3., 0.]
-    props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
-    with_polgrad = replace(molsys, mol_props=props)
-
-    precalc_rows, precalc_zero = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero,
-                                                     states_choice='harmonic')
-    otf_rows, otf_zero = build_contributions([ab_term()], with_polgrad,
-                                             polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
-                                             states_choice='harmonic')
-
-    assert [(r.params, r.location) for r in otf_rows] == [(r.params, r.location) for r in precalc_rows]
-    assert [r.coeff for r in otf_rows] == pytest.approx([r.coeff for r in precalc_rows])
-    assert otf_zero == precalc_zero
-
-
-def test_build_contributions_locations_are_in_cm1(molsys, pre_a1_zero):
-    rows, _ = build_contributions([ab_term()], molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
+def test_build_contributions_locations_are_in_cm1(molsys_a1_zero):
+    rows, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     location = {r.params: r.location for r in rows}
     assert location[PS_01].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # 1600, 500 cm-1
@@ -1163,7 +1027,7 @@ def test_build_contributions_locations_are_in_cm1(molsys, pre_a1_zero):
 
 # -- the location cache: one solve per (motif, params) -------------------------------
 
-def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero, monkeypatch):
+def test_build_contributions_one_solve_per_motif_and_params(molsys_a1_zero, monkeypatch):
     """Two terms with one motif: 2 solves, not 4, and the rows of both terms hold the same location object."""
     solved = []
     real_solve = evaluate_mod.solve_LSE_motif
@@ -1173,8 +1037,8 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero,
     monkeypatch.setattr(evaluate_mod, 'solve_LSE_motif', counting_solve)
     term = ab_term()
 
-    rows, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys,
-                                  precalculated_data=pre_a1_zero, states_choice='harmonic')
+    rows, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys_a1_zero, TOY_RECIPE,
+                                  states_choice='harmonic')
 
     assert sorted(solved) == [PS_00, PS_01]
     row = {(r.term_id, r.params): r for r in rows}
@@ -1183,9 +1047,9 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys, pre_a1_zero,
         assert row[(1, ps)].coeff == pytest.approx(4 * row[(0, ps)].coeff)    # frac_factor 0.5 -> 2.
 
 
-def test_build_contributions_cache_keeps_motifs_apart(molsys, pre_a1_zero):
+def test_build_contributions_cache_keeps_motifs_apart(molsys_a1_zero):
     """Same index sets, different motifs: each motif gets its own location. A cache keyed by params alone fails this."""
-    rows, _ = build_contributions([ab_term(MOTIF_AB), ab_term(MOTIF_A)], molsys, precalculated_data=pre_a1_zero,
+    rows, _ = build_contributions([ab_term(MOTIF_AB), ab_term(MOTIF_A)], molsys_a1_zero, TOY_RECIPE,
                                   states_choice='harmonic')
 
     location = {(r.term_id, r.params): r.location for r in rows}
@@ -1195,10 +1059,10 @@ def test_build_contributions_cache_keeps_motifs_apart(molsys, pre_a1_zero):
 
 # -- input checks --------------------------------------------------------------------
 
-def test_build_contributions_needs_eigenvals(molsys, pre_a1_zero):
+def test_build_contributions_needs_eigenvals(molsys_a1_zero):
     """The number of modes comes from molsys_data.eigenvals."""
     with pytest.raises(ValueError, match='eigenvals'):
-        build_contributions([ab_term()], replace(molsys, eigenvals=None), precalculated_data=pre_a1_zero,
+        build_contributions([ab_term()], replace(molsys_a1_zero, eigenvals=None), TOY_RECIPE,
                             states_choice='harmonic')
 
 

@@ -85,9 +85,17 @@ MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           #
 
 
 # --- toy molecule data and a term with resonance labels a, b (build_contributions, compute_features) ---
-# The fixtures `states`, `molsys` and `pre_a1_zero` (conftest.py) are built from these.
+# The fixtures `states`, `molsys` and `molsys_a1_zero` (conftest.py) are built from these.
 
 CFF = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.   # cff[a, b, c] = 1 + 4a + 2b + c
+
+# The averaged part <polgrad>[a] of toy_term, from data and a recipe:
+#   TOY_RECIPE reads polgrad[a, x, x] + 2 * polgrad[a, y, y] = (4 + 2 * 3, 0 + 2 * 0) = (10, 0)
+# so every index set with a = 1 has coeff 0. Every other polgrad entry is 100: a wrong slot changes the result.
+TOY_POLGRAD = np.full((2, 3, 3), 100.)
+TOY_POLGRAD[:, 0, 0] = [4., 0.]
+TOY_POLGRAD[:, 1, 1] = [3., 0.]
+TOY_RECIPE = {(0, 0): 1., (1, 1): 2.}
 
 PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
 PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})

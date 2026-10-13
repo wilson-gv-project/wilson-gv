@@ -104,15 +104,6 @@ def test_propscollection_request_dict_names_each_property_once():
     assert coll.build_request_dict(origin) == {'dipgrad': origin, 'cff': origin}
 
 
-def test_identify_avrg_motif_erases_inds_on_a_copy_only():
-    coll = PropsCollection([polprop(ops=(0, 1), inds='a'), polprop(inds='ab')])
-
-    motif = coll.identify_avrg_motif()
-
-    assert [p.inds for p in motif] == [None] # type: ignore
-    assert coll.get_mode_indices() == ('a', 'a', 'b')
-
-
 def test_propscollection_equal_by_value_and_usable_as_key():
     a = PropsCollection([polprop(ops=(0, 1), inds='a')])
     b = PropsCollection([polprop(ops=(0, 1), inds='a')])
@@ -137,12 +128,6 @@ def test_freqterms_pert_wf_diff_against_ground_is_pert_only():
     coll = FreqTermsCollection([vibdiff(sl='ab', sr='', pert=True)])
     assert vibdiff_keys(coll.get_vibenedenom()) == []
     assert vibdiff_keys(coll.get_pert_wf_diff()) == [(('a', 'b'), (), True)]
-
-
-def test_freqterms_num_indices_are_sorted_unique_left_quanta():
-    coll = FreqTermsCollection([vibdiff(sl='b'), vibdiff(sl='ab'), vibdiff(sl='ab', sr='a', pert=True)])
-
-    assert coll.get_num_indices_vibenedenom() == ('a', 'b')
 
 
 ## ResCondKey ---------------------------------------------------------------
@@ -455,13 +440,13 @@ def test_compiled_term_from_vibpert_term():
 
     assert ct.frac_factor == 0.5
     assert ct.all_props.get_mode_indices() == ('a', 'a', 'b')
-    assert ct.cmp_freqdenom.get_num_indices_vibenedenom() == ('a',)
+    assert vibdiff_keys(ct.freq_vibenedenom) == [(('a',), (), False)]
     assert ct.cmp_resmotf == ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
     assert ct.idx_summ == ('b',)
     assert ct.idx_nonsumm == ('a',)
 
     indices = set(ct.all_props.get_mode_indices()
-                  + ct.cmp_freqdenom.get_num_indices_vibenedenom()
+                  + tuple(i for vd in ct.cmp_freqdenom for i in (*vd.sl.q, *vd.sr.q))  # type: ignore
                   + tuple(ct.cmp_resmotf.get_nm_indices()))
     assert sorted(set(ct.idx_summ+ct.idx_nonsumm)) == sorted(indices)
 

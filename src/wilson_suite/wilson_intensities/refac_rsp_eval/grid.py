@@ -131,7 +131,6 @@ class Box:
             for ax in shared_axes
         )
 
-    # UNUSED - useful for analysis or for future?
     def overlaps(self, other: "Box") -> bool:
         shared_axes = set(self.axes) & set(other.axes)
         return all(

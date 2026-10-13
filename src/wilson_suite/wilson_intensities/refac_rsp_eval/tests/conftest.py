@@ -2,16 +2,15 @@
 Fixtures shared by the refac_rsp_eval tests: the toy molecule built from helpers.py.
 """
 
-import numpy as np
+from dataclasses import replace
+
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import PrecalculatedData
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import PropsCollection
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     CFF,
+    TOY_POLGRAD,
     E0_eigval,
     E1_eigval,
-    polprop,
     toy_states,
 )
 from wilson_suite.wilson_system.system_data import (
@@ -35,8 +34,7 @@ def molsys(states) -> MolSystemData:
 
 
 @pytest.fixture
-def pre_a1_zero() -> PrecalculatedData:
-    """Precalculated <polgrad>[a] = (10, 0): every index set with a=1 has coeff 0."""
-    avrg_key = PropsCollection([polprop(ops=(0, 1), inds='a')])
-    return PrecalculatedData(avrg_tensors={avrg_key: np.array([10., 0.])},
-                             avrg_expr_tensor_mapping={avrg_key: avrg_key})
+def molsys_a1_zero(molsys) -> MolSystemData:
+    """molsys plus polgrad: with helpers.TOY_RECIPE, <polgrad>[a] = (10, 0), so every index set with a=1 has coeff 0."""
+    polgrad = MolecularProperty(trivial_name='polgrad', vals=TOY_POLGRAD, extra_data={})
+    return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, polgrad]))
