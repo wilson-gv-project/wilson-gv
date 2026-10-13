@@ -244,7 +244,7 @@ def test_feature_result_keeps_its_inputs_without_copying(molsys, pre_a1_zero):
 
     result = compute_features(terms, molsys, precalculated_data=pre_a1_zero, states_choice='harmonic')
 
-    assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms))
+    assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms)) # type: ignore
     assert result.molsys is molsys
     assert result.precalculated_data is pre_a1_zero
     assert result.polarization_linear_comb is None
@@ -650,6 +650,7 @@ def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formal
         points = result.grid_axes[ax]  # type: ignore
         assert (points[0], points[-1], len(points)) == pytest.approx((mn, mx, 101))
     assert result.grid_result.shape == (101, 101)  # type: ignore
+    assert result.grid_result is not None
     intensity = np.abs(result.grid_result) ** 2
 
     # at the strongest feature: its own peak height (get_intensity), plus about 2 % from its neighbours

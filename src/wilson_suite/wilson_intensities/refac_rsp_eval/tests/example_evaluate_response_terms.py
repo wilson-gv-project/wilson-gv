@@ -19,6 +19,7 @@ import numpy as np
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    SpectralWindow,
     draw_spectrum,
     evaluate_response_terms,
     load_molsys_data,
@@ -67,6 +68,16 @@ def main():
     t_full = time.perf_counter() - t0
 
     # 5. what came out
+
+    if result.grid_result is None:
+        raise RuntimeError('grid_result is None, something went wrong')
+    if result.grid_axes is None:
+        raise RuntimeError('grid_axes is None, something went wrong')
+    if result.grid_mesh is None:
+        raise RuntimeError('grid_mesh is None, something went wrong')
+    if result.spectral_window is None:
+        raise RuntimeError('spectral_window is None, something went wrong')
+    
     grid_axes = result.grid_axes                    # 1D points per axis, cm-1
     mesh = result.grid_mesh                         # every grid point, mesh['A'][i, j]: what a renderer reads
     intensity = np.abs(result.grid_result) ** 2     # grid_result: complex amplitude in au, [i_A, i_B]
@@ -77,7 +88,7 @@ def main():
     print(f'brightest point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
           f'intensity {intensity[i, j]:.3e} au')
 
-    drawn = result.spectral_window                  # the window as drawn: features with their boxes
+    drawn: SpectralWindow = result.spectral_window                  # the window as drawn: features with their boxes
     domains = drawn.find_clusters_by_featboxes()    # overlapping boxes, drawn together
     print(f'drawn: {len(drawn.full_features)} features inside, {len(drawn.contrib_features)} outside with a box '
           f'that reaches in, {len(domains)} domains')
@@ -95,6 +106,10 @@ def main():
     t0 = time.perf_counter()
     wider = draw_spectrum(replace(result.feature_result, propagator_param=8.), window, dim_sizes, dynrange=1001.)
     t_redraw = time.perf_counter() - t0
+
+    if wider.grid_result is None:
+        raise RuntimeError('grid_result is None, something went wrong')
+    
     print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.grid_result) ** 2):.3e} au; '
           f'rows reused: {wider.feature_result.table is result.feature_result.table}; '
           f'{t_redraw:.3f} s vs {t_full:.3f} s for the whole run')
