@@ -1,9 +1,12 @@
 refac_rsp_eval — TODO
-updated 2026-10-13
+updated 2026-10-14
 
-Tests  refac_rsp_eval: 606 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
-       Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
-       Since 2026-10-13 also 7 fail on purpose until A15 is fixed: wilson_intensities/tests/unit/test_get_pol_tensor.py.
+Tests (run 2026-10-14)
+       refac_rsp_eval: 606 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
+       (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
+       The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
+       test_domains, test_resonances, test_term_var_translate (see "No item yet").
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -12,37 +15,31 @@ the data dict, from the reader (wilson_data_obtainer -> CQCParse, a separate rep
 derive (not changed in this refactor). Errors in either one need a check on that side.
 
 
-Status (2026-10-11)
+Status (2026-10-13)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
-agrees. What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
+agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
+What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
 README. Only E6 is a big job.
-Speed (2026-10-12): ACDM (42 modes) took 80 s per spectrum (F2); with the einsum averaging (F1) 24 s; with the
-denominators split once per term (F3) 6.5 s; without leaves in build_contributions (leaves on demand, see Done)
-5.9 s: build_contributions 3.3 s, drawing 2.5 s.
 
 
 Order of work
 -------------
-Needed to finish the refactor. Steps 1-6 may use the old code; step 7 deletes it.
-1. [x] F2  Speed test on ACDM (42 modes), 2026-10-12: 80 s per spectrum (averaging 47 s, deepcopy 16 s).
-2. [x] F1  einsum for the averaged part, 2026-10-12: averaging 47 s -> 0.3 s; ACDM 80 s -> 24 s per spectrum.
-   [x] F3  denominators split once per term, 2026-10-12: build_contributions 22 s -> 3.9 s; ACDM 24 s -> 6.5 s.
-   [x] B   Precalculated path deleted, 2026-10-13 (see Fixed). B3, B5, B6 went with it.
-3. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
-4. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 6 open decisions first, then
-           a check that it gives the same spectrum as the old path. Until it exists, nothing calls the new code.
-5. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
-6. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
-7. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
-8. [ ] E4  README, with the data-dict contract (D5).
+Needed to finish the refactor. Steps 1-4 may use the old code; step 5 deletes it.
+1. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
+2. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 6 open decisions first, then
+           a check that it gives the same spectrum as the old path.
+3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
+4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
+5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
+6. [ ] E4  README, with the data-dict contract (D5).
 
 Small, any time: A15 (polarization order, one line); A16 (abs=0 in two tests);
 H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
 Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
-Outside the refactor [outside]: G2, G8 (reader checks); the normal_modes read error (F2).
+Outside the refactor [outside]: G2, G8 (reader checks); G9 (the normal_modes read error).
 No item yet:
 - The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
 - From the old README: is single-component Cartesian selection a wanted feature?
@@ -59,8 +56,8 @@ Decisions and known limits
   both alike, e.g. <['a'],[]>.
 - states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic -> harmonic. The two
   differ in 272 of 340 formaldehyde coefficients. The data cannot know the regime, so nothing has a default.
-  Since 2026-10-12 the data holds no choice: MolSystemData.states holds every state set the source has, by
-  choice (states['harmonic'], states['anharmonic']); the evaluation takes states_choice (compute_features,
+  The data holds no choice (2026-10-12): MolSystemData.states holds every state set the source has, by choice
+  (states['harmonic'], states['anharmonic']). The evaluation takes states_choice (compute_features,
   build_contributions, evaluate_term_coeff_sumover, evaluate_full_index_dict, otf_vibdiffdenom) and reads
   states[states_choice]. One loaded MolSystemData serves both choices. A choice the data lacks raises
   (MolSystemData.check_states_choice), e.g. 'GVPT2' or 'anharmonic' without anharmonic states.
@@ -80,6 +77,10 @@ Decisions and known limits
 - Drawing by domains cuts each feature at its box (draw_window docstring). Formaldehyde, dynrange 100: 1.05 % of
   the max intensity. A weak peak next to a strong one in another domain can be 12-36 % off. The old code cuts
   the same way (C3).
+- Peak width (E5, 2026-10-13): propagator_param sizes both the drawn peak and its box. A box is sized with the
+  largest peak width, on every axis; a width that grows away from the peak can still be cut off by the box.
+  A width function gets only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (the
+  FIXME in eval_resonance_factor).
 
 
 A. Small fixes
@@ -89,28 +90,22 @@ A. Small fixes
         k = pulse k (dressWithPulseInteractions, response_terms.py); the experiment lists all_polarizations in the
         same order. e.g. get_pol_laser([x, y, z]) gives [-1.0]; epsilon_xyz = +1.
         Effect: rank 2 and 4 none (their f elements map onto themselves under reversal), so the 14 EVV terms are
-        right. Rank 3: the sign flips. Rank 5 and mixed rank 6: wrong values (rank 5, xyzxx: exact -0.292,
-        code -0.238). test_pol_laser tests rank 4 only, so it cannot see the reversal.
-        Fix, checked 2026-10-11 in memory against the exact average (G4), ranks 2-6; rank 4 old vs fixed 4e-15:
+        right. Rank 3: the sign flips. A VibExperiment with detector x, pulse 1 y, pulse 2 z averages three
+        transition dipoles to -det(mu)/6 instead of +det(mu)/6, the value of the mirror-image molecule.
+        Rank 5 and mixed rank 6: wrong values (rank 5, xyzxx: exact -0.292, code -0.238; beta-alpha CARS form,
+        fields x, y, z, x, x: +0.598 instead of -0.963).
+        Fix, checked against the exact average (G4), ranks 2-6; rank 4 old vs fixed 4e-15:
             return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
-        Pinned by 14 strict-xfail tests in wilson_intensities/tests/unit/test_averaging_pol_order.py (2026-10-12):
-        the product A slot by slot, get_pol_laser for [x, y, z] and [x, y, z, x, x], and the whole recipe against
-        the exact orientation average (the G4 method), ranks 2-6. 13 more tests there pass before and after the fix.
-        Checked with the fix applied in memory: all 27 pass with the marks ignored; test_averaging.py, the experiment
-        tests and refac_rsp_eval (473 pass, 2 xfail) do not change. Fix, then unmark them.
-        Shown on the evaluator (2026-10-13): tests/test_a15_polarization_order.py, 5 plain tests that fail until
-        the fix (checked: with the fix in memory all 7 pass). Rank 3: a VibExperiment with detector x, pulse 1 y,
-        pulse 2 z hands the evaluator polarization_avg_vector [-1.0], right [+1.0] (det of the three directions);
-        three transition dipoles then average to -det(mu)/6 instead of +det(mu)/6, the value of the mirror-image
-        molecule. Rank 5, beta-alpha CARS form (hypgrad x polgrad), fields x, y, z, x, x: +0.598 instead of -0.963.
-        The reference (det/6, and the quadrature exact_average) passes on its own.
-        On get_pol_tensor itself (2026-10-13): wilson_intensities/tests/unit/test_get_pol_tensor.py, 7 plain tests
-        that fail until the fix, no averaging needed: [x, y, z] puts its 1 at index (2, 1, 0) instead of (0, 1, 2);
-        at ranks 2-6 the result is the Kronecker product of the reversed list; rank 3 get_pol_laser gives
-        -det(a, b, c) instead of +det(a, b, c). One control passes (rank 2 dot product). The docstring states why
-        index k must be pol[k] (get_pol_tensor's own docstring, get_iso_f's slot positions, VibExperiment's order).
-        With the fix: both new files pass; the 14 strict xfails turn into XPASS failures, so remove their marks.
-        exact_average's docstring now says why it is exact (checked: 512 vs 4096 rotations, ranks 1-6, 1.5e-14).
+        Pinned by:
+        - wilson_intensities/tests/unit/test_get_pol_tensor.py: 7 plain tests that fail until the fix, no
+          averaging needed (index order, Kronecker product of the list, rank 3 = +det); 1 control passes.
+        - wilson_intensities/tests/unit/test_averaging_pol_order.py: 14 strict xfails (the recipe against the
+          exact orientation average, ranks 2-6); 13 more pass before and after the fix.
+        - tests/test_a15_polarization_order.py: 5 plain tests that fail until the fix (rank 3 and rank 5 through
+          the evaluator); 2 pass.
+        Checked with the fix applied in memory: all of them pass; test_averaging.py, the experiment tests and the
+        rest of refac_rsp_eval do not change.
+        Fix, then remove the 14 xfail marks (they turn into XPASS failures).
 [ ] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
         averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
 
@@ -118,20 +113,18 @@ A. Small fixes
 D. Data model
 -------------
 [ ] D1  PropsCollection.__eq__ only checks "every prop of A is in B", so [p1] == [p1, p2]. Make it frozen, with
-        __eq__ and __hash__ from one key. Since the precalculated path went (2026-10-13), no code uses a
-        PropsCollection as a dict key; CompiledTerm's == still compares them.
+        __eq__ and __hash__ from one key. No code uses a PropsCollection as a dict key; CompiledTerm's ==
+        still compares them.
 [ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
 [ ] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
         D1-D3 block nothing: rows store term_id and motif, not the CompiledTerm.
 [ ] D4  VibState, MolecularProperty and MolPropsCollection exist twice: wilson_main/abstractions.py and
-        wilson_system/system_data.py. Decide who owns them; the other side imports. (DataOriginInfo is one
-        class since B1.) Keep the imports free of cycles: plan.py imports system_data only for type hints
-        (if TYPE_CHECKING), system_data.py does not import plan.py (since 2026-10-12); evaluate.py and pipeline.py
-        import system_data for real.
-[ ] D5  Data-dict contract: what the evaluator expects in the data dict.
-        Old and new code read the same dict, so comparing them cannot find a wrong dict.
+        wilson_system/system_data.py. Decide who owns them; the other side imports. Keep the imports free of
+        cycles: plan.py imports system_data only for type hints (if TYPE_CHECKING), system_data.py does not
+        import plan.py; evaluate.py and pipeline.py import system_data for real.
+[ ] D5  Data-dict contract: what the evaluator expects in the data dict. Delivering a dict that fits is the
+        reader's job [outside].
         To do: write the list below into the README; add the load checks named in it.
-        Delivering a dict that fits is the reader's job [outside] (see "Outside the refactor").
         - names: properties as dipgrad, polgrad, polhess, diphess, cff, ...; frequencies as 'nc_sqrt_eigval';
           states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there
           (properties: in MolSystemData.load since 2026-10-12; frequencies, states: not yet).
@@ -155,34 +148,29 @@ E. Pipeline
         (git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md). After D4. Contents:
         the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
         reference; the size of the cut), the data-dict contract (D5), the decisions above.
-[x] E5  Width of the drawn peak vs the width of its box, 2026-10-13: one source. propagator_param (compute_features,
-        compute_features_from_terms, evaluate_response_terms, FeatureResult, SpectralFeature) is a number or a
-        function (vd, freqs) -> cm-1, a width per condition and/or per frequency (features.PropagatorParam).
-        It was called lineshape_parameter (the old code's name); one name now, as in eval_resonance_factor.
-        eval_feature_on_grid takes it from the feature, not as an argument: drawing calls the function on the
-        grid, get_intensity and both box makers at the peak (SpectralFeature.peak_widths). A function needs the
-        states: features_from_rows gives each feature its conditions (VibDiff per condition) from FeatureResult.states.
-        Limits: a box is sized with the largest peak width, on every axis; a width that grows away from the peak
-        can still be cut off by the box. The function gets only the VibDiff; if it ever needs the condition's
-        axes, pass the ResCondKey too (the FIXME in eval_resonance_factor).
 [ ] E6  wilson_main adapter: a new evaluate path in WilsonSimulation, next to EvaluationWorkflow (wilson_main:
-        carefully). Until it exists, the old pipeline runs, double count included (C3). Decide first:
-        - [x] where states_choice comes from: the vib analysis regime (see Decisions); the adapter reads it
-        - [ ] old settings without a new counterpart: minimum_box_padding, scale_wrt_max_intensity
-        - [ ] grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges)
-        - [ ] data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
-        - [ ] the magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
-              SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
-        - [x] return the states: FeatureResult.states (2026-10-12, with the leaves on demand, see Done)
-        - [ ] the default dynrange, matched to the plot's dynamic range (log scale is the renderer's default;
-              see the cut in Decisions)
-        - [ ] nothing that assumes point features only (E8)
-        - [x] excluded modes: pass VibAnaSetup.exclude_modes as exclude_modes (2026-10-13, see Decisions). The
-              old-vs-new check matches only without excluded modes: the two codes exclude differently.
-        The new calls (since 2026-10-13): MolSystemData (load_molsys_data, or from WilsonSimulation's data),
-        evaluate_response_terms(sim.terms in pulse IDs, laser_pol = exp.polarization_avg_vector, ...), then
-        draw_spectrum. draw_spectrum already uses make_grid and dynrange 1000 by default; the two items above
-        decide whether to keep that.
+        carefully). Until it exists, the old pipeline runs, double count included (C3).
+        The calls (pipeline.py):
+            molsys = load_molsys_data(terms, data_origin)                                     once
+            result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
+                                             propagator_param=, exclude_modes=)              FeatureResult
+            spec   = draw_spectrum(result, window, dim_sizes, dynrange=1000.)                 EvalRspResult
+        terms = sim.terms (in pulse IDs); laser_pol = exp.polarization_avg_vector.
+        Decided:
+        - states_choice: from the vib analysis regime (see Decisions); the adapter reads it.
+        - exclude_modes: VibAnaSetup.exclude_modes (see Decisions). The old-vs-new check matches only without
+          excluded modes: the two codes exclude differently.
+        - the states for drawing: FeatureResult.states.
+        Open:
+        - old settings without a new counterpart: minimum_box_padding, scale_wrt_max_intensity
+        - grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
+          draw_spectrum uses make_grid now.
+        - data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
+        - the magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
+          SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
+        - the default dynrange (draw_spectrum: 1000), matched to the plot's dynamic range (log scale is the
+          renderer's default; see the cut in Decisions)
+        - nothing that assumes point features only (E8)
         Check: the same spectrum as EvaluationWorkflow.evaluate, through WilsonSimulation (C3 called the new
         functions directly). Needs the old code. Expect differences only where parameter sets share a location.
         Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
@@ -202,7 +190,6 @@ E. Pipeline
         - [ ] amplitudes/__init__.py: Python runs it before averaging.py, and it imports spectrum_composition,
               evaluation_wf, evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
               wilson_intensities/__init__.py imports amplitudes too.
-        - [x] evaluate.py imports amplitudes/utils.py: gone with calculate_avrg_tensor (2026-10-13).
         - [ ] wilson_analysis/render/plot_regions.py: E7.
         - [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState; E6 replaces them.
         - [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
@@ -213,88 +200,21 @@ E. Pipeline
         - First decide about G7: its old-vs-new part needs the old code. Wait for G7, or do G7 later without it.
 
 
-F. Performance
---------------
-[x] F1  einsum for the averaged part. Done 2026-10-12.
-        calculate_avrg_tensor_einsum (evaluate.py): one einsum per term gives the averaged part for every index set.
-        make_avrg_einsum_subscripts writes the einsum from the symbolic expression: each property gets its mode
-        labels, then one letter per Cartesian slot (I, J, K, L = slot 0, 1, 2, 3); W (the recipe) gets the slot
-        letters; the output gets the distinct mode labels, alphabetical. e.g. term 8: 'bIL,aJ,cK,IJKL->abc'.
-        AvrgTensor keeps the labels with the values, so each term reads the tensor with its own labels (no B6).
-        build_contributions makes one tensor per term and passes it down (evaluate_term_coeff_sumover, avrg_tensor).
-        The loop (_make_func_to_compute_avrg) stays as the reference in the tests. Since 2026-10-13 the einsum
-        tensor is the only source of the averaged part (the precalculated path is gone, see Fixed).
-        Tests: test_evaluate.py: the subscripts of 7 shapes; einsum = loop for every index set (5 shapes x 3
-        polarizations, rel 1e-12, abs 0); term 8 summed by hand; a label twice in one property (diagonal); errors;
-        one tensor per term. test_integration.py: the 14 EVV subscripts; einsum = loop for every index set, 14 terms
-        x 3 polarizations, formaldehyde (rel 1e-12, abs 1e-18 = zero_tol). The stored reference rows (C2) and G1
-        pass unchanged through the einsum path.
-        Agreement: formaldehyde rel at most 7e-14; where the loop gives 0, einsum gives at most 4e-19. ACDM, 14000
-        random index sets: rel at most 8e-14. ACDM rows and zero pairs are the same as with the loop (17101, 7595).
-        Speed, ACDM (f2_speed.py): averaging 47 s -> 0.3 s (14 einsums + 892584 lookups); build_contributions 78 s ->
-        22 s; total 80 s -> 24 s.
-        Not done: einsum for the whole sum over summation labels (with cff and the denominators).
-        Size: n_modes ** (number of distinct labels). 3 labels at 42 modes: 0.6 MB; 5 labels would be 1 GB.
-        Measured 2026-10-11 (random polgrad and dipgrad, rank 4, laser_pol (1, 1, 1)):
-        - On the fly: 62 us per index set, for any number of modes. build_contributions asks for 12 n^3 + 2 n^2
-          averages (14 EVV terms): 6 modes 0.17 s, 20 modes 6 s, 40 modes 50 s, 80 modes 6.4 min
-          (time per call x number of calls).
-        - One einsum per averaged expression, the whole n^3 tensor: 0.06 ms (6 modes), 0.12 ms (40), 0.44 ms (80).
-          Memory n^3 x 8 bytes: 0.5 MB at 40 modes. On formaldehyde it gives the on-the-fly values (all 14 terms,
-          every index set, 3 polarizations) to 4e-16 of the largest value.
-        - Why slow: per call, 21 recipe entries x 3 properties = 63 Python steps. Each step calls prop_trivname,
-          searches MolPropsCollection one by one and reads one numpy element. The checks and an import inside the
-          closure run on every call too.
-        - Repeated work: terms 2-13 average the same product, polgrad (slots 0, 3) x dipgrad (1) x dipgrad (2), only
-          with other labels (term 3 reads T[c, a, b], term 8 T[b, a, c]). One n^3 tensor could serve 12 terms.
-          Terms 2, 4, 5, 7, 9-12 have an average without c, yet it is computed again for every c.
-        - Averaging is about 70 % of build_contributions. The rest is about 27 us per index set, so about 20 s at
-          40 modes. Its largest part is the deepcopy in FreqTermsCollection.__post_init__ (get_vibenedenom and
-          get_pert_wf_diff build a new collection on every index set).
-[x] F2  Runtime on a real bigger molecule. Decides F1 and F3.
-        Molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git):
-            wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out
-        (ACAC is acetic acid, 18 modes: too small.)
-        Reader (checked 2026-10-12) [outside]: load_molsys_data fails on ACDM and ACAC at normal_modes ("cannot
-        reshape ... into shape (0,3,3)"). The evaluator does not use normal_modes. MolSystemData.load requests only
-        the terms' properties + nc_sqrt_eigval, harmonic_states, anharmonic_states. Since 2026-10-12
-        load_molsys_data, and so compute_features_from_terms, goes through it: ACDM runs end to end.
-        ACDM loads so in 4 s.
-        Script: tests/f2_speed.py. The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states
-        'anharmonic'. Drawing as in examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700
-        points, gamma 4.7 cm-1, dynrange 500.
-        Measured 2026-10-12 (one run):
-        - load 4 s
-        - build_contributions 78 s: 17101 rows, 7595 zero.
-          Averaging (compute_for_idx_choice) 47 s: 892584 calls (12 x 42^3 + 2 x 42^2), 53 us per call.
-          Deepcopy (FreqTermsCollection.__post_init__) 16 s. The rest of build_contributions 15 s.
-          The two parts are cProfile's shares (61 %, 21 %) times the time of the run without cProfile.
-        - In the rest: np.isclose, 1.7 million calls, 11 % under cProfile. It is the zero check of each averaged
-          and non-averaged value (eval_avrg_per_indexdict, eval_non_avrg_per_indexdict). For one number,
-          abs(x) <= zero_tol gives the same result.
-        - features_from_rows 0.02 s (3524 features); SpectralWindow.from_features 0.02 s (1780 features near the
-          window); draw_window 2.5 s (6 domains).
-        - Total without load: 80 s. Expected: averaging about 55 s, the rest up to 25 s. Close.
-        Each new polarization, states choice or axis choice runs build_contributions again: 78 s each time.
-        Followed by F1 (2026-10-12): 24 s in total. Then F3 (2026-10-12): 6.5 s in total. Then the leaves on
-        demand (build_contributions builds no leaves, 2026-10-12): 5.9 s in total.
-[x] F3  The denominators split once per term. Done 2026-10-12.
-        Before: get_vibenedenom and get_pert_wf_diff built (and deepcopied) a new FreqTermsCollection on every
-        index set (evaluate_full_index_dict). ACDM after F1: 11 s of the 22 s in build_contributions.
-        Now CompiledTerm keeps the two parts: freq_vibenedenom and freq_pert_wf_diff (cached_property, plan.py),
-        made on first use, once per term. Not passed down from build_contributions as F1 does: the split needs
-        only the term, not the data.
-        With it, in evaluate.py, the zero checks: abs(x) <= zero_tol instead of np.isclose(x, 0, atol=zero_tol,
-        rtol=0). The same for one number (NaN included: False both ways); 1.7 million calls on ACDM.
-        Tests: the split is made once (test_plan.py); build_contributions splits 2 times for 2 terms (8 times
-        without F3, test_evaluate.py); the zero checks at and around zero_tol.
-        Speed, ACDM (f2_speed.py, two runs): build_contributions 22 s -> 3.9 s; total 24 s -> 6.5 s. Rows and zero
-        pairs unchanged (17101, 7595). Each part, measured in memory first: the split 23.5 s -> 13.5 s, then the
-        zero checks -> 4.5 s.
-        Left, not needed: evaluate_full_index_dict checks on every index set that every label has a value, 0.56 s.
-        Inside the pipeline that check cannot fail: sum_over fills every label.
-        Gone since (2026-10-12, leaves on demand, see Done): the leaves that build_contributions built (one
-        ParameterSet per summed index set) and dropped; build_contributions 3.9 s -> 3.3 s.
+F. Speed
+--------
+Speed test: tests/f2_speed.py on ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git:
+wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out).
+The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states 'anharmonic'. Drawing as in
+examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points, gamma 4.7 cm-1, dynrange 500.
+Now: load 4 s, once per molecule. Per spectrum 5.9 s: build_contributions 3.3 s (17101 rows, 7595 zero),
+drawing 2.5 s. Each new polarization, states choice or axis choice runs build_contributions again.
+Per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand). See Done.
+Not done, not needed so far:
+- einsum for the whole sum over summation labels (with cff and the denominators). Size: n_modes ** (number of
+  distinct labels). 3 labels at 42 modes: 0.6 MB; 5 labels would be 1 GB.
+- evaluate_full_index_dict checks on every index set that every label has a value: 0.56 s on ACDM. Inside the
+  pipeline that check cannot fail: sum_over fills every label.
+- a 1/omega table: about 0.15 s of build_contributions on ACDM (harmonic_denom's share under cProfile).
 
 
 G. Checks beyond old = new
@@ -308,16 +228,12 @@ checking side.
         Limit (2026-10-11): a rotation test cannot catch wrong weights. Any mix of isotropic tensors stays the same
         under rotation, e.g. laser_pol (0.3, -1.2, 2.0), which no setup of unit vectors gives, passes too
         (test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
-[ ] G4  Averaging weights by brute force: average over many random orientations for the 5 polarization setups
-        of C2; compare with getGeneralPolarizationAveragingExpression.
-        Exact instead of random (scratch check 2026-10-11): Euler angles z-y-z; alpha and gamma 8 even steps,
-        cos(beta) 8 Gauss-Legendre points: 512 rotations. Exact for products of up to 7 rotation-matrix elements,
-        so for ranks 2-6. Average of A . (R x ... x R) T over the grid, with A = pol[0] x pol[1] x ... and T a random
-        molecular tensor; compare with the sum of recipe[k] * T[k]. Numpy only on the checking side.
+[ ] G4  Averaging weights against the exact orientation average, numpy only on the checking side.
+        exact_average (test_averaging_pol_order.py, A15): Euler angles z-y-z; alpha and gamma 8 even steps,
+        cos(beta) 8 Gauss-Legendre points: 512 rotations, exact for ranks 1-6. Tested: exact_average against two
+        textbook values (rank 2 <mu_Z mu_Z> = |mu|^2 / 3; rank 4 Raman, zzzz and zxzx); the recipe against
+        exact_average for ranks 2-6 (all parallel, crossed pairs, random vectors).
         Found: the weights are right; ranks 3, 5 and 6 read the polarizations in reverse order (A15).
-        Partly a test since 2026-10-12: test_averaging_pol_order.py (A15) has exact_average, two textbook values
-        that check exact_average itself (rank 2 <mu_Z mu_Z> = |mu|^2 / 3; rank 4 Raman, zzzz and zxzx), and the
-        recipe against the exact average for ranks 2-6 (all parallel, crossed pairs, random vectors).
         Left:
         - the 5 polarization setups of C2
         - M x Gram(f) = identity for ranks 2-6, Gram(f)[r, s] = sum over all indices of f_r * f_s. Guards the
@@ -331,6 +247,10 @@ checking side.
         To do: generate terms, run the B7 check, then old vs new with the c2 scripts (needs the old code, E9).
         Look for line features (E8), mixed averaging ranks (averaging_rank raises), and parameter sets that share
         a location (the double count, C3).
+        Expect old != new where a term has the same label twice in its 1/w product: the old code (term_parts.py)
+        uses 1/w_a once, harmonic_denom keeps both. No EVV term has a label twice.
+        Run c2_variations.py and c3_spectrum.py with PYTHONHASHSEED=0 to compare outputs: without a fixed seed,
+        set order changes the last digits and the listed examples from run to run, in the old code too.
         First look, 2026-10-09 (derive only, the 3 setups in fixtures.py):
         - evv_experiment: 14 terms, 1 motif; all 4 valid axis choices pass B7; averaging rank 4.
         - evv_experiment_pulse_1_and_2_coincident: 44 terms, 4 motifs. 2 Raman-like terms have one condition,
@@ -371,40 +291,40 @@ and G1 would all miss a reader error. They matter for the final spectra.
 [ ] G8  CFOUR reader: not checked. It turns dimensionless derivatives into mass-weighted ones (times sqrt(w)).
         Found 2026-10-11: qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass
         factor; getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
+[ ] G9  normal_modes: the reader fails on ACDM and ACAC ("cannot reshape ... into shape (0,3,3)"; checked
+        2026-10-12). The evaluator does not need normal_modes: MolSystemData.load requests only the terms'
+        properties, nc_sqrt_eigval, harmonic_states and anharmonic_states, so ACDM runs end to end.
 
 
 Done
 ----
-Details in the named files, or in git history.
+Details in the named files, or in git history (older versions of this file included).
 
 Built: the new evaluator
 E1   From terms to features: build_contributions makes one row per term and index set; features_from_rows
      groups the rows into features (FeatureResult).
 E2   Drawing: eval_feature_on_grid draws one feature; draw_window adds all features on one window grid, box by
      box; draw_all draws every feature on the whole grid and serves as the reference.
-E3   One entry point, compute_features_from_terms: translate the terms, compile them, load the data in one
-     call, set the polarization, make the features. Tested on real data (test_pipeline.py).
-     rps_evaluation.py deleted. Replaced 2026-10-13 by load_molsys_data + evaluate_response_terms +
-     draw_spectrum (see Fixed, "Top functions").
-B7   One resonance point per term, checked when compiling (see Decisions). The `failed` list is gone: it was
-     always empty.
+E3   One entry point. Since 2026-10-13 three calls: load_molsys_data, evaluate_response_terms, draw_spectrum
+     (see Fixed, "Top functions"; the calls in E6).
+E5   Peak width from one source (2026-10-13): propagator_param (features.PropagatorParam), a number or a
+     function (vd, freqs) -> cm-1. The feature carries it: drawing calls it on the grid; get_intensity and both
+     box makers at the peak (SpectralFeature.peak_widths). Was lineshape_parameter. Limits: see Decisions.
+B7   One resonance point per term, checked when compiling (see Decisions).
+F1   einsum for the averaged part (2026-10-12): one einsum per term gives the averaged part for every index set
+     (make_avrg_einsum_subscripts, AvrgTensor; the docstrings explain the subscripts). The loop
+     (_make_func_to_compute_avrg) stays as the reference in the tests. Agrees with the loop to 8e-14 (ACDM,
+     14000 random index sets). ACDM averaging 47 s -> 0.3 s.
+F2   Speed test on ACDM (2026-10-12): 80 s per spectrum, of which averaging 47 s, deepcopy 16 s.
+F3   Denominators split once per term (2026-10-12): CompiledTerm.freq_vibenedenom and freq_pert_wf_diff
+     (cached_property, plan.py). Zero checks abs(x) <= zero_tol instead of np.isclose. ACDM build_contributions
+     22 s -> 3.9 s.
 -    Leaves on demand (2026-10-12), for analysis: a row's leaves are its summed index sets, each with its four
-     factors (feature -> rows -> leaves). FeatureResult keeps what the rows were computed from (compiled, molsys,
-     polarization_linear_comb, states_choice: references, not copies; compare=False), and
-     FeatureResult.leaves(row) computes one row's leaves again: about 1 ms per row on ACDM. Keeping every row's
-     leaves would take 357 MB there (636000 leaves), so build_contributions builds none (keep_leaves=False in
-     evaluate_term_coeff_sumover): ACDM build_contributions 3.9 s -> 3.3 s.
-     Tests (test_pipeline.py, test_evaluate.py): the leaves add up to row.coeff (toy molecule; all 340
-     formaldehyde rows, both state choices); build_contributions asks for no leaves.
-     FeatureResult.states (molsys.states[states_choice]) is also the state set that draw_window needs (E6).
--    States by choice, and MolSystemData.load (2026-10-12). MolSystemData.states holds every state set the source
-     has, by choice; the evaluation takes states_choice (see Decisions). MolSystemData.load(origin, prop_names)
-     reads the named properties, the frequencies and both state lists in one obtainer call (the obtainer can be
-     passed in) and raises for a property the source lacks; pipeline.prop_names(compiled) lists what the terms
-     need. load_molsys_data calls load since the duplication cleanup (below).
-     Tests (test_system_data.py): the state sets by choice, only the sets the data has, check_states_choice,
-     load's request, filling and missing-property error. Same numbers: evv_reference.json, both choices;
-     ACDM 17101 rows, 7595 zero, as before.
+     factors. FeatureResult.leaves(row) computes one row's leaves again (about 1 ms per row on ACDM); keeping all
+     would take 357 MB on ACDM, so build_contributions builds none. ACDM build_contributions 3.9 s -> 3.3 s.
+-    States by choice, and MolSystemData.load (2026-10-12), see Decisions. MolSystemData.load(origin, prop_names)
+     reads the named properties, the frequencies and both state lists in one obtainer call and raises for a
+     property the source lacks.
 
 Checked: the numbers are right
 C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).
@@ -421,91 +341,28 @@ G1   Hand calculation with numpy only: water, terms 0 and 12, every (a, b) pair,
 D5   Coordinates part only (2026-10-11): the data dict fits derive's formulas, see D5. [outside]
 
 Fixed
-A0-A4, A6-A13  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples, harmonic_denom reads the
+A0-A4, A6-A14  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples, harmonic_denom reads the
      eigenvalues, asserts instead of prints, dead code, outdated docstrings. Two of them change behaviour:
      evaluate_term_coeff_sumover raises if a resonance label is missing (summing over one would add peaks at
      different places into one number); VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
 B1   One DataOriginInfo class (system_data.py); the old pipeline runs again.
 B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
--    from_datadict has no default states_choice (2026-10-11); since 2026-10-12 the evaluation takes the choice
-     (see Decisions).
 -    ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
--    Property names made once (2026-10-12). PropsCollection.names: one trivial name per property, in order, made
-     once per collection. It replaces 4 prop_trivname calls: build_request_dict, eval_non_avrg_per_indexdict
-     (there per index set), the averaging loop (_make_func_to_compute_avrg) and the einsum operands.
-     CompiledTerm.all_props and CompiledTerm.prop_names (each name once) are made once per term; all_props was
-     a new PropsCollection, with a deepcopy, on every read. pipeline.prop_names and load_molsys_data use
-     prop_names. PropsCollection.sort returns a new collection; it used to change the collection itself.
-     Speed, ACDM: build_contributions 3.2-3.3 s, before 3.3-3.4 s: no change beyond run-to-run noise.
--    One way to load, one way to name (2026-10-12). load_molsys_data is one line: MolSystemData.load with the
-     terms' prop_names and pipeline's wilson_data_obtainer (c3_spectrum.py replaces that obtainer). Before, it
-     built its own request and also asked for normal_modes, atoms and the geometry, which fail on ACDM; now
-     compute_features_from_terms gives ACDM's 17101 rows. Deleted: build_data_request_for_term and
-     _sys_info_request (system_data.py; MolSystemData.load builds the request, with EVALUATION_DATA_KEYS) and
-     MolecularProperty.from_polprop (its extra_data, ops and frequencies, was read by nothing; properties are
-     made from names). evaluate_response_terms and c2_variations.run_new load through load_molsys_data.
-     Tests: the request tests of test_system_data.py went; their checks live on in the load tests (request keys,
-     origin, no key collides with a property name) and in test_plan.py (one name per distinct property).
-     test_integration.py loads through MolSystemData.load; the one test that reads normal_modes asks for them
-     itself. Same numbers: evv_reference.json; c3 degenerate toy as recorded.
--    Data and recipe from the terms in pulse IDs (2026-10-13). load_molsys_data, make_polarization_linear_comb,
-     prop_names and averaging_rank take the terms as derive writes them, no longer the compiled terms: they read
-     only the props, and the axis translation changes only the resonance conditions. plan.split_props gives a
-     term's averaged props (sorted) and the rest; CompiledTerm.from_VibPertTerm uses it too. Before, a caller
-     translated and compiled only to read the props (compile_terms fails on pulse IDs), and
-     evaluate_response_terms then translated and compiled the same terms again. prop_names keeps the old order:
-     per term the averaged props first.
-     Tests (test_pipeline.py): toy terms in pulse IDs, props only; prop_names of the 14 EVV terms in pulse IDs =
-     those of the compiled terms. Same numbers: the old names and recipe give the same coeffs, bit for bit, on
-     all 6 blocks of evv_reference.json.
-A14  The pipeline.py module docstring names the drawing (draw_spectrum, evaluate.draw_window); found done 2026-10-13.
-B    Precalculated path deleted (2026-10-13, H1). Its reason was speed; since F1 the einsum tensor (AvrgTensor)
-     does the same job, with the polarization as an input and the labels kept with the values. A 1/omega table
-     would save about 0.15 s of build_contributions' 3.2 s on ACDM (harmonic_denom's share under cProfile).
-     Deleted: PrecalculatedData, calculate_avrg_tensor, eval_vibenedenom, _get_ind_tuple_from_base, _avrg_tensor_for
-     (evaluate.py); PropsCollection.identify_avrg_motif and _set_attr_for_all_props, and
-     FreqTermsCollection.get_num_indices_vibenedenom (plan.py). B3, B5 and B6 went with them. B5 (1/w_a twice read
-     once) is also in the old code (term_parts.py); harmonic_denom keeps both.
-     The averaged part comes only from AvrgTensor now: build_contributions and compute_features take the recipe
-     as a required argument; evaluate_term_coeff_sumover takes the recipe or the tensor (avrg_tensor);
-     evaluate_full_index_dict and eval_avrg_per_indexdict take the tensor. evaluate.py no longer imports
-     amplitudes/utils.py (E9).
-     Tests: the toy tests take the averaged part from data. molsys_a1_zero (conftest.py) with helpers.TOY_RECIPE
-     gives <polgrad>[a] = (10, 0), as pre_a1_zero did; tests of one index set pass an AvrgTensor. 16 tests went
-     with the code, among them the 2 B6 xfails. Same numbers: evv_reference.json bit for bit; c3_spectrum.py and
-     c2_variations.py print the same output as before when run with PYTHONHASHSEED=0. Without a fixed seed, set
-     order changes the last digits and the listed examples from run to run, in the old code too.
-     ACDM 5.9 s per spectrum, as before.
--    Cleanup (2026-10-13): commented-out code removed (plan.py, features.py, evaluate.py, H2); the module
-     docstrings of evaluate.py and plan.py name what the modules hold; Box.overlaps lost its wrong "# UNUSED" mark
-     (SpectralFeature.feat_box_overlaps calls it).
--    Top functions (2026-10-13). Before: two top functions did the same first steps (H2).
-     compute_features_from_terms loaded the data on every call (4 s on ACDM); evaluate_response_terms took the
-     recipe from the caller and drew only with a window, so 4 fields of its result were None without one, and
-     dim_sizes without a window was ignored; its 6 settings were positional.
-     Now, three calls:
-         molsys = load_molsys_data(terms, data_origin)                                     once
-         result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
-                                          propagator_param=)                               FeatureResult
-         spec   = draw_spectrum(result, window, dim_sizes, dynrange=1000.)                 EvalRspResult
-     evaluate_response_terms takes laser_pol, not the recipe; every setting is keyword-only. It returns the
-     FeatureResult. draw_spectrum is the only drawing call; every EvalRspResult field is set. dynrange is
-     keyword-only. compute_features_from_terms deleted.
-     make_polarization_linear_comb makes the recipe once per (rank, laser_pol) (functools.cache on
-     _averaging_recipe) and returns a copy per call. Measured: a recipe takes 0.13 ms at rank 4, about 5 ms at
-     ranks 5 and 6; averaging_rank still runs on every call, 1 ms for the 14 EVV terms.
-     Tests (test_pipeline.py): the compute_features_from_terms tests run on evaluate_response_terms; the drawing
-     tests call draw_spectrum; positional settings raise; the recipe is made once and copied. Gone: the two
-     tests of the window-or-not mode. example_evaluate_response_terms.py uses the three calls (no None checks).
--    exclude_modes (2026-10-13). evaluate_response_terms, compute_features and build_contributions take
-     exclude_modes (default none); FeatureResult keeps it, so leaves() sums over the same modes.
-     evaluate.included_modes gives the modes left and raises for an unknown mode or when none is left;
-     make_idx_sets takes the modes, not their number; evaluate_term_coeff_sumover takes modes= (None: all).
-     Meaning: removed everywhere (see Decisions).
-     Tests: test_evaluate.py (toy, 2 modes): included_modes; the sum over the given modes only; exclude mode 1 ->
-     one index set (a = b = 0) whose coefficient is the c = 0 piece alone. test_pipeline.py (formaldehyde,
-     exclude mode 5): 14 x 25 pairs, none with mode 5; every row = the full run's leaves without mode 5, all 14
-     terms; term 2's coefficients change. Same numbers without exclusion; ACDM build_contributions 3.4 s.
+-    Property names made once (2026-10-12): PropsCollection.names, CompiledTerm.all_props and
+     CompiledTerm.prop_names. PropsCollection.sort returns a new collection.
+-    One way to load (2026-10-12): load_molsys_data is MolSystemData.load with the terms' prop_names; it no
+     longer asks for normal_modes, atoms and the geometry (G9).
+-    Data and recipe from the terms in pulse IDs (2026-10-13): load_molsys_data, make_polarization_linear_comb,
+     prop_names and averaging_rank read only the props, so they take the terms as derive writes them
+     (plan.split_props), with no translation or compiling first.
+B    Precalculated path deleted (2026-10-13, H1). Since F1 the einsum tensor (AvrgTensor) does the same job, with
+     the polarization as an input and the labels kept with the values. B3, B5 and B6 went with it.
+-    Cleanup (2026-10-13): commented-out code removed (H2); module docstrings of evaluate.py and plan.py.
+-    Top functions (2026-10-13): three calls instead of two top functions that did the same first steps (H2);
+     the calls are in E6. Every setting is keyword-only; the recipe is made once per (rank, laser_pol).
+     compute_features_from_terms and rps_evaluation.py deleted.
+-    exclude_modes (2026-10-13): evaluate_response_terms, compute_features and build_contributions take it;
+     FeatureResult keeps it, so leaves() sums over the same modes. Meaning: removed everywhere (see Decisions).
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code
