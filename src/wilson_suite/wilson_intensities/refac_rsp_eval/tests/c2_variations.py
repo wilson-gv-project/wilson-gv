@@ -129,11 +129,11 @@ def run_old(v: Variation):
 def run_new(v: Variation, laser_pol):
     """new pipeline; laser_pol comes from the old experiment object (shared, not checked here)"""
     path = MOLECULES[v.molecule][0]
-    translated = term_var_translate.translate_terms_to_axis_variables(VibPerturbedTerm.load_many_from_json(TERMS),
-                                                                      make_SpectralAxisSet(v.axes))
+    terms = VibPerturbedTerm.load_many_from_json(TERMS)
+    translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(v.axes))
     compiled = compile_terms(terms=translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=path)
-    molsys = load_molsys_data(compiled, origin)
+    molsys = load_molsys_data(terms, origin)
     iso = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=tuple(laser_pol))
     table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso, states_choice=v.new_states)
     return compiled, molsys, table, zero

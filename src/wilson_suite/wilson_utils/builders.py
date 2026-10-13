@@ -55,7 +55,7 @@ def show_term_latex(term: VibPerturbedTerm, part_of_term: str = None, output=Fal
     else:
         return coefficients_str + freqterms_str + properties_str + res_conditions_str
     
-def make_SpectralAxisSet(axes_set_dict: dict[str,list[tuple]]) -> SpectralAxisSet:
+def make_SpectralAxisSet(axes_set_dict: dict[str,list[int]]) -> SpectralAxisSet:
     """
     axes_set_dict: {'A': [-1], 'B': [-1, 2]} - lists are sufficient here because each element of the list will be in a SignedPulseTuple
 

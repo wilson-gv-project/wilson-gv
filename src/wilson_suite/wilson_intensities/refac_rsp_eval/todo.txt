@@ -436,6 +436,16 @@ B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
      origin, no key collides with a property name) and in test_plan.py (one name per distinct property).
      test_integration.py loads through MolSystemData.load; the one test that reads normal_modes asks for them
      itself. Same numbers: evv_reference.json; c3 degenerate toy as recorded.
+-    Data and recipe from the terms in pulse IDs (2026-10-13). load_molsys_data, make_polarization_linear_comb,
+     prop_names and averaging_rank take the terms as derive writes them, no longer the compiled terms: they read
+     only the props, and the axis translation changes only the resonance conditions. plan.split_props gives a
+     term's averaged props (sorted) and the rest; CompiledTerm.from_VibPertTerm uses it too. Before, a caller
+     translated and compiled only to read the props (compile_terms fails on pulse IDs), and
+     evaluate_response_terms then translated and compiled the same terms again. prop_names keeps the old order:
+     per term the averaged props first.
+     Tests (test_pipeline.py): toy terms in pulse IDs, props only; prop_names of the 14 EVV terms in pulse IDs =
+     those of the compiled terms. Same numbers: the old names and recipe give the same coeffs, bit for bit, on
+     all 6 blocks of evv_reference.json.
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

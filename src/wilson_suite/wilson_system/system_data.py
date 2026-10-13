@@ -327,7 +327,7 @@ class MolSystemData:
         Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry, and the reader
         fails on normal_modes for some files (ACDM, todo.txt F2).
 
-        prop_names  trivial names, e.g. pipeline.prop_names(compiled)
+        prop_names  trivial names, e.g. pipeline.prop_names(terms)
         obtainer    request {name: DataOriginInfo} -> data dict; default wilson_data_obtainer.
                     A test can pass a function that returns a dict, with no file.
         raises ValueError if the source has no values for a requested property

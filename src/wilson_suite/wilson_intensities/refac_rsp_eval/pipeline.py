@@ -3,6 +3,7 @@ Entry point: compiled terms + molecular data -> spectral features.
 
 compute_features_from_terms does everything from the terms derive writes (in pulse IDs):
 translate to axes -> compile_terms -> load_molsys_data -> make_polarization_linear_comb -> compute_features.
+load_molsys_data and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
@@ -49,6 +50,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     compile_terms,
+    split_props,
 )
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
@@ -150,21 +152,25 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
                          states_choice=states_choice)
 
 
-def load_molsys_data(compiled: Sequence['CompiledTerm'], data_origin: DataOriginInfo) -> MolSystemData:
+def load_molsys_data(terms: Sequence['VibPerturbedTerm'], data_origin: DataOriginInfo) -> MolSystemData:
     """
     One MolSystemData for all terms, each property once: MolSystemData.load with the terms' prop_names.
+    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
     It holds every state set the source has; the evaluation chooses one (compute_features, states_choice).
     The obtainer is this module's wilson_data_obtainer, so a test can replace it here (c3_spectrum.py does).
     """
-    return MolSystemData.load(data_origin, prop_names(compiled), obtainer=wilson_data_obtainer)
+    return MolSystemData.load(data_origin, prop_names(terms), obtainer=wilson_data_obtainer)
 
 
-def prop_names(compiled: Sequence['CompiledTerm']) -> list[str]:
-    """Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: input of MolSystemData.load"""
-    return list(dict.fromkeys(name for term in compiled for name in term.prop_names))
+def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
+    """
+    Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: input of MolSystemData.load.
+    Per term the averaged props first, as in CompiledTerm.prop_names.
+    """
+    return list(dict.fromkeys(name for term in terms for part in split_props(term) for name in part.names))
 
 
-def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
+def averaging_rank(terms: Sequence['VibPerturbedTerm']) -> int:
     """
     Rank of the orientation average: the number of Cartesian slots (op.o) in a term's averaged part.
         e.g. polhess[0,3] * dipgrad[1] * dipgrad[2] -> slots 0, 1, 2, 3 -> rank 4 (all 14 EVV terms)
@@ -172,12 +178,13 @@ def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
     compute_features uses one recipe for every term, so all terms must have the same slots.
     The recipe puts slot i at position i, so the slots must be 0 .. rank-1, each once.
     """
-    if not compiled:
+    if not terms:
         raise ValueError('no terms: no averaging rank')
 
     term_ids_by_slots = defaultdict(list)
-    for term_id, term in enumerate(compiled):
-        term_ids_by_slots[tuple(sorted(term.avrg_props.get_cart_axes()))].append(term_id)
+    for term_id, term in enumerate(terms):
+        avrg_props, _ = split_props(term)
+        term_ids_by_slots[tuple(sorted(avrg_props.get_cart_axes()))].append(term_id)
 
     if len(term_ids_by_slots) > 1:
         raise ValueError(f'terms differ in their averaged slots, one recipe cannot serve them all; '
@@ -188,17 +195,18 @@ def averaging_rank(compiled: Sequence['CompiledTerm']) -> int:
     return len(slots)
 
 
-def make_polarization_linear_comb(compiled: Sequence['CompiledTerm'],
+def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
                                   laser_pol: Sequence[float]) -> dict[tuple, float]:
     """
     The orientation-average recipe {(x/y/z per slot): coefficient} that compute_features takes,
     from getGeneralPolarizationAveragingExpression with the rank of the terms (averaging_rank).
+    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
 
     laser_pol: the experiment's polarization_avg_vector. Its length is fixed by the rank
     (rank 4 -> 3 numbers, e.g. (1, 1, 1) when all pulses and the detector are along x).
     getGeneralPolarizationAveragingExpression would ignore extra numbers without an error.
     """
-    rank = averaging_rank(compiled)
+    rank = averaging_rank(terms)
     if not 2 <= rank <= 6:
         raise ValueError(f'orientation averaging supports rank 2 to 6, the terms have rank {rank}')
 
@@ -232,8 +240,8 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
     """
     translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
     compiled = compile_terms(translated)
-    molsys = load_molsys_data(compiled, data_origin)
-    polarization = make_polarization_linear_comb(compiled, laser_pol)
+    molsys = load_molsys_data(terms, data_origin)
+    polarization = make_polarization_linear_comb(terms, laser_pol)
     return compute_features(compiled, molsys, polarization, propagator_param=propagator_param,
                             states_choice=states_choice)
 
@@ -281,6 +289,9 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
     the spectrum on a grid (draw_spectrum). Without a window: features only.
     For another window, grid or width afterwards: draw_spectrum with result.feature_result. The rows are
     kept, so only the drawing is done again.
+    molsys_data and orient_avrg_recipe can come from anywhere. From the same terms, still in pulse IDs:
+        molsys_data = load_molsys_data(terms, data_origin)
+        orient_avrg_recipe = make_polarization_linear_comb(terms, laser_pol)
     """
     if window is not None and dim_sizes is None:
         raise ValueError('a window needs dim_sizes, the number of grid points per axis')

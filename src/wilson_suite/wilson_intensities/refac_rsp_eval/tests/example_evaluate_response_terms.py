@@ -16,7 +16,6 @@ from dataclasses import replace
 
 import numpy as np
 
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
@@ -25,7 +24,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     load_molsys_data,
     make_polarization_linear_comb,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import compile_terms
 from wilson_suite.wilson_system.system_data import DataOriginInfo
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
@@ -41,11 +39,9 @@ def main():
     laser_pol = (1., 1., 1.)        # pulses and detector along x
     states_choice = 'anharmonic'    # follows the vib analysis regime: GVPT2 -> anharmonic
 
-    # 2. data and recipe, once. Both need the compiled terms: which properties to load, which averaging rank.
-    #    The translation works on copies, so `terms` stay in pulse IDs for evaluate_response_terms.
-    compiled = compile_terms(term_var_translate.translate_terms_to_axis_variables(terms, axes))
-    molsys = load_molsys_data(compiled, data_origin)
-    recipe = make_polarization_linear_comb(compiled, laser_pol)
+    # 2. data and recipe, once. Both read only the terms' props: which properties to load, which averaging rank.
+    molsys = load_molsys_data(terms, data_origin)
+    recipe = make_polarization_linear_comb(terms, laser_pol)
 
     # 3. features only: no window, so nothing is drawn (grid_axes and grid_result are None)
     result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, propagator_param=5.)

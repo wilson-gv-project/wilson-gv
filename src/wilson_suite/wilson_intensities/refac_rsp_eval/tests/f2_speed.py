@@ -60,10 +60,10 @@ WINDOW = {'A': (700., 3400.), 'B': (10., 3500.)}
 GRID = {'A': 700, 'B': 700}
 
 
-def load_acdm(compiled) -> MolSystemData:
+def load_acdm(terms) -> MolSystemData:
     """the terms' properties, frequencies, states; no normal_modes, atoms, geometry: the reader fails on ACDM there"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{DATA_FILE}')
-    return MolSystemData.load(origin, prop_names(compiled))
+    return MolSystemData.load(origin, prop_names(terms))
 
 
 def timed(f, *args, **kwargs):
@@ -98,11 +98,11 @@ def profile_build_contributions(compiled, molsys, pol) -> dict:
 
 
 def main():
-    compiled = ref.compiled_evv_terms()
-    pol = make_polarization_linear_comb(compiled, ref.LASER_POL)
+    terms, compiled = ref.evv_terms(), ref.compiled_evv_terms()
+    pol = make_polarization_linear_comb(terms, ref.LASER_POL)
 
     # 1. load
-    molsys, t_load = timed(load_acdm, compiled)
+    molsys, t_load = timed(load_acdm, terms)
     n_modes = len(molsys.eigenvals)  # type: ignore
     print(f'ACDM: {n_modes} modes, {STATES} states, load {t_load:.1f} s')
 

@@ -127,13 +127,13 @@ def run_old(case: Case):
 
 def run_new(case: Case, laser_pol):
     """new pipeline, the steps of compute_features_from_terms: (the chosen state set for drawing, the result)"""
-    translated = term_var_translate.translate_terms_to_axis_variables(VibPerturbedTerm.load_many_from_json(c2.TERMS),
-                                                                      make_SpectralAxisSet(AXES))
+    terms = VibPerturbedTerm.load_many_from_json(c2.TERMS)
+    translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(AXES))
     compiled = compile_terms(translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=c2.MOLECULES['formaldehyde'][0])
     with mock.patch.object(pipeline, 'wilson_data_obtainer', case.obtainer):
-        molsys = pipeline.load_molsys_data(compiled, origin)
-    result = pipeline.compute_features(compiled, molsys, pipeline.make_polarization_linear_comb(compiled, laser_pol),
+        molsys = pipeline.load_molsys_data(terms, origin)
+    result = pipeline.compute_features(compiled, molsys, pipeline.make_polarization_linear_comb(terms, laser_pol),
                                        propagator_param=GAMMA_CM, states_choice=case.new_states)
     return result.states, result
 

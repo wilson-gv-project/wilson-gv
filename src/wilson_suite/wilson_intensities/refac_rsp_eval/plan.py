@@ -509,6 +509,17 @@ class ResLocPoint:
 
 
 ## --------------------------------------------------------------------
+def split_props(term: 'VibPerturbedTerm') -> tuple[PropsCollection, PropsCollection]:
+    """
+    (averaged props, sorted; non-averaged props) of a term: CompiledTerm.avrg_props and .non_avrg_props.
+        e.g. EVV term 8: (polgrad[b] dipgrad[a] dipgrad[c],  cff[a,b,c]): the props with field operators are averaged
+    Works in pulse IDs and in axes: the axis translation changes only the resonance conditions, not the props.
+    So the props of a term as derive writes it are what load_molsys_data and make_polarization_linear_comb read.
+    """
+    properties = PropsCollection(term.props)
+    return properties.get_averaged_props().sort(), properties.get_non_averaged_props()
+
+
 @dataclass(frozen=True)
 class CompiledTerm:
     """
@@ -554,9 +565,7 @@ class CompiledTerm:
                                  f"axes {axes}, rank {rank}\n{term.to_str()}")
         idx_nonsumm, idx__summ = term.tellNonSummSummIndices()
 
-        properties = PropsCollection(term.props)
-        non_avrg_props = properties.get_non_averaged_props()
-        avrg_props = properties.get_averaged_props().sort()
+        avrg_props, non_avrg_props = split_props(term)
 
         return cls(avrg_props, non_avrg_props, res_conds, freq_denom, frac_factor, tuple(idx__summ), tuple(idx_nonsumm)) # type: ignore
 
