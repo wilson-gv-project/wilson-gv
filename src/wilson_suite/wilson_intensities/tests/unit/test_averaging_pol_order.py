@@ -51,7 +51,18 @@ REVERSED = pytest.mark.xfail(strict=True, reason='A15: get_pol_tensor builds pol
 ## The checking side: the exact orientation average ------------------------------------------------
 
 def _rotations(n: int = 8) -> tuple[np.ndarray, np.ndarray]:
-    """R = Rz(alpha) Ry(beta) Rz(gamma) on the quadrature grid, shape (n**3, 3, 3), and the weights (sum 1)."""
+    """
+    The rotations and weights of a quadrature rule over all orientations: n points per Euler angle (z-y-z),
+    R = Rz(alpha) Ry(beta) Rz(gamma).
+        alpha, gamma  n even steps over 360 degrees. The plain mean over these steps is exact for sin and cos
+                      up to frequency n-1 (7 for n = 8).
+        beta          cos(beta) at the n Gauss-Legendre points, with their weights: exact for polynomials in
+                      cos(beta) up to degree 2n-1 (15). Every orientation counts the same, so the measure is
+                      sin(beta) d(beta) = d cos(beta): that is why the points sit in cos(beta).
+    A signal with r fields (exact_average) has frequencies up to r in alpha and gamma, and after the means over
+    alpha and gamma it is a polynomial of degree up to r in cos(beta). So n = 8 is exact for r <= 7.
+    Returns the rotations, shape (n**3, 3, 3), and the weights, which sum to 1.
+    """
     def rz(t):
         c, s = np.cos(t), np.sin(t)
         return np.array([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]])
@@ -77,8 +88,23 @@ ROTATIONS, WEIGHTS = _rotations()
 
 def exact_average(pol, T: np.ndarray) -> float:
     """
-    Average over all orientations of A . T_lab, with A = pol[0] x pol[1] x ... (slot k gets pol[k]) and
-    T_lab = (R x ... x R) T. Written per rotation: sum over molecular indices of T * prod_k (R^T pol[k]).
+    The orientation average, computed the direct way: the signal of one molecule in each of 512 orientations,
+    then the weighted mean. Uses numpy only: no f, no M, no wilson code.
+
+    1. One orientation: a rotation matrix R. In the lab, field k points along pol[k] (slot k gets pol[k]).
+       Seen from the molecule, field k points along R^T pol[k].
+    2. The signal of the molecule in that orientation: T with each index contracted with one field direction,
+           sum over i, j, ... of T[i, j, ...] * (R^T pol[0])[i] * (R^T pol[1])[j] * ...
+       e.g. rank 2, T = mu x mu, both fields along Z: (mu . R^T Z)^2, the squared length of mu along Z.
+       This is A . T_lab with A = pol[0] x pol[1] x ... and T_lab = (R x ... x R) T, written in the molecule frame.
+    3. The average over all orientations: the weighted sum of step 2 over the rotations of _rotations.
+
+    Why exact and not an estimate. The signal in step 2 is a polynomial in the entries of R, one R per field.
+    _rotations is a quadrature rule that integrates such polynomials exactly up to 7 fields, as Simpson's rule
+    integrates cubics exactly. So for ranks 1-6 the weighted sum is the integral over all orientations, up to
+    rounding. Checked 2026-10-13: ranks 1-6, random T and pol, 512 rotations against 4096 (16 points per angle):
+    differences at most 1.5e-14. And against textbook values: test_exact_average_gives_the_textbook_values,
+    e.g. rank 2, <mu_Z mu_Z> = |mu|^2 / 3.
     """
     in_molecule = [np.einsum('rij,i->rj', ROTATIONS, np.asarray(p, dtype=float)) for p in pol]
     letters = LETTERS[:T.ndim]

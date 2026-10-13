@@ -1,8 +1,9 @@
 refac_rsp_eval — TODO
 updated 2026-10-13
 
-Tests  refac_rsp_eval: 595 pass (2026-10-13, after the top functions were reshaped).
+Tests  refac_rsp_eval: 597 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
+       Since 2026-10-13 also 7 fail on purpose until A15 is fixed: wilson_intensities/tests/unit/test_get_pol_tensor.py.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -91,6 +92,19 @@ A. Small fixes
         the exact orientation average (the G4 method), ranks 2-6. 13 more tests there pass before and after the fix.
         Checked with the fix applied in memory: all 27 pass with the marks ignored; test_averaging.py, the experiment
         tests and refac_rsp_eval (473 pass, 2 xfail) do not change. Fix, then unmark them.
+        Shown on the evaluator (2026-10-13): tests/test_a15_polarization_order.py, 5 plain tests that fail until
+        the fix (checked: with the fix in memory all 7 pass). Rank 3: a VibExperiment with detector x, pulse 1 y,
+        pulse 2 z hands the evaluator polarization_avg_vector [-1.0], right [+1.0] (det of the three directions);
+        three transition dipoles then average to -det(mu)/6 instead of +det(mu)/6, the value of the mirror-image
+        molecule. Rank 5, beta-alpha CARS form (hypgrad x polgrad), fields x, y, z, x, x: +0.598 instead of -0.963.
+        The reference (det/6, and the quadrature exact_average) passes on its own.
+        On get_pol_tensor itself (2026-10-13): wilson_intensities/tests/unit/test_get_pol_tensor.py, 7 plain tests
+        that fail until the fix, no averaging needed: [x, y, z] puts its 1 at index (2, 1, 0) instead of (0, 1, 2);
+        at ranks 2-6 the result is the Kronecker product of the reversed list; rank 3 get_pol_laser gives
+        -det(a, b, c) instead of +det(a, b, c). One control passes (rank 2 dot product). The docstring states why
+        index k must be pol[k] (get_pol_tensor's own docstring, get_iso_f's slot positions, VibExperiment's order).
+        With the fix: both new files pass; the 14 strict xfails turn into XPASS failures, so remove their marks.
+        exact_average's docstring now says why it is exact (checked: 512 vs 4096 rotations, ranks 1-6, 1.5e-14).
 [ ] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
         averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
 
