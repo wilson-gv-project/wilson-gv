@@ -235,8 +235,8 @@ class EvalRspResult:
     grid_axes: np.ndarray | None = None
     grid_result: np.ndarray | None = None
 
-def evaluate_response_terms(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
-                            # origin: DataOriginInfo, 
+def evaluate_response_terms(compiled: Sequence['CompiledTerm'], 
+                            molsys_data: MolSystemData,
                             states_choice: str,
                             orient_avrg_recipe: 'PolarizationAveragingRecipe') -> EvalRspResult:
     """
@@ -244,7 +244,7 @@ def evaluate_response_terms(compiled: Sequence['CompiledTerm'], molsys_data: Mol
     The result keeps the inputs, for FeatureResult.leaves and for the states (molsys_data.states) in drawing.
     """
     # molsys_data = load_molsys_data(compiled, origin)
-    
+
     return EvalRspResult(
         molsys_data=molsys_data,
         polarization_linear_comb=orient_avrg_recipe,
