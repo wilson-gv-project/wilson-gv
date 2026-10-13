@@ -109,17 +109,17 @@ def test_compute_features_reports_zero_pairs(molsys, pre_a1_zero):
     assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
 
 
-def test_compute_features_gives_every_feature_the_lineshape_parameter(molsys, pre_a1_zero):
-    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=5.,
+def test_compute_features_gives_every_feature_the_propagator_param(molsys, pre_a1_zero):
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, propagator_param=5.,
                               states_choice='harmonic')
 
     assert len(result.features) == 2
-    assert all(f.lineshape_parameter == 5. for f in result.features)
+    assert all(f.propagator_param == 5. for f in result.features)
     # no boxes yet: they come later, from dress_these_with_boxes
     assert all(f.feat_box is None for f in result.features)
 
 
-def test_compute_features_gives_a_lineshape_function_the_conditions(molsys, pre_a1_zero):
+def test_compute_features_gives_a_propagator_param_function_the_conditions(molsys, pre_a1_zero):
     """
     The function gets the pair of states of each condition, from the result's states. ab_term (MOTIF_AB), a=0:
     conditions <ab - a> and <b - a>, so with width 5 + 1 % of |E|:
@@ -128,16 +128,16 @@ def test_compute_features_gives_a_lineshape_function_the_conditions(molsys, pre_
     """
     width = lambda vd, freqs: 5. + 0.01 * abs(vd.energy_difference())
 
-    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=width,
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, propagator_param=width,
                               states_choice='harmonic')
 
-    assert all(f.lineshape_parameter is width for f in result.features)
+    assert all(f.propagator_param is width for f in result.features)
     assert [f.peak_widths() for f in result.features] == [pytest.approx((14.5, 5.)), pytest.approx((21., 10.))]
 
 
-def test_feature_result_made_by_hand_gives_a_lineshape_function_no_conditions():
+def test_feature_result_made_by_hand_gives_a_propagator_param_function_no_conditions():
     """No states to take them from: the feature has no conditions, and its box and peak height raise."""
-    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], lineshape_parameter=lambda vd, freqs: 5.)
+    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], propagator_param=lambda vd, freqs: 5.)
 
     [f] = result.features
 
@@ -524,7 +524,7 @@ class TopRun:
 def top_run() -> TopRun:
     terms = ref.evv_terms()
     before = [t.to_str() for t in terms]
-    return TopRun(terms, before, from_terms(terms, lineshape_parameter=4.7))
+    return TopRun(terms, before, from_terms(terms, propagator_param=4.7))
 
 
 @pytest.mark.parametrize('evv_formaldehyde', ['anharmonic'], indirect=True)
@@ -549,8 +549,8 @@ def test_compute_features_from_terms_leaves_the_input_terms_as_they_are(top_run)
     assert [t.to_str() for t in top_run.terms] == top_run.terms_before
 
 
-def test_compute_features_from_terms_gives_every_feature_the_lineshape_parameter(top_run):
-    assert all(f.lineshape_parameter == 4.7 for f in top_run.result.features)
+def test_compute_features_from_terms_gives_every_feature_the_propagator_param(top_run):
+    assert all(f.propagator_param == 4.7 for f in top_run.result.features)
 
 
 def test_compute_features_from_terms_keeps_what_drawing_and_leaves_need(top_run):
@@ -585,14 +585,14 @@ def formaldehyde_data() -> tuple:
             make_polarization_linear_comb(compiled, ref.LASER_POL))
 
 
-def evaluate_formaldehyde(formaldehyde_data, lineshape_parameter, **kwargs):
+def evaluate_formaldehyde(formaldehyde_data, propagator_param, **kwargs):
     molsys, recipe = formaldehyde_data
     return evaluate_response_terms(terms=ref.evv_terms(), 
                                    axes=make_SpectralAxisSet(ref.AXES), 
                                    molsys_data=molsys, 
                                    states_choice='anharmonic',  # type: ignore
                                    orient_avrg_recipe=recipe, 
-                                   lineshape_parameter=lineshape_parameter, **kwargs)
+                                   propagator_param=propagator_param, **kwargs)
 
 
 def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formaldehyde_data, top_run):
@@ -610,7 +610,7 @@ def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formal
     feature_result = result.feature_result
     assert list(feature_result.table) == list(top_run.result.table)
     assert len(feature_result.features) == 68
-    assert all(f.lineshape_parameter is width for f in feature_result.features)
+    assert all(f.propagator_param is width for f in feature_result.features)
     strongest = max(feature_result.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     assert strongest.location.as_dict() == pytest.approx({'A': 2682.765, 'B': 0.})
     assert strongest.peak_widths() == pytest.approx((3. + 0.002 * 2682.765, 3.))
@@ -634,7 +634,7 @@ def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formal
 
 
 def test_evaluate_response_terms_width_function_of_a_constant_draws_as_the_number(formaldehyde_data):
-    """lineshape_parameter 5. and lambda vd, freqs: 5. give the same spectrum"""
+    """propagator_param 5. and lambda vd, freqs: 5. give the same spectrum"""
     number = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
     function = evaluate_formaldehyde(formaldehyde_data, lambda vd, freqs: 5.,
                                      window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)

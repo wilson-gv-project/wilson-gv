@@ -43,7 +43,7 @@ def main():
     recipe = make_polarization_linear_comb(compiled, laser_pol)
 
     # 3. features only: no window, so nothing is drawn (grid_axes and grid_result are None)
-    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, lineshape_parameter=5.)
+    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, propagator_param=5.)
 
     features = result.feature_result.features
     print(f'{len(terms)} terms -> {len(result.feature_result.table)} rows, '
@@ -55,10 +55,10 @@ def main():
     # 4. the spectrum around the strongest peak (A = 2682.8, B = 0), 1 cm-1 steps.
     #    Width per condition: 3 cm-1 plus 0.2 % of the condition's |E| (energy_difference is signed).
     width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
-    window = Box({'A': (2600., 2800.), 'B': (-100., 100.)})
+    window = Box({'A': (2600., 2800.), 'B': (-230., 3100.)})
     dim_sizes = {'A': 201, 'B': 201}
 
-    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, lineshape_parameter=width,
+    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, propagator_param=width,
                                      window=window, dim_sizes=dim_sizes, dynrange=1001.)
 
     # 5. what came out

@@ -1210,7 +1210,7 @@ def test_build_contributions_needs_eigenvals(molsys, pre_a1_zero):
 # The lorentzian_propagator tests, the get_intensity test and the hand-worked values (eval_resonance_factor,
 # eval_feature_on_grid) use the Lorentzian. The other tests pass a RecordingPropagator, so they hold for any propagator.
 
-G_CM = 5.                   # lineshape parameter, cm-1
+G_CM = 5.                   # propagator_param parameter, cm-1
 G_AU = convNu2Ene(G_CM)
 CM1_PER_EH = 219474.6313632  # 1 Eh in cm-1 (CODATA), written out so the hand-worked values don't use convNu2Ene
 
@@ -1226,17 +1226,17 @@ def to_au(grid: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {ax: convNu2Ene(v) for ax, v in grid.items()}
 
 
-def feature_at_solved_location(motif, params: ParameterSet, states, coeffs=(0.3,), lineshape=G_CM) -> SpectralFeature:
+def feature_at_solved_location(motif, params: ParameterSet, states, coeffs=(0.3,), propagator_param=G_CM) -> SpectralFeature:
     """
-    One feature, one row per coeff, at the location solve_LSE_motif finds (cm-1); width `lineshape`.
-    A lineshape function also gets the conditions, as features_from_rows gives them.
+    One feature, one row per coeff, at the location solve_LSE_motif finds (cm-1); width `propagator_param`.
+    A propagator_param function also gets the conditions, as features_from_rows gives them.
     """
     res_motif = ResonanceMotif.from_tuples(motif)
     location = solve_LSE_motif(res_motif, params, states, unit='cm-1')
     rows = tuple(ContributionRow(term_id=i, motif=res_motif, params=params, location=location, coeff=c)
                  for i, c in enumerate(coeffs))
-    conditions = condition_states(res_motif, params, states) if callable(lineshape) else None
-    return SpectralFeature(location=location, rows=rows, lineshape_parameter=lineshape, conditions=conditions)
+    conditions = condition_states(res_motif, params, states) if callable(propagator_param) else None
+    return SpectralFeature(location=location, rows=rows, propagator_param=propagator_param, conditions=conditions)
 
 
 class RecordingPropagator:
@@ -1372,7 +1372,7 @@ def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(para
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
 def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif, ps, states):
     """
-    Grid and lineshape_parameter go in as cm-1. The propagator must get E_i - freq_i and gamma in Eh.
+    Grid and propagator_param go in as cm-1. The propagator must get E_i - freq_i and gamma in Eh.
     The states come from the feature's own params: a=0, b=1 and a=1, b=0 resonate at different places.
     """
     f = feature_at_solved_location(motif, ps, states)
@@ -1503,20 +1503,20 @@ def test_eval_feature_on_grid_peak_is_coeff_times_i_over_gamma_to_the_N(motif, g
     on the imaginary axis for one condition, real and negative for two. Wider line -> lower peak.
     get_intensity only checks |peak|^2; this also checks the phase (the -i*gamma sign).
     """
-    f = replace(feature_at_solved_location(motif, params_obj, states), lineshape_parameter=gamma)
+    f = replace(feature_at_solved_location(motif, params_obj, states), propagator_param=gamma)
 
     value = eval_feature_on_grid(f, states, f.location.as_dict())  # type: ignore
 
     assert value == pytest.approx(CM1_PER_EH ** len(motif) * expected_cm1)
 
 
-def test_eval_feature_on_grid_lineshape_function_gives_each_condition_its_own_width(states):
+def test_eval_feature_on_grid_propagator_param_function_gives_each_condition_its_own_width(states):
     """
     Same points and widths as the eval_resonance_factor test above (16 cm-1 on A, 5 cm-1 on B), with the
     width function on the feature, in cm-1. Values are 0.3 times that test's: -0.0125 -> -0.00375,
     (-1 + i)/160 -> -0.001875 + 0.001875i.
     """
-    f = feature_at_solved_location(MOTIF_AB, PS_01, states, lineshape=lambda vd, freqs: vd.energy_difference() / 100)
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states, propagator_param=lambda vd, freqs: vd.energy_difference() / 100)
     grid_cm = {'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])}
 
     value = eval_feature_on_grid(f, states, grid_cm)
@@ -1525,23 +1525,23 @@ def test_eval_feature_on_grid_lineshape_function_gives_each_condition_its_own_wi
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
 
 
-def test_eval_feature_on_grid_lineshape_function_of_a_constant_equals_the_number(states):
-    """lambda vd, freqs: 5. draws the same as lineshape_parameter=5. MOTIF_AB, 3x3 grid around the peak."""
+def test_eval_feature_on_grid_propagator_param_function_of_a_constant_equals_the_number(states):
+    """lambda vd, freqs: 5. draws the same as propagator_param=5. MOTIF_AB, 3x3 grid around the peak."""
     number = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    function = feature_at_solved_location(MOTIF_AB, PS_01, states, lineshape=lambda vd, freqs: 5.)
+    function = feature_at_solved_location(MOTIF_AB, PS_01, states, propagator_param=lambda vd, freqs: 5.)
     grid = grid_around(number.location.as_dict(), G_CM)
 
     np.testing.assert_allclose(eval_feature_on_grid(function, states, grid), eval_feature_on_grid(number, states, grid))
 
 
-def test_eval_feature_on_grid_lineshape_function_can_depend_on_the_frequency(states):
+def test_eval_feature_on_grid_propagator_param_function_can_depend_on_the_frequency(states):
     """
     The function gets the grid as freqs and returns one value per grid point.
     Here width = A - 1595 cm-1: 5 at A = 1600, 10 at A = 1605. MOTIF_A, peak at 1600:
         A = 1600:  0.3 / (-5i)       = 0.06i
         A = 1605:  0.3 / (-5 - 10i)  = 0.3 * (-5 + 10i) / 125 = -0.012 + 0.024i
     """
-    f = feature_at_solved_location(MOTIF_A, PS_01, states, lineshape=lambda vd, freqs: freqs['A'] - 1595.)
+    f = feature_at_solved_location(MOTIF_A, PS_01, states, propagator_param=lambda vd, freqs: freqs['A'] - 1595.)
 
     value = eval_feature_on_grid(f, states, {'A': np.array([1600., 1605.])})
 
@@ -1549,29 +1549,29 @@ def test_eval_feature_on_grid_lineshape_function_can_depend_on_the_frequency(sta
 
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_feature_on_grid_peak_matches_get_intensity_with_a_lineshape_function(motif, params_obj, states):
+def test_eval_feature_on_grid_peak_matches_get_intensity_with_a_propagator_param_function(motif, params_obj, states):
     """
     E5: the drawn peak and get_intensity (so the box size) take one width. Here a width per condition,
     1 % of |E| (MOTIF_AB, a=0, b=1: 16 and 5 cm-1), plus a part that changes with A.
     abs(): MOTIF_MIXED has E = -1000 on both conditions.
     """
     width = lambda vd, freqs: 0.01 * abs(vd.energy_difference()) + 0.001 * np.abs(freqs['A'])
-    f = feature_at_solved_location(motif, params_obj, states, lineshape=width)
+    f = feature_at_solved_location(motif, params_obj, states, propagator_param=width)
 
     value = eval_feature_on_grid(f, states, f.location.as_dict())  # type: ignore
 
     assert abs(value) ** 2 == pytest.approx(f.get_intensity())
 
 
-def test_eval_feature_on_grid_needs_a_lineshape_parameter(params_obj, states):
-    f = replace(feature_at_solved_location(MOTIF_A, params_obj, states), lineshape_parameter=None)
+def test_eval_feature_on_grid_needs_a_propagator_param(params_obj, states):
+    f = replace(feature_at_solved_location(MOTIF_A, params_obj, states), propagator_param=None)
 
-    with pytest.raises(ValueError, match='lineshape_parameter'):
+    with pytest.raises(ValueError, match='propagator_param'):
         eval_feature_on_grid(f, states, {'A': np.zeros(3)})
 
 
 def test_eval_feature_on_grid_needs_rows(states):
-    f = SpectralFeature(location=ResLocPoint({'A': 0.}), lineshape_parameter=G_CM)
+    f = SpectralFeature(location=ResLocPoint({'A': 0.}), propagator_param=G_CM)
 
     with pytest.raises(ValueError, match='no motif'):
         eval_feature_on_grid(f, states, {'A': np.zeros(3)})

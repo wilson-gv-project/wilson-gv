@@ -800,6 +800,9 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
     One motif consists of resonance conditions from a single term.
 
     propagator - function that takes (resloc, parameter) and returns the resonance factor, e.g., lorentzian_propagator
+    propagator_param - vd -> the propagator's parameter in Eh, one call per condition. The Eh form of
+                       feature.propagator_param (cm-1, a number or a (vd, freqs) function), which
+                       eval_feature_on_grid converts to this.
     """
     result = 1.
 
@@ -822,20 +825,20 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     """
     amplitude_coeff * resonance factor of the feature's motif. grid in cm-1, result in au.
 
-    The propagator's parameter is feature.lineshape_parameter, cm-1 (converted to Eh here):
+    The propagator's parameter is feature.propagator_param, cm-1 (converted to Eh here):
         a number   -> the same on every condition
-        a function -> lineshape_parameter(vd, grid_cm) for each condition (features.LineshapeParameter):
+        a function -> propagator_param(vd, grid_cm) for each condition (features.PropagatorParam):
                       a number per condition, or an array of the grid's shape for one that changes with
                       the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
-    The box and get_intensity take the same lineshape_parameter, at the peak (SpectralFeature.peak_widths).
+    The box and get_intensity take the same propagator_param, at the peak (SpectralFeature.peak_widths).
     """
-    lineshape = feature.lineshape_parameter
-    if lineshape is None:
-        raise ValueError(f'feature {feature} has no lineshape_parameter')
-    if callable(lineshape):
-        param_au = lambda vd: convNu2Ene(lineshape(vd, grid_cm)) # type: ignore
+    param = feature.propagator_param
+    if param is None:
+        raise ValueError(f'feature {feature} has no propagator_param')
+    if callable(param):
+        param_au = lambda vd: convNu2Ene(param(vd, grid_cm)) # type: ignore
     else:
-        gamma_au = convNu2Ene(lineshape)
+        gamma_au = convNu2Ene(param)
         param_au = lambda _vd: gamma_au
 
     if feature.motif is None:

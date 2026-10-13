@@ -121,7 +121,7 @@ def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0,
     if rows is None:
         rows = () if amp is None else (row(amp, location=loc, a=0),)
     box = None if box_extent is None else Box({ax: (v - box_extent, v + box_extent) for ax, v in loc.coordinates})
-    return SpectralFeature(location=loc, rows=rows, lineshape_parameter=gamma, feat_box=box)
+    return SpectralFeature(location=loc, rows=rows, propagator_param=gamma, feat_box=box)
 
 
 def get_box_extent(f: SpectralFeature, axis: str = 'A') -> float:

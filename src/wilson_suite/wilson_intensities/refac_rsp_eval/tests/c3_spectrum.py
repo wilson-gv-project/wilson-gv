@@ -134,7 +134,7 @@ def run_new(case: Case, laser_pol):
     with mock.patch.object(pipeline, 'wilson_data_obtainer', case.obtainer):
         molsys = pipeline.load_molsys_data(compiled, origin)
     result = pipeline.compute_features(compiled, molsys, pipeline.make_polarization_linear_comb(compiled, laser_pol),
-                                       lineshape_parameter=GAMMA_CM, states_choice=case.new_states)
+                                       propagator_param=GAMMA_CM, states_choice=case.new_states)
     return result.states, result
 
 

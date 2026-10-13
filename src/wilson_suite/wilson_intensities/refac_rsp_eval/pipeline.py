@@ -39,7 +39,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     ContributionTable,
-    LineshapeParameter,
+    PropagatorParam,
     SpectralFeature,
     SpectralWindow,
     features_from_rows,
@@ -66,7 +66,7 @@ if TYPE_CHECKING:
 class FeatureResult:
     table: ContributionTable                          # all rows: the source
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
-    lineshape_parameter: LineshapeParameter | None = None   # cm-1: a number or a function (features.LineshapeParameter)
+    propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
     # leaves() needs all five; drawing needs the states (FeatureResult.states). References only: nothing is copied.
     # compare=False: two results are equal by their rows, not by their inputs.
@@ -80,11 +80,11 @@ class FeatureResult:
     def features(self) -> list[SpectralFeature]:
         """
         One feature per (motif, location), built from the table on first use.
-        A lineshape_parameter function also needs the states (compute_features keeps them): each feature gets
+        A propagator_param function also needs the states (compute_features keeps them): each feature gets
         its conditions from them. A result made by hand has no states, so its features get no conditions.
         """
         states = None if self.molsys is None or self.states_choice is None else self.states
-        return features_from_rows(self.table, self.lineshape_parameter, states)
+        return features_from_rows(self.table, self.propagator_param, states)
 
     @property
     def states(self) -> 'VibStatesData':
@@ -128,13 +128,13 @@ class FeatureResult:
 def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
                      polarization_linear_comb: dict | None = None,
                      precalculated_data: PrecalculatedData | None = None,
-                     lineshape_parameter: LineshapeParameter | None = None,
+                     propagator_param: PropagatorParam | None = None,
                      *,
                      states_choice: str) -> FeatureResult:
     """
     One SpectralFeature per (motif, location).
-    lineshape_parameter: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a width
-        per condition and/or per frequency (features.LineshapeParameter).
+    propagator_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a width
+        per condition and/or per frequency (features.PropagatorParam).
     states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
         GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
@@ -142,7 +142,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     """
     table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, precalculated_data,
                                       states_choice=states_choice)
-    return FeatureResult(table, zero, lineshape_parameter,
+    return FeatureResult(table, zero, propagator_param,
                          compiled=tuple(compiled), molsys=molsys_data,
                          polarization_linear_comb=polarization_linear_comb, precalculated_data=precalculated_data,
                          states_choice=states_choice)
@@ -212,7 +212,7 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
                                 data_origin: DataOriginInfo,
                                 states_choice: str,
                                 laser_pol: Sequence[float],
-                                lineshape_parameter: LineshapeParameter | None = None) -> FeatureResult:
+                                propagator_param: PropagatorParam | None = None) -> FeatureResult:
     """
     Terms as derive writes them (in pulse IDs) + data file + experiment settings -> features.
         1. translate the terms to the chosen axes          term_var_translate (copies, keeps the order)
@@ -224,7 +224,7 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
     axes                 e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
     states_choice        must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
     laser_pol            the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
-    lineshape_parameter  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.LineshapeParameter), e.g.
+    propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.
                          lambda vd, freqs: 0.01 * abs(vd.energy_difference())
     row.term_id is the index in `terms`.
     """
@@ -232,7 +232,7 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
     compiled = compile_terms(translated)
     molsys = load_molsys_data(compiled, data_origin)
     polarization = make_polarization_linear_comb(compiled, laser_pol)
-    return compute_features(compiled, molsys, polarization, lineshape_parameter=lineshape_parameter,
+    return compute_features(compiled, molsys, polarization, propagator_param=propagator_param,
                             states_choice=states_choice)
 
 
@@ -252,14 +252,14 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
                             molsys_data: MolSystemData,
                             states_choice: str,
                             orient_avrg_recipe: 'PolarizationAveragingRecipe',
-                            lineshape_parameter: LineshapeParameter,
+                            propagator_param: PropagatorParam,
                             window: 'Box | None' = None,
                             dim_sizes: dict[str, int] | None = None,
                             dynrange: float = 101.) -> EvalRspResult:
     translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
     compiled = compile_terms(translated)
     feature_result = compute_features(compiled, molsys_data, orient_avrg_recipe,
-                                      lineshape_parameter=lineshape_parameter,
+                                      propagator_param=propagator_param,
                                       states_choice=states_choice)
     if window is None:                  # features only, no drawing
         return EvalRspResult(feature_result)

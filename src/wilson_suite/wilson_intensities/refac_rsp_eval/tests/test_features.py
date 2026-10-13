@@ -290,21 +290,21 @@ def test_features_from_rows_does_not_round_locations():
     assert len(features_from_rows(ContributionTable(rows))) == 2
 
 
-def test_features_from_rows_gives_every_feature_the_lineshape_parameter():
-    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_parameter=5.)
+def test_features_from_rows_gives_every_feature_the_propagator_param():
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), propagator_param=5.)
 
-    assert f.lineshape_parameter == 5.
+    assert f.propagator_param == 5.
     assert f.feat_box is None   # boxes come later, from dress_these_with_boxes
     assert f.conditions is None # a number needs no conditions
 
 
-def test_features_from_rows_without_states_gives_a_lineshape_function_no_conditions():
+def test_features_from_rows_without_states_gives_a_propagator_param_function_no_conditions():
     """The conditions come from the states (test_pipeline.py checks them); without states, peak_widths raises."""
     width = lambda vd, freqs: 5.
 
-    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_parameter=width)
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), propagator_param=width)
 
-    assert f.lineshape_parameter is width
+    assert f.propagator_param is width
     assert f.conditions is None
 
 
@@ -424,15 +424,15 @@ def test_intensity_supports_only_abs_squared():
         feat(A=0.).get_intensity('real()')
 
 
-## SpectralFeature: lineshape function, peak widths --------------------------
-# A lineshape function gets each condition's pair of states; here stand-ins that only have an energy difference.
+## SpectralFeature: propagator_param function, peak widths --------------------------
+# A propagator_param function gets each condition's pair of states; here stand-ins that only have an energy difference.
 
 TWO_CONDITIONS = (SimpleNamespace(E=1600.), SimpleNamespace(E=500.))
 WIDTH_1_PERCENT = lambda vd, freqs: vd.E / 100    # 16 and 5 cm-1
 
 
 def with_width_per_condition(f: SpectralFeature) -> SpectralFeature:
-    return replace(f, lineshape_parameter=WIDTH_1_PERCENT, conditions=TWO_CONDITIONS)
+    return replace(f, propagator_param=WIDTH_1_PERCENT, conditions=TWO_CONDITIONS)
 
 
 def test_peak_widths_of_a_number_is_one_per_axis():
@@ -445,14 +445,14 @@ def test_peak_widths_of_a_function_is_one_per_condition():
 
 def test_peak_widths_of_a_function_takes_the_location_as_freqs():
     """width = A / 100 at A = 300 -> 3 cm-1"""
-    f = replace(feat(A=300.), lineshape_parameter=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
+    f = replace(feat(A=300.), propagator_param=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
 
     assert f.peak_widths() == pytest.approx((3.,))
 
 
 def test_peak_widths_of_a_function_needs_the_conditions():
     with pytest.raises(ValueError, match='no conditions'):
-        replace(feat(A=100.), lineshape_parameter=WIDTH_1_PERCENT).peak_widths()
+        replace(feat(A=100.), propagator_param=WIDTH_1_PERCENT).peak_widths()
 
 
 def test_intensity_with_a_width_per_condition():
@@ -463,7 +463,7 @@ def test_intensity_with_a_width_per_condition():
 
 
 def test_intensity_needs_positive_widths_from_a_function():
-    f = replace(feat(A=0.), lineshape_parameter=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
+    f = replace(feat(A=0.), propagator_param=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
 
     with pytest.raises(ValueError, match='must be > 0'):
         f.get_intensity()
@@ -567,8 +567,8 @@ def test_dress_scaled_boxes_shrink_for_weaker_features():
     assert get_box_extent(unscaled) == pytest.approx(5. * 51 ** 0.5)
 
 
-def test_dress_needs_lineshape_parameter():
-    with pytest.raises(ValueError, match='lineshape_parameter'):
+def test_dress_needs_propagator_param():
+    with pytest.raises(ValueError, match='propagator_param'):
         SpectralFeature.dress_these_with_boxes([feat(A=0., gamma=None)], 1., 0.01)
 
 
@@ -756,8 +756,8 @@ def test_window_from_features_needs_dynrange_above_one(dynrange):
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.)], dynrange=dynrange)
 
 
-def test_window_from_features_needs_lineshape_parameter():
-    with pytest.raises(ValueError, match='lineshape_parameter'):
+def test_window_from_features_needs_propagator_param():
+    with pytest.raises(ValueError, match='propagator_param'):
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], dynrange=101.)
 
 
