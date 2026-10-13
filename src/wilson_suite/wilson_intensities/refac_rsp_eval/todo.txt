@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-13
 
-Tests  refac_rsp_eval: 597 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+Tests  refac_rsp_eval: 606 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        Since 2026-10-13 also 7 fail on purpose until A15 is fixed: wilson_intensities/tests/unit/test_get_pol_tensor.py.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
@@ -64,6 +64,12 @@ Decisions and known limits
   build_contributions, evaluate_term_coeff_sumover, evaluate_full_index_dict, otf_vibdiffdenom) and reads
   states[states_choice]. One loaded MolSystemData serves both choices. A choice the data lacks raises
   (MolSystemData.check_states_choice), e.g. 'GVPT2' or 'anharmonic' without anharmonic states.
+- Excluded modes are removed everywhere (2026-10-13): evaluate_response_terms(exclude_modes=(5,)) uses mode 5
+  neither as a resonance label (no row, no peak) nor as a value of a summed label, as if the molecule did not
+  have it. So the other peaks change too. Modes count from 0, as in the data; an unknown mode raises
+  (evaluate.included_modes). The old code (VibAnaSetup.exclude_modes) differs: no peaks either, but its sums
+  dropped the mode only where the summed label is in the averaged part (its precalculated averaged tensors were
+  0 there), e.g. EVV terms 2, 4, 5, 7, 9-12 still summed over it.
 - No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak features stay, and so do
   features whose rows cancel (a record: FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0
   never becomes a row (FeatureResult.zero).
@@ -171,6 +177,8 @@ E. Pipeline
         - [ ] the default dynrange, matched to the plot's dynamic range (log scale is the renderer's default;
               see the cut in Decisions)
         - [ ] nothing that assumes point features only (E8)
+        - [x] excluded modes: pass VibAnaSetup.exclude_modes as exclude_modes (2026-10-13, see Decisions). The
+              old-vs-new check matches only without excluded modes: the two codes exclude differently.
         The new calls (since 2026-10-13): MolSystemData (load_molsys_data, or from WilsonSimulation's data),
         evaluate_response_terms(sim.terms in pulse IDs, laser_pol = exp.polarization_avg_vector, ...), then
         draw_spectrum. draw_spectrum already uses make_grid and dynrange 1000 by default; the two items above
@@ -489,6 +497,15 @@ B    Precalculated path deleted (2026-10-13, H1). Its reason was speed; since F1
      Tests (test_pipeline.py): the compute_features_from_terms tests run on evaluate_response_terms; the drawing
      tests call draw_spectrum; positional settings raise; the recipe is made once and copied. Gone: the two
      tests of the window-or-not mode. example_evaluate_response_terms.py uses the three calls (no None checks).
+-    exclude_modes (2026-10-13). evaluate_response_terms, compute_features and build_contributions take
+     exclude_modes (default none); FeatureResult keeps it, so leaves() sums over the same modes.
+     evaluate.included_modes gives the modes left and raises for an unknown mode or when none is left;
+     make_idx_sets takes the modes, not their number; evaluate_term_coeff_sumover takes modes= (None: all).
+     Meaning: removed everywhere (see Decisions).
+     Tests: test_evaluate.py (toy, 2 modes): included_modes; the sum over the given modes only; exclude mode 1 ->
+     one index set (a = b = 0) whose coefficient is the c = 0 piece alone. test_pipeline.py (formaldehyde,
+     exclude mode 5): 14 x 25 pairs, none with mode 5; every row = the full run's leaves without mode 5, all 14
+     terms; term 2's coefficients change. Same numbers without exclusion; ACDM build_contributions 3.4 s.
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

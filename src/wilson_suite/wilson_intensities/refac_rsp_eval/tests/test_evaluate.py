@@ -29,6 +29,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     evaluate_term_coeff_sumover,
     get_RHS_motif,
     harmonic_denom,
+    included_modes,
     lorentzian_propagator,
     make_avrg_einsum_subscripts,
     otf_vibdiffdenom,
@@ -1064,6 +1065,65 @@ def test_build_contributions_needs_eigenvals(molsys_a1_zero):
     with pytest.raises(ValueError, match='eigenvals'):
         build_contributions([ab_term()], replace(molsys_a1_zero, eigenvals=None), TOY_RECIPE,
                             states_choice='harmonic')
+
+
+## exclude_modes: a mode removed everywhere ------------------------------------
+# The toy molecule has 2 modes, 0 and 1. An excluded mode is no value of a resonance label (no row, no zero
+# pair) and no value of a summed label (included_modes; decided 2026-10-13).
+
+def test_included_modes_without_exclusion_is_every_mode(molsys):
+    assert included_modes(molsys) == (0, 1)
+
+
+def test_included_modes_leaves_out_the_excluded_modes(molsys):
+    assert included_modes(molsys, (1,)) == (0,)
+    assert included_modes(molsys, [1, 1]) == (0,)
+
+
+@pytest.mark.parametrize('exclude', [(2,), (-1,), ('1',)], ids=['beyond the last mode', 'negative', 'not a number'])
+def test_included_modes_raises_for_a_mode_that_does_not_exist(exclude, molsys):
+    """modes count from 0, as in the data: a 1-based list would name a mode beyond the last one"""
+    with pytest.raises(ValueError, match=r'no such mode, the modes are 0 \.\. 1'):
+        included_modes(molsys, exclude)
+
+
+def test_included_modes_raises_if_no_mode_is_left(molsys):
+    with pytest.raises(ValueError, match='removes all 2 modes'):
+        included_modes(molsys, (0, 1))
+
+
+def test_evaluate_term_coeffs_sums_only_over_the_given_modes(term_and_avrg, molsys):
+    """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one leaf instead of four"""
+    term, avrg = term_and_avrg
+
+    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='harmonic',
+                                                modes=(0,))
+
+    only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='harmonic')
+    assert set(leaves) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
+    assert total == only
+
+
+def test_build_contributions_excluded_mode_is_removed_everywhere(molsys_a1_zero):
+    """
+    Exclude mode 1: the only index set is a = b = 0 (no row and no zero pair with a 1), and its sum over c keeps
+    only c = 0. So its coefficient is the c = 0 piece alone; without exclusion it is the sum of the c = 0 and c = 1
+    pieces (cff[0, 0, 0] = 1 and cff[0, 0, 1] = 2).
+    """
+    term = ab_term()
+
+    rows, zero = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic',
+                                     exclude_modes=(1,))
+    full_rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+
+    [row] = rows
+    assert (row.params, zero) == (PS_00, [])
+    avrg = calculate_avrg_tensor_einsum(term.avrg_props, molsys_a1_zero.mol_props, TOY_RECIPE)
+    c0_only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys_a1_zero, avrg,
+                                          states_choice='harmonic')
+    assert row.coeff == pytest.approx(c0_only, rel=1e-14, abs=0)
+    full = {r.params: r.coeff for r in full_rows}[PS_00]
+    assert row.coeff != pytest.approx(full)
 
 
 ## Resonance factors on the grid -----------------------------------------------

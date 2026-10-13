@@ -25,7 +25,7 @@ SpectralFeature(location, rows)                            "what" layer   featur
 spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
 """
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -41,6 +41,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     draw_window,
     evaluate_term_coeff_sumover,
+    included_modes,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
@@ -78,12 +79,13 @@ class FeatureResult:
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # leaves() needs all four; drawing needs the states (FeatureResult.states). References only: nothing is copied.
-    # compare=False: == leaves them out.
+    # leaves() needs the first four, and sums over the modes left after exclude_modes; drawing needs the states
+    # (FeatureResult.states). References only: nothing is copied. compare=False: == leaves them out.
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
     states_choice: str | None = field(default=None, compare=False)
+    exclude_modes: tuple[int, ...] = field(default=(), compare=False)   # sorted, e.g. (5,): evaluate.included_modes
 
     @cached_property
     def features(self) -> list[SpectralFeature]:
@@ -111,16 +113,17 @@ class FeatureResult:
                  'VIBDIFF_TERMS': ..., 'VIBENE_DENOM': ...}, ...,  ParameterSet({'a': 0, 'b': 1, 'c': 41}): {...}}
             An index set whose average or non-averaged part is 0 holds only the factors made before the stop,
             e.g. {'AVRG': 0.}.
-        Computed again from row.term_id and row.params, with the terms, data and polarization of this result, so
-        the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions does not keep
-        them, since every row's leaves would take 357 MB there.
+        Computed again from row.term_id and row.params, with the terms, data, polarization and excluded modes of
+        this result, so the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions
+        does not keep them, since every row's leaves would take 357 MB there.
         """
         if (self.compiled is None or self.molsys is None or self.polarization_linear_comb is None
                 or self.states_choice is None):
             raise ValueError('this FeatureResult has no terms or data (made by hand?): compute_features keeps them, '
                              'and leaves need them')
         _, leaves = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
-                                                self.polarization_linear_comb, states_choice=self.states_choice)
+                                                self.polarization_linear_comb, states_choice=self.states_choice,
+                                                modes=included_modes(self.molsys, self.exclude_modes))
         return leaves # type: ignore
 
     def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
@@ -138,7 +141,8 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
                      polarization_linear_comb: dict,
                      propagator_param: PropagatorParam | None = None,
                      *,
-                     states_choice: str) -> FeatureResult:
+                     states_choice: str,
+                     exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
     One SpectralFeature per (motif, location).
     polarization_linear_comb: the orientation-average recipe (make_polarization_linear_comb).
@@ -146,13 +150,16 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
         per condition and/or per frequency (features.PropagatorParam).
     states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
         GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
+    exclude_modes: modes removed everywhere, e.g. (5,): no peak and no summed value uses them (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) in drawing.
     """
-    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice)
+    table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice,
+                                      exclude_modes=exclude_modes)
     return FeatureResult(table, zero, propagator_param,
                          compiled=tuple(compiled), molsys=molsys_data,
-                         polarization_linear_comb=polarization_linear_comb, states_choice=states_choice)
+                         polarization_linear_comb=polarization_linear_comb, states_choice=states_choice,
+                         exclude_modes=tuple(sorted(set(exclude_modes))))
 
 
 def load_molsys_data(terms: Sequence['VibPerturbedTerm'], data_origin: DataOriginInfo) -> MolSystemData:
@@ -236,7 +243,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                             molsys_data: MolSystemData,
                             states_choice: str,
                             laser_pol: Sequence[float],
-                            propagator_param: PropagatorParam) -> FeatureResult:
+                            propagator_param: PropagatorParam,
+                            exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
     Terms as derive writes them (in pulse IDs) + data loaded before + experiment settings -> rows and features.
         1. translate the terms to the chosen axes           term_var_translate (copies, keeps the order)
@@ -252,6 +260,9 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.
                       lambda vd, freqs: 0.01 * abs(vd.energy_difference())
+    exclude_modes     modes removed everywhere, counted from 0 as in the data, e.g. (5,) (VibAnaSetup.exclude_modes):
+                      no peak and no summed value uses them, as if the molecule did not have them. The other peaks
+                      change too: their sums lose the excluded modes (evaluate.included_modes). Default: none.
     Every argument after the terms is keyword-only: two swapped arguments raise a TypeError.
     row.term_id is the index in `terms`.
     """
@@ -259,7 +270,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     compiled = compile_terms(translated)
     recipe = make_polarization_linear_comb(terms, laser_pol)
     return compute_features(compiled, molsys_data, recipe, propagator_param=propagator_param,
-                            states_choice=states_choice)
+                            states_choice=states_choice, exclude_modes=exclude_modes)
 
 
 @dataclass(frozen=True)

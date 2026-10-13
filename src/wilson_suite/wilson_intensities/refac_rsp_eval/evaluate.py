@@ -72,15 +72,18 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          avrg_tensor: 'AvrgTensor | None' = None,
                          keep_leaves: bool = True,
                          *,
-                         states_choice: str) -> tuple[float, dict | None]:
+                         states_choice: str,
+                         modes: Sequence[int] | None = None) -> tuple[float, dict | None]:
     """
     Coefficient of one term at one resonance location.
     states_choice: which state set of molsys_data gives the energy differences, e.g. 'anharmonic';
         no default (see MolSystemData.states).
+    modes: the values every summed label runs over, e.g. (0, 1, 2, 3, 4) with mode 5 excluded (included_modes).
+        None -> every mode, 0 .. n_modes-1. The caller fixes the resonance labels, from the same modes.
 
     idx_dict must fix every resonance label (compl_term.idx_nonsumm): these labels decide where
-    the peak sits. Every label left out is summed over all modes. The summed pieces all sit at
-    the same location, so adding them is safe.
+    the peak sits. Every label left out is summed over all modes (or over `modes`). The summed pieces all
+    sit at the same location, so adding them is safe.
 
     e.g. a term with resonance labels (a, b) and summation label c:
         {'a': 0, 'b': 1}  ->  f(0,1,0) + f(0,1,1) + ... + f(0,1,n_modes-1)
@@ -106,6 +109,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
     if molsys_data.eigenvals is not None:
         n_modes = len(molsys_data.eigenvals)
     else: raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
+    summed_values = range(n_modes) if modes is None else modes
 
     if avrg_tensor is None:
         if polarization_linear_comb is None:
@@ -124,7 +128,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                 leaves[ParameterSet(index_dict)] = contribs
             return value
         current, rest = remaining[0], remaining[1:]
-        return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in range(n_modes))
+        return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in summed_values)
     
     missing = [i for i in term_idx_all if i not in idx_dict]
     leaves = {} if keep_leaves else None
@@ -560,20 +564,42 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
 ##          loops over collections [terms,index sets,res motifs]
 ## ------------------------------------------------------------------
 
-def make_idx_sets(n_modes: int, mode_labels: Sequence) -> list[dict[str, int]]:
+def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()) -> tuple[int, ...]:
     """
-    n_modes - number of normal modes
-    mode_labels = sorted(set(avrg_expression.get_mode_indices()))
-    """
-    # all possible labels - tuple(range(n_modes))
-    nm_inds_choices = tuple(range(n_modes))
+    The modes the evaluation uses: 0 .. n_modes-1 without exclude_modes, n_modes = len(molsys_data.eigenvals).
+        e.g. 6 modes, exclude_modes (5,) -> (0, 1, 2, 3, 4)
+    An excluded mode is removed everywhere (todo.txt Decisions, 2026-10-13): it is no resonance label (no row,
+    no peak) and no value of a summed label, as if the molecule did not have it. So the other peaks change too:
+    their sums lose the excluded mode. (VibAnaSetup.exclude_modes in the old code: no peaks either, but the sums
+    dropped the mode only where the summed label is in the averaged part.)
 
+    raises ValueError for a mode that does not exist (modes count from 0), or if no mode is left
+    """
+    if molsys_data.eigenvals is None:
+        raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
+    n_modes = len(molsys_data.eigenvals)
+    excluded = set(exclude_modes)
+    unknown = [m for m in excluded if m not in range(n_modes)]
+    if unknown:
+        raise ValueError(f'exclude_modes {unknown}: no such mode, the modes are 0 .. {n_modes - 1}')
+    modes = tuple(m for m in range(n_modes) if m not in excluded)
+    if not modes:
+        raise ValueError(f'exclude_modes removes all {n_modes} modes')
+    return modes
+
+
+def make_idx_sets(modes: Sequence[int], mode_labels: Sequence) -> list[dict[str, int]]:
+    """
+    Every assignment of the given modes to mode_labels, e.g. modes (0, 1), labels ['a', 'b']:
+        [{'a': 0, 'b': 0}, {'a': 0, 'b': 1}, {'a': 1, 'b': 0}, {'a': 1, 'b': 1}]
+    """
     import itertools
-    return [dict(zip(mode_labels, combo)) for combo in itertools.product(nm_inds_choices, repeat=len(mode_labels))]
+    return [dict(zip(mode_labels, combo)) for combo in itertools.product(modes, repeat=len(mode_labels))]
 
 
 def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemData,
-                        polarization_linear_comb: dict, *, states_choice: str
+                        polarization_linear_comb: dict, *, states_choice: str,
+                        exclude_modes: Iterable[int] = ()
                         ) -> tuple[ContributionTable, list[tuple[int, ParameterSet]]]:
     """
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
@@ -581,6 +607,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     The number of modes comes from molsys_data.eigenvals, the state energies from
     molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
     polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
+    exclude_modes: modes removed everywhere, e.g. (5,): no index set and no summed value uses them (included_modes).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
@@ -589,9 +616,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     one point (B7). A term built by hand skips that check; if its motif has no single point,
     solve_LSE_motif raises and the run stops.
     """
-    if molsys_data.eigenvals is None:
-        raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
-    n_modes = len(molsys_data.eigenvals)
+    modes = included_modes(molsys_data, exclude_modes)
     molsys_data.check_states_choice(states_choice)
     states = molsys_data.states[states_choice]
 
@@ -601,13 +626,13 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
         motif = term.cmp_resmotf
         # the averaged part for every index set: one einsum per term, not one per index set
         avrg_tensor = calculate_avrg_tensor_einsum(term.avrg_props, molsys_data.mol_props, polarization_linear_comb)
-        for idxset in make_idx_sets(n_modes, sorted(term.idx_nonsumm)):
+        for idxset in make_idx_sets(modes, sorted(term.idx_nonsumm)):
             ps = ParameterSet(idxset)
 
             # no leaves: FeatureResult.leaves computes a row's leaves again when asked
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, polarization_linear_comb,
                                                    avrg_tensor=avrg_tensor, keep_leaves=False,
-                                                   states_choice=states_choice)
+                                                   states_choice=states_choice, modes=modes)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))

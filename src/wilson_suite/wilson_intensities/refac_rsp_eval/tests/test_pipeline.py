@@ -569,13 +569,13 @@ def formaldehyde_molsys() -> MolSystemData:
     return load_molsys_data(ref.evv_terms(), ref.data_origin('formaldehyde'))
 
 
-def evaluate_formaldehyde(molsys, propagator_param, terms=None) -> FeatureResult:
+def evaluate_formaldehyde(molsys, propagator_param, terms=None, **kwargs) -> FeatureResult:
     return evaluate_response_terms(ref.evv_terms() if terms is None else terms,
                                    axes=make_SpectralAxisSet(ref.AXES),  # type: ignore
                                    molsys_data=molsys,
                                    states_choice='anharmonic',
                                    laser_pol=ref.LASER_POL,
-                                   propagator_param=propagator_param)
+                                   propagator_param=propagator_param, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -638,6 +638,32 @@ def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_mol
     with pytest.raises(TypeError, match='positional'):
         evaluate_response_terms(ref.evv_terms(), make_SpectralAxisSet(ref.AXES), formaldehyde_molsys,  # type: ignore
                                 'anharmonic', ref.LASER_POL, 5.)
+
+
+def test_evaluate_response_terms_excluded_mode_is_removed_everywhere(formaldehyde_molsys, top_run):
+    """
+    exclude_modes (5,), formaldehyde, 6 modes: 5 x 5 (a, b) pairs per term instead of 6 x 6, none with mode 5.
+    Every row's coefficient is the sum of the full run's leaves without mode 5 (top_run: no exclusion), in every
+    term. That includes the terms whose averaged part has no c (2, 4, 5, 7, 9-12), where the old code still
+    summed over the excluded mode: for term 2 the coefficients change.
+    """
+    result = evaluate_formaldehyde(formaldehyde_molsys, 4.7, exclude_modes=(5,))
+
+    pairs = [(r.term_id, r.params) for r in result.table] + result.zero
+    assert len(pairs) == 14 * 5 * 5
+    assert all(5 not in params.indices() for _, params in pairs)
+    assert result.exclude_modes == (5,)
+
+    full = {(r.term_id, r.params): r for r in top_run.result.table}
+    changed_in_term_2 = 0
+    for r in result.table:
+        term = result.compiled[r.term_id]  # type: ignore
+        assert all(5 not in leaf.indices() for leaf in result.leaves(r))
+        full_leaves = top_run.result.leaves(full[(r.term_id, r.params)])
+        without_5 = sum(leaf_value(term, c) for leaf, c in full_leaves.items() if 5 not in leaf.indices())
+        assert r.coeff == pytest.approx(without_5, rel=1e-12, abs=0)
+        changed_in_term_2 += r.term_id == 2 and r.coeff != pytest.approx(full[(2, r.params)].coeff)
+    assert changed_in_term_2 > 0
 
 
 ## draw_spectrum: the features on a grid -------------------------------------
