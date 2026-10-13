@@ -799,6 +799,67 @@ def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_wait
 
     return True
 
+def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: tuple[tuple], thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
+    """
+    Take a tuple of independent variables, consider its powerset sans {} and for each such element,
+    evaluate if the frequency-domain range of the corresponding tuple of (possibly compound) pulses is
+    (by a margin exceeding a specified threshold)
+    a) always positive, b) always negative, or c) indeterminate. If a) or b) register it in the appropriate
+    return tuple.
+
+    ind_var_tuple: A tuple of independent variables (a pulse interaction ordering at a compounding pattern)
+
+    pulses: A bank of pulse data TODO: Consider instead using (compound) pulse frequency ranges here
+
+    thres_magn: A threshold defining a margin which the frequency-domain ranges must surpassed in order to be deemed
+    eligible for the output plus/minus bins
+
+    tol_n_dev: A frequency-domain tolerance parameter (number of standard deviations for a Gaussian pulse) for
+    constructing a bounded bandwidth interval for a (compound) pulse
+
+    Returns: Two tuples of tuples t_plus and t_minus. Both are given in terms of interaction number indices (NOT pulse
+     references).
+    """
+    from itertools import combinations, chain
+    from wilson_suite.wilson_utils.unit_convertor import per_cm_x_fs
+
+    # Get freq ranges for the involved (compound) pulses and index it by interaction number
+    freq_ranges = {}
+    fr_ctr = 0
+
+    for i in ind_var_tuple:
+
+        curr_pulse = pulses[i]
+
+        freq_ranges[fr_ctr] = [curr_pulse.cf - tol_n_dev * (per_cm_x_fs / curr_pulse.dev),
+                   curr_pulse.cf + tol_n_dev * (per_cm_x_fs / curr_pulse.dev)]
+
+        fr_ctr += 1
+
+    # Make all nonempty subsets of interaction combinations
+    int_combs = list(chain.from_iterable(combinations(range(len(ind_var_tuple)), i) for i in range(1, len(ind_var_tuple) + 1)))
+
+    t_plus = []
+    t_minus = []
+
+    # Loop over powerset and construct combined intervals, check for sign and put in plus/minus bins (or nowhere) as appropriate
+    for i in int_combs:
+
+        # Adding together lower/upper bounds to produce combined bounds
+        curr_interval = [0.0, 0.0]
+        for j in i:
+            curr_interval[0] += freq_ranges[j][0]
+            curr_interval[1] += freq_ranges[j][1]
+
+        # Always positive in excess of thres_magn
+        if (curr_interval[0] > thres_magn) and (curr_interval[1] > thres_magn):
+            t_plus.append(copy.deepcopy(i))
+
+        # Always negative in excess of -thres_magn
+        elif (curr_interval[0] < -1.0 * thres_magn) and (curr_interval[1] < -1.0 * thres_magn):
+            t_minus.append(copy.deepcopy(i))
+
+    return tuple(t_plus), tuple(t_minus)
 
 @dataclass
 class FieldAnalysis:
@@ -821,6 +882,9 @@ class FieldAnalysis:
     thres_freq: A threshold: (compound) pulses whose no frequency components fall within the range
      [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
 
+    thres_magn: A threshold used to define what "significant" means in determining whether a pulse combination's
+    frequency components are "significantly greater/smaller than 0"
+
     thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
     distant to produce an appreciable signal. Default: 1500.0 (units: fs).
 
@@ -834,6 +898,7 @@ class FieldAnalysis:
     tol_n_dev_t: float | int = 5.0
     tol_n_dev_w: float | int = 5.0
     thres_freq: float | int = 8000.0
+    thres_magn:  float | int = 200.0
     thres_waiting_time: float | int = 1500.0
     wavevector_filter: str = 'same_order'
 
@@ -842,9 +907,6 @@ class FieldAnalysis:
         # TODO: Consider breaking this routine into a few smaller steps
         # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
         # TODO: Possibly introduce a phase shift to partly account for "non-ideally-Placzek" effects?
-        # TODO: If reintroducing magnitude conditions, have them follow from the field and manage them here (with
-        #  determination offloaded to external routine)
-        # FIXME: Organize interactions after polarization categories?
 
         from itertools import permutations as permutations
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
@@ -1004,7 +1066,7 @@ class FieldAnalysis:
                     # Check if pol avg vector is nonzero
                     if not sum([abs[j] for j in pol_avg_vector]) == 0.0:
 
-                        #  Check against bank; determine bank index or make new bank entry
+                        # Check against bank; determine bank index or make new bank entry
                         found_in_bank = False
 
                         for j in pol_avg_vector_bank:
@@ -1105,7 +1167,64 @@ class FieldAnalysis:
             if int_sequences_by_order_comp_pol[ord] == {}:
                 del int_sequences_by_order_comp_pol[ord]
 
+        # FIXME: Trim pol avg vector bank in case some of them did not in fact get represented
         self.int_sequences_by_order_comp_pol = copy.deepcopy(int_sequences_by_order_comp_pol)
+
+        # Making a pulse bank that is a union of res_and_time_ and time_not_res_ pulse tuples
+        # for use in magnitude_conditions_for_ind_var_tuple
+        all_valid_pulses = copy.deepcopy(res_and_time_compound_pulses)
+
+        for i in time_not_res_compound_pulses:
+            if not i in all_valid_pulses:
+                all_valid_pulses[i] = time_not_res_compound_pulses[i]
+
+        self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
+
+        # Making a bank for conformity with the pol avg vector indexing even though the magnitude
+        # condition tuples are hashable by themselves
+        magnitude_condition_bank = {}
+
+        # A bit inelegant but workable: Going to do "surgery" on the ord, pol, comp dictionary copy to replace
+        # the innermost structure by a dict indexing by magnitude condition.
+        int_sequences_by_order_comp_pol_magn = copy.deepcopy(self.int_sequences_by_order_comp_pol)
+
+        # Walking through int_sequences_by_order_comp_pol and determine magnitude regime for each entry
+        for ord in self.int_sequences_by_order_comp_pol:
+            for comp in self.int_sequences_by_order_comp_pol[ord]:
+                for pol in self.int_sequences_by_order_comp_pol[ord][comp]:
+
+                    new_magn_dict = {}
+
+                    for m in self.int_sequences_by_order_comp_pol[ord][comp][pol]:
+
+                        # Get magnitude conditions (template interaction indices) for this interaction sequence
+                        p_plus, p_minus = magnitude_conditions_for_ind_var_tuple(m, self.all_valid_pulses, self.thres_magn, self.tol_n_dev_w)
+
+                        # Look in bank to see if this magnitude regime was encountered before; if so note where,
+                        # otherwise amend bank
+                        found_in_bank = False
+
+                        for i in magnitude_condition_bank:
+                            if magnitude_condition_bank[i] == (p_plus, p_minus):
+                                found_where = i
+                                found_in_bank = True
+                                break
+
+                        if not found_in_bank:
+                            magnitude_condition_bank[len(magnitude_condition_bank.keys())] = (p_plus, p_minus)
+                            found_where = len(magnitude_condition_bank.keys())
+
+                        # Update magnitude conditions dictionary for this ord, comp, pol set
+                        if found_where in new_magn_dict:
+                            new_magn_dict[found_where].append(copy.deepcopy(m))
+
+                        else:
+                            new_magn_dict[found_where] = copy.deepcopy(m)
+
+                    # Affix the new structure that groups by magnitude regime
+                    int_sequences_by_order_comp_pol_magn[ord][comp][pol] = copy.deepcopy(new_magn_dict)
+
+        self.int_sequences_by_order_comp_pol_magn = copy.deepcopy(int_sequences_by_order_comp_pol_magn)
 
 
 @dataclass
