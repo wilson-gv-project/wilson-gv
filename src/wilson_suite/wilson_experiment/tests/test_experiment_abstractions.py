@@ -1,49 +1,35 @@
 import pytest
 
-from wilson_suite import fixtures as ws_fixtures
-
 from wilson_suite.wilson_experiment.experiment_abstractions import (SpecDetector, ScanObject, SpecScan,
                     EmPulse, make_gaussian_pulse, make_impulsive_gaussian_pulse, make_cw_gaussian_pulse,
-                    ElectricField, VibExperiment, get_carrier_freqs_uv, find_epochs, uv_cancels)
+                    ElectricField, VibExperiment)
 
 def test_spec_detector():
 
     # Detector suitable for EVV:
     #   - Detector is set to capture a spectrum ('freq')
-    #   - Located at laboratory coordinates (0.0, 0.0, 1.0)
-    #       - This keyword currently not in use
     #   - Set to detect light linearly polarized along the x-axis
-    #   - Detection range (currently not in use) here set as the range (0.003, 0.013) a.u. in 101 equidistant spacings
+    #   - Detection interval here set as the range [0.0, 5000.0] (units: cm^-1).
     #   - "Wavevector filter" (for selecting phase-matching conditions) here -k1 + k2 +k3
 
     detector_a = SpecDetector(detection_method='freq',
-                              detector_location=(0.0, 0.0, 1.0),
                               detection_polarization=(1.0, 0.0, 0.0),
-                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              detection_interval=[0.0, 5000.0],
                               interaction_filter=[[-1, 2, 3]])
 
     assert detector_a.detection_method == 'freq'
-    assert detector_a.detector_location == (0.0, 0.0, 1.0)
     assert detector_a.detection_polarization == (1.0, 0.0, 0.0)
-    assert detector_a.detection_range == [0.003 + 0.0001 * i for i in range(101)]
+    assert detector_a.detection_interval == [0.0, 5000.0]
     assert detector_a.interaction_filter[0][0] == -1
     assert detector_a.interaction_filter[0][1] == 2
     assert detector_a.interaction_filter[0][2] == 3
 
-    # Asserting default values of optional parameters not included
-    assert detector_a.ignore_collinear
-    assert detector_a.overall_phase == 1.0 + 0.0j
-
     # Unrecognized detection method
     with pytest.raises(ValueError):
         detector_bogus = SpecDetector(detection_method='bogus',
-                                      detection_range=[0.003 + 0.0001 * i for i in range(101)])
-
-    # Unsupported overall phase
-    with pytest.raises(ValueError):
-        detector_bogus = SpecDetector(detection_method='freq',
-                                      overall_phase=3.0 + 2.0j)
-
+                                      detection_polarization=(1.0, 0.0, 0.0),
+                                      interaction_filter=[[-1, 2, 3]],
+                                      detection_interval=[0.0, 5000.0])
 
 def test_scan_object():
 
@@ -133,14 +119,13 @@ def test_em_pulse():
     # - Polarization vector (0.0, 0.0, 1.0) (laboratory axes)
     # - No overall phase shift (here replicating default)
     # - (Integer) identifier label: 1
-    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 0.005, dev = 2.0, cf_uv=0.0, maxstr=1.0e-5,
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 0.005, dev = 2.0, maxstr=1.0e-5,
                       wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
 
     assert pulse_a.env == 'gaussian'
     assert pulse_a.tc == 100.0
     assert pulse_a.cf == 0.005
     assert pulse_a.dev == 2.0
-    assert pulse_a.cf_uv == 0.0
     assert pulse_a.maxstr == 1.0e-5
     assert pulse_a.wv == (0.0, 1.0, 0.0)
     assert pulse_a.pol == (0.0, 0.0, 1.0)
@@ -154,17 +139,16 @@ def test_em_pulse():
 
     # A UV/VIS impulsive-tending pulse. Leaving several parameters to their default values.
     # For impulsive-tending pulses, the carrier frequency argument is optional
-    pulse_b = EmPulse(env='gaussian', tc = 120.0, dev=0.0, cf_uv = 0.072)
+    pulse_b = EmPulse(env='gaussian', tc = 120.0, dev=0.0)
     assert pulse_b.env == 'gaussian'
     assert pulse_b.tc == 120.0
-    assert pulse_b.cf == None # Default value
+    assert pulse_b.cf is None
     assert pulse_b.dev == 0.0
-    assert pulse_b.cf_uv == 0.072
     assert pulse_b.maxstr == 0.0 # Default
     assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
     assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
     assert pulse_b.overall_phase == 1.0 + 0.0j # Default
-    assert pulse_b.id == None # Default
+    assert pulse_b.id is None # Default
 
     assert pulse_b.tendsImpulsive()
     assert not(pulse_b.tendsContinuous())
@@ -174,7 +158,7 @@ def test_em_pulse():
     from math import inf as infinity
     pulse_c = EmPulse(env='gaussian', cf = 0.003, dev = infinity)
     assert pulse_c.env == 'gaussian'
-    assert pulse_c.tc == None # Default value
+    assert pulse_c.tc is None # Default value
     assert pulse_c.cf == 0.003
     assert pulse_c.dev == infinity
 
@@ -183,15 +167,7 @@ def test_em_pulse():
 
     # Unrecognized pulse envelope
     with pytest.raises((ValueError)):
-        pulse_bogus = EmPulse(env='bogus', tc=120.0, dev=0.0, cf_uv=0.072)
-
-    # Non-zero cf parameter with non-zero cf_uv parameter
-    with pytest.raises((ValueError)):
-        pulse_bogus = EmPulse(env='bogus', tc=120.0, cf=0.001, dev=2.0, cf_uv=0.072)
-
-    # Negative cf_uv parameter
-    with pytest.raises((ValueError)):
-        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf_uv=-0.072)
+        pulse_bogus = EmPulse(env='bogus', tc=120.0, dev=0.0)
 
     # Negative cf parameter
     with pytest.raises((ValueError)):
@@ -199,7 +175,7 @@ def test_em_pulse():
 
     # Missing required parameter for non-limiting pulse shape
     with pytest.raises((AssertionError)):
-        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=2.0, cf_uv=0.072)
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=2.0)
 
     # Missing required parameter for non-limiting pulse shape
     with pytest.raises((AssertionError)):
@@ -232,7 +208,7 @@ def test_em_pulse():
 def test_make_gaussian_pulse():
 
     # Same kind of pulse as first example in test_em_pulse
-    pulse_a = make_gaussian_pulse(100.0, 0.005, 2.0, cf_uv=0.0, maxstr=1.0e-5,
+    pulse_a = make_gaussian_pulse(100.0, 0.005, 2.0, maxstr=1.0e-5,
                       wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
 
     assert pulse_a.env == 'gaussian'
@@ -255,14 +231,14 @@ def test_make_impulsive_gaussian_pulse():
     pulse_b = make_impulsive_gaussian_pulse(tc = 120.0)
     assert pulse_b.env == 'gaussian'
     assert pulse_b.tc == 120.0
-    assert pulse_b.cf == None # Default value
+    assert pulse_b.cf is None # Default value
     assert pulse_b.dev == 0.0
     assert pulse_b.cf_uv == 0.0 # Default
     assert pulse_b.maxstr == 0.0 # Default
     assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
     assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
     assert pulse_b.overall_phase == 1.0 + 0.0j # Default
-    assert pulse_b.id == None # Default
+    assert pulse_b.id is None # Default
 
     assert pulse_b.tendsImpulsive()
     assert not(pulse_b.tendsContinuous())
@@ -279,6 +255,14 @@ def test_make_cw_gaussian_pulse():
 
     assert not(pulse_c.tendsImpulsive())
     assert pulse_c.tendsContinuous()
+
+def test_make_compound_gaussian_pulse():
+
+    pass
+
+def test_compound_pulses_in_list():
+
+    pass
 
 def test_electric_field():
 
@@ -421,15 +405,31 @@ def test_electric_field():
 
     print('screened compound pulses', screened_compound_pulses.keys())
 
+def test_compounding_patterns_at_order():
+
+    pass
+
+def test_pulse_time_ordering_valid():
+
+    pass
+
+def test_magnitude_conditions_for_ind_var_tuple():
+
+    pass
+
+def test_field_analysis():
+
+    pass
+
 def test_vib_experiment():
 
-    pulse_ir_1 = make_impulsive_gaussian_pulse(tc=50.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_1 = make_impulsive_gaussian_pulse(tc=50.0, cf=0.0,
                                                     maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
-    pulse_ir_2 = make_impulsive_gaussian_pulse(tc=100.0, cf=0.0, cf_uv=0.0,
+    pulse_ir_2 = make_impulsive_gaussian_pulse(tc=100.0, cf=0.0,
                                                     maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
-    pulse_uvvis_1 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
+    pulse_uvvis_1 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0,
                                                        maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
@@ -437,9 +437,8 @@ def test_vib_experiment():
     field_a = ElectricField(pulses)
 
     detector_a = SpecDetector(detection_method='freq',
-                              detector_location=(0.0, 0.0, 1.0),
                               detection_polarization=(1.0, 0.0, 0.0),
-                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              detection_interval=[0.003 + 0.0001 * i for i in range(101)],
                               interaction_filter=[[-1, 2, 3]])
 
     # Push one carrier freq
@@ -448,80 +447,29 @@ def test_vib_experiment():
     scan_range_a = [0.0001 * i for i in range(101)]
     scan_a = SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
 
-    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
     # Some attribute testing given a light touch since already covered by respective class tests
     assert len(exp_a.field.pulses) == 3
     assert exp_a.detector.detection_method == 'freq'
     assert len(exp_a.scans) == 1
 
-    assert exp_a.magn_conditions == ((-1, 2),)
-
     # Assertions about post-init attributes: When these are obtained using VibExperiment methods, these assertions
     # also serve to cover those methods
-    assert len(exp_a.relevant_phasematch) == 1
-    assert exp_a.relevant_phasematch[0].id == 0
-    assert exp_a.relevant_phasematch[0].pulses.pulse_refs == (-1, 2, 3)
     assert exp_a.dim == 2
-    assert exp_a.epochs == [[1], [2], [3]] # Three epochs
-    assert exp_a.int_sequences == [ ({1: -1}, {2: 1}, {3: 1}) ] # Only one interaction sequence: First -w1, then w2, then w3
-    assert exp_a.cfuv == {1: 0.0, 2: 0.0, 3: 0.072} # Only pulse 3 has a nonzero UV/VIS freq component
-
-    # One set of independent variables: -w1 and w2
-    assert len(exp_a.indep_vars) == 1
-    assert exp_a.indep_vars[0].phasematch_cond.id == 0
-    assert exp_a.indep_vars[0].phasematch_cond.pulses.pulse_refs == (-1, 2, 3)
-    assert exp_a.indep_vars[0].var_groups[0].var_set[0].pulse_refs == (-1,)
-    assert exp_a.indep_vars[0].var_groups[0].var_set[1].pulse_refs == (2,)
-
-    # See test_find_valid_axes for more information about structure
-    assert len(exp_a.valid_axis_combs) == 1
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[0].label == 'A'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[0].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].label == 'B'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[0].axes[1].var_set.var_set[1].pulse_refs == (2,)
-
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[0].label == 'A'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[0].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[1].label == 'B'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[1].axes[1].var_set.var_set[0].pulse_refs == (2,)
-
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[0].label == 'A'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[0].var_set.var_set[0].pulse_refs == (2,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[1].label == 'B'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[2].axes[1].var_set.var_set[0].pulse_refs == (-1,)
-
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[0].label == 'A'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[0].var_set.var_set[0].pulse_refs == (2,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].label == 'B'
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.valid_axis_combs[0].valid_axis_combs[3].axes[1].var_set.var_set[1].pulse_refs == (2,)
-
-    # Canonical axes: A: -w1, B: w2
-    assert exp_a.canonical_axes.axes[0].label == 'A'
-    assert exp_a.canonical_axes.axes[0].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.canonical_axes.axes[1].label == 'B'
-    assert exp_a.canonical_axes.axes[1].var_set.var_set[0].pulse_refs == (2,)
-
-    # All pulses (and detector polarization filter): Linearly polarized light in the x direction
-    assert exp_a.all_polarizations == [(1.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 0.0, 0.0)]
-
-    # NOTE: May revise result after unit tests for avg vector
-    assert exp_a.polarization_avg_vector == [1.0, 1.0, 1.0]
 
     # Wrong data for VibExperiment
     with pytest.raises(TypeError):
-        exp_bogus = VibExperiment(field='bogus', detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+        exp_bogus = VibExperiment(field='bogus', detector=detector_a, scans=(scan_a,))
 
     with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector='bogus', scans=(scan_a,), magn_conditions=((-1, 2),), )
+        exp_a = VibExperiment(field=field_a, detector='bogus', scans=(scan_a,))
 
     with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=('bogus',), magn_conditions=((-1, 2),), )
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=('bogus',))
 
     with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=([-1, 2],), )
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
     # Relevant phasematch all directions (no detector filter)
     # NOTE: Currently raises assertion error because the interaction sequence finder is not set up to work with
@@ -529,39 +477,36 @@ def test_vib_experiment():
     with pytest.raises(AssertionError):
 
         detector_a = SpecDetector(detection_method='freq',
-                                       detector_location=(0.0, 0.0, 1.0),
-                                       detection_polarization=(1.0, 0.0, 0.0),
-                                       detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                       )
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   interaction_filter=[[-1, 2, 3]],
+                                   detection_interval=[0.003 + 0.0001 * i for i in range(101)])
 
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
     # More than one phase-matching direction in detector filter
     with pytest.raises(AssertionError):
 
         detector_a = SpecDetector(detection_method='freq',
-                                  detector_location=(0.0, 0.0, 1.0),
                                   detection_polarization=(1.0, 0.0, 0.0),
-                                  detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                                  detection_interval=[0.003 + 0.0001 * i for i in range(101)],
                                   interaction_filter=[[-1, 2, 3], [1, 2 -3]])
 
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,), magn_conditions=((-1, 2),),)
+        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
 
     # More exotic setup, testing some of the things that are changed compared to the previous
-    pulse_ir_3 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.0,
-                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=4)
+    pulse_ir_3 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, maxstr=1.0e-5, wv=(0.0, 0.0, 1.0),
+                                               pol=(0.0, 1.0, 0.0), id=4)
 
-    pulse_uvvis_2 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, cf_uv=0.072,
-                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=5)
+    pulse_uvvis_2 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, maxstr=1.0e-5, wv=(0.0, 0.0, 1.0),
+                                                  pol=(0.0, 1.0, 0.0), id=5)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1, pulse_ir_3, pulse_uvvis_2)
 
     field_a = ElectricField(pulses)
 
     detector_a = SpecDetector(detection_method='freq',
-                              detector_location=(0.0, 0.0, 1.0),
                               detection_polarization=(1.0, 0.0, 0.0),
-                              detection_range=[0.003 + 0.0001 * i for i in range(101)],
+                              detection_interval=[0.003 + 0.0001 * i for i in range(101)],
                               interaction_filter=[[-1, 2, 3, 4, -5]])
 
     # Scan IR pulse 1 carrier freq
@@ -580,40 +525,6 @@ def test_vib_experiment():
     scan_b = SpecScan(scan_objs=(scan_obj_c, scan_obj_d, scan_obj_b), range=scan_range_b)
 
     exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a, scan_b))
-
-    # Three epochs
-    assert exp_a.epochs == [[1], [2], [3, 4, 5]]
-
-    # Six possible interaction sequences: All permutations of pulses 3, 4, 5
-    assert exp_a.int_sequences == [
-        ({1: -1}, {2: 1}, {3: 1}, {4: 1}, {5: -1}),
-        ({1: -1}, {2: 1}, {3: 1}, {5: -1}, {4: 1}),
-        ({1: -1}, {2: 1}, {4: 1}, {3: 1}, {5: -1}),
-        ({1: -1}, {2: 1}, {4: 1}, {5: -1}, {3: 1}),
-        ({1: -1}, {2: 1}, {5: -1}, {3: 1}, {4: 1}),
-        ({1: -1}, {2: 1}, {5: -1}, {4: 1}, {3: 1})
-    ]
-
-    # Pulses 3 and 5 have non-zero UV/VIS freq components
-    assert exp_a.cfuv == {1: 0.0, 2: 0.0, 3: 0.072, 4: 0.0, 5: 0.072}
-
-    # Independent variables: -w1, w2, w4, and - w5 + w3
-    assert len(exp_a.indep_vars) == 1
-    assert exp_a.indep_vars[0].var_groups[0].var_set[0].pulse_refs == (-1,)
-    assert exp_a.indep_vars[0].var_groups[0].var_set[1].pulse_refs == (2,)
-    assert exp_a.indep_vars[0].var_groups[0].var_set[2].pulse_refs == (4,)
-    assert exp_a.indep_vars[0].var_groups[0].var_set[3].pulse_refs == (-5, 3)
-
-    # Canonical axes: A: -w1, B: w2, C: w4, D: w3 - w5
-    assert len(exp_a.canonical_axes.axes) == 4
-    assert exp_a.canonical_axes.axes[0].label == 'A'
-    assert exp_a.canonical_axes.axes[0].var_set.var_set[0].pulse_refs == (-1,)
-    assert exp_a.canonical_axes.axes[1].label == 'B'
-    assert exp_a.canonical_axes.axes[1].var_set.var_set[0].pulse_refs == (2,)
-    assert exp_a.canonical_axes.axes[2].label == 'C'
-    assert exp_a.canonical_axes.axes[2].var_set.var_set[0].pulse_refs == (4,)
-    assert exp_a.canonical_axes.axes[3].label == 'D'
-    assert exp_a.canonical_axes.axes[3].var_set.var_set[0].pulse_refs == (-5, 3)
 
     # FIXME: Add test for polarization avg vector once unit tests for that are finished
 

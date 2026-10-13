@@ -19,51 +19,107 @@ class SpecDetector:
     detection_method: String: A detection method: "integrated", "time", "freq"
     If detection_method is "time" or "freq", then the detection data is one spectral dimension
     If detection_method is "integrated", then the detection data is a scalar
-    Currently, only "freq" (frequency-range) detection is supported.
 
-    detection_polarization: List of floats: Detect only light with this specific polarization vector. Default:
-    [1.0, 0.0, 0.0].
+    detection_polarization: 3-tuple of floats: Detect only light with this specific polarization vector.
 
-    detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
-    in either t/E space as relevant the data is collected
+    detection_interval: 2-tuple of floats: For "time"/"integrated" or "freq" detection, tell the min/max points that the
+    detector will detect in either t/w space, respectively. If None, no truncation of the detection interval will stem
+    from the detector itself (but truncation may still be decided elsewhere (e.g. detecting at "reasonable" times)
+    FIXME: For now, only the interval of detection is taken as an attribute of the detector (leaving its
+     granularity to be decided later). This leaves room to choose this parameter in a way that may avoid misalignment
+     of response function arguments during scans. Return to this question after some use to consider this again.
 
-    interaction_filter: List of interaction patterns as lists: Filter signal to include only this/these
-    (signed) interaction pattern(s). Note that any ordering here is not taken as a causal interaction order requirement
-    and also note that while this parameter can be thought of as close to a phase-matching filter, it is not exactly the
-    same (VibExperiment setup may further consider other signals in the same phase-matching direction(s) or isolate
-    specific interaction sequences)
+    detection_limited_to: A string specifying the detection limitation regime along the direction specified
+    by interaction_filter or detector_faces. Must be one of:
+        - 'same_order': Limit detection to other signals at the same order as detector_max_order
+        - 'up_to_order': Limit detection to other signals up to the same order as detector_max_order
+        - 'only_specified: Limit detection to only those signals specified in interaction_filter. Cannot be
+          combined with the detector_faces keyword.
+
+    ONE of the following must be specified:
+
+    EITHER:
+
+    interaction_filter: List of interaction patterns as lists of signed integers: Filter signal to this/these
+    (signed) interaction pattern(s). Requirements:
+        - When this detector is used in an experiment, all given interaction patterns must correspond to the same
+          wavevector.
+        - If detection_limited_to is 'same_order', all given interaction patterns must be at the same order
+
+    OR:
+
+    detector_faces: 3-tuple of floats: The detector faces this direction and will detect signals with wavevectors
+    in this direction. Requirements:
+        - detection_limited_to must be 'same_order' or 'up_to_order'.
+
+    AND
+
+    detector_max_order: Maximum order of perturbation at which signals will be detected. Must be specified directly
+    if detector_faces is given, or will be derived from the maximum encountered order in interaction_filter if it is
+    that which instead is given.
     """
 
     detection_method: str
     detection_polarization: tuple[float]
-    interaction_filter: list[list]
+    detection_interval: Optional[tuple[float]] = None
+    detection_limited_to = str
 
-    # FIXME: Rework to upper/lower bounds and (possibly) granularity?
-    detection_range: Optional[list[float]] = None
+    interaction_filter: list[list[int]] | None = None
 
-    # FIXME: Unsure if this is a relevant attribute
-    overall_phase: float = 0.0
+    detector_faces: tuple[float] | None = None
+    detector_max_order: int | None = None
 
     def __post_init__(self):
-        if self.detection_method not in {'time', 'freq', 'int'}:
+        if self.detection_method not in ('time', 'freq', 'int'):
             raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
 
-        if (self.detection_method in {'time', 'freq'}) and self.detection_range is None:
-            raise ValueError("If the detection type is 'time' or 'freq', the detection range must be specified")
+        if not isinstance(self.detection_polarization, tuple):
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
 
-        # Derived property: Detection granularity
-        if self.detection_range is not None:
-            self.dlen = len(self.detection_range)
+        if not len(self.detection_polarization) == 3:
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
 
-        if not self.overall_phase == 0.0:
-            raise ValueError('Detector overall phase currently restricted to zero shift')
+        if not all([isinstance(i, float) for i in self.detection_polarization]):
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
 
-        # Will currently not be reach because of restriction to zero shift, but will be relevant when that is lifted
-        if not(abs(self.overall_phase) - 1.0 < 1e-10):
-            raise ValueError('Detector overall phase must be of unit length')
+        if self.detection_interval is not None:
+
+            if not len(self.detection_interval) == 2:
+                raise ValueError('The detection interval must be given as a tuple of 2 floats')
+
+            if not all([isinstance(i, float) for i in self.detection_interval]):
+                raise ValueError('The detection interval must be given as a tuple of 2 floats')
+
+        if self.detection_limited_to not in ('same_order', 'up_to_order', 'only_specified'):
+            raise ValueError("The detection limitation must be either 'same_order', 'up_to_order', or 'only_specified'")
 
         if self.interaction_filter is not None:
-            raise NotImplementedError('Non-specification of detector interaction pattern filter')
+            if not isinstance(self.interaction_filter, list):
+                raise ValueError('The interaction filter must be given as a list of lists')
+
+            if not all([isinstance(i, list) for i in self.interaction_filter]):
+                raise ValueError('The interaction filter must be given as a list of lists')
+
+            for i in self.interaction_filter:
+                for j in i:
+                    if not isinstance(j, int):
+                        raise ValueError('The interaction filter IDs must be integers')
+
+            self.detector_max_order = max([len(i) for i in self.interaction_filter])
+
+        elif self.detector_faces is not None:
+
+            if self.detection_limited_to == 'only_specified':
+                raise ValueError("The 'only_specified' detection limitation cannot be used with detector_faces")
+
+            if self.detector_max_order is None:
+                raise ValueError("The detector_max keyword must be given when specifying detector_faces")
+
+            if not isinstance(self.detector_faces, tuple):
+                raise ValueError('The detector_faces keyword must be given as a tuple of 3 floats')
+
+            if not len(self.detector_faces) == 3:
+                raise ValueError('The detector_faces keyword must be given as a tuple of 3 floats')
 
 @dataclass
 class ScanObject:
@@ -196,19 +252,19 @@ class EmPulse:
 
     env: str
     
-    tc: float = None
-    cf: float = None
-    dev: float = None
+    tc: float | None = None
+    cf: float | None = None
+    dev: float | None = None
 
     maxstr: float = 0.0
 
-    wv: tuple[float] = None
-    pol: tuple[float] = None
-    pol_comp:  tuple[tuple[float]] = None
+    wv: tuple[float] | None = None
+    pol: tuple[float] | None = None
+    pol_comp:  tuple[tuple[float]] | None = None
     overall_phase: complex = 0.0
 
-    id: int = None
-    id_comp: tuple = None
+    id: int | None = None
+    id_comp: tuple | None = None
     is_compound = False
 
     def __post_init__(self):
@@ -296,7 +352,7 @@ class EmPulse:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
 # FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
-def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
+def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float=0.0,
                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
     """
@@ -310,7 +366,7 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, ma
                    pol = pol, overall_phase = overall_phase, id = id)
 
 
-def make_impulsive_gaussian_pulse(tc: float, cf: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
+def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
                          overall_phase: complex = 1.0 + 0.0j, id: int = None):
     """
