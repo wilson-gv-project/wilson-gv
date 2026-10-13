@@ -295,6 +295,17 @@ def test_features_from_rows_gives_every_feature_the_lineshape_parameter():
 
     assert f.lineshape_parameter == 5.
     assert f.feat_box is None   # boxes come later, from dress_these_with_boxes
+    assert f.conditions is None # a number needs no conditions
+
+
+def test_features_from_rows_without_states_gives_a_lineshape_function_no_conditions():
+    """The conditions come from the states (test_pipeline.py checks them); without states, peak_widths raises."""
+    width = lambda vd, freqs: 5.
+
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_parameter=width)
+
+    assert f.lineshape_parameter is width
+    assert f.conditions is None
 
 
 def test_features_from_rows_of_empty_table_is_empty():
@@ -411,6 +422,71 @@ def test_intensity_of_zero_amplitude_is_zero():
 def test_intensity_supports_only_abs_squared():
     with pytest.raises(NotImplementedError):
         feat(A=0.).get_intensity('real()')
+
+
+## SpectralFeature: lineshape function, peak widths --------------------------
+# A lineshape function gets each condition's pair of states; here stand-ins that only have an energy difference.
+
+TWO_CONDITIONS = (SimpleNamespace(E=1600.), SimpleNamespace(E=500.))
+WIDTH_1_PERCENT = lambda vd, freqs: vd.E / 100    # 16 and 5 cm-1
+
+
+def with_width_per_condition(f: SpectralFeature) -> SpectralFeature:
+    return replace(f, lineshape_parameter=WIDTH_1_PERCENT, conditions=TWO_CONDITIONS)
+
+
+def test_peak_widths_of_a_number_is_one_per_axis():
+    assert feat(A=100., B=200., gamma=5.).peak_widths() == (5., 5.)
+
+
+def test_peak_widths_of_a_function_is_one_per_condition():
+    assert with_width_per_condition(feat(A=1600., B=500.)).peak_widths() == pytest.approx((16., 5.))
+
+
+def test_peak_widths_of_a_function_takes_the_location_as_freqs():
+    """width = A / 100 at A = 300 -> 3 cm-1"""
+    f = replace(feat(A=300.), lineshape_parameter=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
+
+    assert f.peak_widths() == pytest.approx((3.,))
+
+
+def test_peak_widths_of_a_function_needs_the_conditions():
+    with pytest.raises(ValueError, match='no conditions'):
+        replace(feat(A=100.), lineshape_parameter=WIDTH_1_PERCENT).peak_widths()
+
+
+def test_intensity_with_a_width_per_condition():
+    """|2 / ((-16i) * (-5i))|^2, widths in au: 4 / (16 * 5 * CM_TO_AU**2)**2"""
+    f = with_width_per_condition(feat(A=1600., B=500., amp=2.))
+
+    assert f.get_intensity() == pytest.approx(4. / (16. * 5. * CM_TO_AU ** 2) ** 2, rel=1e-6)
+
+
+def test_intensity_needs_positive_widths_from_a_function():
+    f = replace(feat(A=0.), lineshape_parameter=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
+
+    with pytest.raises(ValueError, match='must be > 0'):
+        f.get_intensity()
+
+
+def test_dress_box_takes_the_largest_peak_width():
+    """widths 16 and 5 cm-1, dynrange 101, no margin: 16 * sqrt(100) = 160 cm-1 on both axes"""
+    f = with_width_per_condition(feat(A=1600., B=500.))
+    top = f.get_intensity()
+
+    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.)
+
+    assert [get_box_extent(dressed, ax) for ax in ('A', 'B')] == pytest.approx([160., 160.])
+
+
+def test_window_from_features_box_takes_the_largest_peak_width():
+    """widths 16 and 5 cm-1, dynrange 101, margin 0.1: 16 * sqrt(100) * 1.1 = 176 cm-1 on both axes"""
+    f = with_width_per_condition(feat(A=5., B=5.))
+
+    window = SpectralWindow.from_features(Box({'A': (0., 10.), 'B': (0., 10.)}), [f], dynrange=101.)
+
+    [boxed] = window.full_features
+    assert [get_box_extent(boxed, ax) for ax in ('A', 'B')] == pytest.approx([176., 176.])
 
 
 def test_max_intensity_feat_by_intensity_or_by_amplitude():

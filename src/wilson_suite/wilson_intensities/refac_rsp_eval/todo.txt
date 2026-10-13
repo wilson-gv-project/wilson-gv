@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 584 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 601 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.
@@ -41,7 +41,7 @@ Small, any time: A14 (one-line docstring); A15 (polarization order, one line); A
 H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
-Later, only when needed: D1, D2, E5, E8 (line features), G7 (other experiments).
+Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
 Outside the refactor [outside]: G2, G8 (reader checks); the normal_modes read error (F2).
 No item yet:
 - The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
@@ -151,12 +151,15 @@ E. Pipeline
         (git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md). After D4. Contents:
         the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
         reference; the size of the cut), the data-dict contract (D5), the decisions above.
-[ ] E5  Width of the drawn peak vs the width of its box. eval_feature_on_grid takes an optional propagator_param
-        (the width in cm-1, per condition or per grid point), but the boxes and get_intensity use
-        feature.lineshape_parameter. If the two differ, part of the peak is cut off, e.g. a 10 cm-1 peak in a box
-        made for 5 cm-1. Now nothing passes propagator_param, so they never differ. When needed: one source for the
-        width, or a check that the two agree. propagator_param gets only the VibDiff; if it ever needs the
-        condition's axes, pass the ResCondKey too (the FIXME in eval_resonance_factor).
+[x] E5  Width of the drawn peak vs the width of its box, 2026-10-13: one source. lineshape_parameter (compute_features,
+        compute_features_from_terms, FeatureResult, SpectralFeature) is a number or a function (vd, freqs) -> cm-1,
+        a width per condition and/or per frequency (features.LineshapeParameter). eval_feature_on_grid's
+        propagator_param is gone: drawing calls the function on the grid, get_intensity and both box makers at
+        the peak (SpectralFeature.peak_widths). A function needs the states: features_from_rows gives each
+        feature its conditions (VibDiff per condition) from FeatureResult.states.
+        Limits: a box is sized with the largest peak width, on every axis; a width that grows away from the peak
+        can still be cut off by the box. The function gets only the VibDiff; if it ever needs the condition's
+        axes, pass the ResCondKey too (the FIXME in eval_resonance_factor).
 [ ] E6  wilson_main adapter: a new evaluate path in WilsonSimulation, next to EvaluationWorkflow (wilson_main:
         carefully). Until it exists, the old pipeline runs, double count included (C3). Decide first:
         - [x] where states_choice comes from: the vib analysis regime (see Decisions); the adapter reads it

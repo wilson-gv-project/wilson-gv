@@ -23,17 +23,20 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
+    draw_all,
     evaluate_term_coeff_sumover,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionTable,
     SpectralFeature,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     averaging_rank,
     compute_features,
     compute_features_from_terms,
+    evaluate_response_terms,
     load_molsys_data,
     make_polarization_linear_comb,
     prop_names,
@@ -114,6 +117,33 @@ def test_compute_features_gives_every_feature_the_lineshape_parameter(molsys, pr
     assert all(f.lineshape_parameter == 5. for f in result.features)
     # no boxes yet: they come later, from dress_these_with_boxes
     assert all(f.feat_box is None for f in result.features)
+
+
+def test_compute_features_gives_a_lineshape_function_the_conditions(molsys, pre_a1_zero):
+    """
+    The function gets the pair of states of each condition, from the result's states. ab_term (MOTIF_AB), a=0:
+    conditions <ab - a> and <b - a>, so with width 5 + 1 % of |E|:
+        b=0:  E00 - E0 = 950,   E0 - E0 = 0    ->  14.5,  5 cm-1
+        b=1:  E01 - E0 = 1600,  E1 - E0 = 500  ->  21,   10 cm-1
+    """
+    width = lambda vd, freqs: 5. + 0.01 * abs(vd.energy_difference())
+
+    result = compute_features([ab_term()], molsys, precalculated_data=pre_a1_zero, lineshape_parameter=width,
+                              states_choice='harmonic')
+
+    assert all(f.lineshape_parameter is width for f in result.features)
+    assert [f.peak_widths() for f in result.features] == [pytest.approx((14.5, 5.)), pytest.approx((21., 10.))]
+
+
+def test_feature_result_made_by_hand_gives_a_lineshape_function_no_conditions():
+    """No states to take them from: the feature has no conditions, and its box and peak height raise."""
+    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], lineshape_parameter=lambda vd, freqs: 5.)
+
+    [f] = result.features
+
+    assert f.conditions is None
+    with pytest.raises(ValueError, match='no conditions'):
+        f.get_intensity()
 
 
 ## FeatureResult ------------------------------------------------------------
@@ -535,3 +565,85 @@ def test_compute_features_from_terms_keeps_what_drawing_and_leaves_need(top_run)
     r = max(result.table, key=lambda r: abs(r.coeff))
     term = result.compiled[r.term_id]  # type: ignore
     assert sum(leaf_value(term, c) for c in result.leaves(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
+
+
+## evaluate_response_terms: features and the spectrum on a grid ----------------
+# The caller loads the data and makes the recipe once (from the compiled terms, as evv_formaldehyde does);
+# evaluate_response_terms then takes the terms as derive writes them (pulse IDs). Formaldehyde, anharmonic.
+# Strongest feature: A = 2682.765, B = 0 (test_real_data_strongest_feature). Its neighbours: A = 2726.8, B = 0
+# and A = 2682.8, B = 44 (and A = 2726.8, B = -44).
+
+WINDOW_AROUND_STRONGEST = Box({'A': (2632.765, 2732.765), 'B': (-50., 50.)})   # 100 x 100 cm-1
+STEPS_1_CM = {'A': 101, 'B': 101}                                               # 1 cm-1 steps, both edges included
+
+
+@pytest.fixture(scope='module')
+def formaldehyde_data() -> tuple:
+    """(molsys_data, orientation-average recipe): loaded once, used by every run below"""
+    compiled = ref.compiled_evv_terms()
+    return (load_molsys_data(compiled, ref.data_origin('formaldehyde')),
+            make_polarization_linear_comb(compiled, ref.LASER_POL))
+
+
+def evaluate_formaldehyde(formaldehyde_data, lineshape_parameter, **kwargs):
+    molsys, recipe = formaldehyde_data
+    return evaluate_response_terms(terms=ref.evv_terms(), 
+                                   axes=make_SpectralAxisSet(ref.AXES), 
+                                   molsys_data=molsys, 
+                                   states_choice='anharmonic',  # type: ignore
+                                   orient_avrg_recipe=recipe, 
+                                   lineshape_parameter=lineshape_parameter, **kwargs)
+
+
+def test_evaluate_response_terms_draws_the_spectrum_with_a_width_function(formaldehyde_data, top_run):
+    """
+    The whole use: terms + data + recipe + width + window -> features and the spectrum on a grid.
+    Width: 3 cm-1 plus 0.2 % of the condition's |E|. The strongest feature's conditions have E = 2682.765 (on A)
+    and E = 0 (on B, since a = b), so its widths are 3 + 5.366 = 8.366 and 3 cm-1.
+    """
+    width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
+
+    result = evaluate_formaldehyde(formaldehyde_data, width,
+                                   window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM, dynrange=1001.)
+
+    # features: the same rows as compute_features_from_terms; every feature has the width function
+    feature_result = result.feature_result
+    assert list(feature_result.table) == list(top_run.result.table)
+    assert len(feature_result.features) == 68
+    assert all(f.lineshape_parameter is width for f in feature_result.features)
+    strongest = max(feature_result.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
+    assert strongest.location.as_dict() == pytest.approx({'A': 2682.765, 'B': 0.})
+    assert strongest.peak_widths() == pytest.approx((3. + 0.002 * 2682.765, 3.))
+
+    # the grid: 101 points per axis, from edge to edge of the window
+    assert list(result.grid_axes) == ['A', 'B']  # type: ignore
+    for ax, (mn, mx) in WINDOW_AROUND_STRONGEST.bounds.items():
+        points = result.grid_axes[ax]  # type: ignore
+        assert (points[0], points[-1], len(points)) == pytest.approx((mn, mx, 101))
+    assert result.grid_result.shape == (101, 101)  # type: ignore
+    intensity = np.abs(result.grid_result) ** 2
+
+    # at the strongest feature: its own peak height (get_intensity), plus about 2 % from its neighbours
+    i = np.argmin(np.abs(result.grid_axes['A'] - 2682.765))  # type: ignore
+    j = np.argmin(np.abs(result.grid_axes['B']))  # type: ignore
+    assert intensity[i, j] == pytest.approx(strongest.get_intensity(), rel=0.05)
+
+    # drawn box by box (draw_window) vs every feature on the whole grid (draw_all): measured 0.3 % of the top
+    reference = np.abs(draw_all(feature_result.features, feature_result.states, result.grid_axes)) ** 2  # type: ignore
+    assert np.max(np.abs(intensity - reference)) < 0.01 * reference.max()
+
+
+def test_evaluate_response_terms_width_function_of_a_constant_draws_as_the_number(formaldehyde_data):
+    """lineshape_parameter 5. and lambda vd, freqs: 5. give the same spectrum"""
+    number = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    function = evaluate_formaldehyde(formaldehyde_data, lambda vd, freqs: 5.,
+                                     window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+
+    np.testing.assert_allclose(function.grid_result, number.grid_result)  # type: ignore
+
+
+def test_evaluate_response_terms_without_a_window_gives_the_features_only(formaldehyde_data):
+    result = evaluate_formaldehyde(formaldehyde_data, 5.)
+
+    assert len(result.feature_result.features) == 68
+    assert result.grid_axes is None and result.grid_result is None

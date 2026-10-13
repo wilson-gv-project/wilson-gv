@@ -818,28 +818,25 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 def eval_feature_on_grid(feature: 'SpectralFeature',
                          vibstates_data: 'VibStatesData',
                          grid_cm: dict[str, np.ndarray],
-                         propagator: Callable=lorentzian_propagator,
-                         propagator_param: Callable[[VibDiff], float | np.ndarray] | None = None) -> complex | np.ndarray:
+                         propagator: Callable=lorentzian_propagator) -> complex | np.ndarray:
     """
     amplitude_coeff * resonance factor of the feature's motif. grid in cm-1, result in au.
 
-    propagator_param - the propagator's parameter for each condition, in cm-1 (converted to Eh here),
-                       e.g. lambda vd: 5. for a 5 cm-1 width on every condition.
-                       None -> feature.lineshape_parameter on every condition.
-                       For a parameter that depends on the frequencies, read grid_cm inside the function
-                       and return an array of the grid's shape, e.g. lambda vd: 0.01 * grid_cm['A'].
-
-    FIXME (todo.txt E5): feat_box and get_intensity use feature.lineshape_parameter, not propagator_param.
-          A propagator_param with another width (or one that changes over the grid) gives a peak they do
-          not match, e.g. a box too small for a wider peak.
+    The propagator's parameter is feature.lineshape_parameter, cm-1 (converted to Eh here):
+        a number   -> the same on every condition
+        a function -> lineshape_parameter(vd, grid_cm) for each condition (features.LineshapeParameter):
+                      a number per condition, or an array of the grid's shape for one that changes with
+                      the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
+    The box and get_intensity take the same lineshape_parameter, at the peak (SpectralFeature.peak_widths).
     """
-    if propagator_param is None:
-        if feature.lineshape_parameter is None:
-            raise ValueError(f'feature {feature} has no lineshape_parameter and no propagator_param was given')
-        gamma_au = convNu2Ene(feature.lineshape_parameter)
-        param_au = lambda _vd: gamma_au
+    lineshape = feature.lineshape_parameter
+    if lineshape is None:
+        raise ValueError(f'feature {feature} has no lineshape_parameter')
+    if callable(lineshape):
+        param_au = lambda vd: convNu2Ene(lineshape(vd, grid_cm)) # type: ignore
     else:
-        param_au = lambda vd: convNu2Ene(propagator_param(vd)) # type: ignore
+        gamma_au = convNu2Ene(lineshape)
+        param_au = lambda _vd: gamma_au
 
     if feature.motif is None:
         raise ValueError(f'feature {feature} has no motif')

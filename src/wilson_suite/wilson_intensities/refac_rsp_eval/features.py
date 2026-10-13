@@ -26,6 +26,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResonanceMotif,
 )
+from wilson_suite.wilson_system.system_data import VibDiff
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         ResLocPoint,
     )
+    from wilson_suite.wilson_system.system_data import VibStatesData
 
 ## -------------------------------------------------------------------------------
 ##          Complete data computation: from terms to contributions to features
@@ -60,6 +62,19 @@ grid.py → spectrum array                                   the picture
 """
 
 K = TypeVar('K', bound=Hashable)   # group_by key
+
+# lineshape_parameter, cm-1: the propagator's parameter (for the Lorentzian: gamma, the half width)
+#   a number   -> the same on every resonance condition, everywhere
+#   a function -> (vd, freqs) -> cm-1, called once per condition
+#       vd     the condition's pair of states (VibDiff), e.g. vd.energy_difference(), vd.left.state_label
+#       freqs  {axis: cm-1}: the grid when drawing (arrays of the grid's shape), the feature's location
+#              for its box and peak height (numbers, the feature's own axes only)
+#       e.g. lambda vd, freqs: 0.01 * abs(vd.energy_difference())    one width per condition
+#            lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])        changes with the frequency on A
+#       abs(): energy_difference is signed (left - right). A negative width conjugates the feature.
+#   A function needs the feature's conditions (features_from_rows with the states).
+LineshapeFunction = Callable[[VibDiff, dict[str, float | np.ndarray]], float | np.ndarray]
+LineshapeParameter = float | LineshapeFunction
 
 
 @dataclass(frozen=True)
@@ -114,14 +129,18 @@ class SpectralFeature:
     """
     One peak: the rows of one motif at one location (made by features_from_rows).
     Same motif + same point -> same peak shape, so the coefficients of the rows add.
-    location and lineshape_parameter are in cm-1.
+    location and lineshape_parameter are in cm-1; lineshape_parameter is a number or a function (LineshapeParameter).
     feat_box: None until dress_these_with_boxes sets it, so clustering an undressed feature raises.
+    conditions: the pair of states of each resonance condition, in motif order, from rows[0].params (as
+        evaluate.eval_feature_on_grid). features_from_rows sets them for a lineshape_parameter function, which
+        needs them for the box and the peak height (peak_widths). Not part of == or hash: the rows fix them.
     """
     location: 'ResLocPoint'
     rows: tuple[ContributionRow, ...] = ()
-    lineshape_parameter: float | None = None
+    lineshape_parameter: LineshapeParameter | None = None
     scale: float = 1.0      # normalize_coeffs_to_max changes this, never the rows
     feat_box: Box | None = None
+    conditions: tuple[VibDiff, ...] | None = None
 
     @property
     def amplitude_coeff(self) -> float | None:
@@ -284,21 +303,43 @@ class SpectralFeature:
         raise ValueError(f'None of the {len(features)} features has a nonzero {measure}')
     
 
+    def peak_widths(self) -> tuple[float, ...]:
+        """
+        lineshape_parameter at the peak, cm-1, one per resonance condition: what get_intensity and the boxes use.
+            a number gamma -> (gamma, gamma, ...), one per axis (as many as conditions, B7)
+            a function     -> lineshape_parameter(vd, location) for each condition: needs `conditions`
+        For a function that changes with the frequency, this is the width at the peak, not farther out.
+            e.g. lambda vd, freqs: 0.01 * abs(vd.energy_difference()), conditions with E = 1600 and 500 -> (16., 5.)
+        """
+        lineshape = self.lineshape_parameter
+        if lineshape is None:
+            raise ValueError(f'feature {self} has no lineshape_parameter')
+        if not callable(lineshape):
+            return (lineshape,) * len(self.location.axes)
+        if self.conditions is None:
+            raise ValueError(f'feature {self} has a lineshape_parameter function but no conditions '
+                             f'(features_from_rows gives them when it gets the states)')
+        at_peak = self.location.as_dict()
+        return tuple(float(lineshape(vd, at_peak)) for vd in self.conditions)
+
     def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
         """
-        ! Assumption: lineshape_parameter is homogeneous/ universal over spectral dimensions
-        lineshape_parameter is in cm-1; intensity will be returned in au
+        |peak amplitude|^2 in au. At the peak every condition gives 1 / (-i * gamma_i), so
+            |amplitude_coeff / ((-i * gamma_1) * (-i * gamma_2) * ...)|^2
+        gamma_i: peak_widths, cm-1 (converted here). One number -> amplitude_coeff / (-i * gamma)^N.
         """
 
         if self.amplitude_coeff is None or self.lineshape_parameter is None:
             raise ValueError('this feature has no amplitude_coeff and/or lineshape_parameter')
-        if self.lineshape_parameter <= 0:
-            raise ValueError(f'lineshape_parameter must be > 0, got {self.lineshape_parameter}')
+        widths = self.peak_widths()
+        if any(gamma <= 0 for gamma in widths):
+            raise ValueError(f'lineshape_parameter must be > 0, got {widths} at the peak')
 
         if intensity_expr == 'abs()**2':
-            N = len(self.location.axes)
-            gamma_au = convNu2Ene(self.lineshape_parameter)
-            return abs(self.amplitude_coeff / (-1j*gamma_au)**N)**2
+            peak = complex(self.amplitude_coeff)
+            for gamma in widths:
+                peak /= -1j * convNu2Ene(gamma)
+            return abs(peak)**2
         else:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
@@ -339,7 +380,8 @@ class SpectralFeature:
         will probably need to return a box covering the full region of the spectral window spanned by such a feature to
         a given tolerance).
 
-        Each feature's own lineshape_parameter sets its box size; a feature without one raises a ValueError.
+        Each feature's own lineshape_parameter sets its box size: the largest of its peak_widths, on every axis.
+        A feature without one raises a ValueError.
 
         box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
             lorentzian_distance_to_dynrange_weaker_than_max?
@@ -386,13 +428,15 @@ class SpectralFeature:
                 if feat_intensity > max_intensity:
                     raise ValueError(f"The feature {feat} will have higher intensity than max_intensity ({max_intensity})")
                 
+                gamma = max(feat.peak_widths())
+
                 if scale_wrt_max_intensity:
 
                     feat_intensity_wrt_max = feat_intensity/max_intensity
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange*feat_intensity_wrt_max) # type: ignore
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(gamma, implied_dynrange*feat_intensity_wrt_max)
 
                 else:
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(feat.lineshape_parameter, implied_dynrange) # type: ignore
+                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(gamma, implied_dynrange)
 
                 # gamma = feat.lineshape_parameter
                 # c = feat.amplitude_coeff
@@ -442,15 +486,29 @@ class SpectralFeature:
                 print('   ', r)
 
 
-def features_from_rows(table: ContributionTable, lineshape_parameter: float | None = None) -> list[SpectralFeature]:
+def features_from_rows(table: ContributionTable, lineshape_parameter: LineshapeParameter | None = None,
+                       states: 'VibStatesData | None' = None) -> list[SpectralFeature]:
     """
     One feature per (motif, location). Same motif + same point -> same peak shape, so the
     coefficients add. Rows of different motifs at one point stay separate features;
     the grid adds them up as complex numbers.
+
+    states: for a lineshape_parameter function, each feature gets its conditions (condition_states), which
+        the function needs for the box and the peak height. A number needs no states and gets no conditions.
     """
     groups = table.group_by(lambda r: (r.motif, r.location))
-    return [SpectralFeature(location=location, rows=tuple(g), lineshape_parameter=lineshape_parameter)
-            for (_, location), g in groups.items()]
+    with_conditions = callable(lineshape_parameter) and states is not None
+    return [SpectralFeature(location=location, rows=tuple(g), lineshape_parameter=lineshape_parameter,
+                            conditions=condition_states(motif, next(iter(g)).params, states) if with_conditions else None) # type: ignore
+            for (motif, location), g in groups.items()]
+
+
+def condition_states(motif: ResonanceMotif, params: ParameterSet, states: 'VibStatesData') -> tuple[VibDiff, ...]:
+    """
+    The pair of states of each condition of `motif` at `params`, in motif order (as evaluate.eval_resonance_factor).
+        e.g. conditions <ab - a> and <b - a> at a=0, b=1: states ('0,1', '0') and ('1', '0')
+    """
+    return tuple(VibDiff.from_quanta(*key.diff, params.to_dict(), states) for key in motif)
 
 
 def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['SpectralFeature']]:
@@ -508,6 +566,8 @@ class SpectralWindow:
         The window over `box` with the features that add amplitude inside it, each with its box. In this order:
           1. a box around every feature: box_extent = gamma * sqrt(dynrange - 1) * (1 + box_range_safety_margin)
              on every axis, as dress_these_with_boxes without scale_wrt_max_intensity. Needs no max intensity.
+             gamma: the largest of the feature's peak_widths, so a condition with a smaller width gets a box
+             larger than it needs, never smaller. For a width that changes with the frequency: the width at the peak.
           2. keep the features whose box overlaps `box` (touching edges excluded):
              location inside `box` -> full_features, outside -> contrib_features
           No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):
@@ -533,7 +593,7 @@ class SpectralWindow:
                 raise ValueError(f'feature {f} has no lineshape_parameter, so no box size')
             if f.amplitude_coeff is None:
                 raise ValueError(f'feature {f} has no rows, so no amplitude')
-            box_extent = (lorentzian_distance_to_dynrange_weaker_than_max(f.lineshape_parameter, dynrange)
+            box_extent = (lorentzian_distance_to_dynrange_weaker_than_max(max(f.peak_widths()), dynrange)
                           * (1. + box_range_safety_margin))
             feat_box = Box({k: (v - box_extent, v + box_extent) for k, v in f.location.as_dict().items()})
             dressed.append(replace(f, feat_box=feat_box))
