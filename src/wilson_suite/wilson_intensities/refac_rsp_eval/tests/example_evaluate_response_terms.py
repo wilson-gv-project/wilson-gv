@@ -6,16 +6,21 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
     2. load the data and make the orientation-average recipe, once
     3. features only (no window): how many, and where they are
     4. the spectrum on a grid (with a window), with a width per condition
-    5. what came out: the grid, the brightest point, the features in the window
+    5. what came out: the grid, the brightest point, the window as drawn (its features and domains)
+    6. another width, same rows: draw_spectrum draws again without computing the rows again
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.example_evaluate_response_terms
 """
+import time
+from dataclasses import replace
+
 import numpy as np
 
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    draw_spectrum,
     evaluate_response_terms,
     load_molsys_data,
     make_polarization_linear_comb,
@@ -58,20 +63,30 @@ def main():
     window = Box({'A': (2600., 2800.), 'B': (-230., 3100.)})
     dim_sizes = {'A': 201, 'B': 201}
 
-    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe, propagator_param=width,
-                                     window=window, dim_sizes=dim_sizes, dynrange=1001.)
+    t0 = time.perf_counter()
+    result = evaluate_response_terms(terms, axes, molsys, states_choice, recipe,
+                                     propagator_param=width,
+                                     window=window, dim_sizes=dim_sizes,
+                                     dynrange=1001.)
+    t_full = time.perf_counter() - t0
 
     # 5. what came out
     grid_axes = result.grid_axes                    # 1D points per axis, cm-1
+    mesh = result.grid_mesh                         # every grid point, mesh['A'][i, j]: what a renderer reads
     intensity = np.abs(result.grid_result) ** 2     # grid_result: complex amplitude in au, [i_A, i_B]
     print(f'\ngrid {intensity.shape}: ' + ', '.join(
         f'{ax} {pts[0]:.0f} .. {pts[-1]:.0f} cm-1, step {pts[1] - pts[0]:.1f}' for ax, pts in grid_axes.items()))
 
     i, j = np.unravel_index(np.argmax(intensity), intensity.shape)
-    print(f'brightest point: A = {grid_axes["A"][i]:.1f}, B = {grid_axes["B"][j]:.1f} cm-1, '
+    print(f'brightest point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
           f'intensity {intensity[i, j]:.3e} au')
 
-    inside = [f for f in result.feature_result.features if f.is_inside(window)]
+    drawn = result.spectral_window                  # the window as drawn: features with their boxes
+    domains = drawn.find_clusters_by_featboxes()    # overlapping boxes, drawn together
+    print(f'drawn: {len(drawn.full_features)} features inside, {len(drawn.contrib_features)} outside with a box '
+          f'that reaches in, {len(domains)} domains')
+
+    inside = drawn.full_features
     print(f'\n{len(inside)} features inside the window, strongest first:')
     print(f'  {"A":>8} {"B":>8}  {"(a, b)":>7}  {"terms":<22} {"widths at peak":<16} {"peak intensity":>14}')
     for f in sorted(inside, key=lambda f: f.get_intensity(), reverse=True):
@@ -79,6 +94,14 @@ def main():
         widths = ', '.join(f'{w:.2f}' for w in f.peak_widths())
         print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '
               f'{str(f.term_ids):<22} {widths:<16} {f.get_intensity():14.3e}')
+
+    # 6. another width, same rows: replace gives a new FeatureResult with the same table, draw_spectrum draws it
+    t0 = time.perf_counter()
+    wider = draw_spectrum(replace(result.feature_result, propagator_param=8.), window, dim_sizes, dynrange=1001.)
+    t_redraw = time.perf_counter() - t0
+    print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.grid_result) ** 2):.3e} au; '
+          f'rows reused: {wider.feature_result.table is result.feature_result.table}; '
+          f'{t_redraw:.3f} s vs {t_full:.3f} s for the whole run')
 
 
 if __name__ == '__main__':

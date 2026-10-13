@@ -36,6 +36,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     averaging_rank,
     compute_features,
     compute_features_from_terms,
+    draw_spectrum,
     evaluate_response_terms,
     load_molsys_data,
     make_polarization_linear_comb,
@@ -647,3 +648,65 @@ def test_evaluate_response_terms_without_a_window_gives_the_features_only(formal
 
     assert len(result.feature_result.features) == 68
     assert result.grid_axes is None and result.grid_result is None
+    assert result.grid_mesh is None and result.spectral_window is None
+
+
+def test_evaluate_response_terms_window_needs_dim_sizes(formaldehyde_data):
+    with pytest.raises(ValueError, match='dim_sizes'):
+        evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST)
+
+
+def test_evaluate_response_terms_grid_mesh_holds_every_grid_point(formaldehyde_data):
+    """grid_mesh['A'][i, j] = grid_axes['A'][i], grid_mesh['B'][i, j] = grid_axes['B'][j]: the form the renderer reads"""
+    result = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    mesh, points = result.grid_mesh, result.grid_axes
+
+    assert list(mesh) == ['A', 'B']  # type: ignore
+    assert mesh['A'].shape == mesh['B'].shape == result.grid_result.shape == (101, 101)  # type: ignore
+    for k in (0, 7, 100):
+        np.testing.assert_array_equal(mesh['A'][:, k], points['A'])  # type: ignore
+        np.testing.assert_array_equal(mesh['B'][k, :], points['B'])  # type: ignore
+
+
+def test_evaluate_response_terms_keeps_the_window_as_drawn(formaldehyde_data):
+    """
+    The window's 4 features (example_evaluate_response_terms.py lists them), each with its box:
+    5 cm-1, dynrange 1000, margin 0.1 -> 5 * sqrt(999) * 1.1 = 173.8 cm-1 on each side. No feature outside
+    reaches in. The 4 boxes overlap, so draw_window drew them as one domain.
+    """
+    result = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    window = result.spectral_window
+
+    assert window.box is WINDOW_AROUND_STRONGEST  # type: ignore
+    assert len(window.full_features) == 4 and window.contrib_features == []  # type: ignore
+    for f in window.full_features:  # type: ignore
+        mn, mx = f.feat_box.bounds['A']  # type: ignore
+        assert (mx - mn) / 2 == pytest.approx(5. * 999 ** 0.5 * 1.1)
+    [domain] = window.find_clusters_by_featboxes()  # type: ignore
+    assert len(domain.full_features + domain.contrib_features) == 4
+
+
+## draw_spectrum: drawing again without computing the rows again --------------
+
+def test_draw_spectrum_with_a_new_width_reuses_the_rows(formaldehyde_data):
+    """replace(..., propagator_param=8.) keeps the table (no new rows) and draws what a new run with 8 cm-1 draws"""
+    first = evaluate_formaldehyde(formaldehyde_data, 5., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+
+    wider = draw_spectrum(replace(first.feature_result, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+
+    assert wider.feature_result.table is first.feature_result.table
+    assert all(f.propagator_param == 8. for f in wider.feature_result.features)
+    new_run = evaluate_formaldehyde(formaldehyde_data, 8., window=WINDOW_AROUND_STRONGEST, dim_sizes=STEPS_1_CM)
+    np.testing.assert_allclose(wider.grid_result, new_run.grid_result)  # type: ignore
+
+
+def test_draw_spectrum_on_another_window_reuses_the_features(formaldehyde_data):
+    """Same features, another window and grid: what a new run on that window draws"""
+    first = evaluate_formaldehyde(formaldehyde_data, 5.)
+    other, sizes = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
+
+    again = draw_spectrum(first.feature_result, other, sizes)
+
+    assert again.feature_result is first.feature_result
+    new_run = evaluate_formaldehyde(formaldehyde_data, 5., window=other, dim_sizes=sizes)
+    np.testing.assert_allclose(again.grid_result, new_run.grid_result)  # type: ignore

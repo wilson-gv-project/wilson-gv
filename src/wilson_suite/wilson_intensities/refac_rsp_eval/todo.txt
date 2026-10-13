@@ -1,7 +1,7 @@
 refac_rsp_eval — TODO
 updated 2026-10-12
 
-Tests  refac_rsp_eval: 601 pass, 2 xfail (B6, on purpose).
+Tests  refac_rsp_eval: 606 pass, 2 xfail (B6, on purpose).
        Rest of src: 9 fail, 291 pass, 3 skip, 14 xfail (A15, on purpose); the same 9 fail before and after B7.
        A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
        e.g. src/wilson_suite/terms_fuller_flat.json.

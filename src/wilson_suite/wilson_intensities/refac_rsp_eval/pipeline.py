@@ -17,13 +17,15 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
   │ 5. peak width, spectral window, boxes
   v
-grid.py → spectrum array                                   E2, not built yet
+spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
 """
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
@@ -237,14 +239,32 @@ def compute_features_from_terms(terms: Sequence['VibPerturbedTerm'], *,
 
 
 PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) -> coefficient
-import numpy as np
 
 
 @dataclass(frozen=True)
 class EvalRspResult:
-    feature_result: FeatureResult                    # rows, features, and molsys / polarization / states_choice
-    grid_axes: dict[str, np.ndarray] | None = None   # 1D points per axis, cm-1
-    grid_result: np.ndarray | None = None            # complex amplitude, au; intensity = abs(...)**2
+    """
+    feature_result   rows, features, and what they came from (molsys, polarization recipe, states_choice)
+    The drawing (draw_spectrum); None for features only:
+    grid_axes        1D points per axis, cm-1, both window edges included, e.g. A and B with 201 points each
+    grid_result      complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
+                     grid_axes, e.g. shape (201, 201). intensity = abs(grid_result)**2
+    spectral_window  the window as drawn: its features, each with its box. full_features: inside the window;
+                     contrib_features: outside, with a box that reaches in. The domains (boxes that overlap,
+                     drawn together): spectral_window.find_clusters_by_featboxes()
+    grid_mesh        (property) the grid points as one full array per axis (ij meshgrid), grid_mesh['A'][i, j]:
+                     what the old EvaluatedSpectrum.axes held and the renderer reads
+    """
+    feature_result: FeatureResult
+    grid_axes: dict[str, np.ndarray] | None = None
+    grid_result: np.ndarray | None = None
+    spectral_window: SpectralWindow | None = None
+
+    @cached_property
+    def grid_mesh(self) -> dict[str, np.ndarray] | None:
+        if self.grid_axes is None:
+            return None
+        return dict(zip(self.grid_axes, np.meshgrid(*self.grid_axes.values(), indexing='ij')))
 
 
 def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
@@ -255,7 +275,16 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
                             propagator_param: PropagatorParam,
                             window: 'Box | None' = None,
                             dim_sizes: dict[str, int] | None = None,
-                            dynrange: float = 101.) -> EvalRspResult:
+                            dynrange: float = 1000.) -> EvalRspResult:
+    """
+    Terms as derive writes them (in pulse IDs) + data loaded before + recipe -> features, and with a window
+    the spectrum on a grid (draw_spectrum). Without a window: features only.
+    For another window, grid or width afterwards: draw_spectrum with result.feature_result. The rows are
+    kept, so only the drawing is done again.
+    """
+    if window is not None and dim_sizes is None:
+        raise ValueError('a window needs dim_sizes, the number of grid points per axis')
+
     translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
     compiled = compile_terms(translated)
     feature_result = compute_features(compiled, molsys_data, orient_avrg_recipe,
@@ -263,8 +292,27 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'],
                                       states_choice=states_choice)
     if window is None:                  # features only, no drawing
         return EvalRspResult(feature_result)
+    return draw_spectrum(feature_result, window, dim_sizes, dynrange)  # type: ignore
 
+
+def draw_spectrum(feature_result: FeatureResult,
+                  window: 'Box',
+                  dim_sizes: dict[str, int],
+                  dynrange: float = 1000.) -> EvalRspResult:
+    """
+    The features of feature_result on a grid over `window`: boxes, grid, drawing. The rows are not computed
+    again (the slow part: build_contributions), so a new window, grid or width costs only the drawing:
+        again = draw_spectrum(result.feature_result, other_window, {'A': 401, 'B': 401})
+        wider = draw_spectrum(replace(result.feature_result, propagator_param=8.), window, dim_sizes)
+    replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
+    new width, on first use (cheap).
+
+    window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
+    dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}
+    dynrange   sets the box sizes (SpectralWindow.from_features): bigger -> less of each peak's tail cut off
+    feature_result needs its states (FeatureResult.states), so it must come from compute_features.
+    """
     spectral_window = SpectralWindow.from_features(window, feature_result.features, dynrange)  # boxes: width at the peak
-    coords_cm, _ = spectral_window.sample_grid(dim_sizes)
-    amplitude = draw_window(spectral_window, feature_result.states, coords_cm)                 # width on the grid
-    return EvalRspResult(feature_result, coords_cm, amplitude)
+    grid_axes, _ = spectral_window.sample_grid(dim_sizes)
+    grid_result = draw_window(spectral_window, feature_result.states, grid_axes)                # width on the grid
+    return EvalRspResult(feature_result, grid_axes, grid_result, spectral_window)
