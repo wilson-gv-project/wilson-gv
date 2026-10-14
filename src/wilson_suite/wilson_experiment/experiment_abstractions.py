@@ -1,8 +1,5 @@
-from code import interact
 from dataclasses import dataclass
-from itertools import cycle
 from typing import Optional, Iterable
-from operator import itemgetter
 import copy
 from math import inf as infinity
 from math import exp as exp
@@ -42,9 +39,10 @@ class SpecDetector:
 
     interaction_filter: List of interaction patterns as lists of signed integers: Filter signal to this/these
     (signed) interaction pattern(s). Requirements:
+        - If detection_limited_to is 'same_order' or 'up_to_order', only one interaction pattern may be given.
+        - If detection_limited_to is 'only_specified', any number of interaction patterns may be given.
         - When this detector is used in an experiment, all given interaction patterns must correspond to the same
-          wavevector.
-        - If detection_limited_to is 'same_order', all given interaction patterns must be at the same order
+          wavevector. (This is not checked here)
 
     OR:
 
@@ -93,6 +91,10 @@ class SpecDetector:
         if self.detection_limited_to not in ('same_order', 'up_to_order', 'only_specified'):
             raise ValueError("The detection limitation must be either 'same_order', 'up_to_order', or 'only_specified'")
 
+        if self.detection_limited_to in ['same_order', 'up_to_order']:
+            if not len(self.interaction_filter) == 1:
+                raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+
         if self.interaction_filter is not None:
             if not isinstance(self.interaction_filter, list):
                 raise ValueError('The interaction filter must be given as a list of lists')
@@ -120,6 +122,10 @@ class SpecDetector:
 
             if not len(self.detector_faces) == 3:
                 raise ValueError('The detector_faces keyword must be given as a tuple of 3 floats')
+
+        else:
+
+            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
 
 @dataclass
 class ScanObject:
@@ -265,7 +271,7 @@ class EmPulse:
 
     id: int | None = None
     id_comp: tuple | None = None
-    is_compound = False
+    is_compound: bool = False
 
     def __post_init__(self):
         
@@ -411,8 +417,6 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
 
     if p2 is None:
 
-
-
         comp_pulse = copy.deepcopy(p1)
 
         comp_pulse.pol_comp = (copy.deepcopy(p1.pol),)
@@ -555,11 +559,11 @@ class ElectricField:
 
     # Take a reference to an interaction pattern and return all interaction patterns whose vector sum
     # corresponds to the same direction
-    def wavevectors_matching_ids(self, ids: list | tuple, filter: str='same_order') -> list[tuple]:
+    def wavevectors_matching_direction(self, direction: tuple[float], max_order: int, filter: str='same_order') -> list[tuple]:
         """
-        ids: List or tuple making up an interaction pattern (ordering arbitrary).
-        Example: To represent the phase-matching direction k1 - k1 + k2 + k3, ids = [2, -1, 3, 1] is a valid choice
-        (as are all its permutations)
+        direction: The 3D direction along for which matching wavevectors will be searched
+
+        max_order: Maximum order of interaction to be considered
 
         filter: A flag to constrain the search (default and currently only supported: 'same_order', which will
         make this function return only those patterns which both correspond to the same direction and contain the
@@ -571,40 +575,26 @@ class ElectricField:
         """
         from itertools import combinations_with_replacement as combs
 
-        valid_filters = ['same_order', 'up_to_order', 'only_specified']
-
-        if not filter in valid_filters:
-            raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
-
-        sorted_ids = sorted(list(ids))
-
-        # Make target wavevector
-        target_wv = [0.0, 0.0, 0.0]
-        for i in sorted_ids:
-            target_wv = [target_wv[j] + self.signed_pulses[i].wv[j] for j in range(3)]
-
         # Normalize
-        t_len = (sum([k ** 2 for k in target_wv])) ** 0.5
+        t_len = (sum([k ** 2 for k in direction])) ** 0.5
         if not t_len == 0.0:
-            target_wv = [j/t_len for j in target_wv]
+            target_wv = [j/t_len for j in direction]
+        else:
+            raise ValueError('The target wavevector is zero length')
 
         # The input interaction pattern trivially matches
-        matching_wv = [tuple(sorted_ids)]
+        matching_wv = []
 
-        if filter == 'only_specified':
-            return matching_wv
-
-        elif filter == 'same_order':
-            ord_start = len(sorted_ids)
-            ord_end = len(sorted_ids) + 1
+        if filter == 'same_order':
+            ord_start = max_order
+            ord_end = max_order + 1
 
         elif filter == 'up_to_order':
             ord_start = 1
-            ord_end = len(sorted_ids) + 1
+            ord_end = max_order + 1
 
         else:
             raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
-
 
         all_ids = self.signed_pulses.keys()
 
@@ -920,14 +910,31 @@ def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: 
 @dataclass
 class FieldAnalysis:
     """
-    Class to carry out and hold results from analysis done on a field
+    Class to carry out and hold results from analysis done on a field.
+
+    Required arguments:
 
     field: Electric field instance on which the analysis is to be made
 
     polarization_filter: A tuple specifying the polarization filter of the detector
 
+    detection_limited_to: String: Speficies regime under which matching wavevectors to that/those of the interaction
+    will be searched for/included
+
+    max_ord: Maximum order of perturbation to be considered
+
+    MUST provide one of the following arguments (and the other one must be None):
+
+    detector_faces: 3-tuple of floats: The detector faces this direction and will detect signals with wavevectors
+    in this direction. Requirements:
+        - detection_limited_to must be 'same_order' or 'up_to_order'.
+
+    OR
+
     interaction_filter: A list of interaction pattern(s) (each a list of signed integers referring to pulse IDs with
     the sign specifying the freq/wavevector parity) to be considered
+
+    Optional arguments:
 
     tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
     deciding (compound) pulse time overlap. Default: 5.
@@ -939,24 +946,27 @@ class FieldAnalysis:
      [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
 
     thres_magn: A threshold used to define what "significant" means in determining whether a pulse combination's
-    frequency components are "significantly greater/smaller than 0"
+    frequency components are "significantly greater/smaller than 0". Default: 200 (units: cm^-1)
 
     thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
     distant to produce an appreciable signal. Default: 1500.0 (units: fs).
-
-    wavevector_filter: String: Speficies regime under which matching wavevectors to that/those of the interaction
-    will be searched for/included
     """
 
     field: ElectricField
     polarization_filter: tuple[float | int]
-    interaction_filter: list[list[int]]
+    detection_limited_to: str
+    max_ord: int
+
+    detector_faces: tuple[float] | None = None
+    interaction_filter: list[list[int]] | None = None
+
     tol_n_dev_t: float | int = 5.0
     tol_n_dev_w: float | int = 5.0
     thres_freq: float | int = 8000.0
     thres_magn:  float | int = 200.0
     thres_waiting_time: float | int = 1500.0
-    wavevector_filter: str = 'same_order'
+
+
 
     def __post_init__(self):
 
@@ -964,23 +974,92 @@ class FieldAnalysis:
         # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
         # TODO: Possibly introduce a phase shift to partly account for "non-ideally-Placzek" effects?
 
-        from itertools import permutations as permutations
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+        # TODO: Divide larger pieces of code into helper methods
 
-        # Dividing larger pieces of code into helper methods, incorporate all the processing leading to the
-        # information that's needed for an integrator:
+        # Get valid interaction patterns
+        self.valid_int_patterns = self.get_interaction_patterns()
 
-        if not len(self.interaction_filter) > 0:
-            raise ValueError('Interaction filter must have nonzero length')
+        # Compile information about which orders of interaction are represented in the interaction patterns
+        int_pattern_orders = []
 
-        # Find wavevector-matching interaction patterns
-        if self.wavevector_filter in ['same_order', 'up_to_order']:
-            if not len(self.interaction_filter) == 1:
-                raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+        for i in self.valid_int_patterns:
+            if not len(i) in int_pattern_orders:
+                int_pattern_orders.append(i)
 
-            self.valid_int_patterns = self.field.wavevectors_matching_ids(self.interaction_filter[0], filter = self.wavevector_filter)
+        self.int_pattern_orders = sorted(int_pattern_orders)
 
-        elif self.wavevector_filter == 'only_specified':
+        # Group interaction patterns according to order
+        int_patterns_by_order = {}
+
+        for i in self.valid_int_patterns:
+            if len(i) in int_patterns_by_order:
+                int_patterns_by_order[len(i)].append(i)
+            else:
+                int_patterns_by_order[len(i)] = [[i]]
+
+        self.int_patterns_by_order = int_patterns_by_order
+
+        # Generate time-overlapping tuples, time-overlapping and "vib. resonance possible" tuples,
+        # time-overlapping and "vib. resonance possible" pulses, and time-overlapping but not "vib. resonance possible"
+        # pulses
+        self.time_ovl_tuples, self.res_and_time_ovl_tuples, self.res_and_time_comp_pulses, self.time_not_res_comp_pulses = self.get_time_freq_valid_pulses_and_tuples()
+
+        # Generate valid compounding patterns at all relevant orders
+        self.comp_patterns_at_order = self.get_comp_patterns_at_order()
+
+        # Get polarization "average vector" bank and interaction sequences indexed by order, compounding pattern and
+        # polarization averaging category
+        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.get_pol_avg_bank_and_int_seq_icp()
+
+        # Making an "all valid pulses" bank that is a union of res_and_time_ and time_not_res_ pulse tuples
+        all_valid_pulses = copy.deepcopy(self.res_and_time_comp_pulses)
+
+        for i in self.time_not_res_comp_pulses:
+            if not i in all_valid_pulses:
+                all_valid_pulses[i] = self.time_not_res_comp_pulses[i]
+
+        self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
+
+
+        # Get "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
+        # polarization averaging category, and magnitude condition category
+        self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.get_magn_cond_bank_and_int_seq_icpm()
+
+
+    def get_interaction_patterns(self):
+        """
+        Helper method: Get valid interaction patterns
+        """
+
+        if self.interaction_filter is not None:
+
+            # Make target wavevector
+            cand_wv = [0.0, 0.0, 0.0]
+            for i in self.interaction_filter[0]:
+                cand_wv = [cand_wv[j] + self.field.signed_pulses[i].wv[j] for j in range(3)]
+
+            c_len = (sum([k ** 2 for k in cand_wv])) ** 0.5
+            if not c_len == 0.0:
+                cand_wv = [j / c_len for j in cand_wv]
+
+            target_wv = cand_wv
+
+        elif self.detector_faces is not None:
+
+            # In this case, the target wavevector is the
+            target_wv = self.detector_faces
+
+        else:
+
+            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
+
+            # Find wavevector-matching interaction patterns
+        if self.detection_limited_to in ['same_order', 'up_to_order']:
+
+            self.valid_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord,
+                                                                                filter=self.detection_limited_to)
+
+        elif self.detection_limited_to == 'only_specified':
 
             valid_int_patterns = [tuple(sorted(list(i))) for i in self.interaction_filter]
 
@@ -994,22 +1073,20 @@ class FieldAnalysis:
                     maxlen = len(self.interaction_filter[i])
                     arg_max = i
 
-            test_int_patterns = self.field.wavevectors_matching_ids(self.interaction_filter[arg_max], filter = 'up_to_order')
+            test_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord, filter='up_to_order')
 
             for i in valid_int_patterns:
                 if not i in test_int_patterns:
                     raise ValueError('Not all requested interaction patterns correspond to the same wavevector')
 
-            self.valid_int_patterns = valid_int_patterns
+        return valid_int_patterns
 
-        # Additionally compile information about which orders of interaction are represented in the interaction patterns
-        int_pattern_orders = []
 
-        for i in self.valid_int_patterns:
-            if not len(i) in int_pattern_orders:
-                int_pattern_orders.append(i)
-
-        self.int_pattern_orders = sorted(int_pattern_orders)
+    def get_time_freq_valid_pulses_and_tuples(self):
+        """
+        Helper method: Get (compound) pulses and tuples that are both "time overlap" and "vib. resonance" valid,
+        and ditto for "time overlap" tuples and "time overlap" but not "vib. resonance" pulses
+        """
 
         # Initialize result holders
         time_ovl_tuples = []
@@ -1034,17 +1111,20 @@ class FieldAnalysis:
             if not(i in res_and_time_ovl_tuples):
                 time_not_res_compound_pulses[i] = compound_pulses_in_list([self.field.signed_pulses[j] for j in i])
 
-        self.time_ovl_tuples = time_ovl_tuples
-        self.res_and_time_ovl_tuples = res_and_time_ovl_tuples
-        self.res_and_time_comp_pulses = res_and_time_compound_pulses
-        self.time_not_res_comp_pulses = time_not_res_compound_pulses
+        return time_ovl_tuples, res_and_time_ovl_tuples, res_and_time_compound_pulses, time_not_res_compound_pulses
 
+
+    def get_comp_patterns_at_order(self):
+        """
+        Helper method: Get compounding patterns at valid orders
+        """
+
+        # Compile info about time overlap compounding levels
         time_ovl_comp_lvls = []
         for i in self.time_ovl_tuples:
             if not len(i) in time_ovl_comp_lvls:
                 time_ovl_comp_lvls.append(len(i))
 
-        # Generate valid compounding patterns at all relevant orders
         comp_patterns_at_order = {}
 
         for i in self.int_pattern_orders:
@@ -1069,17 +1149,12 @@ class FieldAnalysis:
 
             comp_patterns_at_order[i] = copy.deepcopy(screened_patterns)
 
-        self.comp_patterns_at_order = comp_patterns_at_order
+        return comp_patterns_at_order
 
-        int_patterns_by_order = {}
+    def get_pol_avg_bank_and_int_seq_icp(self):
 
-        for i in self.valid_int_patterns:
-
-            if len(i) in int_patterns_by_order:
-                int_patterns_by_order[len(i)].append(i)
-
-            else:
-                int_patterns_by_order[len(i)] = [[i]]
+        from itertools import permutations as permutations
+        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 
         # Initializing macroscopic orientational average polarization vector "bank"
         pol_avg_vector_bank = {}
@@ -1090,18 +1165,18 @@ class FieldAnalysis:
         int_sequences_by_order_comp_pol = {}
 
         # For each valid order of interaction pattern
-        for ord in int_patterns_by_order:
+        for ord in self.int_patterns_by_order:
 
             int_sequences_by_order_comp_pol[ord] = {}
 
-            for c in comp_patterns_at_order[ord]:
+            for c in self.comp_patterns_at_order[ord]:
                 int_sequences_by_order_comp_pol[ord][c] = {}
 
             # For each permutation of indices at this order
             for p in permutations(range(ord)):
 
                 # For each interaction pattern at this order
-                for i in int_patterns_by_order[ord]:
+                for i in self.int_patterns_by_order[ord]:
 
                     p_pattern = []
 
@@ -1120,7 +1195,7 @@ class FieldAnalysis:
 
                     # FIXME: May need to introduce tolerances here
                     # Check if pol avg vector is nonzero
-                    if not sum([abs[j] for j in pol_avg_vector]) == 0.0:
+                    if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
 
                         # Check against bank; determine bank index or make new bank entry
                         found_in_bank = False
@@ -1143,7 +1218,7 @@ class FieldAnalysis:
                         continue
 
                     # For each compounding pattern at this interaction pattern's order:
-                    for c in comp_patterns_at_order[ord]:
+                    for c in self.comp_patterns_at_order[ord]:
 
                         if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
                             int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
@@ -1213,7 +1288,7 @@ class FieldAnalysis:
 
                     # If this polarization setup gave nothing, delete the reference to it
                     if int_sequences_by_order_comp_pol[ord][comp][pol] == []:
-                        del int_sequences_by_order_comp_pol[ord][c][pol]
+                        del int_sequences_by_order_comp_pol[ord][comp][pol]
 
                 # If no polarization setups remain for this compounding pattern, delete the reference to it
                 if int_sequences_by_order_comp_pol[ord][comp] == {}:
@@ -1224,17 +1299,11 @@ class FieldAnalysis:
                 del int_sequences_by_order_comp_pol[ord]
 
         # FIXME: Trim pol avg vector bank in case some of them did not in fact get represented
-        self.int_sequences_by_order_comp_pol = copy.deepcopy(int_sequences_by_order_comp_pol)
 
-        # Making a pulse bank that is a union of res_and_time_ and time_not_res_ pulse tuples
-        # for use in magnitude_conditions_for_ind_var_tuple
-        all_valid_pulses = copy.deepcopy(res_and_time_compound_pulses)
+        return pol_avg_vector_bank, int_sequences_by_order_comp_pol
 
-        for i in time_not_res_compound_pulses:
-            if not i in all_valid_pulses:
-                all_valid_pulses[i] = time_not_res_compound_pulses[i]
+    def get_magn_cond_bank_and_int_seq_icpm(self):
 
-        self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
 
         # Making a bank for conformity with the pol avg vector indexing even though the magnitude
         # condition tuples are hashable by themselves
@@ -1280,7 +1349,7 @@ class FieldAnalysis:
                     # Affix the new structure that groups by magnitude regime
                     int_sequences_by_order_comp_pol_magn[ord][comp][pol] = copy.deepcopy(new_magn_dict)
 
-        self.int_sequences_by_order_comp_pol_magn = copy.deepcopy(int_sequences_by_order_comp_pol_magn)
+        return magnitude_condition_bank, int_sequences_by_order_comp_pol_magn
 
 
 @dataclass
@@ -1293,11 +1362,35 @@ class VibExperiment:
     detector: SpecDetector instance: The detector for this experiment
 
     scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
+
+    Optional parameters
+
+    tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse time overlap. Default: 5.
+
+    tol_n_dev_w: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse ability to create vibrational resonance. Default: 5.
+
+    thres_freq: A threshold: (compound) pulses whose no frequency components fall within the range
+     [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
+
+    thres_magn: A threshold used to define what "significant" means in determining whether a pulse combination's
+    frequency components are "significantly greater/smaller than 0". Default: 200 (units: cm^-1)
+
+    thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
+    distant to produce an appreciable signal. Default: 1500.0 (units: fs).
+
     """
 
     field: ElectricField
     detector: SpecDetector
     scans: tuple[SpecScan] = ()
+
+    tol_n_dev_t: float | int = 5.0
+    tol_n_dev_w: float | int = 5.0
+    thres_freq: float | int = 8000.0
+    thres_magn:  float | int = 200.0
+    thres_waiting_time: float | int = 1500.0
 
     def __post_init__(self):
 
