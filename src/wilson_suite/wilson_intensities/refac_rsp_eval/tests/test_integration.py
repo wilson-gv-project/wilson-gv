@@ -245,7 +245,11 @@ def evv_props(polgrad, dipgrad) -> MolPropsCollection:
 
 
 def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
-    """Every index set: sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k]."""
+    """
+    Every index set: sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k].
+    Tolerance: rel 1e-12, abs 0, so the small values count too: they go from 1e-23 to 5e-6. Measured 2026-10-14:
+    rel at most 1.6e-15.
+    """
     term, molsys = term8
     assert [(tuple(o.o for o in p.ops), p.inds) for p in term.avrg_props] == [((0, 3), ['b']), ((1,), ['a']), ((2,), ['c'])]
     polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
@@ -256,11 +260,16 @@ def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
 
     for idx in ALL_ABC:
         expected = np.einsum('ijkl,il,j,k->', C, polgrad[idx['b']], dipgrad[idx['a']], dipgrad[idx['c']])
-        assert func(idx, molsys.mol_props) == pytest.approx(expected)
+        assert func(idx, molsys.mol_props) == pytest.approx(expected, rel=1e-12, abs=0)
 
 
 def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(term8):
-    """Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged."""
+    """
+    Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged.
+    Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). Measured 2026-10-14:
+    72 of the 216 values are 6.4e-9 or more and agree to rel 2e-15; the other 144 are rounding noise, below 2.4e-19,
+    and change with the rotation by up to 34 % of their size.
+    """
     term, molsys = term8
     polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
     ca, sa, cb, sb = np.cos(0.7), np.sin(0.7), np.cos(1.9), np.sin(1.9)
@@ -270,7 +279,7 @@ def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(t
 
     values = [func(idx, molsys.mol_props) for idx in ALL_ABC]
     assert any(v != 0. for v in values)
-    assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values)
+    assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values, rel=1e-12, abs=1e-18)
 
 
 ## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde (todo.txt F1) ----------------

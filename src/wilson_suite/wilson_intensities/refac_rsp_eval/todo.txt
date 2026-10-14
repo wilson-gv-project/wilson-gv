@@ -43,7 +43,7 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
 6. [ ] E4  README, with the data-dict contract (D5).
 
-Small, any time: A15 (polarization order, one line); A16 (abs=0 in two tests);
+Small, any time: A15 (polarization order, one line);
 H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
@@ -123,8 +123,13 @@ A. Small fixes
         Checked with the fix applied in memory: all of them pass; test_averaging.py, the experiment tests and the
         rest of refac_rsp_eval do not change.
         Fix, then remove the 14 xfail marks (they turn into XPASS failures).
-[ ] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
+[x] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
         averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
+        Done 2026-10-14, rel 1e-12 in both:
+        - einsum contraction: abs=0. Values from 1e-23 to 5e-6; measured rel at most 1.6e-15.
+        - rotation: abs=0 fails. 144 of the 216 values are rounding noise (below 2.4e-19) and change with the
+          rotation by up to 34 % of their size. So abs=1e-18, the evaluator's zero_tol, as in the F1 einsum test.
+          The other 72 values (6.4e-9 or more) agree to rel 2e-15.
 
 
 D. Data model
