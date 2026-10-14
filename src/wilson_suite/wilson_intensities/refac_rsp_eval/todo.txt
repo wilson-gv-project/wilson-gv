@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-14
 
 Tests (run 2026-10-14)
-       refac_rsp_eval: 636 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       refac_rsp_eval: 631 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
@@ -26,14 +26,16 @@ README. Only E6 is a big job.
 Order of work
 -------------
 Needed to finish the refactor. Steps 1-4 may use the old code; step 5 deletes it.
-1. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
+For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
+1. [x] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_system (2026-10-14).
 2. [ ] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
    E6b (the caller side) waits: the WilsonSimulation procedure will change, so where the evaluation is called is open.
    Open: E9 needs the old code until E6b's check, or E6b drops the check (C3 already checked the numbers).
-   E6a includes E10 (box size by amplitude): code done 2026-10-14; left: tune the knobs, delete dress_these_with_boxes.
+   E6a includes E10 (box size by amplitude): code done 2026-10-14. Open: dress_these_with_boxes as a second box
+   rule, or delete it. Tuning the knobs: later.
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
-4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
-5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
+4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict). Waits (see above).
+5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
 6. [ ] E4  README, with the data-dict contract (D5).
 
 Small, any time: A15 (polarization order, one line); A16 (abs=0 in two tests);
@@ -126,6 +128,8 @@ D. Data model
         wilson_system/system_data.py. Decide who owns them; the other side imports. Keep the imports free of
         cycles: plan.py imports system_data only for type hints (if TYPE_CHECKING), system_data.py does not
         import plan.py; evaluate.py and pipeline.py import system_data for real.
+        Decided 2026-10-14: wilson_system owns them; wilson_main imports. The code move waits: no big moves or
+        removals outside refac_rsp_eval for now.
 [ ] D5  Data-dict contract: what the evaluator expects in the data dict. Delivering a dict that fits is the
         reader's job [outside].
         To do: write the list below into the README; add the load checks named in it.
@@ -189,11 +193,11 @@ E. Pipeline
         - Write the inputs and outputs above into the pipeline.py docstring (and later the README, E4).
         - [x] Old box settings (E10): eps replaces box_range_safety_margin, min_gammas replaces minimum_box_padding
           (in gammas, not cm-1), scale_wrt_max_intensity is built into the rule.
-        - margins (diag_margin, for the condition w2 > w1): decide with the magnitude-condition filter below.
+        - [x] margins (diag_margin, for the condition w2 > w1): dropped with the magnitude-condition filter below.
         - [x] Grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
           draw_spectrum uses make_grid now.
-        - The magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
-          SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
+        - [x] The magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): dropped
+          2026-10-14, not done in the evaluation. SpectralFeature.apply_magn_cond_filter and its 5 tests deleted.
         - [x] The default dynrange (E10): none. dynrange is the plot's dynamic range (the renderer has it; log scale
           is its default), required. The caller passes the renderer's value (E6b).
         - [x] Data from more than one source: the old setup can take one origin per property (eval_by_prop_name);
@@ -215,8 +219,9 @@ E. Pipeline
         which does not exist (dead module).
 [ ] E10 Box size by amplitude (found 2026-10-14). The boxes before E10 cut off parts of the spectrum that the plot
         shows. A box sized by amplitude, with each feature drawn on its own box, is accurate and about as fast.
-        Code done 2026-10-14 (see Code below). Left: tune the knobs (tests/e10_boxes.py), delete
-        dress_these_with_boxes, decide about the domains.
+        Code done 2026-10-14 (see Code below). Left: dress_these_with_boxes as a second box rule, or delete it;
+        decide about the domains (E7). Later: tune the knobs (tests/e10_boxes.py with more cases and knob values,
+        then choose the defaults).
         ("today" below: the boxes before E10.)
         Why today's boxes cut too much:
         - A box ends where the feature's intensity is down to 1/dynrange of its own peak:
@@ -305,13 +310,14 @@ E. Pipeline
           cost (ACDM, big, D 500). With amplitude boxes the own box is enough (at most 0.13 floors, table above).
         - So with E10: each feature on its own box; domains leave the drawing. Keep them only if plotting regions
           needs them (E7), else delete them (E9).
-        dress_these_with_boxes: delete it now (E10's code step is done; nothing needs it any more).
+        dress_these_with_boxes: open (2026-10-14): keep it as a second box rule, or delete it.
         - No code calls this copy (refac_rsp_eval/features.py); 12 tests in test_features.py do. The old pipeline
           has its own copy (amplitudes/spectrum_composition.py, tested in wilson_intensities/tests/unit/
           test_specfeature.py and test_integration_evaluation.py); that copy goes with E9, not here.
         - Its ideas: weak features get small boxes -> the amplitude rule; minimum_box_padding -> min_gammas;
           weak features dropped -> no (2026-10-09).
-          Its tests: 9 test its own behaviour (dropping, padding, scaling, the raise, input unchanged, ...): they go.
+          Its tests: 9 test its own behaviour (dropping, padding, scaling, the raise, input unchanged, ...): they go
+          if it goes.
           3 use it to check a box (no box until dressed, the largest peak width, the same on every axis): the
           amplitude_half_widths tests cover the last two; the first needs a from_features version.
         - lorentzian_distance_to_dynrange_weaker_than_max stays: amplitude_half_widths uses it,
@@ -328,7 +334,8 @@ E. Pipeline
               peak_not_for_a_weak_neighbour went. test_features.py: the rule and each knob.
         - [x] Scripts: e10_boxes.py (the tuning script), f2_speed.py and the example use the new code;
               c3_spectrum.py keeps the boxes and the domain drawing of before, to compare with the old code (C3).
-        - [ ] Delete dress_these_with_boxes, with scale_wrt_max_intensity and minimum_box_padding, and its tests (above).
+        - [ ] dress_these_with_boxes: a second box rule (the box step takes a box-rule function), or delete it with
+              scale_wrt_max_intensity and minimum_box_padding, and its tests (above).
         - [ ] Domains (find_clusters_by_featboxes, RectangularDomain): no longer used in drawing. Keep only if
               plotting regions needs them (E7), else delete (E9).
         - E6b: the drawing no longer matches the old code (the old code cuts more). Check the drawing against
@@ -342,7 +349,8 @@ E. Pipeline
         - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
         Real terms like this exist (G7, coincident pulses). Once such a setup matters: allow them in B7, then
         boxes (the whole window along the line?), get_intensity, eval_feature_on_grid, drawing.
-[ ] E9  Delete the old code (after E6b and E7, unless E6b drops its check; see Order of work). Code outside
+[ ] E9  Delete the old code (after E6b and E7, unless E6b drops its check; see Order of work). Waits: no big
+        moves or removals outside refac_rsp_eval for now (2026-10-14). Code outside
         refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing pipeline.py. In this order:
         - [ ] amplitudes/averaging.py stays at this path: wilson_experiment imports get_pol_laser from it, and
               pipeline.py imports from it too. It needs only numpy.

@@ -602,38 +602,6 @@ def test_dress_drops_the_weak_one_of_two_equal_features():
     assert [f.amplitude_coeff for f in result] == [1.]
 
 
-## SpectralFeature: apply_magn_cond_filter ----------------------------------
-
-def test_magn_cond_filter_none_returns_input():
-    feats = [feat(A=0., B=-1.)]
-
-    assert SpectralFeature.apply_magn_cond_filter(feats, None, 0.) is feats # type: ignore
-
-
-def test_magn_cond_filter_keeps_B_above_margin():
-    feats = [feat(A=0., B=-1.), feat(A=0., B=0.5), feat(A=0., B=2.)]
-
-    assert SpectralFeature.apply_magn_cond_filter(feats, (('B',),), magn_conditions_margin=1.) == [feats[2]]
-
-
-def test_magn_cond_filter_keeps_B_minus_A_above_margin():
-    feats = [feat(A=5., B=3.), feat(A=5., B=7.)]
-
-    assert SpectralFeature.apply_magn_cond_filter(feats, (('-A', 'B'),), magn_conditions_margin=0.) == [feats[1]]
-
-
-def test_magn_cond_filter_drops_features_exactly_at_margin():
-    feats = [feat(A=0., B=1.), feat(A=2., B=3.)]
-
-    assert SpectralFeature.apply_magn_cond_filter(feats, (('B',),), magn_conditions_margin=1.) == [feats[1]]
-    assert SpectralFeature.apply_magn_cond_filter(feats, (('-A', 'B'),), magn_conditions_margin=1.) == []
-
-
-def test_magn_cond_filter_rejects_unknown_condition():
-    with pytest.raises(ValueError):
-        SpectralFeature.apply_magn_cond_filter([feat(A=0., B=1.)], (('A',),), 0.)
-
-
 ## SpectralWindow -----------------------------------------------------------
 
 def test_window_bounds_ndim_and_widths():
