@@ -19,6 +19,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     amplitude_half_widths,
     amplitude_in_window,
     features_from_rows,
+    intensity_half_widths,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
@@ -115,14 +116,13 @@ def test_table_axis_range_needs_a_row_with_the_axis():
 
 ## SpectralFeature: basics --------------------------------------------------
 
-def test_feature_has_no_box_until_dressed():
-    f = feat(A=100., gamma=5.)
-    top = f.get_intensity()
+def test_feature_has_no_box_until_its_window_gives_one():
+    f = feat(A=5., gamma=5.)
 
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101)
+    [boxed] = SpectralWindow.from_features(WINDOW_0_10, [f], [55.]).full_features
 
     assert f.feat_box is None
-    assert dressed.feat_box is not None
+    assert boxed.feat_box is not None
 
 
 def test_replace_keeps_the_box():
@@ -296,7 +296,7 @@ def test_features_from_rows_gives_every_feature_the_propagator_param():
     [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), propagator_param=5.)
 
     assert f.propagator_param == 5.
-    assert f.feat_box is None   # boxes come later, from dress_these_with_boxes
+    assert f.feat_box is None   # boxes come later, from SpectralWindow.from_features
     assert f.conditions is None # a number needs no conditions
 
 
@@ -471,14 +471,14 @@ def test_intensity_needs_positive_widths_from_a_function():
         f.get_intensity()
 
 
-def test_dress_box_takes_the_largest_peak_width():
-    """widths 16 and 5 cm-1, dynrange 101, no margin: 16 * sqrt(100) = 160 cm-1 on both axes"""
-    f = with_width_per_condition(feat(A=1600., B=500.))
-    top = f.get_intensity()
+def test_intensity_half_widths_take_the_largest_peak_width():
+    """widths 16 and 5 cm-1, dynrange 101, no margin: 16 * sqrt(100) = 160 cm-1, scaled or not (the only feature)"""
+    f = with_width_per_condition(feat(A=5., B=5.))
+    window = Box({'A': (0., 10.), 'B': (0., 10.)})
 
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.)
-
-    assert [get_box_extent(dressed, ax) for ax in ('A', 'B')] == pytest.approx([160., 160.])
+    for scaled in (False, True):
+        assert intensity_half_widths(window, [f], dynrange=101., box_range_safety_margin=0.,
+                                     scale_wrt_max_intensity=scaled) == pytest.approx([160.])
 
 
 def test_amplitude_half_widths_take_the_largest_peak_width():
@@ -515,91 +515,6 @@ def test_max_intensity_feat_rejects_empty_list():
 def test_max_intensity_feat_rejects_features_that_all_have_zero_intensity():
     with pytest.raises(ValueError, match='None of the 2 features has a nonzero intensity'):
         SpectralFeature.get_max_intensity_feat([feat(A=0., amp=0.), feat(A=1., amp=0.)])
-
-
-## SpectralFeature: dress_these_with_boxes ----------------------------------
-# A Lorentzian drops to 1/dynrange of its peak at distance gamma*sqrt(dynrange - 1).
-# dynrange = 101 -> 10*gamma ; dynrange = 26 -> 5*gamma
-
-def test_dress_box_extent_is_gamma_times_sqrt_dynrange_minus_one():
-    f = feat(A=100., gamma=5.)
-    top = f.get_intensity()
-
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.)
-
-    assert dressed.feat_box.bounds['A'] == pytest.approx((50., 150.)) # type: ignore
-
-
-def test_dress_safety_margin_widens_the_box():
-    f = feat(A=0., gamma=5.)
-    top = f.get_intensity()
-
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.1)
-
-    assert get_box_extent(dressed) == pytest.approx(55.)
-
-
-def test_dress_drops_features_below_min_intensity():
-    strong, weak = feat(A=0., amp=1.), feat(A=50., amp=1e-3)
-    top = strong.get_intensity()
-
-    assert SpectralFeature.dress_these_with_boxes([strong, weak], top, top / 100) == [strong]
-
-
-def test_dress_minimum_padding_keeps_weak_features_and_sets_a_floor():
-    strong, weak = feat(A=0., amp=1., gamma=5.), feat(A=500., amp=1e-3, gamma=5.)
-    top = strong.get_intensity()
-
-    result = SpectralFeature.dress_these_with_boxes([strong, weak], top, top / 101,
-                                                    box_range_safety_margin=0.,
-                                                    scale_wrt_max_intensity=True,
-                                                    minimum_box_padding=20.)
-
-    assert [get_box_extent(f) for f in result] == pytest.approx([50., 20.])
-
-
-def test_dress_scaled_boxes_shrink_for_weaker_features():
-    # the feature is at half of max_intensity: dynrange 52 is scaled to 26
-    f = feat(A=0., gamma=5.)
-    top = 2 * f.get_intensity()
-
-    [scaled] = SpectralFeature.dress_these_with_boxes([f], top, top / 52, box_range_safety_margin=0.,
-                                                      scale_wrt_max_intensity=True)
-    [unscaled] = SpectralFeature.dress_these_with_boxes([f], top, top / 52, box_range_safety_margin=0.)
-
-    assert get_box_extent(scaled) == pytest.approx(25.)
-    assert get_box_extent(unscaled) == pytest.approx(5. * 51 ** 0.5)
-
-
-def test_dress_needs_propagator_param():
-    with pytest.raises(ValueError, match='propagator_param'):
-        SpectralFeature.dress_these_with_boxes([feat(A=0., gamma=None)], 1., 0.01)
-
-
-def test_dress_rejects_feature_above_max_intensity():
-    f = feat(A=0.)
-    top = f.get_intensity()
-
-    with pytest.raises(ValueError, match='higher intensity'):
-        SpectralFeature.dress_these_with_boxes([f], top / 2, top / 200)
-
-
-def test_dress_does_not_change_input_features():
-    f = feat(A=0., gamma=5.)
-    top = f.get_intensity()
-
-    SpectralFeature.dress_these_with_boxes([f], top, top / 101)
-
-    assert f.feat_box is None
-
-
-def test_dress_drops_the_weak_one_of_two_equal_features():
-    strong, weak = feat(A=0., amp=1.), feat(A=0., amp=1e-3)  # same location, gamma and terms
-    top = strong.get_intensity()
-
-    result = SpectralFeature.dress_these_with_boxes([strong, weak], max_intensity=top, min_intensity=(top / 100))
-
-    assert [f.amplitude_coeff for f in result] == [1.]
 
 
 ## SpectralWindow -----------------------------------------------------------
@@ -844,6 +759,116 @@ def test_amplitude_half_widths_need_a_drawable_feature(f, message):
         amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
+## intensity_half_widths: the old code's box rule (dress_these_with_boxes until 2026-10-14) ---------
+# Unscaled: gamma * sqrt(dynrange - 1), the same for every strength.
+# Scaled: gamma * sqrt(dynrange * i / max_intensity - 1), 0 at or below the floor.
+# Then times (1 + box_range_safety_margin), at least minimum_box_padding (cm-1). gamma 5 cm-1: dynrange 101 -> 50 cm-1.
+
+def test_intensity_half_widths_unscaled_are_the_same_for_every_strength():
+    """three_strengths (intensities 1, 1e-4 and 1e-8 of the max), dynrange 101, no margin: 50 cm-1 each"""
+    half_widths = intensity_half_widths(WINDOW_0_10, three_strengths(), dynrange=101., box_range_safety_margin=0.)
+
+    assert half_widths == pytest.approx([50., 50., 50.])
+
+
+def test_intensity_half_widths_safety_margin_widens_the_boxes():
+    """default margin 0.1: 50 * 1.1 = 55 cm-1, the boxes of before 2026-10-14"""
+    assert intensity_half_widths(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.) == pytest.approx([55.])
+
+
+def test_intensity_half_widths_minimum_box_padding_is_the_smallest_half_width():
+    """padding 80 cm-1: above the 50 cm-1 of the formula, so 80, margin or not (the margin is not applied to it)"""
+    assert intensity_half_widths(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.,
+                                 minimum_box_padding=80.) == pytest.approx([80.])
+
+
+def test_intensity_half_widths_scaled_shrink_for_weaker_features():
+    """intensities 1 and 1/2 of the max, dynrange 52: k = 52 and 26 -> 5 * sqrt(51) and 5 * sqrt(25) = 25 cm-1"""
+    strong, half = feat(A=5., amp=2. ** 0.5, gamma=5.), feat(A=6., amp=1., gamma=5.)
+
+    half_widths = intensity_half_widths(WINDOW_0_10, [strong, half], dynrange=52., box_range_safety_margin=0.,
+                                        scale_wrt_max_intensity=True)
+
+    assert half_widths == pytest.approx([5. * 51 ** 0.5, 25.])
+
+
+@pytest.mark.parametrize('padding', [0., 20.])
+def test_intensity_half_widths_scaled_never_drop_a_feature_below_the_floor(padding):
+    """
+    three_strengths, dynrange 101: k = 101, 0.0101 and 1e-6. The two below the floor (k <= 1) get half-width
+    minimum_box_padding and stay in the window. dress_these_with_boxes dropped them when the padding was 0.
+    """
+    features = three_strengths()
+
+    half_widths = intensity_half_widths(WINDOW_0_10, features, dynrange=101., box_range_safety_margin=0.,
+                                        scale_wrt_max_intensity=True, minimum_box_padding=padding)
+
+    assert half_widths == pytest.approx([50., padding, padding])
+    assert SpectralWindow.from_features(WINDOW_0_10, features, half_widths).full_features == features
+
+
+def test_intensity_half_widths_scaled_by_a_given_max_intensity():
+    """max_intensity twice the strongest peak: k halves, 101 -> 50.5, so 5 * sqrt(49.5) for the strongest"""
+    features = three_strengths()
+
+    half_widths = intensity_half_widths(WINDOW_0_10, features, dynrange=101., box_range_safety_margin=0.,
+                                        scale_wrt_max_intensity=True,
+                                        max_intensity=2. * features[0].get_intensity())
+
+    assert half_widths == pytest.approx([5. * 49.5 ** 0.5, 0., 0.])
+
+
+def test_intensity_half_widths_scaled_take_a_stronger_feature_outside_the_window():
+    """
+    A feature 10 times stronger in amplitude, 100 cm-1 outside: dress_these_with_boxes raised (stronger than its
+    max). max_intensity is the strongest peak inside: inside k = 101 -> 50 cm-1; outside k = 101 * 100 = 10100 ->
+    5 * sqrt(10099) cm-1.
+    """
+    inside, strong_outside = feat(A=5., amp=1., gamma=5.), feat(A=110., amp=10., gamma=5.)
+
+    half_widths = intensity_half_widths(WINDOW_0_10, [inside, strong_outside], dynrange=101.,
+                                        box_range_safety_margin=0., scale_wrt_max_intensity=True)
+
+    assert half_widths == pytest.approx([50., 5. * 10099 ** 0.5])
+
+
+def test_intensity_half_widths_scaled_need_a_feature_inside_or_max_intensity():
+    """no feature inside: no strongest peak to scale by, as in the old callers. Unscaled needs none."""
+    outside = feat(A=60., gamma=5.)
+
+    with pytest.raises(ValueError, match='pass max_intensity'):
+        intensity_half_widths(WINDOW_0_10, [outside], dynrange=101., scale_wrt_max_intensity=True)
+    assert intensity_half_widths(WINDOW_0_10, [outside], dynrange=101., box_range_safety_margin=0.,
+                                 scale_wrt_max_intensity=True,
+                                 max_intensity=outside.get_intensity()) == pytest.approx([50.])
+    assert intensity_half_widths(WINDOW_0_10, [outside], dynrange=101.) == pytest.approx([55.])
+
+
+def test_intensity_half_widths_scaled_with_every_amplitude_zero_are_the_smallest_boxes():
+    """rows that cancel everywhere: nothing to scale by -> minimum_box_padding"""
+    assert intensity_half_widths(WINDOW_0_10, [feat(A=5., amp=0., gamma=5.), feat(A=6., amp=0., gamma=2.)],
+                                 dynrange=100., scale_wrt_max_intensity=True, minimum_box_padding=3.) == [3., 3.]
+
+
+def test_intensity_half_widths_of_no_features_is_empty():
+    assert intensity_half_widths(WINDOW_0_10, [], dynrange=100.) == []
+
+
+@pytest.mark.parametrize('setting, value', [('dynrange', 1.), ('dynrange', 0.5), ('box_range_safety_margin', -0.1),
+                                            ('minimum_box_padding', -1.), ('max_intensity', 0.)])
+def test_intensity_half_widths_reject_settings_out_of_range(setting, value):
+    settings = {'dynrange': 100., setting: value}
+
+    with pytest.raises(ValueError, match=setting):
+        intensity_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
+
+
+@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
+def test_intensity_half_widths_need_a_drawable_feature(f, message):
+    with pytest.raises(ValueError, match=message):
+        intensity_half_widths(WINDOW_0_10, [f], dynrange=100.)
+
+
 ## RectangularDomain --------------------------------------------------------
 
 def test_domain_from_features_spans_feature_boxes():
@@ -905,13 +930,13 @@ def test_nd_intensity_has_one_gamma_factor_per_axis(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_dress_box_extent_is_the_same_on_every_axis(ndim):
-    f = feat(coords(ndim, 100.), gamma=5.)
-    top = f.get_intensity()
+@pytest.mark.parametrize('scaled', [False, True])
+def test_nd_intensity_half_width_does_not_change_with_the_number_of_axes(ndim, scaled):
+    """one gamma factor per axis in the intensity, the same half-width: 5 * sqrt(100) = 50 cm-1 (dynrange 101)"""
+    f = feat(coords(ndim, 5.), gamma=5.)
 
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101, box_range_safety_margin=0.)
-
-    assert [get_box_extent(dressed, ax) for ax in AXES[:ndim]] == pytest.approx([50.] * ndim)
+    assert intensity_half_widths(cube(ndim, 0., 10.), [f], dynrange=101., box_range_safety_margin=0.,
+                                 scale_wrt_max_intensity=scaled) == pytest.approx([50.])
 
 
 @pytest.mark.parametrize('ndim', NDIMS)

@@ -121,9 +121,9 @@ def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0,
     A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1.
     The dict form is for N-dimensional tests: feat(coords(3, 100.)).
     Without `rows`, the feature gets one row with coeff=amp and a=0 (amp=None -> no rows, so no amplitude).
-    No box, as before dress_these_with_boxes. box_extent gives it the box location +- box_extent on every axis
-    (box_extent as in dress_these_with_boxes: from the location to each box face), e.g. feat(A=0., box_extent=1.)
-    has the box (-1, 1).
+    No box, as before SpectralWindow.from_features gives one. box_extent gives it the box location +- box_extent on
+    every axis (box_extent: the half-width in from_features, from the location to each box face), e.g.
+    feat(A=0., box_extent=1.) has the box (-1, 1).
     """
     loc = ResLocPoint({**(location or {}), **coords})
     if rows is None:
@@ -133,7 +133,7 @@ def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0,
 
 
 def get_box_extent(f: SpectralFeature, axis: str = 'A') -> float:
-    """From the feature's location to each face of its box on `axis` (box_extent in dress_these_with_boxes)."""
+    """From the feature's location to each face of its box on `axis` (the half-width in from_features)."""
     mn, mx = f.feat_box.bounds[axis] # type: ignore
     return (mx - mn) / 2
 

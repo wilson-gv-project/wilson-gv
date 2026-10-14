@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-14
 
 Tests (run 2026-10-14)
-       refac_rsp_eval: 631 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       refac_rsp_eval: 646 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
@@ -31,8 +31,8 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
 2. [ ] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
    E6b (the caller side) waits: the WilsonSimulation procedure will change, so where the evaluation is called is open.
    Open: E9 needs the old code until E6b's check, or E6b drops the check (C3 already checked the numbers).
-   E6a includes E10 (box size by amplitude): code done 2026-10-14. Open: dress_these_with_boxes as a second box
-   rule, or delete it. Tuning the knobs: later.
+   E6a includes E10 (box size by amplitude): code done 2026-10-14, with a box rule as the input of draw_spectrum
+   (amplitude_half_widths, or intensity_half_widths: the old rule). Tuning the knobs: later.
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
 4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict). Waits (see above).
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
@@ -83,6 +83,8 @@ Decisions and known limits
   required. Measured: at most 0.13 floors with eps 0.1. Before E10 (and in the old code, C3) boxes ended at
   1/dynrange of each feature's own peak, drawn by domains: 0.8-7.7 floors, up to 100 % off at points the plot
   shows (formaldehyde, ACDM; dynrange 100-1000).
+  The box size is a rule passed to draw_spectrum (box_rule, 2026-10-14): amplitude_half_widths (the above), or
+  intensity_half_widths (the old code's rule, kept as an option). No rule drops a feature.
 - Peak width (E5, 2026-10-13): propagator_param sizes both the drawn peak and its box. A box is sized with the
   largest peak width, on every axis; a width that grows away from the peak can still be cut off by the box.
   A width function gets only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (the
@@ -163,7 +165,7 @@ E. Pipeline
             molsys = load_molsys_data(terms, data_origin)                                     once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)              FeatureResult
-            spec   = draw_spectrum(result, window, dim_sizes, dynrange=, eps=, min_gammas=, max_cm=)   EvalRspResult
+            spec   = draw_spectrum(result, window, dim_sizes, box_rule=)                      EvalRspResult
         Inputs: plain values, derive's terms and two small types (DataOriginInfo, SpectralAxisSet).
         No WilsonSimulation type. Where the old setup keeps each one:
             terms             VibPerturbedTerm list, in pulse IDs           sim.terms
@@ -176,9 +178,16 @@ E. Pipeline
             window            grid.Box, cm-1, one range per axis            ev_info.spectral_window.box: another
                                                                             Box class (spectrum_composition), convert
             dim_sizes         grid points per axis, both edges included     ev_info.grid_resolution
-            dynrange          the plot's dynamic range, required            ev_info.dynamic_range (default 100)
-            eps, min_gammas,  box knobs (E10), defaults 0.1, 1, none        box_range_safety_margin,
-            max_cm                                                          minimum_box_padding (cm-1, not gammas)
+            box_rule          features.BoxRule, knobs by functools.partial, the old box settings:
+                              e.g. partial(amplitude_half_widths,           box_range_safety_margin,
+                              dynrange=500.)                                scale_wrt_max_intensity,
+                                                                            minimum_box_padding (cm-1)
+                dynrange      the plot's dynamic range, required by both    ev_info.dynamic_range (default 100)
+                              rules
+                amplitude_half_widths: eps, min_gammas, max_cm, a_max       no old equivalent (E10)
+                intensity_half_widths: the old names, meanings and          box_range_safety_margin,
+                              defaults; max_intensity (None: the strongest  scale_wrt_max_intensity, minimum_box_padding
+                              peak inside the window, as the old callers)   (cm-1)
         Outputs:
             FeatureResult     the rows (table), zero, features; leaves(row), cancelling(rel_tol)
             EvalRspResult     grid_result: complex amplitude in au, one per grid point     the old sim.spec
@@ -191,8 +200,10 @@ E. Pipeline
         - the states for drawing: FeatureResult.states.
 [ ] E6a Evaluator side. Needs no caller.
         - Write the inputs and outputs above into the pipeline.py docstring (and later the README, E4).
-        - [x] Old box settings (E10): eps replaces box_range_safety_margin, min_gammas replaces minimum_box_padding
-          (in gammas, not cm-1), scale_wrt_max_intensity is built into the rule.
+        - [x] Old box settings (E10): two box rules, draw_spectrum(box_rule=). amplitude_half_widths: eps replaces
+          box_range_safety_margin, min_gammas replaces minimum_box_padding (in gammas, not cm-1),
+          scale_wrt_max_intensity is built into the rule. intensity_half_widths (the old rule) keeps the old
+          settings: names, meanings, defaults.
         - [x] margins (diag_margin, for the condition w2 > w1): dropped with the magnitude-condition filter below.
         - [x] Grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
           draw_spectrum uses make_grid now.
@@ -219,8 +230,11 @@ E. Pipeline
         which does not exist (dead module).
 [ ] E10 Box size by amplitude (found 2026-10-14). The boxes before E10 cut off parts of the spectrum that the plot
         shows. A box sized by amplitude, with each feature drawn on its own box, is accurate and about as fast.
-        Code done 2026-10-14 (see Code below). Left: dress_these_with_boxes as a second box rule, or delete it;
-        decide about the domains (E7). Later: tune the knobs (tests/e10_boxes.py with more cases and knob values,
+        Code done 2026-10-14 (see Code below). Left: decide about the domains (E7).
+        Open: amplitude_half_widths takes dynrange and eps, but uses only their ratio eps / dynrange: the allowed
+        intensity error as a fraction of the strongest peak, e.g. 0.1 / 500 = 2e-4. dynrange = 1 does not switch it
+        off (it raises; allowed, it would mean 10 % of the max). Keep both knobs, or one knob instead
+        (e.g. rel_err, with a default, so box_rule=amplitude_half_widths works without partial). Later: tune the knobs (tests/e10_boxes.py with more cases and knob values,
         then choose the defaults).
         ("today" below: the boxes before E10.)
         Why today's boxes cut too much:
@@ -235,7 +249,7 @@ E. Pipeline
         - Domains hide part of this (see "Domains vs each feature on its own box" below).
         - Bigger boxes help little: ACDM, plot floor at D 500, box dynrange 500 -> 250000: 3.9 -> 3.0 floors, the
           drawing 3 s -> 66 s (draw_all: 73 s). The rest comes from features more than 2585 cm-1 away.
-        What dress_these_with_boxes was for (features.py; no code calls it, 13 tests do): the same idea as the rule
+        What dress_these_with_boxes was for (features.py; now intensity_half_widths, see below): the same idea as the rule
         below, from the plot's dynamic range, done in intensity. scale_wrt_max_intensity: a box ends where the feature
         drops below the plot's floor, so weak features get small boxes. minimum_box_padding: a smallest box; with 0,
         features below the floor are dropped (against the 2026-10-09 decision). It raises for a feature stronger than
@@ -310,32 +324,42 @@ E. Pipeline
           cost (ACDM, big, D 500). With amplitude boxes the own box is enough (at most 0.13 floors, table above).
         - So with E10: each feature on its own box; domains leave the drawing. Keep them only if plotting regions
           needs them (E7), else delete them (E9).
-        dress_these_with_boxes: open (2026-10-14): keep it as a second box rule, or delete it.
-        - No code calls this copy (refac_rsp_eval/features.py); 12 tests in test_features.py do. The old pipeline
-          has its own copy (amplitudes/spectrum_composition.py, tested in wilson_intensities/tests/unit/
-          test_specfeature.py and test_integration_evaluation.py); that copy goes with E9, not here.
-        - Its ideas: weak features get small boxes -> the amplitude rule; minimum_box_padding -> min_gammas;
-          weak features dropped -> no (2026-10-09).
-          Its tests: 9 test its own behaviour (dropping, padding, scaling, the raise, input unchanged, ...): they go
-          if it goes.
-          3 use it to check a box (no box until dressed, the largest peak width, the same on every axis): the
-          amplitude_half_widths tests cover the last two; the first needs a from_features version.
-        - lorentzian_distance_to_dynrange_weaker_than_max stays: amplitude_half_widths uses it,
-          d = max(lorentzian_distance_to_dynrange_weaker_than_max(gamma, k^2), min_gammas * gamma).
+        dress_these_with_boxes: kept as a second box rule, features.intensity_half_widths (2026-10-14).
+        - The box step takes a rule: draw_spectrum(box_rule=), a function (window, features) -> half-widths
+          (features.BoxRule). functools.partial gives a rule its knobs, e.g. partial(intensity_half_widths, dynrange=500.).
+        - The old knobs keep their names, meanings and defaults (box_range_safety_margin 0.1, unscaled,
+          minimum_box_padding 0 cm-1), plus dynrange: the old function took max_intensity and min_intensity, and
+          both old callers set min_intensity = max_intensity / dynamic_range, so implied_dynrange = dynrange.
+          max_intensity: None -> the strongest peak inside the window, as the old callers took it.
+        - Changed from dress_these_with_boxes: returns half-widths (from_features makes the boxes, no deep copy);
+          never drops a feature (2026-10-09; the old function dropped the features below min_intensity when
+          minimum_box_padding was 0; dropping could come back as a knob, not for now); no error for a feature
+          stronger than max_intensity (a stronger feature outside the window is normal: ACDM has 4).
+        - Unscaled (default) it gives the boxes of before E10: c3_spectrum.py uses it, old = new still 1e-16.
+          Measured 2026-10-14 (tests/e10_boxes.py rules: formaldehyde and ACDM, quick_start window and zoom,
+          dynrange 100, 500, 1000), error in floors against draw_all, worst visible point:
+              amplitude, eps 0.1              0.03-0.13 floors, 2.2 %; draws in 0.01-0.8 s
+              intensity, unscaled             1.7-12 floors, 86-214 %; 0.00-0.16 s
+              intensity, scaled               0.7-39 floors, 44-229 %; 0.00-0.09 s
+              intensity, scaled, padding 10   about as scaled (padding: at most 15 % less error)
+        - The old pipeline has its own copy (amplitudes/spectrum_composition.py, tested in wilson_intensities/
+          tests/unit/test_specfeature.py and test_integration_evaluation.py); that copy goes with E9.
+        - lorentzian_distance_to_dynrange_weaker_than_max: both rules use it.
         Code (2026-10-14):
         - [x] features.amplitude_half_widths: the rule, with the knobs eps (default 0.1), min_gammas (the smallest
               box in gammas, default 1), max_cm (a cap; default none: with a cap, eps no longer bounds the error),
               a_max (default: the estimate above, amplitude_in_window). Docstring: the formula, the knobs, numbers.
         - [x] SpectralWindow.from_features(box, features, half_widths): any rule's half-widths, one per feature.
         - [x] draw_window: each feature on its own box, no domains.
-        - [x] draw_spectrum: dynrange required (the plot's), and the knobs.
+        - [x] draw_spectrum: dynrange required (the plot's), and the knobs. Since the box rule: box_rule required,
+              the knobs go with the rule.
         - [x] Tests against draw_all (test_evaluate.py): a strong peak next to a weak one (0.034 floors; before: 0.8),
               a strong peak outside the window (0; before: 58 floors). test_draw_window_cut_is_small_for_the_strongest_
               peak_not_for_a_weak_neighbour went. test_features.py: the rule and each knob.
         - [x] Scripts: e10_boxes.py (the tuning script), f2_speed.py and the example use the new code;
               c3_spectrum.py keeps the boxes and the domain drawing of before, to compare with the old code (C3).
-        - [ ] dress_these_with_boxes: a second box rule (the box step takes a box-rule function), or delete it with
-              scale_wrt_max_intensity and minimum_box_padding, and its tests (above).
+        - [x] Box rule as an input (2026-10-14): draw_spectrum(box_rule=), features.BoxRule. dress_these_with_boxes
+              reworked into intensity_half_widths (above); its tests rewritten; e10_boxes.py scores either rule.
         - [ ] Domains (find_clusters_by_featboxes, RectangularDomain): no longer used in drawing. Keep only if
               plotting regions needs them (E7), else delete (E9).
         - E6b: the drawing no longer matches the old code (the old code cuts more). Check the drawing against

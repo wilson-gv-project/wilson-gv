@@ -53,7 +53,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralWindow,
-    lorentzian_distance_to_dynrange_weaker_than_max,
+    intensity_half_widths,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import compile_terms
@@ -68,7 +68,7 @@ POLS = (c2.X, c2.X, c2.X, c2.X)
 GAMMA_CM = 4.7
 DYNRANGE = 100.          # old EvaluationInfo default
 MARGIN = 0.1             # box_range_safety_margin, old default
-MIN_PADDING = 30.        # old only; boxes are 4.7 * sqrt(99) * 1.1 = 51 cm-1 anyway
+MIN_PADDING = 30.        # minimum_box_padding, cm-1; boxes are 4.7 * sqrt(99) * 1.1 = 51 cm-1 anyway
 WINDOW_PAD_CM = 60.      # window = feature locations +- this: every feature box inside the window
 STEP_CM = 2.             # grid step, about GAMMA_CM / 2
 LOC_DIGITS = 4           # locations match to 1e-4 cm-1 (C2: old = new locations to 1e-6)
@@ -232,9 +232,11 @@ def compare(case: Case) -> dict:
                nocut_old_fixed_vs_new_amp=rel(old_fixed, new_all))
 
     # 4. cut by domains. Both keep every feature near the window, however weak (old: minimum_box_padding > 0)
-    old_rule = [lorentzian_distance_to_dynrange_weaker_than_max(max(f.peak_widths()), DYNRANGE) * (1. + MARGIN)
-                for f in new_feats]
-    window = SpectralWindow.from_features(Box(dict(bounds)), new_feats, old_rule)
+    box = Box(dict(bounds))
+    window = SpectralWindow.from_features(box, new_feats,
+                                          intensity_half_widths(box, new_feats, dynrange=DYNRANGE,
+                                                                box_range_safety_margin=MARGIN,
+                                                                minimum_box_padding=MIN_PADDING))
     new_cut = draw_by_domains(window, states, coords)
     old_cut = old_spec.result
     out.update(window_feats_old_new=(sum(len(r.features) for r in wf.region_eval.regions),

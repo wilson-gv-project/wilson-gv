@@ -345,110 +345,6 @@ class SpectralFeature:
             raise NotImplementedError("Only standard 'abs()**2' expression is implemented.")
     
     @classmethod
-    def dress_these_with_boxes(cls, features: list['SpectralFeature'],
-                               max_intensity, min_intensity,
-                               box_range_safety_margin: float=0.1,
-                               scale_wrt_max_intensity: bool=False,
-                               minimum_box_padding: float=0.) -> list['SpectralFeature']:
-        """
-        Assumptions: Feature locations, propagator_param (and minimum box padding if used) given in the same units
-
-        Limitations: This method is currently for m == n for m-D features in n-D spectra. May need further work for
-                     m != n.
-
-        Note that well-functioning of this routine should be reviewed after usage experience.
-
-        Dressing features with boxes: Uses a helper function describing at which radius from a Lorentzian's centerpoint
-        that the intensity is "dynamic range times smaller" than at the centerpoint, and then constructs an n-dimensional
-        (currently "n-dimensional cubic") box of that distance from the centerpoint along the given axes:
-          - the distance provided by the helper function gives distances along the axes under the "worst case" assumption
-            that each axis is parallel to the resonance condition direction
-            - the rest of the term is then taken as constant and the distance can be determined in each direction separately
-            - otherwise (if not each axis and resonance condition parallel), walking along one axis means gaining
-              distance to more than one resonance condition, which means that the intensity will be even smaller than
-              dictated by a single Lorentzian
-            - if so (not parallel), the box would become somewhat larger than needed but I think at most sqrt(N),
-              where N is the spectrum dimensionality, for a given direction
-                - for instance in the 2D case, if one resonance condition runs along axis A and the other along A + B,
-                then the lineshapes will be at a 45 degree angle to each other on a plot over the (A, B) space. The box
-                could have then been sqrt(2) shorter along the B direction.
-                - This can likely be accomplished by inspecting each resonance condition more closely for which
-                  combination of axes they run along and accounting for this angle in the box scaling via trigonometry
-
-        For m != n (feature--spectrum dimensionality): One typical example is a line feature (e.g. CARS) in a 2D spectrum).
-        This feature decreases along one direction in the spectrum and stays constant along the other, and the present
-        algorithm will then likely need adjustment to make an appropriate box for this (if sticking to rectangular boxes,
-        will probably need to return a box covering the full region of the spectral window spanned by such a feature to
-        a given tolerance).
-
-        Each feature's own propagator_param sets its box size: the largest of its peak_widths, on every axis.
-        A feature without one raises a ValueError.
-
-        box_range_safety_margin: How much larger should the box dimensions be than what is dictated by
-            lorentzian_distance_to_dynrange_weaker_than_max?
-            default: 0.1 (ten percent margin). Note: Accounting for the larger boxes that may be warranted by constructive
-            interference between features whose lineshapes overlap might be feasible to handle in a somewhat crude manner
-            by adjusting this parameter.
-
-        scale_wrt_max_intensity (default False): When determining box sizes for a given feature, should the box size be
-        scaled according to the max_intensity parameter? (i.e. "weaker features need smaller boxes so I decrease the
-        desired dynamic range for weaker features (compared to their centerpoint value)")
-
-        minimum_box_padding (default 0.0): Apply a minimum size box around each feature, where the value of this parameter
-        is the minimum distance to the box surface centerpoints along each positive/negative Cartesian direction, i.e.
-        boxes may be larger than this minumum, but not smaller. If applied, then is unchanged by box_range_safety_margin.
-        If set to 0.0, features with point intensity < min_intensity will be removed, potentially removing effects
-        that should have been included if e.g. these features were close to each other on the shoulder of a stronger feature
-
-        Recommended use unless performance is critical:
-            - box_range_safety margin at default or other judiciously chosen nonzero value
-            - scale_wrt_max_intensity: True (recommended as long as the collection of features includes the spectrum's strongest feature)
-            - minimum_box_padding: Low but positive number (2-10 * propagator_param)
-
-        """
-        import copy
-
-        # Defining here an implied dynamic range based on the max/min specified intensity ratio
-        implied_dynrange = max_intensity/min_intensity
-
-        # Return data initialization
-        res_features = copy.deepcopy(features)
-
-        for feat in res_features[:]:
-
-            feat_intensity = feat.get_intensity()
-
-            # FIXME Warning: If features removed by this were e.g. close to each other and/or on the shoulder of a stronger feature,
-            # this removal may be too strict. Can be mitigated by choosing nonzero minimum_box_padding. 
-            if (feat_intensity < min_intensity) and (minimum_box_padding == 0.0):
-                res_features.remove(feat)
-            else:
-
-                feat.feat_box = None
-
-                if feat_intensity > max_intensity:
-                    raise ValueError(f"The feature {feat} will have higher intensity than max_intensity ({max_intensity})")
-                
-                gamma = max(feat.peak_widths())
-
-                if scale_wrt_max_intensity:
-
-                    feat_intensity_wrt_max = feat_intensity/max_intensity
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(gamma, implied_dynrange*feat_intensity_wrt_max)
-
-                else:
-                    delta_a_general = lorentzian_distance_to_dynrange_weaker_than_max(gamma, implied_dynrange)
-
-                box_extent = max(delta_a_general*(1.0 + box_range_safety_margin), minimum_box_padding)
-
-                feat.feat_box = Box({k: (v - box_extent,
-                                         v + box_extent)
-                                     for k,v in feat.location.as_dict().items()})
-
-        return res_features
-
-
-    @classmethod
     def print_list_features(cls, features: list['SpectralFeature']):
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
@@ -541,6 +437,12 @@ def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
     return float(amplitude)
 
 
+# A box rule: (window, features) -> the box half-width of each feature, cm-1, in the order of `features`
+# (the input of SpectralWindow.from_features; draw_spectrum takes the rule). Two rules: amplitude_half_widths and
+# intensity_half_widths. functools.partial gives a rule its knobs, e.g. partial(amplitude_half_widths, dynrange=500.)
+BoxRule = Callable[[Box, Sequence[SpectralFeature]], Sequence[float]]
+
+
 def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
                           dynrange: float,
                           eps: float = 0.1,
@@ -549,7 +451,7 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
                           a_max: float | None = None) -> list[float]:
     """
     The box half-width of each feature, cm-1, in the order of `features`, from its amplitude (todo.txt E10):
-    strong features get big boxes, weak ones small. The input of SpectralWindow.from_features.
+    strong features get big boxes, weak ones small. A box rule (BoxRule).
 
     Why: the plot shows intensities down to its floor, a_max**2 / dynrange. Drawing adds amplitudes, then squares,
     so a tail t cut off where it meets an amplitude A changes the intensity by about 2 * A * t, much more than t**2.
@@ -606,6 +508,94 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     return half_widths
 
 
+def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
+                          dynrange: float,
+                          box_range_safety_margin: float = 0.1,
+                          scale_wrt_max_intensity: bool = False,
+                          minimum_box_padding: float = 0.,
+                          max_intensity: float | None = None) -> list[float]:
+    """
+    The box half-width of each feature, cm-1, in the order of `features`: the old code's rule,
+    SpectralFeature.dress_these_with_boxes (until 2026-10-14), as a box rule (BoxRule). The old knobs keep their
+    names, meanings and defaults.
+
+    dynrange: the old function took max_intensity and min_intensity, and computed
+    implied_dynrange = max_intensity / min_intensity. Both old callers (SpectralWindow.dress_with_featboxes,
+    evaluation_wf.dress_features_with_boxes) set min_intensity = max_intensity / dynamic_range, so
+    implied_dynrange is the plot's dynamic range: `dynrange` here. min_intensity = max_intensity / dynrange.
+
+    Per feature, as in the old function (gamma: the largest of its peak_widths, on every axis; i: its peak
+    intensity, get_intensity()):
+        unscaled (default):  d = gamma * sqrt(dynrange - 1)                      down to 1/dynrange of its own peak
+        scaled:              d = gamma * sqrt(dynrange * i / max_intensity - 1)   down to min_intensity, the floor;
+                                                                                  0 for a feature at or below it
+        half-width (the old box_extent) = max(d * (1 + box_range_safety_margin), minimum_box_padding)
+        e.g. gamma 5, dynrange 101, margin 0: unscaled 50 cm-1 for every feature; scaled 50 cm-1 for the
+             strongest, 0 (or minimum_box_padding) for a feature 101 times weaker or weaker still
+
+    The knobs:
+        dynrange                 the plot's dynamic range, max / floor, e.g. 100. Required.
+        box_range_safety_margin  the boxes this much larger, e.g. 0.1 (default): 10 % larger.
+        scale_wrt_max_intensity  False (default): each box to 1/dynrange of its own peak. True: to the floor.
+        minimum_box_padding      the smallest half-width, cm-1. Default 0. (The old setup class passed 10.)
+        max_intensity            used only when scaled. None (default): the strongest peak intensity of the
+                                 features inside `window`, as the old callers took it.
+    The old settings' defaults (wilson_main, spectrum_abstractions.py): dynamic_range 100, margin 0.1, unscaled,
+    minimum_box_padding 10.
+
+    Changed from dress_these_with_boxes:
+        - No feature is dropped (decided 2026-10-09). The old function dropped every feature below the floor
+          (i < min_intensity) when minimum_box_padding was 0, scaled or not. Here such a feature keeps its box as
+          above: unscaled the usual one; scaled, half-width minimum_box_padding (with 0: drawn only on the grid
+          points around its peak). Dropping is not offered for now; it could come back as a knob.
+        - No error for a feature stronger than max_intensity: a stronger feature outside the window is normal
+          (ACDM, quick_start window: 4 of them). Scaled, it gets a box larger than the unscaled one.
+        - Returns half-widths, not copies of the features with boxes: SpectralWindow.from_features makes those.
+
+    Cuts more than amplitude_half_widths: a box ends by the feature's own intensity, but the cut tail adds to the
+    amplitude of its neighbours (see amplitude_half_widths). Measured 2026-10-14 (todo.txt E10), unscaled, each
+    feature on its own box: 1.7-12 floors off; amplitude_half_widths with eps 0.1: at most 0.13 floors.
+    Every feature needs rows and a propagator_param > 0. Scaled, without max_intensity, at least one feature must
+    lie inside `window` (the old callers raised too).
+    """
+    if not dynrange > 1.:
+        raise ValueError(f'dynrange must be > 1, got {dynrange}')
+    if not box_range_safety_margin >= 0.:
+        raise ValueError(f'box_range_safety_margin must be >= 0, got {box_range_safety_margin}')
+    if not minimum_box_padding >= 0.:
+        raise ValueError(f'minimum_box_padding must be >= 0, got {minimum_box_padding}')
+    if max_intensity is not None and not max_intensity > 0.:
+        raise ValueError(f'max_intensity must be > 0 or None, got {max_intensity}')
+    if not features:
+        return []
+
+    for f in features:
+        _check_drawable(f)
+    i_max = 0.
+    if scale_wrt_max_intensity:
+        if max_intensity is not None:
+            i_max = max_intensity
+        else:
+            inside = [f.get_intensity() for f in features if f.is_inside(window)]
+            if not inside:
+                raise ValueError('scaled boxes need the strongest peak inside the window, and no feature is inside: '
+                                 'pass max_intensity')
+            i_max = max(inside)
+
+    half_widths = []
+    for f in features:
+        gamma = max(f.peak_widths())
+        if scale_wrt_max_intensity:
+            # implied_dynrange * feat_intensity_wrt_max, as in the old function; 0 if every peak inside is 0
+            k = dynrange * f.get_intensity() / i_max if i_max > 0. else 0.
+        else:
+            k = dynrange
+        # gamma * sqrt(k - 1), 0 for k <= 1: where the Lorentzian intensity is down to 1/k of its peak
+        box_extent = lorentzian_distance_to_dynrange_weaker_than_max(gamma, k) * (1. + box_range_safety_margin)
+        half_widths.append(max(box_extent, minimum_box_padding))
+    return half_widths
+
+
 @dataclass
 class SpectralWindow:
     """
@@ -623,8 +613,8 @@ class SpectralWindow:
         """
         The window over `box` with the features that add amplitude inside it, each with its box. In this order:
           1. a box around every feature: its location +- its half-width, the same on every axis
-             half_widths: cm-1, one per feature, in the order of `features`, e.g. from amplitude_half_widths.
-             Any other rule works too: the window does not care how the half-widths were chosen.
+             half_widths: cm-1, one per feature, in the order of `features`, e.g. from a box rule (BoxRule):
+             amplitude_half_widths or intensity_half_widths. The window does not care how they were chosen.
           2. keep the features whose box overlaps `box` (touching edges excluded):
              location inside `box` -> full_features, outside -> contrib_features
           No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):

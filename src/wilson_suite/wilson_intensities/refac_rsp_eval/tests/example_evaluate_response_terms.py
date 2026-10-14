@@ -13,10 +13,12 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
 """
 import time
 from dataclasses import replace
+from functools import partial
 
 import numpy as np
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     draw_spectrum,
@@ -60,8 +62,11 @@ def main():
     window = Box({'A': (600., 2800.), 'B': (5., 3100.)})
     dim_sizes = {'A': 501, 'B': 201}
 
+    # Boxes: the box rule, with its knobs given by partial. dynrange is the plot's dynamic range (max / floor).
+    boxes = partial(amplitude_half_widths, dynrange=1001.)
+
     t0 = time.perf_counter()
-    spec = draw_spectrum(result, window, dim_sizes, dynrange=1001.)
+    spec = draw_spectrum(result, window, dim_sizes, box_rule=boxes)
     t_draw = time.perf_counter() - t0
 
     # 5. what came out
@@ -101,7 +106,7 @@ def main():
     # ---------------------------------------------------
     # 6. another width, same rows: replace gives a new FeatureResult with the same table, draw_spectrum draws it
     t0 = time.perf_counter()
-    wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, dynrange=1001.)
+    wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
     t_redraw = time.perf_counter() - t0
 
     print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.grid_result) ** 2):.3e} au; '

@@ -5,7 +5,7 @@ Three calls, from the terms derive writes (in pulse IDs):
     molsys = load_molsys_data(terms, data_origin)                     once, for any number of runs
     result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
                                      propagator_param=...)            rows and features: FeatureResult
-    spec   = draw_spectrum(result, window, dim_sizes, dynrange=...)   the spectrum on a grid: EvalRspResult
+    spec   = draw_spectrum(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
 evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
 load_molsys_data and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
 
@@ -20,7 +20,7 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
   │ 4. group by (motif, location), add the coeffs
   v
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
-  │ 5. peak width, boxes by amplitude (features.amplitude_half_widths), spectral window
+  │ 5. peak width, boxes (a box rule, e.g. features.amplitude_half_widths), spectral window
   v
 spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
 """
@@ -44,12 +44,12 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     included_modes,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    BoxRule,
     ContributionRow,
     ContributionTable,
     PropagatorParam,
     SpectralFeature,
     SpectralWindow,
-    amplitude_half_widths,
     features_from_rows,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -253,7 +253,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
         3. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
                                                             rank and laser_pol)
         4. rows, zero pairs, features                       compute_features
-    The spectrum on a grid: draw_spectrum(result, window, dim_sizes), as often as needed; the rows stay.
+    The spectrum on a grid: draw_spectrum(result, window, dim_sizes, box_rule=...), as often as needed; the rows stay.
 
     axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
     molsys_data       load_molsys_data(terms, data_origin): loaded once, for any number of runs
@@ -301,34 +301,29 @@ def draw_spectrum(feature_result: FeatureResult,
                   window: 'Box',
                   dim_sizes: dict[str, int],
                   *,
-                  dynrange: float,
-                  eps: float = 0.1,
-                  min_gammas: float = 1.,
-                  max_cm: float | None = None,
-                  a_max: float | None = None) -> EvalRspResult:
+                  box_rule: BoxRule) -> EvalRspResult:
     """
     The features of feature_result on a grid over `window`: boxes, grid, drawing. The rows are not computed
-    again (the slow part: build_contributions), so a new window, grid, width or box setting runs only the drawing:
-        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401}, dynrange=500.)
-        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, dynrange=500.)
+    again (the slow part: build_contributions), so a new window, grid, width or box rule runs only the drawing:
+        boxes = partial(amplitude_half_widths, dynrange=500.)
+        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
+        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
     new width, on first use (features_from_rows: 0.02 s for 3524 features on ACDM, F2).
 
     window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
     dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}
-    dynrange   the plot's dynamic range (max / floor): the boxes are sized so the cut stays below what the plot
-               shows. Required: the plot decides it.
-    eps, min_gammas, max_cm, a_max: the box knobs, see features.amplitude_half_widths
+    box_rule   the box half-width of each feature: a function (window, features) -> cm-1, one per feature
+               (features.BoxRule). Two exist in features.py; functools.partial gives them their knobs:
+                   partial(amplitude_half_widths, dynrange=500.)   by amplitude: the cut stays below eps * the
+                                                                   plot's floor (E10)
+                   partial(intensity_half_widths, dynrange=500.)   by intensity, the old code's rule: cuts more
+               dynrange: the plot's dynamic range (max / floor). Required by both: the plot decides it.
+               Any other function works too, e.g. lambda window, features: [20.] * len(features).
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
-
-    Another box rule: the same three steps, with your own half-widths (cm-1, one per feature):
-        spectral_window = SpectralWindow.from_features(window, result.features, half_widths)
-        grid_axes, _ = spectral_window.sample_grid(dim_sizes)
-        amplitude = draw_window(spectral_window, result.states, grid_axes)
     """
     features = feature_result.features
-    half_widths = amplitude_half_widths(window, features, dynrange=dynrange, eps=eps, min_gammas=min_gammas,
-                                        max_cm=max_cm, a_max=a_max)                       # boxes: width at the peak
+    half_widths = box_rule(window, features)                                              # boxes: width at the peak
     spectral_window = SpectralWindow.from_features(window, features, half_widths)
     grid_axes, _ = spectral_window.sample_grid(dim_sizes)
     grid_result = draw_window(spectral_window, feature_result.states, grid_axes)          # width on the grid
