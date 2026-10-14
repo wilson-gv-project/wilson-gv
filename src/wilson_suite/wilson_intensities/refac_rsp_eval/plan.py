@@ -291,36 +291,29 @@ def generate_LHS_motif(motif: ResonanceMotif,
     return coeff_matrix, all_axes
 
 
-"""
-ParameterSet has a type that lies. Declared Mapping[str, int], but __init__ injects params['zero'] = 'zero' (a str value) and __getitem__ remaps '' → 'zero'; __lt__ hardcodes the alphabet ('a'..'h'). A generic index-assignment type that secretly knows vibrational-state labelling conventions. Decide which it is: if generic, the zero sentinel and ordering are policy living in a labelling module; if domain, name it (IndexAssignment) and make the conventions explicit and tested. The ground state currently spelled three ways ('', 'zero', state_label == 'zero') is that ambiguity leaking.
-"""
 @dataclass(frozen=True)
 class ParameterSet(Mapping[str, int]):
     """
-    Immutable mapping of parameter label -> index value.
+    Immutable mapping of label -> mode number: one index set of a term, e.g. ParameterSet({'a': 0, 'b': 1, 'c': 4}).
+    It holds exactly the given labels. The ground state needs no entry: it has no quanta, so nothing is looked up
+    (VibDiff.from_quanta, make_state_label(()) -> 'zero'). Hashable, so a dict key (leaves,
+    ContributionTable.by_params); not ordered (todo.txt D3).
     """
     _parameters: Mapping[str, int]
 
-    def __init__(self, parameters: Mapping[str, int|str]):
+    def __init__(self, parameters: Mapping[str, int]):
         if not isinstance(parameters, Mapping):
             raise TypeError("ParameterSet must be initialized with a mapping.")
-
-        params = dict(parameters)
-
-        if 'zero' not in params:
-            params['zero'] = 'zero'
 
         object.__setattr__(
             self,
             "_parameters",
-            MappingProxyType(params),
+            MappingProxyType(dict(parameters)),
         )
 
     # --- Mapping interface ---
 
     def __getitem__(self, key: str):
-        if key == '':
-            key = 'zero'
         return self._parameters[key]
 
     def __iter__(self) -> Iterator[str]:
@@ -340,34 +333,19 @@ class ParameterSet(Mapping[str, int]):
         # Order-independent, value-based hash
         return hash(frozenset(self._parameters.items()))
 
-    def __lt__(self, other):
-        if not isinstance(other, ParameterSet):
-            return NotImplemented
-        
-        sort_keys = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
-        relevant_keys = [k for k in sort_keys if k in self or k in other]
-
-        # Sort keys to ensure we compare 'a', then 'b', then 'c' 
-        # regardless of insertion order.
-        self_vals = tuple(self.get(k, 0) for k in relevant_keys)
-        other_vals = tuple(other.get(k, 0) for k in relevant_keys)
-        
-        return self_vals < other_vals
-
     # --- Convenience ---
 
     def parameter_labels(self):
-        return [k for k in self._parameters if k != 'zero']
+        return list(self._parameters)
 
     def indices(self):
-        return [v for v in self._parameters.values() if v != 'zero']
+        return list(self._parameters.values())
 
     def to_dict(self):
         return dict(self._parameters)
 
     def __repr__(self):
-        repr_d = {k: v for k, v in self._parameters.items() if k != 'zero'}
-        return f"{self.__class__.__name__}({repr_d})"
+        return f"{self.__class__.__name__}({dict(self._parameters)})"
 
     # --- Pickle support ---
     def __getstate__(self):

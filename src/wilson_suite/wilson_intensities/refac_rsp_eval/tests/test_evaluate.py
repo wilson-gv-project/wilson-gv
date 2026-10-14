@@ -4,6 +4,7 @@ no VibPerturbedTerm, no data files.
 """
 
 import itertools
+from collections import Counter
 from dataclasses import replace
 
 import numpy as np
@@ -832,15 +833,14 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     of evaluating each leaf assignment independently (nothing dropped, double-counted or
     rescaled), and the contribs stored per leaf are exactly what that call returns.
 
-    Leaves are keyed by ParameterSet, which adds a 'zero' sentinel entry, so
-    {k: leaf[k] for k in 'abc'} recovers the plain (a, b, c) dict needed to re-evaluate a leaf.
+    Leaves are keyed by ParameterSet; leaf.to_dict() is the plain (a, b, c) dict needed to re-evaluate a leaf.
     """
     term, avrg = term_and_avrg
 
     total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
                                                 states_choice='harmonic')
 
-    per_leaf = {leaf: evaluate_full_index_dict(term, {k: leaf[k] for k in 'abc'}, molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
+    per_leaf = {leaf: evaluate_full_index_dict(term, leaf.to_dict(), molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
                                                states_choice='harmonic')
                 for leaf in leaves}
     assert len(leaves) == 4             # b, c in {0, 1}
@@ -1042,7 +1042,7 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys_a1_zero, monk
     rows, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys_a1_zero, TOY_RECIPE,
                                   states_choice='harmonic')
 
-    assert sorted(solved) == [PS_00, PS_01]
+    assert Counter(solved) == Counter([PS_00, PS_01])           # each once, in any order
     row = {(r.term_id, r.params): r for r in rows}
     for ps in (PS_00, PS_01):
         assert row[(0, ps)].location is row[(1, ps)].location

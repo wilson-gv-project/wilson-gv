@@ -56,8 +56,8 @@ def data_origin(molecule: str) -> DataOriginInfo:
 
 
 def _params(ps: ParameterSet) -> dict[str, int]:
-    """only the term's labels, without ParameterSet's hidden 'zero' entry"""
-    return {k: ps[k] for k in ps.parameter_labels()}
+    """the term's labels and their modes, as plain json data"""
+    return ps.to_dict()
 
 
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:

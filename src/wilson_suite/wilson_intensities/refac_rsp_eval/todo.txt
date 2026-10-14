@@ -2,8 +2,8 @@ refac_rsp_eval — TODO
 updated 2026-10-14
 
 Tests (run 2026-10-14)
-       refac_rsp_eval: 645 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
-       Rest of src: 315 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
+       refac_rsp_eval: 642 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       Rest of src: 314 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
        test_domains, test_resonances, test_term_var_translate (see "No item yet").
@@ -39,7 +39,7 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
    (amplitude_half_widths, or intensity_half_widths: the old rule). amplitude_half_widths keeps both knobs,
    dynrange and eps. Left in E10: tuning the knobs (later); the domains (E7).
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
-4. [ ] D4 code move, with D3 (ParameterSet cleanup). Waits (see above). D5's load checks: done 2026-10-14.
+4. [ ] D4 code move. Waits (see above). D5's load checks and D3 (ParameterSet cleanup): done 2026-10-14.
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
 6. [ ] E4  README, with the data-dict contract (D5).
 
@@ -138,8 +138,22 @@ D. Data model
         __eq__ and __hash__ from one key. No code uses a PropsCollection as a dict key; CompiledTerm's ==
         still compares them.
 [ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
-[ ] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
+[x] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
         D1-D3 block nothing: rows store term_id and motif, not the CompiledTerm.
+        Done 2026-10-14 (plan.ParameterSet only; the old code keeps its two copies, term_parts.py and
+        func_abstractions.py):
+        - What the entry was for: the first ParameterSet (2025-10-18) served VibDiffSymbolic, whose states were
+          single strings, the ground state 'zero' or ''; parameters['zero'] -> 'zero' let the ground state go
+          through the same lookup as a mode. The new code looks up each quantum (VibDiff.from_quanta); derive's
+          ground state has no quanta (q = []) and only one-letter quanta, and make_state_label(()) gives 'zero'.
+        - Checked before the change: all tests with the entry and the remap patched out in memory: only the 2
+          tests of the entry itself failed.
+        - ParameterSet holds exactly the given labels: len({'a': 0, 'b': 3}) = 2; ps['zero'], ps[''] raise KeyError.
+        - No order: __lt__ and SpectralFeature.sort_by_params deleted. Nothing sorted ParameterSets but 3 tests
+          (checked with __lt__ removed in memory): the 2 of the order itself (deleted) and
+          test_build_contributions_one_solve_per_motif_and_params (compares with Counter now).
+        - Tests: the 2 'zero' tests became test_parameterset_holds_exactly_the_given_labels;
+          test_from_quanta_works_with_the_zero_entry_of_a_parameter_set (test_system_data.py) deleted.
 [ ] D4  VibState, MolecularProperty and MolPropsCollection exist twice: wilson_main/abstractions.py and
         wilson_system/system_data.py. Decide who owns them; the other side imports. Keep the imports free of
         cycles: plan.py imports system_data only for type hints (if TYPE_CHECKING), system_data.py does not

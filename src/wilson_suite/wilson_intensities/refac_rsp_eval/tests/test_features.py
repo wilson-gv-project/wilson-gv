@@ -316,13 +316,6 @@ def test_features_from_rows_of_empty_table_is_empty():
 
 ## SpectralFeature: list helpers --------------------------------------------
 
-def test_sort_by_params_orders_by_sorted_index_sets():
-    f_high = feat(A=0., rows=(row(a=1),))
-    f_low = feat(A=1., rows=(row(a=2), row(a=0)))
-
-    assert SpectralFeature.sort_by_params([f_high, f_low]) == [f_low, f_high]
-
-
 def test_normalize_coeffs_divides_by_largest_absolute_amplitude():
     feats = [feat(A=0., amp=2.), feat(A=1., amp=-4.)]
 

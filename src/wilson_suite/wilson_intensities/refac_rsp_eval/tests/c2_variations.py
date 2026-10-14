@@ -84,7 +84,8 @@ VARIATIONS = [
 
 
 def key(ps) -> tuple:
-    """Old ParameterSet, new ParameterSet or a plain dict -> sorted ((label, mode), ...) without 'zero'."""
+    """Old ParameterSet, new ParameterSet or a plain dict -> sorted ((label, mode), ...), without the old
+    ParameterSet's hidden 'zero' entry (the new one has none since 2026-10-14)."""
     d = dict(ps._parameters) if hasattr(ps, '_parameters') else dict(ps)
     return tuple(sorted((k, int(v)) for k, v in d.items() if k != 'zero'))
 

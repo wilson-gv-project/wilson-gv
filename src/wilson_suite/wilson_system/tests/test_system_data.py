@@ -11,7 +11,6 @@ import pytest
 
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
-    ParameterSet,
     ResCondKey,
     ResonanceMotif,
 )
@@ -206,13 +205,6 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree_on_the_ground_state(left, r
     assert symb == quanta
     assert symb.energy_difference() == pytest.approx(expected)
     assert symb.energy_difference(au=True) == pytest.approx(convNu2Ene(expected))
-
-
-def test_from_quanta_works_with_the_zero_entry_of_a_parameter_set(states):
-    """get_RHS_motif passes ParameterSet.to_dict(), which carries 'zero': 'zero' next to the mode labels."""
-    index_dict = ParameterSet({'a': 0}).to_dict()
-
-    assert VibDiff.from_quanta(('a',), (), index_dict, states).energy_difference() == E0
 
 
 ## MolPropsCollection / MolSystemData ---------------------------------------

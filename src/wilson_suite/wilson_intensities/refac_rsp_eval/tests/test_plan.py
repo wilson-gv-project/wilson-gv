@@ -306,25 +306,19 @@ def test_generate_LHS_motif_ignores_states():
 
 ## ParameterSet -------------------------------------------------------------
 
-def test_parameterset_injects_zero_and_maps_empty_label():
+def test_parameterset_holds_exactly_the_given_labels():
+    """no hidden entry (until 2026-10-14: 'zero': 'zero', and '' looked up as 'zero'; todo.txt D3)"""
     ps = ParameterSet({'a': 0, 'b': 3})
 
-    assert ps['zero'] == 'zero'
-    assert ps[''] == 'zero'
+    assert len(ps) == 2
+    assert list(ps) == ['a', 'b']
     assert ps.parameter_labels() == ['a', 'b']
     assert ps.indices() == [0, 3]
-    assert len(ps) == 3
-
-
-def test_parameterset_zero_entry_is_hidden_from_repr_but_kept_in_to_dict():
-    """The 'zero' entry is always there: giving it explicitly changes nothing, and pickling keeps it."""
-    ps = ParameterSet({'a': 0})
-
-    assert repr(ps) == "ParameterSet({'a': 0})"
-    assert ps.to_dict() == {'a': 0, 'zero': 'zero'}
-    assert ps == ParameterSet({'a': 0, 'zero': 'zero'})
-    assert hash(ps) == hash(ParameterSet({'a': 0, 'zero': 'zero'}))
-    assert pickle.loads(pickle.dumps(ps)).to_dict() == {'a': 0, 'zero': 'zero'}
+    assert ps.to_dict() == {'a': 0, 'b': 3}
+    assert repr(ps) == "ParameterSet({'a': 0, 'b': 3})"
+    for key in ('zero', ''):
+        with pytest.raises(KeyError):
+            ps[key]
 
 
 def test_parameterset_rejects_non_mapping():
@@ -336,12 +330,6 @@ def test_parameterset_equality_is_order_independent():
     assert ParameterSet({'a': 0, 'b': 1}) == ParameterSet({'b': 1, 'a': 0})
     assert hash(ParameterSet({'a': 0, 'b': 1})) == hash(ParameterSet({'b': 1, 'a': 0}))
     assert ParameterSet({'a': 0}) != ParameterSet({'a': 1})
-
-
-def test_parameterset_orders_alphabetically_by_label():
-    assert ParameterSet({'a': 0, 'b': 5}) < ParameterSet({'a': 1, 'b': 0})
-    assert not ParameterSet({'a': 1}) < ParameterSet({'a': 1})
-    assert min(ParameterSet({'a': 2}), ParameterSet({'a': 0})) == ParameterSet({'a': 0})
 
 
 def test_parameterset_pickle_roundtrip():

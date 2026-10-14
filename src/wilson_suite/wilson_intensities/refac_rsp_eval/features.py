@@ -213,13 +213,6 @@ class SpectralFeature:
         return f'SpectralFeature(location={self.location}, rows={len(self.rows)}, amplitude_coeff={self.amplitude_coeff})'
 
     @classmethod
-    def sort_by_params(cls, features: list['SpectralFeature']):
-        """
-        Sort features by their sorted index sets.
-        """
-        return sorted(features, key=lambda f: tuple(sorted(f.param_sets)))
-
-    @classmethod
     def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float | None = None):
         """
         returns a new list; each copy gets scale / |max|, the rows stay as they are
