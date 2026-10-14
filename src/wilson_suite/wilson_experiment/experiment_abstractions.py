@@ -966,15 +966,9 @@ class FieldAnalysis:
     thres_magn:  float | int = 200.0
     thres_waiting_time: float | int = 1500.0
 
-
-
     def __post_init__(self):
 
-        # TODO: Consider breaking this routine into a few smaller steps
         # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
-        # TODO: Possibly introduce a phase shift to partly account for "non-ideally-Placzek" effects?
-
-        # TODO: Divide larger pieces of code into helper methods
 
         # Get valid interaction patterns
         self.valid_int_patterns = self.get_interaction_patterns()
@@ -1020,7 +1014,6 @@ class FieldAnalysis:
 
         self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
 
-
         # Get "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
         # polarization averaging category, and magnitude condition category
         self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.get_magn_cond_bank_and_int_seq_icpm()
@@ -1033,7 +1026,7 @@ class FieldAnalysis:
 
         if self.interaction_filter is not None:
 
-            # Make target wavevector
+            # Make target wavevector from interaction filter entry
             cand_wv = [0.0, 0.0, 0.0]
             for i in self.interaction_filter[0]:
                 cand_wv = [cand_wv[j] + self.field.signed_pulses[i].wv[j] for j in range(3)]
@@ -1046,14 +1039,14 @@ class FieldAnalysis:
 
         elif self.detector_faces is not None:
 
-            # In this case, the target wavevector is the
+            # In this case, the target wavevector is the direction the detector faces
             target_wv = self.detector_faces
 
         else:
 
-            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
+            raise ValueError('Only one of detector_faces and interaction_filter can (and must) be specified')
 
-            # Find wavevector-matching interaction patterns
+        # Find wavevector-matching interaction patterns
         if self.detection_limited_to in ['same_order', 'up_to_order']:
 
             self.valid_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord,
@@ -1430,23 +1423,51 @@ class VibExperiment:
 
         if len(self.scans) > 0:
             for scan_elem in np.ndindex(self.field_analyses.shape):
-                self.field_analyses[scan_elem] = FieldAnalysis(
-                    self.field.new_field_with_changes(self.scans, scan_elem),
-                    self.detector.interaction_filter)
 
-                if not(self.field_analyses[scan_elem].int_sequences_by_order_comp_pol == {}):
+                curr_analysis = FieldAnalysis(
+                    field = self.field.new_field_with_changes(self.scans, scan_elem),
+                    polarization_filter = self.detector.detection_polarization,
+                    detection_limited_to = self.detector.detection_limited_to,
+                    max_ord = self.detector.detector_max_order,
+                    detector_faces = self.detector.detector_faces,
+                    interaction_filter = self.detector.interaction_filter,
+                    tol_n_dev_t = self.tol_n_dev_t,
+                    tol_n_dev_w = self.tol_n_dev_w,
+                    thres_freq = self.thres_freq,
+                    thres_magn = self.thres_magn,
+                    thres_waiting_time = self.thres_waiting_time
+                )
+
+                if not(curr_analysis.int_sequences_by_order_comp_pol == {}):
                     any_field_analysis_nonempty = True
+
+                self.field_analyses[scan_elem] = copy.deepcopy(curr_analysis)
+
 
         # With no scans, the analysis is only done with respect to the base field
         else:
-            self.field_analyses[()] = FieldAnalysis(self.field, self.detector.interaction_filter)
 
-            if not (self.field_analyses[()].int_sequences_by_order_comp_pol == {}):
+            curr_analysis = FieldAnalysis(
+                field=self.field,
+                polarization_filter=self.detector.detection_polarization,
+                detection_limited_to=self.detector.detection_limited_to,
+                max_ord=self.detector.detector_max_order,
+                detector_faces=self.detector.detector_faces,
+                interaction_filter=self.detector.interaction_filter,
+                tol_n_dev_t=self.tol_n_dev_t,
+                tol_n_dev_w=self.tol_n_dev_w,
+                thres_freq=self.thres_freq,
+                thres_magn=self.thres_magn,
+                thres_waiting_time=self.thres_waiting_time
+            )
+
+            if not (curr_analysis.int_sequences_by_order_comp_pol == {}):
                 any_field_analysis_nonempty = True
+
+            self.field_analyses[()] = copy.deepcopy(curr_analysis)
 
         if not any_field_analysis_nonempty:
             raise AssertionError('This experiment will give a zero signal as set up and/or with the present tolerances/thresholds ')
-
 
     def findDimensionality(self) -> int:
         """
@@ -1461,12 +1482,10 @@ class VibExperiment:
 
         # Time or frequency series adds a dimension
         if self.detector.detection_method == 'time':
-            if self.detector.detection_range is not None:
-                return d + 1
+            return d + 1
 
         elif self.detector.detection_method == 'freq':
-            if self.detector.detection_range is not None:
-                return d + 1
+            return d + 1
 
         # Integrated intensity does not add a dimension
         elif self.detector.detection_method == 'int':
@@ -1474,5 +1493,3 @@ class VibExperiment:
 
         else:
             raise AssertionError('Cannot determine dimensionality: Unrecognized detection method')
-
-        return d
