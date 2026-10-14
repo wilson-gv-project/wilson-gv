@@ -143,20 +143,9 @@ def test_eval_molsys_data():
     assert np.all(molsys.eigenvecs[0] == np.array([ 0.04, -0.,  0., -0.17,  0., -0.,  0.7, -0., -0., 0.7,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
     assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
 
-    # with empty datadict
-    molsys = MolSystemData.from_datadict(mol_props=molprops, data_dict={})
-    assert molsys.eigenvals is None
-    assert molsys.eigenvecs is None
-    assert molsys.natoms == 0
-    assert molsys.geo is None
-    assert molsys.linear == False
-    assert molsys.data_origin is None
-    assert molsys.data_filled == False
-
-    assert molsys.mol_props.is_filled == False
-    assert len(molsys.mol_props) == 2                 # polhess, dipgrad
-
-    assert molsys.states == {}                    # no state lists in the data dict: no state set
+    # with empty datadict: no frequencies and no states, so it does not fit (check_data_dict)
+    with pytest.raises(ValueError, match=r"no 'nc_sqrt_eigval'.*\n.*no 'harmonic_states'"):
+        MolSystemData.from_datadict(mol_props=molprops, data_dict={})
 
 
 def test_evaluate_term():

@@ -3,7 +3,7 @@ updated 2026-10-14
 
 Tests (run 2026-10-14)
        refac_rsp_eval: 645 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
-       Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
+       Rest of src: 315 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
        test_domains, test_resonances, test_term_var_translate (see "No item yet").
@@ -39,7 +39,7 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
    (amplitude_half_widths, or intensity_half_widths: the old rule). amplitude_half_widths keeps both knobs,
    dynrange and eps. Left in E10: tuning the knobs (later); the domains (E7).
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
-4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict). Waits (see above).
+4. [ ] D4 code move, with D3 (ParameterSet cleanup). Waits (see above). D5's load checks: done 2026-10-14.
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
 6. [ ] E4  README, with the data-dict contract (D5).
 
@@ -148,20 +148,34 @@ D. Data model
         removals outside refac_rsp_eval for now.
 [ ] D5  Data-dict contract: what the evaluator expects in the data dict. Delivering a dict that fits is the
         reader's job [outside].
-        To do: write the list below into the README; add the load checks named in it.
+        To do: write the list below into the README. [x] The load checks named in it (2026-10-14).
+        Load checks: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load too). It lists
+        every problem in one ValueError; load adds the source to the message. Every rule passes on formaldehyde,
+        water, CO and ACDM (the tensors are exactly symmetric). 52 ms for cff, qff and polhess at 42 modes.
+        Since then from_datadict needs 'nc_sqrt_eigval' and 'harmonic_states': the wilson_system tests with
+        partial toy dicts use a toy dict that fits (TOY_DATA, test_system_data.py).
         - names: properties as dipgrad, polgrad, polhess, diphess, cff, ...; frequencies as 'nc_sqrt_eigval';
           states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there
-          (properties: in MolSystemData.load since 2026-10-12; frequencies, states: not yet).
+          (properties: in MolSystemData.load since 2026-10-12; frequencies and harmonic states: check_data_dict
+          since 2026-10-14; anharmonic states may be missing: check_states_choice raises when they are asked for).
         - layout: mode indices first, then x, y, z, e.g. polhess[a, b, x, y]. Modes are 0 .. n-1, with
-          n = number of frequencies. Load check: shapes, e.g. polhess is (n, n, 3, 3).
+          n = number of frequencies. Load check: shapes, e.g. polhess is (n, n, 3, 3) (PROP_INDEX_COUNTS: the
+          index counts of every name prop_trivname makes; 'B' and 'coriolis' get no shape check); the
+          frequencies' keys are 0 .. n-1.
         - full tensors: every index order is filled, e.g. cff[a, c, c] and cff[c, a, c]. Load check: each
-          tensor is symmetric in its mode indices.
+          tensor is symmetric in its mode indices (rtol 1e-12, atol 1e-18: the evaluator's zero_tol).
         - units: properties in au; frequencies and state energies in cm-1 (converted to Eh inside).
         - coordinates [outside]: plain derivatives in mass-weighted coordinates, in au. derive's formulas
           (1/(2w) per mode pair, Taylor factors 1/2 and 1/6) fit only this form. No load check is possible.
           Gaussian reader: fits (checked 2026-10-11). CFOUR reader: not checked.
         - state energies: relative to the ground state (0). Key ('0', '0') = 2 quanta in mode 0. Every
           fundamental is in 'harmonic_states'. Load check: the fundamentals are there.
+          Found 2026-10-14: ACDM's anharmonic states (GVPT2) have 66 of 14189 energies at or below 0, e.g. the
+          fundamentals of modes 41, 40, 39: -136.1, -128.0, -54.7 cm-1 (harmonic: positive); the lowest,
+          ('40', '41', '41'), -596.7 cm-1. The low-frequency modes of the dimer.
+          The F2 speed test and the E10 tables use ACDM with anharmonic states.
+          Decided 2026-10-14: a warning, no error, for now. check_data_dict warns (UserWarning) for any state list
+          with energies at or below 0: how many, and the lowest 3. load's warning names the source.
         - zero: |value| < 1e-18 counts as 0. Fits au: rounding noise is about 1e-19, real values 1e-9 or more
           (formaldehyde).
 

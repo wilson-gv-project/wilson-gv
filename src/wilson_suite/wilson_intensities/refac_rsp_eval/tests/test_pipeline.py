@@ -336,7 +336,8 @@ def test_prop_names_of_the_terms_in_pulse_ids_are_those_of_the_compiled_terms():
 def test_molsys_data_loaded_with_the_prop_names_has_one_property_per_name():
     """the caller's load (pipeline docstring): one property per name, no matter how many terms use it; filled from
     the data dict"""
-    data = {'polgrad': np.ones((2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1., 1: 2.}}
+    data = {'polgrad': np.ones((2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1., 1: 2.},
+            'harmonic_states': {('0',): 1., ('1',): 2.}}
 
     molsys = MolSystemData.load(None, prop_names([toy_pulse_term(), toy_pulse_term()]),  # type: ignore
                                 obtainer=lambda request: data)

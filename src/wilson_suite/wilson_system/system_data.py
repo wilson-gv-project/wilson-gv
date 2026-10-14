@@ -1,10 +1,12 @@
 import copy
+import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
@@ -14,6 +16,14 @@ if TYPE_CHECKING:
 
 # What every evaluation reads besides the properties: MolSystemData.load requests these from every source.
 EVALUATION_DATA_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states')
+
+# Property name -> (number of mode indices, number of x/y/z indices), e.g. 'polhess' -> (2, 2): shape (n, n, 3, 3).
+# Every name prop_trivname makes from the orders 0-6; the rotational ones ('B', 'coriolis') are not here.
+PROP_INDEX_COUNTS = {prop_trivname(ord_geo=g, ord_el=e): (g, e) for g in range(7) for e in range(7)}
+
+# Symmetry in the mode indices: values that differ by less than this count as equal. 1e-18 is the evaluator's
+# zero_tol (au). Measured 2026-10-14 (formaldehyde, water, CO, ACDM): the reader's tensors are exactly symmetric.
+SYMMETRY_RTOL, SYMMETRY_ATOL = 1e-12, 1e-18
 
 
 @dataclass(frozen=True)
@@ -299,9 +309,13 @@ class MolSystemData:
         data_dict: dict - {data_name: values}
         states: one VibStatesData per state list in data_dict, by states choice:
             'harmonic_states' -> states['harmonic'], 'anharmonic_states' -> states['anharmonic'].
-            A list that data_dict does not have gives no entry, e.g. {} for a data_dict without states.
+            'anharmonic_states' may be missing: no entry (check_states_choice raises if the evaluation asks for it).
             Both sets get the modes of the harmonic fundamentals as harmonic_osc_states_labels.
+        raises ValueError if data_dict does not fit what the evaluator reads (check_data_dict), e.g. without
+            'nc_sqrt_eigval'. A property of mol_props that data_dict lacks is no error here: its vals stay None
+            (check_props).
         """
+        check_data_dict(data_dict, mol_props.names())
 
         mol_props = mol_props.empty_copy()
         mol_props.fill_from(data_dict)
@@ -341,7 +355,8 @@ class MolSystemData:
         prop_names  trivial names, e.g. pipeline.prop_names(terms)
         obtainer    request {name: DataOriginInfo} -> data dict; default wilson_data_obtainer.
                     A test can pass a function that returns a dict, with no file.
-        raises ValueError if the source has no values for a requested property
+        raises ValueError if the data does not fit what the evaluator reads (check_data_dict), or if the source
+            has no values for a requested property. Both messages name the source; so do check_data_dict's warnings.
         """
         if obtainer is None:
             # imported here, not at the top: wilson_data_obtainer imports DataOriginInfo from this module
@@ -352,8 +367,15 @@ class MolSystemData:
         request = dict.fromkeys([*names, *EVALUATION_DATA_KEYS], origin)
         data_dict = obtainer(request)
 
-        molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
-                                   data_dict, name=name)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            try:
+                molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
+                                           data_dict, name=name)
+            except ValueError as err:
+                raise ValueError(f'the data from {origin} does not fit: {err}') from err
+        for w in caught:            # again, with the source, at the line that called load
+            warnings.warn(f'the data from {origin}: {w.message}', w.category, stacklevel=2)
 
         # fill_from leaves vals None for a name the source lacks. The same check as build_contributions makes,
         # but here it means the source failed to return a property: it fails at the reading, naming the source
@@ -362,6 +384,76 @@ class MolSystemData:
         except ValueError as err:
             raise ValueError(f'the source did not return every requested property, {origin}: {err}') from err
         return molsys
+
+
+def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
+    """
+    raises ValueError if data_dict does not fit what the evaluator reads (refac_rsp_eval/todo.txt D5), with every
+    problem found:
+        names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
+                      'anharmonic_states' may be missing: MolSystemData.check_states_choice raises if it is asked for.
+        modes         nc_sqrt_eigval has the keys 0 .. n-1, e.g. {0: 2878.7, 1: 1820.4}: n modes
+        shapes        each property: mode indices first, then x, y, z (PROP_INDEX_COUNTS),
+                      e.g. n = 6: polhess (6, 6, 3, 3), cff (6, 6, 6), dipgrad (6, 3)
+        full tensors  each property is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
+                      (SYMMETRY_RTOL, SYMMETRY_ATOL)
+        fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
+    prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
+                (MolSystemData.check_props); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no shape check.
+    warns (UserWarning), no error: a state at or below 0 cm-1, the ground state, in any state list,
+        e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1 (todo.txt D5).
+    Not checked (no check is possible from the values): units, coordinates.
+    """
+    for key in ('harmonic_states', 'anharmonic_states'):
+        low = sorted((energy, state) for state, energy in (data_dict.get(key) or {}).items() if energy <= 0.)
+        if low:
+            lowest = ', '.join(f'{state} {energy:.1f}' for energy, state in low[:3])
+            warnings.warn(f'{key}: {len(low)} of {len(data_dict[key])} state energies are at or below 0 cm-1, '
+                          f'the ground state; lowest: {lowest}', stacklevel=3)
+
+    problems = []
+
+    freqs = data_dict.get('nc_sqrt_eigval')
+    n = None
+    if freqs is None:
+        problems.append("no 'nc_sqrt_eigval' (the harmonic frequencies)")
+    elif not isinstance(freqs, dict) or not freqs or sorted(freqs) != list(range(len(freqs))):
+        keys = sorted(freqs) if isinstance(freqs, dict) else type(freqs).__name__
+        problems.append(f"'nc_sqrt_eigval': needs a dict with the modes 0 .. n-1 as keys, got {keys}")
+    else:
+        n = len(freqs)
+
+    harmonic = data_dict.get('harmonic_states')
+    if harmonic is None:
+        problems.append("no 'harmonic_states'")
+    elif n is not None:
+        have = {int(key[0]) for key in harmonic if len(key) == 1}
+        missing = [m for m in range(n) if m not in have]
+        if missing:
+            problems.append(f"'harmonic_states' lacks the fundamentals of modes {missing}, e.g. the key "
+                            f"('{missing[0]}',)")
+
+    for name in dict.fromkeys(prop_names):
+        if n is None or data_dict.get(name) is None or name not in PROP_INDEX_COUNTS:
+            continue
+        n_modes, n_xyz = PROP_INDEX_COUNTS[name]
+        vals = np.asarray(data_dict[name])
+        expected = (n,) * n_modes + (3,) * n_xyz
+        if vals.shape != expected:
+            problems.append(f'{name}: shape {vals.shape}, expected {expected} (mode indices first, then x, y, z)')
+            continue
+        for i in range(n_modes - 1):             # symmetric under every swap of neighbours: under every order
+            swapped = np.swapaxes(vals, i, i + 1)
+            if not np.allclose(vals, swapped, rtol=SYMMETRY_RTOL, atol=SYMMETRY_ATOL):
+                idx = np.unravel_index(np.argmax(np.abs(vals - swapped)), vals.shape)
+                other = list(idx)
+                other[i], other[i + 1] = other[i + 1], other[i]
+                problems.append(f'{name}: not symmetric in its mode indices, {name}{list(map(int, idx))} = '
+                                f'{vals[idx]:.6g}, {name}{list(map(int, other))} = {vals[tuple(other)]:.6g}')
+                break
+
+    if problems:
+        raise ValueError('the data dict does not fit what the evaluator reads:\n  - ' + '\n  - '.join(problems))
 
 
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
