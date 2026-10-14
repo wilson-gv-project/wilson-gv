@@ -8,8 +8,8 @@ Steps:
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
      (before F1 the loop, compute_for_idx_choice; since F1 calculate_avrg_tensor_einsum + AvrgTensor.at) and of
      the deepcopy (FreqTermsCollection.__post_init__).
-  3. the rest: features_from_rows, SpectralWindow.from_features, draw_window on one grid.
-     Window, grid, gamma and dynrange as in examples/quick_start.ipynb.
+  3. the rest: features_from_rows, amplitude_half_widths, SpectralWindow.from_features, draw_window on one grid.
+     Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1 (E10).
 
 Result 2026-10-12 (also todo.txt F2): load 4 s; build_contributions 78 s (averaging 47 s, deepcopy 16 s, the rest
 15 s); features, window and draw_window 2.5 s. Total without load: 80 s.
@@ -18,6 +18,8 @@ After F3, the same day (todo.txt F3): build_contributions 3.9 s (no deepcopy per
 once per term). Total: 6.5 s. The deepcopy line shows 0 calls: the timed run before the profile made the splits.
 After the leaves on demand, the same day (todo.txt Done): build_contributions 3.3 s (it builds no leaves).
 Total: 5.9 s.
+Boxes by amplitude, each feature on its own box (E10, 2026-10-14): drawing 2.5 s -> 1.5 s (amplitude_half_widths
+0.04 s, draw_window 1.3 s; 1509 features near the window instead of the domains). Total: 5.7 s.
 
 A script, not a test: it runs for minutes.
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed
@@ -34,6 +36,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralWindow,
+    amplitude_half_widths,
     features_from_rows,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
@@ -56,6 +59,7 @@ STATES = 'anharmonic'
 # drawing, as in examples/quick_start.ipynb
 GAMMA_CM = 4.7
 DYNRANGE = 500.
+EPS = 0.1
 WINDOW = {'A': (700., 3400.), 'B': (10., 3500.)}
 GRID = {'A': 700, 'B': 700}
 
@@ -118,22 +122,22 @@ def main():
                   f'scaled to the plain run: {t / total * t_build:.2f} s')
 
     # 3. the rest
+    box = Box(dict(WINDOW))
     features, t_feat = timed(features_from_rows, table, GAMMA_CM)
-    window, t_window = timed(SpectralWindow.from_features, Box(dict(WINDOW)), features, DYNRANGE)
+    half_widths, t_boxes = timed(amplitude_half_widths, box, features, dynrange=DYNRANGE, eps=EPS)
+    window, t_window = timed(SpectralWindow.from_features, box, features, half_widths)
     (coords, _), t_grid = timed(window.sample_grid, GRID)
-    domains, t_domains = timed(window.find_clusters_by_featboxes)
     spec, t_draw = timed(draw_window, window, molsys.states[STATES], coords)
 
     n_in = len(window.full_features) + len(window.contrib_features)
     print(f'features_from_rows:          {t_feat:7.2f} s, {len(features)} features')
+    print(f'amplitude_half_widths:       {t_boxes:7.2f} s')
     print(f'SpectralWindow.from_features: {t_window:6.2f} s, {n_in} features near the window '
           f'({len(window.full_features)} inside)')
     print(f'sample_grid {GRID}:   {t_grid:6.2f} s')
-    print(f'find_clusters_by_featboxes:  {t_domains:7.2f} s, {len(domains)} domains '
-          f'(draw_window finds them again)')
     print(f'draw_window:                 {t_draw:7.2f} s, max intensity {np.max(np.abs(spec)) ** 2:.3e}')
 
-    t_rest = t_feat + t_window + t_grid + t_draw
+    t_rest = t_feat + t_boxes + t_window + t_grid + t_draw
     print(f'\ntotal without load: {t_build + t_rest:.1f} s (build_contributions {t_build:.1f} s, rest {t_rest:.1f} s)')
 
 

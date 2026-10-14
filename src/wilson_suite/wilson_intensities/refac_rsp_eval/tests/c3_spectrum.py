@@ -12,7 +12,8 @@ Per case, on one grid (the old SpectralWindow.sample_grid over a window around a
   2. each feature on the whole grid: old evaluate_feature vs new eval_feature_on_grid.
      Expected: old = n * new, n = number of parameter sets at the location (old: one shape per parameter set)
   3. no cut: sum of old evaluate_feature vs draw_all; also the old sum with each feature divided by its n
-  4. cut by domains: old EvaluationWorkflow.evaluate vs draw_window, each also vs its own no-cut sum
+  4. cut by domains: old EvaluationWorkflow.evaluate vs the new code's boxes and drawing of before E10
+     (draw_by_domains, here), each also vs its own no-cut sum. Since E10 the new code cuts differently (todo.txt).
 
 Result 2026-10-09 (also todo.txt C3), dynrange 100, gamma 4.7 cm-1, grid step 2 cm-1,
 after from_features stopped dropping weak features (it drops no feature for its amplitude):
@@ -48,11 +49,13 @@ from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import (
 from wilson_suite.wilson_intensities.refac_rsp_eval import pipeline
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     draw_all,
-    draw_window,
     eval_feature_on_grid,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralWindow
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    SpectralWindow,
+    lorentzian_distance_to_dynrange_weaker_than_max,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import compile_terms
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import c2_variations as c2
 from wilson_suite.wilson_system.system_data import DataOriginInfo
@@ -138,6 +141,21 @@ def run_new(case: Case, laser_pol):
     return result.states, result
 
 
+def draw_by_domains(window: SpectralWindow, states, coords: dict[str, np.ndarray]) -> np.ndarray:
+    """
+    The new code's drawing until 2026-10-14 (todo.txt E10), kept here to compare with the old code, which cuts the
+    same way: each domain (boxes that overlap) is draw_all of its features on the domain box.
+    """
+    total = np.zeros(tuple(len(points) for points in coords.values()), dtype=complex)
+    for domain in window.find_clusters_by_featboxes():
+        slices = box_slices(domain.box, coords)
+        if slices is None:
+            continue
+        sub = {ax: points[s] for (ax, points), s in zip(coords.items(), slices)}
+        total[slices] += draw_all(domain.full_features + domain.contrib_features, states, sub)
+    return total
+
+
 def loc_key(coord_dict: dict) -> tuple:
     return tuple(sorted((ax, round(float(v), LOC_DIGITS)) for ax, v in coord_dict.items()))
 
@@ -214,8 +232,10 @@ def compare(case: Case) -> dict:
                nocut_old_fixed_vs_new_amp=rel(old_fixed, new_all))
 
     # 4. cut by domains. Both keep every feature near the window, however weak (old: minimum_box_padding > 0)
-    window = SpectralWindow.from_features(Box(dict(bounds)), new_feats, DYNRANGE, MARGIN)
-    new_cut = draw_window(window, states, coords)
+    old_rule = [lorentzian_distance_to_dynrange_weaker_than_max(max(f.peak_widths()), DYNRANGE) * (1. + MARGIN)
+                for f in new_feats]
+    window = SpectralWindow.from_features(Box(dict(bounds)), new_feats, old_rule)
+    new_cut = draw_by_domains(window, states, coords)
     old_cut = old_spec.result
     out.update(window_feats_old_new=(sum(len(r.features) for r in wf.region_eval.regions),
                                      len(window.full_features) + len(window.contrib_features)),

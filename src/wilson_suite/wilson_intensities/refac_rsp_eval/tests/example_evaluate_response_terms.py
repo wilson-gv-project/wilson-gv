@@ -6,7 +6,7 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
     2. load the data, once
     3. features (evaluate_response_terms): how many, and where they are
     4. the spectrum on a grid (draw_spectrum), with a width per condition
-    5. what came out: the grid, the brightest point, the window as drawn (its features and domains)
+    5. what came out: the grid, the brightest point, the window as drawn (its features and their boxes)
     6. another width, same rows: draw_spectrum draws again without computing the rows again
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.example_evaluate_response_terms
@@ -57,8 +57,8 @@ def main():
 
     # 4. the spectrum around the strongest peak (A = 2682.8, B = 0): A in 1 cm-1 steps, B over the whole
     #    range of the features in 16.65 cm-1 steps (201 points from -230 to 3100)
-    window = Box({'A': (2600., 2800.), 'B': (-230., 3100.)})
-    dim_sizes = {'A': 201, 'B': 201}
+    window = Box({'A': (600., 2800.), 'B': (5., 3100.)})
+    dim_sizes = {'A': 501, 'B': 201}
 
     t0 = time.perf_counter()
     spec = draw_spectrum(result, window, dim_sizes, dynrange=1001.)
@@ -75,10 +75,10 @@ def main():
     print(f'brightest grid point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
           f'intensity {intensity[i, j]:.3e} au (the grid misses the peak centre on B)')
 
-    drawn = spec.spectral_window                  # the window as drawn: features with their boxes
-    domains = drawn.find_clusters_by_featboxes()  # overlapping boxes, drawn together
+    drawn = spec.spectral_window                  # the window as drawn: features with their boxes (by amplitude)
+    whole = sum(f.feat_box.contains_box(window) for f in drawn.full_features + drawn.contrib_features)  # type: ignore
     print(f'drawn: {len(drawn.full_features)} features inside, {len(drawn.contrib_features)} outside with a box '
-          f'that reaches in, {len(domains)} domains')
+          f'that reaches in; {whole} boxes cover the whole window')
 
     inside = drawn.full_features
     print(f'\n{len(inside)} features inside the window, strongest first:')
@@ -86,9 +86,19 @@ def main():
     for f in sorted(inside, key=lambda f: f.get_intensity(), reverse=True):
         (ps,) = f.param_sets
         widths = ', '.join(f'{w:.2f}' for w in f.peak_widths())
-        print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '
-              f'{str(f.term_ids):<22} {widths:<16} {f.get_intensity():14.3e}')
+        print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '  # noqa: RUF010
+              f'{str(f.term_ids):<22} {widths:<16} {f.get_intensity():14.3e}')  # noqa: RUF010
 
+    print('-----------------------------')
+    for i in inside:
+        for k in i.rows:
+            print(k.location, k.params, k.term_id)
+        print('\n')
+
+    print('-----------------------------')
+
+
+    # ---------------------------------------------------
     # 6. another width, same rows: replace gives a new FeatureResult with the same table, draw_spectrum draws it
     t0 = time.perf_counter()
     wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, dynrange=1001.)

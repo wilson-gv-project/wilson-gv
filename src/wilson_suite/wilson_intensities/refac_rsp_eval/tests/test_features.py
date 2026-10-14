@@ -16,6 +16,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     RectangularDomain,
     SpectralFeature,
     SpectralWindow,
+    amplitude_half_widths,
+    amplitude_in_window,
     features_from_rows,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
@@ -479,14 +481,16 @@ def test_dress_box_takes_the_largest_peak_width():
     assert [get_box_extent(dressed, ax) for ax in ('A', 'B')] == pytest.approx([160., 160.])
 
 
-def test_window_from_features_box_takes_the_largest_peak_width():
-    """widths 16 and 5 cm-1, dynrange 101, margin 0.1: 16 * sqrt(100) * 1.1 = 176 cm-1 on both axes"""
+def test_amplitude_half_widths_take_the_largest_peak_width():
+    """
+    widths 16 and 5 cm-1. Alone, the feature is the max: k = 2 * 101 / 0.1 = 2020 -> 16 * sqrt(2020**2 - 1).
+    With an a_max far above it: k < 1 -> the smallest box, 1 gamma = 16 cm-1.
+    """
     f = with_width_per_condition(feat(A=5., B=5.))
+    window = Box({'A': (0., 10.), 'B': (0., 10.)})
 
-    window = SpectralWindow.from_features(Box({'A': (0., 10.), 'B': (0., 10.)}), [f], dynrange=101.)
-
-    [boxed] = window.full_features
-    assert [get_box_extent(boxed, ax) for ax in ('A', 'B')] == pytest.approx([176., 176.])
+    assert amplitude_half_widths(window, [f], dynrange=101.) == pytest.approx([16. * (2020. ** 2 - 1) ** 0.5])
+    assert amplitude_half_widths(window, [f], dynrange=101., a_max=1e6 * f.get_intensity() ** 0.5) == [16.]
 
 
 def test_max_intensity_feat_by_intensity_or_by_amplitude():
@@ -662,8 +666,7 @@ def test_window_find_clusters_by_featboxes_includes_contributing_features():
 
 
 ## SpectralWindow.from_features ---------------------------------------------
-# Window A (0, 10). gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * sqrt(101 - 1) * 1.1 = 55.
-# Intensity goes with amp**2, e.g. amp 0.09 -> 1/123 of amp 1.
+# Window A (0, 10). Half-width 55 cm-1: a feature at A = 60 has the box (5, 115), at A = 70 the box (15, 125).
 
 WINDOW_0_10 = Box({'A': (0., 10.)})
 
@@ -675,41 +678,21 @@ def test_window_from_features_keeps_features_whose_box_overlaps_the_window():
     """
     inside, near, far = feat(A=5., gamma=5.), feat(A=60., gamma=5.), feat(A=70., gamma=5.)
 
-    window = SpectralWindow.from_features(WINDOW_0_10, [inside, near, far], dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, [inside, near, far], [55., 55., 55.])
 
     assert window.box == WINDOW_0_10
     assert window.full_features == [inside]
     assert window.contrib_features == [near]
 
 
-def test_window_from_features_box_extent_is_gamma_times_sqrt_dynrange_minus_one_plus_margin():
-    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.)
-    no_margin = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.,
-                                             box_range_safety_margin=0.)
+def test_window_from_features_box_is_the_location_plus_minus_its_half_width():
+    """one half-width per feature, in the order of the features; the same on every axis"""
+    f0, f1 = feat(A=5., B=1., gamma=5.), feat(A=6., B=2., gamma=5.)
 
-    assert get_box_extent(window.full_features[0]) == pytest.approx(55.)
-    assert get_box_extent(no_margin.full_features[0]) == pytest.approx(50.)
+    window = SpectralWindow.from_features(Box({'A': (0., 10.), 'B': (0., 10.)}), [f0, f1], [55., 3.])
 
-
-def test_window_from_features_boxes_are_the_dress_these_with_boxes_boxes():
-    f = feat(A=5., gamma=5.)
-    top = f.get_intensity()
-
-    [dressed] = SpectralFeature.dress_these_with_boxes([f], top, top / 101)
-    window = SpectralWindow.from_features(WINDOW_0_10, [f], dynrange=101.)
-
-    assert window.full_features[0].feat_box == dressed.feat_box
-
-
-def test_window_from_features_keeps_weak_features():
-    """No feature is dropped for being weak, inside or outside the window: 1/123 and 1e-12 of the strong intensity stay."""
-    strong = feat(A=5., amp=1., gamma=5.)
-    weak, weakest, weak_outside = feat(A=6., amp=0.09, gamma=5.), feat(A=7., amp=1e-6, gamma=5.), feat(A=12., amp=1e-6, gamma=5.)
-
-    window = SpectralWindow.from_features(WINDOW_0_10, [strong, weak, weakest, weak_outside], dynrange=101.)
-
-    assert window.full_features == [strong, weak, weakest]
-    assert window.contrib_features == [weak_outside]
+    assert [f.feat_box for f in window.full_features] == [Box({'A': (-50., 60.), 'B': (-54., 56.)}),
+                                                          Box({'A': (3., 9.), 'B': (-1., 5.)})]
 
 
 def test_window_from_features_keeps_a_feature_whose_rows_cancel():
@@ -719,7 +702,7 @@ def test_window_from_features_keeps_a_feature_whose_rows_cancel():
                                            row(-0.5, location=ResLocPoint(loc), a=1)))
     other = feat(A=5., gamma=5.)
 
-    window = SpectralWindow.from_features(WINDOW_0_10, [other, cancelling], dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, [other, cancelling], [55., 55.])
 
     assert window.full_features[1].amplitude_coeff == 0.
     assert window.full_features[1].rows == cancelling.rows
@@ -728,7 +711,7 @@ def test_window_from_features_keeps_a_feature_whose_rows_cancel():
 
 @pytest.mark.parametrize('features', [[], [feat(A=500., gamma=5.)]])
 def test_window_from_features_without_features_near_the_window_is_empty(features):
-    window = SpectralWindow.from_features(WINDOW_0_10, features, dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, features, [55.] * len(features))
 
     assert window.full_features == [] and window.contrib_features == []
 
@@ -736,34 +719,161 @@ def test_window_from_features_without_features_near_the_window_is_empty(features
 def test_window_from_features_does_not_change_input_features():
     f = feat(A=5., gamma=5.)
 
-    SpectralWindow.from_features(WINDOW_0_10, [f], dynrange=101.)
+    SpectralWindow.from_features(WINDOW_0_10, [f], [55.])
 
     assert f.feat_box is None
 
 
 def test_window_from_features_can_be_clustered_right_away():
     """inside: box (-50, 60), near: box (5, 115). They overlap, so one domain spans both."""
-    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.), feat(A=60., gamma=5.)], dynrange=101.)
+    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.), feat(A=60., gamma=5.)], [55., 55.])
 
     [domain] = window.find_clusters_by_featboxes()
 
     assert domain.box.bounds['A'] == pytest.approx((-50., 115.))
 
 
-@pytest.mark.parametrize('dynrange', [1., 0.5])
-def test_window_from_features_needs_dynrange_above_one(dynrange):
-    with pytest.raises(ValueError, match='dynrange'):
-        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.)], dynrange=dynrange)
+def test_window_from_features_needs_one_half_width_per_feature():
+    with pytest.raises(ValueError, match='one half-width per feature'):
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.), feat(A=6.)], [55.])
+
+
+@pytest.mark.parametrize('half_width', [-1., float('nan')])
+def test_window_from_features_needs_half_widths_of_zero_or_more(half_width):
+    with pytest.raises(ValueError, match='half-width must be >= 0'):
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.)], [half_width])
 
 
 def test_window_from_features_needs_propagator_param():
     with pytest.raises(ValueError, match='propagator_param'):
-        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], dynrange=101.)
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], [55.])
 
 
 def test_window_from_features_needs_rows():
     with pytest.raises(ValueError, match='no rows'):
-        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., amp=None)], dynrange=101.)
+        SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., amp=None)], [55.])
+
+
+## amplitude_half_widths: box size by amplitude (todo.txt E10) ----------------
+# k = 2 * dynrange * a / (eps * a_max), half-width = gamma * sqrt(k**2 - 1), at least min_gammas * gamma.
+# dynrange 100, eps 0.1 (default): k = 2000 * a / a_max. One gamma (5 cm-1) for all: a / a_max = amp / max amp.
+
+def three_strengths() -> list[SpectralFeature]:
+    """amp 1 (the max), 0.01 and 1e-4, inside WINDOW_0_10: k = 2000, 20, 0.2"""
+    return [feat(A=5., amp=1., gamma=5.), feat(A=6., amp=0.01, gamma=5.), feat(A=7., amp=1e-4, gamma=5.)]
+
+
+def test_amplitude_half_widths_follow_the_rule():
+    """k = 2000, 20, 0.2 -> 5 * sqrt(2000**2 - 1), 5 * sqrt(20**2 - 1), and 1 gamma (k <= 1)"""
+    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100.)
+
+    assert half_widths == pytest.approx([5. * (2000. ** 2 - 1) ** 0.5, 5. * (20. ** 2 - 1) ** 0.5, 5.])
+
+
+def test_amplitude_half_widths_smaller_eps_gives_bigger_boxes():
+    """eps 0.01: k ten times larger, 20000, 200, 2"""
+    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100., eps=0.01)
+
+    assert half_widths == pytest.approx([5. * (20000. ** 2 - 1) ** 0.5, 5. * (200. ** 2 - 1) ** 0.5, 5. * 3 ** 0.5])
+
+
+@pytest.mark.parametrize('min_gammas, weakest', [(3., 15.), (0., 0.)])
+def test_amplitude_half_widths_min_gammas_sets_the_smallest_box(min_gammas, weakest):
+    """only the weakest one (k = 0.2) is below the smallest box; the other two keep theirs"""
+    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100., min_gammas=min_gammas)
+
+    assert half_widths == pytest.approx([5. * (2000. ** 2 - 1) ** 0.5, 5. * (20. ** 2 - 1) ** 0.5, weakest])
+
+
+def test_amplitude_half_widths_max_cm_caps_the_boxes():
+    """cap 50 cm-1: the two strong boxes (9999.999 and 99.87) are cut to 50, the weakest (5) stays"""
+    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100., max_cm=50.)
+
+    assert half_widths == pytest.approx([50., 50., 5.])
+
+
+def test_amplitude_half_widths_a_max_given_replaces_the_estimate():
+    """a_max twice the strongest peak: every k halves, 1000, 10, 0.1"""
+    features = three_strengths()
+    peak = features[0].get_intensity() ** 0.5
+
+    half_widths = amplitude_half_widths(WINDOW_0_10, features, dynrange=100., a_max=2. * peak)
+
+    assert half_widths == pytest.approx([5. * (1000. ** 2 - 1) ** 0.5, 5. * (10. ** 2 - 1) ** 0.5, 5.])
+
+
+def test_amplitude_in_window_is_the_peak_inside_and_the_tail_at_the_nearest_point_outside():
+    """gamma 5: at A = 5, the peak; at A = 110, 100 cm-1 outside the window: peak * 5 / hypot(100, 5)"""
+    inside, outside = feat(A=5., gamma=5.), feat(A=110., gamma=5.)
+    peak = inside.get_intensity() ** 0.5
+
+    assert amplitude_in_window(inside, WINDOW_0_10) == pytest.approx(peak)
+    assert amplitude_in_window(outside, WINDOW_0_10) == pytest.approx(peak * 5. / np.hypot(100., 5.))
+
+
+def test_amplitude_half_widths_a_max_comes_from_inside_the_window():
+    """
+    A feature 10 times stronger, 100 cm-1 outside, reaches the window with 10 * 0.05 = 0.5 of the inside peak.
+    So a_max is the inside peak: k = 2000 inside, as if alone; outside k = 20000: its box reaches far into the window.
+    """
+    inside, strong_outside = feat(A=5., amp=1., gamma=5.), feat(A=110., amp=10., gamma=5.)
+
+    half_widths = amplitude_half_widths(WINDOW_0_10, [inside, strong_outside], dynrange=100.)
+
+    assert half_widths == pytest.approx([5. * (2000. ** 2 - 1) ** 0.5, 5. * (20000. ** 2 - 1) ** 0.5])
+
+
+def test_amplitude_half_widths_compare_peak_heights_not_coefficients():
+    """
+    The same coefficient, gamma 1 and 5: the narrow peak is 5 times taller (one condition: amp / gamma), so it is
+    the max. Narrow: k = 2000 -> 1 * sqrt(2000**2 - 1). Broad: k = 2000 / 5 = 400 -> 5 * sqrt(400**2 - 1).
+    """
+    narrow, broad = feat(A=5., amp=1., gamma=1.), feat(A=6., amp=1., gamma=5.)
+
+    half_widths = amplitude_half_widths(WINDOW_0_10, [narrow, broad], dynrange=100.)
+
+    assert half_widths == pytest.approx([(2000. ** 2 - 1) ** 0.5, 5. * (400. ** 2 - 1) ** 0.5])
+
+
+def test_amplitude_half_widths_with_every_amplitude_zero_are_the_smallest_boxes():
+    """rows that cancel everywhere: nothing to draw, no a_max to scale by -> min_gammas * gamma"""
+    assert amplitude_half_widths(WINDOW_0_10, [feat(A=5., amp=0., gamma=5.), feat(A=6., amp=0., gamma=2.)],
+                                 dynrange=100.) == [5., 2.]
+
+
+def test_amplitude_half_widths_of_no_features_is_empty():
+    assert amplitude_half_widths(WINDOW_0_10, [], dynrange=100.) == []
+
+
+def test_window_from_amplitude_boxes_keeps_weak_features():
+    """
+    No feature is dropped for being weak (decided 2026-10-09). Amplitudes 1, 1e-6 inside, 1e-6 at A = 12, outside:
+    the weak ones get the smallest box, 1 gamma; at A = 12 that is (7, 17), so it still reaches into the window.
+    """
+    strong, weakest, weak_outside = feat(A=5., amp=1., gamma=5.), feat(A=7., amp=1e-6, gamma=5.), feat(A=12., amp=1e-6, gamma=5.)
+    features = [strong, weakest, weak_outside]
+
+    window = SpectralWindow.from_features(WINDOW_0_10, features,
+                                          amplitude_half_widths(WINDOW_0_10, features, dynrange=101.))
+
+    assert window.full_features == [strong, weakest]
+    assert window.contrib_features == [weak_outside]
+    assert window.contrib_features[0].feat_box == Box({'A': (7., 17.)})
+
+
+@pytest.mark.parametrize('setting, value', [('dynrange', 1.), ('dynrange', 0.5), ('eps', 0.), ('eps', -0.1),
+                                            ('min_gammas', -1.), ('max_cm', 0.), ('a_max', 0.)])
+def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
+    settings = {'dynrange': 100., setting: value}
+
+    with pytest.raises(ValueError, match=setting):
+        amplitude_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
+
+
+@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
+def test_amplitude_half_widths_need_a_drawable_feature(f, message):
+    with pytest.raises(ValueError, match=message):
+        amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
 ## RectangularDomain --------------------------------------------------------
@@ -839,7 +949,7 @@ def test_nd_dress_box_extent_is_the_same_on_every_axis(ndim):
 @pytest.mark.parametrize('ndim', NDIMS)
 def test_nd_window_from_features_needs_box_overlap_on_every_axis(ndim):
     """
-    Window (0, 10) on every axis; gamma 5, dynrange 101 -> box_extent 55 on every axis.
+    Window (0, 10) on every axis; half-width 55 on every axis.
     near and far sit on `inside`, except on the last axis: near at 60 (box from 5: overlaps), far at 70 (from 15: no).
     """
     last = AXES[ndim - 1]
@@ -847,11 +957,20 @@ def test_nd_window_from_features_needs_box_overlap_on_every_axis(ndim):
     near = feat(coords(ndim, 5., **{last: 60.}), gamma=5.)
     far = feat(coords(ndim, 5., **{last: 70.}), gamma=5.)
 
-    window = SpectralWindow.from_features(cube(ndim, 0., 10.), [inside, near, far], dynrange=101.)
+    window = SpectralWindow.from_features(cube(ndim, 0., 10.), [inside, near, far], [55., 55., 55.])
 
     assert window.full_features == [inside]
     assert window.contrib_features == [near]
     assert [get_box_extent(window.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
+
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_nd_amplitude_in_window_multiplies_the_tail_of_each_axis_outside(ndim):
+    """100 cm-1 outside on every axis, gamma 5: peak * (5 / hypot(100, 5)) ** ndim"""
+    inside, outside = feat(coords(ndim, 5.), gamma=5.), feat(coords(ndim, 110.), gamma=5.)
+
+    assert amplitude_in_window(outside, cube(ndim, 0., 10.)) == pytest.approx(
+        inside.get_intensity() ** 0.5 * (5. / np.hypot(100., 5.)) ** ndim)
 
 
 @pytest.mark.parametrize('ndim', NDIMS)

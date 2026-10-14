@@ -5,7 +5,7 @@ Three calls, from the terms derive writes (in pulse IDs):
     molsys = load_molsys_data(terms, data_origin)                     once, for any number of runs
     result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
                                      propagator_param=...)            rows and features: FeatureResult
-    spec   = draw_spectrum(result, window, dim_sizes)                 the spectrum on a grid: EvalRspResult
+    spec   = draw_spectrum(result, window, dim_sizes, dynrange=...)   the spectrum on a grid: EvalRspResult
 evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
 load_molsys_data and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
 
@@ -20,7 +20,7 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
   │ 4. group by (motif, location), add the coeffs
   v
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
-  │ 5. peak width, spectral window, boxes
+  │ 5. peak width, boxes by amplitude (features.amplitude_half_widths), spectral window
   v
 spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
 """
@@ -49,6 +49,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     PropagatorParam,
     SpectralFeature,
     SpectralWindow,
+    amplitude_half_widths,
     features_from_rows,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -281,9 +282,8 @@ class EvalRspResult:
     grid_axes        1D points per axis, cm-1, both window edges included, e.g. A and B with 201 points each
     grid_result      complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
                      grid_axes, e.g. shape (201, 201). intensity = abs(grid_result)**2
-    spectral_window  the window as drawn: its features, each with its box. full_features: inside the window;
-                     contrib_features: outside, with a box that reaches in. The domains (boxes that overlap,
-                     drawn together): spectral_window.find_clusters_by_featboxes()
+    spectral_window  the window as drawn: its features, each with its box (each drawn on its own box only).
+                     full_features: inside the window; contrib_features: outside, with a box that reaches in.
     grid_mesh        (property) the grid points as one full array per axis (ij meshgrid), grid_mesh['A'][i, j]:
                      what the old EvaluatedSpectrum.axes held and the renderer reads
     """
@@ -301,21 +301,35 @@ def draw_spectrum(feature_result: FeatureResult,
                   window: 'Box',
                   dim_sizes: dict[str, int],
                   *,
-                  dynrange: float = 1000.) -> EvalRspResult:
+                  dynrange: float,
+                  eps: float = 0.1,
+                  min_gammas: float = 1.,
+                  max_cm: float | None = None,
+                  a_max: float | None = None) -> EvalRspResult:
     """
     The features of feature_result on a grid over `window`: boxes, grid, drawing. The rows are not computed
-    again (the slow part: build_contributions), so a new window, grid or width runs only the drawing:
-        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401})
-        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes)
+    again (the slow part: build_contributions), so a new window, grid, width or box setting runs only the drawing:
+        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401}, dynrange=500.)
+        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, dynrange=500.)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
     new width, on first use (features_from_rows: 0.02 s for 3524 features on ACDM, F2).
 
     window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
     dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}
-    dynrange   sets the box sizes (SpectralWindow.from_features): bigger -> less of each peak's tail cut off
+    dynrange   the plot's dynamic range (max / floor): the boxes are sized so the cut stays below what the plot
+               shows. Required: the plot decides it.
+    eps, min_gammas, max_cm, a_max: the box knobs, see features.amplitude_half_widths
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
+
+    Another box rule: the same three steps, with your own half-widths (cm-1, one per feature):
+        spectral_window = SpectralWindow.from_features(window, result.features, half_widths)
+        grid_axes, _ = spectral_window.sample_grid(dim_sizes)
+        amplitude = draw_window(spectral_window, result.states, grid_axes)
     """
-    spectral_window = SpectralWindow.from_features(window, feature_result.features, dynrange)  # boxes: width at the peak
+    features = feature_result.features
+    half_widths = amplitude_half_widths(window, features, dynrange=dynrange, eps=eps, min_gammas=min_gammas,
+                                        max_cm=max_cm, a_max=a_max)                       # boxes: width at the peak
+    spectral_window = SpectralWindow.from_features(window, features, half_widths)
     grid_axes, _ = spectral_window.sample_grid(dim_sizes)
-    grid_result = draw_window(spectral_window, feature_result.states, grid_axes)                # width on the grid
+    grid_result = draw_window(spectral_window, feature_result.states, grid_axes)          # width on the grid
     return EvalRspResult(feature_result, grid_axes, grid_result, spectral_window)

@@ -32,6 +32,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionTable,
     SpectralFeature,
+    SpectralWindow,
+    amplitude_half_widths,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
@@ -65,6 +67,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     PS_11,
     TOY_RECIPE,
     ab_term,
+    get_box_extent,
     polprop,
     row,
     toy_term,
@@ -707,23 +710,25 @@ def test_draw_spectrum_with_a_width_function(formaldehyde_molsys, top_run):
     j = np.argmin(np.abs(spec.grid_axes['B']))
     assert intensity[i, j] == pytest.approx(strongest.get_intensity(), rel=0.05)
 
-    # drawn box by box (draw_window) vs every feature on the whole grid (draw_all): measured 0.3 % of the top
+    # drawn box by box (draw_window) vs every feature on the whole grid (draw_all): at most eps = 0.1 floors
+    # (floor: max / dynrange), measured 0.05 (4.8e-5 of the max; 0.3 % with the boxes of before 2026-10-14)
     reference = np.abs(draw_all(result.features, result.states, spec.grid_axes)) ** 2
-    assert np.max(np.abs(intensity - reference)) < 0.01 * reference.max()
+    assert np.max(np.abs(intensity - reference)) < 0.1 * reference.max() / 1001.
 
 
 def test_draw_spectrum_width_function_of_a_constant_draws_as_the_number(formaldehyde_molsys):
     """propagator_param 5. and lambda vd, freqs: 5. give the same spectrum"""
-    number = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    number = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
+                           dynrange=1001.)
     function = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
-                             WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+                             WINDOW_AROUND_STRONGEST, STEPS_1_CM, dynrange=1001.)
 
     np.testing.assert_allclose(function.grid_result, number.grid_result)
 
 
 def test_draw_spectrum_grid_mesh_holds_every_grid_point(top_run):
     """grid_mesh['A'][i, j] = grid_axes['A'][i], grid_mesh['B'][i, j] = grid_axes['B'][j]: the form the renderer reads"""
-    spec = draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    spec = draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, dynrange=1001.)
     mesh, points = spec.grid_mesh, spec.grid_axes
 
     assert list(mesh) == ['A', 'B']
@@ -735,31 +740,53 @@ def test_draw_spectrum_grid_mesh_holds_every_grid_point(top_run):
 
 def test_draw_spectrum_keeps_the_window_as_drawn(formaldehyde_molsys):
     """
-    The window's 4 features, each with its box: 5 cm-1, dynrange 1000, margin 0.1 -> 5 * sqrt(999) * 1.1
-    = 173.8 cm-1 on each side. No feature outside reaches in. The 4 boxes overlap, so draw_window drew them
-    as one domain.
+    The window as drawn: each feature with its amplitude box (amplitude_half_widths, dynrange 1001). The 4 features
+    inside are strong enough for boxes far wider than the window (29000 to 100000 cm-1); 32 of the 64 outside
+    reach in, as contrib_features.
     """
-    spec = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
-    window = spec.spectral_window
+    result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
+    spec = draw_spectrum(result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, dynrange=1001.)
+
+    window = spec.spectral_window
+    expected = SpectralWindow.from_features(WINDOW_AROUND_STRONGEST, result.features,
+                                            amplitude_half_widths(WINDOW_AROUND_STRONGEST, result.features, dynrange=1001.))
     assert window.box is WINDOW_AROUND_STRONGEST
-    assert len(window.full_features) == 4 and window.contrib_features == []
-    for f in window.full_features:
-        mn, mx = f.feat_box.bounds['A']  # type: ignore
-        assert (mx - mn) / 2 == pytest.approx(5. * 999 ** 0.5 * 1.1)
-    [domain] = window.find_clusters_by_featboxes()
-    assert len(domain.full_features + domain.contrib_features) == 4
+    assert (len(window.full_features), len(window.contrib_features)) == (4, 32)
+    for drawn, made in zip(window.full_features + window.contrib_features,
+                           expected.full_features + expected.contrib_features, strict=True):
+        assert drawn == made and drawn.feat_box == made.feat_box
+    assert all(WINDOW_AROUND_STRONGEST.bounds['A'][1] - WINDOW_AROUND_STRONGEST.bounds['A'][0]
+               < get_box_extent(f) for f in window.full_features)
+
+
+def test_draw_spectrum_passes_the_box_knobs_on(top_run):
+    """
+    Every knob reaches amplitude_half_widths: the drawn boxes are its half-widths with the same settings.
+    min_gammas 2 and max_cm 20 (gamma 4.7): the 68 boxes lie between 9.4 and 20 cm-1, both bounds reached.
+    """
+    features = top_run.result.features
+    knobs = dict(dynrange=1001., eps=0.3, min_gammas=2., max_cm=20.,
+                 a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
+
+    spec = draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, **knobs)
+
+    drawn = spec.spectral_window.full_features + spec.spectral_window.contrib_features
+    expected = amplitude_half_widths(WINDOW_AROUND_STRONGEST, features, **knobs)
+    assert drawn and all(get_box_extent(f) == pytest.approx(expected[features.index(f)]) for f in drawn)
+    assert (min(expected), max(expected)) == pytest.approx((9.4, 20.))
 
 
 def test_draw_spectrum_with_a_new_width_reuses_the_rows(formaldehyde_molsys):
     """replace(..., propagator_param=8.) keeps the table (no new rows) and draws what a new run with 8 cm-1 draws"""
     first = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
-    wider = draw_spectrum(replace(first, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    wider = draw_spectrum(replace(first, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM, dynrange=1001.)
 
     assert wider.feature_result.table is first.table
     assert all(f.propagator_param == 8. for f in wider.feature_result.features)
-    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM)
+    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
+                            dynrange=1001.)
     np.testing.assert_allclose(wider.grid_result, new_run.grid_result)
 
 
@@ -768,13 +795,19 @@ def test_draw_spectrum_on_another_window_reuses_the_features(formaldehyde_molsys
     result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
     other, sizes = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
 
-    again = draw_spectrum(result, other, sizes)
+    again = draw_spectrum(result, other, sizes, dynrange=1001.)
 
     assert again.feature_result is result
-    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), other, sizes)
+    new_run = draw_spectrum(evaluate_formaldehyde(formaldehyde_molsys, 5.), other, sizes, dynrange=1001.)
     np.testing.assert_allclose(again.grid_result, new_run.grid_result)
 
 
 def test_draw_spectrum_takes_dynrange_by_keyword(top_run):
     with pytest.raises(TypeError, match='positional'):
         draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, 1001.)  # type: ignore
+
+
+def test_draw_spectrum_needs_dynrange(top_run):
+    """no default: the plot decides what it shows, so the caller passes it"""
+    with pytest.raises(TypeError, match='dynrange'):
+        draw_spectrum(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM)  # type: ignore

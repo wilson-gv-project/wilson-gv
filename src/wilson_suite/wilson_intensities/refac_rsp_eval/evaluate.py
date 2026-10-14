@@ -764,7 +764,7 @@ def draw_all(features: Iterable['SpectralFeature'],
              coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
     Sum of eval_feature_on_grid over all features, each on the whole grid. Nothing is cut off, so this is
-    the reference for the drawing by domains (draw_window). Slow for many features on big grids.
+    the reference for the drawing box by box (draw_window). Slow for many features on big grids.
 
     coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid.
     Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm (ij indexing),
@@ -777,35 +777,34 @@ def draw_all(features: Iterable['SpectralFeature'],
     return total
 
 
-# the window's features by domain: each domain on its own part of the grid
+# the window's features, each on its own box
 def draw_window(window: 'SpectralWindow',
                 vibstates_data: 'VibStatesData',
                 coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
-    Domains: clusters of overlapping feature boxes (window.find_clusters_by_featboxes). Each domain is
-    draw_all of its features on its part of the grid (box_slices), and the domains add up into one array.
-    So inside a domain every feature is on the whole domain box: a strong feature's tail is also computed
-    under its weak neighbours. Outside its domain a feature is left out.
+    Every feature of the window (full_features and contrib_features) on its own box only: the part of the grid
+    under its box (box_slices). Each box is a cut-out of the same grid points, so where boxes overlap their
+    amplitudes add, as in draw_all; squaring comes later, on the whole grid. Only each feature's tail beyond its
+    box is left out.
 
-    Size of the cut. A box ends where the feature's intensity is down to about 1/dynrange of its own peak
-    (SpectralWindow.from_features). So the error is small next to the strongest peak, but not always next
-    to a weak peak in another domain. Measured against draw_all, dynrange 101: strong peak at A = 1100,
-    weak peak at A = 950 with 1 % of its intensity, boxes (1045, 1155) and (895, 1005), two domains:
-        whole grid:        intensity error 0.9 % of the strong peak (about 1/dynrange)
-        at the weak peak:  12 % of the weak peak's intensity (up to 36 % on its sides): the strong tail is cut off
-    With dynrange 1001 the two boxes overlap: one domain, no error. To check a case, compare with draw_all.
-    (test_draw_window_cut_is_small_for_the_strongest_peak_not_for_a_weak_neighbour)
+    Size of the cut: set by the box sizes. With amplitude_half_widths (features.py) the intensity error stays near
+    eps * the plot's floor (measured against draw_all: tests/e10_boxes.py, todo.txt E10). To check a case,
+    compare with draw_all.
+    Until 2026-10-14 features were drawn by domains (boxes that overlap, each feature on the whole domain box):
+    that hid part of the cut of the old boxes, at up to 20 times the cost. With amplitude boxes the own box is enough.
 
     window    - e.g. from SpectralWindow.from_features, so every feature has its box
     coords_cm - one 1D array per window axis, cm-1, e.g. the first output of window.sample_grid
-    Returns the complex amplitude in au, laid out as in draw_all. A domain outside the grid adds nothing.
+    Returns the complex amplitude in au, laid out as in draw_all. A box outside the grid adds nothing.
     """
     total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
-    for domain in window.find_clusters_by_featboxes():
-        slices = box_slices(domain.box, coords_cm)
+    for feature in window.full_features + window.contrib_features:
+        if feature.feat_box is None:
+            raise ValueError(f'feature {feature} has no box: SpectralWindow.from_features gives one')
+        slices = box_slices(feature.feat_box, coords_cm)
         if slices is None:
             continue
-        domain_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
-        total[slices] += draw_all(domain.full_features + domain.contrib_features, vibstates_data, domain_coords)
+        box_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
+        total[slices] += draw_all([feature], vibstates_data, box_coords)
     return total
 

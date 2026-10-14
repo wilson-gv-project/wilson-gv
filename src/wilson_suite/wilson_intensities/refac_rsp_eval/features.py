@@ -11,7 +11,7 @@ Takes Box, box grids and box clustering from grid.py; grid.py never imports from
 """
 import copy
 from collections import defaultdict
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, TypeVar
 
@@ -130,7 +130,8 @@ class SpectralFeature:
     One peak: the rows of one motif at one location (made by features_from_rows).
     Same motif + same point -> same peak shape, so the coefficients of the rows add.
     location and propagator_param are in cm-1; propagator_param is a number or a function (PropagatorParam).
-    feat_box: None until dress_these_with_boxes sets it, so clustering an undressed feature raises.
+    feat_box: None until SpectralWindow.from_features gives the feature its box, so drawing or clustering a feature
+        without one raises.
     conditions: the pair of states of each resonance condition, in motif order, from rows[0].params (as
         evaluate.eval_feature_on_grid). features_from_rows sets them for a propagator_param function, which
         needs them for the box and the peak height (peak_widths). Not part of == or hash: the rows fix them.
@@ -545,6 +546,94 @@ def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> f
         return ( (gamma ** 2.0 - (1.0 / dynrange) * (gamma ** 2.0)) / (1.0 / dynrange) ) ** 0.5
 
 
+def _check_drawable(f: SpectralFeature):
+    """raises ValueError for a feature that cannot get a box or be drawn: no propagator_param or no rows"""
+    if f.propagator_param is None:
+        raise ValueError(f'feature {f} has no propagator_param, so no box size')
+    if f.amplitude_coeff is None:
+        raise ValueError(f'feature {f} has no rows, so no amplitude')
+
+
+def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
+    """
+    The feature's largest amplitude inside `window`, au, without drawing.
+        inside:   its peak amplitude, sqrt(get_intensity())
+        outside:  its amplitude at the nearest point of the window, the Lorentzian of each axis it lies outside on,
+                  e.g. 100 cm-1 outside on A, gamma 5: peak * 5 / hypot(100, 5) = peak * 0.05
+    gamma: the largest of its peak_widths, as for its box.
+    """
+    amplitude, gamma = np.sqrt(f.get_intensity()), max(f.peak_widths())
+    for ax, x in f.location.as_dict().items():
+        mn, mx = window.bounds[ax]
+        amplitude *= gamma / np.hypot(max(mn - x, 0., x - mx), gamma)
+    return float(amplitude)
+
+
+def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
+                          dynrange: float,
+                          eps: float = 0.1,
+                          min_gammas: float = 1.,
+                          max_cm: float | None = None,
+                          a_max: float | None = None) -> list[float]:
+    """
+    The box half-width of each feature, cm-1, in the order of `features`, from its amplitude (todo.txt E10):
+    strong features get big boxes, weak ones small. The input of SpectralWindow.from_features.
+
+    Why: the plot shows intensities down to its floor, a_max**2 / dynrange. Drawing adds amplitudes, then squares,
+    so a tail t cut off where it meets an amplitude A changes the intensity by about 2 * A * t, much more than t**2.
+    The rule takes the worst case, A = a_max, and keeps that change below eps * floor:
+        k          = 2 * dynrange * a / (eps * a_max)     a: the feature's peak amplitude, sqrt(get_intensity())
+        half-width = gamma * sqrt(k**2 - 1)               there its Lorentzian tail, a * gamma / sqrt(d**2 + gamma**2),
+                                                          is down to eps * a_max / (2 * dynrange)
+        then at least min_gammas * gamma, and at most max_cm
+    gamma: the largest of the feature's peak_widths, on every axis. With one width for every feature,
+    a / a_max = |coeff| / max |coeff|.
+        e.g. gamma 4.7, dynrange 500, eps 0.1:  a / a_max = 1 -> 47000 cm-1 (the whole window), 0.1 -> 4700,
+             0.01 -> 470, 0.001 -> 47, 1e-4 or less -> 4.7 (1 gamma)
+
+    The knobs, to tune against draw_all (tests/e10_boxes.py):
+        dynrange    the plot's dynamic range, max / floor, e.g. 500. Required: it says what the plot shows.
+        eps         the allowed error, as a fraction of the floor. Smaller: bigger boxes, more accurate, slower.
+                    Measured 2026-10-14 (formaldehyde, ACDM, dynrange 100-1000): eps 0.1 -> at most 0.13 floors,
+                    the worst visible point 2.2 % off; eps 0.3 -> 0.47 floors, 4.9 %.
+        min_gammas  the smallest half-width, in gammas: how much of a weak peak is drawn. Its tail beyond
+                    k gammas is below the error anyway; more only changes how a weak peak looks. Default 1.
+        max_cm      the largest half-width, cm-1; None (default): no cap. A cap bounds the cost of the strong
+                    features, but then eps no longer bounds the error.
+        a_max       the strongest amplitude in the window, au; None (default): estimated without drawing, the
+                    largest amplitude_in_window of `features` (0.4-10 % from the true max, todo.txt E10).
+                    Pass it e.g. to give two windows the same boxes, or to try the true max of a drawing.
+    Every feature needs rows and a propagator_param > 0. A run whose features all have amplitude 0 gets the
+    smallest boxes: it draws nothing.
+    """
+    if not dynrange > 1.:
+        raise ValueError(f'dynrange must be > 1, got {dynrange}')
+    if not eps > 0.:
+        raise ValueError(f'eps must be > 0, got {eps}')
+    if not min_gammas >= 0.:
+        raise ValueError(f'min_gammas must be >= 0, got {min_gammas}')
+    if max_cm is not None and not max_cm > 0.:
+        raise ValueError(f'max_cm must be > 0 or None, got {max_cm}')
+    if a_max is not None and not a_max > 0.:
+        raise ValueError(f'a_max must be > 0 or None, got {a_max}')
+    if not features:
+        return []
+
+    for f in features:
+        _check_drawable(f)
+    if a_max is None:
+        a_max = max(amplitude_in_window(f, window) for f in features)
+
+    half_widths = []
+    for f in features:
+        gamma = max(f.peak_widths())
+        k = 2. * dynrange * np.sqrt(f.get_intensity()) / (eps * a_max) if a_max > 0. else 0.
+        # gamma * sqrt(k**2 - 1), 0 for k <= 1: where the Lorentzian intensity is down to 1/k**2 of its peak
+        half_width = max(lorentzian_distance_to_dynrange_weaker_than_max(gamma, k ** 2), min_gammas * gamma)
+        half_widths.append(half_width if max_cm is None else min(half_width, max_cm))
+    return half_widths
+
+
 @dataclass
 class SpectralWindow:
     """
@@ -557,14 +646,13 @@ class SpectralWindow:
     contrib_features: list['SpectralFeature'] = field(default_factory=list)
 
     @classmethod
-    def from_features(cls, box: Box, features: list['SpectralFeature'], dynrange: float,
-                      box_range_safety_margin: float = 0.1) -> 'SpectralWindow':
+    def from_features(cls, box: Box, features: Sequence['SpectralFeature'],
+                      half_widths: Sequence[float]) -> 'SpectralWindow':
         """
         The window over `box` with the features that add amplitude inside it, each with its box. In this order:
-          1. a box around every feature: box_extent = gamma * sqrt(dynrange - 1) * (1 + box_range_safety_margin)
-             on every axis, as dress_these_with_boxes without scale_wrt_max_intensity. Needs no max intensity.
-             gamma: the largest of the feature's peak_widths, so a condition with a smaller width gets a box
-             larger than it needs, never smaller. For a width that changes with the frequency: the width at the peak.
+          1. a box around every feature: its location +- its half-width, the same on every axis
+             half_widths: cm-1, one per feature, in the order of `features`, e.g. from amplitude_half_widths.
+             Any other rule works too: the window does not care how the half-widths were chosen.
           2. keep the features whose box overlaps `box` (touching edges excluded):
              location inside `box` -> full_features, outside -> contrib_features
           No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):
@@ -572,27 +660,21 @@ class SpectralWindow:
             - a term with coefficient 0 never becomes a row (build_contributions puts it in `zero`)
             - a feature whose rows cancel (amplitude 0) stays as a record of it; it draws nothing
 
-        e.g. gamma 5 cm-1, dynrange 101, margin 0.1: box_extent = 5 * 10 * 1.1 = 55 cm-1. For `box` A (0, 10),
-        a feature at A = 60 is kept (its box starts at 5), a feature at A = 70 is not (its box starts at 15).
+        e.g. half-width 55 cm-1, `box` A (0, 10): a feature at A = 60 is kept (its box starts at 5), a feature at
+        A = 70 is not (its box starts at 15).
 
-        dynrange: sets the box size only. A box ends where its feature's intensity is down to 1/dynrange of the
-        feature's own peak. A bigger dynrange gives bigger boxes, so fewer tails are cut off when drawing
-        (size of the cut: see evaluate.draw_window).
         Returns copies with boxes; the input features stay as they are. Every feature needs rows and a
-        propagator_param.
+        propagator_param: drawing needs both.
         """
-        if dynrange <= 1.:
-            raise ValueError(f'dynrange must be > 1, got {dynrange}')
+        if len(half_widths) != len(features):
+            raise ValueError(f'one half-width per feature: {len(half_widths)} half-widths, {len(features)} features')
 
         dressed = []
-        for f in features:
-            if f.propagator_param is None:
-                raise ValueError(f'feature {f} has no propagator_param, so no box size')
-            if f.amplitude_coeff is None:
-                raise ValueError(f'feature {f} has no rows, so no amplitude')
-            box_extent = (lorentzian_distance_to_dynrange_weaker_than_max(max(f.peak_widths()), dynrange)
-                          * (1. + box_range_safety_margin))
-            feat_box = Box({k: (v - box_extent, v + box_extent) for k, v in f.location.as_dict().items()})
+        for f, half_width in zip(features, half_widths):
+            _check_drawable(f)
+            if not half_width >= 0.:
+                raise ValueError(f'half-width must be >= 0, got {half_width} for {f}')
+            feat_box = Box({k: (v - half_width, v + half_width) for k, v in f.location.as_dict().items()})
             dressed.append(replace(f, feat_box=feat_box))
 
         kept = [f for f in dressed if f.feat_box_overlaps(box)]
