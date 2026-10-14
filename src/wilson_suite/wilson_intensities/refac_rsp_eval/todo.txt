@@ -27,8 +27,9 @@ Order of work
 -------------
 Needed to finish the refactor. Steps 1-4 may use the old code; step 5 deletes it.
 1. [ ] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_main or wilson_system.
-2. [ ] E6  wilson_main adapter: the new evaluate path in WilsonSimulation. The big one: 6 open decisions first, then
-           a check that it gives the same spectrum as the old path.
+2. [ ] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
+   E6b (the caller side) waits: the WilsonSimulation procedure will change, so where the evaluation is called is open.
+   Open: E9 needs the old code until E6b's check, or E6b drops the check (C3 already checked the numbers).
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
 4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict).
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part.
@@ -148,31 +149,60 @@ E. Pipeline
         (git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md). After D4. Contents:
         the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
         reference; the size of the cut), the data-dict contract (D5), the decisions above.
-[ ] E6  wilson_main adapter: a new evaluate path in WilsonSimulation, next to EvaluationWorkflow (wilson_main:
-        carefully). Until it exists, the old pipeline runs, double count included (C3).
+[ ] E6  The evaluator's inputs and outputs, and where it is called. Split 2026-10-14: the WilsonSimulation
+        procedure will change, so where the evaluation is called is open. E6a (evaluator side) now; E6b (the
+        caller) later. Until E6b, the old pipeline runs, double count included (C3).
         The calls (pipeline.py):
             molsys = load_molsys_data(terms, data_origin)                                     once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)              FeatureResult
             spec   = draw_spectrum(result, window, dim_sizes, dynrange=1000.)                 EvalRspResult
-        terms = sim.terms (in pulse IDs); laser_pol = exp.polarization_avg_vector.
+        Inputs: plain values, derive's terms and two small types (DataOriginInfo, SpectralAxisSet).
+        No WilsonSimulation type. Where the old setup keeps each one:
+            terms             VibPerturbedTerm list, in pulse IDs           sim.terms
+            data_origin       DataOriginInfo, one for all properties        eval_uniform (addPropEvalSetup)
+            axes              SpectralAxisSet                               sim.axis_choice, else exp.canonical_axes
+            states_choice     'harmonic' or 'anharmonic'                    vib_ana_setup.regime (see Decisions)
+            laser_pol         numbers, e.g. (1, 1, 1)                       exp.polarization_avg_vector
+            propagator_param  cm-1, a number or a function (E5)             ev_info.Gamma, ev_info.Gamma_unit
+            exclude_modes     mode numbers, from 0                          vib_ana_setup.exclude_modes
+            window            grid.Box, cm-1, one range per axis            ev_info.spectral_window.box: another
+                                                                            Box class (spectrum_composition), convert
+            dim_sizes         grid points per axis, both edges included     ev_info.grid_resolution
+            dynrange          a number                                      ev_info.dynamic_range (default 100; new 1000)
+        Outputs:
+            FeatureResult     the rows (table), zero, features; leaves(row), cancelling(rel_tol)
+            EvalRspResult     grid_result: complex amplitude in au, one per grid point     the old sim.spec
+                              grid_mesh: the grid points, a full array per axis           the old spec_eval_setup.grid
+                              grid_axes: 1D points per axis; spectral_window: features and boxes
         Decided:
-        - states_choice: from the vib analysis regime (see Decisions); the adapter reads it.
+        - states_choice: from the vib analysis regime (see Decisions); the caller reads it.
         - exclude_modes: VibAnaSetup.exclude_modes (see Decisions). The old-vs-new check matches only without
           excluded modes: the two codes exclude differently.
         - the states for drawing: FeatureResult.states.
-        Open:
-        - old settings without a new counterpart: minimum_box_padding, scale_wrt_max_intensity
-        - grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
+[ ] E6a Evaluator side. Needs no caller.
+        - Write the inputs and outputs above into the pipeline.py docstring (and later the README, E4).
+        - Old settings without a new counterpart: drop, or add to draw_spectrum.
+          minimum_box_padding, scale_wrt_max_intensity, margins; box_range_safety_margin
+          (SpectralWindow.from_features takes it, draw_spectrum does not pass it on: always 0.1).
+        - Grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
           draw_spectrum uses make_grid now.
-        - data: reuse what WilsonSimulation loaded, or load again (load_molsys_data)
-        - the magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
+        - The magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): keep or drop.
           SpectralFeature.apply_magn_cond_filter exists; only its tests call it.
-        - the default dynrange (draw_spectrum: 1000), matched to the plot's dynamic range (log scale is the
-          renderer's default; see the cut in Decisions)
-        - nothing that assumes point features only (E8)
-        Check: the same spectrum as EvaluationWorkflow.evaluate, through WilsonSimulation (C3 called the new
-        functions directly). Needs the old code. Expect differences only where parameter sets share a location.
+        - The default dynrange: old 100, new 1000. Match it to the plot's dynamic range (log scale is the
+          renderer's default; see the cut in Decisions).
+        - Data from more than one source: the old setup can take one origin per property (eval_by_prop_name);
+          load_molsys_data takes one origin. Support it, or not.
+        - Data that the caller already read: MolSystemData.from_datadict builds one from a data dict, but without
+          load's check for missing properties. Offer it as a second way in, or not.
+[ ] E6b The caller. After the new WilsonSimulation procedure is known.
+        - Where the three calls go, and where the outputs are kept.
+        - Data: reuse what the caller read, or read again (load_molsys_data). See E6a.
+        - states_choice from the regime. The regime 'compare' (both state sets) gives no single choice.
+        - Nothing that assumes point features only (E8).
+        - Check: the same spectrum as EvaluationWorkflow.evaluate, with the old settings passed as listed above.
+          C3 checked the evaluator itself (the new functions called directly); this checks the caller.
+          Needs the old code. Expect differences only where parameter sets share a location.
         Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
         EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
         which does not exist (dead module).
@@ -183,7 +213,7 @@ E. Pipeline
         - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
         Real terms like this exist (G7, coincident pulses). Once such a setup matters: allow them in B7, then
         boxes (the whole window along the line?), get_intensity, eval_feature_on_grid, drawing.
-[ ] E9  Delete the old code (after E6 and E7). Code outside refac_rsp_eval still imports it: deleting
+[ ] E9  Delete the old code (after E6b and E7, unless E6b drops its check; see Order of work). Code outside refac_rsp_eval still imports it: deleting
         amplitudes/ today breaks importing pipeline.py. In this order:
         - [ ] amplitudes/averaging.py stays at this path: wilson_experiment imports get_pol_laser from it, and
               pipeline.py imports from it too. It needs only numpy.
