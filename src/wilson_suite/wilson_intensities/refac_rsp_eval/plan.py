@@ -45,7 +45,6 @@ from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 
 @dataclass
@@ -135,12 +134,6 @@ class PropsCollection:
         inds_all = [len(p.inds) if p.inds else 0 for p in self.props]
         full_string = [f'{prop_trivname(ord_geo=inds_all[i], ord_el=len(p.ops))}{p.inds}{[i.o for i in p.ops]}_d{p.dord}' for i, p in enumerate(self.props)]
         return ' * '.join(full_string)
-
-    # -------------------------------------
-
-    def build_request_dict(self, calc_setup: 'DataOriginInfo') -> dict[str, 'DataOriginInfo']:
-        """Build a {name: DataOriginInfo} shopping list."""
-        return dict.fromkeys(self.names, calc_setup)
 
 
 @dataclass
@@ -450,7 +443,7 @@ def split_props(term: 'VibPerturbedTerm') -> tuple[PropsCollection, PropsCollect
     (averaged props, sorted; non-averaged props) of a term: CompiledTerm.avrg_props and .non_avrg_props.
         e.g. EVV term 8: (polgrad[b] dipgrad[a] dipgrad[c],  cff[a,b,c]): the props with field operators are averaged
     Works in pulse IDs and in axes: the axis translation changes only the resonance conditions, not the props.
-    So the props of a term as derive writes it are what load_molsys_data and make_polarization_linear_comb read.
+    So the props of a term as derive writes it are what prop_names and make_polarization_linear_comb read.
     """
     properties = PropsCollection(term.props)
     return properties.get_averaged_props().sort(), properties.get_non_averaged_props()

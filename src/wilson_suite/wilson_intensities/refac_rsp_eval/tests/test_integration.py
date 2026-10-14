@@ -17,7 +17,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     evaluate_term_coeff_sumover,
     make_avrg_einsum_subscripts,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import prop_names
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     compile_terms,
@@ -116,8 +116,8 @@ def test_eval_molsys_data():
     
     calc_dataorigin = DataOriginInfo(source_type='gaussian',
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    # request dict is built from PropsCollection
-    request = term0_el.all_props.build_request_dict(calc_setup=calc_dataorigin)
+    # request dict: one entry per property name
+    request = dict.fromkeys(term0_el.prop_names, calc_dataorigin)
 
     # base info about system, including vib states, normal modes and geometry (MolSystemData.load asks only for
     # the frequencies and the states: the evaluator reads no more)
@@ -288,7 +288,7 @@ EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL-
 def evv_molsys() -> MolSystemData:
     """all properties of the 14 terms; the states do not enter the average"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    return load_molsys_data(evv_terms, origin)
+    return MolSystemData.load(origin, prop_names(evv_terms))
 
 
 def test_evv_einsum_subscripts():

@@ -50,12 +50,13 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     draw_spectrum,
     evaluate_response_terms,
-    load_molsys_data,
+    prop_names,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed import load_acdm
+from wilson_suite.wilson_system.system_data import MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 GAMMA_CM = 4.7
@@ -130,7 +131,7 @@ def zoom_around_strongest(result: FeatureResult, window: Box) -> tuple[Box, dict
 
 def main(settings: list[dict]):
     terms = ref.evv_terms()
-    for mol, load in (('formaldehyde', lambda: load_molsys_data(terms, ref.data_origin('formaldehyde'))),
+    for mol, load in (('formaldehyde', lambda: MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))),
                       ('ACDM', lambda: load_acdm(terms))):
         result = evaluate_response_terms(terms, axes=make_SpectralAxisSet(ref.AXES), molsys_data=load(),  # type: ignore
                                          states_choice=STATES, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)

@@ -32,9 +32,9 @@ from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box 
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow as OldWindow
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif as OldMotif
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions, solve_LSE_motif
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import load_molsys_data
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import prop_names
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ParameterSet, compile_terms
-from wilson_suite.wilson_system.system_data import DataOriginInfo
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
@@ -133,7 +133,7 @@ def run_new(v: Variation, laser_pol):
     translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(v.axes))
     compiled = compile_terms(terms=translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=path)
-    molsys = load_molsys_data(terms, origin)
+    molsys = MolSystemData.load(origin, prop_names(terms))
     iso = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=tuple(laser_pol))
     table, zero = build_contributions(compiled, molsys, polarization_linear_comb=iso, states_choice=v.new_states)
     return compiled, molsys, table, zero

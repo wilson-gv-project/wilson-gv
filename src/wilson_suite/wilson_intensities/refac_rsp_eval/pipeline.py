@@ -1,13 +1,53 @@
 """
 Entry point: terms + molecular data -> spectral features -> the spectrum on a grid.
 
-Three calls, from the terms derive writes (in pulse IDs):
-    molsys = load_molsys_data(terms, data_origin)                     once, for any number of runs
+Two calls, from the terms derive writes (in pulse IDs) and the data:
     result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
-                                     propagator_param=...)            rows and features: FeatureResult
+                                     propagator_param=..., exclude_modes=...)
+                                                                      rows and features: FeatureResult
     spec   = draw_spectrum(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
+A caller needs only these two calls. The inputs are plain values, derive's terms and a few small types (below).
 evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
-load_molsys_data and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
+prop_names and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
+
+The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
+MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
+    molsys = MolSystemData.load(origin, prop_names(terms))     origin: DataOriginInfo; once, for any number of runs
+    molsys = MolSystemData.from_datadict(...)                  from a data dict the caller already read
+evaluate_response_terms checks that molsys has every property the terms use (MolSystemData.check_props).
+
+Inputs
+    terms             VibPerturbedTerm list, as derive writes them (with pulse IDs). row.term_id is the index in it.
+    molsys_data       MolSystemData: the properties, frequencies and state sets of one molecule (see above)
+    axes             SpectralAxisSet, e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}): A = w1, B = -w1 + w2
+    states_choice     'harmonic' or 'anharmonic'. Must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic';
+                      harmonic -> 'harmonic'. No default: the data cannot know the regime.
+    laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
+                      The averaging rank fixes its length (rank 4: 3 numbers).
+    propagator_param  the peak width, cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam).
+                      It sizes both the drawn peak and its box.
+    exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): removed everywhere. Default: none.
+    window            grid.Box, cm-1, one range per axis, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)})
+    dim_sizes         grid points per axis, both window edges included, e.g. {'A': 501, 'B': 201}
+    box_rule          features.BoxRule: (window, features) -> one box half-width per feature, cm-1. Knobs by
+                      functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
+                      dynamic range (max / floor), required. intensity_half_widths: the old code's rule.
+
+Outputs
+    FeatureResult     the evaluation, before any grid:
+                        table           one ContributionRow per term and index set: term_id, motif, params,
+                                        location (cm-1), coeff (au)
+                        zero            the (term_id, params) pairs with coeff 0: no row
+                        features        one SpectralFeature per (motif, location), made from the table
+                        states_choice, exclude_modes, propagator_param: as passed
+                        leaves(row)     the summed index sets behind one row, computed again on demand
+                        cancelling(rel_tol)   the features whose rows (nearly) cancel
+    EvalRspResult     the spectrum on the grid:
+                        grid_axes       1D points per axis, cm-1
+                        grid_result     complex amplitude in au, one per grid point; intensity = abs(grid_result)**2
+                        grid_mesh       the grid points, one full array per axis: what the renderer reads
+                        spectral_window the features as drawn, each with its box
+                        feature_result  the FeatureResult it was drawn from
 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
@@ -57,11 +97,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     compile_terms,
     split_props,
 )
-from wilson_suite.wilson_system.system_data import (
-    DataOriginInfo,
-    MolSystemData,
-)
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.system_data import MolSystemData
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
@@ -163,19 +199,11 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
                          exclude_modes=tuple(sorted(set(exclude_modes))))
 
 
-def load_molsys_data(terms: Sequence['VibPerturbedTerm'], data_origin: DataOriginInfo) -> MolSystemData:
-    """
-    One MolSystemData for all terms, each property once: MolSystemData.load with the terms' prop_names.
-    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
-    It holds every state set the source has; the evaluation chooses one (compute_features, states_choice).
-    The obtainer is this module's wilson_data_obtainer, so a test can replace it here (c3_spectrum.py does).
-    """
-    return MolSystemData.load(data_origin, prop_names(terms), obtainer=wilson_data_obtainer)
-
-
 def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
     """
-    Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: input of MolSystemData.load.
+    Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: what the caller loads,
+    e.g. MolSystemData.load(origin, prop_names(terms)).
+    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
     Per term the averaged props first, as in CompiledTerm.prop_names.
     """
     return list(dict.fromkeys(name for term in terms for part in split_props(term) for name in part.names))
@@ -256,7 +284,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     The spectrum on a grid: draw_spectrum(result, window, dim_sizes, box_rule=...), as often as needed; the rows stay.
 
     axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
-    molsys_data       load_molsys_data(terms, data_origin): loaded once, for any number of runs
+    molsys_data       MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
+                      loaded once, for any number of runs
     states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.

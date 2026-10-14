@@ -31,7 +31,6 @@ import copy
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from unittest import mock
 
 import numpy as np
 
@@ -58,7 +57,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import compile_terms
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import c2_variations as c2
-from wilson_suite.wilson_system.system_data import DataOriginInfo
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
@@ -129,13 +128,12 @@ def run_old(case: Case):
 
 
 def run_new(case: Case, laser_pol):
-    """new pipeline, load_molsys_data + the steps of evaluate_response_terms: (the chosen state set for drawing, the result)"""
+    """new pipeline, MolSystemData.load + the steps of evaluate_response_terms: (the chosen state set for drawing, the result)"""
     terms = VibPerturbedTerm.load_many_from_json(c2.TERMS)
     translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(AXES))
     compiled = compile_terms(translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=c2.MOLECULES['formaldehyde'][0])
-    with mock.patch.object(pipeline, 'wilson_data_obtainer', case.obtainer):
-        molsys = pipeline.load_molsys_data(terms, origin)
+    molsys = MolSystemData.load(origin, pipeline.prop_names(terms), obtainer=case.obtainer)
     result = pipeline.compute_features(compiled, molsys, pipeline.make_polarization_linear_comb(terms, laser_pol),
                                        propagator_param=GAMMA_CM, states_choice=case.new_states)
     return result.states, result

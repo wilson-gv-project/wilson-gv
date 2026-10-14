@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-14
 
 Tests (run 2026-10-14)
-       refac_rsp_eval: 646 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       refac_rsp_eval: 645 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
@@ -15,12 +15,14 @@ the data dict, from the reader (wilson_data_obtainer -> CQCParse, a separate rep
 derive (not changed in this refactor). Errors in either one need a check on that side.
 
 
-Status (2026-10-13)
+Status (2026-10-14)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
-What is left is mostly wiring: connect the new code to WilsonSimulation, delete the old code, write the
-README. Only E6 is a big job.
+The refactor ends with an evaluator that a caller uses through its two calls (E6a). Connecting it to
+WilsonSimulation (E6b) left the refactor 2026-10-14 (see Outside the refactor). E6a is done: the two calls,
+their inputs and outputs are in the pipeline.py docstring. What is left: the plotting code (E7), the D4 code move,
+deleting the old code (E9), the README (E4).
 
 
 Order of work
@@ -28,11 +30,14 @@ Order of work
 Needed to finish the refactor. Steps 1-4 may use the old code; step 5 deletes it.
 For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
 1. [x] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_system (2026-10-14).
-2. [ ] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
-   E6b (the caller side) waits: the WilsonSimulation procedure will change, so where the evaluation is called is open.
-   Open: E9 needs the old code until E6b's check, or E6b drops the check (C3 already checked the numbers).
+2. [x] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
+   Done 2026-10-14.
+   E6b (the caller side) left the refactor 2026-10-14: the WilsonSimulation procedure will change, so where the
+   evaluation is called is open (see Outside the refactor). Its check against the old code is dropped (see E6b),
+   so E9 no longer waits for E6b.
    E6a includes E10 (box size by amplitude): code done 2026-10-14, with a box rule as the input of draw_spectrum
-   (amplitude_half_widths, or intensity_half_widths: the old rule). Tuning the knobs: later.
+   (amplitude_half_widths, or intensity_half_widths: the old rule). amplitude_half_widths keeps both knobs,
+   dynrange and eps. Left in E10: tuning the knobs (later); the domains (E7).
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
 4. [ ] D4 code move, with D3 (ParameterSet cleanup) and D5 (load checks of the data dict). Waits (see above).
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
@@ -43,7 +48,7 @@ H8 (keep or drop a rule); G6 (smallest energy differences).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
 Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
-Outside the refactor [outside]: G2, G8 (reader checks); G9 (the normal_modes read error).
+Outside the refactor [outside]: E6b (the caller); G2, G8 (reader checks); G9 (the normal_modes read error).
 No item yet:
 - The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
 - From the old README: is single-component Cartesian selection a wanted feature?
@@ -74,6 +79,10 @@ Decisions and known limits
 - No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak features stay, and so do
   features whose rows cancel (a record: FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0
   never becomes a row (FeatureResult.zero).
+- The data is the caller's job (2026-10-14): the evaluator takes a MolSystemData (molsys_data) and reads no file;
+  it takes no DataOriginInfo and does not call wilson_data_obtainer. Loading belongs to wilson_system
+  (MolSystemData.load, MolSystemData.from_datadict). The evaluator only says which properties the terms use:
+  pipeline.prop_names(terms). evaluate_response_terms checks that molsys_data has them (MolSystemData.check_props).
 - Linear polarization only (2026-10-11): get_pol_laser stores into a real array. A complex vector (circular light)
   loses its imaginary part with only a ComplexWarning, e.g. (1, i, 0)/sqrt(2) on all four slots gives (0, 0, 0).
   No complex conjugate for the detected field either. Before circular light is used: raise on complex input, then
@@ -159,17 +168,19 @@ E. Pipeline
         the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
         reference; the size of the cut), the data-dict contract (D5), the decisions above.
 [ ] E6  The evaluator's inputs and outputs, and where it is called. Split 2026-10-14: the WilsonSimulation
-        procedure will change, so where the evaluation is called is open. E6a (evaluator side) now; E6b (the
-        caller) later. Until E6b, the old pipeline runs, double count included (C3).
+        procedure will change, so where the evaluation is called is open. E6a (evaluator side) in the refactor;
+        E6b (the caller) outside it (see Outside the refactor). Until E6b, the old pipeline runs, double count
+        included (C3).
         The calls (pipeline.py):
-            molsys = load_molsys_data(terms, data_origin)                                     once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)              FeatureResult
             spec   = draw_spectrum(result, window, dim_sizes, box_rule=)                      EvalRspResult
-        Inputs: plain values, derive's terms and two small types (DataOriginInfo, SpectralAxisSet).
+        The data is the caller's job (see Decisions): the caller makes the MolSystemData, e.g.
+            molsys = MolSystemData.load(origin, prop_names(terms))                            once
+        Inputs: plain values, derive's terms and two small types (MolSystemData, SpectralAxisSet).
         No WilsonSimulation type. Where the old setup keeps each one:
             terms             VibPerturbedTerm list, in pulse IDs           sim.terms
-            data_origin       DataOriginInfo, one for all properties        eval_uniform (addPropEvalSetup)
+            molsys_data       MolSystemData, made by the caller             the origin: eval_uniform (addPropEvalSetup)
             axes              SpectralAxisSet                               sim.axis_choice, else exp.canonical_axes
             states_choice     'harmonic' or 'anharmonic'                    vib_ana_setup.regime (see Decisions)
             laser_pol         numbers, e.g. (1, 1, 1)                       exp.polarization_avg_vector
@@ -198,8 +209,13 @@ E. Pipeline
         - exclude_modes: VibAnaSetup.exclude_modes (see Decisions). The old-vs-new check matches only without
           excluded modes: the two codes exclude differently.
         - the states for drawing: FeatureResult.states.
-[ ] E6a Evaluator side. Needs no caller.
-        - Write the inputs and outputs above into the pipeline.py docstring (and later the README, E4).
+[x] E6a Evaluator side. Needs no caller. Done 2026-10-14.
+        - [x] The inputs and outputs above, in the pipeline.py module docstring (2026-10-14); later the README (E4).
+              The column "where the old setup keeps each one" stays here, for the caller (E6b).
+        - [x] E10 knobs: amplitude_half_widths keeps both, dynrange and eps (see E10).
+        - [x] Data out of the evaluator (2026-10-14, see Decisions): pipeline.load_molsys_data and
+              PropsCollection.build_request_dict (plan.py) deleted, with build_request_dict's test (test_plan.py).
+              The tests and scripts load with MolSystemData.load(origin, prop_names(terms)).
         - [x] Old box settings (E10): two box rules, draw_spectrum(box_rule=). amplitude_half_widths: eps replaces
           box_range_safety_margin, min_gammas replaces minimum_box_padding (in gammas, not cm-1),
           scale_wrt_max_intensity is built into the rule. intensity_half_widths (the old rule) keeps the old
@@ -212,30 +228,21 @@ E. Pipeline
         - [x] The default dynrange (E10): none. dynrange is the plot's dynamic range (the renderer has it; log scale
           is its default), required. The caller passes the renderer's value (E6b).
         - [x] Data from more than one source: the old setup can take one origin per property (eval_by_prop_name);
-          load_molsys_data takes one origin. Support it, or not. --- NOT SUPPORTING NOW
+          MolSystemData.load takes one origin. Support it, or not. --- NOT SUPPORTING NOW
         - [x] Data that the caller already read: MolSystemData.from_datadict builds one from a data dict. Since
           2026-10-14 build_contributions checks the properties the terms use (MolSystemData.check_props), however
           the data was made. load makes the same check (check_props), with another meaning: the source did not
           return a requested property. Its message names the source.
-[ ] E6b The caller. After the new WilsonSimulation procedure is known.
-        - Where the three calls go, and where the outputs are kept.
-        - Data: reuse what the caller read, or read again (load_molsys_data). See E6a.
-        - states_choice from the regime. The regime 'compare' (both state sets) gives no single choice.
-        - Nothing that assumes point features only (E8).
-        - Check: the same spectrum as EvaluationWorkflow.evaluate, with the old settings passed as listed above.
-          C3 checked the evaluator itself (the new functions called directly); this checks the caller.
-          Needs the old code. Expect differences only where parameter sets share a location.
-        Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
-        EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
-        which does not exist (dead module).
+[outside] E6b The caller: moved to Outside the refactor (2026-10-14).
 [ ] E10 Box size by amplitude (found 2026-10-14). The boxes before E10 cut off parts of the spectrum that the plot
         shows. A box sized by amplitude, with each feature drawn on its own box, is accurate and about as fast.
         Code done 2026-10-14 (see Code below). Left: decide about the domains (E7).
-        Open: amplitude_half_widths takes dynrange and eps, but uses only their ratio eps / dynrange: the allowed
-        intensity error as a fraction of the strongest peak, e.g. 0.1 / 500 = 2e-4. dynrange = 1 does not switch it
-        off (it raises; allowed, it would mean 10 % of the max). Keep both knobs, or one knob instead
-        (e.g. rel_err, with a default, so box_rule=amplitude_half_widths works without partial). Later: tune the knobs (tests/e10_boxes.py with more cases and knob values,
-        then choose the defaults).
+        Decided 2026-10-14: amplitude_half_widths keeps both knobs, dynrange and eps. The formula uses only their
+        ratio eps / dynrange: the allowed intensity error as a fraction of the strongest peak, e.g.
+        0.1 / 500 = 2e-4. dynrange = 1 does not switch it off (it raises; allowed, it would mean 10 % of the max).
+        Not taken: one knob instead (e.g. rel_err, with a default, so box_rule=amplitude_half_widths works without
+        partial).
+        Later: tune the knobs (tests/e10_boxes.py with more cases and knob values, then choose the defaults).
         ("today" below: the boxes before E10.)
         Why today's boxes cut too much:
         - A box ends where the feature's intensity is down to 1/dynrange of its own peak:
@@ -362,8 +369,9 @@ E. Pipeline
               reworked into intensity_half_widths (above); its tests rewritten; e10_boxes.py scores either rule.
         - [ ] Domains (find_clusters_by_featboxes, RectangularDomain): no longer used in drawing. Keep only if
               plotting regions needs them (E7), else delete (E9).
-        - E6b: the drawing no longer matches the old code (the old code cuts more). Check the drawing against
-          draw_all; the rows against the old code are checked (C2).
+        - The drawing no longer matches the old code (the old code cuts more), so the old code is no reference for
+          the drawing: draw_all is (test_pipeline.py). The rows against the old code are checked (C2). For this
+          reason E6b's check against the old code is dropped.
         Limits: a Lorentzian tail (gamma / d); the largest width on every axis, the width at the peak (as now).
         A worst case (it assumes the cut tail meets A_max), so boxes are larger than needed where the plot is weak.
 [ ] E7  Port wilson_analysis/render. Only plot_regions reads an old type (GridRegion); the main renderer reads
@@ -373,7 +381,7 @@ E. Pipeline
         - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
         Real terms like this exist (G7, coincident pulses). Once such a setup matters: allow them in B7, then
         boxes (the whole window along the line?), get_intensity, eval_feature_on_grid, drawing.
-[ ] E9  Delete the old code (after E6b and E7, unless E6b drops its check; see Order of work). Waits: no big
+[ ] E9  Delete the old code (after E7; E6b's check is dropped, see E6b). Waits: no big
         moves or removals outside refac_rsp_eval for now (2026-10-14). Code outside
         refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing pipeline.py. In this order:
         - [ ] amplitudes/averaging.py stays at this path: wilson_experiment imports get_pol_laser from it, and
@@ -470,8 +478,26 @@ H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both d
 
 Outside the refactor [outside]
 ------------------------------
-Not the evaluator's job: these items check or fix the reader. Old and new read the same data dict, so C2, C3
-and G1 would all miss a reader error. They matter for the final spectra.
+Not the evaluator's job: these items connect the evaluator to its caller (E6b), or check or fix the reader.
+Old and new read the same data dict, so C2, C3 and G1 would all miss a reader error. The reader items matter for
+the final spectra.
+[ ] E6b The caller (left the refactor 2026-10-14). After the new WilsonSimulation procedure is known. The
+        evaluator side (E6a) needs no caller: the two calls take plain values, derive's terms and a MolSystemData.
+        - Where the two calls go, and where the outputs are kept.
+        - Data, the caller's job: make the MolSystemData once, from what the caller already read
+          (MolSystemData.from_datadict) or by reading again (MolSystemData.load(origin, prop_names(terms))).
+        - states_choice from the regime. The regime 'compare' (both state sets) gives no single choice.
+        - Nothing that assumes point features only (E8).
+        - Check against the old code (EvaluationWorkflow.evaluate): dropped 2026-10-14.
+          - C3 already checked the evaluator against the old code (the whole spectrum, 1e-16).
+          - Since E10 the new drawing differs from the old one on purpose (the old code cuts more), so the old
+            code is no reference for the drawing. The reference is draw_all.
+          - Already in place instead: test_pipeline.py, test_draw_spectrum_with_a_width_function: data file ->
+            MolSystemData.load -> evaluate_response_terms -> draw_spectrum, against draw_all (at most 0.1 floors).
+          - What no test covers until a caller exists: that the caller passes the right settings (the table in E6).
+        Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
+        EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
+        which does not exist (dead module).
 [ ] G2  Data reader vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental, one dipgrad
         value, one polgrad value.
         Done by hand 2026-10-11, water (a scratch script, not a test). From the reader's values, Gaussian's own
@@ -497,8 +523,9 @@ E1   From terms to features: build_contributions makes one row per term and inde
      groups the rows into features (FeatureResult).
 E2   Drawing: eval_feature_on_grid draws one feature; draw_window adds all features on one window grid, box by
      box; draw_all draws every feature on the whole grid and serves as the reference.
-E3   One entry point. Since 2026-10-13 three calls: load_molsys_data, evaluate_response_terms, draw_spectrum
-     (see Fixed, "Top functions"; the calls in E6).
+E3   One entry point. Since 2026-10-14 two calls: evaluate_response_terms, draw_spectrum; the caller makes the
+     MolSystemData (2026-10-13 to 2026-10-14 a third call, load_molsys_data). See Fixed, "Top functions" and
+     "Data out of the evaluator"; the calls in E6.
 E5   Peak width from one source (2026-10-13): propagator_param (features.PropagatorParam), a number or a
      function (vd, freqs) -> cm-1. The feature carries it: drawing calls it on the grid; get_intensity and both
      box makers at the peak (SpectralFeature.peak_widths). Was lineshape_parameter. Limits: see Decisions.
@@ -543,8 +570,9 @@ B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
 -    Property names made once (2026-10-12): PropsCollection.names, CompiledTerm.all_props and
      CompiledTerm.prop_names. PropsCollection.sort returns a new collection.
 -    One way to load (2026-10-12): load_molsys_data is MolSystemData.load with the terms' prop_names; it no
-     longer asks for normal_modes, atoms and the geometry (G9).
--    Data and recipe from the terms in pulse IDs (2026-10-13): load_molsys_data, make_polarization_linear_comb,
+     longer asks for normal_modes, atoms and the geometry (G9). load_molsys_data deleted 2026-10-14 (Data out of
+     the evaluator, below).
+-    Data and recipe from the terms in pulse IDs (2026-10-13): make_polarization_linear_comb,
      prop_names and averaging_rank read only the props, so they take the terms as derive writes them
      (plan.split_props), with no translation or compiling first.
 B    Precalculated path deleted (2026-10-13, H1). Since F1 the einsum tensor (AvrgTensor) does the same job, with
@@ -555,6 +583,9 @@ B    Precalculated path deleted (2026-10-13, H1). Since F1 the einsum tensor (Av
      compute_features_from_terms and rps_evaluation.py deleted.
 -    exclude_modes (2026-10-13): evaluate_response_terms, compute_features and build_contributions take it;
      FeatureResult keeps it, so leaves() sums over the same modes. Meaning: removed everywhere (see Decisions).
+-    Data out of the evaluator (2026-10-14, see Decisions): load_molsys_data (pipeline.py) and
+     PropsCollection.build_request_dict (plan.py) deleted. No module of refac_rsp_eval imports DataOriginInfo or
+     wilson_data_obtainer now. The callers load with MolSystemData.load(origin, prop_names(terms)).
 
 Dropped
 C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code

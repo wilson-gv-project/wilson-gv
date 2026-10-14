@@ -17,15 +17,15 @@ from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
-    load_molsys_data,
     make_polarization_linear_comb,
+    prop_names,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     ParameterSet,
     compile_terms,
 )
-from wilson_suite.wilson_system.system_data import DataOriginInfo
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
@@ -63,7 +63,7 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
     terms = evv_terms()     # data and recipe read only the props: the terms in pulse IDs
-    molsys = load_molsys_data(terms, data_origin(molecule))
+    molsys = MolSystemData.load(data_origin(molecule), prop_names(terms))
     pol = make_polarization_linear_comb(terms, LASER_POL)
     table, zero = build_contributions(compiled, molsys, pol, states_choice=states_choice)
     rows = list(table)

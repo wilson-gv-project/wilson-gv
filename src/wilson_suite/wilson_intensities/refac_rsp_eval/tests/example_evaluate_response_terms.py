@@ -23,9 +23,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     draw_spectrum,
     evaluate_response_terms,
-    load_molsys_data,
+    prop_names,
 )
-from wilson_suite.wilson_system.system_data import DataOriginInfo
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
@@ -40,8 +40,9 @@ def main():
     laser_pol = (1., 1., 1.)        # pulses and detector along x
     states_choice = 'anharmonic'    # follows the vib analysis regime: GVPT2 -> anharmonic
 
-    # 2. data, once. It reads only the terms' props: which properties to load.
-    molsys = load_molsys_data(terms, data_origin)
+    # 2. data, once, outside the evaluator: the evaluator takes a MolSystemData and reads no file.
+    #    prop_names(terms): which properties the terms use, so which ones to load.
+    molsys = MolSystemData.load(data_origin, prop_names(terms))
 
     # 3. features. Width per condition: 3 cm-1 plus 0.2 % of the condition's |E| (energy_difference is signed).
     width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())

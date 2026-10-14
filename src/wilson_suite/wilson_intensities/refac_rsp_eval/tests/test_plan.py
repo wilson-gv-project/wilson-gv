@@ -97,13 +97,6 @@ def test_propscollection_names_are_made_once():
     assert coll.names is coll.names
 
 
-def test_propscollection_request_dict_names_each_property_once():
-    origin = 'the data origin'      # passed through as it is; plan.py needs no DataOriginInfo
-    coll = PropsCollection([polprop(ops=(1,), inds='a'), polprop(ops=(2,), inds='c'), polprop(inds='abc')])
-
-    assert coll.build_request_dict(origin) == {'dipgrad': origin, 'cff': origin}
-
-
 def test_propscollection_equal_by_value_and_usable_as_key():
     a = PropsCollection([polprop(ops=(0, 1), inds='a')])
     b = PropsCollection([polprop(ops=(0, 1), inds='a')])
