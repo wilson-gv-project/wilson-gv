@@ -59,11 +59,10 @@ class SpecDetector:
 
     detection_method: str
     detection_polarization: tuple[float]
-    detection_interval: Optional[tuple[float]] = None
-    detection_limited_to = str
+    detection_limited_to: str
 
+    detection_interval: tuple[float] | None = None
     interaction_filter: list[list[int]] | None = None
-
     detector_faces: tuple[float] | None = None
     detector_max_order: int | None = None
 
@@ -247,7 +246,6 @@ class EmPulse:
 
     overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse, expressed as a
     float and understood as the exponent theta of e^(i theta)
-    Currently enforced as 0.0
 
     id: integer: Pulse ID label
 
@@ -327,12 +325,6 @@ class EmPulse:
             else:
                 raise AssertionError('The polarization must be a len 3 tuple of floats')
 
-        if not self.overall_phase == 0.0:
-            raise AssertionError('Overall phase currently restricted to zero shift')
-
-        if not((abs(self.overall_phase) - 1.0) < 1e-10):
-            raise AssertionError('The overall phase must be of unit length')
-
     def tendsImpulsive(self):
         """
         Does this pulse tend to impulsive?
@@ -358,9 +350,9 @@ class EmPulse:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
 # FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
-def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float=0.0,
-                        wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                        overall_phase: complex = 1.0 + 0.0j, id: int = None):
+def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
+                        wv: tuple[float], pol: tuple[float],
+                        overall_phase: float | int = 0.0, id: int = None):
     """
     Helper function: Makes a Gaussian EmPulse instance with the selected parameters.
     See EmPulse for a definition of these parameters.
@@ -374,7 +366,7 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float=0.0,
 
 def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
+                         overall_phase: float | int = 0.0, id: int = None):
     """
     Helper function: Makes an impulsive-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -389,7 +381,7 @@ def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0
 
 def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
+                         overall_phase: float | int = 0.0, id: int = None):
     """
     Helper function: Makes a continuous-wave-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -452,7 +444,7 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
         if p1.is_compound:
             lcppc = list(p1.pol_comp)
         else:
-            lccpc = [p1.pol]
+            lcppc = [p1.pol]
 
         if p2.is_compound:
             lcppc.extend(p2.pol_comp)
@@ -785,7 +777,7 @@ class ElectricField:
                 else:
                     raise ValueError('Invalid scan subcategory')
 
-        return ElectricField(tuple(copy.deepcopy(pulse_dict.values())))
+        return ElectricField(copy.deepcopy(tuple(pulse_dict.values())))
 
 def compounding_patterns_at_order(n) -> list[tuple]:
     """
@@ -796,7 +788,7 @@ def compounding_patterns_at_order(n) -> list[tuple]:
     Returns: A list of tuples: Each tuple is a compounding pattern at this order
     """
 
-    def compounding_patterns_recurse(n, curr, acc):
+    def compounding_patterns_recurse(n: int, curr: list, acc: list[tuple]):
         """
         Tail-recursive routine to accumulate compounding patterns
         """
@@ -809,7 +801,7 @@ def compounding_patterns_at_order(n) -> list[tuple]:
         else:
 
             # Add 1 to all in curr and recurse
-            for i in curr:
+            for i in range(len(curr)):
 
                 new_curr = copy.deepcopy(curr)
                 new_curr[i] += 1
@@ -978,7 +970,7 @@ class FieldAnalysis:
 
         for i in self.valid_int_patterns:
             if not len(i) in int_pattern_orders:
-                int_pattern_orders.append(i)
+                int_pattern_orders.append(len(i))
 
         self.int_pattern_orders = sorted(int_pattern_orders)
 
@@ -989,7 +981,7 @@ class FieldAnalysis:
             if len(i) in int_patterns_by_order:
                 int_patterns_by_order[len(i)].append(i)
             else:
-                int_patterns_by_order[len(i)] = [[i]]
+                int_patterns_by_order[len(i)] = [i]
 
         self.int_patterns_by_order = int_patterns_by_order
 
@@ -1084,8 +1076,6 @@ class FieldAnalysis:
         # Initialize result holders
         time_ovl_tuples = []
         time_not_res_compound_pulses = {}
-        res_and_time_ovl_tuples = []
-        res_and_time_compound_pulses = {}
 
         # For all valid interaction patterns:
         for i in self.valid_int_patterns:
@@ -1097,7 +1087,7 @@ class FieldAnalysis:
         res_and_time_compound_pulses = self.field.all_resonance_screened_compound_pulses(time_ovl_tuples, self.thres_freq, self.tol_n_dev_w)
 
         # Take keys of prev results as overview of both resonance and time-overlap screened tuples
-        res_and_time_ovl_tuples = copy.deepcopy(res_and_time_compound_pulses.keys())
+        res_and_time_ovl_tuples = copy.deepcopy(tuple(res_and_time_compound_pulses.keys()))
 
         # Obtain remaining compound pulses (time-overlapping but not resonance-possible) (they apply for the last interaction)
         for i in time_ovl_tuples:
@@ -1194,7 +1184,7 @@ class FieldAnalysis:
                         found_in_bank = False
 
                         for j in pol_avg_vector_bank:
-                            pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector[j][k]) for k in pol_avg_vector_bank])
+                            pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in range(3)])
 
                             if pol_diff == 0.0:
                                 found_in_bank = True
@@ -1233,7 +1223,7 @@ class FieldAnalysis:
                         for c_elem in range(len(c)):
 
                             # Generate the candidate (compound) pulse tuple
-                            c_elem_len = len(c_elem)
+                            c_elem_len = c[c_elem]
                             c_pulse_ind = tuple(sorted(p_pattern[c_ctr: c_ctr + c_elem_len]))
 
                             # If this is not the last interaction, the candidate pulse tuple must
@@ -1329,8 +1319,9 @@ class FieldAnalysis:
                                 break
 
                         if not found_in_bank:
-                            magnitude_condition_bank[len(magnitude_condition_bank.keys())] = (p_plus, p_minus)
-                            found_where = len(magnitude_condition_bank.keys())
+                            bank_len = len(magnitude_condition_bank.keys())
+                            magnitude_condition_bank[bank_len] = (p_plus, p_minus)
+                            found_where = bank_len
 
                         # Update magnitude conditions dictionary for this ord, comp, pol set
                         if found_where in new_magn_dict:
@@ -1422,6 +1413,7 @@ class VibExperiment:
         any_field_analysis_nonempty = False
 
         if len(self.scans) > 0:
+
             for scan_elem in np.ndindex(self.field_analyses.shape):
 
                 curr_analysis = FieldAnalysis(
@@ -1442,6 +1434,7 @@ class VibExperiment:
                     any_field_analysis_nonempty = True
 
                 self.field_analyses[scan_elem] = copy.deepcopy(curr_analysis)
+
 
 
         # With no scans, the analysis is only done with respect to the base field

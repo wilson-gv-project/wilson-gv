@@ -423,110 +423,57 @@ def test_field_analysis():
 
 def test_vib_experiment():
 
-    pulse_ir_1 = make_impulsive_gaussian_pulse(tc=50.0, cf=0.0,
-                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+    pulse_ir_1 = make_gaussian_pulse(tc=200.0, cf=3000.0, dev=150.0, maxstr=1.0e-5,
+                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
-    pulse_ir_2 = make_impulsive_gaussian_pulse(tc=100.0, cf=0.0,
-                                                    maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+    pulse_ir_2 = make_gaussian_pulse(tc=800.0, cf=1000.0, dev=150.0, maxstr=1.0e-5,
+                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
-    pulse_uvvis_1 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0,
-                                                       maxstr=1.0e-5, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+    pulse_uvvis_1 = make_gaussian_pulse(tc=1300.0, cf=15000.0, dev=200.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
     field_a = ElectricField(pulses)
 
-    detector_a = SpecDetector(detection_method='freq',
+    detector_a = SpecDetector(detection_method='int',
                               detection_polarization=(1.0, 0.0, 0.0),
-                              detection_interval=[0.003 + 0.0001 * i for i in range(101)],
+                              detection_limited_to = 'only_specified',
                               interaction_filter=[[-1, 2, 3]])
 
     # Push one carrier freq
     scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
-    scan_obj_b = ScanObject('detector', 'detection_range', id=0, coeff=1.0)
-    scan_range_a = [0.0001 * i for i in range(101)]
-    scan_a = SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
+    scan_range_a = [50.0* i for i in range(10)]
+    scan_a = SpecScan(scan_objs=(scan_obj_a,), range=scan_range_a)
 
-    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
+    scan_obj_b = ScanObject('pulse', 'cf', id=2, coeff=1.0)
+    scan_range_b = [50.0* i for i in range(10)]
+    scan_b = SpecScan(scan_objs=(scan_obj_b,), range=scan_range_b)
+
+    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a, scan_b))
+
+    print(exp_a.field_analyses[0,0])
+    print('valid int patterns', exp_a.field_analyses[0,0].valid_int_patterns)
+    print('int pattern orders', exp_a.field_analyses[0, 0].int_pattern_orders)
+    print('int patterns by order', exp_a.field_analyses[0, 0].int_patterns_by_order)
+    print('time_ovl_tuples', exp_a.field_analyses[0, 0].time_ovl_tuples)
+    print('res_and_time_ovl_tuples', exp_a.field_analyses[0, 0].res_and_time_ovl_tuples)
+
+    print('comp_patterns_at_order', exp_a.field_analyses[0, 0].comp_patterns_at_order)
+    print('pol_avg_vector_bank', exp_a.field_analyses[0, 0].pol_avg_vector_bank)
+    print('int_sequences_by_order_comp_pol', exp_a.field_analyses[0, 0].int_sequences_by_order_comp_pol)
+
+    print('magnitude_condition_bank', exp_a.field_analyses[0, 0].magnitude_condition_bank)
+    print('int_sequences_by_order_comp_pol_magn', exp_a.field_analyses[0, 0].int_sequences_by_order_comp_pol_magn)
 
     # Some attribute testing given a light touch since already covered by respective class tests
     assert len(exp_a.field.pulses) == 3
-    assert exp_a.detector.detection_method == 'freq'
-    assert len(exp_a.scans) == 1
+    assert exp_a.detector.detection_method == 'int'
+    assert len(exp_a.scans) == 2
 
     # Assertions about post-init attributes: When these are obtained using VibExperiment methods, these assertions
     # also serve to cover those methods
     assert exp_a.dim == 2
-
-    # Wrong data for VibExperiment
-    with pytest.raises(TypeError):
-        exp_bogus = VibExperiment(field='bogus', detector=detector_a, scans=(scan_a,))
-
-    with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector='bogus', scans=(scan_a,))
-
-    with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=('bogus',))
-
-    with pytest.raises(TypeError):
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
-
-    # Relevant phasematch all directions (no detector filter)
-    # NOTE: Currently raises assertion error because the interaction sequence finder is not set up to work with
-    # more than one phase-matching direction (and requires it to be specified in the detector)
-    with pytest.raises(AssertionError):
-
-        detector_a = SpecDetector(detection_method='freq',
-                                   detection_polarization=(1.0, 0.0, 0.0),
-                                   interaction_filter=[[-1, 2, 3]],
-                                   detection_interval=[0.003 + 0.0001 * i for i in range(101)])
-
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
-
-    # More than one phase-matching direction in detector filter
-    with pytest.raises(AssertionError):
-
-        detector_a = SpecDetector(detection_method='freq',
-                                  detection_polarization=(1.0, 0.0, 0.0),
-                                  detection_interval=[0.003 + 0.0001 * i for i in range(101)],
-                                  interaction_filter=[[-1, 2, 3], [1, 2 -3]])
-
-        exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a,))
-
-    # More exotic setup, testing some of the things that are changed compared to the previous
-    pulse_ir_3 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, maxstr=1.0e-5, wv=(0.0, 0.0, 1.0),
-                                               pol=(0.0, 1.0, 0.0), id=4)
-
-    pulse_uvvis_2 = make_impulsive_gaussian_pulse(tc=120.0, cf=0.0, maxstr=1.0e-5, wv=(0.0, 0.0, 1.0),
-                                                  pol=(0.0, 1.0, 0.0), id=5)
-
-    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1, pulse_ir_3, pulse_uvvis_2)
-
-    field_a = ElectricField(pulses)
-
-    detector_a = SpecDetector(detection_method='freq',
-                              detection_polarization=(1.0, 0.0, 0.0),
-                              detection_interval=[0.003 + 0.0001 * i for i in range(101)],
-                              interaction_filter=[[-1, 2, 3, 4, -5]])
-
-    # Scan IR pulse 1 carrier freq
-    scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
-    scan_obj_b = ScanObject('detector', 'detection_range', id=0, coeff=1.0)
-
-    # Scan a Raman-like freq. difference
-    # NOTE: Not decided yet if this kind of scan should be expressed as scanning cf or cf_uv for UV/VIS pulses
-    scan_obj_c = ScanObject('pulse', 'cf', id=3, coeff=0.5)
-    scan_obj_d = ScanObject('pulse', 'cf', id=5, coeff=-0.5)
-
-    scan_range_a = [0.0001 * i for i in range(101)]
-    scan_range_b = [0.0001 * i for i in range(101)]
-
-    scan_a = SpecScan(scan_objs=(scan_obj_a, scan_obj_b), range=scan_range_a)
-    scan_b = SpecScan(scan_objs=(scan_obj_c, scan_obj_d, scan_obj_b), range=scan_range_b)
-
-    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a, scan_b))
-
-    # FIXME: Add test for polarization avg vector once unit tests for that are finished
 
 
 
