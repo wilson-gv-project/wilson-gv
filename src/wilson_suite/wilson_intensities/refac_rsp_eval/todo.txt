@@ -22,7 +22,7 @@ agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Not
 The refactor ends with an evaluator that a caller uses through its two calls (E6a). Connecting it to
 WilsonSimulation (E6b) left the refactor 2026-10-14 (see Outside the refactor). E6a is done: the two calls,
 their inputs and outputs are in the pipeline.py docstring. What is left: the plotting code (E7), the D4 code move,
-deleting the old code (E9), the README (E4).
+deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
 
 
 Order of work
@@ -41,10 +41,10 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
 3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
 4. [ ] D4 code move. Waits (see above). D5's load checks and D3 (ParameterSet cleanup): done 2026-10-14.
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
-6. [ ] E4  README, with the data-dict contract (D5).
+6. [-] E4  README, with the data-dict contract (D5). Postponed 2026-10-14.
 
-Small, any time: A15 (polarization order, one line);
-H8 (keep or drop a rule); G6 (smallest energy differences).
+Small, any time: H8 (keep or drop a rule); G6 (smallest energy differences).
+Postponed 2026-10-14: A15 (polarization order, one line), E4 (README).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
 Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
@@ -102,7 +102,8 @@ Decisions and known limits
 
 A. Small fixes
 --------------
-[ ] A15 get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
+[-] A15 Postponed 2026-10-14; until then the A15 tests fail on purpose (see Tests).
+        get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
         reverse order: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector,
         k = pulse k (dressWithPulseInteractions, response_terms.py); the experiment lists all_polarizations in the
         same order. e.g. get_pol_laser([x, y, z]) gives [-1.0]; epsilon_xyz = +1.
@@ -196,7 +197,7 @@ D. Data model
 
 E. Pipeline
 -----------
-[ ] E4  README. The old one was removed 2026-10-09: it described designs the code does not follow
+[-] E4  README. Postponed 2026-10-14. The old one was removed 2026-10-09: it described designs the code does not follow
         (git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md). After D4. Contents:
         the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
         reference; the size of the cut), the data-dict contract (D5), the decisions above.
