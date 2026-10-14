@@ -1067,6 +1067,12 @@ def test_build_contributions_needs_eigenvals(molsys_a1_zero):
                             states_choice='harmonic')
 
 
+def test_build_contributions_needs_every_prop_the_terms_use(molsys):
+    """ab_term uses polgrad and cff, molsys has cff only: a ValueError before any row, not a KeyError deep inside"""
+    with pytest.raises(ValueError, match=r"no values for \['polgrad'\]"):
+        build_contributions([ab_term()], molsys, TOY_RECIPE, states_choice='harmonic')
+
+
 ## exclude_modes: a mode removed everywhere ------------------------------------
 # The toy molecule has 2 modes, 0 and 1. An excluded mode is no value of a resonance label (no row, no zero
 # pair) and no value of a summed label (included_modes; decided 2026-10-13).

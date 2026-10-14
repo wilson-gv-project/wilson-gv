@@ -2,7 +2,7 @@ refac_rsp_eval — TODO
 updated 2026-10-14
 
 Tests (run 2026-10-14)
-       refac_rsp_eval: 606 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
+       refac_rsp_eval: 607 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
        Rest of src: 292 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
@@ -193,8 +193,10 @@ E. Pipeline
           renderer's default; see the cut in Decisions).
         - Data from more than one source: the old setup can take one origin per property (eval_by_prop_name);
           load_molsys_data takes one origin. Support it, or not.
-        - Data that the caller already read: MolSystemData.from_datadict builds one from a data dict, but without
-          load's check for missing properties. Offer it as a second way in, or not.
+        - Data that the caller already read: MolSystemData.from_datadict builds one from a data dict. Since
+          2026-10-14 build_contributions checks the properties the terms use (MolSystemData.check_props), however
+          the data was made. load makes the same check (check_props), with another meaning: the source did not
+          return a requested property. Its message names the source.
 [ ] E6b The caller. After the new WilsonSimulation procedure is known.
         - Where the three calls go, and where the outputs are kept.
         - Data: reuse what the caller read, or read again (load_molsys_data). See E6a.

@@ -275,6 +275,17 @@ class MolSystemData:
         if states_choice not in self.states:
             raise ValueError(f'states_choice {states_choice!r}: the data has the state sets {sorted(self.states)}')
 
+    def check_props(self, prop_names: Iterable[str]) -> None:
+        """
+        raises ValueError if a named property has no values here: not in mol_props, or there with vals None,
+            e.g. 'polhess' for data loaded for ['polgrad', 'dipgrad', 'cff'] only.
+        prop_names: what the terms need, e.g. from CompiledTerm.prop_names
+        """
+        have = [p.trivial_name for p in self.mol_props if p.vals is not None]
+        missing = [name for name in dict.fromkeys(prop_names) if name not in have]
+        if missing:
+            raise ValueError(f'no values for {missing}: the data has values for {have}')
+
 
     @classmethod
     def from_datadict(cls,
@@ -344,10 +355,12 @@ class MolSystemData:
         molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
                                    data_dict, name=name)
 
-        # fill_from leaves vals None for a name the source lacks; without this check the run fails later, deep inside
-        missing = molsys.mol_props.without_values().names()
-        if missing:
-            raise ValueError(f'no values for {missing} in {origin}')
+        # fill_from leaves vals None for a name the source lacks. The same check as build_contributions makes,
+        # but here it means the source failed to return a property: it fails at the reading, naming the source
+        try:
+            molsys.check_props(names)
+        except ValueError as err:
+            raise ValueError(f'the source did not return every requested property, {origin}: {err}') from err
         return molsys
 
 

@@ -608,6 +608,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
     polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
     exclude_modes: modes removed everywhere, e.g. (5,): no index set and no summed value uses them (included_modes).
+    Checks molsys_data first: the frequencies, the chosen states, and values for every property the terms use
+    (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.load or from_datadict).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
@@ -618,6 +620,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     """
     modes = included_modes(molsys_data, exclude_modes)
     molsys_data.check_states_choice(states_choice)
+    molsys_data.check_props(name for term in terms for name in term.prop_names)
     states = molsys_data.states[states_choice]
 
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}

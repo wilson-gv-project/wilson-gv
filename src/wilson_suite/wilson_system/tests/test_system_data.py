@@ -284,6 +284,17 @@ def test_check_states_choice_names_the_sets_the_data_has(choice):
         molsys.check_states_choice(choice)
 
 
+def test_check_props_names_what_is_missing_and_what_the_data_has():
+    """polgrad: in mol_props, vals None; polhess: not in mol_props. Both count as missing, each named once."""
+    molsys = MolSystemData.from_datadict(MolPropsCollection([MolecularProperty(trivial_name='cff'),
+                                                             MolecularProperty(trivial_name='polgrad')]),
+                                         {'cff': np.ones(2)})
+
+    molsys.check_props(['cff'])
+    with pytest.raises(ValueError, match=r"no values for \['polgrad', 'polhess'\]: the data has values for \['cff'\]"):
+        molsys.check_props(['cff', 'polgrad', 'polhess', 'polgrad'])
+
+
 ## MolSystemData.load: one obtainer call, only what the evaluation reads ------------------------
 
 ORIGIN = DataOriginInfo(source_type='gaussian', base_file_loc='toy.out')
@@ -323,7 +334,7 @@ def test_load_fills_properties_frequencies_and_state_sets():
 def test_load_raises_for_a_property_the_source_lacks():
     data = {'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1100., 1: 1580.}}
 
-    with pytest.raises(ValueError, match=r"no values for \['polgrad'\]"):
+    with pytest.raises(ValueError, match=r"the source did not return .*toy\.out.*no values for \['polgrad'\]"):
         MolSystemData.load(ORIGIN, ['cff', 'polgrad'], obtainer=fake_obtainer(data, []))
 
 
