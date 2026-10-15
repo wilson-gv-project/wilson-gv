@@ -1,480 +1,275 @@
 refac_rsp_eval — TODO
 updated 2026-10-15
+Shortened 2026-10-15. The long version (all measurements and reasons):
+    git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
+
+[outside] = not the evaluator's job. The evaluator takes two inputs as given: the data dict (from the reader:
+wilson_data_obtainer -> CQCParse, a separate repo) and the formulas (from derive, not changed in this refactor).
+Errors in either one need a check on that side.
+
 
 Tests (run 2026-10-15)
-       refac_rsp_eval: 642 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
-       Rest of src: 332 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
-       (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
-       The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
-       test_domains, test_resonances, test_term_var_translate (see "No item yet").
-       A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
-       e.g. src/wilson_suite/terms_fuller_flat.json.
-
-[outside] marks work that is not the evaluator's job. The evaluator (refac_rsp_eval) takes two inputs as given:
-the data dict, from the reader (wilson_data_obtainer -> CQCParse, a separate repo), and the formulas, from
-derive (not changed in this refactor). Errors in either one need a check on that side.
+----------------------
+                    pass  fail  skip  xfail   on purpose until A15 is fixed
+    refac_rsp_eval   642     5     -      -   all 5 fails (tests/test_a15_polarization_order.py)
+    rest of src      332    16     3     14   7 fails (wilson_intensities/tests/unit/test_get_pol_tensor.py),
+                                              all 14 xfails (test_averaging_pol_order.py)
+The other 9 fails in the rest of src are the same before and after B7: render tests (4, belong to E7b),
+test_machinery (2), test_domains, test_resonances, test_term_var_translate.
+A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
+e.g. src/wilson_suite/terms_fuller_flat.json.
 
 
 Status (2026-10-15)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
-The refactor ends with an evaluator that a caller uses through its two calls (E6a). Connecting it to
-WilsonSimulation (E6b) left the refactor 2026-10-14 (see Outside the refactor). E6a is done: the two calls,
-their inputs and outputs are in the pipeline.py docstring. E7 is done: plot_rsp_func plots the result, 1D or 2D;
-the rest of the render code left the refactor 2026-10-15 (E7b). What is left: the D4 code move, deleting the old
-code (E9). Postponed: the README (E4), the polarization order fix (A15).
+Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
+Left: the D4 code move, deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
+Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 
 
 Order of work
 -------------
-Needed to finish the refactor. Steps 1-4 may use the old code; step 5 deletes it.
-For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
-1. [x] D4  Decide who owns VibState, MolecularProperty and MolPropsCollection: wilson_system (2026-10-14).
-2. [x] E6a Evaluator side of E6: inputs and outputs written down; the open decisions that do not depend on the caller.
-   Done 2026-10-14.
-   E6b (the caller side) left the refactor 2026-10-14: the WilsonSimulation procedure will change, so where the
-   evaluation is called is open (see Outside the refactor). Its check against the old code is dropped (see E6b),
-   so E9 no longer waits for E6b.
-   E6a includes E10 (box size by amplitude): code done 2026-10-14, with a box rule as the input of draw_spectrum
-   (amplitude_half_widths, or intensity_half_widths: the old rule). amplitude_half_widths keeps both knobs,
-   dynrange and eps. Left in E10: tuning the knobs (later); the domains go with E9.
-3. [x] E7  Plotting the new result: plot_spectrum, plot_rsp_func (wilson_analysis/render/plot_spectrum.py),
-   1D and 2D. Done 2026-10-15. The rest of the render code left the refactor 2026-10-15 (E7b, see Outside the
-   refactor).
-4. [ ] D4 code move. Waits (see above). D5's load checks and D3 (ParameterSet cleanup): done 2026-10-14.
-5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
-6. [-] E4  README, with the data-dict contract (D5). Postponed 2026-10-14.
+Rule for now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
+Steps 1-4 may use the old code; step 5 deletes it.
+    #  item  what                                               state
+    1  D4    decide who owns VibState, MolecularProperty,       done 2026-10-14: wilson_system
+             MolPropsCollection
+    2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
+    3  E7    plot the new result                                done 2026-10-15
+    4  D4    the code move                                      waits (rule above)
+    5  E9    delete the old code                                waits (rule above); first decide about G7
+    6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
-Small, any time: H8 (keep or drop a rule); G6 (smallest energy differences).
-Postponed 2026-10-14: A15 (polarization order, one line), E4 (README).
-Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
-are used).
-Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
-Outside the refactor [outside]: E6b (the caller); E7b (the rest of the render code); G2, G8 (reader checks);
-G9 (the normal_modes read error).
-No item yet:
-- The 9 failing tests in the rest of src (see Tests): the 4 render tests belong to E7b [outside]; open whether the
-  other 5 belong to the refactor.
-- From the old README: is single-component Cartesian selection a wanted feature?
+Other items:
+    small, any time      H8 (keep or drop a rule), G6 (smallest energy differences)
+    postponed            A15 (polarization order, one line), E4 (README)
+    optional checks      G3 (rest); G4, G5 (needed before polarizations other than all along x, or ranks
+                         other than 4, are used)
+    later, when needed   D1, D2, E8 (line features), G7 (other experiments), E10 (tune the knobs)
+    [outside]            E6b (the caller), E7b (the render code), G2, G8 (reader checks), G9 (normal_modes)
+    no item yet          - the 9 other failing tests in the rest of src (see Tests): the 4 render tests belong
+                           to E7b; open whether the other 5 belong to the refactor
+                         - from the old README: is single-component Cartesian selection a wanted feature?
 
 
 Decisions and known limits
 --------------------------
-- B7 (2026-10-09): each term's motif has exactly one resonance point: number of conditions = number of axes
-  = rank of the condition matrix. Checked when compiling (CompiledTerm.from_VibPertTerm, plan.py).
-  Not supported: fewer conditions than axes (a line, E8), more conditions than axes. Malformed: conditions that
-  contradict each other. A term without conditions passes: no spectrum, but its other parts can be computed.
-- Denominators (2026-10-10): w is always the Hessian eigenvalue (nc_sqrt_eigval); an energy difference always
-  uses the chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); to_str prints
-  both alike, e.g. <['a'],[]>.
-- states_choice must follow the vib analysis regime: GVPT2, VPT2 -> anharmonic; harmonic -> harmonic. The two
-  differ in 272 of 340 formaldehyde coefficients. The data cannot know the regime, so nothing has a default.
-  The data holds no choice (2026-10-12): MolSystemData.states holds every state set the source has, by choice
-  (states['harmonic'], states['anharmonic']). The evaluation takes states_choice (compute_features,
-  build_contributions, evaluate_term_coeff_sumover, evaluate_full_index_dict, otf_vibdiffdenom) and reads
-  states[states_choice]. One loaded MolSystemData serves both choices. A choice the data lacks raises
-  (MolSystemData.check_states_choice), e.g. 'GVPT2' or 'anharmonic' without anharmonic states.
-- Excluded modes are removed everywhere (2026-10-13): evaluate_response_terms(exclude_modes=(5,)) uses mode 5
-  neither as a resonance label (no row, no peak) nor as a value of a summed label, as if the molecule did not
-  have it. So the other peaks change too. Modes count from 0, as in the data; an unknown mode raises
-  (evaluate.included_modes). The old code (VibAnaSetup.exclude_modes) differs: no peaks either, but its sums
-  dropped the mode only where the summed label is in the averaged part (its precalculated averaged tensors were
-  0 there), e.g. EVV terms 2, 4, 5, 7, 9-12 still summed over it.
-- No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak features stay, and so do
-  features whose rows cancel (a record: FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0
-  never becomes a row (FeatureResult.zero).
-- The data is the caller's job (2026-10-14): the evaluator takes a MolSystemData (molsys_data) and reads no file;
-  it takes no DataOriginInfo and does not call wilson_data_obtainer. Loading belongs to wilson_system
-  (MolSystemData.load, MolSystemData.from_datadict). The evaluator only says which properties the terms use:
-  pipeline.prop_names(terms). evaluate_response_terms checks that molsys_data has them (MolSystemData.check_props).
-- Linear polarization only (2026-10-11): get_pol_laser stores into a real array. A complex vector (circular light)
-  loses its imaginary part with only a ComplexWarning, e.g. (1, i, 0)/sqrt(2) on all four slots gives (0, 0, 0).
-  No complex conjugate for the detected field either. Before circular light is used: raise on complex input, then
-  add the conjugates.
-- Boxes by amplitude (E10, 2026-10-14): each feature is drawn on its own box, sized so that a cut tail changes the
-  plot by about eps * floor at most (floor = max / dynrange, the faintest the plot shows). dynrange is the plot's,
-  required. Measured: at most 0.13 floors with eps 0.1. Before E10 (and in the old code, C3) boxes ended at
-  1/dynrange of each feature's own peak, drawn by domains: 0.8-7.7 floors, up to 100 % off at points the plot
-  shows (formaldehyde, ACDM; dynrange 100-1000).
-  The box size is a rule passed to draw_spectrum (box_rule, 2026-10-14): amplitude_half_widths (the above), or
-  intensity_half_widths (the old code's rule, kept as an option). No rule drops a feature.
-- Peak width (E5, 2026-10-13): propagator_param sizes both the drawn peak and its box. A box is sized with the
-  largest peak width, on every axis; a width that grows away from the peak can still be cut off by the box.
-  A width function gets only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (the
-  FIXME in eval_resonance_factor).
+- One resonance point per term (B7, 2026-10-09): number of conditions = number of axes = rank of the condition
+  matrix. Checked when compiling (CompiledTerm.from_VibPertTerm, plan.py). Not supported: fewer conditions
+  (a line, E8) or more. Conditions that contradict each other: malformed. A term without conditions passes
+  (no spectrum, but its other parts can be computed).
+- Denominators (2026-10-10): w is always the Hessian eigenvalue (nc_sqrt_eigval); an energy difference uses the
+  chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); to_str prints both alike,
+  e.g. <['a'],[]>.
+- states_choice (2026-10-12) must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic ->
+  'harmonic'. No default: the data cannot know the regime (formaldehyde: 272 of 340 coefficients differ).
+  MolSystemData.states holds every state set the source has; the evaluation reads states[states_choice].
+  A choice the data lacks raises (MolSystemData.check_states_choice).
+- Excluded modes (2026-10-13) are removed everywhere, as if the molecule did not have them: no peak, and not
+  summed over, so other peaks change too. Modes count from 0; an unknown mode raises (evaluate.included_modes).
+  The old code (VibAnaSetup.exclude_modes) still summed over them in EVV terms 2, 4, 5, 7, 9-12.
+- No feature is dropped for its amplitude (2026-10-09), as in the old code. Weak and cancelling features stay
+  (FeatureResult.cancelling(rel_tol) lists them). A term with coefficient 0 makes no row (FeatureResult.zero).
+- The data is the caller's job (2026-10-14): the evaluator takes a MolSystemData, reads no file, and does not
+  call wilson_data_obtainer. Loading: MolSystemData.load or MolSystemData.from_datadict (wilson_system).
+  The evaluator names the properties the terms use (pipeline.prop_names(terms)) and checks that the data has
+  them (MolSystemData.check_props).
+- Linear polarization only (2026-10-11): get_pol_laser stores into a real array, so a complex vector (circular
+  light) loses its imaginary part with only a ComplexWarning. No complex conjugate for the detected field
+  either. Before circular light is used: raise on complex input, then add the conjugates.
+- Boxes by amplitude (E10, 2026-10-14): each feature is drawn on its own box, sized so that a cut tail changes
+  the plot by at most about eps * floor (floor = max / dynrange). The box rule is an input:
+  draw_spectrum(box_rule=), amplitude_half_widths (new) or intensity_half_widths (the old rule). No rule drops
+  a feature.
+- Peak width (E5, 2026-10-13): propagator_param sizes both the drawn peak and its box. A box uses the largest
+  peak width, on every axis; a width that grows away from the peak can still be cut off. A width function gets
+  only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (FIXME in
+  eval_resonance_factor).
 
 
 A. Small fixes
 --------------
-[-] A15 Postponed 2026-10-14; until then the A15 tests fail on purpose (see Tests).
+[-] A15 Polarization order. Postponed 2026-10-14; until then the A15 tests fail on purpose (see Tests).
         get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
-        reverse order: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector,
-        k = pulse k (dressWithPulseInteractions, response_terms.py); the experiment lists all_polarizations in the
-        same order. e.g. get_pol_laser([x, y, z]) gives [-1.0]; epsilon_xyz = +1.
-        Effect: rank 2 and 4 none (their f elements map onto themselves under reversal), so the 14 EVV terms are
-        right. Rank 3: the sign flips. A VibExperiment with detector x, pulse 1 y, pulse 2 z averages three
-        transition dipoles to -det(mu)/6 instead of +det(mu)/6, the value of the mirror-image molecule.
-        Rank 5 and mixed rank 6: wrong values (rank 5, xyzxx: exact -0.292, code -0.238; beta-alpha CARS form,
-        fields x, y, z, x, x: +0.598 instead of -0.963).
-        Fix, checked against the exact average (G4), ranks 2-6; rank 4 old vs fixed 4e-15:
+        reverse: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector, k = pulse k
+        (dressWithPulseInteractions, response_terms.py). e.g. get_pol_laser([x, y, z]) gives [-1.0]; should be +1.
+            rank 2, 4   no effect (the 14 EVV terms are right)
+            rank 3      sign flips: detector x, pulse 1 y, pulse 2 z gives -det(mu)/6 instead of +det(mu)/6,
+                        the value of the mirror-image molecule
+            rank 5, 6   wrong values. Rank 5, xyzxx: exact -0.292, code -0.238. beta-alpha CARS form, fields
+                        x, y, z, x, x: +0.598 instead of -0.963
+        Fix, checked against the exact average (G4), ranks 2-6 (rank 4 old vs fixed: 4e-15):
             return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
-        Pinned by:
-        - wilson_intensities/tests/unit/test_get_pol_tensor.py: 7 plain tests that fail until the fix, no
-          averaging needed (index order, Kronecker product of the list, rank 3 = +det); 1 control passes.
-        - wilson_intensities/tests/unit/test_averaging_pol_order.py: 14 strict xfails (the recipe against the
-          exact orientation average, ranks 2-6); 13 more pass before and after the fix.
-        - tests/test_a15_polarization_order.py: 5 plain tests that fail until the fix (rank 3 and rank 5 through
-          the evaluator); 2 pass.
-        Checked with the fix applied in memory: all of them pass; test_averaging.py, the experiment tests and the
-        rest of refac_rsp_eval do not change.
-        Fix, then remove the 14 xfail marks (they turn into XPASS failures).
-[x] A16 test_integration.py, the two term 8 tests: pytest.approx with its default abs=1e-12. The formaldehyde
-        averages are at most 5e-6, so small entries are barely checked (as in G1). Set abs=0.
-        Done 2026-10-14, rel 1e-12 in both:
-        - einsum contraction: abs=0. Values from 1e-23 to 5e-6; measured rel at most 1.6e-15.
-        - rotation: abs=0 fails. 144 of the 216 values are rounding noise (below 2.4e-19) and change with the
-          rotation by up to 34 % of their size. So abs=1e-18, the evaluator's zero_tol, as in the F1 einsum test.
-          The other 72 values (6.4e-9 or more) agree to rel 2e-15.
+        Then remove the 14 xfail marks (they turn into XPASS failures). Tests that pin it:
+            wilson_intensities/tests/unit/test_get_pol_tensor.py        7 fail until the fix; 1 control passes
+            wilson_intensities/tests/unit/test_averaging_pol_order.py   14 strict xfails; 13 pass either way
+            refac_rsp_eval/tests/test_a15_polarization_order.py         5 fail until the fix; 2 pass
+        With the fix applied in memory all of them pass, and nothing else changes.
 
 
 D. Data model
 -------------
 [ ] D1  PropsCollection.__eq__ only checks "every prop of A is in B", so [p1] == [p1, p2]. Make it frozen, with
-        __eq__ and __hash__ from one key. No code uses a PropsCollection as a dict key; CompiledTerm's ==
-        still compares them.
+        __eq__ and __hash__ from one key. No code uses it as a dict key; CompiledTerm's == still compares them.
 [ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
-[x] D3  ParameterSet: drop the hidden 'zero' entry and the '' -> 'zero' remap; __lt__ without hard-coded a..h.
-        D1-D3 block nothing: rows store term_id and motif, not the CompiledTerm.
-        Done 2026-10-14 (plan.ParameterSet only; the old code keeps its two copies, term_parts.py and
-        func_abstractions.py):
-        - What the entry was for: the first ParameterSet (2025-10-18) served VibDiffSymbolic, whose states were
-          single strings, the ground state 'zero' or ''; parameters['zero'] -> 'zero' let the ground state go
-          through the same lookup as a mode. The new code looks up each quantum (VibDiff.from_quanta); derive's
-          ground state has no quanta (q = []) and only one-letter quanta, and make_state_label(()) gives 'zero'.
-        - Checked before the change: all tests with the entry and the remap patched out in memory: only the 2
-          tests of the entry itself failed.
-        - ParameterSet holds exactly the given labels: len({'a': 0, 'b': 3}) = 2; ps['zero'], ps[''] raise KeyError.
-        - No order: __lt__ and SpectralFeature.sort_by_params deleted. Nothing sorted ParameterSets but 3 tests
-          (checked with __lt__ removed in memory): the 2 of the order itself (deleted) and
-          test_build_contributions_one_solve_per_motif_and_params (compares with Counter now).
-        - Tests: the 2 'zero' tests became test_parameterset_holds_exactly_the_given_labels;
-          test_from_quanta_works_with_the_zero_entry_of_a_parameter_set (test_system_data.py) deleted.
-[ ] D4  VibState, MolecularProperty and MolPropsCollection exist twice: wilson_main/abstractions.py and
-        wilson_system/system_data.py. Decide who owns them; the other side imports. Keep the imports free of
-        cycles: plan.py imports system_data only for type hints (if TYPE_CHECKING), system_data.py does not
-        import plan.py; evaluate.py and pipeline.py import system_data for real.
-        Decided 2026-10-14: wilson_system owns them; wilson_main imports. The code move waits: no big moves or
-        removals outside refac_rsp_eval for now.
-[ ] D5  Data-dict contract: what the evaluator expects in the data dict. Delivering a dict that fits is the
-        reader's job [outside].
-        To do: write the list below into the README. [x] The load checks named in it (2026-10-14).
-        Load checks: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load too). It lists
-        every problem in one ValueError; load adds the source to the message. Every rule passes on formaldehyde,
-        water, CO and ACDM (the tensors are exactly symmetric). 52 ms for cff, qff and polhess at 42 modes.
-        Since then from_datadict needs 'nc_sqrt_eigval' and 'harmonic_states': the wilson_system tests with
-        partial toy dicts use a toy dict that fits (TOY_DATA, test_system_data.py).
-        - names: properties as dipgrad, polgrad, polhess, diphess, cff, ...; frequencies as 'nc_sqrt_eigval';
-          states as 'harmonic_states' and 'anharmonic_states'. Load check: every needed name is there
-          (properties: in MolSystemData.load since 2026-10-12; frequencies and harmonic states: check_data_dict
-          since 2026-10-14; anharmonic states may be missing: check_states_choice raises when they are asked for).
-        - layout: mode indices first, then x, y, z, e.g. polhess[a, b, x, y]. Modes are 0 .. n-1, with
-          n = number of frequencies. Load check: shapes, e.g. polhess is (n, n, 3, 3) (PROP_INDEX_COUNTS: the
-          index counts of every name prop_trivname makes; 'B' and 'coriolis' get no shape check); the
-          frequencies' keys are 0 .. n-1.
-        - full tensors: every index order is filled, e.g. cff[a, c, c] and cff[c, a, c]. Load check: each
-          tensor is symmetric in its mode indices (rtol 1e-12, atol 1e-18: the evaluator's zero_tol).
-        - units: properties in au; frequencies and state energies in cm-1 (converted to Eh inside).
-        - coordinates [outside]: plain derivatives in mass-weighted coordinates, in au. derive's formulas
-          (1/(2w) per mode pair, Taylor factors 1/2 and 1/6) fit only this form. No load check is possible.
-          Gaussian reader: fits (checked 2026-10-11). CFOUR reader: not checked.
-        - state energies: relative to the ground state (0). Key ('0', '0') = 2 quanta in mode 0. Every
-          fundamental is in 'harmonic_states'. Load check: the fundamentals are there.
-          Found 2026-10-14: ACDM's anharmonic states (GVPT2) have 66 of 14189 energies at or below 0, e.g. the
-          fundamentals of modes 41, 40, 39: -136.1, -128.0, -54.7 cm-1 (harmonic: positive); the lowest,
-          ('40', '41', '41'), -596.7 cm-1. The low-frequency modes of the dimer.
-          The F2 speed test and the E10 tables use ACDM with anharmonic states.
-          Decided 2026-10-14: a warning, no error, for now. check_data_dict warns (UserWarning) for any state list
-          with energies at or below 0: how many, and the lowest 3. load's warning names the source.
-        - zero: |value| < 1e-18 counts as 0. Fits au: rounding noise is about 1e-19, real values 1e-9 or more
-          (formaldehyde).
+        D1 and D2 block nothing: rows store term_id and motif, not the CompiledTerm.
+[ ] D4  VibState, MolecularProperty, MolPropsCollection exist twice: wilson_main/abstractions.py and
+        wilson_system/system_data.py. Decided 2026-10-14: wilson_system owns them; wilson_main imports.
+        The code move waits (rule in Order of work). Keep the imports free of cycles: plan.py imports
+        system_data only for type hints (if TYPE_CHECKING); system_data.py does not import plan.py;
+        evaluate.py and pipeline.py import system_data for real.
+[ ] D5  Data-dict contract: what the evaluator expects. Delivering a dict that fits is the reader's job [outside].
+        To do: write the table below into the README (E4).
+        Load checks done 2026-10-14: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load
+        too). It lists every problem in one ValueError. Passes on formaldehyde, water, CO, ACDM; 52 ms at 42 modes.
+            rule            what                                              load check
+            names           properties: dipgrad, polgrad, polhess, diphess,   every needed name is there;
+                            cff, ...; frequencies: 'nc_sqrt_eigval';          anharmonic states only when asked
+                            states: 'harmonic_states', 'anharmonic_states'    for (check_states_choice)
+            layout          mode indices first, then x, y, z, e.g.            shapes (PROP_INDEX_COUNTS; none for
+                            polhess[a, b, x, y]; modes 0 .. n-1               'B', 'coriolis'); frequency keys
+                            (n = number of frequencies)                       are 0 .. n-1
+            full tensors    every index order is filled, e.g. cff[a, c, c]    symmetric in the mode indices
+                            and cff[c, a, c]                                  (rtol 1e-12, atol 1e-18)
+            units           properties in au; frequencies and state           -
+                            energies in cm-1 (converted to Eh inside)
+            coordinates     plain derivatives in mass-weighted coordinates,   none possible. Gaussian reader
+              [outside]     au; derive's formulas fit only this form          fits (2026-10-11); CFOUR: not checked
+            state energies  relative to the ground state (0);                 the fundamentals are there;
+                            key ('0', '0') = 2 quanta in mode 0               warning (no error) for energies <= 0
+            zero            |value| < 1e-18 counts as 0 (rounding noise       -
+                            ~1e-19; real values 1e-9 or more)
+        ACDM's anharmonic states (GVPT2) have 66 of 14189 energies <= 0, e.g. the fundamentals of modes 41, 40, 39:
+        -136.1, -128.0, -54.7 cm-1 (harmonic: positive); the lowest, ('40', '41', '41'), -596.7 cm-1. The
+        low-frequency modes of the dimer. F2 and E10 use them anyway.
+        Tests with toy dicts must use a dict that fits (TOY_DATA, test_system_data.py).
 
 
 E. Pipeline
 -----------
-[-] E4  README. Postponed 2026-10-14. The old one was removed 2026-10-09: it described designs the code does not follow
-        (git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md). After D4. Contents:
-        the pipeline (pipeline.py docstring), the drawing (from_features, domains, draw_window; draw_all as the
-        reference; the size of the cut), the data-dict contract (D5), the decisions above.
-[ ] E6  The evaluator's inputs and outputs, and where it is called. Split 2026-10-14: the WilsonSimulation
-        procedure will change, so where the evaluation is called is open. E6a (evaluator side) in the refactor;
-        E6b (the caller) outside it (see Outside the refactor). Until E6b, the old pipeline runs, double count
-        included (C3).
-        The calls (pipeline.py):
+[-] E4  README. Postponed 2026-10-14; after D4. Contents: the pipeline (pipeline.py docstring), the drawing
+        (from_features, draw_window; draw_all as the reference; the size of the cut), the data-dict contract (D5),
+        the decisions above. The old README (removed 2026-10-09; it described designs the code does not follow):
+            git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md
+[ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
+        [outside]. Until E6b, the old pipeline runs, double count included (C3).
+            molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
-                                             propagator_param=, exclude_modes=)              FeatureResult
-            spec   = draw_spectrum(result, window, dim_sizes, box_rule=)                      EvalRspResult
-        The data is the caller's job (see Decisions): the caller makes the MolSystemData, e.g.
-            molsys = MolSystemData.load(origin, prop_names(terms))                            once
-        Inputs: plain values, derive's terms and two small types (MolSystemData, SpectralAxisSet).
-        No WilsonSimulation type. Where the old setup keeps each one:
-            terms             VibPerturbedTerm list, in pulse IDs           sim.terms
-            molsys_data       MolSystemData, made by the caller             the origin: eval_uniform (addPropEvalSetup)
-            axes              SpectralAxisSet                               sim.axis_choice, else exp.canonical_axes
-            states_choice     'harmonic' or 'anharmonic'                    vib_ana_setup.regime (see Decisions)
-            laser_pol         numbers, e.g. (1, 1, 1)                       exp.polarization_avg_vector
-            propagator_param  cm-1, a number or a function (E5)             ev_info.Gamma, ev_info.Gamma_unit
-            exclude_modes     mode numbers, from 0                          vib_ana_setup.exclude_modes
-            window            grid.Box, cm-1, one range per axis            ev_info.spectral_window.box: another
-                                                                            Box class (spectrum_composition), convert
-            dim_sizes         grid points per axis, both edges included     ev_info.grid_resolution
-            box_rule          features.BoxRule, knobs by functools.partial, the old box settings:
-                              e.g. partial(amplitude_half_widths,           box_range_safety_margin,
-                              dynrange=500.)                                scale_wrt_max_intensity,
-                                                                            minimum_box_padding (cm-1)
-                dynrange      the plot's dynamic range, required by both    ev_info.dynamic_range (default 100)
-                              rules
-                amplitude_half_widths: eps, min_gammas, max_cm, a_max       no old equivalent (E10)
-                intensity_half_widths: the old names, meanings and          box_range_safety_margin,
-                              defaults; max_intensity (None: the strongest  scale_wrt_max_intensity, minimum_box_padding
-                              peak inside the window, as the old callers)   (cm-1)
+                                             propagator_param=, exclude_modes=)      -> FeatureResult
+            spec   = draw_spectrum(result, window, dim_sizes, box_rule=)              -> EvalRspResult
+        Inputs, and where the old setup keeps each one (for E6b):
+            terms             VibPerturbedTerm list, in pulse IDs          sim.terms
+            molsys_data       MolSystemData, made by the caller            the origin: eval_uniform (addPropEvalSetup)
+            axes              SpectralAxisSet                              sim.axis_choice, else exp.canonical_axes
+            states_choice     'harmonic' or 'anharmonic'                   vib_ana_setup.regime (see Decisions)
+            laser_pol         numbers, e.g. (1, 1, 1)                      exp.polarization_avg_vector
+            propagator_param  cm-1, a number or a function (E5)            ev_info.Gamma, ev_info.Gamma_unit
+            exclude_modes     mode numbers, from 0                         vib_ana_setup.exclude_modes
+            window            grid.Box, cm-1, one range per axis           ev_info.spectral_window.box (another Box
+                                                                           class, spectrum_composition: convert)
+            dim_sizes         grid points per axis, both edges included    ev_info.grid_resolution
+            box_rule          features.BoxRule, knobs by functools.partial,
+                              e.g. partial(amplitude_half_widths, dynrange=500.)
+              dynrange        the plot's dynamic range, required           ev_info.dynamic_range (default 100)
+              amplitude_half_widths: eps, min_gammas, max_cm, a_max        no old equivalent (E10)
+              intensity_half_widths: the old knobs (names, meanings,       box_range_safety_margin,
+                defaults); max_intensity (None: strongest in window)       scale_wrt_max_intensity, minimum_box_padding
         Outputs:
-            FeatureResult     the rows (table), zero, features; leaves(row), cancelling(rel_tol)
-            EvalRspResult     grid_result: complex amplitude in au, one per grid point     the old sim.spec
-                              grid_mesh: the grid points, a full array per axis           the old spec_eval_setup.grid
-                              grid_axes: 1D points per axis; spectral_window: features and boxes
-        Decided:
-        - states_choice: from the vib analysis regime (see Decisions); the caller reads it.
-        - exclude_modes: VibAnaSetup.exclude_modes (see Decisions). The old-vs-new check matches only without
-          excluded modes: the two codes exclude differently.
-        - the states for drawing: FeatureResult.states.
-[x] E6a Evaluator side. Needs no caller. Done 2026-10-14.
-        - [x] The inputs and outputs above, in the pipeline.py module docstring (2026-10-14); later the README (E4).
-              The column "where the old setup keeps each one" stays here, for the caller (E6b).
-        - [x] E10 knobs: amplitude_half_widths keeps both, dynrange and eps (see E10).
-        - [x] Data out of the evaluator (2026-10-14, see Decisions): pipeline.load_molsys_data and
-              PropsCollection.build_request_dict (plan.py) deleted, with build_request_dict's test (test_plan.py).
-              The tests and scripts load with MolSystemData.load(origin, prop_names(terms)).
-        - [x] Old box settings (E10): two box rules, draw_spectrum(box_rule=). amplitude_half_widths: eps replaces
-          box_range_safety_margin, min_gammas replaces minimum_box_padding (in gammas, not cm-1),
-          scale_wrt_max_intensity is built into the rule. intensity_half_widths (the old rule) keeps the old
-          settings: names, meanings, defaults.
-        - [x] margins (diag_margin, for the condition w2 > w1): dropped with the magnitude-condition filter below.
-        - [x] Grid: old sample_grid (its last point falls short of the window's max) or new make_grid (both edges).
-          draw_spectrum uses make_grid now.
-        - [x] The magnitude-condition filter (EvaluationInfo.apply_magn_conditions, off by default): dropped
-          2026-10-14, not done in the evaluation. SpectralFeature.apply_magn_cond_filter and its 5 tests deleted.
-        - [x] The default dynrange (E10): none. dynrange is the plot's dynamic range (the renderer has it; log scale
-          is its default), required. The caller passes the renderer's value (E6b).
-        - [x] Data from more than one source: the old setup can take one origin per property (eval_by_prop_name);
-          MolSystemData.load takes one origin. Support it, or not. --- NOT SUPPORTING NOW
-        - [x] Data that the caller already read: MolSystemData.from_datadict builds one from a data dict. Since
-          2026-10-14 build_contributions checks the properties the terms use (MolSystemData.check_props), however
-          the data was made. load makes the same check (check_props), with another meaning: the source did not
-          return a requested property. Its message names the source.
-[outside] E6b The caller: moved to Outside the refactor (2026-10-14).
-[ ] E10 Box size by amplitude (found 2026-10-14). The boxes before E10 cut off parts of the spectrum that the plot
-        shows. A box sized by amplitude, with each feature drawn on its own box, is accurate and about as fast.
-        Code done 2026-10-14 (see Code below). The domains: delete in E9 (see Code below, 2026-10-15).
-        Decided 2026-10-14: amplitude_half_widths keeps both knobs, dynrange and eps. The formula uses only their
-        ratio eps / dynrange: the allowed intensity error as a fraction of the strongest peak, e.g.
-        0.1 / 500 = 2e-4. dynrange = 1 does not switch it off (it raises; allowed, it would mean 10 % of the max).
-        Not taken: one knob instead (e.g. rel_err, with a default, so box_rule=amplitude_half_widths works without
-        partial).
-        Later: tune the knobs (tests/e10_boxes.py with more cases and knob values, then choose the defaults).
-        ("today" below: the boxes before E10.)
-        Why today's boxes cut too much:
-        - A box ends where the feature's intensity is down to 1/dynrange of its own peak:
-          half-width gamma * sqrt(D - 1) * 1.1, the same for every feature (115 cm-1 at gamma 4.7, D 500).
-        - The drawing adds amplitudes, then squares. A cut tail t next to amplitude A changes the intensity by up to
-          2 |A| |t|, much more than t^2. And a feature's amplitude falls only as gamma / d along each axis (its
-          ridge: on resonance in the other axes), its intensity as (gamma / d)^2.
-        - So the cut tails of strong peaks change visible peaks nearby. And a feature outside the window that is
-          stronger than anything inside (ACDM, quick_start window: 4 of them, 49-81 times) has a ridge above the
-          floor inside the window, but its box does not reach in: it is not drawn at all.
-        - Domains hide part of this (see "Domains vs each feature on its own box" below).
-        - Bigger boxes help little: ACDM, plot floor at D 500, box dynrange 500 -> 250000: 3.9 -> 3.0 floors, the
-          drawing 3 s -> 66 s (draw_all: 73 s). The rest comes from features more than 2585 cm-1 away.
-        What dress_these_with_boxes was for (features.py; now intensity_half_widths, see below): the same idea as the rule
-        below, from the plot's dynamic range, done in intensity. scale_wrt_max_intensity: a box ends where the feature
-        drops below the plot's floor, so weak features get small boxes. minimum_box_padding: a smallest box; with 0,
-        features below the floor are dropped (against the 2026-10-09 decision). It raises for a feature stronger than
-        the max it gets; the old caller gives the max of the features inside the window (ACDM has 4 stronger outside;
-        not checked whether the old path passes them in). It deep-copies every feature. Measured, ACDM, D 500: draws
-        in 0.18 s, but parts of the visible spectrum are lost (100 % off at a visible point).
-        The rule. From the plot's dynamic range D, as the renderer has it:
-            the plot shows intensities down to floor = A_max^2 / D
-            a cut tail may change the plot by at most eps * floor:   2 * A_max * tail(d) <= eps * floor
-            tail(d) = a_f * gamma / sqrt(d^2 + gamma^2)                a_f: the feature's peak amplitude
-            k = 2 * D * a_f / (eps * A_max),  half-width d = gamma * sqrt(k^2 - 1)     k <= 1: 1 gamma
-          a_f = sqrt(get_intensity()); gamma: the largest of peak_widths(), on every axis (as now); eps = 0.1.
-          A_max without drawing: each feature's amplitude at the nearest point of the window, the largest. Within
-          0.4-10 % of the true max in the cases below.
-          Strong features get the whole window, weak ones small boxes. e.g. ACDM, D 500: a feature with 1e-2 of the
-          max intensity -> the whole window; 1e-4 -> 470 cm-1; 1e-6 -> 47 cm-1; 1e-8 -> 1 gamma.
-        Measured 2026-10-14 against draw_all: the 14 EVV terms, anharmonic states, gamma 4.7 cm-1. err: the largest
-        error, in floors (max / D); worst: the worst grid point above the floor. quick_start window: A (700, 3400),
-        B (10, 3500), 700 x 700 points. zoom: +-150 cm-1 around the strongest feature inside it, 301 x 301 points.
-                                             today (domains)          amplitude, eps 0.1
-            case                    D      err   worst  draw s      err   worst  draw s
-            formaldehyde, big     100      5.1   100 %    0.01     0.06   2.2 %    0.25
-                                  500      5.2   100 %    0.01     0.05   0.7 %    0.74
-                                 1000      5.9   100 %    0.03     0.08   0.5 %    0.92
-            formaldehyde, zoom    100      1.1   100 %    0.00     0.03   0.5 %    0.01
-                                  500      1.2   100 %    0.01     0.12   0.8 %    0.03
-                                 1000      1.7    11 %    0.01     0.04   0.3 %    0.05
-            ACDM, big             100      0.8   8.4 %    0.34     0.09   2.1 %    0.43
-                                  500      3.9    27 %    3.1      0.05   0.9 %    1.1
-                                 1000      7.7    47 %    6.4      0.07   1.1 %    1.5
-            ACDM, zoom            100      0.9    64 %    0.18     0.08   1.0 %    0.13
-                                  500      0.9    13 %    0.27     0.10   1.2 %    0.24
-                                 1000      1.4   9.3 %    0.37     0.13   1.7 %    0.34
-          With eps 0.1 everywhere: at most 0.13 floors; the worst visible point 2.2 % off; no visible point more
-          than 10 % off. eps 0.3: at most 0.47 floors, 4.9 %. Slower than today only with few features
-          (formaldehyde: under 1 s instead of 0.01 s); ACDM at D 500 and 1000: 3-4 times faster.
-          Script: tests/e10_boxes.py at commit 27f41ee (this table and the domains table below; a few minutes). Two
-          other numbers in E10 (bigger boxes, dress_these_with_boxes) came from scratch scripts that were not kept.
-          Since the code step, tests/e10_boxes.py is the tuning script: it scores any knob settings against draw_all.
-          Run 2026-10-14, the same cases, against the library code. err in floors, worst visible point, draw s:
-                                             D 500, eps 0.1           D 500, eps 0.1, max_cm 500
-            formaldehyde, big                0.05   0.7 %   0.95      1.34   36 %   0.04
-            ACDM, big                        0.05   0.9 %   1.22      3.95   26 %   0.29   (10 % of visible pts > 10 % off)
-            ACDM, zoom                       0.10   1.2 %   0.29      0.65    6 %   0.14
-          A cap trades accuracy for speed badly: the strong features' tails are what it cuts. min_gammas 3
-          changed nothing measurable (same err, same time).
-        Domains vs each feature on its own box:
-        - What domains do: draw_window groups boxes that overlap into domains (find_clusters_by_featboxes). Every
-          feature of a domain is drawn on the whole domain box (the rectangle around all its boxes), not only on
-          its own box.
-        - They are not needed for interference. Every box is a cut-out of the same grid points (box_slices), no
-          grid of its own. All amplitudes add on those points, and squaring comes once, on the whole grid. So with
-          each feature on its own box, two overlapping boxes still add their amplitudes where they overlap.
-        - What they change: how far each feature is drawn. In a domain, to the domain's edge: that depends on the
-          neighbours, not on the feature. So more work, and less cut, by accident.
-        - Measured, today's boxes (tests/e10_boxes.py, the cases above). err: largest error in floors.
-                                             domains           own box
-            case                    D      err  draw s      err  draw s
-            formaldehyde, big     100      5.1    0.01     12.1    0.00
-                                  500      5.2    0.01      8.8    0.01
-                                 1000      5.9    0.03      9.0    0.01
-            formaldehyde, zoom    100      1.1    0.00      3.5    0.00
-                                  500      1.2    0.01      1.9    0.00
-                                 1000      1.7    0.01      1.7    0.00
-            ACDM, big             100      0.8    0.33      3.0    0.09
-                                  500      3.9    2.9       9.3    0.14
-                                 1000      7.7    6.1       9.3    0.20
-            ACDM, zoom            100      0.9    0.12      2.4    0.02
-                                  500      0.9    0.26      3.2    0.07
-                                 1000      1.4    0.34      3.0    0.13
-          The domains hide part of today's cut (own box: 1.7-12 floors, domains: 0.8-7.7), at up to 20 times the
-          cost (ACDM, big, D 500). With amplitude boxes the own box is enough (at most 0.13 floors, table above).
-        - So with E10: each feature on its own box; domains leave the drawing. Keep them only if plotting regions
-          needs them (E7), else delete them (E9).
-        dress_these_with_boxes: kept as a second box rule, features.intensity_half_widths (2026-10-14).
-        - The box step takes a rule: draw_spectrum(box_rule=), a function (window, features) -> half-widths
-          (features.BoxRule). functools.partial gives a rule its knobs, e.g. partial(intensity_half_widths, dynrange=500.).
-        - The old knobs keep their names, meanings and defaults (box_range_safety_margin 0.1, unscaled,
-          minimum_box_padding 0 cm-1), plus dynrange: the old function took max_intensity and min_intensity, and
-          both old callers set min_intensity = max_intensity / dynamic_range, so implied_dynrange = dynrange.
-          max_intensity: None -> the strongest peak inside the window, as the old callers took it.
-        - Changed from dress_these_with_boxes: returns half-widths (from_features makes the boxes, no deep copy);
-          never drops a feature (2026-10-09; the old function dropped the features below min_intensity when
-          minimum_box_padding was 0; dropping could come back as a knob, not for now); no error for a feature
-          stronger than max_intensity (a stronger feature outside the window is normal: ACDM has 4).
-        - Unscaled (default) it gives the boxes of before E10: c3_spectrum.py uses it, old = new still 1e-16.
-          Measured 2026-10-14 (tests/e10_boxes.py rules: formaldehyde and ACDM, quick_start window and zoom,
-          dynrange 100, 500, 1000), error in floors against draw_all, worst visible point:
-              amplitude, eps 0.1              0.03-0.13 floors, 2.2 %; draws in 0.01-0.8 s
-              intensity, unscaled             1.7-12 floors, 86-214 %; 0.00-0.16 s
-              intensity, scaled               0.7-39 floors, 44-229 %; 0.00-0.09 s
-              intensity, scaled, padding 10   about as scaled (padding: at most 15 % less error)
-        - The old pipeline has its own copy (amplitudes/spectrum_composition.py, tested in wilson_intensities/
-          tests/unit/test_specfeature.py and test_integration_evaluation.py); that copy goes with E9.
-        - lorentzian_distance_to_dynrange_weaker_than_max: both rules use it.
-        Code (2026-10-14):
-        - [x] features.amplitude_half_widths: the rule, with the knobs eps (default 0.1), min_gammas (the smallest
-              box in gammas, default 1), max_cm (a cap; default none: with a cap, eps no longer bounds the error),
-              a_max (default: the estimate above, amplitude_in_window). Docstring: the formula, the knobs, numbers.
-        - [x] SpectralWindow.from_features(box, features, half_widths): any rule's half-widths, one per feature.
-        - [x] draw_window: each feature on its own box, no domains.
-        - [x] draw_spectrum: dynrange required (the plot's), and the knobs. Since the box rule: box_rule required,
-              the knobs go with the rule.
-        - [x] Tests against draw_all (test_evaluate.py): a strong peak next to a weak one (0.034 floors; before: 0.8),
-              a strong peak outside the window (0; before: 58 floors). test_draw_window_cut_is_small_for_the_strongest_
-              peak_not_for_a_weak_neighbour went. test_features.py: the rule and each knob.
-        - [x] Scripts: e10_boxes.py (the tuning script), f2_speed.py and the example use the new code;
-              c3_spectrum.py keeps the boxes and the domain drawing of before, to compare with the old code (C3).
-        - [x] Box rule as an input (2026-10-14): draw_spectrum(box_rule=), features.BoxRule. dress_these_with_boxes
-              reworked into intensity_half_widths (above); its tests rewritten; e10_boxes.py scores either rule.
-        - [ ] Domains (find_clusters_by_featboxes, RectangularDomain): no longer used in drawing. Keep only if
-              plotting regions needs them (E7), else delete (E9). Since E7 (2026-10-15) nothing in the new
-              code needs them; their only user is c3_spectrum.py (the drawing of before, C3). So: delete in E9,
-              with c3_spectrum.py.
-        - The drawing no longer matches the old code (the old code cuts more), so the old code is no reference for
-          the drawing: draw_all is (test_pipeline.py). The rows against the old code are checked (C2). For this
-          reason E6b's check against the old code is dropped.
-        Limits: a Lorentzian tail (gamma / d); the largest width on every axis, the width at the peak (as now).
-        A worst case (it assumes the cut tail meets A_max), so boxes are larger than needed where the plot is weak.
-[x] E7  Plotting the new result. Done 2026-10-15. The rest of the render code (the old renderer, plot_regions) is
-        not part of the evaluator refactor since 2026-10-15: E7b, see Outside the refactor.
-        - [x] wilson_analysis/render/plot_spectrum.py (2026-10-15): 1D and 2D spectra, plain arguments, two
-              functions:
-                plot_spectrum(intensity, grid, ...)   any real 1D or 2D intensity array; grid: one full array of
-                                                      the grid points per axis (1D: the points; 2D:
-                                                      EvalRspResult.grid_mesh, the old spec_eval_setup.grid,
-                                                      np.meshgrid(..., indexing='ij'))
-                plot_rsp_func(spec, ...)              the new result (EvalRspResult), 1D or 2D: plot_spectrum of
-                                                      |spec.grid_result|^2 on spec.grid_mesh
-              Both show intensity / top from 1 / dynrange to 1 on a log scale (top: the max, or reference_max for
-              a shared scale). 1D: a line, y axis log. 2D: the key steps of MatplotlibRenderer: nlevels
-              log-spaced levels; magma, over_color above the top, below_color under the lowest level; colorbar
-              ticks as fractions of the top. Left out: RenderingInfo, EvaluationInfo, PlotConfig, the EVV-only
-              w2 > w1 mask, the second colorbar axis, saving. Same 2D plot as MatplotlibRenderer on formaldehyde
-              (12 levels, 1.0e9 to 5.2e11). Tests: wilson_analysis/tests/test_plot_spectrum.py.
-              Example: tests/example_plot_spectrum.py (formaldehyde whole window, zoom, a 1D row of the zoom,
-              harmonic vs anharmonic on one scale; ACDM; about 10 s).
-[outside] E7b The rest of the render code: moved to Outside the refactor (2026-10-15).
-[ ] E8  Line features (Later). Fewer conditions than spectrum axes give a line, not a point:
-        - one condition on B only, in an (A, B) spectrum: location {'B': E}, a line along A. from_features raises.
-        - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
-        Real terms like this exist (G7, coincident pulses). Once such a setup matters: allow them in B7, then
-        boxes (the whole window along the line?), get_intensity, eval_feature_on_grid, drawing.
-[ ] E9  Delete the old code (E7 done; E6b's check is dropped, see E6b). Waits: no big
-        moves or removals outside refac_rsp_eval for now (2026-10-14). Code outside
-        refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing pipeline.py. In this order:
-        - [ ] amplitudes/averaging.py stays at this path: wilson_experiment imports get_pol_laser from it, and
-              pipeline.py imports from it too. It needs only numpy.
-        - [ ] amplitudes/__init__.py: Python runs it before averaging.py, and it imports spectrum_composition,
-              evaluation_wf, evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
-              wilson_intensities/__init__.py imports amplitudes too.
-        - [ ] wilson_analysis/render/plot_regions.py imports amplitudes/ (GridRegion), and render/__init__.py
-              imports plot_regions: once amplitudes/ goes, importing render breaks, plot_spectrum included.
-              Before: plot_regions out of render/__init__.py (E7b), or E9 cuts that one import line.
-        - [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState; E6 replaces them.
-        - [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
-              wilson_main/abstractions.py. Already wrong: they live in workflow_abstractions_updated.py.
-        - wilson_derive/response_terms.py has a type hint to the old MolecularProperty. Leave it (wilson_derive);
-          nothing breaks at run time.
-        - tests/c2_variations.py, tests/c2_leaves.py and tests/c3_spectrum.py go too: they run the old code.
-        - First decide about G7: its old-vs-new part needs the old code. Wait for G7, or do G7 later without it.
+            FeatureResult     the rows (table), zero, features, states; leaves(row), cancelling(rel_tol)
+            EvalRspResult     grid_result (complex amplitude in au per grid point; the old sim.spec),
+                              grid_mesh (a full array per axis; the old spec_eval_setup.grid),
+                              grid_axes (1D points per axis), spectral_window (features and boxes)
+        Not supported: data from more than one source (the old eval_by_prop_name); MolSystemData.load takes one
+        origin. The old-vs-new check matches only without excluded modes (the two codes exclude differently).
+[ ] E8  Line features (later). Fewer conditions than spectrum axes give a line, not a point: one condition on B
+        in an (A, B) spectrum (from_features raises); one on A + B, a diagonal line (B7 rejects it). Real terms
+        like this exist (G7, coincident pulses). When needed: allow them in B7, then boxes, get_intensity,
+        eval_feature_on_grid, drawing.
+[ ] E9  Delete the old code. Waits (rule in Order of work). First decide about G7: its old-vs-new part needs
+        the old code. Code outside refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing
+        pipeline.py. In this order:
+        [ ] amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
+            get_pol_laser from it, and pipeline.py imports from it too.
+        [ ] amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
+            evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
+            wilson_intensities/__init__.py imports amplitudes too.
+        [ ] wilson_analysis/render/plot_regions.py imports amplitudes/ (GridRegion), and render/__init__.py
+            imports plot_regions: once amplitudes/ goes, importing render breaks, plot_spectrum included.
+            Before: plot_regions out of render/__init__.py (E7b), or E9 cuts that one import line.
+        [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState.
+        [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
+            wilson_main/abstractions.py. Already wrong: they live in workflow_abstractions_updated.py.
+        [ ] the domains (find_clusters_by_featboxes, RectangularDomain): unused since E10 and E7; only
+            c3_spectrum.py uses them.
+        [ ] the old pipeline's copy of the box rule (amplitudes/spectrum_composition.py; tested in
+            wilson_intensities/tests/unit/test_specfeature.py and test_integration_evaluation.py).
+        [ ] the scripts that run the old code: tests/c2_variations.py, tests/c2_leaves.py, tests/c3_spectrum.py.
+        Leave: wilson_derive/response_terms.py's type hint to the old MolecularProperty (nothing breaks at run time).
+[ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
+        knob setting against draw_all; add cases and knob values, then choose the defaults.
+        The rule (features.amplitude_half_widths), from the plot's dynamic range D:
+            floor = A_max^2 / D                                  the faintest the plot shows
+            2 * A_max * tail(d) <= eps * floor                   a cut tail changes the plot by eps * floor at most
+            tail(d) = a_f * gamma / sqrt(d^2 + gamma^2)          a_f = sqrt(get_intensity()): the feature's peak
+            k = 2 * D * a_f / (eps * A_max);  d = gamma * sqrt(k^2 - 1);  k <= 1: 1 gamma
+          gamma: the largest of peak_widths(), on every axis. A_max: each feature's amplitude at the nearest
+          window point, the largest (0.4-10 % from the true max). Only eps / D counts, e.g. 0.1 / 500 = 2e-4.
+          Knobs: dynrange (required), eps (0.1), min_gammas (1), max_cm (none; a cap breaks the eps bound),
+          a_max (default: the estimate above).
+          e.g. ACDM, D 500: a feature with 1e-2 of the max intensity gets the whole window; 1e-4: 470 cm-1;
+          1e-6: 47 cm-1; 1e-8: 1 gamma.
+        Why: the old boxes ended at 1/D of each feature's own peak. But amplitudes add before squaring, so a cut
+        tail t next to amplitude A changes the intensity by up to 2|A||t|, and an amplitude falls only as gamma / d.
+        So the cut tails of strong peaks changed visible peaks, and strong features outside the window were not
+        drawn at all (ACDM: 4 of them, 49-81 times the strongest inside).
+        Measured 2026-10-14 against draw_all. 14 EVV terms, anharmonic states, gamma 4.7 cm-1. big: the quick_start
+        window, 700 x 700 points; zoom: +-150 cm-1 around the strongest feature, 301 x 301. Ranges over D 100,
+        500, 1000. err: the largest error, in floors; worst: the worst visible grid point.
+                                   old boxes (domains)               amplitude, eps 0.1
+            case                   err      worst      draw s        err        worst      draw s
+            formaldehyde, big      5.1-5.9  100 %      0.01-0.03     0.05-0.08  0.5-2.2 %  0.25-0.92
+            formaldehyde, zoom     1.1-1.7  11-100 %   0.00-0.01     0.03-0.12  0.3-0.8 %  0.01-0.05
+            ACDM, big              0.8-7.7  8.4-47 %   0.34-6.4      0.05-0.09  0.9-2.1 %  0.43-1.5
+            ACDM, zoom             0.9-1.4  9.3-64 %   0.18-0.37     0.08-0.13  1.0-1.7 %  0.13-0.34
+          Full table (per D): tests/e10_boxes.py at commit 27f41ee, or the long todo.
+        Other results:
+            eps 0.3                                    at most 0.47 floors, worst 4.9 %
+            a cap, max_cm 500 (D 500)                  bad trade: ACDM big 3.95 floors, 26 %; formaldehyde 1.34, 36 %
+            min_gammas 3                               no measurable change
+            bigger old boxes (ACDM, D 500, box D 250000)   3.9 -> 3.0 floors, drawing 3 s -> 66 s
+            intensity_half_widths, unscaled            = the boxes before E10; 1.7-12 floors (c3_spectrum.py uses it)
+            intensity_half_widths, scaled              0.7-39 floors
+        Domains (each feature drawn on the rectangle around all the boxes it overlaps): not needed for interference;
+        all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of the old cut
+        (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the own box is
+        enough. They go with E9.
+        intensity_half_widths vs the old dress_these_with_boxes: returns half-widths (no deep copy); never drops a
+        feature; no error for a feature stronger than max_intensity. Same knobs (box_range_safety_margin 0.1,
+        unscaled, minimum_box_padding 0 cm-1), plus dynrange.
+        Limits: a Lorentzian tail (gamma / d); the largest width on every axis; a worst case (assumes the cut tail
+        meets A_max), so boxes are larger than needed where the plot is weak.
+        The drawing no longer matches the old code (the old code cuts more): the reference is draw_all
+        (test_pipeline.py). The rows are checked against the old code (C2).
 
 
 F. Speed
 --------
-Speed test: tests/f2_speed.py on ACDM, the acetic acid dimer, 16 atoms, 42 modes (in git:
+Speed test: tests/f2_speed.py on ACDM (the acetic acid dimer, 16 atoms, 42 modes; in git:
 wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out).
-The 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), states 'anharmonic'. Drawing as in
+14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), 'anharmonic'. Drawing as in
 examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points, gamma 4.7 cm-1, dynrange 500.
-Now: load 4 s, once per molecule. Per spectrum 5.9 s: build_contributions 3.3 s (17101 rows, 7595 zero),
-drawing 2.5 s; since E10 (amplitude boxes, eps 0.1) drawing 1.5 s. Each new polarization, states choice or axis
-choice runs build_contributions again.
-Per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand). See Done.
+    step                  time     note
+    load                  4 s      once per molecule
+    build_contributions   3.3 s    17101 rows, 7595 zero; runs again for each polarization, states or axis choice
+    drawing               2.5 s    1.5 s since E10 (amplitude boxes, eps 0.1)
+    per spectrum          5.9 s    measured before E10
+History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand).
 Not done, not needed so far:
-- einsum for the whole sum over summation labels (with cff and the denominators). Size: n_modes ** (number of
-  distinct labels). 3 labels at 42 modes: 0.6 MB; 5 labels would be 1 GB.
-- evaluate_full_index_dict checks on every index set that every label has a value: 0.56 s on ACDM. Inside the
-  pipeline that check cannot fail: sum_over fills every label.
-- a 1/omega table: about 0.15 s of build_contributions on ACDM (harmonic_denom's share under cProfile).
+    einsum for the whole sum (with cff and the denominators)    size n_modes ** labels: 3 labels 0.6 MB, 5: 1 GB
+    evaluate_full_index_dict's check that every label has a value    0.56 s on ACDM; cannot fail in the pipeline
+    a 1/omega table                                             about 0.15 s of build_contributions on ACDM
 
 
 G. Checks beyond old = new
@@ -483,196 +278,161 @@ Old and new share derive's terms, term_var_translate, the data reader, the avera
 polarization vector. An error there looks the same on both sides, so these checks use no wilson code on the
 checking side.
 [ ] G3  Rotation: rotate the property tensors; every averaged value must stay the same. Done for term 8
-        (test_integration.py: polgrad and dipgrad, formaldehyde, all 216 index sets, to 2e-15). Left: the
-        properties of the other terms (polhess, diphess), if wanted.
-        Limit (2026-10-11): a rotation test cannot catch wrong weights. Any mix of isotropic tensors stays the same
-        under rotation, e.g. laser_pol (0.3, -1.2, 2.0), which no setup of unit vectors gives, passes too
-        (test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
-[ ] G4  Averaging weights against the exact orientation average, numpy only on the checking side.
-        exact_average (test_averaging_pol_order.py, A15): Euler angles z-y-z; alpha and gamma 8 even steps,
-        cos(beta) 8 Gauss-Legendre points: 512 rotations, exact for ranks 1-6. Tested: exact_average against two
-        textbook values (rank 2 <mu_Z mu_Z> = |mu|^2 / 3; rank 4 Raman, zzzz and zxzx); the recipe against
-        exact_average for ranks 2-6 (all parallel, crossed pairs, random vectors).
-        Found: the weights are right; ranks 3, 5 and 6 read the polarizations in reverse order (A15).
-        Left:
-        - the 5 polarization setups of C2
-        - M x Gram(f) = identity for ranks 2-6, Gram(f)[r, s] = sum over all indices of f_r * f_s. Guards the
-          typed-in M tables; passes now (4e-16).
+        (test_integration.py: polgrad, dipgrad, formaldehyde, all 216 index sets, to 2e-15). Left, if wanted:
+        polhess, diphess.
+        Limit: a rotation test cannot catch wrong weights (any mix of isotropic tensors passes, e.g. laser_pol
+        (0.3, -1.2, 2.0), test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
+[ ] G4  Averaging weights against the exact orientation average, numpy only. exact_average
+        (test_averaging_pol_order.py): Euler angles z-y-z, 8 x 8 x 8 = 512 rotations (Gauss-Legendre in cos beta),
+        exact for ranks 1-6; checked against textbook values (rank 2; rank 4 Raman, zzzz and zxzx).
+        Found: the weights are right; ranks 3, 5, 6 read the polarizations in reverse order (A15).
+        Left: the 5 polarization setups of C2; M x Gram(f) = identity for ranks 2-6, with Gram(f)[r, s] = sum over
+        all indices of f_r * f_s (guards the typed-in M tables; passes now, 4e-16).
 [ ] G5  Polarization vector by hand for 2-3 setups (e.g. all along x -> (1, 1, 1)): what each entry means.
 [ ] G6  Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a term
         huge; otf_vibdiffdenom raises only at exactly zero.
 [-] G7  Other experiments. Postponed 2026-10-09; open: which experiments. Every term file in the repo holds the
-        same 14 EVV terms, with one motif. An experiment is a VibExperiment (pulses: how many, when, IR or UV/vis;
-        detector; magnitude conditions); derive turns it into terms (VibExperiment.derive_terms).
+        same 14 EVV terms. An experiment is a VibExperiment; derive turns it into terms (derive_terms).
         To do: generate terms, run the B7 check, then old vs new with the c2 scripts (needs the old code, E9).
-        Look for line features (E8), mixed averaging ranks (averaging_rank raises), and parameter sets that share
-        a location (the double count, C3).
-        Expect old != new where a term has the same label twice in its 1/w product: the old code (term_parts.py)
-        uses 1/w_a once, harmonic_denom keeps both. No EVV term has a label twice.
-        Run c2_variations.py and c3_spectrum.py with PYTHONHASHSEED=0 to compare outputs: without a fixed seed,
-        set order changes the last digits and the listed examples from run to run, in the old code too.
-        First look, 2026-10-09 (derive only, the 3 setups in fixtures.py):
-        - evv_experiment: 14 terms, 1 motif; all 4 valid axis choices pass B7; averaging rank 4.
-        - evv_experiment_pulse_1_and_2_coincident: 44 terms, 4 motifs. 2 Raman-like terms have one condition,
-          on -w1 + w2: a line in 2D (E8).
-        - experiment_beta_alpha_cars: 12 terms, a 1D spectrum, averaging rank 5. Needs 'hypgrad'; no reader
-          supports it.
-        - derive's anharmonicity limits (2, 1, 1) and (2, 2, 1) add no EVV terms; (2, 2, 2) is not implemented.
+        Look for line features (E8), mixed averaging ranks (averaging_rank raises), parameter sets that share a
+        location (the double count, C3).
+        Expect old != new where a term has the same label twice in its 1/w product (the old term_parts.py uses
+        1/w_a once); no EVV term does. Run c2_variations.py and c3_spectrum.py with PYTHONHASHSEED=0, else set
+        order changes the last digits from run to run.
+        First look, 2026-10-09 (derive only, the setups in fixtures.py):
+            setup                                     terms  motifs  rank  note
+            evv_experiment                            14     1       4     all 4 valid axis choices pass B7
+            evv_experiment_pulse_1_and_2_coincident   44     4             2 terms: one condition, on -w1 + w2 (E8)
+            experiment_beta_alpha_cars                12             5     1D; needs 'hypgrad', no reader has it
+        derive's anharmonicity limits (2, 1, 1) and (2, 2, 1) add no EVV terms; (2, 2, 2) is not implemented.
 
 
 H. Rules
 --------
-H1  Prefer deleting to designing. A new type, cache or optimization needs a measured reason,
-    e.g. draw_window came with a test that measures how far it is from draw_all.
+H1  Prefer deleting to designing. A new type, cache or optimization needs a measured reason (e.g. draw_window
+    came with a test that measures how far it is from draw_all).
 H2  Make an abstraction on the second real use, not the first. No base classes, no registries, no second
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
-H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from the size of a number.
+H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
     Not frozen yet: Box, SpectralFeature, SpectralWindow, RectangularDomain.
 H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.
-H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do. plan.py's docstring says so
-    since 2026-10-13. No test checks it. Decide: move the translation into plan.py, or drop the rule.
+H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do (plan.py's docstring says so;
+    no test checks it). Decide: move the translation into plan.py, or drop the rule.
 
 
 Outside the refactor [outside]
 ------------------------------
-Not the evaluator's job: these items connect the evaluator to its caller (E6b), rework the render code (E7b), or
-check or fix the reader.
-Old and new read the same data dict, so C2, C3 and G1 would all miss a reader error. The reader items matter for
-the final spectra.
-[ ] E6b The caller (left the refactor 2026-10-14). After the new WilsonSimulation procedure is known. The
-        evaluator side (E6a) needs no caller: the two calls take plain values, derive's terms and a MolSystemData.
+These connect the evaluator to its caller (E6b), rework the render code (E7b), or check the reader. Old and new
+read the same data dict, so C2, C3 and G1 would all miss a reader error: the reader items matter for the final
+spectra.
+[ ] E6b The caller (left the refactor 2026-10-14). After the new WilsonSimulation procedure is known.
         - Where the two calls go, and where the outputs are kept.
-        - Data, the caller's job: make the MolSystemData once, from what the caller already read
-          (MolSystemData.from_datadict) or by reading again (MolSystemData.load(origin, prop_names(terms))).
+        - Make the MolSystemData once: from_datadict (data already read) or load(origin, prop_names(terms)).
         - states_choice from the regime. The regime 'compare' (both state sets) gives no single choice.
         - Nothing that assumes point features only (E8).
-        - Check against the old code (EvaluationWorkflow.evaluate): dropped 2026-10-14.
-          - C3 already checked the evaluator against the old code (the whole spectrum, 1e-16).
-          - Since E10 the new drawing differs from the old one on purpose (the old code cuts more), so the old
-            code is no reference for the drawing. The reference is draw_all.
-          - Already in place instead: test_pipeline.py, test_draw_spectrum_with_a_width_function: data file ->
-            MolSystemData.load -> evaluate_response_terms -> draw_spectrum, against draw_all (at most 0.1 floors).
-          - What no test covers until a caller exists: that the caller passes the right settings (the table in E6).
+        - No test covers the settings the caller passes (the table in E6) until a caller exists. In place:
+          test_pipeline.py, test_draw_spectrum_with_a_width_function (data file -> load -> evaluate -> draw,
+          against draw_all, at most 0.1 floors).
         Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
         EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
         which does not exist (dead module).
-[ ] E7b The rest of the render code, wilson_analysis/render (left the refactor 2026-10-15). The new result is
-        plotted by plot_rsp_func (E7); the old renderer is for the old WilsonSimulation path.
+[ ] E7b The rest of the render code, wilson_analysis/render (left the refactor 2026-10-15). The old renderer is
+        for the old WilsonSimulation path; the new result is plotted by plot_rsp_func (E7).
         Found 2026-10-15:
         - The old renderer plots the new result too: MatplotlibRenderer(spec_data=spec.grid_result,
           spec_grid=spec.grid_mesh, ev_info=EvaluationInfo(), rnd_info=RenderingInfo(...)). ev_info is only
           type-checked (SpectrumRenderer._validate_inputs), never read.
-        - Old types in render: plot_regions (GridRegion from amplitudes/, old domains and feature fields);
-          render_spectrum's features overlay (old feature fields: term_contributions, states_parameters,
-          res_motif); MatplotlibRendererGV and base.py, made for workflow_abstractions_updated.py (a dead
-          module, see E6b).
-        - The 4 failing render tests (see Tests): they set dynamic_range on EvaluationInfo; the renderer reads
-          RenderingInfo.dynamic_range (moved to EvaluationInfo in b210b9e, 2026-01-10, later back). Checked for
-          test_render_spectrum_simplecontour_sq: with dynamic_range on RenderingInfo its levels match.
-        - render_spectrum (render.py): print('hello') and print('CBAR MIN'); a line with no effect
+        - Old types in render: plot_regions (GridRegion, old domains and feature fields); render_spectrum's
+          features overlay (old feature fields); MatplotlibRendererGV and base.py (for the dead
+          workflow_abstractions_updated.py).
+        - The 4 failing render tests set dynamic_range on EvaluationInfo; the renderer reads
+          RenderingInfo.dynamic_range (moved in b210b9e, 2026-01-10, later back). With dynamic_range on
+          RenderingInfo, test_render_spectrum_simplecontour_sq's levels match.
+        - render_spectrum (render.py): print('hello'), print('CBAR MIN'); a line with no effect
           (spec_eval_setup.grid['A'][row,col]); filename.replace('.', '_sticks.') replaces every '.' of the path.
-        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps (data prep, normalization, masks);
-          add_colorbar exists 3 times; the masks know only the EVV w2 > w1 condition.
-        Open:
+        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps; add_colorbar exists 3 times; the
+          masks know only the EVV w2 > w1 condition.
+        To do:
         - plot_regions: no caller. Delete, or port to a plot of the new boxes (SpectralWindow). Either way
-          render/__init__.py stops importing it, so importing render no longer loads amplitudes/ (E9 needs this,
-          or cuts the import itself).
-        - Fix the 4 render tests; drop the unused EvaluationInfo check; render_spectrum's prints, the no-effect
-          line, the '_sticks' filename.
-        - A rework of the old renderer: with the new WilsonSimulation procedure (it calls the renderer), as E6b.
-[ ] G2  Data reader vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental, one dipgrad
-        value, one polgrad value.
-        Done by hand 2026-10-11, water (a scratch script, not a test). From the reader's values, Gaussian's own
-        printed numbers come out right to print precision: harmonic frequencies (nc_sqrt_eigval), IR intensities
-        (dipgrad), Raman activities (polgrad), reduced cubic constants (cff), and the "ELECTRIC" rows of the
-        2-quanta transition moments (diphess). The match holds only for mass-weighted derivatives (D5 coordinates).
-        Left: one anharmonic fundamental; polhess (the same check as diphess, with the .out's
-        "Polarizability tensor [Alpha(0,0)] : 2 quanta" rows). Make it a test only if the reader changes.
+          render/__init__.py stops importing it (E9 needs this, or cuts the import itself).
+        - Fix the 4 render tests; drop the unused EvaluationInfo check; clean render_spectrum (the prints, the
+          no-effect line, the '_sticks' filename).
+        - Rework the old renderer together with the new WilsonSimulation procedure (as E6b).
+[ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
+        harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
+        and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for
+        mass-weighted derivatives, D5). Left: one anharmonic fundamental; polhess ("Polarizability tensor
+        [Alpha(0,0)] : 2 quanta" rows). Make it a test only if the reader changes.
 [ ] G8  CFOUR reader: not checked. It turns dimensionless derivatives into mass-weighted ones (times sqrt(w)).
-        Found 2026-10-11: qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass
-        factor; getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
-[ ] G9  normal_modes: the reader fails on ACDM and ACAC ("cannot reshape ... into shape (0,3,3)"; checked
-        2026-10-12). The evaluator does not need normal_modes: MolSystemData.load requests only the terms'
-        properties, nc_sqrt_eigval, harmonic_states and anharmonic_states, so ACDM runs end to end.
+        qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass factor;
+        getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
+[ ] G9  normal_modes: the reader fails on ACDM and ACAC ("cannot reshape ... into shape (0,3,3)", 2026-10-12).
+        The evaluator does not need normal_modes (MolSystemData.load does not ask for it), so ACDM runs end to end.
 
 
 Done
 ----
 Details in the named files, or in git history (older versions of this file included).
-
-Built: the new evaluator
-E1   From terms to features: build_contributions makes one row per term and index set; features_from_rows
-     groups the rows into features (FeatureResult).
-E2   Drawing: eval_feature_on_grid draws one feature; draw_window adds all features on one window grid, box by
-     box; draw_all draws every feature on the whole grid and serves as the reference.
-E3   One entry point. Since 2026-10-14 two calls: evaluate_response_terms, draw_spectrum; the caller makes the
-     MolSystemData (2026-10-13 to 2026-10-14 a third call, load_molsys_data). See Fixed, "Top functions" and
-     "Data out of the evaluator"; the calls in E6.
-E5   Peak width from one source (2026-10-13): propagator_param (features.PropagatorParam), a number or a
-     function (vd, freqs) -> cm-1. The feature carries it: drawing calls it on the grid; get_intensity and both
-     box makers at the peak (SpectralFeature.peak_widths). Was lineshape_parameter. Limits: see Decisions.
-B7   One resonance point per term, checked when compiling (see Decisions).
-F1   einsum for the averaged part (2026-10-12): one einsum per term gives the averaged part for every index set
-     (make_avrg_einsum_subscripts, AvrgTensor; the docstrings explain the subscripts). The loop
-     (_make_func_to_compute_avrg) stays as the reference in the tests. Agrees with the loop to 8e-14 (ACDM,
-     14000 random index sets). ACDM averaging 47 s -> 0.3 s.
-F2   Speed test on ACDM (2026-10-12): 80 s per spectrum, of which averaging 47 s, deepcopy 16 s.
-F3   Denominators split once per term (2026-10-12): CompiledTerm.freq_vibenedenom and freq_pert_wf_diff
-     (cached_property, plan.py). Zero checks abs(x) <= zero_tol instead of np.isclose. ACDM build_contributions
-     22 s -> 3.9 s.
--    Leaves on demand (2026-10-12), for analysis: a row's leaves are its summed index sets, each with its four
-     factors. FeatureResult.leaves(row) computes one row's leaves again (about 1 ms per row on ACDM); keeping all
-     would take 357 MB on ACDM, so build_contributions builds none. ACDM build_contributions 3.9 s -> 3.3 s.
--    States by choice, and MolSystemData.load (2026-10-12), see Decisions. MolSystemData.load(origin, prop_names)
-     reads the named properties, the frequencies and both state lists in one obtainer call and raises for a
-     property the source lacks.
-
+Built
+    E1   build_contributions: one row per term and index set; features_from_rows groups them (FeatureResult).
+    E2   Drawing: eval_feature_on_grid (one feature), draw_window (all features, box by box), draw_all (every
+         feature on the whole grid, the reference).
+    E3   Entry point: two calls, evaluate_response_terms and draw_spectrum (2026-10-14; see E6).
+    E5   Peak width from one source (2026-10-13): propagator_param, a number or a function (vd, freqs) -> cm-1.
+         Was lineshape_parameter.
+    E6a  The evaluator side of E6 (2026-10-14): inputs and outputs in the pipeline.py docstring; data out of the
+         evaluator; the box rule as an input; grid by make_grid (both edges); the magnitude-condition filter
+         dropped (apply_magn_cond_filter, its 5 tests and diag_margin deleted).
+    E7   plot_spectrum, plot_rsp_func (wilson_analysis/render/plot_spectrum.py), 1D and 2D (2026-10-15):
+         intensity / top on a log scale from 1 / dynrange to 1; 2D as MatplotlibRenderer (same plot on
+         formaldehyde). Left out: RenderingInfo, EvaluationInfo, PlotConfig, the w2 > w1 mask, saving.
+         Tests: wilson_analysis/tests/test_plot_spectrum.py. Example: tests/example_plot_spectrum.py.
+    E10  Code (2026-10-14): amplitude_half_widths, intensity_half_widths, SpectralWindow.from_features,
+         draw_window on each feature's own box, draw_spectrum(box_rule=). Tests in test_evaluate.py and
+         test_features.py.
+    B7   One resonance point per term, checked when compiling (see Decisions).
+    F1   einsum for the averaged part (2026-10-12; make_avrg_einsum_subscripts, AvrgTensor). Agrees with the loop
+         to 8e-14. ACDM averaging 47 s -> 0.3 s.
+    F2   Speed test on ACDM (2026-10-12): 80 s per spectrum, of which averaging 47 s, deepcopy 16 s.
+    F3   Denominators split once per term (2026-10-12; CompiledTerm.freq_vibenedenom, freq_pert_wf_diff).
+         ACDM build_contributions 22 s -> 3.9 s.
+    -    Leaves on demand (2026-10-12): FeatureResult.leaves(row), about 1 ms per row on ACDM (keeping all: 357 MB).
+         build_contributions 3.9 s -> 3.3 s.
+    -    States by choice, and MolSystemData.load (2026-10-12), see Decisions.
+    D3   ParameterSet (plan.py) holds exactly the given labels (2026-10-14): no hidden 'zero' entry, no '' -> 'zero'
+         remap, no order (__lt__ and SpectralFeature.sort_by_params deleted). The old code keeps its two copies
+         (term_parts.py, func_abstractions.py).
+    D5   Load checks (2026-10-14); the coordinates part checked (2026-10-11).
 Checked: the numbers are right
-C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).
-C2   Same numbers as the old code, term by term: 14 EVV terms; formaldehyde, water, CO; harmonic and anharmonic
-     states; for formaldehyde also more axis choices and polarizations. Largest difference 2e-15. Record: the
-     test_evv_reference.py docstring; evv_reference.json stores the numbers.
-C3   Same whole spectrum as the old code, cut into boxes included (formaldehyde, 1e-16). Found on the way: the
-     old code draws a peak n times too large (n^2 in intensity) when n parameter sets share one location, e.g.
-     degenerate modes. Shown with a toy molecule (record: tests/c3_spectrum.py docstring). Formaldehyde has
-     n = 1 everywhere, so its old spectra are right.
-G1   Hand calculation with numpy only: water, terms 0 and 12, every (a, b) pair, both state choices; matches to
-     1e-12 (test_hand_calculation.py). Found on the way: pytest.approx's default abs=1e-12 had let the reference
-     test pass small coefficients that were up to 6e-5 off; now abs=0.
-D5   Coordinates part only (2026-10-11): the data dict fits derive's formulas, see D5. [outside]
-
+    C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).
+    C2   Same numbers as the old code, term by term: 14 EVV terms; formaldehyde, water, CO; both state sets; for
+         formaldehyde also more axis choices and polarizations. Largest difference 2e-15. Record: the
+         test_evv_reference.py docstring; evv_reference.json.
+    C3   Same whole spectrum as the old code, boxes included (formaldehyde, 1e-16). Found: the old code draws a peak
+         n times too large (n^2 in intensity) when n parameter sets share one location (e.g. degenerate modes).
+         Record: tests/c3_spectrum.py docstring. Formaldehyde has n = 1 everywhere, so its old spectra are right.
+    G1   Hand calculation, numpy only: water, terms 0 and 12, every (a, b) pair, both state choices; to 1e-12
+         (test_hand_calculation.py). Found: pytest.approx's default abs=1e-12 had hidden errors up to 6e-5.
+    A16  test_integration.py, the two term 8 tests (2026-10-14): rel 1e-12; einsum abs=0; rotation abs=1e-18 (the
+         evaluator's zero_tol: 144 of 216 values are rounding noise below 2.4e-19).
 Fixed
-A0-A4, A6-A14  Small fixes: the 'zero' state lookup, CompiledTerm stores tuples, harmonic_denom reads the
-     eigenvalues, asserts instead of prints, dead code, outdated docstrings. Two of them change behaviour:
-     evaluate_term_coeff_sumover raises if a resonance label is missing (summing over one would add peaks at
-     different places into one number); VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
-B1   One DataOriginInfo class (system_data.py); the old pipeline runs again.
-B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
--    ResLocPoint keeps its own copy of the input dict; locations are in cm-1.
--    Property names made once (2026-10-12): PropsCollection.names, CompiledTerm.all_props and
-     CompiledTerm.prop_names. PropsCollection.sort returns a new collection.
--    One way to load (2026-10-12): load_molsys_data is MolSystemData.load with the terms' prop_names; it no
-     longer asks for normal_modes, atoms and the geometry (G9). load_molsys_data deleted 2026-10-14 (Data out of
-     the evaluator, below).
--    Data and recipe from the terms in pulse IDs (2026-10-13): make_polarization_linear_comb,
-     prop_names and averaging_rank read only the props, so they take the terms as derive writes them
-     (plan.split_props), with no translation or compiling first.
-B    Precalculated path deleted (2026-10-13, H1). Since F1 the einsum tensor (AvrgTensor) does the same job, with
-     the polarization as an input and the labels kept with the values. B3, B5 and B6 went with it.
--    Cleanup (2026-10-13): commented-out code removed (H2); module docstrings of evaluate.py and plan.py.
--    Top functions (2026-10-13): three calls instead of two top functions that did the same first steps (H2);
-     the calls are in E6. Every setting is keyword-only; the recipe is made once per (rank, laser_pol).
-     compute_features_from_terms and rps_evaluation.py deleted.
--    exclude_modes (2026-10-13): evaluate_response_terms, compute_features and build_contributions take it;
-     FeatureResult keeps it, so leaves() sums over the same modes. Meaning: removed everywhere (see Decisions).
--    Data out of the evaluator (2026-10-14, see Decisions): load_molsys_data (pipeline.py) and
-     PropsCollection.build_request_dict (plan.py) deleted. No module of refac_rsp_eval imports DataOriginInfo or
-     wilson_data_obtainer now. The callers load with MolSystemData.load(origin, prop_names(terms)).
-
+    A0-A4, A6-A14  Small fixes. Two change behaviour: evaluate_term_coeff_sumover raises if a resonance label is
+         missing; VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
+    B1   One DataOriginInfo class (system_data.py); the old pipeline runs again.
+    B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
+    B    Precalculated path deleted (2026-10-13, H1), with B3, B5, B6: the einsum tensor (AvrgTensor) does its job.
+    -    ResLocPoint keeps its own copy of the input dict; locations in cm-1.
+    -    Property names made once (2026-10-12): PropsCollection.names, CompiledTerm.all_props, prop_names.
+    -    Data and recipe from the terms in pulse IDs (2026-10-13, plan.split_props), no translation first.
+    -    Cleanup (2026-10-13): commented-out code removed (H2); module docstrings of evaluate.py and plan.py.
+    -    Top functions (2026-10-13): keyword-only settings; the recipe made once per (rank, laser_pol);
+         compute_features_from_terms and rps_evaluation.py deleted.
+    -    exclude_modes (2026-10-13): removed everywhere (see Decisions); FeatureResult keeps it for leaves().
+    -    Data out of the evaluator (2026-10-14): load_molsys_data and PropsCollection.build_request_dict deleted.
+         No module of refac_rsp_eval imports DataOriginInfo or wilson_data_obtainer.
 Dropped
-C4   Old vs new location solvers on 4 special motifs. Two of them now fail when compiling (B7). Old and new code
-     both refuse to draw the other two, peaks without every spectrum axis (E8). Running it would only confirm
-     that, on code that is about to go.
+    C4   Old vs new location solvers on 4 special motifs: two fail B7 now; both codes refuse the other two (E8).
+    E6b's check against the old code (2026-10-14): C3 already checked it; since E10 the drawing differs on purpose.
