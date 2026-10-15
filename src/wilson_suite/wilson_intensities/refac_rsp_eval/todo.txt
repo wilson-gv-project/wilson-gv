@@ -27,6 +27,8 @@ agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Not
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
 Left: the D4 code move, deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
+Other experiments checked 2026-10-15 (G7): 1D and 2D run end to end. 3D needs one resonance axis set per
+evaluation (E11). 4D is blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8.
 
 
 Order of work
@@ -47,11 +49,17 @@ Other items:
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest); G4, G5 (needed before polarizations other than all along x, or ranks
                          other than 4, are used)
-    later, when needed   D1, D2, E8 (line features), G7 (other experiments), E10 (tune the knobs)
-    [outside]            E6b (the caller), E7b (the render code), G2, G8 (reader checks), G9 (normal_modes)
+    next (2026-10-15)    E11 (one resonance axis set per evaluation), E12 (flat background), G10 (mock-data
+                         tests for 1D, 3D, 4D)
+    later, when needed   D1, D2, E8 (lines and planes), G7 (old vs new for other experiments), E10 (tune the
+                         knobs), F (reuse on a new axis choice; the sum as arrays)
+    [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
+                         checks), G9 (normal_modes)
     no item yet          - the 9 other failing tests in the rest of src (see Tests): the 4 render tests belong
                            to E7b; open whether the other 5 belong to the refactor
                          - from the old README: is single-component Cartesian selection a wanted feature?
+                         - 3D and 4D spectra have no plot (plot_spectrum: 1D and 2D only): slices or projections,
+                           when needed
 
 
 Decisions and known limits
@@ -59,7 +67,12 @@ Decisions and known limits
 - One resonance point per term (B7, 2026-10-09): number of conditions = number of axes = rank of the condition
   matrix. Checked when compiling (CompiledTerm.from_VibPertTerm, plan.py). Not supported: fewer conditions
   (a line, E8) or more. Conditions that contradict each other: malformed. A term without conditions passes
-  (no spectrum, but its other parts can be computed).
+  B7; decided 2026-10-15: it is a flat background, calculated and drawn (E12; today build_contributions raises).
+- One resonance axis set per evaluation (2026-10-15): one evaluate_response_terms call, and its grid result, is
+  for one set of axes, e.g. {A, B}. The input terms are checked first: all must resonate on the same axes (E11).
+  {A} and {B} are different sets. The caller splits the terms and makes one evaluation per set.
+- Mock data for what the reader cannot give (2026-10-15): the reader's limits (no hypgrad, states up to 3
+  quanta) are not the evaluator's. Tests for 1D, 3D, 4D use mock data (G10).
 - Denominators (2026-10-10): w is always the Hessian eigenvalue (nc_sqrt_eigval); an energy difference uses the
   chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); to_str prints both alike,
   e.g. <['a'],[]>.
@@ -107,6 +120,17 @@ A. Small fixes
             wilson_intensities/tests/unit/test_averaging_pol_order.py   14 strict xfails; 13 pass either way
             refac_rsp_eval/tests/test_a15_polarization_order.py         5 fail until the fix; 2 pass
         With the fix applied in memory all of them pass, and nothing else changes.
+        When it matters (checked 2026-10-15). An odd-rank average (3, 5) is built from the Levi-Civita tensor, so it
+        changes sign in a mirror. It is nonzero only if both:
+            - the molecule is chiral. An achiral one (a mirror plane or an inversion centre) gives 0: formaldehyde
+              gives 0 for IR + vis SFG and for 3 IR + UV, even with fields along x, y and z;
+            - three fields point along three different directions, not all in one plane. laser_pol at rank 3:
+              0 for x x x, 0 for x, y and a direction between them, -1 for x y z (+1 after the fix).
+        So at odd rank A15 matters exactly where there is a signal, and there its sign tells the two mirror images
+        of the molecule apart. Odd rank in G7: IR + vis SFG (3); beta-alpha CARS, EVV + 2nd UV, every 3 IR + UV (5).
+        Rank 6 (every 4 IR + UV setup) is even: nonzero for any molecule. There A15 can give wrong values unless the
+        polarization list reads the same backwards (e.g. all along x).
+        Ranks above 6 are not supported at all (G7: the 7-pulse setup has rank 8).
 
 
 D. Data model
@@ -183,10 +207,20 @@ E. Pipeline
                               grid_axes (1D points per axis), spectral_window (features and boxes)
         Not supported: data from more than one source (the old eval_by_prop_name); MolSystemData.load takes one
         origin. The old-vs-new check matches only without excluded modes (the two codes exclude differently).
-[ ] E8  Line features (later). Fewer conditions than spectrum axes give a line, not a point: one condition on B
-        in an (A, B) spectrum (from_features raises); one on A + B, a diagonal line (B7 rejects it). Real terms
-        like this exist (G7, coincident pulses). When needed: allow them in B7, then boxes, get_intensity,
-        eval_feature_on_grid, drawing.
+[ ] E8  Lines and planes (later). Fewer independent conditions than the axes they use: the resonance is a line or
+        a plane, not a point, e.g. one condition on A + B (a diagonal line). B7 rejects these terms when compiling.
+        (A term on fewer axes than the spectrum, e.g. only B in an (A, B) spectrum, is not one of these: it is a
+        point on its own axes, E11.)
+        Found 2026-10-15 (G7 survey): they come only from pulses that arrive at the same time (same tc), which give
+        conditions on sums such as A + B. Pulses at different times gave only points.
+            EVV, IR 1 and 2 at the same time          2 of 44 terms              line: (A+B)
+            3 IR + UV, IR 1 and 2 at the same time    110-220 of 156-268         line: (A+B ; A+B+C)
+            3 IR + UV, all 3 IR at the same time      1106-1332 of 1240-1476     lines (6 patterns), plane: (A+B+C)
+            4 IR + UV, IR in 2 same-time pairs        360-1076 of 19128-21872    plane: (A+B ; A+B+C+D), lines
+        A line term is a point in the coordinates of its conditions: (A+B ; A+B+C) is a point in (A+B, C) and the
+        same everywhere along A - B. The drawing already evaluates each condition at every grid point
+        (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
+        no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
 [ ] E9  Delete the old code. Waits (rule in Order of work). First decide about G7: its old-vs-new part needs
         the old code. Code outside refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing
         pipeline.py. In this order:
@@ -252,6 +286,39 @@ E. Pipeline
         meets A_max), so boxes are larger than needed where the plot is weak.
         The drawing no longer matches the old code (the old code cuts more): the reference is draw_all
         (test_pipeline.py). The rows are checked against the old code (C2).
+        Seen 2026-10-15, not investigated: IR + IR + vis sum frequency (2D, formaldehyde, gamma 10 cm-1, 201 x 201
+        points over 11000 cm-1, so steps of 55 cm-1) 0.59 floors from draw_all, above the 0.13 measured here.
+[ ] E11 One resonance axis set per evaluation (decided 2026-10-15). One evaluate_response_terms call, and its grid
+        result, is for one set of axes, e.g. {A, B}. To do:
+        - Check first, after the translation to axes: every term must resonate on the same set of axes (the axes
+          in its conditions). If not, raise and list the sets with their term ids. Today such a mix passes
+          compiling (B7 checks each term on its own axes) and fails only in drawing: "Expected SpectralFeature
+          with axes ('A', 'B', 'C'), got ('A', 'B')" (G7: the 3-IR setup).
+        - A helper for the caller: the terms grouped by resonance axis set, e.g. {('A', 'B'): [...],
+          ('A', 'B', 'C'): [...]}. Grouping needs the axes (the translation), not only the terms.
+        - The set, not the number: {A} and {B} are different sets (a term on A only is a stripe along B in an
+          (A, B) plane).
+        - Open: which axes the caller passes for a smaller set: all of the experiment's, or only the set's.
+        - Open: terms without conditions (E12) have no axes. Proposal: allowed with any set, added as a constant
+          on its grid.
+        Found 2026-10-15 (G7): mixed sets in one experiment are common with more than 2 axes:
+            3 IR (seminar notebook)                    {A, B} 14, {A, B, C} 2
+            7-pulse UV (try.py)                        {A, B} 440, {A, B, C} 192
+            4 IR + UV, UV with the 2nd IR pair         {A, B} 192-220, {A, B, C} 46-48, {A, B, D} 46-48,
+                                                       {A, B, C, D} about 19000, and lines and planes (E8)
+        Limit: the measured signal is |sum of all amplitudes|^2, so the sets interfere. Separate grid results do
+        not add up as intensities. Adding sets would need their amplitudes on one grid (a smaller set copied
+        along its missing axes). Not planned.
+        The window and box code stays as it is: drawing already needs every feature to have the window's axes
+        (SpectralFeature._check_same_axes).
+[ ] E12 Terms without resonance conditions: a flat background (decided 2026-10-15). Calculated as other terms,
+        drawn as one constant amplitude on every grid point, added before squaring.
+        Today: B7 lets them pass, then build_contributions raises (solve_LSE_motif: "motif has no resonance
+        conditions"). Found in IR absorption (1 IR pulse, G7): 3 of 5 terms, e.g. 1/4 * polhess_(a,a) / <a>, next
+        to 2 terms with one condition on A. No other setup of the survey has them.
+        To do: an empty location; the row's coefficient is the full sum (no resonance labels); drawing:
+        amplitude_coeff on every grid point; get_intensity: |coeff|^2; no box (today the box rules fail on the
+        empty peak_widths()). How they join an axis set: E11.
 
 
 F. Speed
@@ -266,6 +333,26 @@ examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points
     drawing               2.5 s    1.5 s since E10 (amplitude boxes, eps 0.1)
     per spectrum          5.9 s    measured before E10
 History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand).
+What a changed setting needs again (measured 2026-10-15, ACDM). build_contributions under cProfile: the loop over
+index sets about 90 % (892584 calls; inside it the averaged lookups 11 %, non-averaged 22 %, energy-difference
+denominators 23 %, 1/omega 5 %), location solves 4 %, the averaged einsum about 0 %.
+    setting changed            changes                    now                     reuse
+    width, window, grid, box   drawing only               rows reused (tested)    -
+    axis choice                only the locations         full rerun              possible: same coefficients
+                                                                                  (difference 0), same zero list;
+                                                                                  only the solves again (4 %)
+    laser_pol                  only the averaged part     full rerun              not worth it: linear only to
+                                                                                  6e-10 (the zero_tol cut per index
+                                                                                  set), 19-123 extra tiny rows;
+                                                                                  3 base runs at rank 4, 15 at 6
+    states choice              denominators, locations    full rerun              no: 2 choices
+    excluded modes, molecule   everything                 full rerun              no
+    a subset of terms          which rows count           possible: table.where + dataclasses.replace (filter
+                                                          zero too); not documented, not tested
+FeatureResult.leaves(row): 0.1 ms per row (2026-10-15; its docstring and Done say 1 ms).
+Better than caching: the sum as arrays (the first line below). It speeds every rerun, and bigger molecules and
+4D need it: 4 IR + UV terms have up to 4 labels, about 1e10 index sets on ACDM (EVV: 0.9 million), about half a
+day with the loop (estimate).
 Not done, not needed so far:
     einsum for the whole sum (with cff and the denominators)    size n_modes ** labels: 3 labels 0.6 MB, 5: 1 GB
     evaluate_full_index_dict's check that every label has a value    0.56 s on ACDM; cannot fail in the pipeline
@@ -291,20 +378,84 @@ checking side.
 [ ] G5  Polarization vector by hand for 2-3 setups (e.g. all along x -> (1, 1, 1)): what each entry means.
 [ ] G6  Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a term
         huge; otf_vibdiffdenom raises only at exactly zero.
-[-] G7  Other experiments. Postponed 2026-10-09; open: which experiments. Every term file in the repo holds the
-        same 14 EVV terms. An experiment is a VibExperiment; derive turns it into terms (derive_terms).
-        To do: generate terms, run the B7 check, then old vs new with the c2 scripts (needs the old code, E9).
-        Look for line features (E8), mixed averaging ranks (averaging_rank raises), parameter sets that share a
-        location (the double count, C3).
-        Expect old != new where a term has the same label twice in its 1/w product (the old term_parts.py uses
-        1/w_a once); no EVV term does. Run c2_variations.py and c3_spectrum.py with PYTHONHASHSEED=0, else set
-        order changes the last digits from run to run.
-        First look, 2026-10-09 (derive only, the setups in fixtures.py):
-            setup                                     terms  motifs  rank  note
-            evv_experiment                            14     1       4     all 4 valid axis choices pass B7
-            evv_experiment_pulse_1_and_2_coincident   44     4             2 terms: one condition, on -w1 + w2 (E8)
-            experiment_beta_alpha_cars                12             5     1D; needs 'hypgrad', no reader has it
+[ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below). Left: old vs new with the c2 scripts
+        (needs the old code, E9) for the setups that run (CARS, the 3-IR setup), and parameter sets that share a
+        location (the double count, C3). Expect old != new where a term has the same label twice in its 1/w
+        product (the old term_parts.py uses 1/w_a once). Run c2_variations.py and c3_spectrum.py with
+        PYTHONHASHSEED=0, else set order changes the last digits from run to run.
+        Where the experiments come from:
+            ~/pre_paper3/try.py      make_experiment; run_experiment prints t.to_str() of every term;
+                                     sweep_sign_patterns runs every +/- pattern of the filter. Its
+                                     experiment_cahrs() has 3 pulses and a 5-entry filter: VibExperiment raises
+                                     (UnboundLocalError).
+            ~/pre_paper3/try_orig.py                                 an older version of try.py
+            ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb     EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
+            src/wilson_suite/fixtures.py                             EVV, EVV coincident, beta-alpha CARS
+        Script: tests/g7_survey.py (every setup about 12 min; --only for some setups, --terms for every term).
+        Survey 2026-10-15: derive -> the canonical axes -> B7 -> evaluation on formaldehyde (anharmonic, the
+        experiment's laser_pol). The filter's sign patterns only relabel the axes and change the counts a little:
+        one row per sweep. Patterns: the axes of each condition, e.g. (A ; A+B) = one condition on A, one on A + B.
+        point AB: a point in the (A, B) plane, the same along other axes. line, plane: E8. flat: no conditions (E12).
+            setup                                 axes               terms        patterns (terms)
+          1D
+            CARS (try; nb x2), 3 UV               A = w1-w2          4 / 2 / 2    point A: (A)
+            beta-alpha CARS (try), 4 UV           A = w1+w2-w3       12           point A: (A)
+            CAHRS?? (try), 5 UV                   A = w1+w2-w3       6            point A: (A)
+            IR + vis SFG                          A = w1             2            point A: (A)
+            IR absorption, 1 IR                   A = w1             5            point A: (A) 2; flat 3
+          2D
+            EVV (nb, fixtures), 2 IR + UV         A = -w1, B = w2    14           point AB: (A ; A+B)
+            EVV + 2nd UV (nb)                     A = -w1, B = w2    14           point AB: (A ; A+B)
+            EVV, IR 1 and 2 at the same time      A = -w1, B = w2    44           point AB: (B ; A+B) 28,
+                                                                                  (A ; A+B) 14; line: (A+B) 2
+          3D
+            3 IR (nb)                             A = -w1, B = w2,   16           point AB: (A ; A+B) 14;
+                                                  C = w3                          point ABC: (A ; A+B ; A+B+C) 2
+            7-pulse UV (try)                      A = w1-w2,         632          point AB: (A ; A+B) 440;
+                                                  B = w3-w4,                      point ABC: (A ; A+B ; A+B+C) 192
+                                                  C = w5-w6
+            3 IR + UV, different times (16)       A, B, C = +-w1..3  24           point ABC: (A ; A+B ; A+B+C)
+            3 IR + UV, IR 1 and 2 same time       same               156-268      point ABC: 2 patterns, 46-48;
+              (try + 16)                                                          line: (A+B ; A+B+C) 110-220
+            3 IR + UV, all 3 IR same time (16)    same               1240-1476    point ABC: 6 patterns, 134-144;
+                                                                                  line: 6 patterns, 1100-1320;
+                                                                                  plane: (A+B+C) 6-12
+          4D
+            4 IR + UV, different times (try + 4)  A-D = +-w1..4      5120         point ABCD: (A ; A+B ; A+B+C ;
+                                                                                  A+B+C+D)
+            4 IR + UV, IR in 2 same-time pairs    same               19128-21112  point ABCD: 4 patterns, 4264-5120
+              (4)                                                                 each; plane: (A+B ; A+B+C+D)
+                                                                                  220-440; lines 140-192
+            same, UV with the 2nd IR pair         same               19634-21872  point ABCD about 19000; point AB
+              (try + 4)                                                           192-220, ABC 46-48, ABD 46-48;
+                                                                                  lines and planes 582-1076
+        Results:
+            run end to end      CARS (24 rows, 12 features, drawn in 1D, 0.06 floors from draw_all), EVV
+            rows, no drawing    3 IR: two axis sets (E11)
+            all 0               IR + vis SFG, 3 IR + UV at different times: odd rank (3, 5) is 0 for an achiral
+                                molecule, and with every field along x laser_pol is all 0 at rank 5
+            raises              IR absorption: terms without conditions (E12)
+            props missing       beta-alpha CARS, CAHRS?? (hypgrad); EVV + 2nd UV (hypgrad, hyphess); 7-pulse
+                                (shypgrad, shyphess). The reader's job [outside]; tests: mock data (G10)
+            rank too high       7-pulse: rank 8 (2-6 supported)
+            B7 rejects          every setup with pulses at the same time (lines and planes, E8)
+            4D                  derive's translation stops at 3 axes (E13); 4-quanta states (the data has up to
+                                3); size: 6e6-2e7 index sets even on formaldehyde (6 modes; F)
         derive's anharmonicity limits (2, 1, 1) and (2, 2, 1) add no EVV terms; (2, 2, 2) is not implemented.
+[ ] G10 Tests with mock data for 1D, 3D, 4D (2026-10-15; the reader's limits are not the evaluator's).
+        Now: the real-data pipeline tests are 2D only (EVV); the unit tests have 1D and 2D motifs, none with 3 or 4
+        axes; the geometry tests (Box, grid, slices, intensity, boxes) run 1D-4D (helpers.NDIMS).
+        To do:
+        - 1D: CARS on formaldehyde runs today and needs only polgrad: a cheap real-data test.
+        - 3D: unit tests with a 3-axis motif (solve_LSE_motif, eval_feature_on_grid, draw_window vs draw_all), and
+          a toy pipeline test. Seen 2026-10-15 with randomly changed formaldehyde data (3 IR + UV, laser_pol for
+          x, y, z, x, x): 480 rows; 41^3 points 1.7 s, 81^3 13 s; 0.03-0.04 floors from draw_all.
+        - 4D: needs mock 4-quanta states, and E13 (or terms translated by hand).
+        - Mock data: MolSystemData.from_datadict with a toy dict (as TOY_DATA, test_system_data.py). Its shape
+          checks know hypgrad and the like (PROP_INDEX_COUNTS: up to 6 geometric and 6 field orders); 4-quanta
+          states are more keys in the state lists.
+        - Odd ranks (3, 5) give 0 unless the mock tensors lack the symmetry of an achiral molecule and the
+          polarizations mix x, y, z. Fix A15 first, or the values are wrong.
 
 
 H. Rules
@@ -361,6 +512,15 @@ spectra.
         - Fix the 4 render tests; drop the unused EvaluationInfo check; clean render_spectrum (the prints, the
           no-effect line, the '_sticks' filename).
         - Rework the old renderer together with the new WilsonSimulation procedure (as E6b).
+[ ] E13 derive's translation stops at 3 axes (found 2026-10-15). wilson_derive/term_var_translate.py, lines 31 and
+        59, in find_pulse_id_tuples_as_axis_vars:
+            if j > 2:
+                raise ValueError('Current version enables maximum 3 axes')
+        The evaluator hits it in evaluate_response_terms (pipeline.py line 299). These two checks are the only
+        block: the search itself works for any number of axes (the G7 survey used a copy without them: all 5120
+        4-axis terms translated and passed B7). Without them the limit is 7 axes: the axes are named
+        cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
+        4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data (G10).
 [ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
         harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
         and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for
