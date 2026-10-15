@@ -824,13 +824,16 @@ def compounding_patterns_at_order(n) -> list[tuple]:
 
 def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000.) -> bool:
     """
-    Take an ordered sequence of (compounded) pulses and determine
+    Take an ordered sequence of (compounded) pulses and determine whether the time ordering is
+    (according to threshold) causally valid
     """
 
     # Singleton sequences are trivially valid
     if len(pulses) == 1:
         return True
 
+    # FIXME: This simply tests for delays between pulse centerpoints and is not sufficiently accurate in the long term
+    #  Needs a revisit and some improvement at a later stage
     for i in range(len(pulses) - 1):
         if (pulses[i + 1].tc - pulses[i].tc) > thres_waiting_time:
             return False
@@ -1103,7 +1106,8 @@ class FieldAnalysis:
         """
 
         # Compile info about time overlap compounding levels
-        time_ovl_comp_lvls = []
+        # NOTE: Includes 0 for validity when the last (emission) compounding coefficient is 1
+        time_ovl_comp_lvls = [0]
         for i in self.time_ovl_tuples:
             if not len(i) in time_ovl_comp_lvls:
                 time_ovl_comp_lvls.append(len(i))
@@ -1113,22 +1117,34 @@ class FieldAnalysis:
         for i in self.int_pattern_orders:
 
             # Generate candidate patterns (all patterns but will be screened)
-            candidate_compounding_patterns_at_order = compounding_patterns_at_order(i)
+            candidate_compounding_patterns_at_order = compounding_patterns_at_order(i + 1)
 
             # Screen based on occurrence of valid orders in time_ovl_tuples
             # (if no pulse tuple of a compounding level required in a compounding pattern can exist,
             # then that compounding pattern can already here be disregarded)
-            for j in candidate_compounding_patterns_at_order:
+            screened_patterns = []
 
-                screened_patterns = []
+            for j in range(len(candidate_compounding_patterns_at_order)):
+
                 pattern_supported_by_tuples = True
 
-                for k in j:
-                    if not k in time_ovl_comp_lvls:
-                        pattern_supported_by_tuples = False
+                for k in range(len(candidate_compounding_patterns_at_order[j])):
+
+                    # Not last interaction
+                    if k + 1 < len(candidate_compounding_patterns_at_order[j]):
+
+                        if not candidate_compounding_patterns_at_order[j][k] in time_ovl_comp_lvls:
+                            pattern_supported_by_tuples = False
+
+                    # Last interaction: Disregard the emission
+                    else:
+
+
+                        if not candidate_compounding_patterns_at_order[j][k] - 1 in time_ovl_comp_lvls:
+                            pattern_supported_by_tuples = False
 
                 if pattern_supported_by_tuples:
-                    screened_patterns.append(j)
+                    screened_patterns.append(candidate_compounding_patterns_at_order[j])
 
             comp_patterns_at_order[i] = copy.deepcopy(screened_patterns)
 
@@ -1139,9 +1155,11 @@ class FieldAnalysis:
         from itertools import permutations as permutations
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 
-        # Initializing macroscopic orientational average polarization vector "bank"
+        # Initializing macroscopic orientational average polarization vector "bank", counter and
+        # "actually used" register
         pol_avg_vector_bank = {}
         pol_avg_vector_bank_ctr = 0
+        pol_actually_used = []
 
         # The "master" loop: Evaluate all available interaction sequences,
         # group by order, pulse compounding and polarization
@@ -1223,7 +1241,21 @@ class FieldAnalysis:
                         for c_elem in range(len(c)):
 
                             # Generate the candidate (compound) pulse tuple
-                            c_elem_len = c[c_elem]
+
+                            # If this is the last compounding pattern element, disregard the emission
+                            if c_elem + 1 == len(c):
+
+                                c_elem_len = c[c_elem] - 1
+
+                                # If the length is zero, then this was a "lone emission" and no pulse structure needs
+                                # to be checked (this cycling will end the loop so break would also have worked)
+                                if c_elem_len == 0:
+                                    continue
+
+                            # Otherwise, do not disregard anything
+                            else:
+                                c_elem_len = c[c_elem]
+
                             c_pulse_ind = tuple(sorted(p_pattern[c_ctr: c_ctr + c_elem_len]))
 
                             # If this is not the last interaction, the candidate pulse tuple must
@@ -1237,6 +1269,7 @@ class FieldAnalysis:
                                 c_pulses.append(self.res_and_time_comp_pulses[c_pulse_ind])
                                 c_pulse_inds.append(c_pulse_ind)
 
+                            # FIXME: Adapt to pattern one order higher
                             # If this is the last interaction, only the time-overlapping criterion applies
                             else:
 
@@ -1255,38 +1288,78 @@ class FieldAnalysis:
 
                         # Time-ordering enforcement screening: If also passing this criterion, register this
                         # interaction sequence as valid
-                        if pulse_time_ordering_valid(c_pulses):
+                        if pulse_time_ordering_valid(c_pulses, thres_waiting_time=self.thres_waiting_time):
 
                             # FIXME: With any compounding, some permutations will be revisited here
                             #  Checking for uniqueness here and will account for this as part of the overall
                             #  permutations--coefficient question for these cases
+                            #  Permutation should here be OK under the dipole approximation (symmetry of alpha, beta...)?
+                            #  In general case may need to register separate or two different polarization situations
                             if not tuple(c_pulse_inds) in int_sequences_by_order_comp_pol[ord][c][pol_bank_ind]:
+                                if not pol_bank_ind in pol_actually_used:
+                                    pol_actually_used.append(pol_bank_ind)
                                 int_sequences_by_order_comp_pol[ord][c][pol_bank_ind].append(tuple(c_pulse_inds))
 
         # Prune int_sequences_by_order_comp_pol over empty pol bank ind entries, empty compounding
         # patterns, empty orders, then assign as attribute
+        del_o = []
+        del_oc = []
+        del_ocp = []
+
         for ord in int_sequences_by_order_comp_pol:
+
+            new_oc = []
+
             for comp in int_sequences_by_order_comp_pol[ord]:
+
+                new_ocp = []
+
                 for pol in int_sequences_by_order_comp_pol[ord][comp]:
 
                     # If this polarization setup gave nothing, delete the reference to it
-                    if int_sequences_by_order_comp_pol[ord][comp][pol] == []:
-                        del int_sequences_by_order_comp_pol[ord][comp][pol]
+                    if len(int_sequences_by_order_comp_pol[ord][comp][pol]) == 0:
+                        new_ocp.append((ord, comp, pol))
 
                 # If no polarization setups remain for this compounding pattern, delete the reference to it
-                if int_sequences_by_order_comp_pol[ord][comp] == {}:
-                    del int_sequences_by_order_comp_pol[ord][comp]
+                if len(new_ocp) == len(int_sequences_by_order_comp_pol[ord][comp]):
+                    new_oc.append((ord, comp))
+
+                # Otherwise extend the ocp delete list if delete candidates were found
+                else:
+                    if len(new_ocp) > 0:
+                        del_ocp.extend(copy.deepcopy(new_ocp))
 
             # If no compounding patterns remain for this order, delete the reference to it
-            if int_sequences_by_order_comp_pol[ord] == {}:
-                del int_sequences_by_order_comp_pol[ord]
+            if len(new_oc) == len(int_sequences_by_order_comp_pol[ord]):
+                del_o.append(ord)
 
-        # FIXME: Trim pol avg vector bank in case some of them did not in fact get represented
+            # Otherwise extend the oc delete list if delete candidates were found
+            else:
+                if len(new_oc) > 0:
+                    del_oc.extend(copy.deepcopy(new_oc))
+
+        # Deletions
+        for o in del_o:
+            del int_sequences_by_order_comp_pol[o]
+
+        for oc in del_oc:
+            del int_sequences_by_order_comp_pol[oc[0]][oc[1]]
+
+        for ocp in del_ocp:
+            del int_sequences_by_order_comp_pol[ocp[0]][ocp[1]][ocp[2]]
+
+        del_p = []
+
+        for p in pol_avg_vector_bank:
+            if not p in pol_actually_used:
+                del_p.append(p)
+
+        for p in del_p:
+            del pol_avg_vector_bank[p]
 
         return pol_avg_vector_bank, int_sequences_by_order_comp_pol
 
     def get_magn_cond_bank_and_int_seq_icpm(self):
-
 
         # Making a bank for conformity with the pol avg vector indexing even though the magnitude
         # condition tuples are hashable by themselves

@@ -423,13 +423,13 @@ def test_field_analysis():
 
 def test_vib_experiment():
 
-    pulse_ir_1 = make_gaussian_pulse(tc=200.0, cf=3000.0, dev=150.0, maxstr=1.0e-5,
+    pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
-    pulse_ir_2 = make_gaussian_pulse(tc=800.0, cf=1000.0, dev=150.0, maxstr=1.0e-5,
+    pulse_ir_2 = make_gaussian_pulse(tc=600.0, cf=1000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
-    pulse_uvvis_1 = make_gaussian_pulse(tc=1300.0, cf=15000.0, dev=200.0, maxstr=1.0e-5,
+    pulse_uvvis_1 = make_gaussian_pulse(tc=1100.0, cf=15000.0, dev=100.0, maxstr=1.0e-5,
                                         wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
@@ -450,7 +450,12 @@ def test_vib_experiment():
     scan_range_b = [50.0* i for i in range(10)]
     scan_b = SpecScan(scan_objs=(scan_obj_b,), range=scan_range_b)
 
-    exp_a = VibExperiment(field=field_a, detector=detector_a, scans=(scan_a, scan_b))
+    exp_a = VibExperiment(field=field_a,
+                          detector=detector_a,
+                          scans=(scan_a, scan_b),
+                          tol_n_dev_t=2.0,
+                          tol_n_dev_w=2.0,
+                          thres_waiting_time=600.0)
 
     print(exp_a.field_analyses[0,0])
     print('valid int patterns', exp_a.field_analyses[0,0].valid_int_patterns)
