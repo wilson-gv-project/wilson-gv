@@ -15,14 +15,15 @@ the data dict, from the reader (wilson_data_obtainer -> CQCParse, a separate rep
 derive (not changed in this refactor). Errors in either one need a check on that side.
 
 
-Status (2026-10-14)
+Status (2026-10-15)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 The refactor ends with an evaluator that a caller uses through its two calls (E6a). Connecting it to
 WilsonSimulation (E6b) left the refactor 2026-10-14 (see Outside the refactor). E6a is done: the two calls,
-their inputs and outputs are in the pipeline.py docstring. What is left: the plotting code (E7), the D4 code move,
-deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
+their inputs and outputs are in the pipeline.py docstring. E7 is done: plot_rsp_func plots the result, 1D or 2D;
+the rest of the render code left the refactor 2026-10-15 (E7b). What is left: the D4 code move, deleting the old
+code (E9). Postponed: the README (E4), the polarization order fix (A15).
 
 
 Order of work
@@ -37,8 +38,10 @@ For now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 a
    so E9 no longer waits for E6b.
    E6a includes E10 (box size by amplitude): code done 2026-10-14, with a box rule as the input of draw_spectrum
    (amplitude_half_widths, or intensity_half_widths: the old rule). amplitude_half_widths keeps both knobs,
-   dynrange and eps. Left in E10: tuning the knobs (later); the domains (E7).
-3. [ ] E7  Port the plotting code (wilson_analysis/render). Small: only plot_regions reads an old type.
+   dynrange and eps. Left in E10: tuning the knobs (later); the domains go with E9.
+3. [x] E7  Plotting the new result: plot_spectrum, plot_rsp_func (wilson_analysis/render/plot_spectrum.py),
+   1D and 2D. Done 2026-10-15. The rest of the render code left the refactor 2026-10-15 (E7b, see Outside the
+   refactor).
 4. [ ] D4 code move. Waits (see above). D5's load checks and D3 (ParameterSet cleanup): done 2026-10-14.
 5. [ ] E9  Delete the old code, in the order E9 lists. Before: decide about G7's old-vs-new part. Waits (see above).
 6. [-] E4  README, with the data-dict contract (D5). Postponed 2026-10-14.
@@ -48,9 +51,11 @@ Postponed 2026-10-14: A15 (polarization order, one line), E4 (README).
 Optional checks: G3 (rest); G4 and G5 (needed before polarizations other than all along x, or ranks other than 4,
 are used).
 Later, only when needed: D1, D2, E8 (line features), G7 (other experiments).
-Outside the refactor [outside]: E6b (the caller); G2, G8 (reader checks); G9 (the normal_modes read error).
+Outside the refactor [outside]: E6b (the caller); E7b (the rest of the render code); G2, G8 (reader checks);
+G9 (the normal_modes read error).
 No item yet:
-- The 9 failing tests in the rest of src (see Tests): open whether they belong to the refactor.
+- The 9 failing tests in the rest of src (see Tests): the 4 render tests belong to E7b [outside]; open whether the
+  other 5 belong to the refactor.
 - From the old README: is single-component Cartesian selection a wanted feature?
 
 
@@ -270,7 +275,7 @@ E. Pipeline
 [outside] E6b The caller: moved to Outside the refactor (2026-10-14).
 [ ] E10 Box size by amplitude (found 2026-10-14). The boxes before E10 cut off parts of the spectrum that the plot
         shows. A box sized by amplitude, with each feature drawn on its own box, is accurate and about as fast.
-        Code done 2026-10-14 (see Code below). Left: decide about the domains (E7).
+        Code done 2026-10-14 (see Code below). The domains: delete in E9 (see Code below, 2026-10-15).
         Decided 2026-10-14: amplitude_half_widths keeps both knobs, dynrange and eps. The formula uses only their
         ratio eps / dynrange: the allowed intensity error as a fraction of the strongest peak, e.g.
         0.1 / 500 = 2e-4. dynrange = 1 does not switch it off (it raises; allowed, it would mean 10 % of the max).
@@ -402,14 +407,16 @@ E. Pipeline
         - [x] Box rule as an input (2026-10-14): draw_spectrum(box_rule=), features.BoxRule. dress_these_with_boxes
               reworked into intensity_half_widths (above); its tests rewritten; e10_boxes.py scores either rule.
         - [ ] Domains (find_clusters_by_featboxes, RectangularDomain): no longer used in drawing. Keep only if
-              plotting regions needs them (E7), else delete (E9).
+              plotting regions needs them (E7), else delete (E9). Since E7 (2026-10-15) nothing in the new
+              code needs them; their only user is c3_spectrum.py (the drawing of before, C3). So: delete in E9,
+              with c3_spectrum.py.
         - The drawing no longer matches the old code (the old code cuts more), so the old code is no reference for
           the drawing: draw_all is (test_pipeline.py). The rows against the old code are checked (C2). For this
           reason E6b's check against the old code is dropped.
         Limits: a Lorentzian tail (gamma / d); the largest width on every axis, the width at the peak (as now).
         A worst case (it assumes the cut tail meets A_max), so boxes are larger than needed where the plot is weak.
-[ ] E7  Port wilson_analysis/render. Only plot_regions reads an old type (GridRegion); the main renderer reads
-        arrays (sim.spec and the grid).
+[x] E7  Plotting the new result. Done 2026-10-15. The rest of the render code (the old renderer, plot_regions) is
+        not part of the evaluator refactor since 2026-10-15: E7b, see Outside the refactor.
         - [x] wilson_analysis/render/plot_spectrum.py (2026-10-15): 1D and 2D spectra, plain arguments, two
               functions:
                 plot_spectrum(intensity, grid, ...)   any real 1D or 2D intensity array; grid: one full array of
@@ -426,32 +433,13 @@ E. Pipeline
               (12 levels, 1.0e9 to 5.2e11). Tests: wilson_analysis/tests/test_plot_spectrum.py.
               Example: tests/example_plot_spectrum.py (formaldehyde whole window, zoom, a 1D row of the zoom,
               harmonic vs anharmonic on one scale; ACDM; about 10 s).
-        Found 2026-10-15:
-        - The old renderer plots the new result too: MatplotlibRenderer(spec_data=spec.grid_result,
-          spec_grid=spec.grid_mesh, ev_info=EvaluationInfo(), rnd_info=RenderingInfo(...)). ev_info is only
-          type-checked (SpectrumRenderer._validate_inputs), never read.
-        - Besides plot_regions, old types in render: render_spectrum's features overlay (old feature fields:
-          term_contributions, states_parameters, res_motif); MatplotlibRendererGV and base.py, made for
-          workflow_abstractions_updated.py (a dead module, see E6b).
-        - The 4 failing render tests (see Tests): they set dynamic_range on EvaluationInfo; the renderer reads
-          RenderingInfo.dynamic_range (moved to EvaluationInfo in b210b9e, 2026-01-10, later back). Checked for
-          test_render_spectrum_simplecontour_sq: with dynamic_range on RenderingInfo its levels match.
-        - render_spectrum (render.py): print('hello') and print('CBAR MIN'); a line with no effect
-          (spec_eval_setup.grid['A'][row,col]); filename.replace('.', '_sticks.') replaces every '.' of the path.
-        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps (data prep, normalization, masks);
-          add_colorbar exists 3 times; the masks know only the EVV w2 > w1 condition.
-        Open:
-        - plot_regions: no caller. Delete, or port to a plot of the new boxes (SpectralWindow). Either way
-          render/__init__.py stops importing it, so importing render no longer loads amplitudes/ (needed for E9).
-        - Fix the 4 render tests; drop the unused EvaluationInfo check; render_spectrum's prints, the no-effect
-          line, the '_sticks' filename.
-        - A rework of the old renderer: with the new WilsonSimulation procedure (it calls the renderer), as E6b.
+[outside] E7b The rest of the render code: moved to Outside the refactor (2026-10-15).
 [ ] E8  Line features (Later). Fewer conditions than spectrum axes give a line, not a point:
         - one condition on B only, in an (A, B) spectrum: location {'B': E}, a line along A. from_features raises.
         - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
         Real terms like this exist (G7, coincident pulses). Once such a setup matters: allow them in B7, then
         boxes (the whole window along the line?), get_intensity, eval_feature_on_grid, drawing.
-[ ] E9  Delete the old code (after E7; E6b's check is dropped, see E6b). Waits: no big
+[ ] E9  Delete the old code (E7 done; E6b's check is dropped, see E6b). Waits: no big
         moves or removals outside refac_rsp_eval for now (2026-10-14). Code outside
         refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing pipeline.py. In this order:
         - [ ] amplitudes/averaging.py stays at this path: wilson_experiment imports get_pol_laser from it, and
@@ -459,7 +447,9 @@ E. Pipeline
         - [ ] amplitudes/__init__.py: Python runs it before averaging.py, and it imports spectrum_composition,
               evaluation_wf, evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
               wilson_intensities/__init__.py imports amplitudes too.
-        - [ ] wilson_analysis/render/plot_regions.py: E7.
+        - [ ] wilson_analysis/render/plot_regions.py imports amplitudes/ (GridRegion), and render/__init__.py
+              imports plot_regions: once amplitudes/ goes, importing render breaks, plot_spectrum included.
+              Before: plot_regions out of render/__init__.py (E7b), or E9 cuts that one import line.
         - [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState; E6 replaces them.
         - [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
               wilson_main/abstractions.py. Already wrong: they live in workflow_abstractions_updated.py.
@@ -548,7 +538,8 @@ H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both d
 
 Outside the refactor [outside]
 ------------------------------
-Not the evaluator's job: these items connect the evaluator to its caller (E6b), or check or fix the reader.
+Not the evaluator's job: these items connect the evaluator to its caller (E6b), rework the render code (E7b), or
+check or fix the reader.
 Old and new read the same data dict, so C2, C3 and G1 would all miss a reader error. The reader items matter for
 the final spectra.
 [ ] E6b The caller (left the refactor 2026-10-14). After the new WilsonSimulation procedure is known. The
@@ -568,6 +559,30 @@ the final spectra.
         Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
         EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
         which does not exist (dead module).
+[ ] E7b The rest of the render code, wilson_analysis/render (left the refactor 2026-10-15). The new result is
+        plotted by plot_rsp_func (E7); the old renderer is for the old WilsonSimulation path.
+        Found 2026-10-15:
+        - The old renderer plots the new result too: MatplotlibRenderer(spec_data=spec.grid_result,
+          spec_grid=spec.grid_mesh, ev_info=EvaluationInfo(), rnd_info=RenderingInfo(...)). ev_info is only
+          type-checked (SpectrumRenderer._validate_inputs), never read.
+        - Old types in render: plot_regions (GridRegion from amplitudes/, old domains and feature fields);
+          render_spectrum's features overlay (old feature fields: term_contributions, states_parameters,
+          res_motif); MatplotlibRendererGV and base.py, made for workflow_abstractions_updated.py (a dead
+          module, see E6b).
+        - The 4 failing render tests (see Tests): they set dynamic_range on EvaluationInfo; the renderer reads
+          RenderingInfo.dynamic_range (moved to EvaluationInfo in b210b9e, 2026-01-10, later back). Checked for
+          test_render_spectrum_simplecontour_sq: with dynamic_range on RenderingInfo its levels match.
+        - render_spectrum (render.py): print('hello') and print('CBAR MIN'); a line with no effect
+          (spec_eval_setup.grid['A'][row,col]); filename.replace('.', '_sticks.') replaces every '.' of the path.
+        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps (data prep, normalization, masks);
+          add_colorbar exists 3 times; the masks know only the EVV w2 > w1 condition.
+        Open:
+        - plot_regions: no caller. Delete, or port to a plot of the new boxes (SpectralWindow). Either way
+          render/__init__.py stops importing it, so importing render no longer loads amplitudes/ (E9 needs this,
+          or cuts the import itself).
+        - Fix the 4 render tests; drop the unused EvaluationInfo check; render_spectrum's prints, the no-effect
+          line, the '_sticks' filename.
+        - A rework of the old renderer: with the new WilsonSimulation procedure (it calls the renderer), as E6b.
 [ ] G2  Data reader vs the Gaussian .out file: one harmonic frequency, one anharmonic fundamental, one dipgrad
         value, one polgrad value.
         Done by hand 2026-10-11, water (a scratch script, not a test). From the reader's values, Gaussian's own
