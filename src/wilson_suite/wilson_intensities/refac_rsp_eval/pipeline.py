@@ -9,6 +9,8 @@ Two calls, from the terms derive writes (in pulse IDs) and the data:
 A caller needs only these two calls. The inputs are plain values, derive's terms and a few small types (below).
 evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
 prop_names and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
+One call is for one set of resonance axes, e.g. {A, B} (check_one_axis_set). Terms on more than one set, e.g. the
+3 IR setup ({A, B} and {A, B, C}): terms_by_axis_set splits them, and each set gets its own call.
 
 The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
 MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
@@ -65,7 +67,7 @@ SpectralFeature(location, rows)                            "what" layer   featur
 spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
 """
 from collections import defaultdict
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -94,6 +96,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
+    ResonanceMotif,
     compile_terms,
     split_props,
 )
@@ -190,13 +193,54 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     exclude_modes: modes removed everywhere, e.g. (5,): no peak and no summed value uses them (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) in drawing.
+    raises ValueError if the terms resonate on more than one set of axes (check_one_axis_set).
     """
+    check_one_axis_set(compiled)
     table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice,
                                       exclude_modes=exclude_modes)
     return FeatureResult(table, zero, propagator_param,
                          compiled=tuple(compiled), molsys=molsys_data,
                          polarization_linear_comb=polarization_linear_comb, states_choice=states_choice,
                          exclude_modes=tuple(sorted(set(exclude_modes))))
+
+
+def _term_ids_by_axis_set(motifs: Iterable[ResonanceMotif]) -> dict[tuple[str, ...], list[int]]:
+    """term ids grouped by the axes of their conditions, sets in first-seen order, e.g. {('A', 'B'): [0, 2], ('A',): [1]}"""
+    term_ids = defaultdict(list)
+    for term_id, motif in enumerate(motifs):
+        term_ids[tuple(sorted(motif.get_max_different_freq_axes()))].append(term_id)
+    return dict(term_ids)
+
+
+def check_one_axis_set(compiled: Sequence['CompiledTerm']) -> None:
+    """
+    raises ValueError if the terms resonate on more than one set of axes (todo.txt E11). One evaluation, and its
+    grid, is for one set, e.g. {A, B}. The message lists the term ids per set, e.g. the 3 IR setup:
+        {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}
+    {A} and {B} are different sets: a term on A only is a stripe along B in an (A, B) plane.
+    Terms without conditions (key (), E12) do not count here.
+    Without this check such a mix passes compiling (B7 checks each term on its own axes) and fails only in drawing.
+    """
+    term_ids = {axis_set: ids for axis_set, ids in _term_ids_by_axis_set(t.cmp_resmotf for t in compiled).items()
+                if axis_set}
+    if len(term_ids) > 1:
+        raise ValueError(f'the terms resonate on {len(term_ids)} sets of axes, one evaluation takes one set '
+                         f'(terms_by_axis_set splits them); term ids by set: {term_ids}')
+
+
+def terms_by_axis_set(terms: Sequence['VibPerturbedTerm'],
+                      axes: 'SpectralAxisSet') -> dict[tuple[str, ...], list[int]]:
+    """
+    The term ids (index in `terms`) grouped by the axes their resonance conditions use in the chosen axes, e.g.
+    the 3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: key ().
+    terms: as derive writes them (pulse IDs); grouping needs the translation to `axes`, so it is done here (copies).
+    For the caller: one evaluate_response_terms call per set, e.g.
+        for axis_set, ids in terms_by_axis_set(terms, axes).items():
+            result = evaluate_response_terms([terms[i] for i in ids], axes=axes, ...)
+    There row.term_id is the index in that call's list: ids[row.term_id] is the index in `terms`.
+    """
+    translated = translate_terms_to_axis_variables(terms, axes)
+    return _term_ids_by_axis_set(ResonanceMotif.from_conditions(t.res) for t in translated)
 
 
 def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
@@ -281,7 +325,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
         2. compile                                          compile_terms
         3. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
                                                             rank and laser_pol)
-        4. rows, zero pairs, features                       compute_features
+        4. rows, zero pairs, features                       compute_features (raises first if the terms resonate
+                                                            on more than one set of axes: terms_by_axis_set)
     The spectrum on a grid: draw_spectrum(result, window, dim_sizes, box_rule=...), as often as needed; the rows stay.
 
     axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})

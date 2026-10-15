@@ -1,5 +1,5 @@
 refac_rsp_eval — TODO
-updated 2026-10-15, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+updated 2026-10-16, branch rsp_eval_refactor (brings the refactor to main, see Branch)
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
 Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are on debug_rendering.
@@ -7,12 +7,14 @@ Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are
 [outside] = not the evaluator's job. The evaluator takes two inputs as given: the data dict (from the reader:
 wilson_data_obtainer -> CQCParse, a separate repo) and the formulas (from derive, not changed in this refactor).
 Errors in either one need a check on that side.
+[aside] = next to the evaluator procedure, not done in this refactoring (2026-10-16): the averaging weights and
+the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (G6).
 
 
-Tests (run 2026-10-15, branch rsp_eval_refactor)
+Tests (run 2026-10-16, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   652     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+    refac_rsp_eval   680     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
     rest of src      323     4     3      -   none
     tests/ (root)      4    16     -      -   none
@@ -23,15 +25,16 @@ A fresh checkout (e.g. a git worktree) fails more: some tests read files that gi
 e.g. src/wilson_suite/terms_fuller_flat.json.
 
 
-Status (2026-10-15)
+Status (2026-10-16)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
 Left: the D4 code move, deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
-Other experiments checked 2026-10-15 (G7): 1D and 2D run end to end. 3D needs one resonance axis set per
-evaluation (E11). 4D is blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8.
+Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
+evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
+blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8. Flat background: E12.
 
 
 Branch rsp_eval_refactor (2026-10-15)
@@ -44,7 +47,7 @@ debug_rendering (the dft_vs_cc PRs #53-#61, the render changes) stays there.
              f7c0b92)
     27408f9  compat.py; test_averaging_pol_order.py moved from wilson_intensities/tests/unit into tests/;
              wilson_utils/some_reprs.py renamed builders.py (as on debug_rendering, 40621bd)
-wilson_derive and wilson_experiment are as on main. Four changes of debug_rendering there were used by the
+wilson_derive and wilson_experiment are as on main. Five changes of debug_rendering there were used by the
 refactor; on this branch:
     flat term list in translate_terms_to_axis_variables     compat.translate_terms_to_axis_variables: wraps the list
       (40621bd)                                             in main's {i: {j: [terms]}} and unwraps the result
@@ -54,12 +57,15 @@ refactor; on this branch:
       (bbe1c77)
     VibPerturbedTerm.anharmonicity (e55257b)                SpectralFeature.anharm_contributions and its 3 tests
                                                             deleted
-compat.py goes once wilson_derive has the flat list and to_str [outside].
+    VibExperiment.derive_terms (40621bd)                    compat.derive_terms: main's derive, flattened by
+                                                            derived_terms_flat (test_dimensions.py uses it)
+compat.py goes once derive and the experiment have the flat list, to_str and derive_terms [outside].
 Scripts that do not run on this branch (main's old pipeline and derive); pytest collects none of them:
     tests/c3_spectrum.py                  ImportError: main has no evaluate_feature in amplitudes/evaluators.py
     tests/c2_variations.py (run_old),     main's find_props (wilson_main/main_functions.py) wants the terms as
       tests/c2_leaves.py                  {i: {j: [terms]}}; the scripts pass a flat list
-    tests/g7_survey.py                    VibExperiment.derive_terms is not on main (40621bd)
+    tests/g7_survey.py                    calls experiment.derive_terms(), not on main; compat.derive_terms gives
+                                          the same list
 C2 stays checked without them: test_evv_reference.py against evv_reference.json.
 
 
@@ -77,14 +83,14 @@ Steps 1-4 may use the old code; step 5 deletes it.
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
 Other items:
-    small, any time      H8 (keep or drop a rule), G6 (smallest energy differences)
+    small, any time      H8 (keep or drop a rule)
     postponed            A15 (polarization order, one line), E4 (README)
-    optional checks      G3 (rest); G4, G5 (needed before polarizations other than all along x, or ranks
-                         other than 4, are used)
-    next (2026-10-15)    E11 (one resonance axis set per evaluation), E12 (flat background), G10 (mock-data
-                         tests for 1D, 3D, 4D)
+    optional checks      G3 (rest)
+    next (2026-10-16)    E12 (flat background)
     later, when needed   D1, D2, E8 (lines and planes), G7 (old vs new for other experiments), E10 (tune the
                          knobs), F (reuse on a new axis choice; the sum as arrays)
+    [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
+                         all along x, or ranks other than 4, are used), G6 (smallest energy differences)
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
                          checks), G9 (normal_modes); derive's flat term list and to_str, then compat.py goes
                          (see Branch)
@@ -103,10 +109,13 @@ Decisions and known limits
   (a line, E8) or more. Conditions that contradict each other: malformed. A term without conditions passes
   B7; decided 2026-10-15: it is a flat background, calculated and drawn (E12; today build_contributions raises).
 - One resonance axis set per evaluation (2026-10-15): one evaluate_response_terms call, and its grid result, is
-  for one set of axes, e.g. {A, B}. The input terms are checked first: all must resonate on the same axes (E11).
-  {A} and {B} are different sets. The caller splits the terms and makes one evaluation per set.
+  for one set of axes, e.g. {A, B}. The input terms are checked first: all must resonate on the same axes
+  (check_one_axis_set, E11). {A} and {B} are different sets. The caller splits the terms (terms_by_axis_set) and
+  makes one evaluation per set. Limit: the measured signal is |sum of all amplitudes|^2, so the sets interfere;
+  separate grid results do not add up as intensities. Adding sets on one grid (a smaller set copied along its
+  missing axes): not planned.
 - Mock data for what the reader cannot give (2026-10-15): the reader's limits (no hypgrad, states up to 3
-  quanta) are not the evaluator's. Tests for 1D, 3D, 4D use mock data (G10).
+  quanta) are not the evaluator's. Tests for 1D-4D use mock data (G10, test_dimensions.py).
 - Denominators (2026-10-10): w is always the Hessian eigenvalue (nc_sqrt_eigval); an energy difference uses the
   chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); term_to_str (compat.py)
   prints both alike, e.g. <['a'],[]>.
@@ -318,29 +327,6 @@ E. Pipeline
         (test_pipeline.py). The rows are checked against the old code (C2).
         Seen 2026-10-15, not investigated: IR + IR + vis sum frequency (2D, formaldehyde, gamma 10 cm-1, 201 x 201
         points over 11000 cm-1, so steps of 55 cm-1) 0.59 floors from draw_all, above the 0.13 measured here.
-[ ] E11 One resonance axis set per evaluation (decided 2026-10-15). One evaluate_response_terms call, and its grid
-        result, is for one set of axes, e.g. {A, B}. To do:
-        - Check first, after the translation to axes: every term must resonate on the same set of axes (the axes
-          in its conditions). If not, raise and list the sets with their term ids. Today such a mix passes
-          compiling (B7 checks each term on its own axes) and fails only in drawing: "Expected SpectralFeature
-          with axes ('A', 'B', 'C'), got ('A', 'B')" (G7: the 3-IR setup).
-        - A helper for the caller: the terms grouped by resonance axis set, e.g. {('A', 'B'): [...],
-          ('A', 'B', 'C'): [...]}. Grouping needs the axes (the translation), not only the terms.
-        - The set, not the number: {A} and {B} are different sets (a term on A only is a stripe along B in an
-          (A, B) plane).
-        - Open: which axes the caller passes for a smaller set: all of the experiment's, or only the set's.
-        - Open: terms without conditions (E12) have no axes. Proposal: allowed with any set, added as a constant
-          on its grid.
-        Found 2026-10-15 (G7): mixed sets in one experiment are common with more than 2 axes:
-            3 IR (seminar notebook)                    {A, B} 14, {A, B, C} 2
-            7-pulse UV (try.py)                        {A, B} 440, {A, B, C} 192
-            4 IR + UV, UV with the 2nd IR pair         {A, B} 192-220, {A, B, C} 46-48, {A, B, D} 46-48,
-                                                       {A, B, C, D} about 19000, and lines and planes (E8)
-        Limit: the measured signal is |sum of all amplitudes|^2, so the sets interfere. Separate grid results do
-        not add up as intensities. Adding sets would need their amplitudes on one grid (a smaller set copied
-        along its missing axes). Not planned.
-        The window and box code stays as it is: drawing already needs every feature to have the window's axes
-        (SpectralFeature._check_same_axes).
 [ ] E12 Terms without resonance conditions: a flat background (decided 2026-10-15). Calculated as other terms,
         drawn as one constant amplitude on every grid point, added before squaring.
         Today: B7 lets them pass, then build_contributions raises (solve_LSE_motif: "motif has no resonance
@@ -348,7 +334,8 @@ E. Pipeline
         to 2 terms with one condition on A. No other setup of the survey has them.
         To do: an empty location; the row's coefficient is the full sum (no resonance labels); drawing:
         amplitude_coeff on every grid point; get_intensity: |coeff|^2; no box (today the box rules fail on the
-        empty peak_widths()). How they join an axis set: E11.
+        empty peak_widths()). Axis sets (E11): check_one_axis_set does not count them (no axes); terms_by_axis_set
+        puts them under key (). Proposal: allowed with any set, a constant on its grid.
 
 
 F. Speed
@@ -399,15 +386,16 @@ checking side.
         polhess, diphess.
         Limit: a rotation test cannot catch wrong weights (any mix of isotropic tensors passes, e.g. laser_pol
         (0.3, -1.2, 2.0), test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
-[ ] G4  Averaging weights against the exact orientation average, numpy only. exact_average
+[ ] G4  [aside] Averaging weights against the exact orientation average, numpy only. exact_average
         (test_averaging_pol_order.py): Euler angles z-y-z, 8 x 8 x 8 = 512 rotations (Gauss-Legendre in cos beta),
         exact for ranks 1-6; checked against textbook values (rank 2; rank 4 Raman, zzzz and zxzx).
         Found: the weights are right; ranks 3, 5, 6 read the polarizations in reverse order (A15).
         Left: the 5 polarization setups of C2; M x Gram(f) = identity for ranks 2-6, with Gram(f)[r, s] = sum over
         all indices of f_r * f_s (guards the typed-in M tables; passes now, 4e-16).
-[ ] G5  Polarization vector by hand for 2-3 setups (e.g. all along x -> (1, 1, 1)): what each entry means.
-[ ] G6  Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a term
-        huge; otf_vibdiffdenom raises only at exactly zero.
+[ ] G5  [aside] Polarization vector by hand for 2-3 setups (e.g. all along x -> (1, 1, 1)): what each entry means.
+[ ] G6  [aside] Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a
+        term huge; otf_vibdiffdenom raises only at exactly zero (the evaluator's part). Which energies come near
+        each other is a property of the molecule's states (the data).
 [ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below). Left: old vs new with the c2 scripts
         (needs the old code, E9) for the setups that run (CARS, the 3-IR setup), and parameter sets that share a
         location (the double count, C3). The scripts named here do not run on this branch (see Branch); the
@@ -461,8 +449,9 @@ checking side.
               (try + 4)                                                           192-220, ABC 46-48, ABD 46-48;
                                                                                   lines and planes 582-1076
         Results:
-            run end to end      CARS (24 rows, 12 features, drawn in 1D, 0.06 floors from draw_all), EVV
-            rows, no drawing    3 IR: two axis sets (E11)
+            run end to end      CARS (24 rows, 12 features, drawn in 1D, 0.06 floors from draw_all), EVV; since
+                                2026-10-16 also 3 IR, one evaluation per axis set (E11). CARS and 3 IR are
+                                tests now (test_dimensions.py, G10)
             all 0               IR + vis SFG, 3 IR + UV at different times: odd rank (3, 5) is 0 for an achiral
                                 molecule, and with every field along x laser_pol is all 0 at rank 5
             raises              IR absorption: terms without conditions (E12)
@@ -473,20 +462,6 @@ checking side.
             4D                  derive's translation stops at 3 axes (E13); 4-quanta states (the data has up to
                                 3); size: 6e6-2e7 index sets even on formaldehyde (6 modes; F)
         derive's anharmonicity limits (2, 1, 1) and (2, 2, 1) add no EVV terms; (2, 2, 2) is not implemented.
-[ ] G10 Tests with mock data for 1D, 3D, 4D (2026-10-15; the reader's limits are not the evaluator's).
-        Now: the real-data pipeline tests are 2D only (EVV); the unit tests have 1D and 2D motifs, none with 3 or 4
-        axes; the geometry tests (Box, grid, slices, intensity, boxes) run 1D-4D (helpers.NDIMS).
-        To do:
-        - 1D: CARS on formaldehyde runs today and needs only polgrad: a cheap real-data test.
-        - 3D: unit tests with a 3-axis motif (solve_LSE_motif, eval_feature_on_grid, draw_window vs draw_all), and
-          a toy pipeline test. Seen 2026-10-15 with randomly changed formaldehyde data (3 IR + UV, laser_pol for
-          x, y, z, x, x): 480 rows; 41^3 points 1.7 s, 81^3 13 s; 0.03-0.04 floors from draw_all.
-        - 4D: needs mock 4-quanta states, and E13 (or terms translated by hand).
-        - Mock data: MolSystemData.from_datadict with a toy dict (as TOY_DATA, test_system_data.py). Its shape
-          checks know hypgrad and the like (PROP_INDEX_COUNTS: up to 6 geometric and 6 field orders); 4-quanta
-          states are more keys in the state lists.
-        - Odd ranks (3, 5) give 0 unless the mock tensors lack the symmetry of an achiral molecule and the
-          polarizations mix x, y, z. Fix A15 first, or the values are wrong.
 
 
 H. Rules
@@ -516,6 +491,8 @@ spectra.
         - Make the MolSystemData once: from_datadict (data already read) or load(origin, prop_names(terms)).
         - states_choice from the regime. The regime 'compare' (both state sets) gives no single choice.
         - Nothing that assumes point features only (E8).
+        - Terms on more than one resonance axis set (E11): one evaluation per set (terms_by_axis_set). Open: which
+          axes to pass for a smaller set, all of the experiment's or only the set's.
         - No test covers the settings the caller passes (the table in E6) until a caller exists. In place:
           test_pipeline.py, test_draw_spectrum_with_a_width_function (data file -> load -> evaluate -> draw,
           against draw_all, at most 0.1 floors).
@@ -534,7 +511,8 @@ spectra.
         for any number of axes (the G7 survey used a copy without them: all 5120
         4-axis terms translated and passed B7). Without them the limit is 7 axes: the axes are named
         cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
-        4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data (G10).
+        4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data and
+        terms compiled by hand (G10, test_dimensions.py).
 [ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
         harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
         and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for
@@ -567,6 +545,12 @@ Built
     E10  Code (2026-10-14): amplitude_half_widths, intensity_half_widths, SpectralWindow.from_features,
          draw_window on each feature's own box, draw_spectrum(box_rule=). Tests in test_evaluate.py and
          test_features.py.
+    E11  One resonance axis set per evaluation (2026-10-16, see Decisions). pipeline.check_one_axis_set:
+         compute_features raises before any row is computed and lists the term ids per set; before, such a mix
+         failed only in drawing ("Expected SpectralFeature with axes ..."). pipeline.terms_by_axis_set: the term
+         ids per set, in the chosen axes, for the caller. Mixed sets are common above 2 axes (G7: 3 IR {A, B} 14,
+         {A, B, C} 2; 7-pulse UV {A, B} 440, {A, B, C} 192; 4 IR + UV four sets). Tests: test_pipeline.py (toy
+         terms; EVV with term 0 on A only), test_dimensions.py (3 IR).
     B7   One resonance point per term, checked when compiling (see Decisions).
     F1   einsum for the averaged part (2026-10-12; make_avrg_einsum_subscripts, AvrgTensor). Agrees with the loop
          to 8e-14. ACDM averaging 47 s -> 0.3 s.
@@ -592,6 +576,14 @@ Checked: the numbers are right
          (test_hand_calculation.py). Found: pytest.approx's default abs=1e-12 had hidden errors up to 6e-5.
     A16  test_integration.py, the two term 8 tests (2026-10-14): rel 1e-12; einsum abs=0; rotation abs=1e-18 (the
          evaluator's zero_tol: 144 of 216 values are rounding noise below 2.4e-19).
+    G10  1D-4D (2026-10-16, test_dimensions.py). Mock data (MolSystemData.from_datadict: 2 modes, states up to 4
+         quanta): a toy term per dimensionality with the chain motif (A ; A+B ; A+B+C ; A+B+C+D), compiled by
+         hand (no translation, so 4D despite E13). Checked: B7 takes the motif; one row per index set at the
+         written-out point; peak = amplitude * (i / gamma)^N = get_intensity; drawing box by box (each feature's
+         draw_all value inside its own box). Real data, terms from derive (compat.derive_terms), formaldehyde:
+         CARS (1D: 24 rows, 12 features at +- the anharmonic fundamentals; 0.06 floors from draw_all) and 3 IR
+         (3D: {A, B} 340 rows; {A, B, C} 72 rows, drawn on 41^3 points within 0.1 floors). Not covered: odd ranks
+         (A15 first), 4D from derive (E13).
 Fixed
     A0-A4, A6-A14  Small fixes. Two change behaviour: evaluate_term_coeff_sumover raises if a resonance label is
          missing; VibDiff.from_symbolic calls from_quanta, so a state is found one way only.

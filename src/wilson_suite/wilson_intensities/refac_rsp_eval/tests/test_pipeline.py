@@ -11,6 +11,7 @@ with a=1 have coeff 0: per term, 2 rows (a=0) at 2 different locations and 2 zer
 
 import dataclasses
 import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from fractions import Fraction
@@ -42,11 +43,13 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     averaging_rank,
+    check_one_axis_set,
     compute_features,
     draw_spectrum,
     evaluate_response_terms,
     make_polarization_linear_comb,
     prop_names,
+    terms_by_axis_set,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
@@ -62,6 +65,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E00,
     E01,
     E1,
+    MOTIF_A,
     MOTIF_AB,
     PS_00,
     PS_01,
@@ -141,6 +145,34 @@ def test_compute_features_gives_a_propagator_param_function_the_conditions(molsy
 
     assert all(f.propagator_param is width for f in result.features)
     assert [f.peak_widths() for f in result.features] == [pytest.approx((14.5, 5.)), pytest.approx((21., 10.))]
+
+
+## one set of resonance axes per evaluation (todo.txt E11) ----------------------
+# MOTIF_AB resonates on {A, B}, MOTIF_A on {A}, MOTIF_B on {B}.
+
+MOTIF_B = (((('b',), ('a',)), ('B',)),)
+
+
+def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
+    """
+    {A, B} and {A}: compiling takes both (each fixes one point on its own axes); drawing would not
+    ("Expected SpectralFeature with axes ('A', 'B'), got ('A',)"). The message lists the term ids per set.
+    """
+    terms = [ab_term(MOTIF_AB), ab_term(MOTIF_A), ab_term(MOTIF_AB)]
+
+    with pytest.raises(ValueError, match=re.escape("term ids by set: {('A', 'B'): [0, 2], ('A',): [1]}")):
+        compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+
+
+def test_compute_features_raises_for_terms_on_A_only_and_on_B_only(molsys_a1_zero):
+    """{A} and {B} are different sets: in an (A, B) plane the first is a stripe along B, the second along A."""
+    with pytest.raises(ValueError, match='2 sets of axes'):
+        compute_features([ab_term(MOTIF_A), ab_term(MOTIF_B)], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+
+
+def test_check_one_axis_set_does_not_count_a_term_without_conditions():
+    """A term without conditions has no axes (E12): it is not a set of its own."""
+    check_one_axis_set([ab_term(MOTIF_AB), toy_term()])
 
 
 def test_feature_result_made_by_hand_gives_a_propagator_param_function_no_conditions():
@@ -638,6 +670,39 @@ def test_evaluate_response_terms_keeps_what_drawing_and_leaves_need(top_run, for
     r = max(result.table, key=lambda r: abs(r.coeff))
     term = result.compiled[r.term_id]  # type: ignore
     assert sum(leaf_value(term, c) for c in result.leaves(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
+
+
+def test_terms_by_axis_set_the_14_evv_terms_are_one_set():
+    assert terms_by_axis_set(ref.evv_terms(), make_SpectralAxisSet(ref.AXES)) == {('A', 'B'): list(range(14))}  # type: ignore
+
+
+def evv_terms_with_term_0_on_A_only() -> list:
+    """the 14 EVV terms; term 0 keeps only its first condition (pulse 1, -A in these axes): its set is {A}"""
+    terms = ref.evv_terms()
+    terms[0].res = terms[0].res[:1]
+    return terms
+
+
+def test_terms_by_axis_set_groups_the_term_ids_in_the_chosen_axes():
+    groups = terms_by_axis_set(evv_terms_with_term_0_on_A_only(), make_SpectralAxisSet(ref.AXES))  # type: ignore
+
+    assert groups == {('A',): [0], ('A', 'B'): list(range(1, 14))}
+
+
+def test_evaluate_response_terms_raises_for_two_axis_sets_and_runs_per_set(formaldehyde_molsys, top_run):
+    """
+    The mix raises before any row is computed. Split by terms_by_axis_set, the {A, B} set runs: its rows are those of
+    terms 1-13 in top_run, with ids[row.term_id] the index in the full list.
+    """
+    terms = evv_terms_with_term_0_on_A_only()
+    with pytest.raises(ValueError, match='2 sets of axes'):
+        evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms)
+
+    ids = terms_by_axis_set(terms, make_SpectralAxisSet(ref.AXES))[('A', 'B')]  # type: ignore
+    result = evaluate_formaldehyde(formaldehyde_molsys, 4.7, [terms[i] for i in ids])
+
+    assert ({(ids[r.term_id], r.params, r.coeff) for r in result.table}
+            == {(r.term_id, r.params, r.coeff) for r in top_run.result.table if r.term_id != 0})
 
 
 def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_molsys):
