@@ -1,22 +1,25 @@
 refac_rsp_eval — TODO
-updated 2026-10-15
-Shortened 2026-10-15. The long version (all measurements and reasons):
+updated 2026-10-15, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
+Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are on debug_rendering.
 
 [outside] = not the evaluator's job. The evaluator takes two inputs as given: the data dict (from the reader:
 wilson_data_obtainer -> CQCParse, a separate repo) and the formulas (from derive, not changed in this refactor).
 Errors in either one need a check on that side.
 
 
-Tests (run 2026-10-15)
-----------------------
+Tests (run 2026-10-15, branch rsp_eval_refactor)
+------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   642     5     -      -   all 5 fails (tests/test_a15_polarization_order.py)
-    rest of src      332    16     3     14   7 fails (wilson_intensities/tests/unit/test_get_pol_tensor.py),
-                                              all 14 xfails (test_averaging_pol_order.py)
-The other 9 fails in the rest of src are the same before and after B7: render tests (4, belong to E7b),
-test_machinery (2), test_domains, test_resonances, test_term_var_translate.
-A fresh checkout (e.g. a git worktree) fails about 18 more: some tests read files that git ignores,
+    refac_rsp_eval   652     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+                                              all 14 xfails (tests/test_averaging_pol_order.py)
+    rest of src      323     4     3      -   none
+    tests/ (root)      4    16     -      -   none
+Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The 4 in the rest of src:
+test_integration_evv_experiment_until_after_evaluation, test_domains (test_find_domain_groups_by_distance needs
+sklearn; test_find_clusters_by_distance), test_wilson_data_obtainer (test_getting_data).
+A fresh checkout (e.g. a git worktree) fails more: some tests read files that git ignores,
 e.g. src/wilson_suite/terms_fuller_flat.json.
 
 
@@ -29,6 +32,35 @@ Left: the D4 code move, deleting the old code (E9). Postponed: the README (E4), 
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments checked 2026-10-15 (G7): 1D and 2D run end to end. 3D needs one resonance axis set per
 evaluation (E11). 4D is blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8.
+
+
+Branch rsp_eval_refactor (2026-10-15)
+-------------------------------------
+This branch brings the refactor to main. It starts at main 11e3d0a and holds only the refactor; the rest of
+debug_rendering (the dft_vs_cc PRs #53-#61, the render changes) stays there.
+    01a11d8  refac_rsp_eval, wilson_system, wilson_analysis/render/plot_spectrum.py and its test, copied from
+             debug_rendering 3d18259
+    96bcc63  one DataOriginInfo class: wilson_main/abstractions.py imports it from wilson_system (B1; debug_rendering
+             f7c0b92)
+    27408f9  compat.py; test_averaging_pol_order.py moved from wilson_intensities/tests/unit into tests/;
+             wilson_utils/some_reprs.py renamed builders.py (as on debug_rendering, 40621bd)
+wilson_derive and wilson_experiment are as on main. Four changes of debug_rendering there were used by the
+refactor; on this branch:
+    flat term list in translate_terms_to_axis_variables     compat.translate_terms_to_axis_variables: wraps the list
+      (40621bd)                                             in main's {i: {j: [terms]}} and unwraps the result
+    VibPerturbedTerm.to_str (27bc080)                       compat.term_to_str, a copy (uses term.to_str if the
+                                                            term has one, e.g. the fake terms in test_plan.py)
+    VibDiffTerm.to_latex gives 'a' for a harmonic factor    main gives 'a,'; test_integration.py expects 'a,'
+      (bbe1c77)
+    VibPerturbedTerm.anharmonicity (e55257b)                SpectralFeature.anharm_contributions and its 3 tests
+                                                            deleted
+compat.py goes once wilson_derive has the flat list and to_str [outside].
+Scripts that do not run on this branch (main's old pipeline and derive); pytest collects none of them:
+    tests/c3_spectrum.py                  ImportError: main has no evaluate_feature in amplitudes/evaluators.py
+    tests/c2_variations.py (run_old),     main's find_props (wilson_main/main_functions.py) wants the terms as
+      tests/c2_leaves.py                  {i: {j: [terms]}}; the scripts pass a flat list
+    tests/g7_survey.py                    VibExperiment.derive_terms is not on main (40621bd)
+C2 stays checked without them: test_evv_reference.py against evv_reference.json.
 
 
 Order of work
@@ -54,9 +86,11 @@ Other items:
     later, when needed   D1, D2, E8 (lines and planes), G7 (old vs new for other experiments), E10 (tune the
                          knobs), F (reuse on a new axis choice; the sum as arrays)
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
-                         checks), G9 (normal_modes)
-    no item yet          - the 9 other failing tests in the rest of src (see Tests): the 4 render tests belong
-                           to E7b; open whether the other 5 belong to the refactor
+                         checks), G9 (normal_modes); derive's flat term list and to_str, then compat.py goes
+                         (see Branch)
+    no item yet          - the 4 failing tests in the rest of src (see Tests) fail on main too; open whether they
+                           belong to the refactor
+                         - the scripts that do not run on this branch (see Branch): fix, or drop with E9
                          - from the old README: is single-component Cartesian selection a wanted feature?
                          - 3D and 4D spectra have no plot (plot_spectrum: 1D and 2D only): slices or projections,
                            when needed
@@ -74,8 +108,8 @@ Decisions and known limits
 - Mock data for what the reader cannot give (2026-10-15): the reader's limits (no hypgrad, states up to 3
   quanta) are not the evaluator's. Tests for 1D, 3D, 4D use mock data (G10).
 - Denominators (2026-10-10): w is always the Hessian eigenvalue (nc_sqrt_eigval); an energy difference uses the
-  chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); to_str prints both alike,
-  e.g. <['a'],[]>.
+  chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); term_to_str (compat.py)
+  prints both alike, e.g. <['a'],[]>.
 - states_choice (2026-10-12) must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic ->
   'harmonic'. No default: the data cannot know the regime (formaldehyde: 272 of 340 coefficients differ).
   MolSystemData.states holds every state set the source has; the evaluation reads states[states_choice].
@@ -116,9 +150,10 @@ A. Small fixes
         Fix, checked against the exact average (G4), ranks 2-6 (rank 4 old vs fixed: 4e-15):
             return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
         Then remove the 14 xfail marks (they turn into XPASS failures). Tests that pin it:
-            wilson_intensities/tests/unit/test_get_pol_tensor.py        7 fail until the fix; 1 control passes
-            wilson_intensities/tests/unit/test_averaging_pol_order.py   14 strict xfails; 13 pass either way
+            refac_rsp_eval/tests/test_averaging_pol_order.py            14 strict xfails; 13 pass either way
             refac_rsp_eval/tests/test_a15_polarization_order.py         5 fail until the fix; 2 pass
+        debug_rendering also has wilson_intensities/tests/unit/test_get_pol_tensor.py (7 fail until the fix,
+        1 control passes); not on this branch.
         With the fix applied in memory all of them pass, and nothing else changes.
         When it matters (checked 2026-10-15). An odd-rank average (3, 5) is built from the Levi-Civita tensor, so it
         changes sign in a mirror. It is nonzero only if both:
@@ -222,25 +257,20 @@ E. Pipeline
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
 [ ] E9  Delete the old code. Waits (rule in Order of work). First decide about G7: its old-vs-new part needs
-        the old code. Code outside refac_rsp_eval still imports it: deleting amplitudes/ today breaks importing
-        pipeline.py. In this order:
+        the old code, and its scripts do not run on this branch (see Branch). Code outside refac_rsp_eval still
+        imports the old code: deleting amplitudes/ today breaks importing pipeline.py. In this order:
         [ ] amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
             get_pol_laser from it, and pipeline.py imports from it too.
         [ ] amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
-            evaluators, term_parts, grid_manager_evaluator. Cut it down to what stays.
-            wilson_intensities/__init__.py imports amplitudes too.
-        [ ] wilson_analysis/render/plot_regions.py imports amplitudes/ (GridRegion), and render/__init__.py
-            imports plot_regions: once amplitudes/ goes, importing render breaks, plot_spectrum included.
-            Before: plot_regions out of render/__init__.py (E7b), or E9 cuts that one import line.
-        [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow and VibState.
-        [ ] wilson_analysis/render/base.py: type hints to EvaluatedResult, SealedSetup from
-            wilson_main/abstractions.py. Already wrong: they live in workflow_abstractions_updated.py.
+            term_parts. Cut it down to what stays. wilson_intensities/__init__.py imports amplitudes too.
+        [ ] wilson_main/spectrum_abstractions.py imports SpectralWindow from amplitudes/spectrum_composition.py.
+        [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow (imported inside
+            WilsonSimulation.evaluate) and VibState.
         [ ] the domains (find_clusters_by_featboxes, RectangularDomain): unused since E10 and E7; only
             c3_spectrum.py uses them.
         [ ] the old pipeline's copy of the box rule (amplitudes/spectrum_composition.py; tested in
             wilson_intensities/tests/unit/test_specfeature.py and test_integration_evaluation.py).
         [ ] the scripts that run the old code: tests/c2_variations.py, tests/c2_leaves.py, tests/c3_spectrum.py.
-        Leave: wilson_derive/response_terms.py's type hint to the old MolecularProperty (nothing breaks at run time).
 [ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
         knob setting against draw_all; add cases and knob values, then choose the defaults.
         The rule (features.amplitude_half_widths), from the plot's dynamic range D:
@@ -380,7 +410,8 @@ checking side.
         huge; otf_vibdiffdenom raises only at exactly zero.
 [ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below). Left: old vs new with the c2 scripts
         (needs the old code, E9) for the setups that run (CARS, the 3-IR setup), and parameter sets that share a
-        location (the double count, C3). Expect old != new where a term has the same label twice in its 1/w
+        location (the double count, C3). The scripts named here do not run on this branch (see Branch); the
+        survey below was run on debug_rendering. Expect old != new where a term has the same label twice in its 1/w
         product (the old term_parts.py uses 1/w_a once). Run c2_variations.py and c3_spectrum.py with
         PYTHONHASHSEED=0, else set order changes the last digits from run to run.
         Where the experiments come from:
@@ -470,8 +501,9 @@ H4  Don't store a value that can be derived from other fields; frozen dataclasse
 H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.
-H8  "One module imports wilson_derive" is broken: plan.py and pipeline.py both do (plan.py's docstring says so;
-    no test checks it). Decide: move the translation into plan.py, or drop the rule.
+H8  "One module imports wilson_derive" is broken: plan.py and compat.py both do at run time; pipeline.py only for
+    type hints (plan.py's docstring says so; no test checks it). Decide: move the translation into plan.py, or
+    drop the rule.
 
 
 Outside the refactor [outside]
@@ -487,37 +519,19 @@ spectra.
         - No test covers the settings the caller passes (the table in E6) until a caller exists. In place:
           test_pipeline.py, test_draw_spectrum_with_a_width_function (data file -> load -> evaluate -> draw,
           against draw_all, at most 0.1 floors).
-        Found in the old code: WilsonSimulation.evaluate(save_dir=...) calls workflow.save_to, which
-        EvaluationWorkflow does not have (crash); workflow_abstractions_updated.py calls EvaluationWorkflow_NEW,
-        which does not exist (dead module).
 [ ] E7b The rest of the render code, wilson_analysis/render (left the refactor 2026-10-15). The old renderer is
         for the old WilsonSimulation path; the new result is plotted by plot_rsp_func (E7).
-        Found 2026-10-15:
-        - The old renderer plots the new result too: MatplotlibRenderer(spec_data=spec.grid_result,
-          spec_grid=spec.grid_mesh, ev_info=EvaluationInfo(), rnd_info=RenderingInfo(...)). ev_info is only
-          type-checked (SpectrumRenderer._validate_inputs), never read.
-        - Old types in render: plot_regions (GridRegion, old domains and feature fields); render_spectrum's
-          features overlay (old feature fields); MatplotlibRendererGV and base.py (for the dead
-          workflow_abstractions_updated.py).
-        - The 4 failing render tests set dynamic_range on EvaluationInfo; the renderer reads
-          RenderingInfo.dynamic_range (moved in b210b9e, 2026-01-10, later back). With dynamic_range on
-          RenderingInfo, test_render_spectrum_simplecontour_sq's levels match.
-        - render_spectrum (render.py): print('hello'), print('CBAR MIN'); a line with no effect
-          (spec_eval_setup.grid['A'][row,col]); filename.replace('.', '_sticks.') replaces every '.' of the path.
-        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps; add_colorbar exists 3 times; the
-          masks know only the EVV w2 > w1 condition.
-        To do:
-        - plot_regions: no caller. Delete, or port to a plot of the new boxes (SpectralWindow). Either way
-          render/__init__.py stops importing it (E9 needs this, or cuts the import itself).
-        - Fix the 4 render tests; drop the unused EvaluationInfo check; clean render_spectrum (the prints, the
-          no-effect line, the '_sticks' filename).
-        - Rework the old renderer together with the new WilsonSimulation procedure (as E6b).
+        To do: rework the old renderer together with the new WilsonSimulation procedure (as E6b).
+        The render code on this branch is main's: its tests pass; no plot_regions.py, base.py or
+        MatplotlibRendererGV. The findings of 2026-10-15 (the 4 failing render tests, plot_regions, the prints in
+        render_spectrum) are about debug_rendering's render code: see this file at debug_rendering 3d18259.
 [ ] E13 derive's translation stops at 3 axes (found 2026-10-15). wilson_derive/term_var_translate.py, lines 31 and
         59, in find_pulse_id_tuples_as_axis_vars:
             if j > 2:
                 raise ValueError('Current version enables maximum 3 axes')
-        The evaluator hits it in evaluate_response_terms (pipeline.py line 299). These two checks are the only
-        block: the search itself works for any number of axes (the G7 survey used a copy without them: all 5120
+        The evaluator hits it in evaluate_response_terms (pipeline.py), through
+        compat.translate_terms_to_axis_variables. These two checks are the only block: the search itself works
+        for any number of axes (the G7 survey used a copy without them: all 5120
         4-axis terms translated and passed B7). Without them the limit is 7 axes: the axes are named
         cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
         4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data (G10).

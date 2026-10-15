@@ -199,17 +199,6 @@ class SpectralFeature:
         else:
             raise ValueError("cannot compare amplitude_coeff of features")
 
-    ## TERM DOES NOT HAVE .anharmonicity ATTRIBUTE
-    # def anharm_contributions(self, terms) -> dict:
-    #     """
-    #     amplitude_coeff split by terms[term_id].anharmonicity; the parts add up to amplitude_coeff.
-    #     terms - indexable by term_id, e.g. the VibPerturbedTerm list the CompiledTerms were made from
-    #     """
-    #     result = defaultdict(float)
-    #     for r in self.rows:
-    #         result[terms[r.term_id].anharmonicity] += self.scale * r.coeff
-    #     return dict(result)
-
     def __repr__(self) -> str:
         return f'SpectralFeature(location={self.location}, rows={len(self.rows)}, amplitude_coeff={self.amplitude_coeff})'
 
