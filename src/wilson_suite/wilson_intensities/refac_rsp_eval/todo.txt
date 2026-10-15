@@ -1,9 +1,9 @@
 refac_rsp_eval — TODO
-updated 2026-10-14
+updated 2026-10-15
 
-Tests (run 2026-10-14)
+Tests (run 2026-10-15)
        refac_rsp_eval: 642 pass, 5 fail on purpose until A15 is fixed (tests/test_a15_polarization_order.py).
-       Rest of src: 314 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
+       Rest of src: 332 pass, 16 fail, 3 skip, 14 xfail. On purpose until A15 is fixed: 7 of the fails
        (wilson_intensities/tests/unit/test_get_pol_tensor.py) and the 14 xfails (test_averaging_pol_order.py).
        The other 9 fails are the same before and after B7: wilson_analysis render tests (4), test_machinery (2),
        test_domains, test_resonances, test_term_var_translate (see "No item yet").
@@ -410,6 +410,42 @@ E. Pipeline
         A worst case (it assumes the cut tail meets A_max), so boxes are larger than needed where the plot is weak.
 [ ] E7  Port wilson_analysis/render. Only plot_regions reads an old type (GridRegion); the main renderer reads
         arrays (sim.spec and the grid).
+        - [x] wilson_analysis/render/plot_spectrum.py (2026-10-15): 1D and 2D spectra, plain arguments, two
+              functions:
+                plot_spectrum(intensity, grid, ...)   any real 1D or 2D intensity array; grid: one full array of
+                                                      the grid points per axis (1D: the points; 2D:
+                                                      EvalRspResult.grid_mesh, the old spec_eval_setup.grid,
+                                                      np.meshgrid(..., indexing='ij'))
+                plot_rsp_func(spec, ...)              the new result (EvalRspResult), 1D or 2D: plot_spectrum of
+                                                      |spec.grid_result|^2 on spec.grid_mesh
+              Both show intensity / top from 1 / dynrange to 1 on a log scale (top: the max, or reference_max for
+              a shared scale). 1D: a line, y axis log. 2D: the key steps of MatplotlibRenderer: nlevels
+              log-spaced levels; magma, over_color above the top, below_color under the lowest level; colorbar
+              ticks as fractions of the top. Left out: RenderingInfo, EvaluationInfo, PlotConfig, the EVV-only
+              w2 > w1 mask, the second colorbar axis, saving. Same 2D plot as MatplotlibRenderer on formaldehyde
+              (12 levels, 1.0e9 to 5.2e11). Tests: wilson_analysis/tests/test_plot_spectrum.py.
+              Example: tests/example_plot_spectrum.py (formaldehyde whole window, zoom, a 1D row of the zoom,
+              harmonic vs anharmonic on one scale; ACDM; about 10 s).
+        Found 2026-10-15:
+        - The old renderer plots the new result too: MatplotlibRenderer(spec_data=spec.grid_result,
+          spec_grid=spec.grid_mesh, ev_info=EvaluationInfo(), rnd_info=RenderingInfo(...)). ev_info is only
+          type-checked (SpectrumRenderer._validate_inputs), never read.
+        - Besides plot_regions, old types in render: render_spectrum's features overlay (old feature fields:
+          term_contributions, states_parameters, res_motif); MatplotlibRendererGV and base.py, made for
+          workflow_abstractions_updated.py (a dead module, see E6b).
+        - The 4 failing render tests (see Tests): they set dynamic_range on EvaluationInfo; the renderer reads
+          RenderingInfo.dynamic_range (moved to EvaluationInfo in b210b9e, 2026-01-10, later back). Checked for
+          test_render_spectrum_simplecontour_sq: with dynamic_range on RenderingInfo its levels match.
+        - render_spectrum (render.py): print('hello') and print('CBAR MIN'); a line with no effect
+          (spec_eval_setup.grid['A'][row,col]); filename.replace('.', '_sticks.') replaces every '.' of the path.
+        - MatplotlibRenderer and MatplotlibRendererGV repeat the same steps (data prep, normalization, masks);
+          add_colorbar exists 3 times; the masks know only the EVV w2 > w1 condition.
+        Open:
+        - plot_regions: no caller. Delete, or port to a plot of the new boxes (SpectralWindow). Either way
+          render/__init__.py stops importing it, so importing render no longer loads amplitudes/ (needed for E9).
+        - Fix the 4 render tests; drop the unused EvaluationInfo check; render_spectrum's prints, the no-effect
+          line, the '_sticks' filename.
+        - A rework of the old renderer: with the new WilsonSimulation procedure (it calls the renderer), as E6b.
 [ ] E8  Line features (Later). Fewer conditions than spectrum axes give a line, not a point:
         - one condition on B only, in an (A, B) spectrum: location {'B': E}, a line along A. from_features raises.
         - one condition on A + B: a diagonal line. B7 rejects the term when compiling.
