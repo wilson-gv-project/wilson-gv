@@ -13,8 +13,8 @@ Run it again only on purpose (a deliberate change of numbers), then check the di
 import json
 from pathlib import Path
 
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     make_polarization_linear_comb,
@@ -48,7 +48,7 @@ def evv_terms() -> list[VibPerturbedTerm]:
 
 def compiled_evv_terms() -> list[CompiledTerm]:
     axes = make_SpectralAxisSet(AXES)  # type: ignore
-    return compile_terms(terms=term_var_translate.translate_terms_to_axis_variables(evv_terms(), axes))
+    return compile_terms(terms=translate_terms_to_axis_variables(evv_terms(), axes))
 
 
 def data_origin(molecule: str) -> DataOriginInfo:

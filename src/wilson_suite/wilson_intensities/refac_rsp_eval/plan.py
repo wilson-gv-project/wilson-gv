@@ -7,7 +7,7 @@ From derive's terms to compiled terms: the symbolic side, no molecular data (tod
   holds: PropsCollection, FreqTermsCollection, ResCondKey, ResonanceMotif, generate_LHS_motif, ParameterSet,
          ResLocPoint, split_props, CompiledTerm
 
-Imports wilson_derive; pipeline.py does too (term_var_translate), see todo.txt H8.
+Imports wilson_derive; pipeline.py does too (term_var_translate, through compat.py), see todo.txt H8.
 """
 
 """
@@ -41,6 +41,7 @@ from wilson_suite.wilson_derive.abstractions import (
     ResonanceCondition,  # here and term_parts
     VibDiffTerm,  # here and term_parts and vibene_differences
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
 if TYPE_CHECKING:
@@ -469,7 +470,7 @@ class CompiledTerm:
             rank = int(np.linalg.matrix_rank(lhs))
             if not len(res_conds) == len(axes) == rank:
                 raise ValueError(f"resonance conditions do not fix one point: {len(res_conds)} conditions, "
-                                 f"axes {axes}, rank {rank}\n{term.to_str()}")
+                                 f"axes {axes}, rank {rank}\n{term_to_str(term)}")
         idx_nonsumm, idx__summ = term.tellNonSummSummIndices()
 
         avrg_props, non_avrg_props = split_props(term)

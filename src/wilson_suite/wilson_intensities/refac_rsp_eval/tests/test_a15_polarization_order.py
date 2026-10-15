@@ -1,7 +1,7 @@
 """
 A15 (todo.txt), shown on the evaluator's numbers. These tests fail until A15 is fixed (one line in
-amplitudes/averaging.py, get_pol_tensor). The cause, slot by slot, and more setups: tests/unit/test_averaging_pol_order.py
-in wilson_intensities (strict xfail there).
+amplitudes/averaging.py, get_pol_tensor). The cause, slot by slot, and more setups: test_averaging_pol_order.py
+(strict xfail there).
 
 Slots. Slot 0 is the detected field, slot k is pulse k. VibExperiment lists its polarizations in that order
 (all_polarizations = [detector, pulse 1, pulse 2, ...]) and turns them into polarization_avg_vector with
@@ -19,7 +19,7 @@ of the mirror-image molecule: VibExperiment hands it polarization_avg_vector [-1
 Rank 5. The error is not always a sign. Beta-alpha CARS form (experiment_beta_alpha_cars in fixtures.py),
 fields x, y, z, x, x: exact -0.963, today +0.598.
 
-Rank 2 and rank 4 (the 14 EVV terms) are right: test_rank_2_and_4_do_not_see_the_order in the unit tests.
+Rank 2 and rank 4 (the 14 EVV terms) are right: test_rank_2_and_4_do_not_see_the_order in test_averaging_pol_order.py.
 """
 
 from fractions import Fraction
@@ -34,7 +34,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import calculate_av
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import make_polarization_linear_comb
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import split_props
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import polprop
-from wilson_suite.wilson_intensities.tests.unit.test_averaging_pol_order import exact_average
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_averaging_pol_order import exact_average
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
 
 X, Y, Z = (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)

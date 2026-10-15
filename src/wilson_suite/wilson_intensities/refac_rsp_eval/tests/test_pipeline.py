@@ -25,6 +25,7 @@ from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     draw_all,
@@ -594,7 +595,7 @@ class TopRun:
 @pytest.fixture(scope='module')
 def top_run(formaldehyde_molsys) -> TopRun:
     terms = ref.evv_terms()
-    before = [t.to_str() for t in terms]
+    before = [term_to_str(t) for t in terms]
     return TopRun(terms, before, evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms))
 
 
@@ -617,7 +618,7 @@ def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run,
 
 def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
     """the translation to axes works on copies: the caller's terms keep their pulse IDs"""
-    assert [t.to_str() for t in top_run.terms] == top_run.terms_before
+    assert [term_to_str(t) for t in top_run.terms] == top_run.terms_before
 
 
 def test_evaluate_response_terms_gives_every_feature_the_propagator_param(top_run):

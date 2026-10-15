@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     _make_func_to_compute_avrg,
     calculate_avrg_tensor_einsum,
@@ -61,7 +61,7 @@ def term_to_str(term: VibPerturbedTerm):
 evv_terms = VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/wilson_intensities/refac_rsp_eval/tests/test_terms.json')
 
 axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}) # type: ignore
-translated_terms = term_var_translate.translate_terms_to_axis_variables(evv_terms, axis_choice)
+translated_terms = translate_terms_to_axis_variables(evv_terms, axis_choice)
 cmpl_terms = compile_terms(terms=translated_terms)
 
 
@@ -89,7 +89,8 @@ def test_plan_compiled_term():
         cmpl_terms[8].frac_factor = 0.5 # type: ignore
 
     freqdenom_idx = sorted([freqt.to_latex() for freqt in cmpl_terms[8].cmp_freqdenom])
-    assert freqdenom_idx == sorted(['a', 'b', 'c', 'a+b,c'])
+    # main's VibDiffTerm.to_latex keeps the comma of an empty ket: 'a,' (debug_rendering drops it for harmonic factors: 'a')
+    assert freqdenom_idx == sorted(['a,', 'b,', 'c,', 'a+b,c'])
 
 
 def test_compiled_terms():

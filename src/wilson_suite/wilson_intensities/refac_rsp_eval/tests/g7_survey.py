@@ -40,7 +40,7 @@ from itertools import product
 import numpy as np
 
 import wilson_suite.wilson_experiment.experiment_abstractions as wexp
-from wilson_suite.wilson_derive import term_var_translate
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str, translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     compute_features,
     make_polarization_linear_comb,
@@ -252,7 +252,7 @@ def survey(name, pulses, wv_filter, magn_conditions, terms_file=None) -> None:
         print('  no canonical axes: the first valid choice')
     axes = axes_dict(axis_set)
     try:
-        term_var_translate.translate_terms_to_axis_variables(list(unique), axis_set)
+        translate_terms_to_axis_variables(unique, axis_set)
         derive_translation = 'ok'
     except (ValueError, AssertionError) as e:
         derive_translation = f'raises: {e}'
@@ -301,7 +301,7 @@ def survey(name, pulses, wv_filter, magn_conditions, terms_file=None) -> None:
     if terms_file is not None:
         terms_file.write(f'\n{name}\n')
         for t in translated:
-            terms_file.write(f'    {t.to_str()}\n')
+            terms_file.write(f'    {term_to_str(t)}\n')
 
 
 def main():

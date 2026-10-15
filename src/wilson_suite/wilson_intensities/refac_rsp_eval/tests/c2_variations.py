@@ -24,13 +24,13 @@ import numpy as np
 
 import wilson_suite as ws
 import wilson_suite.wilson_experiment.experiment_abstractions as wexp
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import getGeneralPolarizationAveragingExpression
 from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import Box as OldBox
 from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow as OldWindow
 from wilson_suite.wilson_intensities.amplitudes.term_parts import ResonanceMotif as OldMotif
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions, solve_LSE_motif
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import prop_names
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ParameterSet, compile_terms
@@ -131,7 +131,7 @@ def run_new(v: Variation, laser_pol):
     """new pipeline; laser_pol comes from the old experiment object (shared, not checked here)"""
     path = MOLECULES[v.molecule][0]
     terms = VibPerturbedTerm.load_many_from_json(TERMS)
-    translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(v.axes))
+    translated = translate_terms_to_axis_variables(terms, make_SpectralAxisSet(v.axes))
     compiled = compile_terms(terms=translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=path)
     molsys = MolSystemData.load(origin, prop_names(terms))

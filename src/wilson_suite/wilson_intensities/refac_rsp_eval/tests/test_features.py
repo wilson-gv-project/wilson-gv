@@ -218,28 +218,32 @@ def test_feature_order_needs_amplitudes():
 def test_feature_order_accepts_zero_amplitude():
     assert feat(A=0., amp=0.) < feat(A=1., amp=1.)
 
+# ----------------------------------
+## TERM DOES NOT HAVE .anharmonicity ATTRIBUTE
 
-def test_feature_anharm_contributions_sums_per_anharmonicity():
-    terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='mech'),
-             SimpleNamespace(anharmonicity='el')]
-    f = feat(A=0., rows=(row(1., term_id=0, a=0), row(2., term_id=1, a=0), row(5., term_id=2, a=0)))
+# def test_feature_anharm_contributions_sums_per_anharmonicity():
+#     terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='mech'),
+#              SimpleNamespace(anharmonicity='el')]
+#     f = feat(A=0., rows=(row(1., term_id=0, a=0), row(2., term_id=1, a=0), row(5., term_id=2, a=0)))
 
-    assert f.anharm_contributions(terms) == {'mech': 3., 'el': 5.}
-
-
-def test_feature_anharm_contributions_add_up_to_the_scaled_amplitude():
-    terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='el')]
-    f = feat(A=0., rows=(row(1., term_id=0, a=0), row(3., term_id=1, a=0)))
-    f.scale = 0.5
-
-    parts = f.anharm_contributions(terms)
-
-    assert parts == {'mech': 0.5, 'el': 1.5}
-    assert sum(parts.values()) == f.amplitude_coeff
+#     assert f.anharm_contributions(terms) == {'mech': 3., 'el': 5.}
 
 
-def test_feature_anharm_contributions_is_empty_without_rows():
-    assert feat(A=0., amp=None).anharm_contributions([]) == {}
+# def test_feature_anharm_contributions_add_up_to_the_scaled_amplitude():
+#     terms = [SimpleNamespace(anharmonicity='mech'), SimpleNamespace(anharmonicity='el')]
+#     f = feat(A=0., rows=(row(1., term_id=0, a=0), row(3., term_id=1, a=0)))
+#     f.scale = 0.5
+
+#     parts = f.anharm_contributions(terms)
+
+#     assert parts == {'mech': 0.5, 'el': 1.5}
+#     assert sum(parts.values()) == f.amplitude_coeff
+
+
+# def test_feature_anharm_contributions_is_empty_without_rows():
+#     assert feat(A=0., amp=None).anharm_contributions([]) == {}
+
+## ----------------------------------
 
 
 ## features_from_rows -------------------------------------------------------

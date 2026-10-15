@@ -72,11 +72,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     get_iso_f,
     getGeneralPolarizationAveragingExpression,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     build_contributions,
     draw_window,
@@ -276,7 +276,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                             exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
     Terms as derive writes them (in pulse IDs) + data loaded before + experiment settings -> rows and features.
-        1. translate the terms to the chosen axes           term_var_translate (copies, keeps the order)
+        1. translate the terms to the chosen axes           compat.translate_terms_to_axis_variables (copies,
+                                                            keeps the order)
         2. compile                                          compile_terms
         3. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
                                                             rank and laser_pol)
@@ -296,7 +297,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     Every argument after the terms is keyword-only: two swapped arguments raise a TypeError.
     row.term_id is the index in `terms`.
     """
-    translated = term_var_translate.translate_terms_to_axis_variables(list(terms), axes)
+    translated = translate_terms_to_axis_variables(terms, axes)
     compiled = compile_terms(translated)
     recipe = make_polarization_linear_comb(terms, laser_pol)
     return compute_features(compiled, molsys_data, recipe, propagator_param=propagator_param,

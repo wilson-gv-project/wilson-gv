@@ -35,7 +35,6 @@ from dataclasses import dataclass
 import numpy as np
 
 import wilson_suite as ws
-from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow
 from wilson_suite.wilson_intensities.amplitudes.evaluators import evaluate_feature
@@ -46,6 +45,7 @@ from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import (
     SpectralWindow as OldWindow,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval import pipeline
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     draw_all,
     eval_feature_on_grid,
@@ -130,7 +130,7 @@ def run_old(case: Case):
 def run_new(case: Case, laser_pol):
     """new pipeline, MolSystemData.load + the steps of evaluate_response_terms: (the chosen state set for drawing, the result)"""
     terms = VibPerturbedTerm.load_many_from_json(c2.TERMS)
-    translated = term_var_translate.translate_terms_to_axis_variables(terms, make_SpectralAxisSet(AXES))
+    translated = translate_terms_to_axis_variables(terms, make_SpectralAxisSet(AXES))
     compiled = compile_terms(translated)
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=c2.MOLECULES['formaldehyde'][0])
     molsys = MolSystemData.load(origin, pipeline.prop_names(terms), obtainer=case.obtainer)
