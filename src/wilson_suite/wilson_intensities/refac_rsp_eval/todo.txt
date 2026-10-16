@@ -209,8 +209,8 @@ D. Data model
         Files that use wilson_main's copies: 20. 13 go with E9 (6 old amplitudes modules; 7 of their unit tests in
         wilson_intensities/tests/unit, deleted in 3612e5b). 7 stay: main_functions.py, workflow_abstractions.py,
         molprops.py, anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py,
-        test_anharm_analyzer.py, wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes 7 files instead of 20;
-        find_props' prop_spec goes with the caller's rework (E6b).
+        test_anharm_analyzer.py, wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes
+        7 files instead of 20; find_props' prop_spec goes with the caller's rework (E6b).
 [ ] D5  Data-dict contract: what the evaluator expects. Delivering a dict that fits is the reader's job [outside].
         To do: write the table below into the README (E4).
         Load checks done 2026-10-14: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load
@@ -309,8 +309,9 @@ E. Pipeline
               (3612e5b). Kept: test_averaging.py (averaging.py stays), test_spectrum_utils.py, test_tags.py, the
               anharmonic analyzer tests. Found by the check: test_latex.py took a helper (test terms, derive only)
               from test_resonances.py; the helper moved into test_latex.py.
-        3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). To categorize first.
-        4 [ ] wilson_main (carefully). To categorize first.
+        3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). Categorized in
+              todo_oldcode_rm.txt (B, C, D); decisions open.
+        4 [ ] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E); decisions open.
               spectrum_abstractions.py, line 5, imports SpectralWindow from amplitudes/spectrum_composition.py; it is
               the type of EvaluationInfo.spectral_window (line 270).
               workflow_abstractions.py: WilsonSimulation.evaluate raises NotImplementedError instead of running the
