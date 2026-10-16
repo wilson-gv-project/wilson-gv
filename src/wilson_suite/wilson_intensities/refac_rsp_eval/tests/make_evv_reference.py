@@ -2,8 +2,9 @@
 Writes evv_reference.json: the rows of the new pipeline (build_contributions) for the 14 EVV terms
 of test_terms.json, for formaldehyde, water and CO, with harmonic and with anharmonic states.
 
-Settings are the ones of the old EVV integration tests (tests/integration/test_integration_evaluation.py):
-axes A = [1], B = [-1, 2]; laser polarization (1, 1, 1), rank 4. The data files are GVPT2 runs,
+Settings are the ones of the old EVV integration tests (tests/integration/test_integration_evaluation.py; deleted
+with the old code, see git show d93cc7b:src/wilson_suite/wilson_intensities/tests/integration/
+test_integration_evaluation.py): axes A = [1], B = [-1, 2]; laser polarization (1, 1, 1), rank 4. The data files are GVPT2 runs,
 so the old pipeline uses anharmonic states for them; harmonic is stored too.
 
 Run it again only on purpose (a deliberate change of numbers), then check the diff:

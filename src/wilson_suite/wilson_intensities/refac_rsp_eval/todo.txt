@@ -3,6 +3,11 @@ updated 2026-10-16, branch rsp_eval_refactor (brings the refactor to main, see B
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
 Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are on debug_rendering.
+The old code before its removal (E9), on rsp_eval_refactor: d93cc7b is the last commit with all of it (amplitudes/,
+its tests in wilson_intensities/tests, the old-vs-new scripts c2_variations.py, c2_leaves.py, c3_spectrum.py).
+A deleted file, or the file list of a folder, at that commit:
+    git show d93cc7b:src/wilson_suite/wilson_intensities/refac_rsp_eval/tests/c3_spectrum.py
+    git ls-tree -r --name-only d93cc7b -- src/wilson_suite/wilson_intensities/amplitudes
 
 [outside] = not the evaluator's job. The evaluator takes two inputs as given: the data dict (from the reader:
 wilson_data_obtainer -> CQCParse, a separate repo) and the formulas (from derive, not changed in this refactor).
@@ -16,11 +21,10 @@ Tests (run 2026-10-16, branch rsp_eval_refactor)
                     pass  fail  skip  xfail   on purpose until A15 is fixed
     refac_rsp_eval   684     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
-    rest of src      323     4     3      -   none
+    rest of src      220     1     3      -   none
     tests/ (root)      4    16     -      -   none
-Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The 4 in the rest of src:
-test_integration_evv_experiment_until_after_evaluation, test_domains (test_find_domain_groups_by_distance needs
-sklearn; test_find_clusters_by_distance), test_wilson_data_obtainer (test_getting_data).
+Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The 1 in the rest of src: test_wilson_data_obtainer
+(test_getting_data). Before 3612e5b deleted the old unit and integration tests (E9) the rest of src had 323 / 4.
 A fresh checkout (e.g. a git worktree) fails more: some tests read files that git ignores,
 e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -30,8 +34,8 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-Next: deleting the old code (E9), then the D4 code move (Order of work). Postponed: the README (E4), the
-polarization order fix (A15).
+In progress: deleting the old code (E9: stages 1-2 of 6 done, 3612e5b), then the D4 code move (Order of work).
+Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
 evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
@@ -63,14 +67,12 @@ refactor; on this branch:
     VibExperiment.derive_terms (40621bd)                    compat.derive_terms: main's derive, flattened by
                                                             derived_terms_flat (test_dimensions.py uses it)
 compat.py goes once derive and the experiment have the flat list, to_str and derive_terms [outside].
-Scripts that do not run on this branch (main's old pipeline and derive); pytest collects none of them:
-    tests/c3_spectrum.py                  ImportError: main has no evaluate_feature in amplitudes/evaluators.py
-    tests/c2_variations.py (run_old),     main's find_props (wilson_main/main_functions.py) wants the terms as
-      tests/c2_leaves.py                  {i: {j: [terms]}}; the scripts pass a flat list
+A script that does not run on this branch; pytest does not collect it:
     tests/g7_survey.py                    calls experiment.derive_terms(), not on main; compat.derive_terms gives
-                                          the same list
-C2 stays checked without them: test_evv_reference.py against evv_reference.json. They go with E9 (G7's old-vs-new
-part was dropped 2026-10-16).
+                                          the same list. It uses no old code, so it stays after E9.
+The old-vs-new scripts tests/c3_spectrum.py, c2_variations.py and c2_leaves.py (main's old pipeline; they did not
+run here either) were deleted in 3612e5b (E9, stage 1; d93cc7b has them, see the top of this file). C2 stays
+checked without them: test_evv_reference.py against evv_reference.json.
 
 
 Order of work
@@ -84,7 +86,7 @@ after E9 the move changes 7 files instead of 20 (D4).
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                next; needs neither E6b nor G7 (2026-10-16, E9)
+    4  E9    delete the old code                                in progress: stages 1-2 of 6 done (3612e5b, E9)
     5  D4    the code move                                      after E9; the two copies differ (D4)
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
@@ -101,8 +103,8 @@ Other items:
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
                          checks), G9 (normal_modes); derive's flat term list and to_str, then compat.py goes
                          (see Branch)
-    no item yet          - the 4 failing tests in the rest of src (see Tests) fail on main too; open whether they
-                           belong to the refactor
+    no item yet          - the failing test in the rest of src (test_wilson_data_obtainer, see Tests) fails on main
+                           too; open whether it belongs to the refactor
                          - from the old README: is single-component Cartesian selection a wanted feature?
 
 
@@ -204,10 +206,10 @@ D. Data model
                                  None (its [] raises KeyError)
             VibState             defaults: state_label None / '', harmonic_WF None / False (wilson_main /
                                  wilson_system); get_1q_states only in wilson_system (no caller)
-        Files that use wilson_main's copies: 20. 13 go with E9 (6 old amplitudes modules, 7 of their unit tests in
-        wilson_intensities/tests/unit). 7 stay: main_functions.py, workflow_abstractions.py, molprops.py,
-        anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py, test_anharm_analyzer.py,
-        wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes 7 files instead of 20;
+        Files that use wilson_main's copies: 20. 13 go with E9 (6 old amplitudes modules; 7 of their unit tests in
+        wilson_intensities/tests/unit, deleted in 3612e5b). 7 stay: main_functions.py, workflow_abstractions.py,
+        molprops.py, anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py,
+        test_anharm_analyzer.py, wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes 7 files instead of 20;
         find_props' prop_spec goes with the caller's rework (E6b).
 [ ] D5  Data-dict contract: what the evaluator expects. Delivering a dict that fits is the reader's job [outside].
         To do: write the table below into the README (E4).
@@ -288,30 +290,47 @@ E. Pipeline
         same everywhere along A - B. The drawing already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. Next: nothing blocks it since 2026-10-16 (Order of work). Decided 2026-10-16:
+[ ] E9  Delete the old code. In progress since 2026-10-16: stages 1-2 of 6 done (3612e5b). d93cc7b is the last
+        commit with all of the old code (see the top of this file). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
           (workflow_abstractions.py:356, imports the old EvaluationWorkflow) raises NotImplementedError until then.
           These call it and break with it (fix or drop with E9): README.md (the quick start),
-          examples/quick_start.ipynb, script_example.py, wilson_intensities/tests/integration/
-          test_integration_evaluation.py, wilson_analysis/tests/test_integration_rendering.py, and in tests/:
+          examples/quick_start.ipynb, script_example.py, wilson_analysis/tests/test_integration_rendering.py,
+          wilson_main/tests/test_saving_in_workflow.py (test_save_wilsonsim), and in tests/:
           test_intensities_testing.py, evv_tester.py, evv_tester_general_evaluator.py, pulse_exp_var_tester.py.
         - no need to wait for G7: its old-vs-new part was dropped (see G7).
         Size (2026-10-16): amplitudes/ 4444 lines (averaging.py, 485 of them, stays); wilson_intensities/tests/unit
-        and integration 5167 lines, part of them for the old code.
+        and integration 5167 lines, 4401 of them for the old code (deleted, stage 2).
         Code outside refac_rsp_eval still imports the old code: deleting amplitudes/ today breaks importing
-        pipeline.py. In this order:
-        [ ] amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
-            get_pol_laser from it, and pipeline.py imports from it too.
-        [ ] amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
-            term_parts. Cut it down to what stays. wilson_intensities/__init__.py imports amplitudes too.
-        [ ] wilson_main/spectrum_abstractions.py imports SpectralWindow from amplitudes/spectrum_composition.py.
-        [ ] wilson_main/workflow_abstractions.py (carefully): WilsonSimulation.evaluate raises NotImplementedError
-            instead of running the old EvaluationWorkflow; VibState.
-        [ ] the domains (find_clusters_by_featboxes, RectangularDomain): unused since E10 and E7; only
-            c3_spectrum.py uses them.
-        [ ] the old pipeline's copy of the box rule (amplitudes/spectrum_composition.py; tested in
-            wilson_intensities/tests/unit/test_specfeature.py and test_integration_evaluation.py).
-        [ ] the scripts that run the old code: tests/c2_variations.py, tests/c2_leaves.py, tests/c3_spectrum.py.
+        pipeline.py. Stages, each checked (every test's outcome and the import of every module under src, diffed
+        against the stage before):
+        1 [x] the old-vs-new scripts tests/c2_variations.py, c2_leaves.py, c3_spectrum.py (3612e5b).
+        2 [x] the old tests in wilson_intensities/tests: 16 unit and 2 integration files, 4401 lines, 106 tests
+              (3612e5b). Kept: test_averaging.py (averaging.py stays), test_spectrum_utils.py, test_tags.py, the
+              anharmonic analyzer tests. Found by the check: test_latex.py took a helper (test terms, derive only)
+              from test_resonances.py; the helper moved into test_latex.py.
+        3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). To categorize first.
+        4 [ ] wilson_main (carefully). To categorize first.
+              spectrum_abstractions.py, line 5, imports SpectralWindow from amplitudes/spectrum_composition.py; it is
+              the type of EvaluationInfo.spectral_window (line 270).
+              workflow_abstractions.py: WilsonSimulation.evaluate raises NotImplementedError instead of running the
+              old EvaluationWorkflow; VibState.
+        5 [ ] the 14 old modules of amplitudes/, about 3940 lines. With them: the domains (find_clusters_by_featboxes,
+              RectangularDomain; unused since E10 and E7, only c3_spectrum.py used them) and the old pipeline's copy
+              of the box rule (spectrum_composition.py; its tests went in stage 2).
+              amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
+              get_pol_laser from it, and pipeline.py imports from it too.
+              amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
+              term_parts: cut it down to the averaging import. wilson_intensities/__init__.py imports amplitudes too.
+        6 [ ] todo.txt, docstrings and comments that name the old code (e.g. features.py, plan.py, system_data.py).
+        Stage 5 needs line 5 of spectrum_abstractions.py changed first (stage 4). Two dry runs, 2026-10-16 (the
+        files restored after):
+            stage 5 alone             import wilson_suite fails (wilson_main/__init__.py imports
+                                      spectrum_abstractions), so no test is collected (24 errors)
+            stage 5, line 5 changed   5 tests change, all to fail: test_integration_rendering.py (4; today 2 pass,
+                                      2 skip) and test_save_wilsonsim (passes today). No refac_rsp_eval test
+                                      changes; tests/ (root) fails as before. No test covers README.md,
+                                      quick_start.ipynb, script_example.py.
 [ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
         knob setting against draw_all; add cases and knob values, then choose the defaults.
         The rule (features.amplitude_half_widths), from the plot's dynamic range D:
@@ -344,7 +363,7 @@ E. Pipeline
             a cap, max_cm 500 (D 500)                  bad trade: ACDM big 3.95 floors, 26 %; formaldehyde 1.34, 36 %
             min_gammas 3                               no measurable change
             bigger old boxes (ACDM, D 500, box D 250000)   3.9 -> 3.0 floors, drawing 3 s -> 66 s
-            intensity_half_widths, unscaled            = the boxes before E10; 1.7-12 floors (c3_spectrum.py uses it)
+            intensity_half_widths, unscaled            = the boxes before E10; 1.7-12 floors (c3_spectrum.py used it)
             intensity_half_widths, scaled              0.7-39 floors
         Domains (each feature drawn on the rectangle around all the boxes it overlaps): not needed for interference;
         all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of the old cut
@@ -421,7 +440,8 @@ E. Pipeline
         draw / drawing / drawn / draws in refac_rsp_eval and plot_spectrum.py, each to read (some mean the
         picture). The names by search and replace, todo.txt included (e.g. E6b names
         test_draw_spectrum_with_a_width_function). Outside refac_rsp_eval: plot_spectrum.py (text and one call).
-        draw_by_domains (c3_spectrum.py) goes with E9.
+        draw_by_domains went with c3_spectrum.py (E9, stage 1); the counts above are from before, when c3_spectrum.py
+        had 8 of the uses.
         When: before E6b and the merge to main; no code outside this branch calls the names yet.
 
 
@@ -704,7 +724,9 @@ Checked: the numbers are right
          test_evv_reference.py docstring; evv_reference.json.
     C3   Same whole spectrum as the old code, boxes included (formaldehyde, 1e-16). Found: the old code draws a peak
          n times too large (n^2 in intensity) when n parameter sets share one location (e.g. degenerate modes).
-         Record: tests/c3_spectrum.py docstring. Formaldehyde has n = 1 everywhere, so its old spectra are right.
+         Record: the docstring of tests/c3_spectrum.py (deleted in E9; git show d93cc7b:src/wilson_suite/
+         wilson_intensities/refac_rsp_eval/tests/c3_spectrum.py). Formaldehyde has n = 1 everywhere, so its old
+         spectra are right.
     G1   Hand calculation, numpy only: water, terms 0 and 12, every (a, b) pair, both state choices; to 1e-12
          (test_hand_calculation.py). Found: pytest.approx's default abs=1e-12 had hidden errors up to 6e-5.
     G7   Hand calculation beyond EVV (2026-10-16, test_hand_calculation.py): water, terms from derive, every row's
