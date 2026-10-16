@@ -1,8 +1,10 @@
 import pytest
 
 from wilson_suite.wilson_experiment.experiment_abstractions import (SpecDetector, ScanObject, SpecScan,
-                    EmPulse, make_gaussian_pulse, make_impulsive_gaussian_pulse, make_cw_gaussian_pulse,
-                    ElectricField, VibExperiment)
+                                                                    EmPulse, make_gaussian_pulse,
+                                                                    make_impulsive_gaussian_pulse,
+                                                                    make_cw_gaussian_pulse,
+                                                                    ElectricField, VibExperiment, FieldAnalysis)
 
 def test_spec_detector():
 
@@ -421,7 +423,59 @@ def test_field_analysis():
 
     pass
 
+
+def present_field_analysis(e: FieldAnalysis):
+
+    print(e)
+    print('valid int patterns', e.valid_int_patterns)
+    print('int pattern orders', e.int_pattern_orders)
+    print('int patterns by order', e.int_patterns_by_order)
+    print('time_ovl_tuples', e.time_ovl_tuples)
+    print('res_and_time_ovl_tuples', e.res_and_time_ovl_tuples)
+
+    print('comp_patterns_at_order', e.comp_patterns_at_order)
+    print('pol_avg_vector_bank', e.pol_avg_vector_bank)
+    print('int_sequences_by_order_comp_pol', e.int_sequences_by_order_comp_pol)
+
+    print('magnitude_condition_bank', e.magnitude_condition_bank)
+    print('int_sequences_by_order_comp_pol_magn', e.int_sequences_by_order_comp_pol_magn)
+
+    return
+
+
 def test_vib_experiment():
+
+    # TODO: More extensive tests, covering more relevant cases
+
+    # Rough wishlist:
+    #
+    # Overall setups:
+    #
+    # - EVV 2-scan experiment OK
+    # - CARS OK
+    # - "alpha, beta" cars
+    # - TRIVE variant (possibly delays)
+    # - Ideal freq domain (with simplifications)
+    # - "2D Raman" with/without cascading effects
+    #
+    # Situations (some may be covered by above setups):
+    #
+    # - Tolerances changing outcome: Pathways in/out etc.
+    # - Different scan setups: Differing dimensionalities, scans making field analyses nonhomogeneous over scans
+    # - Variations on pulses changing outcome: Resonance possibilities in/out
+    # - More than one wavevector combination overlapping
+    # - Testing both "same_order", "up_to_order", and "only_specified"
+    # - Interacting more than one time with same pulse
+    #
+    # Specific attributes to verify (cannot test all exhaustively)
+    #
+    # - Compounding patterns identified
+    # - Pol. avgs.
+    # - Compound pulse bandwidths/positions in time
+    #
+    #
+
+    # EVV 2-scan
 
     pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
@@ -434,9 +488,9 @@ def test_vib_experiment():
 
     pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
 
-    field_a = ElectricField(pulses)
+    field_evv = ElectricField(pulses)
 
-    detector_a = SpecDetector(detection_method='int',
+    detector_evv = SpecDetector(detection_method='int',
                               detection_polarization=(1.0, 0.0, 0.0),
                               detection_limited_to = 'only_specified',
                               interaction_filter=[[-1, 2, 3]])
@@ -446,39 +500,54 @@ def test_vib_experiment():
     scan_range_a = [50.0* i for i in range(10)]
     scan_a = SpecScan(scan_objs=(scan_obj_a,), range=scan_range_a)
 
+    # Push another carrier freq
     scan_obj_b = ScanObject('pulse', 'cf', id=2, coeff=1.0)
     scan_range_b = [50.0* i for i in range(10)]
     scan_b = SpecScan(scan_objs=(scan_obj_b,), range=scan_range_b)
 
-    exp_a = VibExperiment(field=field_a,
-                          detector=detector_a,
+    exp_evv = VibExperiment(field=field_evv,
+                          detector=detector_evv,
                           scans=(scan_a, scan_b),
                           tol_n_dev_t=2.0,
                           tol_n_dev_w=2.0,
                           thres_waiting_time=600.0)
 
-    print(exp_a.field_analyses[0,0])
-    print('valid int patterns', exp_a.field_analyses[0,0].valid_int_patterns)
-    print('int pattern orders', exp_a.field_analyses[0, 0].int_pattern_orders)
-    print('int patterns by order', exp_a.field_analyses[0, 0].int_patterns_by_order)
-    print('time_ovl_tuples', exp_a.field_analyses[0, 0].time_ovl_tuples)
-    print('res_and_time_ovl_tuples', exp_a.field_analyses[0, 0].res_and_time_ovl_tuples)
-
-    print('comp_patterns_at_order', exp_a.field_analyses[0, 0].comp_patterns_at_order)
-    print('pol_avg_vector_bank', exp_a.field_analyses[0, 0].pol_avg_vector_bank)
-    print('int_sequences_by_order_comp_pol', exp_a.field_analyses[0, 0].int_sequences_by_order_comp_pol)
-
-    print('magnitude_condition_bank', exp_a.field_analyses[0, 0].magnitude_condition_bank)
-    print('int_sequences_by_order_comp_pol_magn', exp_a.field_analyses[0, 0].int_sequences_by_order_comp_pol_magn)
+    present_field_analysis(exp_evv.field_analyses[0,0])
 
     # Some attribute testing given a light touch since already covered by respective class tests
-    assert len(exp_a.field.pulses) == 3
-    assert exp_a.detector.detection_method == 'int'
-    assert len(exp_a.scans) == 2
+    assert len(exp_evv.field.pulses) == 3
+    assert exp_evv.detector.detection_method == 'int'
+    assert len(exp_evv.scans) == 2
 
     # Assertions about post-init attributes: When these are obtained using VibExperiment methods, these assertions
     # also serve to cover those methods
-    assert exp_a.dim == 2
+    assert exp_evv.dim == 2
 
+    # CARS
 
+    pulse_uvvis_1 = make_gaussian_pulse(tc=0.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
+    pulse_uvvis_2 = make_gaussian_pulse(tc=350.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.012, 1.0), pol=(1.0, 0.0, 0.0), id=2)
+
+    pulse_uvvis_3 = make_gaussian_pulse(tc=750.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulses = (pulse_uvvis_1, pulse_uvvis_2, pulse_uvvis_3)
+
+    field_cars = ElectricField(pulses)
+
+    detector_cars = SpecDetector(detection_method='freq',
+                                 detection_polarization=(1.0, 0.0, 0.0),
+                                 detection_limited_to='same_order',
+                                 interaction_filter=[[1, -2, 3]])
+
+    exp_cars = VibExperiment(field=field_cars,
+                          detector=detector_cars,
+                          scans=(),
+                          tol_n_dev_t=3.0,
+                          tol_n_dev_w=3.0,
+                          thres_waiting_time=600.0,)
+
+    present_field_analysis(exp_cars.field_analyses[()])

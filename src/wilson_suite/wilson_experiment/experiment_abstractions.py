@@ -3,6 +3,8 @@ from typing import Optional, Iterable
 import copy
 from math import inf as infinity
 from math import exp as exp
+from math import acos as acos
+from math import pi as pi
 import numpy as np
 
 # TODO: Expand functionality according to below TODOs
@@ -244,6 +246,11 @@ class EmPulse:
     pol_comp: Tuple of tuples of floats: Polarizations under pulse compounding. Assumed ordering is same ordering
     as id_comp
 
+    tol_pol_wv_nonort: Tolerate nonorthogonality between polarization vector and wavevector
+    if deviation from orthogonality is less than tol_pol_wv_nonort degrees. (Intended use is to be able to use
+    simple polarization while still being able to distinguish slightly non-collinear wavevectors). Default: 0.0 (no
+    tolerance)
+
     overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse, expressed as a
     float and understood as the exponent theta of e^(i theta)
 
@@ -265,7 +272,10 @@ class EmPulse:
     wv: tuple[float] | None = None
     pol: tuple[float] | None = None
     pol_comp:  tuple[tuple[float]] | None = None
-    overall_phase: complex = 0.0
+
+    tol_wv_pol_nonort: float | int = 0.0
+
+    overall_phase: float | int = 0.0
 
     id: int | None = None
     id_comp: tuple | None = None
@@ -311,11 +321,16 @@ class EmPulse:
                         pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
                         if not pol_len == 1.0:
                             print('Polarization vector was normalized')
+
                         self.pol = tuple([i/pol_len for i in self.pol])
 
-                        wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
+                        # Make wv, pol dot product w.r.t. normalized both vectors
+                        wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
+                        wv_norm = tuple([i/wv_len for i in self.wv])
+                        wv_pol_dot = self.pol[0] * wv_norm[0] + self.pol[1] * wv_norm[1] + self.pol[2] * wv_norm[2]
 
-                        if not(wv_pol_dot == 0.0):
+
+                        if not(abs(acos(wv_pol_dot) - pi/2.0) <= self.tol_wv_pol_nonort*pi/180.0):
                             raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
 
                     else:
@@ -432,7 +447,7 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
         p12dsq = p1dsq + p2dsq
 
         # New time maximum, carrier frequency, deviation, overall coefficient
-        new_tc = (p1.tc * p1dsq + p2.tc * p2dsq) / p12dsq
+        new_tc = (p1.tc * p2dsq + p2.tc * p1dsq) / p12dsq
         new_cf = p1.cf + p2.cf
         new_dev = (p1dsq * p2dsq / p12dsq) ** 0.5
         new_maxstr = p1.maxstr * p2.maxstr * exp(-1 * ((p1.tc - p2.tc) ** 2) / (2 * p12dsq))
@@ -1044,8 +1059,8 @@ class FieldAnalysis:
         # Find wavevector-matching interaction patterns
         if self.detection_limited_to in ['same_order', 'up_to_order']:
 
-            self.valid_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord,
-                                                                                filter=self.detection_limited_to)
+            valid_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord,
+                                                                            filter=self.detection_limited_to)
 
         elif self.detection_limited_to == 'only_specified':
 
@@ -1066,6 +1081,9 @@ class FieldAnalysis:
             for i in valid_int_patterns:
                 if not i in test_int_patterns:
                     raise ValueError('Not all requested interaction patterns correspond to the same wavevector')
+
+        else:
+            raise ValueError('Unrecognized detection regime')
 
         return valid_int_patterns
 
