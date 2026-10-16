@@ -30,11 +30,14 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-Left: the D4 code move, deleting the old code (E9). Postponed: the README (E4), the polarization order fix (A15).
+Left: the D4 code move, deleting the old code (E9; needs the caller, E6b). Postponed: the README (E4), the
+polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
 evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
 blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8. Flat background: E12.
+Slices of 3D and 4D spectra: E14 (the evaluation on the grid works, the plot does not). The word "draw" means two
+things: E15 (rename). Caching and processes: F (no cache for now; the sum as arrays first).
 
 
 Branch rsp_eval_refactor (2026-10-15)
@@ -78,8 +81,9 @@ Steps 1-4 may use the old code; step 5 deletes it.
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  D4    the code move                                      waits (rule above)
-    5  E9    delete the old code                                waits (rule above); first decide about G7
+    4  D4    the code move                                      waits (rule above); the two copies differ (D4)
+    5  E9    delete the old code                                waits (rule above); first decide about G7;
+                                                                needs the caller (E6b)
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
 Other items:
@@ -87,8 +91,10 @@ Other items:
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
     next (2026-10-16)    E12 (flat background)
-    later, when needed   D1, D2, E8 (lines and planes), G7 (old vs new for other experiments), E10 (tune the
-                         knobs), F (reuse on a new axis choice; the sum as arrays)
+    before E6b           E15 (rename draw_*: no code outside this branch calls the names yet)
+    later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), G7 (old vs new for
+                         other experiments), E10 (tune the knobs), F (the sum as arrays; for 4D also the rows as
+                         arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
@@ -98,8 +104,6 @@ Other items:
                            belong to the refactor
                          - the scripts that do not run on this branch (see Branch): fix, or drop with E9
                          - from the old README: is single-component Cartesian selection a wanted feature?
-                         - 3D and 4D spectra have no plot (plot_spectrum: 1D and 2D only): slices or projections,
-                           when needed
 
 
 Decisions and known limits
@@ -182,12 +186,29 @@ D. Data model
 [ ] D1  PropsCollection.__eq__ only checks "every prop of A is in B", so [p1] == [p1, p2]. Make it frozen, with
         __eq__ and __hash__ from one key. No code uses it as a dict key; CompiledTerm's == still compares them.
 [ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
-        D1 and D2 block nothing: rows store term_id and motif, not the CompiledTerm.
+        D1 and D2 block nothing: rows store term_id and motif, not the CompiledTerm. They would block a cache keyed
+        on CompiledTerm (F, "same terms, other experiment"): with this ==, such a cache returns the rows of [p1, p2]
+        for [p1]. Key on term_to_str instead, or fix D1 and D2 first.
 [ ] D4  VibState, MolecularProperty, MolPropsCollection exist twice: wilson_main/abstractions.py and
         wilson_system/system_data.py. Decided 2026-10-14: wilson_system owns them; wilson_main imports.
         The code move waits (rule in Order of work). Keep the imports free of cycles: plan.py imports
         system_data only for type hints (if TYPE_CHECKING); system_data.py does not import plan.py;
         evaluate.py and pipeline.py import system_data for real.
+        wilson_main's copies are dropped. They differ from wilson_system's (checked 2026-10-16), so a caller of
+        wilson_main's copies needs more than a new import line:
+            MolecularProperty    wilson_main's has prop_spec (required), calc_setup, vals as an InitVar;
+                                 wilson_system's has trivial_name, vals, extra_data. find_props
+                                 (wilson_main/main_functions.py, the old pipeline's property list) and molprops.py
+                                 build it with prop_spec.
+            MolPropsCollection   .get of an unknown name: wilson_main's raises ValueError, wilson_system's returns
+                                 None (its [] raises KeyError)
+            VibState             defaults: state_label None / '', harmonic_WF None / False (wilson_main /
+                                 wilson_system); get_1q_states only in wilson_system (no caller)
+        Files that use wilson_main's copies: 20. 13 go with E9 (6 old amplitudes modules, 7 of their unit tests in
+        wilson_intensities/tests/unit). 7 stay: main_functions.py, workflow_abstractions.py, molprops.py,
+        anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py, test_anharm_analyzer.py,
+        wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes 7 files instead of 20;
+        find_props' prop_spec goes with the caller's rework (E6b).
 [ ] D5  Data-dict contract: what the evaluator expects. Delivering a dict that fits is the reader's job [outside].
         To do: write the table below into the README (E4).
         Load checks done 2026-10-14: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load
@@ -266,8 +287,13 @@ E. Pipeline
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
 [ ] E9  Delete the old code. Waits (rule in Order of work). First decide about G7: its old-vs-new part needs
-        the old code, and its scripts do not run on this branch (see Branch). Code outside refac_rsp_eval still
-        imports the old code: deleting amplitudes/ today breaks importing pipeline.py. In this order:
+        the old code, and its scripts do not run on this branch (see Branch). Needs the caller first (E6b):
+        WilsonSimulation.evaluate imports the old EvaluationWorkflow (workflow_abstractions.py:356), so deleting
+        the old code before E6b leaves WilsonSimulation with no evaluator.
+        Size (2026-10-16): amplitudes/ 4444 lines (averaging.py, 485 of them, stays); wilson_intensities/tests/unit
+        and integration 5167 lines, part of them for the old code.
+        Code outside refac_rsp_eval still imports the old code: deleting amplitudes/ today breaks importing
+        pipeline.py. In this order:
         [ ] amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
             get_pol_laser from it, and pipeline.py imports from it too.
         [ ] amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
@@ -336,6 +362,61 @@ E. Pipeline
         amplitude_coeff on every grid point; get_intensity: |coeff|^2; no box (today the box rules fail on the
         empty peak_widths()). Axis sets (E11): check_one_axis_set does not count them (no axes); terms_by_axis_set
         puts them under key (). Proposal: allowed with any set, a constant on its grid.
+[ ] E14 Slices of 3D and 4D spectra (2026-10-16). Two steps, two states:
+            evaluation on the grid (draw_spectrum)    works today, no new code
+            plot (plot_rsp_func, plot_spectrum)       1D and 2D only: raises for a slice of shape (201, 201, 1)
+        The evaluation: a window zero-wide on the fixed axes, with 1 grid point there, e.g.
+            draw_spectrum(result, Box({'A': (a0, a1), 'B': (b0, b1), 'C': (c0, c0)}), {'A': 201, 'B': 201, 'C': 1},
+                          box_rule=...)        -> grid_result (201, 201, 1), grid_axes['C'] = [c0]
+        Box allows min = max, make_grid gives 1 point, box_slices finds it, Box.overlaps keeps every feature whose
+        box reaches c0. Checked (a scratch script, not in git): 3 IR {A, B, C} on formaldehyde (72 features, gamma
+        10 cm-1), slice (A, B) at the C of the strongest feature: 0.000 floors from draw_all, 0.04-0.07 s per slice,
+        60 of 72 features reach the slice (1 on it). 4D chain term (mock data, test_dimensions.py), slice (A, B) at
+        the C, D of the strongest feature: 0.000 floors.
+        The full grid instead: 3D 81^3 0.88 s, 8.5 MB; 201^3 about 13 s, 130 MB (scaled by points); 4D 101^4: 1.6 GB
+        for one complex array. So 4D needs slices.
+        To do:
+        [ ] the plot: plot_rsp_func drops the 1-point axes and shows their values in the title (about 5 lines).
+            By hand, today: plot_spectrum(abs(spec.grid_result[:, :, 0])**2,
+                                          {ax: m[:, :, 0] for ax, m in spec.grid_mesh.items() if ax != 'C'}, ...)
+        [ ] the slice as an input: draw_spectrum(fixed={'C': c0}), or a helper that makes the window and dim_sizes.
+            Test: the slice against draw_all.
+        [ ] slice positions from the feature locations. Peaks are points: a slice 37 cm-1 from the strongest peak
+            (in C) has no feature on it, and its max is 15 % of that peak. The 72 features have 42 distinct C values.
+        [ ] one scale for a series of slices. Boxes: partial(amplitude_half_widths, dynrange=..., a_max=a_max_full),
+            a_max_full = the largest amplitude_in_window over the full window.
+            Colours: plot_spectrum(reference_max=).
+            Without a_max each slice sets its own floor (between peaks: 66 features drawn, 60 with a_max_full).
+        Other views, when needed:
+            feature map     the locations on 2 axes, coloured by get_intensity(); no grid. Shows where the peaks
+                            are (for choosing slices); no line shape, no interference.
+            projection      sum or max of the intensity over a dropped axis, built slice by slice (one 2D array in
+                            memory). Amplitudes add before squaring, so not feature by feature. For the max: a step
+                            <= gamma along the dropped axis. e.g. step 5 cm-1: about 360 slices x 0.05 s = 18 s
+                            (formaldehyde, 3 IR).
+            slanted slice   e.g. along A = B: eval_feature_on_grid takes any points, but box_slices needs a grid
+                            along the axes.
+        Slices do not depend on each other: one process per slice, each sends back one 2D array (201 x 201: 0.65 MB).
+[ ] E15 Rename draw_* (2026-10-16). "draw" means two things:
+            refac_rsp_eval      the complex amplitude on grid points: draw_all, draw_window, draw_spectrum;
+                                "drawing 1.5 s" (F)
+            plot_spectrum.py    a matplotlib picture: its error "plot_spectrum draws 1D and 2D spectra", "ax: draw
+                                into this axes". Its line 44 has the other meaning ("a spectrum from draw_spectrum").
+        Rule: "plot" only for pictures; the grid functions get "on_grid", as eval_feature_on_grid has.
+            draw_all        -> all_features_on_grid      every feature on every grid point: the reference
+            draw_window     -> boxed_features_on_grid    each feature on its own box
+            draw_spectrum   -> spectrum_on_grid          boxes, grid, boxed_features_on_grid -> EvalRspResult
+                               (or compute_spectrum, next to compute_features)
+            eval_feature_on_grid stays. In the text: "drawing" -> "evaluation on the grid", "drawn" -> "evaluated on
+            the grid".
+        Not: "sample" (SpectralWindow.sample_grid makes the grid points), "render" (the old render code makes
+        pictures), "evaluate" alone (evaluate_response_terms makes the rows).
+        Size: draw_spectrum 53 uses in 9 files, draw_window 31 in 6, draw_all 61 in 8; 31 test names; 116 words
+        draw / drawing / drawn / draws in refac_rsp_eval and plot_spectrum.py, each to read (some mean the
+        picture). The names by search and replace, todo.txt included (e.g. E6b names
+        test_draw_spectrum_with_a_width_function). Outside refac_rsp_eval: plot_spectrum.py (text and one call).
+        draw_by_domains (c3_spectrum.py) goes with E9.
+        When: before E6b and the merge to main; no code outside this branch calls the names yet.
 
 
 F. Speed
@@ -374,6 +455,53 @@ Not done, not needed so far:
     einsum for the whole sum (with cff and the denominators)    size n_modes ** labels: 3 labels 0.6 MB, 5: 1 GB
     evaluate_full_index_dict's check that every label has a value    0.56 s on ACDM; cannot fail in the pipeline
     a 1/omega table                                             about 0.15 s of build_contributions on ACDM
+Caching and processes (2026-10-16; ACDM, 14 EVV terms, build_contributions 3.06 s; scratch scripts, not in git).
+    What repeats inside one run:
+        lookup                lookups    distinct   uses of each
+        energy differences     264266      14284           18.5
+        non-averaged values    795076      73960           10.8
+        1/omega                796820         42          18972
+    A memo (a result stored on first use and read on the next) of the energy differences and 1/omega: 3.06 s ->
+    2.80 s, -8 %; largest relative difference 1e-10 (order of rounding). Not worth it: the time is the Python work
+    per index set (about 900000 calls), not the lookups.
+    The sum as arrays, timed on random arrays (not the real code): one EVV-like term, 42 modes, every 42 x 42 index
+    set, sum over c, one np.einsum: 0.14 ms. A 4-label term (42^4 = 3.1e6 index sets, 25 MB per array): 8 ms.
+    Estimate for build_contributions with arrays: 0.2-0.3 s, then set by making the 17101 rows and by the location
+    solves (4 %). Every setting of the table above then reruns in about that time: laser_pol: the averaged tensor
+    and the last sum again; states choice: the energy-difference arrays again; excluded modes: cut the arrays.
+    Processes, split by term (fork: the workers read the parent's data without a copy; 20 CPUs):
+        processes   1        2        4        8
+        time        3.00 s   1.93 s   1.17 s   0.80 s (3.8x)
+      12 terms take 0.25-0.33 s each, 2 terms 0.03-0.04 s: a split by term stays above the largest term, 0.33 s.
+      Starting 8 processes and sending the rows back: about 0.4 s (0.80 s against 3.00 / 8 = 0.375 s). Sent back:
+      2.3 MB, 94 bytes per (term, index set) pair.
+    Caches and processes: a cache filled during the run lives in one process, so each worker computes the same
+    values again. Sharing between processes needs messages, and a message takes longer than the dict read it would
+    save (not measured). The one cache of build_contributions (locations per (motif, params)) splits too: at most
+    4 % more time (the share of the location solves). Processes can use tables made once before the split,
+    read-only, e.g. the 14284 energy differences and the 42 values of 1/omega: the arrays of the sum as arrays.
+    After the sum as arrays: one EVV term 0.14 ms, against 0.4 s for starting processes, so no processes for EVV.
+    4D (thousands of terms, 8 ms per 4-label term): split by term.
+    Reuse not in the table above:
+        same terms, other experiment   the 14 {A, B} terms of 3 IR are the 14 EVV terms (term_to_str, checked).
+                                       Both on one molecule: the same rows twice, 3.06 s each. A row cache per
+                                       term needs the key term string + molecule + states_choice + modes + recipe
+                                       (not CompiledTerm: D1, D2). With the sum as arrays a rerun takes 0.2-0.3 s
+                                       (estimate), so the cache pays only without the arrays.
+        compile once                   translate + compile_terms: 6 ms for the 14 EVV terms. compute_features takes
+                                       the compiled list, so a caller that changes laser_pol, states or modes can
+                                       compile once. No code change.
+        load                           4 s per molecule and session (reading the Gaussian file). A MolSystemData
+                                       saved to disk (e.g. npz) would reload faster [outside: the caller's data].
+        slices (E14)                   with a fixed a_max the box sizes are the same for every slice. Storing per
+                                       feature the conditions without C (2 of 3 in (A ; A+B ; A+B+C)) saves at most
+                                       about 28 % of a slice (the Lorentzian factor takes 42 % of a slice): not
+                                       worth it at 0.05 s per slice.
+    4D limit, the rows: 522 bytes per (term, index set) pair in memory (ACDM EVV: 24696 pairs, 12.9 MB), 94 bytes
+    pickled. 4D on formaldehyde has 6e6-2e7 pairs (G7): 3-10 GB as Python rows, 0.6-1.9 GB sent back from
+    processes. The sum as arrays does not change that: 4D also needs the rows as arrays (one table of numbers, not
+    one object per row).
+    Conclusion: no cache for now (H1); the sum as arrays first; processes only for runs of 4D size.
 
 
 G. Checks beyond old = new
