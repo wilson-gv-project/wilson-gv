@@ -30,8 +30,8 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-Left: deleting the old code (E9), then the D4 code move; both wait only for the rule (Order of work). Postponed:
-the README (E4), the polarization order fix (A15).
+Next: deleting the old code (E9), then the D4 code move (Order of work). Postponed: the README (E4), the
+polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
 evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
@@ -75,8 +75,8 @@ part was dropped 2026-10-16).
 
 Order of work
 -------------
-Rule for now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
-Steps 1-3 may use the old code; step 4 deletes it.
+The rule of 2026-10-14 (no big moves or removals outside refac_rsp_eval) was lifted 2026-10-16: steps 4 and 5
+can go ahead. Steps 1-3 may use the old code; step 4 deletes it.
 E9 before the D4 move (2026-10-16): wilson_system's MolecularProperty has no prop_spec, which the old code needs;
 after E9 the move changes 7 files instead of 20 (D4).
     #  item  what                                               state
@@ -84,9 +84,8 @@ after E9 the move changes 7 files instead of 20 (D4).
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                waits (rule above); no longer needs E6b or G7
-                                                                (2026-10-16, see E9)
-    5  D4    the code move                                      waits (rule above); the two copies differ (D4)
+    4  E9    delete the old code                                next; needs neither E6b nor G7 (2026-10-16, E9)
+    5  D4    the code move                                      after E9; the two copies differ (D4)
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
 Other items:
@@ -192,7 +191,7 @@ D. Data model
         for [p1]. Key on term_to_str instead, or fix D1 and D2 first.
 [ ] D4  VibState, MolecularProperty, MolPropsCollection exist twice: wilson_main/abstractions.py and
         wilson_system/system_data.py. Decided 2026-10-14: wilson_system owns them; wilson_main imports.
-        The code move waits (rule in Order of work). Keep the imports free of cycles: plan.py imports
+        The code move comes after E9 (Order of work). Keep the imports free of cycles: plan.py imports
         system_data only for type hints (if TYPE_CHECKING); system_data.py does not import plan.py;
         evaluate.py and pipeline.py import system_data for real.
         wilson_main's copies are dropped. They differ from wilson_system's (checked 2026-10-16), so a caller of
@@ -289,7 +288,7 @@ E. Pipeline
         same everywhere along A - B. The drawing already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. Waits only for the rule in Order of work. Decided 2026-10-16:
+[ ] E9  Delete the old code. Next: nothing blocks it since 2026-10-16 (Order of work). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
           (workflow_abstractions.py:356, imports the old EvaluationWorkflow) raises NotImplementedError until then.
           These call it and break with it (fix or drop with E9): README.md (the quick start),
