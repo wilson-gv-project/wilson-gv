@@ -252,10 +252,14 @@ def test_cars_draws_within_eps_floor_of_draw_all(cars):
 # The setup 'nb: 3 IR (3D)': three IR pulses at different times, filter -1 +2 +3, magnitude condition -w1 + w2 > 0.
 # Axes A = -w1, B = w2, C = w3.
 
+def three_ir_experiment() -> wexp.VibExperiment:
+    return experiment((pulse(50., 0., 1), pulse(100., 0., 2), pulse(120., 0., 3)), {1: -1, 2: 1, 3: 1},
+                      magn_conditions=((-1, 2),))
+
+
 @pytest.fixture(scope='module')
 def three_ir() -> tuple[wexp.VibExperiment, list, dict[tuple[str, ...], list[int]]]:
-    exp = experiment((pulse(50., 0., 1), pulse(100., 0., 2), pulse(120., 0., 3)), {1: -1, 2: 1, 3: 1},
-                     magn_conditions=((-1, 2),))
+    exp = three_ir_experiment()
     terms = derive_terms(exp)
     return exp, terms, terms_by_axis_set(terms, exp.canonical_axes)
 

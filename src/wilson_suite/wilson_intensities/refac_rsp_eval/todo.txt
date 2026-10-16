@@ -14,7 +14,7 @@ the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (
 Tests (run 2026-10-16, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   680     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+    refac_rsp_eval   684     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
     rest of src      323     4     3      -   none
     tests/ (root)      4    16     -      -   none
@@ -30,8 +30,8 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-Left: the D4 code move, deleting the old code (E9; needs the caller, E6b). Postponed: the README (E4), the
-polarization order fix (A15).
+Left: deleting the old code (E9), then the D4 code move; both wait only for the rule (Order of work). Postponed:
+the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
 evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
@@ -69,21 +69,24 @@ Scripts that do not run on this branch (main's old pipeline and derive); pytest 
       tests/c2_leaves.py                  {i: {j: [terms]}}; the scripts pass a flat list
     tests/g7_survey.py                    calls experiment.derive_terms(), not on main; compat.derive_terms gives
                                           the same list
-C2 stays checked without them: test_evv_reference.py against evv_reference.json.
+C2 stays checked without them: test_evv_reference.py against evv_reference.json. They go with E9 (G7's old-vs-new
+part was dropped 2026-10-16).
 
 
 Order of work
 -------------
 Rule for now (2026-10-14): no big moves or removals outside refac_rsp_eval. Steps 4 and 5 wait.
-Steps 1-4 may use the old code; step 5 deletes it.
+Steps 1-3 may use the old code; step 4 deletes it.
+E9 before the D4 move (2026-10-16): wilson_system's MolecularProperty has no prop_spec, which the old code needs;
+after E9 the move changes 7 files instead of 20 (D4).
     #  item  what                                               state
     1  D4    decide who owns VibState, MolecularProperty,       done 2026-10-14: wilson_system
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  D4    the code move                                      waits (rule above); the two copies differ (D4)
-    5  E9    delete the old code                                waits (rule above); first decide about G7;
-                                                                needs the caller (E6b)
+    4  E9    delete the old code                                waits (rule above); no longer needs E6b or G7
+                                                                (2026-10-16, see E9)
+    5  D4    the code move                                      waits (rule above); the two copies differ (D4)
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
 Other items:
@@ -92,9 +95,8 @@ Other items:
     optional checks      G3 (rest)
     next (2026-10-16)    E12 (flat background)
     before E6b           E15 (rename draw_*: no code outside this branch calls the names yet)
-    later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), G7 (old vs new for
-                         other experiments), E10 (tune the knobs), F (the sum as arrays; for 4D also the rows as
-                         arrays; reuse on a new axis choice)
+    later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
+                         F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
@@ -102,7 +104,6 @@ Other items:
                          (see Branch)
     no item yet          - the 4 failing tests in the rest of src (see Tests) fail on main too; open whether they
                            belong to the refactor
-                         - the scripts that do not run on this branch (see Branch): fix, or drop with E9
                          - from the old README: is single-component Cartesian selection a wanted feature?
 
 
@@ -243,7 +244,9 @@ E. Pipeline
         the decisions above. The old README (removed 2026-10-09; it described designs the code does not follow):
             git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md
 [ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
-        [outside]. Until E6b, the old pipeline runs, double count included (C3).
+        [outside]. Until E9, the old pipeline runs, double count included (C3). From E9 until E6b,
+        WilsonSimulation.evaluate raises NotImplementedError, and the entry point is the library calls below
+        (e.g. tests/example_evaluate_response_terms.py, tests/example_plot_spectrum.py).
             molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)      -> FeatureResult
@@ -286,10 +289,14 @@ E. Pipeline
         same everywhere along A - B. The drawing already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. Waits (rule in Order of work). First decide about G7: its old-vs-new part needs
-        the old code, and its scripts do not run on this branch (see Branch). Needs the caller first (E6b):
-        WilsonSimulation.evaluate imports the old EvaluationWorkflow (workflow_abstractions.py:356), so deleting
-        the old code before E6b leaves WilsonSimulation with no evaluator.
+[ ] E9  Delete the old code. Waits only for the rule in Order of work. Decided 2026-10-16:
+        - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
+          (workflow_abstractions.py:356, imports the old EvaluationWorkflow) raises NotImplementedError until then.
+          These call it and break with it (fix or drop with E9): README.md (the quick start),
+          examples/quick_start.ipynb, script_example.py, wilson_intensities/tests/integration/
+          test_integration_evaluation.py, wilson_analysis/tests/test_integration_rendering.py, and in tests/:
+          test_intensities_testing.py, evv_tester.py, evv_tester_general_evaluator.py, pulse_exp_var_tester.py.
+        - no need to wait for G7: its old-vs-new part was dropped (see G7).
         Size (2026-10-16): amplitudes/ 4444 lines (averaging.py, 485 of them, stays); wilson_intensities/tests/unit
         and integration 5167 lines, part of them for the old code.
         Code outside refac_rsp_eval still imports the old code: deleting amplitudes/ today breaks importing
@@ -299,8 +306,8 @@ E. Pipeline
         [ ] amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
             term_parts. Cut it down to what stays. wilson_intensities/__init__.py imports amplitudes too.
         [ ] wilson_main/spectrum_abstractions.py imports SpectralWindow from amplitudes/spectrum_composition.py.
-        [ ] wilson_main/workflow_abstractions.py (carefully): the old EvaluationWorkflow (imported inside
-            WilsonSimulation.evaluate) and VibState.
+        [ ] wilson_main/workflow_abstractions.py (carefully): WilsonSimulation.evaluate raises NotImplementedError
+            instead of running the old EvaluationWorkflow; VibState.
         [ ] the domains (find_clusters_by_featboxes, RectangularDomain): unused since E10 and E7; only
             c3_spectrum.py uses them.
         [ ] the old pipeline's copy of the box rule (amplitudes/spectrum_composition.py; tested in
@@ -524,12 +531,11 @@ checking side.
 [ ] G6  [aside] Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a
         term huge; otf_vibdiffdenom raises only at exactly zero (the evaluator's part). Which energies come near
         each other is a property of the molecule's states (the data).
-[ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below). Left: old vs new with the c2 scripts
-        (needs the old code, E9) for the setups that run (CARS, the 3-IR setup), and parameter sets that share a
-        location (the double count, C3). The scripts named here do not run on this branch (see Branch); the
-        survey below was run on debug_rendering. Expect old != new where a term has the same label twice in its 1/w
-        product (the old term_parts.py uses 1/w_a once). Run c2_variations.py and c3_spectrum.py with
-        PYTHONHASHSEED=0, else set order changes the last digits from run to run.
+[ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below), and the hand calculations for CARS
+        and 3 IR (2026-10-16, Done). Old vs new dropped 2026-10-16: correctness is checked by numerical tests
+        against hand calculations, not against the old code (which shares derive, the reader and the averaging).
+        Left: nothing for now; more hand calculations when a new setup is used. The scripts named here do not run
+        on this branch (see Branch); the survey below was run on debug_rendering.
         Where the experiments come from:
             ~/pre_paper3/try.py      make_experiment; run_experiment prints t.to_str() of every term;
                                      sweep_sign_patterns runs every +/- pattern of the filter. Its
@@ -702,6 +708,11 @@ Checked: the numbers are right
          Record: tests/c3_spectrum.py docstring. Formaldehyde has n = 1 everywhere, so its old spectra are right.
     G1   Hand calculation, numpy only: water, terms 0 and 12, every (a, b) pair, both state choices; to 1e-12
          (test_hand_calculation.py). Found: pytest.approx's default abs=1e-12 had hidden errors up to 6e-5.
+    G7   Hand calculation beyond EVV (2026-10-16, test_hand_calculation.py): water, terms from derive, every row's
+         coefficient (rel 5e-12) and location (rel 1e-12), both state choices. CARS (1D, 4 terms, 12 rows) and
+         the {A, B, C} terms of 3 IR (3D, 2 terms, 18 rows). The {A, B} terms of 3 IR are the 14 EVV terms (C2,
+         G1). Checked to fail for w swapped with E(1) - E(0), harmonic locations, -C, a and b swapped.
+         Limit: every field along x, so a property in the wrong slot does not show (A15, G3).
     A16  test_integration.py, the two term 8 tests (2026-10-14): rel 1e-12; einsum abs=0; rotation abs=1e-18 (the
          evaluator's zero_tol: 144 of 216 values are rounding noise below 2.4e-19).
     G10  1D-4D (2026-10-16, test_dimensions.py). Mock data (MolSystemData.from_datadict: 2 modes, states up to 4

@@ -18,16 +18,34 @@ Checked 2026-10-10, both states choices: term 0, 9 pairs, largest relative diffe
 1.07e-12, and the 3 pairs with a = 2 exactly 0, as stored (cff_(2,c,c) = 0: mode 2 is antisymmetric). All of the
 difference comes from the cm-1 per Eh constant (see REL): term 0 has 2 energy factors, term 12 has 4.
 (First done for CO, 1 mode; replaced by water so that the sum over c has more than one entry.)
+
+Beyond EVV (G7, 2026-10-16): CARS (1D) and the {A, B, C} terms of 3 IR (3D), by hand against the evaluator's rows
+on water, coefficients and locations. The terms come from derive, for the setups of test_dimensions.py (every
+pulse and the detector along x); the formulas here are those terms as derive writes them (term_to_str), so these
+two check everything after derive: the evaluator, the experiment's polarization vector, the units.
+Limit, as for terms 0 and 12: with every field along x, the rank 4 average is the same for any order of the slots,
+so a property in the wrong slot does not show (A15, G3).
 """
 
 import json
+from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_system.system_data import DataOriginInfo
+from wilson_suite.wilson_intensities.refac_rsp_eval.compat import derive_terms
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    evaluate_response_terms,
+    prop_names,
+    terms_by_axis_set,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_dimensions import (
+    cars_experiment,
+    three_ir_experiment,
+)
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
@@ -53,7 +71,9 @@ def water() -> SimpleNamespace:
         cff=data['cff'],                # [a, b, c]
         w=np.array([data['nc_sqrt_eigval'][a] for a in modes]) / CM1_PER_EH,
         # E(1_a) - E(0); the stored energies are relative to the ground state
-        e1={s: np.array([data[f'{s}_states'][(str(a),)] for a in modes]) / CM1_PER_EH for s in STATES})
+        e1={s: np.array([data[f'{s}_states'][(str(a),)] for a in modes]) / CM1_PER_EH for s in STATES},
+        # every state energy, cm-1, e.g. ('0', '1') = 1 quantum in modes 0 and 1: for the locations
+        states_cm1={s: data[f'{s}_states'] for s in STATES})
 
 
 def iso_average_xxxx(t: np.ndarray) -> float:
@@ -131,3 +151,91 @@ def test_term_0_needs_w_not_the_state_energy_difference(water):
     for (a, b), coeff in stored.items():
         if coeff != 0.:
             assert term_0(with_e1, a, b, 'anharmonic') != pytest.approx(coeff, rel=0.02, abs=0)
+
+
+## beyond EVV (G7): CARS and the {A, B, C} terms of 3 IR ----------------------------------------------------------
+# Every denominator of these terms is w (none is a state energy difference): the states choice changes only the
+# locations. A location solves each condition E_left - E_right - (sum of axes) = 0, E = 0 for the ground state.
+
+def cars_by_hand(mol: SimpleNamespace, a: int, states: str) -> list[tuple[float, dict[str, float]]]:
+    """
+    [(coeff, location in cm-1), ...] of the 4 CARS terms at a, two pairs of equal terms:
+        -1/2 * polgrad_(a) * polgrad_(a) / w_a / (E(1_a) - A - iG)      twice, at A = E(1_a)
+        +1/2 * polgrad_(a) * polgrad_(a) / w_a / (-E(1_a) - A - iG)     twice, at A = -E(1_a)
+    Slots: one polgrad 0 and 3, the other 1 and 2.
+    """
+    t = np.einsum('il,jk->ijkl', mol.polgrad[a], mol.polgrad[a])
+    coeff = iso_average_xxxx(t) / (2 * mol.w[a])
+    e_a = mol.states_cm1[states][(str(a),)]
+    return [(-coeff, {'A': e_a})] * 2 + [(coeff, {'A': -e_a})] * 2
+
+
+def three_ir_abc_by_hand(mol: SimpleNamespace, a: int, b: int, states: str) -> list[tuple[float, dict[str, float]]]:
+    """
+    [(coeff, location in cm-1), ...] of the 2 {A, B, C} terms of 3 IR at (a, b),
+    +-1/4 * dipgrad_(b) * dipgrad_(a) * dipgrad_(a) * dipgrad_(b) / w_a / w_b over three conditions:
+        +1/4   (-E_a - A) (E_b - E_a - A - B) (E_ab - E_a - A - B - C)    at A = -E_a, B = E_b, C = E_ab - E_b
+        -1/4   (-E_a - A) (E_b - E_a - A - B) (E_b - A - B - C)           at A = -E_a, B = E_b, C = E_a
+    E_a = E(1_a), E_ab = E(1_a 1_b), E(2_a) for a = b. Slots: dipgrad_(b) 0 and 2, dipgrad_(a) 1 and 3.
+    """
+    t = np.einsum('i,j,k,l->ijkl', mol.dipgrad[b], mol.dipgrad[a], mol.dipgrad[b], mol.dipgrad[a])
+    coeff = iso_average_xxxx(t) / (4 * mol.w[a] * mol.w[b])
+    energy = lambda *modes: mol.states_cm1[states][tuple(sorted(str(m) for m in modes))]
+    at = {'A': -energy(a), 'B': energy(b)}
+    return [(coeff, {**at, 'C': energy(a, b) - energy(b)}), (-coeff, {**at, 'C': energy(a)})]
+
+
+def evaluator_rows(exp, terms: list, states: str) -> dict[tuple[int, ...], list[tuple[float, dict[str, float]]]]:
+    """The evaluator's rows on water, {index values in label order: [(coeff, location in cm-1), ...]}."""
+    molsys = MolSystemData.load(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
+                                prop_names(terms))
+    result = evaluate_response_terms(terms, axes=exp.canonical_axes, molsys_data=molsys, states_choice=states,
+                                     laser_pol=exp.polarization_avg_vector, propagator_param=10.)
+    assert result.zero == []
+    rows = defaultdict(list)
+    for r in result.table:
+        rows[tuple(r.params[label] for label in sorted(r.params))].append((r.coeff, r.location.as_dict()))
+    return dict(rows)
+
+
+def assert_rows_match(by_evaluator: dict, by_hand: dict):
+    """
+    The same index sets, and per index set the same rows. Rows pair up in the order of their coeff: each average
+    here is a sum of squares (> 0), so the sign of the coeff tells the terms apart.
+    """
+    assert set(by_evaluator) == set(by_hand)
+    for params, rows in by_evaluator.items():
+        expected = sorted(by_hand[params], key=lambda row: row[0])
+        assert len(rows) == len(expected), params
+        for (coeff, location), (coeff_hand, location_hand) in zip(sorted(rows, key=lambda row: row[0]), expected):
+            assert coeff == pytest.approx(coeff_hand, rel=REL, abs=0), params
+            assert location == pytest.approx(location_hand, rel=1e-12, abs=0), params
+
+
+@pytest.fixture(scope='module')
+def cars():
+    exp = cars_experiment()
+    return exp, derive_terms(exp)
+
+
+@pytest.fixture(scope='module')
+def three_ir_abc():
+    exp = three_ir_experiment()
+    terms = derive_terms(exp)
+    return exp, [terms[i] for i in terms_by_axis_set(terms, exp.canonical_axes)[('A', 'B', 'C')]]
+
+
+@pytest.mark.parametrize('states', STATES)
+def test_cars_rows_are_the_hand_calculation(water, cars, states):
+    """1D: 3 modes, 4 terms -> 12 rows, at +- each fundamental."""
+    by_hand = {(a,): cars_by_hand(water, a, states) for a in water.modes}
+
+    assert_rows_match(evaluator_rows(*cars, states), by_hand)
+
+
+@pytest.mark.parametrize('states', STATES)
+def test_three_ir_abc_rows_are_the_hand_calculation(water, three_ir_abc, states):
+    """3D: 3 modes, 2 terms -> 18 rows, every (a, b) pair."""
+    by_hand = {(a, b): three_ir_abc_by_hand(water, a, b, states) for a in water.modes for b in water.modes}
+
+    assert_rows_match(evaluator_rows(*three_ir_abc, states), by_hand)
