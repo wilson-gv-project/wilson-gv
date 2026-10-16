@@ -128,21 +128,15 @@ def test_save_wilsonsim():
     axes_choice = make_SpectralAxisSet({'A': [2], 'B': [-1, 2]})
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
 
-    from wilson_suite.wilson_intensities.amplitudes.spectrum_composition import SpectralWindow, Box
-    bounds_dict = {'A': (1000., 3100.), 'B': (-100., 2500.)}
-    spectral_window = SpectralWindow(box=Box(bounds_dict))
-
-    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'spectral_window': spectral_window,
-                                                          'Gamma': 24.7, 'Gamma_unit': 'cm-1',
+    # no spectral_window: the old evaluator's SpectralWindow and the run of the old evaluation (sim.evaluate) went
+    # with the old code (E9)
+    evi = ws.main.spectrum_abstractions.EvaluationInfo(**{'Gamma': 24.7, 'Gamma_unit': 'cm-1',
                                                           'dynamic_range': 1000,
                                                           'grid_resolution': {'A': 70, 'B': 100}})
     eval_setup = ws.main.spectrum_abstractions.SpecEvalSetup(ev_info=evi)
 
     sim.addSpecEvalSetup(eval_setup)
     sim.save_to_pkl(filename='sim1.pkl')
-
-    # save EvaluationInputs for evaluation workflow
-    sim.evaluate(save_evalinputs_pkl='EvalInputs.pkl')
 
     sim.save_to_pkl(filename='configs.pkl', configs_only=True)
 

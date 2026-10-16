@@ -141,7 +141,11 @@ F3  src/wilson_suite/vibana.py: its import fails today (wilson_suite.fixtures ha
 
 Order
 -----
-1. A1; after it stage 5 no longer breaks imports.
-2. B1, B2 before or with stage 5; otherwise these 5 tests fail until they are done.
-3. E1 with stage 5: a clear error instead of ModuleNotFoundError.
-4. C, D, E2-E5, F: any time; independent of stage 5.
+1. [x] A1: EvaluationInfo.spectral_window: Any (typing.Any was imported already). After it stage 5 no longer
+       breaks imports.
+2. [x] B1: the file deleted. B2: test_save_wilsonsim without its old part (no spectral_window, no
+       sim.evaluate); it still passes.
+3. [x] E1: evaluate raises NotImplementedError; the message names the library calls and their modules.
+   Steps 1-3 (2026-10-16, the prep for stage 5) were checked one by one: no other test changed. A dry run of
+   stage 5 after them changes no test; only the 14 old modules leave the import list.
+4. [ ] C, D, E2-E5, F: any time; independent of stage 5.

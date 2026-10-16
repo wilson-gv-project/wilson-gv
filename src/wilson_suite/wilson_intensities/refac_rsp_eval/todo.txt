@@ -310,8 +310,10 @@ E. Pipeline
               anharmonic analyzer tests. Found by the check: test_latex.py took a helper (test terms, derive only)
               from test_resonances.py; the helper moved into test_latex.py.
         3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). Categorized in
-              todo_oldcode_rm.txt (B, C, D); decisions open.
-        4 [ ] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E); decisions open.
+              todo_oldcode_rm.txt (B, C, D). Done as the prep for stage 5: B (test_integration_rendering.py
+              deleted; test_save_wilsonsim without its old part). Open: C, D.
+        4 [ ] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E). Done as the prep for stage 5: A1
+              (EvaluationInfo.spectral_window: Any), E1 (evaluate raises NotImplementedError). Open: E2-E5.
               spectrum_abstractions.py, line 5, imports SpectralWindow from amplitudes/spectrum_composition.py; it is
               the type of EvaluationInfo.spectral_window (line 270).
               workflow_abstractions.py: WilsonSimulation.evaluate raises NotImplementedError instead of running the
@@ -332,6 +334,7 @@ E. Pipeline
                                       2 skip) and test_save_wilsonsim (passes today). No refac_rsp_eval test
                                       changes; tests/ (root) fails as before. No test covers README.md,
                                       quick_start.ipynb, script_example.py.
+            after the prep (A1, B, E1)  no test changes; only the 14 modules leave the import list (third dry run)
 [ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
         knob setting against draw_all; add cases and knob values, then choose the defaults.
         The rule (features.amplitude_half_widths), from the plot's dynamic range D:
