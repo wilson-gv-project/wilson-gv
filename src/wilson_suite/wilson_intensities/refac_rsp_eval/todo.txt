@@ -21,10 +21,11 @@ Tests (run 2026-10-16, branch rsp_eval_refactor)
                     pass  fail  skip  xfail   on purpose until A15 is fixed
     refac_rsp_eval   684     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
-    rest of src      220     1     3      -   none
+    rest of src      218     1     1      -   none
     tests/ (root)      4    16     -      -   none
 Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The 1 in the rest of src: test_wilson_data_obtainer
-(test_getting_data). Before 3612e5b deleted the old unit and integration tests (E9) the rest of src had 323 / 4.
+(test_getting_data). Before E9 deleted the old tests the rest of src had 323 / 4 / 3 (pass / fail / skip): 3612e5b
+deleted the old unit and integration tests, 7463870 test_integration_rendering.py (2 pass, 2 skip).
 A fresh checkout (e.g. a git worktree) fails more: some tests read files that git ignores,
 e.g. src/wilson_suite/terms_fuller_flat.json.
 
@@ -34,7 +35,7 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-In progress: deleting the old code (E9: stages 1-2 of 6 done, 3612e5b), then the D4 code move (Order of work).
+In progress: deleting the old code (E9: stages 1, 2, 5 done; 3, 4 in part), then the D4 code move (Order of work).
 Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
@@ -86,7 +87,7 @@ after E9 the move changes 7 files instead of 20 (D4).
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                in progress: stages 1-2 of 6 done (3612e5b, E9)
+    4  E9    delete the old code                                in progress: stages 1, 2, 5 of 6 done (E9)
     5  D4    the code move                                      after E9; the two copies differ (D4)
     6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
 
@@ -290,8 +291,8 @@ E. Pipeline
         same everywhere along A - B. The drawing already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. In progress since 2026-10-16: stages 1-2 of 6 done (3612e5b). d93cc7b is the last
-        commit with all of the old code (see the top of this file). Decided 2026-10-16:
+[ ] E9  Delete the old code. In progress since 2026-10-16: stages 1, 2, 5 of 6 done; 3, 4 in part (below).
+        d93cc7b is the last commit with all of the old code (see the top of this file). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
           (workflow_abstractions.py:356, imports the old EvaluationWorkflow) raises NotImplementedError until then.
           These call it and break with it (fix or drop with E9): README.md (the quick start),
@@ -318,14 +319,18 @@ E. Pipeline
               the type of EvaluationInfo.spectral_window (line 270).
               workflow_abstractions.py: WilsonSimulation.evaluate raises NotImplementedError instead of running the
               old EvaluationWorkflow; VibState.
-        5 [ ] the 14 old modules of amplitudes/, about 3940 lines. With them: the domains (find_clusters_by_featboxes,
-              RectangularDomain; unused since E10 and E7, only c3_spectrum.py used them) and the old pipeline's copy
-              of the box rule (spectrum_composition.py; its tests went in stage 2).
+        5 [x] the 14 old modules of amplitudes/, 3941 lines (2026-10-16). Check: no test changed; only the 14 modules
+              left the import list. Only category C (todo_oldcode_rm.txt) still imports them, and it failed before.
+              The example tests/example_evaluate_response_terms.py runs (0.9 s). With them went: the domains
+              (find_clusters_by_featboxes, RectangularDomain; unused since E10 and E7, only c3_spectrum.py used
+              them) and the old pipeline's copy of the box rule (spectrum_composition.py; its tests went in stage 2).
               amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
               get_pol_laser from it, and pipeline.py imports from it too.
-              amplitudes/__init__.py runs before averaging.py and imports spectrum_composition, evaluation_wf,
-              term_parts: cut it down to the averaging import. wilson_intensities/__init__.py imports amplitudes too.
-        6 [ ] todo.txt, docstrings and comments that name the old code (e.g. features.py, plan.py, system_data.py).
+              amplitudes/__init__.py imported spectrum_composition, evaluation_wf, term_parts: now only the
+              averaging import (get_iso_f, get_AlphaBetaGammaDelta_indices; no caller uses the package names).
+        6 [ ] todo.txt, docstrings and comments that name the old code. Left 2026-10-16: features.py:507,
+              evaluate.py:689, plan.py:40-42, system_data.py:14, tests/helpers.py:78, tests/test_evv_reference.py:8;
+              commented-out code in wilson_analysis/analysis/pre_eval.py (lines 4, 136, 178).
         Stage 5 needs line 5 of spectrum_abstractions.py changed first (stage 4). Two dry runs, 2026-10-16 (the
         files restored after):
             stage 5 alone             import wilson_suite fails (wilson_main/__init__.py imports
