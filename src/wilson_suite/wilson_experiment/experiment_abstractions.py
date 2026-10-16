@@ -329,7 +329,6 @@ class EmPulse:
                         wv_norm = tuple([i/wv_len for i in self.wv])
                         wv_pol_dot = self.pol[0] * wv_norm[0] + self.pol[1] * wv_norm[1] + self.pol[2] * wv_norm[2]
 
-
                         if not(abs(acos(wv_pol_dot) - pi/2.0) <= self.tol_wv_pol_nonort*pi/180.0):
                             raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
 
@@ -367,7 +366,7 @@ class EmPulse:
 # FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
 def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
                         wv: tuple[float], pol: tuple[float],
-                        overall_phase: float | int = 0.0, id: int = None):
+                        overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0):
     """
     Helper function: Makes a Gaussian EmPulse instance with the selected parameters.
     See EmPulse for a definition of these parameters.
@@ -376,12 +375,12 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
     """
 
     return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort= tol_wv_pol_nonort)
 
 
 def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: float | int = 0.0, id: int = None):
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort =0.0):
     """
     Helper function: Makes an impulsive-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -392,11 +391,11 @@ def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0
     """
 
     return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort = tol_wv_pol_nonort)
 
 def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
                          wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: float | int = 0.0, id: int = None):
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0):
     """
     Helper function: Makes a continuous-wave-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -408,7 +407,7 @@ def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxs
     """
 
     return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort = tol_wv_pol_nonort)
 
 def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
     """
@@ -484,10 +483,14 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
 
         new_id_comp = tuple(nic)
 
+        # Nonorthogonality tolerance not currently used but carried through as max for completeness
+        new_tol_nonort = max(p1.tol_wv_pol_nonort, p2.tol_wv_pol_nonort)
+
         # Make compound pulse
         return EmPulse(env='gaussian', tc=new_tc, cf=new_cf, dev=new_dev, maxstr=new_maxstr,
                        wv=new_wv, pol=None, pol_comp=new_pol_comp, overall_phase=new_overall_phase,
-                       id=None, id_comp=new_id_comp, is_compound=True)
+                       id=None, id_comp=new_id_comp, is_compound=True,
+                       tol_wv_pol_nonort=new_tol_nonort)
 
 
 def compound_pulses_in_list(pulses: list[EmPulse]) -> EmPulse:
@@ -559,7 +562,8 @@ class ElectricField:
             signed_pulses[-1 * i.id] = EmPulse(env = i.env, tc = i.tc, cf = -1 * i.cf, dev = i.dev, maxstr = i.maxstr,
                                                wv = tuple([-1.0*j for j in i.wv]),
                                                pol = tuple([j.real - j.imag for j in i.pol]),
-                                               overall_phase = -1 * i.overall_phase, id = -1 * i.id)
+                                               overall_phase = -1 * i.overall_phase, id = -1 * i.id,
+                                               tol_wv_pol_nonort=i.tol_wv_pol_nonort)
 
             self.signed_pulses = signed_pulses
 
@@ -1203,44 +1207,8 @@ class FieldAnalysis:
                     for j in range(len(i)):
                         p_pattern.append(i[p[j]])
 
-                    # Determine orientational avg polarization vector
-                    all_polarizations = [copy.deepcopy(self.polarization_filter)]
-
-                    # Could probably be done more elegantly but works
-                    for j in p_pattern:
-                        all_polarizations.append(copy.deepcopy(self.field.signed_pulses[j].pol))
-
-                    pol_avg_vector = get_pol_laser(all_polarizations)
-
-                    # FIXME: May need to introduce tolerances here
-                    # Check if pol avg vector is nonzero
-                    if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
-
-                        # Check against bank; determine bank index or make new bank entry
-                        found_in_bank = False
-
-                        for j in pol_avg_vector_bank:
-                            pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in range(3)])
-
-                            if pol_diff == 0.0:
-                                found_in_bank = True
-                                pol_bank_ind = j
-                                break
-
-                        if not found_in_bank:
-                            pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
-                            pol_bank_ind = pol_avg_vector_bank_ctr
-                            pol_avg_vector_bank_ctr += 1
-
-                    #  Otherwise cycle
-                    else:
-                        continue
-
                     # For each compounding pattern at this interaction pattern's order:
                     for c in self.comp_patterns_at_order[ord]:
-
-                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
-                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
 
                         # FIXME: There should be several optimization opportunities here if needed:
                         #  - Precalculate motifs of compounding patterns for time-overlap/resonance criteria
@@ -1299,6 +1267,44 @@ class FieldAnalysis:
                                 c_pulse_inds.append(c_pulse_ind)
 
                             c_ctr += c_elem_len
+
+                            # Determine orientational avg polarization vector
+                            all_polarizations = [copy.deepcopy(self.polarization_filter)]
+
+                            # Could probably be done more elegantly but works
+                            for j in c_pulse_inds:
+                                for k in j:
+                                    all_polarizations.append(copy.deepcopy(self.field.signed_pulses[k].pol))
+
+                            pol_avg_vector = get_pol_laser(all_polarizations)
+
+                            # FIXME: May need to introduce tolerances here
+                            # Check if pol avg vector is nonzero
+                            if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
+
+                                # Check against bank; determine bank index or make new bank entry
+                                found_in_bank = False
+
+                                for j in pol_avg_vector_bank:
+                                    pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in
+                                                    range(len(pol_avg_vector_bank[j]))])
+
+                                    if pol_diff == 0.0:
+                                        found_in_bank = True
+                                        pol_bank_ind = j
+                                        break
+
+                                if not found_in_bank:
+                                    pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
+                                    pol_bank_ind = pol_avg_vector_bank_ctr
+                                    pol_avg_vector_bank_ctr += 1
+
+                            #  Otherwise cycle
+                            else:
+                                continue
+
+                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
+                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
 
                         # Cycle if any (compound) pulse was invalid
                         if not comp_valid:

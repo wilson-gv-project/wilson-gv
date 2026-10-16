@@ -475,6 +475,37 @@ def test_vib_experiment():
     #
     #
 
+
+    # "Alpha-beta CARS"
+
+    pulse_uvvis_1 = make_gaussian_pulse(tc=0.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1, tol_wv_pol_nonort=5.0)
+
+    pulse_uvvis_2 = make_gaussian_pulse(tc=350.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.012, 1.0), pol=(0.0, 1.0, 0.0), id=2, tol_wv_pol_nonort=5.0)
+
+    pulse_uvvis_3 = make_gaussian_pulse(tc=750.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3, tol_wv_pol_nonort=5.0)
+
+    pulses = (pulse_uvvis_1, pulse_uvvis_2, pulse_uvvis_3)
+
+    field_ab_cars = ElectricField(pulses)
+
+    detector_ab_cars = SpecDetector(detection_method='freq',
+                                 detection_polarization=(0.0, 0.0, 1.0),
+                                 detection_limited_to='same_order',
+                                 interaction_filter=[[1, -2, 3, 3]])
+
+    exp_ab_cars = VibExperiment(field=field_ab_cars,
+                          detector=detector_ab_cars,
+                          scans=(),
+                          tol_n_dev_t=3.0,
+                          tol_n_dev_w=3.0,
+                          thres_waiting_time=600.0,)
+
+    present_field_analysis(exp_ab_cars.field_analyses[()])
+
+
     # EVV 2-scan
 
     pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
@@ -551,3 +582,30 @@ def test_vib_experiment():
                           thres_waiting_time=600.0,)
 
     present_field_analysis(exp_cars.field_analyses[()])
+
+    # "SFG-style"
+
+    pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=1500.0, dev=100.0, maxstr=1.0e-5,
+                                     wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
+
+
+    pulse_uvvis_1 = make_gaussian_pulse(tc=500.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
+                                        wv=(0.02, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=2)
+
+    pulses = (pulse_ir_1, pulse_uvvis_1)
+
+    field_sfg = ElectricField(pulses)
+
+    detector_sfg = SpecDetector(detection_method='freq',
+                                 detection_polarization=(0.0, 0.0, 1.0),
+                                 detection_limited_to='same_order',
+                                 interaction_filter=[[1, 2]])
+
+    exp_sfg = VibExperiment(field=field_sfg,
+                          detector=detector_sfg,
+                          scans=(),
+                          tol_n_dev_t=3.0,
+                          tol_n_dev_w=3.0,
+                          thres_waiting_time=600.0,)
+
+    present_field_analysis(exp_sfg.field_analyses[()])
