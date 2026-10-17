@@ -5,8 +5,8 @@ and which pairs are zero. Formaldehyde, water and CO; anharmonic and harmonic st
 Features and the spectrum are not checked here (C3).
 
 C2, checked 2026-10-07: these numbers equal the old pipeline's (relative difference below 1e-12), for all
-3 molecules, GVPT2 (anharmonic states) and harmonic regime. Old side: EvaluationWorkflow set up as in
-test_full_integration_EVV_axes. Formaldehyde, GVPT2:
+3 molecules, GVPT2 (anharmonic states) and harmonic regime. Old side (deleted in E9; d93cc7b is the last commit
+with it): EvaluationWorkflow set up as in test_full_integration_EVV_axes. Formaldehyde, GVPT2:
     - 2664 full label sets, factor by factor (NON_AVRG, AVRG, VIBDIFF_TERMS, VIBENE_DENOM):
       old evaluate_single_index_dict = new evaluate_full_index_dict
     - 504 coefficients per (term, fixed labels): old evaluate_term_coeffs = new evaluate_term_coeff_sumover

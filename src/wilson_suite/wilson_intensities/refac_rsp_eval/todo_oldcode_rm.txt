@@ -52,7 +52,7 @@ B1  wilson_analysis/tests/test_integration_rendering.py, 224 lines, 4 tests, eac
     Covered there: the old pipeline end to end, and main's old renderer (render_spectrum, sim.render) on its
     result. The old renderer keeps its unit tests: test_render.py, test_spectrum_renderer.py,
     test_matplotlib_renderer.py (no old code; unchanged in the dry run). The new path end to end is covered by
-    test_pipeline.py (test_draw_spectrum_with_a_width_function: data file -> load -> evaluate -> draw) and
+    test_pipeline.py (test_spectrum_on_grid_with_a_width_function: data file -> load -> evaluate -> grid) and
     test_plot_spectrum.py.
     Options: delete the file; or rewrite it on the new path (that needs the new WilsonSimulation procedure: E6b,
     E7b).
@@ -99,7 +99,7 @@ D1  README.md, the quick start (lines 59-182), 4 steps:
 D2  examples/quick_start.ipynb, 11 cells, the README's flow: cell 4 some_reprs; cell 6 SpectralWindow, Box;
     cell 8 sim.evaluate, render_spectrum; cell 10 shows the svg.
 Options:
-    a  rewrite steps 3-4 with the new calls: MolSystemData.load, evaluate_response_terms, draw_spectrum,
+    a  rewrite steps 3-4 with the new calls: MolSystemData.load, evaluate_response_terms, spectrum_on_grid,
        plot_rsp_func (the flow of tests/example_plot_spectrum.py)
     b  keep the text, with a note: does not run until the new caller (E6b)
     c  leave both for E6b; the merge to main then carries a quick start that does not run

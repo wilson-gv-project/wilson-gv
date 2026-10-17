@@ -1,13 +1,13 @@
 """
-evaluate_response_terms and draw_spectrum, step by step. An example of use, not a test.
+evaluate_response_terms and spectrum_on_grid, step by step. An example of use, not a test.
 The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B = -w1 + w2.
 
     1. the inputs: terms as derive writes them, axes, data file, laser polarization, states choice
     2. load the data, once
     3. features (evaluate_response_terms): how many, and where they are
-    4. the spectrum on a grid (draw_spectrum), with a width per condition
-    5. what came out: the grid, the brightest point, the window as drawn (its features and their boxes)
-    6. another width, same rows: draw_spectrum draws again without computing the rows again
+    4. the spectrum on a grid (spectrum_on_grid), with a width per condition
+    5. what came out: the grid, the brightest point, the window as used (its features and their boxes)
+    6. another width, same rows: spectrum_on_grid runs again without computing the rows again
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.example_evaluate_response_terms
 """
@@ -21,9 +21,9 @@ from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
-    draw_spectrum,
     evaluate_response_terms,
     prop_names,
+    spectrum_on_grid,
 )
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
@@ -67,8 +67,8 @@ def main():
     boxes = partial(amplitude_half_widths, dynrange=1001.)
 
     t0 = time.perf_counter()
-    spec = draw_spectrum(result, window, dim_sizes, box_rule=boxes)
-    t_draw = time.perf_counter() - t0
+    spec = spectrum_on_grid(result, window, dim_sizes, box_rule=boxes)
+    t_on_grid = time.perf_counter() - t0
 
     # 5. what came out
     grid_axes = spec.grid_axes                    # 1D points per axis, cm-1
@@ -81,12 +81,12 @@ def main():
     print(f'brightest grid point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
           f'intensity {intensity[i, j]:.3e} au (the grid misses the peak centre on B)')
 
-    drawn = spec.spectral_window                  # the window as drawn: features with their boxes (by amplitude)
-    whole = sum(f.feat_box.contains_box(window) for f in drawn.full_features + drawn.contrib_features)  # type: ignore
-    print(f'drawn: {len(drawn.full_features)} features inside, {len(drawn.contrib_features)} outside with a box '
+    used = spec.spectral_window                   # the window as used: features with their boxes (by amplitude)
+    whole = sum(f.feat_box.contains_box(window) for f in used.full_features + used.contrib_features)  # type: ignore
+    print(f'window: {len(used.full_features)} features inside, {len(used.contrib_features)} outside with a box '
           f'that reaches in; {whole} boxes cover the whole window')
 
-    inside = drawn.full_features
+    inside = used.full_features
     print(f'\n{len(inside)} features inside the window, strongest first:')
     print(f'  {"A":>8} {"B":>8}  {"(a, b)":>7}  {"terms":<22} {"widths at peak":<16} {"peak intensity":>14}')
     for f in sorted(inside, key=lambda f: f.get_intensity(), reverse=True):
@@ -105,14 +105,14 @@ def main():
 
 
     # ---------------------------------------------------
-    # 6. another width, same rows: replace gives a new FeatureResult with the same table, draw_spectrum draws it
+    # 6. another width, same rows: replace gives a new FeatureResult with the same table, spectrum_on_grid uses it
     t0 = time.perf_counter()
-    wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
-    t_redraw = time.perf_counter() - t0
+    wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
+    t_again = time.perf_counter() - t0
 
     print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.grid_result) ** 2):.3e} au; '
           f'rows reused: {wider.feature_result.table is result.table}; '
-          f'rows {t_rows:.3f} s, first drawing {t_draw:.3f} s, drawing again {t_redraw:.3f} s')
+          f'rows {t_rows:.3f} s, first grid {t_on_grid:.3f} s, grid again {t_again:.3f} s')
 
 
 if __name__ == '__main__':

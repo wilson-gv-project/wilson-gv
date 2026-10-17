@@ -5,7 +5,7 @@ Two calls, from the terms derive writes (in pulse IDs) and the data:
     result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
                                      propagator_param=..., exclude_modes=...)
                                                                       rows and features: FeatureResult
-    spec   = draw_spectrum(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
+    spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
 A caller needs only these two calls. The inputs are plain values, derive's terms and a few small types (below).
 evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
 prop_names and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
@@ -27,7 +27,7 @@ Inputs
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
     propagator_param  the peak width, cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam).
-                      It sizes both the drawn peak and its box.
+                      It sizes both the peak on the grid and its box.
     exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): removed everywhere. Default: none.
     window            grid.Box, cm-1, one range per axis, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)})
     dim_sizes         grid points per axis, both window edges included, e.g. {'A': 501, 'B': 201}
@@ -48,15 +48,16 @@ Outputs
                         grid_axes       1D points per axis, cm-1
                         grid_result     complex amplitude in au, one per grid point; intensity = abs(grid_result)**2
                         grid_mesh       the grid points, one full array per axis: what the renderer reads
-                        spectral_window the features as drawn, each with its box
-                        feature_result  the FeatureResult it was drawn from
+                        spectral_window the features as evaluated on the grid, each with its box
+                        feature_result  the FeatureResult it was made from
 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
   │    zero coeff -> `zero`, no row
   │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states[states_choice]
-  │    always one point: compile_terms checked the motif (B7)
+  │    always one point: compile_terms checked the motif (B7). A term without conditions: the point without
+  │    axes, a flat background on every grid point (E12)
   v
 ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evaluate.build_contributions
   │ 4. group by (motif, location), add the coeffs
@@ -64,7 +65,7 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
   │ 5. peak width, boxes (a box rule, e.g. features.amplitude_half_widths), spectral window
   v
-spectrum array on a grid                                   draw_spectrum (evaluate.draw_window)
+spectrum array on a grid                                   spectrum_on_grid (evaluate.boxed_features_on_grid)
 """
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Sequence
@@ -80,8 +81,8 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    boxed_features_on_grid,
     build_contributions,
-    draw_window,
     evaluate_term_coeff_sumover,
     included_modes,
 )
@@ -119,8 +120,8 @@ class FeatureResult:
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # leaves() needs the first four, and sums over the modes left after exclude_modes; drawing needs the states
-    # (FeatureResult.states). References only: nothing is copied. compare=False: == leaves them out.
+    # leaves() needs the first four, and sums over the modes left after exclude_modes; spectrum_on_grid needs
+    # the states (FeatureResult.states). References only: nothing is copied. compare=False: == leaves them out.
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
@@ -139,7 +140,7 @@ class FeatureResult:
 
     @property
     def states(self) -> 'VibStatesData':
-        """The state set the rows were computed with, molsys.states[states_choice]: what draw_window needs."""
+        """The state set the rows were computed with, molsys.states[states_choice]: boxed_features_on_grid needs it."""
         if self.molsys is None or self.states_choice is None:
             raise ValueError('this FeatureResult has no data or states choice (made by hand?): compute_features '
                              'keeps them')
@@ -192,7 +193,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
         GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
     exclude_modes: modes removed everywhere, e.g. (5,): no peak and no summed value uses them (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
-    The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) in drawing.
+    The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) on the grid.
     raises ValueError if the terms resonate on more than one set of axes (check_one_axis_set).
     """
     check_one_axis_set(compiled)
@@ -219,7 +220,7 @@ def check_one_axis_set(compiled: Sequence['CompiledTerm']) -> None:
         {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}
     {A} and {B} are different sets: a term on A only is a stripe along B in an (A, B) plane.
     Terms without conditions (key (), E12) do not count here.
-    Without this check such a mix passes compiling (B7 checks each term on its own axes) and fails only in drawing.
+    Without this check such a mix passes compiling (B7 checks each term on its own axes) and fails only on the grid.
     """
     term_ids = {axis_set: ids for axis_set, ids in _term_ids_by_axis_set(t.cmp_resmotf for t in compiled).items()
                 if axis_set}
@@ -233,6 +234,8 @@ def terms_by_axis_set(terms: Sequence['VibPerturbedTerm'],
     """
     The term ids (index in `terms`) grouped by the axes their resonance conditions use in the chosen axes, e.g.
     the 3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: key ().
+    They are a flat background, the same on any grid (E12), and check_one_axis_set does not count them, so they
+    can join the call of any set, e.g. IR absorption: {(): [0, 1, 2], ('A',): [3, 4]}, all 5 terms in one call.
     terms: as derive writes them (pulse IDs); grouping needs the translation to `axes`, so it is done here (copies).
     For the caller: one evaluate_response_terms call per set, e.g.
         for axis_set, ids in terms_by_axis_set(terms, axes).items():
@@ -327,7 +330,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                                                             rank and laser_pol)
         4. rows, zero pairs, features                       compute_features (raises first if the terms resonate
                                                             on more than one set of axes: terms_by_axis_set)
-    The spectrum on a grid: draw_spectrum(result, window, dim_sizes, box_rule=...), as often as needed; the rows stay.
+    The spectrum on a grid: spectrum_on_grid(result, window, dim_sizes, box_rule=...), as often as needed; the rows
+    stay.
 
     axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
     molsys_data       MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
@@ -352,12 +356,12 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
 @dataclass(frozen=True)
 class EvalRspResult:
     """
-    The spectrum on a grid, made by draw_spectrum. Every field is set.
+    The spectrum on a grid, made by spectrum_on_grid. Every field is set.
     feature_result   rows, features, and what they came from (molsys, polarization recipe, states_choice)
     grid_axes        1D points per axis, cm-1, both window edges included, e.g. A and B with 201 points each
     grid_result      complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
                      grid_axes, e.g. shape (201, 201). intensity = abs(grid_result)**2
-    spectral_window  the window as drawn: its features, each with its box (each drawn on its own box only).
+    spectral_window  the window as used: its features, each with its box (each evaluated on its own box only).
                      full_features: inside the window; contrib_features: outside, with a box that reaches in.
     grid_mesh        (property) the grid points as one full array per axis (ij meshgrid), grid_mesh['A'][i, j]:
                      what the old EvaluatedSpectrum.axes held and the renderer reads
@@ -372,17 +376,17 @@ class EvalRspResult:
         return dict(zip(self.grid_axes, np.meshgrid(*self.grid_axes.values(), indexing='ij')))
 
 
-def draw_spectrum(feature_result: FeatureResult,
+def spectrum_on_grid(feature_result: FeatureResult,
                   window: 'Box',
                   dim_sizes: dict[str, int],
                   *,
                   box_rule: BoxRule) -> EvalRspResult:
     """
-    The features of feature_result on a grid over `window`: boxes, grid, drawing. The rows are not computed
-    again (the slow part: build_contributions), so a new window, grid, width or box rule runs only the drawing:
+    The features of feature_result on a grid over `window`: boxes, grid, the values on it. The rows are not computed
+    again (the slow part: build_contributions), so a new window, grid, width or box rule runs only the grid part:
         boxes = partial(amplitude_half_widths, dynrange=500.)
-        again = draw_spectrum(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
-        wider = draw_spectrum(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
+        again = spectrum_on_grid(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
+        wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
     new width, on first use (features_from_rows: 0.02 s for 3524 features on ACDM, F2).
 
@@ -401,5 +405,5 @@ def draw_spectrum(feature_result: FeatureResult,
     half_widths = box_rule(window, features)                                              # boxes: width at the peak
     spectral_window = SpectralWindow.from_features(window, features, half_widths)
     grid_axes, _ = spectral_window.sample_grid(dim_sizes)
-    grid_result = draw_window(spectral_window, feature_result.states, grid_axes)          # width on the grid
+    grid_result = boxed_features_on_grid(spectral_window, feature_result.states, grid_axes)   # width on the grid
     return EvalRspResult(feature_result, grid_axes, grid_result, spectral_window)

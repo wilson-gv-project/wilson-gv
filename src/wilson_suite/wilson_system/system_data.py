@@ -11,7 +11,7 @@ from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import (
-        VibDiffTerm,  # here and term_parts and vibene_differences
+        VibDiffTerm,
     )
 
 # What every evaluation reads besides the properties: MolSystemData.load requests these from every source.

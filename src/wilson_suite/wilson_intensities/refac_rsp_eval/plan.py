@@ -37,9 +37,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from wilson_suite.wilson_derive.abstractions import (
-    PolProp,  # here and term_parts
-    ResonanceCondition,  # here and term_parts
-    VibDiffTerm,  # here and term_parts and vibene_differences
+    PolProp,
+    ResonanceCondition,
+    VibDiffTerm,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
@@ -457,8 +457,8 @@ class CompiledTerm:
         the condition matrix needs only the axes, not the energies.
         e.g. conditions on A and on B -> a point in 2D; on B only -> a point in 1D (fine);
              one condition on A + B -> a line; two conditions on B only -> no point or the same one twice.
-        A term without conditions passes: it has no place on the spectrum (solve_LSE_motif raises
-        if it gets there), but its other parts can still be computed.
+        A term without conditions passes: it is a flat background (todo.txt E12), the same on every grid
+        point (solve_LSE_motif gives it the location without axes).
 
         TODO: enable possibility of missing parts
         """

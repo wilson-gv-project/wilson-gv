@@ -17,10 +17,10 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     AvrgTensor,
     _make_func_to_compute_avrg,
+    all_features_on_grid,
+    boxed_features_on_grid,
     build_contributions,
     calculate_avrg_tensor_einsum,
-    draw_all,
-    draw_window,
     eval_avrg_per_indexdict,
     eval_feature_on_grid,
     eval_non_avrg_per_indexdict,
@@ -71,8 +71,10 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0_eigval,
     E1_eigval,
     ab_term,
+    flat_term,
     get_box_extent,
     polprop,
+    row,
     toy_term,
     vibdiff,
 )
@@ -215,9 +217,9 @@ def test_solve_LSE_motif_single_axis_other_than_A(params_obj, states):
     assert location == ResLocPoint({'B': -E0})
 
 
-def test_solve_LSE_motif_empty_motif_raises(params, states):
-    with pytest.raises(ValueError, match='no resonance conditions'):
-        solve_LSE_motif(ResonanceMotif(()), params, states)
+def test_solve_LSE_motif_empty_motif_is_the_location_without_axes(params, states):
+    """A term without resonance conditions is a flat background (todo.txt E12): no axes, nothing to solve."""
+    assert solve_LSE_motif(ResonanceMotif(()), params, states) == ResLocPoint({})
 
 
 ## Evaluation kernels -------------------------------------------------------
@@ -1006,6 +1008,22 @@ def test_build_contributions_without_terms_is_empty(molsys):
     assert (len(rows), zero) == (0, [])
 
 
+def test_build_contributions_term_without_conditions_is_one_row_summing_every_label(molsys_a1_zero):
+    """
+    A flat background (todo.txt E12): no label to fix, so one index set, {}, at the location without axes.
+    Its coefficient sums every (a, b, c): the rows and zero pairs of ab_term (the same summand) added up.
+    """
+    resonant, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+
+    rows, zero = build_contributions([flat_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+
+    [flat] = rows
+    assert zero == []
+    assert (flat.term_id, flat.motif, flat.params, flat.location) == (0, ResonanceMotif(()), ParameterSet({}),
+                                                                     ResLocPoint({}))
+    assert flat.coeff == pytest.approx(sum(r.coeff for r in resonant), rel=1e-12)
+
+
 # -- the numbers in a row: coeff and location --------------------------------------
 
 def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys_a1_zero):
@@ -1457,7 +1475,7 @@ def test_eval_feature_on_grid_propagator_param_function_gives_each_condition_its
 
 
 def test_eval_feature_on_grid_propagator_param_function_of_a_constant_equals_the_number(states):
-    """lambda vd, freqs: 5. draws the same as propagator_param=5. MOTIF_AB, 3x3 grid around the peak."""
+    """lambda vd, freqs: 5. gives the same as propagator_param=5. MOTIF_AB, 3x3 grid around the peak."""
     number = feature_at_solved_location(MOTIF_AB, PS_01, states)
     function = feature_at_solved_location(MOTIF_AB, PS_01, states, propagator_param=lambda vd, freqs: 5.)
     grid = grid_around(number.location.as_dict(), G_CM)
@@ -1482,7 +1500,7 @@ def test_eval_feature_on_grid_propagator_param_function_can_depend_on_the_freque
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
 def test_eval_feature_on_grid_peak_matches_get_intensity_with_a_propagator_param_function(motif, params_obj, states):
     """
-    E5: the drawn peak and get_intensity (so the box size) take one width. Here a width per condition,
+    E5: the peak on the grid and get_intensity (so the box size) take one width. Here a width per condition,
     1 % of |E| (MOTIF_AB, a=0, b=1: 16 and 5 cm-1), plus a part that changes with A.
     abs(): MOTIF_MIXED has E = -1000 on both conditions.
     """
@@ -1508,28 +1526,43 @@ def test_eval_feature_on_grid_needs_rows(states):
         eval_feature_on_grid(f, states, {'A': np.zeros(3)})
 
 
-# -- draw_all -------------------------------------------------------------------
+def flat_feature(coeff: float = 0.3) -> SpectralFeature:
+    """A flat background (todo.txt E12): one row of a term without conditions, at the location without axes."""
+    return SpectralFeature(location=ResLocPoint({}), rows=(row(coeff, location=ResLocPoint({})),),
+                           propagator_param=G_CM)
+
+
+@pytest.mark.parametrize('grid, shape', [({'A': np.zeros((4, 3)), 'B': np.ones((4, 3))}, (4, 3)),
+                                         ({'A': 1600., 'B': 500.}, ())])
+def test_eval_feature_on_grid_flat_feature_is_its_coefficient_on_every_point(grid, shape, states):
+    value = eval_feature_on_grid(flat_feature(0.3), states, grid)
+
+    assert np.shape(value) == shape
+    np.testing.assert_array_equal(value, np.full(shape, 0.3 + 0j))
+
+
+# -- all_features_on_grid -------------------------------------------------------------------
 # Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1600, B = 500.  With a=1, b=0 (PS_10): MOTIF_A at A = 1100,
 # a ridge along B.
 
-def test_draw_all_is_the_sum_of_the_features_on_the_whole_grid(states):
+def test_all_features_on_grid_is_the_sum_of_the_features_on_the_whole_grid(states):
     peak = feature_at_solved_location(MOTIF_AB, PS_01, states)
     ridge = feature_at_solved_location(MOTIF_A, PS_10, states)
     coords = {'A': np.array([1100., 1600.]), 'B': np.array([495., 500., 505.])}
     mesh = dict(zip(coords, np.meshgrid(*coords.values(), indexing='ij')))
 
-    value = draw_all([peak, ridge], states, coords)
+    value = all_features_on_grid([peak, ridge], states, coords)
 
     expected = eval_feature_on_grid(peak, states, mesh) + eval_feature_on_grid(ridge, states, mesh)
     np.testing.assert_allclose(value, expected)
 
 
-def test_draw_all_index_i_j_is_the_point_A_i_B_j(states):
+def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(states):
     """ij indexing: value[i, j] belongs to A = coords['A'][i], B = coords['B'][j]; A has 5 points, B has 3."""
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
     coords = {'A': 1600. + np.array([-10., -5., 0., 5., 10.]), 'B': 500. + np.array([-5., 0., 5.])}
 
-    value = draw_all([f], states, coords)
+    value = all_features_on_grid([f], states, coords)
 
     assert value.shape == (5, 3)
     for i, a in enumerate(coords['A']):
@@ -1537,7 +1570,7 @@ def test_draw_all_index_i_j_is_the_point_A_i_B_j(states):
             assert value[i, j] == pytest.approx(eval_feature_on_grid(f, states, {'A': a, 'B': b}))  # type: ignore
 
 
-def test_draw_all_adds_amplitudes_so_opposite_features_cancel(states):
+def test_all_features_on_grid_adds_amplitudes_so_opposite_features_cancel(states):
     """
     Same place, same shape, coefficients +0.3 and -0.3: the amplitudes cancel everywhere.
     Adding intensities instead would give twice the intensity of one feature.
@@ -1546,22 +1579,22 @@ def test_draw_all_adds_amplitudes_so_opposite_features_cancel(states):
     minus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(-0.3,))
     coords = {'A': np.array([1595., 1600.]), 'B': np.array([500., 505.])}
 
-    np.testing.assert_allclose(draw_all([plus, minus], states, coords), 0.)
+    np.testing.assert_allclose(all_features_on_grid([plus, minus], states, coords), 0.)
 
 
-def test_draw_all_without_features_is_zero_on_the_grid(states):
-    value = draw_all([], states, {'A': np.zeros(4), 'B': np.zeros(2)})
+def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
+    value = all_features_on_grid([], states, {'A': np.zeros(4), 'B': np.zeros(2)})
 
     assert value.shape == (4, 2)
     assert value.dtype == complex
     assert not value.any()
 
 
-# -- draw_window ----------------------------------------------------------------
+# -- boxed_features_on_grid ----------------------------------------------------------------
 # MOTIF_A (one condition, on A) peaks: a=0, b=0 (PS_00) at A = 950; PS_10 at 1100; PS_01 at 1600.
 # Width G_CM = 5 cm-1. Half-widths given by hand, except in the amplitude_half_widths tests.
 
-def test_draw_window_one_feature_is_draw_all_inside_its_box_and_zero_outside(states):
+def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_box_and_zero_outside(states):
     """
     MOTIF_AB peak at A = 1600, B = 500, half-width 55: box (1545, 1655) x (445, 555).
     Grid A = 1500 ... 1700 (201 points), B = 300 ... 700 (401 points): the box covers a different part of each axis.
@@ -1570,85 +1603,88 @@ def test_draw_window_one_feature_is_draw_all_inside_its_box_and_zero_outside(sta
     window = SpectralWindow.from_features(Box({'A': (1500., 1700.), 'B': (300., 700.)}), [f], [55.])
     coords, _ = window.sample_grid({'A': 201, 'B': 401})
 
-    value = draw_window(window, states, coords)
+    value = boxed_features_on_grid(window, states, coords)
 
     inside = np.zeros(value.shape, dtype=bool)
     inside[box_slices(window.full_features[0].feat_box, coords)] = True  # type: ignore
-    np.testing.assert_allclose(value[inside], draw_all([f], states, coords)[inside])
+    np.testing.assert_allclose(value[inside], all_features_on_grid([f], states, coords)[inside])
     assert not value[~inside].any()
 
 
-def test_draw_window_overlapping_boxes_add_their_amplitudes(states):
+def test_boxed_features_on_grid_overlapping_boxes_add_their_amplitudes(states):
     """
     A weak peak next to a strong one: PS_00 at A = 950 (coeff 0.03), PS_10 at A = 1100 (coeff 0.3).
     Half-widths 550: boxes (400, 1500) and (550, 1650) both cover the grid A = 900 ... 1150, so nothing is cut
-    off: the result is draw_all's, the strong peak's tail under the weak peak included.
+    off: the result is all_features_on_grid's, the strong peak's tail under the weak peak included.
     """
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [550., 550.])
     coords, _ = window.sample_grid({'A': 251})
 
-    value = draw_window(window, states, coords)
+    value = boxed_features_on_grid(window, states, coords)
 
-    np.testing.assert_allclose(value, draw_all([weak, strong], states, coords))
+    np.testing.assert_allclose(value, all_features_on_grid([weak, strong], states, coords))
 
 
-def test_draw_window_draws_each_feature_on_its_own_box_only(states):
+def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(states):
     """
-    The strong peak's box (550) covers the grid, the weak peak's box is (940, 960). The weak peak is drawn on its
-    own box only, not on the strong peak's box around it (as drawing by domains did until 2026-10-14).
+    The strong peak's box (550) covers the grid, the weak peak's box is (940, 960). The weak peak is evaluated on
+    its own box only, not on the strong peak's box around it (as the domains did until 2026-10-14).
     """
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [10., 550.])
     coords, _ = window.sample_grid({'A': 251})        # A = 900, 901, ..., 1150
 
-    value = draw_window(window, states, coords)
+    value = boxed_features_on_grid(window, states, coords)
 
     weak_box = (coords['A'] >= 940.) & (coords['A'] <= 960.)
-    expected = draw_all([strong], states, coords)
-    expected[weak_box] += draw_all([weak], states, {'A': coords['A'][weak_box]})
+    expected = all_features_on_grid([strong], states, coords)
+    expected[weak_box] += all_features_on_grid([weak], states, {'A': coords['A'][weak_box]})
     np.testing.assert_allclose(value, expected)
 
 
-def test_draw_window_differs_from_draw_all_only_by_the_cut_off_tails(states):
+def test_boxed_features_on_grid_differs_from_all_features_on_grid_only_by_the_cut_off_tails(states):
     """
     Peaks at A = 1100 and 1600, half-widths 55: boxes (1045, 1155) and (1545, 1655).
-    draw_window leaves each feature out beyond its box, draw_all does not. A Lorentzian only gets smaller
-    further out, so the difference is at most the sum of the two features' values at their box edges.
+    boxed_features_on_grid leaves each feature out beyond its box, all_features_on_grid does not. A Lorentzian only
+    gets smaller further out, so the difference is at most the sum of the two features' values at their box edges.
     """
     features = [feature_at_solved_location(MOTIF_A, PS_10, states), feature_at_solved_location(MOTIF_A, PS_01, states)]
     window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), features, [55., 55.])
     coords, _ = window.sample_grid({'A': 701})
 
-    difference = draw_window(window, states, coords) - draw_all(features, states, coords)
+    difference = boxed_features_on_grid(window, states, coords) - all_features_on_grid(features, states, coords)
 
     at_box_edge = [abs(eval_feature_on_grid(f, states, {'A': f.location['A'] + get_box_extent(f)}))  # type: ignore
                    for f in window.full_features]
     assert 0. < np.abs(difference).max() <= sum(at_box_edge)
 
 
-def draw_with_amplitude_boxes(features, window: Box, n_points: int, states, dynrange: float):
-    """(the window as drawn, intensity of draw_window, intensity of draw_all), boxes from amplitude_half_widths"""
+def on_grid_with_amplitude_boxes(features, window: Box, n_points: int, states, dynrange: float):
+    """
+    (the window as used, intensity of boxed_features_on_grid, intensity of all_features_on_grid), boxes from
+    amplitude_half_widths
+    """
     spectral_window = SpectralWindow.from_features(window, features,
                                                    amplitude_half_widths(window, features, dynrange=dynrange))
     coords, _ = spectral_window.sample_grid({'A': n_points})
-    return (spectral_window, abs(draw_window(spectral_window, states, coords)) ** 2,
-            abs(draw_all(features, states, coords)) ** 2)
+    return (spectral_window, abs(boxed_features_on_grid(spectral_window, states, coords)) ** 2,
+            abs(all_features_on_grid(features, states, coords)) ** 2)
 
 
-def test_draw_window_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_strong_peak(states):
+def test_boxed_features_on_grid_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_strong_peak(states):
     """
     Strong peak at A = 1100 (coeff 0.3), weak at A = 950 (coeff 0.003). dynrange 101, eps 0.1 (default):
-    the strong box covers the grid, the weak one is 100.9 cm-1. Error against draw_all: at most 0.1 floors
+    the strong box covers the grid, the weak one is 100.9 cm-1. Error against all_features_on_grid: at most 0.1 floors
     (floor: max / dynrange), measured 0.034. The boxes of before 2026-10-14 (5 * sqrt(100) * 1.1 = 55 for both):
     0.8 floors.
     """
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.003,))
 
-    window, intensity, reference = draw_with_amplitude_boxes([strong, weak], Box({'A': (850., 1200.)}), 351, states,
+    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1200.)}), 351, states,
                                                              dynrange=101.)
 
     floor = reference.max() / 101.
@@ -1656,43 +1692,58 @@ def test_draw_window_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_str
     assert 0. < np.abs(intensity - reference).max() < 0.1 * floor
 
 
-def test_draw_window_with_amplitude_boxes_draws_a_strong_peak_outside_the_window(states):
+def test_boxed_features_on_grid_with_amplitude_boxes_includes_a_strong_peak_outside_the_window(states):
     """
     Window A = 850 ... 1050 holds the weak peak (A = 950, coeff 0.03); the strong one (A = 1100, coeff 0.3) is
-    outside. Its box reaches in, so it is drawn: error below 0.1 floors (measured 0). With the boxes of before
+    outside. Its box reaches in, so it is on the grid: error below 0.1 floors (measured 0). With the boxes of before
     2026-10-14 (55 cm-1 for both), its tail was cut at 1045: 58 floors, and a visible point 511 % off.
     """
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
 
-    window, intensity, reference = draw_with_amplitude_boxes([strong, weak], Box({'A': (850., 1050.)}), 201, states,
+    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1050.)}), 201, states,
                                                              dynrange=101.)
 
     assert window.contrib_features == [strong]
     assert np.abs(intensity - reference).max() < 0.1 * reference.max() / 101.
 
 
-def test_draw_window_skips_a_feature_whose_box_is_outside_the_grid(states):
+def test_boxed_features_on_grid_skips_a_feature_whose_box_is_outside_the_grid(states):
     """The grid covers only A = 1000 ... 1200 of the window; the peak at 1600 (box 1545 ... 1655) adds nothing."""
     f = feature_at_solved_location(MOTIF_A, PS_01, states)
     window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), [f], [55.])
 
-    value = draw_window(window, states, {'A': np.linspace(1000., 1200., 201)})
+    value = boxed_features_on_grid(window, states, {'A': np.linspace(1000., 1200., 201)})
 
     assert value.shape == (201,)
     assert not value.any()
 
 
-def test_draw_window_needs_feature_boxes(states):
+def test_boxed_features_on_grid_needs_feature_boxes(states):
     window = SpectralWindow(Box({'A': (1000., 1700.)}), full_features=[feature_at_solved_location(MOTIF_A, PS_01, states)])
 
     with pytest.raises(ValueError, match='no box'):
-        draw_window(window, states, {'A': np.linspace(1000., 1700., 11)})
+        boxed_features_on_grid(window, states, {'A': np.linspace(1000., 1700., 11)})
 
 
-def test_draw_window_without_features_is_zero_on_the_grid(states):
-    value = draw_window(SpectralWindow(Box({'A': (0., 10.)})), states, {'A': np.linspace(0., 10., 11)})
+def test_boxed_features_on_grid_without_features_is_zero_on_the_grid(states):
+    value = boxed_features_on_grid(SpectralWindow(Box({'A': (0., 10.)})), states, {'A': np.linspace(0., 10., 11)})
 
     assert value.shape == (11,)
     assert value.dtype == complex
     assert not value.any()
+
+
+def test_boxed_features_on_grid_adds_a_flat_feature_on_every_grid_point(states):
+    """
+    The peak of test_boxed_features_on_grid_one_feature_..., plus a flat background of 0.3 (todo.txt E12): its box
+    is the window, so the grid is the peak's grid plus 0.3 everywhere, outside the peak's box too.
+    """
+    peak, box = feature_at_solved_location(MOTIF_AB, PS_01, states), Box({'A': (1500., 1700.), 'B': (300., 700.)})
+    alone = SpectralWindow.from_features(box, [peak], [55.])
+    with_flat = SpectralWindow.from_features(box, [peak, flat_feature(0.3)], [55., 0.])
+    coords, _ = alone.sample_grid({'A': 201, 'B': 401})
+
+    value = boxed_features_on_grid(with_flat, states, coords)
+
+    np.testing.assert_allclose(value, boxed_features_on_grid(alone, states, coords) + 0.3)

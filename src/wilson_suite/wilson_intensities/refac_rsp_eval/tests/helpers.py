@@ -75,7 +75,8 @@ def toy_term() -> CompiledTerm:
 # sign s_j ('-B' -> s = -1). Fixing the mode labels (a, b, ...) to modes turns the motif into
 # a linear system  LHS @ w = RHS  whose solution is where on the axes the term resonates.
 #
-# The four motifs below are the ones used for the pre-refactor amplitudes/resonances.py.
+# The four motifs below are the ones the old code used in its tests (deleted in E9; d93cc7b is the last commit
+# with them).
 # With toy_states() and a=0, b=1:  E_a = E0, E_b = E1, E_ab = E01, E_0 = 0.
 
 MOTIF_AB = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))        # one axis per condition
@@ -104,6 +105,14 @@ PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})
 def ab_term(motif=MOTIF_AB) -> CompiledTerm:
     """toy_term() with resonance labels a, b (fixed by the index sets) and summation label c."""
     return replace(toy_term(), cmp_resmotf=ResonanceMotif.from_tuples(motif), idx_summ=('c',), idx_nonsumm=('a', 'b'))
+
+
+def flat_term() -> CompiledTerm:
+    """
+    toy_term() as derive writes a term without resonance conditions (todo.txt E12): no label to fix, a, b and c
+    all summed. A flat background: the same amplitude on every grid point.
+    """
+    return replace(toy_term(), idx_summ=('a', 'b', 'c'), idx_nonsumm=())
 
 
 # --- spectral features (grid.py, features.py) ---

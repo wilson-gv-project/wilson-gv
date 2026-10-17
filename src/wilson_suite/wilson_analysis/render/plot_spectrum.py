@@ -41,11 +41,11 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
                    shape: 1D the points themselves; 2D e.g. np.meshgrid(a_points, b_points, indexing='ij'),
                    EvalRspResult.grid_mesh or the old spec_eval_setup.grid
     dynrange       the plot's dynamic range, top / lowest intensity shown, e.g. 500. For a spectrum from
-                   draw_spectrum, use the box rule's dynrange: with a larger one the plot shows where the boxes
+                   spectrum_on_grid, use the box rule's dynrange: with a larger one the plot shows where the boxes
                    cut the tails.
     reference_max  au; None: each plot on its own scale. A number: intensity / reference_max, so several spectra
                    share one scale; above the reference: 1D above 1, 2D over_color.
-    ax             draw into this axes; None: a new figure
+    ax             plot into this axes; None: a new figure
     axis_labels    e.g. {'A': r'$\\omega_1/2\\pi c$, cm$^{-1}$'}; default: the axis name with cm-1
     nlevels, cmap, below_color, over_color: 2D only
     returns (fig, ax, contour, colorbar) for 2D, (fig, ax, line, None) for 1D; e.g. ax.set_yscale('linear')
@@ -54,7 +54,7 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
     if np.iscomplexobj(intensity):
         raise TypeError('intensity must be real, e.g. abs(amplitude)**2 (plot_rsp_func takes the amplitudes)')
     if intensity.ndim not in (1, 2) or len(grid) != intensity.ndim:
-        raise ValueError(f'plot_spectrum draws 1D and 2D spectra, one grid axis per dimension: got intensity of '
+        raise ValueError(f'plot_spectrum plots 1D and 2D spectra, one grid axis per dimension: got intensity of '
                          f'shape {intensity.shape} and the axes {list(grid)}')
     for name, points in grid.items():
         if np.shape(points) != intensity.shape:
@@ -106,7 +106,7 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
 
 def plot_rsp_func(spec: 'EvalRspResult', *, dynrange: float, **options):
     """
-    The new evaluator's spectrum (draw_spectrum), 1D or 2D: plot_spectrum of |spec.grid_result|^2 on
+    The new evaluator's spectrum (spectrum_on_grid), 1D or 2D: plot_spectrum of |spec.grid_result|^2 on
     spec.grid_mesh.
         fig, ax, contour, cbar = plot_rsp_func(spec, dynrange=500.)
     options: the keyword arguments of plot_spectrum, e.g. reference_max, ax, axis_labels

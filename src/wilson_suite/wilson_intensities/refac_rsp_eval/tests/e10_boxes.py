@@ -1,21 +1,21 @@
 """
 E10: the box sizes (a box rule and its knobs: features.amplitude_half_widths or intensity_half_widths, the
-box_rule of draw_spectrum) against draw_all (no cut). Two lists of settings:
+box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists of settings:
     SETTINGS  tune the knobs of amplitude_half_widths
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes
     RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity (the old code's
               rule) unscaled, scaled, and scaled with minimum_box_padding 10 cm-1 (the old setup's padding)
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes rules
-Each takes a few minutes, mostly draw_all on ACDM.
+Each takes a few minutes, mostly all_features_on_grid on ACDM.
 
-Per case, draw_all once (the reference: slow, about 70 s on ACDM in the quick_start window), then draw_spectrum
-with each setting. Scores per setting:
+Per case, all_features_on_grid once (the reference: slow, about 70 s on ACDM in the quick_start window), then
+spectrum_on_grid with each setting. Scores per setting:
     err      the largest intensity error, in floors (floor = max / dynrange: the faintest the plot shows)
     worst    the worst relative error at a grid point above the floor (a point the plot shows)
     >10%     the share of those points more than 10 % off
-    draw s   draw_spectrum's time (boxes + drawing)
-    drawn    features drawn (inside the window, or outside with a box that reaches in)
-    whole    of those, the ones whose box covers the whole window: the costly ones (one full-grid draw each)
+    grid s   spectrum_on_grid's time (boxes + the values on the grid)
+    kept     features evaluated on the grid (inside the window, or outside with a box that reaches in)
+    whole    of those, the ones whose box covers the whole window: the costly ones (each evaluated on the full grid)
 
 Cases: formaldehyde and ACDM; the quick_start window (A (700, 3400), B (10, 3500), 700 x 700 points) and a zoom
 (+-150 cm-1 around the strongest feature inside it, 301 x 301 points). The 14 EVV terms, anharmonic states,
@@ -24,11 +24,11 @@ gamma 4.7 cm-1.
 A setting: rule (the box rule; amplitude_half_widths if not given) and its knobs, dynrange required. To tune: edit
 SETTINGS or RULES and run as above, or, from a notebook, with your own result and window:
     from wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes import reference, score
-    ref = reference(result, window, dim_sizes)                                  # once: draw_all
+    ref = reference(result, window, dim_sizes)                                  # once: all_features_on_grid
     score(result, window, dim_sizes, ref, dynrange=500., eps=0.3, max_cm=300.)  # as often as wanted
     score(result, window, dim_sizes, ref, intensity_half_widths, dynrange=500.) # the old code's rule
 
-Result 2026-10-14 (todo.txt E10, also the boxes before E10 and drawing by domains): with eps 0.1, at most
+Result 2026-10-14 (todo.txt E10, also the boxes before E10 and the evaluation by domains): with eps 0.1, at most
 0.13 floors, the worst visible point 2.2 % off, no visible point more than 10 % off; eps 0.3: 0.47 floors, 4.9 %.
 RULES, 2026-10-14: amplitude 0.03-0.13 floors (2.2 %); intensity unscaled 1.7-12 floors, scaled 0.7-39 floors
 (visible points up to 229 % off), with padding 10 about the same.
@@ -39,7 +39,7 @@ from functools import partial
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import draw_all
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import all_features_on_grid
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     BoxRule,
     amplitude_half_widths,
@@ -48,9 +48,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
-    draw_spectrum,
     evaluate_response_terms,
     prop_names,
+    spectrum_on_grid,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
@@ -81,26 +81,26 @@ SHORT = {'scale_wrt_max_intensity': 'scaled', 'minimum_box_padding': 'padding', 
 
 
 def reference(result: FeatureResult, window: Box, dim_sizes: dict[str, int]) -> np.ndarray:
-    """the intensity with nothing cut off: every feature on the whole grid (draw_all), on draw_spectrum's grid"""
+    """the intensity with nothing cut off: all_features_on_grid, on spectrum_on_grid's grid"""
     coords, _ = window.make_grid(dim_sizes)
-    return np.abs(draw_all(result.features, result.states, coords)) ** 2
+    return np.abs(all_features_on_grid(result.features, result.states, coords)) ** 2
 
 
 def score(result: FeatureResult, window: Box, dim_sizes: dict[str, int], reference_intensity: np.ndarray,
           rule: BoxRule = amplitude_half_widths, **knobs) -> dict:
-    """draw_spectrum with `rule` and its `knobs` (dynrange required) against the reference: the scores above"""
+    """spectrum_on_grid with `rule` and its `knobs` (dynrange required) against the reference: the scores above"""
     t0 = time.perf_counter()
-    spec = draw_spectrum(result, window, dim_sizes, box_rule=partial(rule, **knobs))
-    t_draw = time.perf_counter() - t0
+    spec = spectrum_on_grid(result, window, dim_sizes, box_rule=partial(rule, **knobs))
+    t_on_grid = time.perf_counter() - t0
 
     intensity = np.abs(spec.grid_result) ** 2
     floor = reference_intensity.max() / knobs['dynrange']
     visible = reference_intensity > floor
     err = np.abs(intensity - reference_intensity)
     rel = err[visible] / reference_intensity[visible]
-    drawn = spec.spectral_window.full_features + spec.spectral_window.contrib_features
-    return {'err': err.max() / floor, 'worst': rel.max(), '>10%': np.mean(rel > 0.1), 'draw s': t_draw,
-            'drawn': len(drawn), 'whole': sum(f.feat_box.contains_box(window) for f in drawn)}  # type: ignore
+    kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
+    return {'err': err.max() / floor, 'worst': rel.max(), '>10%': np.mean(rel > 0.1), 'grid s': t_on_grid,
+            'kept': len(kept), 'whole': sum(f.feat_box.contains_box(window) for f in kept)}  # type: ignore
 
 
 def label(rule: BoxRule, knobs: dict) -> str:
@@ -113,14 +113,15 @@ def run_case(name: str, result: FeatureResult, window: Box, dim_sizes: dict[str,
     t0 = time.perf_counter()
     reference_intensity = reference(result, window, dim_sizes)
     inside = sum(f.is_inside(window) for f in result.features)
-    print(f'\n{name}: {len(result.features)} features, {inside} inside; draw_all {time.perf_counter() - t0:.1f} s')
-    print(f'  {"setting":<48} {"err":>6} {"worst":>7} {">10%":>6} {"draw s":>7} {"drawn":>6} {"whole":>6}')
+    print(f'\n{name}: {len(result.features)} features, {inside} inside; '
+          f'all_features_on_grid {time.perf_counter() - t0:.1f} s')
+    print(f'  {"setting":<48} {"err":>6} {"worst":>7} {">10%":>6} {"grid s":>7} {"kept":>6} {"whole":>6}')
     for setting in settings:
         knobs = dict(setting)
         rule = knobs.pop('rule', amplitude_half_widths)
         s = score(result, window, dim_sizes, reference_intensity, rule, **knobs)
-        print(f'  {label(rule, knobs):<48} {s["err"]:>6.2f} {s["worst"]:>7.1%} {s[">10%"]:>6.1%} {s["draw s"]:>7.2f} '
-              f'{s["drawn"]:>6} {s["whole"]:>6}')
+        print(f'  {label(rule, knobs):<48} {s["err"]:>6.2f} {s["worst"]:>7.1%} {s[">10%"]:>6.1%} {s["grid s"]:>7.2f} '
+              f'{s["kept"]:>6} {s["whole"]:>6}')
 
 
 def zoom_around_strongest(result: FeatureResult, window: Box) -> tuple[Box, dict[str, int]]:

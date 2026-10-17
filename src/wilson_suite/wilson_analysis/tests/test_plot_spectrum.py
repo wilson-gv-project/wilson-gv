@@ -80,7 +80,7 @@ def test_2d_first_axis_along_x_second_along_y():
     np.testing.assert_allclose(np.asarray(top_band.vertices).mean(axis=0), (30., -10.), atol=1.)
 
 
-def test_2d_draws_into_the_given_axes_with_the_given_labels():
+def test_2d_plots_into_the_given_axes_with_the_given_labels():
     fig, ax = plt.subplots()
 
     fig_out, ax_out, _, _ = plot_spectrum(*toy_spectrum(), dynrange=100., ax=ax, axis_labels={'A': 'w1'})
@@ -127,7 +127,7 @@ def test_raises_for_3d():
     cube = np.ones((2, 3, 4))
     grid = dict(zip('ABC', np.meshgrid(np.arange(2.), np.arange(3.), np.arange(4.), indexing='ij')))
 
-    with pytest.raises(ValueError, match=r'draws 1D and 2D spectra.*shape \(2, 3, 4\)'):
+    with pytest.raises(ValueError, match=r'plots 1D and 2D spectra.*shape \(2, 3, 4\)'):
         plot_spectrum(cube, grid, dynrange=100.)
 
 

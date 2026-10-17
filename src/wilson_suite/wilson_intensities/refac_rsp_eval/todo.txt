@@ -22,7 +22,7 @@ the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (
 Tests (run 2026-10-17, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   684     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+    refac_rsp_eval   706     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
     rest of src      218     1     1      -   none
     tests/ (root)      4    16     -      -   none
@@ -39,15 +39,15 @@ Status (2026-10-17)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.7 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-Deleting the old code (E9): stages 1, 2, 4, 5 done; stage 6 (comments) open; stage 3 (old scripts and tests,
-README quick start) comes last, right before the pull request (decided 2026-10-17).
+Deleting the old code (E9): stages 1, 2, 4, 5, 6 done; stage 3 (old scripts and tests, README quick start) comes
+last, right before the pull request (decided 2026-10-17).
 Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
 evaluation per resonance axis set, E11). 4D runs with mock data and terms compiled by hand; from derive it is
-blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8. Flat background: E12.
-Slices of 3D and 4D spectra: E14 (the evaluation on the grid works, the plot does not). The word "draw" means two
-things: E15 (rename). Caching and processes: F (no cache for now; the sum as arrays first).
+blocked by derive (E13) and by the data (4-quanta states). Lines and planes: E8. Flat background (E12):
+done 2026-10-17. Slices of 3D and 4D spectra: E14 (the evaluation on the grid works, the plot does not). Grid
+functions renamed (E15, 2026-10-17). Caching and processes: F (no cache for now; the sum as arrays first).
 
 
 Branch rsp_eval_refactor (2026-10-15)
@@ -90,20 +90,18 @@ ahead. Steps 1-3 may use the old code; step 4 deletes it. Step 5 moved to wilson
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                stages 1, 2, 4, 5 done; 6 open; 3 last,
+    4  E9    delete the old code                                stages 1, 2, 4, 5, 6 done; 3 last,
                                                                 right before the pull request (E9)
     5  D4    the code move                                      moved to wilson_system/todo.txt 2026-10-17
     6  E4    README, with the data-dict contract (D5, in        postponed 2026-10-14
              wilson_system/todo.txt)
 
 Other items:
-    small, any time      H8 (keep or drop a rule), E9 stage 6 (comments that name the old code)
     last, before the PR  E9 stage 3 (C, D in todo_oldcode_rm.txt)
     kept, unused         E16 (the domains)
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
-    next (2026-10-16)    E12 (flat background)
-    before E6b           E15 (rename draw_*: no code outside this branch calls the names yet)
+    done (2026-10-17)    E12 (flat background), E15 (rename), E9 stage 6 (comments); H8 left as it is
     later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
                          F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
@@ -119,7 +117,7 @@ Decisions and known limits
 - One resonance point per term (B7, 2026-10-09): number of conditions = number of axes = rank of the condition
   matrix. Checked when compiling (CompiledTerm.from_VibPertTerm, plan.py). Not supported: fewer conditions
   (a line, E8) or more. Conditions that contradict each other: malformed. A term without conditions passes
-  B7; decided 2026-10-15: it is a flat background, calculated and drawn (E12; today build_contributions raises).
+  B7; decided 2026-10-15: it is a flat background, the same amplitude on every grid point (E12, built 2026-10-17).
 - One resonance axis set per evaluation (2026-10-15): one evaluate_response_terms call, and its grid result, is
   for one set of axes, e.g. {A, B}. The input terms are checked first: all must resonate on the same axes
   (check_one_axis_set, E11). {A} and {B} are different sets. The caller splits the terms (terms_by_axis_set) and
@@ -147,11 +145,11 @@ Decisions and known limits
 - Linear polarization only (2026-10-11): get_pol_laser stores into a real array, so a complex vector (circular
   light) loses its imaginary part with only a ComplexWarning. No complex conjugate for the detected field
   either. Before circular light is used: raise on complex input, then add the conjugates.
-- Boxes by amplitude (E10, 2026-10-14): each feature is drawn on its own box, sized so that a cut tail changes
+- Boxes by amplitude (E10, 2026-10-14): each feature is evaluated on its own box, sized so that a cut tail changes
   the plot by at most about eps * floor (floor = max / dynrange). The box rule is an input:
-  draw_spectrum(box_rule=), amplitude_half_widths (new) or intensity_half_widths (the old rule). No rule drops
+  spectrum_on_grid(box_rule=), amplitude_half_widths (new) or intensity_half_widths (the old rule). No rule drops
   a feature.
-- Peak width (E5, 2026-10-13): propagator_param sizes both the drawn peak and its box. A box uses the largest
+- Peak width (E5, 2026-10-13): propagator_param sizes both the peak on the grid and its box. A box uses the largest
   peak width, on every axis; a width that grows away from the peak can still be cut off. A width function gets
   only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (FIXME in
   eval_resonance_factor).
@@ -203,10 +201,10 @@ wilson_system/todo.txt (2026-10-17).
 
 E. Pipeline
 -----------
-[-] E4  README. Postponed 2026-10-14. Contents: the pipeline (pipeline.py docstring), the drawing
-        (from_features, draw_window; draw_all as the reference; the size of the cut), the data-dict contract (D5,
-        in wilson_system/todo.txt), the decisions above. The old README (removed 2026-10-09; it described designs
-        the code does not follow):
+[-] E4  README. Postponed 2026-10-14. Contents: the pipeline (pipeline.py docstring), the evaluation on the
+        grid (from_features, boxed_features_on_grid; all_features_on_grid as the reference; the size of the cut),
+        the data-dict contract (D5, in wilson_system/todo.txt), the decisions above. The old README (removed
+        2026-10-09; it described designs the code does not follow):
             git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md
 [ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
         [outside]. Since E9 (2026-10-16) WilsonSimulation.evaluate raises NotImplementedError until E6b (before,
@@ -215,7 +213,7 @@ E. Pipeline
             molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)      -> FeatureResult
-            spec   = draw_spectrum(result, window, dim_sizes, box_rule=)              -> EvalRspResult
+            spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=)              -> EvalRspResult
         Inputs, and where the old setup keeps each one (for E6b):
             terms             VibPerturbedTerm list, in pulse IDs          sim.terms
             molsys_data       MolSystemData, made by the caller            the origin: eval_uniform (addPropEvalSetup)
@@ -252,10 +250,10 @@ E. Pipeline
             3 IR + UV, all 3 IR at the same time      1106-1332 of 1240-1476     lines (6 patterns), plane: (A+B+C)
             4 IR + UV, IR in 2 same-time pairs        360-1076 of 19128-21872    plane: (A+B ; A+B+C+D), lines
         A line term is a point in the coordinates of its conditions: (A+B ; A+B+C) is a point in (A+B, C) and the
-        same everywhere along A - B. The drawing already evaluates each condition at every grid point
-        (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
+        same everywhere along A - B. The grid code already evaluates each condition at every grid point
+        (eval_rescond_resloc), so it would give such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. Since 2026-10-16: stages 1, 2, 4, 5 of 6 done; 6 open; 3 last, right before the pull
+[ ] E9  Delete the old code. Since 2026-10-16: stages 1, 2, 4, 5, 6 of 6 done; 3 last, right before the pull
         request (decided 2026-10-17).
         d93cc7b is the last commit with all of the old code (see the top of this file). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
@@ -293,9 +291,12 @@ E. Pipeline
               get_pol_laser from it, and pipeline.py imports from it too.
               amplitudes/__init__.py imported spectrum_composition, evaluation_wf, term_parts: now only the
               averaging import (get_iso_f, get_AlphaBetaGammaDelta_indices; no caller uses the package names).
-        6 [ ] todo.txt, docstrings and comments that name the old code. Left 2026-10-16: features.py:507,
-              evaluate.py:689, plan.py:40-42, system_data.py:14, tests/helpers.py:78, tests/test_evv_reference.py:8;
-              commented-out code in wilson_analysis/analysis/pre_eval.py (lines 4, 136, 178).
+        6 [x] todo.txt, docstrings and comments that name the old code (2026-10-17). features.py
+              (intensity_half_widths), evaluate.py (eval_rescond_resloc), tests/helpers.py,
+              tests/test_evv_reference.py: the old code named as deleted in E9, with d93cc7b. plan.py,
+              system_data.py: the import comments "# here and term_parts" removed.
+              wilson_analysis/analysis/pre_eval.py (commented-out notes, kept): its docstring says that the modules
+              it names are gone.
         Stage 5 needed line 5 of spectrum_abstractions.py changed first (stage 4, A1). Dry runs, 2026-10-16 (the
         files restored after):
             stage 5 alone             import wilson_suite fails (wilson_main/__init__.py imports
@@ -306,7 +307,7 @@ E. Pipeline
                                       quick_start.ipynb, script_example.py.
             after the prep (A1, B, E1)  no test changes; only the 14 modules leave the import list (third dry run)
 [ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
-        knob setting against draw_all; add cases and knob values, then choose the defaults.
+        knob setting against all_features_on_grid; add cases and knob values, then choose the defaults.
         The rule (features.amplitude_half_widths), from the plot's dynamic range D:
             floor = A_max^2 / D                                  the faintest the plot shows
             2 * A_max * tail(d) <= eps * floor                   a cut tail changes the plot by eps * floor at most
@@ -321,12 +322,12 @@ E. Pipeline
         Why: the old boxes ended at 1/D of each feature's own peak. But amplitudes add before squaring, so a cut
         tail t next to amplitude A changes the intensity by up to 2|A||t|, and an amplitude falls only as gamma / d.
         So the cut tails of strong peaks changed visible peaks, and strong features outside the window were not
-        drawn at all (ACDM: 4 of them, 49-81 times the strongest inside).
-        Measured 2026-10-14 against draw_all. 14 EVV terms, anharmonic states, gamma 4.7 cm-1. big: the quick_start
-        window, 700 x 700 points; zoom: +-150 cm-1 around the strongest feature, 301 x 301. Ranges over D 100,
-        500, 1000. err: the largest error, in floors; worst: the worst visible grid point.
+        on the grid at all (ACDM: 4 of them, 49-81 times the strongest inside).
+        Measured 2026-10-14 against all_features_on_grid. 14 EVV terms, anharmonic states, gamma 4.7 cm-1.
+        big: the quick_start window, 700 x 700 points; zoom: +-150 cm-1 around the strongest feature, 301 x 301.
+        Ranges over D 100, 500, 1000. err: the largest error, in floors; worst: the worst visible grid point.
                                    old boxes (domains)               amplitude, eps 0.1
-            case                   err      worst      draw s        err        worst      draw s
+            case                   err      worst      grid s        err        worst      grid s
             formaldehyde, big      5.1-5.9  100 %      0.01-0.03     0.05-0.08  0.5-2.2 %  0.25-0.92
             formaldehyde, zoom     1.1-1.7  11-100 %   0.00-0.01     0.03-0.12  0.3-0.8 %  0.01-0.05
             ACDM, big              0.8-7.7  8.4-47 %   0.34-6.4      0.05-0.09  0.9-2.1 %  0.43-1.5
@@ -336,56 +337,48 @@ E. Pipeline
             eps 0.3                                    at most 0.47 floors, worst 4.9 %
             a cap, max_cm 500 (D 500)                  bad trade: ACDM big 3.95 floors, 26 %; formaldehyde 1.34, 36 %
             min_gammas 3                               no measurable change
-            bigger old boxes (ACDM, D 500, box D 250000)   3.9 -> 3.0 floors, drawing 3 s -> 66 s
+            bigger old boxes (ACDM, D 500, box D 250000)   3.9 -> 3.0 floors, the grid 3 s -> 66 s
             intensity_half_widths, unscaled            = the boxes before E10; 1.7-12 floors (c3_spectrum.py used it)
             intensity_half_widths, scaled              0.7-39 floors
-        Domains (each feature drawn on the rectangle around all the boxes it overlaps): not needed for interference;
-        all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of the old cut
-        (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the own box is
-        enough. The new code's domains stay, unused (E16).
+        Domains (each feature evaluated on the rectangle around all the boxes it overlaps): not needed for
+        interference; all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of
+        the old cut (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the
+        own box is enough. The new code's domains stay, unused (E16).
         intensity_half_widths vs the old dress_these_with_boxes: returns half-widths (no deep copy); never drops a
         feature; no error for a feature stronger than max_intensity. Same knobs (box_range_safety_margin 0.1,
         unscaled, minimum_box_padding 0 cm-1), plus dynrange.
         Limits: a Lorentzian tail (gamma / d); the largest width on every axis; a worst case (assumes the cut tail
         meets A_max), so boxes are larger than needed where the plot is weak.
-        The drawing no longer matches the old code (the old code cuts more): the reference is draw_all
+        The grid result no longer matches the old code (the old code cuts more): the reference is all_features_on_grid
         (test_pipeline.py). The rows are checked against the old code (C2).
         Seen 2026-10-15, not investigated: IR + IR + vis sum frequency (2D, formaldehyde, gamma 10 cm-1, 201 x 201
-        points over 11000 cm-1, so steps of 55 cm-1) 0.59 floors from draw_all, above the 0.13 measured here.
-[ ] E12 Terms without resonance conditions: a flat background (decided 2026-10-15). Calculated as other terms,
-        drawn as one constant amplitude on every grid point, added before squaring.
-        Today: B7 lets them pass, then build_contributions raises (solve_LSE_motif: "motif has no resonance
-        conditions"). Found in IR absorption (1 IR pulse, G7): 3 of 5 terms, e.g. 1/4 * polhess_(a,a) / <a>, next
-        to 2 terms with one condition on A. No other setup of the survey has them.
-        To do: an empty location; the row's coefficient is the full sum (no resonance labels); drawing:
-        amplitude_coeff on every grid point; get_intensity: |coeff|^2; no box (today the box rules fail on the
-        empty peak_widths()). Axis sets (E11): check_one_axis_set does not count them (no axes); terms_by_axis_set
-        puts them under key (). Proposal: allowed with any set, a constant on its grid.
+        points over 11000 cm-1, so steps of 55 cm-1) 0.59 floors from all_features_on_grid,
+        above the 0.13 measured here.
 [ ] E14 Slices of 3D and 4D spectra (2026-10-16). Two steps, two states:
-            evaluation on the grid (draw_spectrum)    works today, no new code
-            plot (plot_rsp_func, plot_spectrum)       1D and 2D only: raises for a slice of shape (201, 201, 1)
+            evaluation on the grid (spectrum_on_grid)    works today, no new code
+            plot (plot_rsp_func, plot_spectrum)          1D and 2D only: raises for a slice of shape (201, 201, 1)
         The evaluation: a window zero-wide on the fixed axes, with 1 grid point there, e.g.
-            draw_spectrum(result, Box({'A': (a0, a1), 'B': (b0, b1), 'C': (c0, c0)}), {'A': 201, 'B': 201, 'C': 1},
-                          box_rule=...)        -> grid_result (201, 201, 1), grid_axes['C'] = [c0]
+            spectrum_on_grid(result, Box({'A': (a0, a1), 'B': (b0, b1), 'C': (c0, c0)}), {'A': 201, 'B': 201, 'C': 1},
+                             box_rule=...)        -> grid_result (201, 201, 1), grid_axes['C'] = [c0]
         Box allows min = max, make_grid gives 1 point, box_slices finds it, Box.overlaps keeps every feature whose
         box reaches c0. Checked (a scratch script, not in git): 3 IR {A, B, C} on formaldehyde (72 features, gamma
-        10 cm-1), slice (A, B) at the C of the strongest feature: 0.000 floors from draw_all, 0.04-0.07 s per slice,
-        60 of 72 features reach the slice (1 on it). 4D chain term (mock data, test_dimensions.py), slice (A, B) at
-        the C, D of the strongest feature: 0.000 floors.
+        10 cm-1), slice (A, B) at the C of the strongest feature: 0.000 floors from all_features_on_grid,
+        0.04-0.07 s per slice, 60 of 72 features reach the slice (1 on it). 4D chain term (mock data,
+        test_dimensions.py), slice (A, B) at the C, D of the strongest feature: 0.000 floors.
         The full grid instead: 3D 81^3 0.88 s, 8.5 MB; 201^3 about 13 s, 130 MB (scaled by points); 4D 101^4: 1.6 GB
         for one complex array. So 4D needs slices.
         To do:
         [ ] the plot: plot_rsp_func drops the 1-point axes and shows their values in the title (about 5 lines).
             By hand, today: plot_spectrum(abs(spec.grid_result[:, :, 0])**2,
                                           {ax: m[:, :, 0] for ax, m in spec.grid_mesh.items() if ax != 'C'}, ...)
-        [ ] the slice as an input: draw_spectrum(fixed={'C': c0}), or a helper that makes the window and dim_sizes.
-            Test: the slice against draw_all.
+        [ ] the slice as an input: spectrum_on_grid(fixed={'C': c0}), or a helper that makes the window and dim_sizes.
+            Test: the slice against all_features_on_grid.
         [ ] slice positions from the feature locations. Peaks are points: a slice 37 cm-1 from the strongest peak
             (in C) has no feature on it, and its max is 15 % of that peak. The 72 features have 42 distinct C values.
         [ ] one scale for a series of slices. Boxes: partial(amplitude_half_widths, dynrange=..., a_max=a_max_full),
             a_max_full = the largest amplitude_in_window over the full window.
             Colours: plot_spectrum(reference_max=).
-            Without a_max each slice sets its own floor (between peaks: 66 features drawn, 60 with a_max_full).
+            Without a_max each slice sets its own floor (between peaks: 66 features on the grid, 60 with a_max_full).
         Other views, when needed:
             feature map     the locations on 2 axes, coloured by get_intensity(); no grid. Shows where the peaks
                             are (for choosing slices); no line shape, no interference.
@@ -396,27 +389,6 @@ E. Pipeline
             slanted slice   e.g. along A = B: eval_feature_on_grid takes any points, but box_slices needs a grid
                             along the axes.
         Slices do not depend on each other: one process per slice, each sends back one 2D array (201 x 201: 0.65 MB).
-[ ] E15 Rename draw_* (2026-10-16). "draw" means two things:
-            refac_rsp_eval      the complex amplitude on grid points: draw_all, draw_window, draw_spectrum;
-                                "drawing 1.5 s" (F)
-            plot_spectrum.py    a matplotlib picture: its error "plot_spectrum draws 1D and 2D spectra", "ax: draw
-                                into this axes". Its line 44 has the other meaning ("a spectrum from draw_spectrum").
-        Rule: "plot" only for pictures; the grid functions get "on_grid", as eval_feature_on_grid has.
-            draw_all        -> all_features_on_grid      every feature on every grid point: the reference
-            draw_window     -> boxed_features_on_grid    each feature on its own box
-            draw_spectrum   -> spectrum_on_grid          boxes, grid, boxed_features_on_grid -> EvalRspResult
-                               (or compute_spectrum, next to compute_features)
-            eval_feature_on_grid stays. In the text: "drawing" -> "evaluation on the grid", "drawn" -> "evaluated on
-            the grid".
-        Not: "sample" (SpectralWindow.sample_grid makes the grid points), "render" (the old render code makes
-        pictures), "evaluate" alone (evaluate_response_terms makes the rows).
-        Size: draw_spectrum 53 uses in 9 files, draw_window 31 in 6, draw_all 61 in 8; 31 test names; 116 words
-        draw / drawing / drawn / draws in refac_rsp_eval and plot_spectrum.py, each to read (some mean the
-        picture). The names by search and replace, todo.txt included (e.g. E6b names
-        test_draw_spectrum_with_a_width_function). Outside refac_rsp_eval: plot_spectrum.py (text and one call).
-        draw_by_domains went with c3_spectrum.py (E9, stage 1); the counts above are from before, when c3_spectrum.py
-        had 8 of the uses.
-        When: before E6b and the merge to main; no code outside this branch calls the names yet.
 [-] E16 Domains in the new code: unused, kept for now (decided 2026-10-17). A domain is the rectangle around a
         cluster of features whose boxes overlap. No evaluation code calls them, only tests. The last other caller,
         draw_by_domains in tests/c3_spectrum.py, went in E9 stage 1. Why unused: E10 (with amplitude boxes each
@@ -425,14 +397,14 @@ E. Pipeline
             grid.py:175-246       compute_box_adjacency: an n x n matrix, True where two boxes overlap on every
                                   axis (touch_inclusive: touching counts too); connected_components_from_adjacency:
                                   the groups of objects linked through the matrix (depth-first search)
-            features.py:363-376   features_to_clusters: the features grouped by overlapping feature boxes
+            features.py:379-391   features_to_clusters: the features grouped by overlapping feature boxes
                                   (feat_box; raises for a feature without one)
-            features.py:652-661   SpectralWindow.find_clusters_by_featboxes: one RectangularDomain per cluster of
+            features.py:687-696   SpectralWindow.find_clusters_by_featboxes: one RectangularDomain per cluster of
                                   the window's features (full_features and contrib_features together)
-            features.py:664-707   RectangularDomain: box (the union of its features' boxes), full_features,
+            features.py:699-742   RectangularDomain: box (the union of its features' boxes), full_features,
                                   contrib_features, __hash__, from_features; 4 add_* methods marked UNUSED
         Tests: test_grid.py:291-376 (13: adjacency, connected components, features_to_clusters); test_features.py
-        (7, at lines 511, 580, 844, 853, 858, 868, 940).
+        (7, at lines 511, 580, 920, 929, 934, 944, 1016).
         Possible use, none planned: groups of nearby peaks, e.g. to choose zoom windows or slice positions (E14).
         Delete with their tests (H1) once nothing needs them.
 
@@ -441,12 +413,12 @@ F. Speed
 --------
 Speed test: tests/f2_speed.py on ACDM (the acetic acid dimer, 16 atoms, 42 modes; in git:
 wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out).
-14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), 'anharmonic'. Drawing as in
+14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), 'anharmonic'. The grid as in
 examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points, gamma 4.7 cm-1, dynrange 500.
     step                  time     note
     load                  4 s      once per molecule
     build_contributions   3.3 s    17101 rows, 7595 zero; runs again for each polarization, states or axis choice
-    drawing               2.5 s    1.5 s since E10 (amplitude boxes, eps 0.1)
+    grid                  2.5 s    1.5 s since E10 (amplitude boxes, eps 0.1)
     per spectrum          5.7 s    5.9 s before E10 (f2_speed.py docstring)
 History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand); 5.7 s
 after E10 (2026-10-14).
@@ -454,7 +426,7 @@ What a changed setting needs again (measured 2026-10-15, ACDM). build_contributi
 index sets about 90 % (892584 calls; inside it the averaged lookups 11 %, non-averaged 22 %, energy-difference
 denominators 23 %, 1/omega 5 %), location solves 4 %, the averaged einsum about 0 %.
     setting changed            changes                    now                     reuse
-    width, window, grid, box   drawing only               rows reused (tested)    -
+    width, window, grid, box   the grid only              rows reused (tested)    -
     axis choice                only the locations         full rerun              possible: same coefficients
                                                                                   (difference 0), same zero list;
                                                                                   only the solves again (4 %)
@@ -596,12 +568,12 @@ checking side.
               (try + 4)                                                           192-220, ABC 46-48, ABD 46-48;
                                                                                   lines and planes 582-1076
         Results:
-            run end to end      CARS (24 rows, 12 features, drawn in 1D, 0.06 floors from draw_all), EVV; since
+            run end to end      CARS (24 rows, 12 features, 1D, 0.06 floors from all_features_on_grid), EVV; since
                                 2026-10-16 also 3 IR, one evaluation per axis set (E11). CARS and 3 IR are
                                 tests now (test_dimensions.py, G10)
             all 0               IR + vis SFG, 3 IR + UV at different times: odd rank (3, 5) is 0 for an achiral
                                 molecule, and with every field along x laser_pol is all 0 at rank 5
-            raises              IR absorption: terms without conditions (E12)
+            raises              IR absorption: terms without conditions; runs since E12 (2026-10-17)
             props missing       beta-alpha CARS, CAHRS?? (hypgrad); EVV + 2nd UV (hypgrad, hyphess); 7-pulse
                                 (shypgrad, shyphess). The reader's job [outside]; tests: mock data (G10)
             rank too high       7-pulse: rank 8 (2-6 supported)
@@ -613,8 +585,8 @@ checking side.
 
 H. Rules
 --------
-H1  Prefer deleting to designing. A new type, cache or optimization needs a measured reason (e.g. draw_window
-    came with a test that measures how far it is from draw_all).
+H1  Prefer deleting to designing. A new type, cache or optimization needs a measured reason (e.g.
+    boxed_features_on_grid came with a test that measures how far it is from all_features_on_grid).
 H2  Make an abstraction on the second real use, not the first. No base classes, no registries, no second
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
@@ -624,8 +596,7 @@ H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.
 H8  "One module imports wilson_derive" is broken: plan.py and compat.py both do at run time; pipeline.py only for
-    type hints (plan.py's docstring says so; no test checks it). Decide: move the translation into plan.py, or
-    drop the rule.
+    type hints (plan.py's docstring says so; no test checks it). Left as it is (decided 2026-10-17).
 
 
 Outside the refactor [outside]
@@ -641,8 +612,8 @@ so C2, C3 and G1 would all miss a reader error: those checks matter for the fina
         - Terms on more than one resonance axis set (E11): one evaluation per set (terms_by_axis_set). Open: which
           axes to pass for a smaller set, all of the experiment's or only the set's.
         - No test covers the settings the caller passes (the table in E6) until a caller exists. In place:
-          test_pipeline.py, test_draw_spectrum_with_a_width_function (data file -> load -> evaluate -> draw,
-          against draw_all, at most 0.1 floors).
+          test_pipeline.py, test_spectrum_on_grid_with_a_width_function (data file -> load -> evaluate -> grid,
+          against all_features_on_grid, at most 0.1 floors).
 [ ] E7b The rest of the render code, wilson_analysis/render (left the refactor 2026-10-15). The old renderer is
         for the old WilsonSimulation path; the new result is plotted by plot_rsp_func (E7).
         To do: rework the old renderer together with the new WilsonSimulation procedure (as E6b).
@@ -667,9 +638,9 @@ Done
 Details in the named files, or in git history (older versions of this file included).
 Built
     E1   build_contributions: one row per term and index set; features_from_rows groups them (FeatureResult).
-    E2   Drawing: eval_feature_on_grid (one feature), draw_window (all features, box by box), draw_all (every
-         feature on the whole grid, the reference).
-    E3   Entry point: two calls, evaluate_response_terms and draw_spectrum (2026-10-14; see E6).
+    E2   The spectrum on the grid: eval_feature_on_grid (one feature), boxed_features_on_grid (all features, box by
+         box), all_features_on_grid (every feature on the whole grid, the reference).
+    E3   Entry point: two calls, evaluate_response_terms and spectrum_on_grid (2026-10-14; see E6).
     E5   Peak width from one source (2026-10-13): propagator_param, a number or a function (vd, freqs) -> cm-1.
          Was lineshape_parameter.
     E6a  The evaluator side of E6 (2026-10-14): inputs and outputs in the pipeline.py docstring; data out of the
@@ -680,14 +651,26 @@ Built
          formaldehyde). Left out: RenderingInfo, EvaluationInfo, PlotConfig, the w2 > w1 mask, saving.
          Tests: wilson_analysis/tests/test_plot_spectrum.py. Example: tests/example_plot_spectrum.py.
     E10  Code (2026-10-14): amplitude_half_widths, intensity_half_widths, SpectralWindow.from_features,
-         draw_window on each feature's own box, draw_spectrum(box_rule=). Tests in test_evaluate.py and
+         boxed_features_on_grid on each feature's own box, spectrum_on_grid(box_rule=). Tests in test_evaluate.py and
          test_features.py.
     E11  One resonance axis set per evaluation (2026-10-16, see Decisions). pipeline.check_one_axis_set:
          compute_features raises before any row is computed and lists the term ids per set; before, such a mix
-         failed only in drawing ("Expected SpectralFeature with axes ..."). pipeline.terms_by_axis_set: the term
+         failed only on the grid ("Expected SpectralFeature with axes ..."). pipeline.terms_by_axis_set: the term
          ids per set, in the chosen axes, for the caller. Mixed sets are common above 2 axes (G7: 3 IR {A, B} 14,
          {A, B, C} 2; 7-pulse UV {A, B} 440, {A, B, C} 192; 4 IR + UV four sets). Tests: test_pipeline.py (toy
          terms; EVV with term 0 on A only), test_dimensions.py (3 IR).
+    E12  Flat background (2026-10-17): a term without resonance conditions gives one row (index set {}, every label
+         summed) at the location without axes, ResLocPoint({}). Its feature (SpectralFeature.is_flat) has the same
+         amplitude on every grid point: its box is the window, the box rules give it 0 and count its amplitude
+         (amplitude_in_window). Terms without conditions join the call of any axis set (E11; terms_by_axis_set key
+         ()). Tests: test_evaluate.py, test_features.py, test_pipeline.py; test_dimensions.py: IR absorption on
+         formaldehyde, 3 of 5 terms without conditions (term 0 by hand, numpy only: rel 6e-8; the grid result equals
+         all_features_on_grid).
+    E15  The grid functions renamed (2026-10-17): draw_all -> all_features_on_grid, draw_window ->
+         boxed_features_on_grid, draw_spectrum -> spectrum_on_grid; test names and text too. "plot" only for
+         pictures (plot_spectrum.py: "plot_spectrum plots 1D and 2D spectra"). Left: the NotImplementedError message
+         of WilsonSimulation.evaluate (wilson_main, workflow_abstractions.py:363, 365) names draw_spectrum; open:
+         whether to change it there.
     B7   One resonance point per term, checked when compiling (see Decisions).
     F1   einsum for the averaged part (2026-10-12; make_avrg_einsum_subscripts, AvrgTensor). Agrees with the loop
          to 8e-14. ACDM averaging 47 s -> 0.3 s.
@@ -706,7 +689,7 @@ Checked: the numbers are right
     C2   Same numbers as the old code, term by term: 14 EVV terms; formaldehyde, water, CO; both state sets; for
          formaldehyde also more axis choices and polarizations. Largest difference 2e-15. Record: the
          test_evv_reference.py docstring; evv_reference.json.
-    C3   Same whole spectrum as the old code, boxes included (formaldehyde, 1e-16). Found: the old code draws a peak
+    C3   Same whole spectrum as the old code, boxes included (formaldehyde, 1e-16). Found: the old code gives a peak
          n times too large (n^2 in intensity) when n parameter sets share one location (e.g. degenerate modes).
          Record: the docstring of tests/c3_spectrum.py (deleted in E9; git show d93cc7b:src/wilson_suite/
          wilson_intensities/refac_rsp_eval/tests/c3_spectrum.py). Formaldehyde has n = 1 everywhere, so its old
@@ -723,11 +706,11 @@ Checked: the numbers are right
     G10  1D-4D (2026-10-16, test_dimensions.py). Mock data (MolSystemData.from_datadict: 2 modes, states up to 4
          quanta): a toy term per dimensionality with the chain motif (A ; A+B ; A+B+C ; A+B+C+D), compiled by
          hand (no translation, so 4D despite E13). Checked: B7 takes the motif; one row per index set at the
-         written-out point; peak = amplitude * (i / gamma)^N = get_intensity; drawing box by box (each feature's
-         draw_all value inside its own box). Real data, terms from derive (compat.derive_terms), formaldehyde:
-         CARS (1D: 24 rows, 12 features at +- the anharmonic fundamentals; 0.06 floors from draw_all) and 3 IR
-         (3D: {A, B} 340 rows; {A, B, C} 72 rows, drawn on 41^3 points within 0.1 floors). Not covered: odd ranks
-         (A15 first), 4D from derive (E13).
+         written-out point; peak = amplitude * (i / gamma)^N = get_intensity; box by box on the grid (each feature's
+         all_features_on_grid value inside its own box). Real data, terms from derive (compat.derive_terms),
+         formaldehyde: CARS (1D: 24 rows, 12 features at +- the anharmonic fundamentals; 0.06 floors from
+         all_features_on_grid) and 3 IR (3D: {A, B} 340 rows; {A, B, C} 72 rows, on 41^3 grid points within 0.1
+         floors). Not covered: odd ranks (A15 first), 4D from derive (E13).
 Fixed
     A0-A4, A6-A14  Small fixes. Two change behaviour: evaluate_term_coeff_sumover raises if a resonance label is
          missing; VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
@@ -745,4 +728,4 @@ Fixed
          No module of refac_rsp_eval imports DataOriginInfo or wilson_data_obtainer.
 Dropped
     C4   Old vs new location solvers on 4 special motifs: two fail B7 now; both codes refuse the other two (E8).
-    E6b's check against the old code (2026-10-14): C3 already checked it; since E10 the drawing differs on purpose.
+    E6b's check against the old code (2026-10-14): C3 already checked it; since E10 the grid result differs on purpose.

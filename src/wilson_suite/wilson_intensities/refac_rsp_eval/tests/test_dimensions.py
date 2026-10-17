@@ -8,6 +8,7 @@ as derive writes them for pulses at different times (G7 survey), on a toy molecu
 
 Real data, terms from derive, data from formaldehyde's Gaussian file:
     1D  CARS: polgrad only
+    1D  IR absorption: 3 of its 5 terms have no resonance conditions, a flat background (E12)
     3D  3 IR: two sets of resonance axes, {A, B} (14 terms) and {A, B, C} (2 terms), so one evaluation per set (E11)
 """
 
@@ -19,15 +20,15 @@ import pytest
 
 import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 from wilson_suite.wilson_intensities.refac_rsp_eval.compat import derive_terms
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import draw_all, eval_feature_on_grid
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import all_features_on_grid, eval_feature_on_grid
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     compute_features,
-    draw_spectrum,
     evaluate_response_terms,
     prop_names,
+    spectrum_on_grid,
     terms_by_axis_set,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
@@ -149,26 +150,27 @@ def test_chain_feature_peak_is_amplitude_times_i_over_gamma_to_the_ndim(chain_re
 POINTS = {1: 2001, 2: 101, 3: 31, 4: 13}     # grid points per axis
 
 
-def test_draw_spectrum_chain_term_draws_each_feature_on_its_own_box(chain_result):
+def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_result):
     """
-    Boxes of 3 gamma (60 cm-1) cut every feature: the spectrum is each feature's draw_all value inside its own box,
-    0 outside, added up, in every dimensionality. Window: the features +- 100 cm-1 on every axis.
+    Boxes of 3 gamma (60 cm-1) cut every feature: the spectrum is each feature's all_features_on_grid value inside its
+    own box, 0 outside, added up, in every dimensionality. Window: the features +- 100 cm-1 on every axis.
     (The amplitude boxes of E10 would give these features the whole window: they are of similar strength.)
     """
     locations = np.array([f.location.values for f in chain_result.features])
     ndim = locations.shape[1]
     window = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip(AXES, locations.min(0), locations.max(0))})
 
-    spec = draw_spectrum(chain_result, window, {ax: POINTS[ndim] for ax in AXES[:ndim]},
+    spec = spectrum_on_grid(chain_result, window, {ax: POINTS[ndim] for ax in AXES[:ndim]},
                          box_rule=lambda window, features: [3 * G_CM] * len(features))
 
     expected = np.zeros((POINTS[ndim],) * ndim, dtype=complex)
     for f in [*spec.spectral_window.full_features, *spec.spectral_window.contrib_features]:
         inside = box_slices(f.feat_box, spec.grid_axes)  # type: ignore
-        expected[inside] += draw_all([f], chain_result.states, spec.grid_axes)[inside]
+        expected[inside] += all_features_on_grid([f], chain_result.states, spec.grid_axes)[inside]
     assert spec.grid_result.shape == expected.shape
     np.testing.assert_allclose(spec.grid_result, expected)
-    assert np.abs(spec.grid_result - draw_all(chain_result.features, chain_result.states, spec.grid_axes)).max() > 0
+    every_point = all_features_on_grid(chain_result.features, chain_result.states, spec.grid_axes)
+    assert np.abs(spec.grid_result - every_point).max() > 0
 
 
 ## real data: experiments as in the G7 survey (g7_survey.py), every pulse and the detector along x -------------
@@ -236,16 +238,103 @@ def test_cars_peaks_are_the_anharmonic_fundamentals_with_both_signs(cars):
         sorted([*fundamentals, *(-e for e in fundamentals)]))
 
 
-def test_cars_draws_within_eps_floor_of_draw_all(cars):
-    """1D, the features +- 200 cm-1, 2001 points: at most 0.1 floors from draw_all (G7 survey: 0.06)."""
+def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
+    """1D, the features +- 200 cm-1, 2001 points: at most 0.1 floors from all_features_on_grid (G7 survey: 0.06)."""
     _, _, result = cars
     locations = [f.location['A'] for f in result.features]
     window = Box({'A': (min(locations) - 200., max(locations) + 200.)})
 
-    spec = draw_spectrum(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.))
+    spec = spectrum_on_grid(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.))
 
-    reference = abs(draw_all(result.features, result.states, spec.grid_axes)) ** 2
+    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
     assert 0. < np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.
+
+
+## 1D, real data: IR absorption on formaldehyde, with a flat background (E12) ----------------
+# The setup '1D: IR absorption': one IR pulse, filter +1. One axis, A = w1; rank 2. derive gives 5 terms: 3 without
+# resonance conditions (polhess, and polgrad * cff twice), a flat background, and 2 on A (dipgrad * dipgrad, the
+# conditions E_a = A and -E_a = A). All 5 go into one call: the background interferes with the peaks.
+
+CM_TO_EH = 4.556335e-6      # 1 cm-1 in Eh
+
+
+def ir_absorption_experiment() -> wexp.VibExperiment:
+    return experiment((pulse(50., 0., 1),), {1: 1})
+
+
+@pytest.fixture(scope='module')
+def ir_absorption() -> tuple[wexp.VibExperiment, list, FeatureResult]:
+    exp = ir_absorption_experiment()
+    terms = derive_terms(exp)
+    return exp, terms, evaluate_on_formaldehyde(exp, terms)
+
+
+def test_ir_absorption_derive_gives_3_terms_without_conditions_and_2_on_A(ir_absorption):
+    exp, terms, _ = ir_absorption
+
+    assert [(ax.label, [t.pulse_refs for t in ax.var_set.var_set]) for ax in exp.canonical_axes.axes] == [
+        ('A', [(1,)])]                                                                      # A = w1
+    assert list(exp.polarization_avg_vector) == [1.]                                       # rank 2
+    assert prop_names(terms) == ['polhess', 'polgrad', 'cff', 'dipgrad']
+    assert terms_by_axis_set(terms, exp.canonical_axes) == {(): [0, 1, 2], ('A',): [3, 4]}
+
+
+def test_ir_absorption_flat_terms_make_one_feature_next_to_12_peaks(ir_absorption):
+    """
+    Each term without conditions: one row (no label to fix) at the location without axes; the 3 rows add up in
+    one flat feature. The 2 terms on A: 12 rows, one feature each, at +- each anharmonic fundamental.
+    """
+    _, _, result = ir_absorption
+    fundamentals = [result.states.get_state_by_label(str(m)).energy for m in range(6)]
+    flat_rows = [r for r in result.table if not r.location.axes]
+    [flat] = [f for f in result.features if f.is_flat]
+    peaks = [f for f in result.features if not f.is_flat]
+
+    assert (len(result.table), result.zero) == (15, [])
+    assert [(r.term_id, r.params.to_dict()) for r in flat_rows] == [(0, {}), (1, {}), (2, {})]
+    assert flat.amplitude_coeff == pytest.approx(sum(r.coeff for r in flat_rows))
+    assert sorted(f.location['A'] for f in peaks) == pytest.approx(
+        sorted([*fundamentals, *(-e for e in fundamentals)]))
+
+
+def test_ir_absorption_polhess_term_by_hand(ir_absorption):
+    """
+    Term 0, 1/4 * polhess_(a,a) / <a>, numpy only: 1/4 * sum over a of <polhess>[a, a] / w_a. Rank 2, both fields
+    along x: <T_xx> = trace(T) / 3. w_a: the harmonic frequency (nc_sqrt_eigval, see Decisions), in Eh.
+    """
+    _, _, result = ir_absorption
+    polhess, w_cm = np.asarray(result.molsys.mol_props['polhess'].vals), result.molsys.eigenvals
+    [row] = [r for r in result.table if r.term_id == 0]
+
+    hand = 0.25 * sum(np.trace(polhess[a, a]) / 3. / (w_cm[a] * CM_TO_EH) for a in range(6))
+
+    assert row.coeff == pytest.approx(hand, rel=1e-6)
+
+
+def test_ir_absorption_cff_terms_are_one_sum_twice(ir_absorption):
+    """
+    Term 1: -1/12 * polgrad_(b) * cff_(a,a,b) / (w_a w_b w_b).
+    Term 2: -1/6 * polgrad_(a) * cff_(a,b,b) / (w_a w_a w_b), the same sum with a and b swapped (cff is
+    symmetric) and twice the factor: its coefficient is twice term 1's.
+    """
+    _, _, result = ir_absorption
+    coeff = {r.term_id: r.coeff for r in result.table if not r.location.axes}
+
+    assert coeff[2] == pytest.approx(2. * coeff[1], rel=1e-12)
+
+
+def test_ir_absorption_on_grid_with_the_background_within_eps_floor_of_all_features_on_grid(ir_absorption):
+    """1D, the peaks +- 200 cm-1, 2001 points, amplitude boxes: the flat feature's box is the window."""
+    _, _, result = ir_absorption
+    locations = [f.location['A'] for f in result.features if not f.is_flat]
+    window = Box({'A': (min(locations) - 200., max(locations) + 200.)})
+
+    spec = spectrum_on_grid(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.))
+
+    [flat] = [f for f in spec.spectral_window.full_features if f.is_flat]
+    assert flat.feat_box == window
+    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
+    assert np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.
 
 
 ## 3D, real data: 3 IR on formaldehyde -------------------------------------------
@@ -287,15 +376,19 @@ def test_three_ir_each_axis_set_runs_on_its_own(three_ir):
     assert all(f.location.axes == ('A', 'B', 'C') for f in abc.features)
 
 
-def test_three_ir_abc_set_draws_in_3d_within_eps_floor_of_draw_all(three_ir):
-    """The {A, B, C} features +- 100 cm-1, 41 points per axis, amplitude boxes (E10): at most 0.1 floors from draw_all."""
+def test_three_ir_abc_set_on_a_3d_grid_within_eps_floor_of_all_features_on_grid(three_ir):
+    """
+    The {A, B, C} features +- 100 cm-1, 41 points per axis, amplitude boxes (E10): at most 0.1 floors from
+    all_features_on_grid.
+    """
     exp, terms, groups = three_ir
     result = evaluate_on_formaldehyde(exp, [terms[i] for i in groups[('A', 'B', 'C')]])
     locations = np.array([f.location.values for f in result.features])
     window = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip('ABC', locations.min(0), locations.max(0))})
 
-    spec = draw_spectrum(result, window, {ax: 41 for ax in 'ABC'}, box_rule=partial(amplitude_half_widths, dynrange=500.))
+    spec = spectrum_on_grid(result, window, {ax: 41 for ax in 'ABC'},
+                            box_rule=partial(amplitude_half_widths, dynrange=500.))
 
-    reference = abs(draw_all(result.features, result.states, spec.grid_axes)) ** 2
+    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
     assert spec.grid_result.shape == (41, 41, 41)
     assert 0. < np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.

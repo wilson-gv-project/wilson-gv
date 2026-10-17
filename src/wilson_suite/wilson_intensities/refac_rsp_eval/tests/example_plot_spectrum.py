@@ -29,9 +29,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_ha
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
-    draw_spectrum,
     evaluate_response_terms,
     prop_names,
+    spectrum_on_grid,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
@@ -64,7 +64,8 @@ def main(out: Path):
     anharmonic, harmonic = evaluate(terms, formaldehyde, 'anharmonic'), evaluate(terms, formaldehyde, 'harmonic')
 
     # 1. the whole window
-    spec = draw_spectrum(anharmonic, Box({'A': (600., 3100.), 'B': (5., 3100.)}), {'A': 501, 'B': 501}, box_rule=BOXES)
+    spec = spectrum_on_grid(anharmonic, Box({'A': (600., 3100.), 'B': (5., 3100.)}), {'A': 501, 'B': 501},
+                            box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title('formaldehyde, 14 EVV terms, anharmonic states, dynrange 500')
     save(fig, out / '1_formaldehyde.png')
@@ -73,7 +74,7 @@ def main(out: Path):
     strongest = max(anharmonic.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     a0, b0 = strongest.location['A'], strongest.location['B']
     zoom = Box({'A': (a0 - 150., a0 + 150.), 'B': (b0, b0 + 300.)})
-    spec = draw_spectrum(anharmonic, zoom, {'A': 301, 'B': 301}, box_rule=BOXES)
+    spec = spectrum_on_grid(anharmonic, zoom, {'A': 301, 'B': 301}, box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title(f'zoom: strongest peak at A = {a0:.1f}, B = {b0:.1f} cm$^{{-1}}$')
     save(fig, out / '2_formaldehyde_zoom.png')
@@ -87,7 +88,7 @@ def main(out: Path):
 
     # 3. harmonic vs anharmonic: reference_max = the larger of the two maxima, so both share one scale
     window, sizes = Box({'A': (1100., 3000.), 'B': (5., 3000.)}), {'A': 401, 'B': 401}
-    specs = {name: draw_spectrum(result, window, sizes, box_rule=BOXES)
+    specs = {name: spectrum_on_grid(result, window, sizes, box_rule=BOXES)
              for name, result in (('anharmonic', anharmonic), ('harmonic', harmonic))}
     reference_max = max(np.max(np.abs(s.grid_result)) ** 2 for s in specs.values())
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
@@ -101,7 +102,7 @@ def main(out: Path):
     acdm = load_acdm(terms)
     t_load = time.perf_counter() - t0
     t0 = time.perf_counter()
-    spec = draw_spectrum(evaluate(terms, acdm, 'anharmonic'), Box({'A': (700., 3400.), 'B': (10., 3500.)}),
+    spec = spectrum_on_grid(evaluate(terms, acdm, 'anharmonic'), Box({'A': (700., 3400.), 'B': (10., 3500.)}),
                          {'A': 700, 'B': 700}, box_rule=BOXES)
     t_eval = time.perf_counter() - t0
     t0 = time.perf_counter()
@@ -109,7 +110,7 @@ def main(out: Path):
     ax.set_title('ACDM (42 modes), anharmonic states, dynrange 500')
     save(fig, out / '4_acdm.png')
     t_plot = time.perf_counter() - t0
-    print(f'ACDM: load {t_load:.1f} s, evaluate and draw {t_eval:.1f} s, plot and save {t_plot:.1f} s')
+    print(f'ACDM: load {t_load:.1f} s, rows and grid {t_eval:.1f} s, plot and save {t_plot:.1f} s')
 
 
 if __name__ == '__main__':

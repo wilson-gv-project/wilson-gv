@@ -2,11 +2,12 @@
 The numbers: term coefficients, resonance locations, and the spectrum on a grid.
 
   in:  CompiledTerm list (plan.py), MolSystemData, the orientation-average recipe, a states choice
-  out: rows and zero pairs (build_contributions); the complex amplitude on a grid (draw_all, draw_window)
+  out: rows and zero pairs (build_contributions); the complex amplitude on a grid (all_features_on_grid,
+       boxed_features_on_grid)
 
   holds: the four factors of one index set (evaluate_full_index_dict), the sum over the summation labels
          (evaluate_term_coeff_sumover), the averaged part as one einsum per term (AvrgTensor), the resonance
-         location (solve_LSE_motif), the resonance factors on the grid, the drawing
+         location (solve_LSE_motif), the resonance factors on the grid, the features on the grid
 """
 
 import string
@@ -529,6 +530,8 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
              [-1,  1]]                           then w_B from row 1
 
     The location is {axis: w} over the motif's own axes: always a point, every axis has a value.
+    A motif without conditions (a term without resonance conditions, a flat background, todo.txt E12) has no axes:
+    its location is ResLocPoint({}), and the feature is the same on every grid point.
 
     raises np.linalg.LinAlgError if the location is not a point (fewer independent conditions
     than axes, e.g. a single condition on A + B) or the conditions are inconsistent.
@@ -536,7 +539,7 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
     checks guard motifs built by hand.
     """
     if len(motif) == 0:
-        raise ValueError('motif has no resonance conditions: no resonance location')
+        return ResLocPoint({})
 
     A, all_axes = generate_LHS_motif(motif)
     b = np.array(get_RHS_motif(motif, parameters, vibdata, unit))
@@ -617,6 +620,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     Every nonzero pair gets a location: CompiledTerm.from_VibPertTerm checks that the motif fixes
     one point (B7). A term built by hand skips that check; if its motif has no single point,
     solve_LSE_motif raises and the run stops.
+    A term without resonance conditions (a flat background, todo.txt E12) has no label to fix: one index set, {},
+    whose coefficient sums every label, at the location without axes (ResLocPoint({})).
     """
     modes = included_modes(molsys_data, exclude_modes)
     molsys_data.check_states_choice(states_choice)
@@ -686,7 +691,7 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
         a motif with N conditions, which the coefficients do not know about.
       - -i*gamma is not fixed by derive (no damping there). +i*gamma gives the complex conjugate
         everywhere, so |amplitude|^2 stays the same. -i*gamma matches to_str and the old code
-        (amplitudes/evaluators.py, evaluate_resonance_motif).
+        (deleted in E9; d93cc7b is the last commit with it).
     """
     freq = sum((-1 if ax.startswith('-') else 1) * grid[ax.lstrip('-')] for ax in res_cond_key.pf)
     return vib_diff.energy_difference(au=True) - freq
@@ -734,6 +739,7 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
                       a number per condition, or an array of the grid's shape for one that changes with
                       the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
     The box and get_intensity take the same propagator_param, at the peak (SpectralFeature.peak_widths).
+    A flat feature (no conditions, todo.txt E12): amplitude_coeff on every grid point, an array of the grid's shape.
     """
     param = feature.propagator_param
     if param is None:
@@ -749,7 +755,11 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     
     if feature.amplitude_coeff is None:
         raise ValueError(f'feature {feature} has no amplitude_coeff')
-    
+
+    if feature.is_flat:
+        shape = np.broadcast_shapes(*(np.shape(v) for v in grid_cm.values()))
+        return np.full(shape, complex(feature.amplitude_coeff))
+
     grid_au = {ax: convNu2Ene(v) for ax, v in grid_cm.items()}
 
     resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
@@ -759,12 +769,12 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
 
 
 # every feature on every grid point: no boxes, no domains
-def draw_all(features: Iterable['SpectralFeature'],
+def all_features_on_grid(features: Iterable['SpectralFeature'],
              vibstates_data: 'VibStatesData',
              coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
     Sum of eval_feature_on_grid over all features, each on the whole grid. Nothing is cut off, so this is
-    the reference for the drawing box by box (draw_window). Slow for many features on big grids.
+    the reference for the evaluation box by box (boxed_features_on_grid). Slow for many features on big grids.
 
     coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid.
     Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm (ij indexing),
@@ -778,24 +788,24 @@ def draw_all(features: Iterable['SpectralFeature'],
 
 
 # the window's features, each on its own box
-def draw_window(window: 'SpectralWindow',
+def boxed_features_on_grid(window: 'SpectralWindow',
                 vibstates_data: 'VibStatesData',
                 coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
     Every feature of the window (full_features and contrib_features) on its own box only: the part of the grid
     under its box (box_slices). Each box is a cut-out of the same grid points, so where boxes overlap their
-    amplitudes add, as in draw_all; squaring comes later, on the whole grid. Only each feature's tail beyond its
-    box is left out.
+    amplitudes add, as in all_features_on_grid; squaring comes later, on the whole grid. Only each feature's tail
+    beyond its box is left out.
 
     Size of the cut: set by the box sizes. With amplitude_half_widths (features.py) the intensity error stays near
-    eps * the plot's floor (measured against draw_all: tests/e10_boxes.py, todo.txt E10). To check a case,
-    compare with draw_all.
-    Until 2026-10-14 features were drawn by domains (boxes that overlap, each feature on the whole domain box):
+    eps * the plot's floor (measured against all_features_on_grid: tests/e10_boxes.py, todo.txt E10). To check a case,
+    compare with all_features_on_grid.
+    Until 2026-10-14 features were evaluated by domains (boxes that overlap, each feature on the whole domain box):
     that hid part of the cut of the old boxes, at up to 20 times the cost. With amplitude boxes the own box is enough.
 
-    window    - e.g. from SpectralWindow.from_features, so every feature has its box
+    window    - e.g. from SpectralWindow.from_features, so every feature has its box (a flat feature: the window)
     coords_cm - one 1D array per window axis, cm-1, e.g. the first output of window.sample_grid
-    Returns the complex amplitude in au, laid out as in draw_all. A box outside the grid adds nothing.
+    Returns the complex amplitude in au, laid out as in all_features_on_grid. A box outside the grid adds nothing.
     """
     total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
     for feature in window.full_features + window.contrib_features:
@@ -805,6 +815,6 @@ def draw_window(window: 'SpectralWindow',
         if slices is None:
             continue
         box_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
-        total[slices] += draw_all([feature], vibstates_data, box_coords)
+        total[slices] += all_features_on_grid([feature], vibstates_data, box_coords)
     return total
 

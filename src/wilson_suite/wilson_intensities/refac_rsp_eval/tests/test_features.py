@@ -689,7 +689,7 @@ def test_amplitude_half_widths_compare_peak_heights_not_coefficients():
 
 
 def test_amplitude_half_widths_with_every_amplitude_zero_are_the_smallest_boxes():
-    """rows that cancel everywhere: nothing to draw, no a_max to scale by -> min_gammas * gamma"""
+    """rows that cancel everywhere: nothing on the grid, no a_max to scale by -> min_gammas * gamma"""
     assert amplitude_half_widths(WINDOW_0_10, [feat(A=5., amp=0., gamma=5.), feat(A=6., amp=0., gamma=2.)],
                                  dynrange=100.) == [5., 2.]
 
@@ -724,7 +724,7 @@ def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
 
 
 @pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
-def test_amplitude_half_widths_need_a_drawable_feature(f, message):
+def test_amplitude_half_widths_need_a_feature_with_rows_and_width(f, message):
     with pytest.raises(ValueError, match=message):
         amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
@@ -834,9 +834,85 @@ def test_intensity_half_widths_reject_settings_out_of_range(setting, value):
 
 
 @pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
-def test_intensity_half_widths_need_a_drawable_feature(f, message):
+def test_intensity_half_widths_need_a_feature_with_rows_and_width(f, message):
     with pytest.raises(ValueError, match=message):
         intensity_half_widths(WINDOW_0_10, [f], dynrange=100.)
+
+
+## A flat background: rows without resonance conditions (todo.txt E12) ---------------------------
+# The rows of a term without conditions sit at the location without axes. The feature has the same amplitude on
+# every grid point: no peak, no width, no box of its own.
+
+def flat(amp: float = 2.) -> SpectralFeature:
+    return feat({}, amp=amp, gamma=5.)
+
+
+def test_flat_feature_has_no_axes():
+    assert flat().is_flat
+    assert not feat(A=0.).is_flat
+
+
+@pytest.mark.parametrize('propagator_param', [5., WIDTH_1_PERCENT])
+def test_flat_feature_has_no_peak_widths(propagator_param):
+    """No conditions, so no width; a function needs no conditions here."""
+    assert replace(flat(), propagator_param=propagator_param).peak_widths() == ()
+
+
+def test_flat_feature_intensity_is_its_amplitude_squared():
+    """No 1/gamma factor: amp 2 -> 4 (au), on every grid point."""
+    assert flat(2.).get_intensity() == 4.
+
+
+@pytest.mark.parametrize('window', [WINDOW_0_10, Box({'A': (500., 600.), 'B': (0., 1.)})])
+def test_amplitude_in_window_of_a_flat_feature_is_its_amplitude_anywhere(window):
+    assert amplitude_in_window(flat(2.), window) == 2.
+
+
+def test_amplitude_half_widths_give_a_flat_feature_0_and_count_it_for_a_max():
+    """
+    A background twice the strongest peak: a_max is the background, so every k halves, 1000, 10, 0.1 (as in
+    test_amplitude_half_widths_a_max_given_replaces_the_estimate). The background itself gets 0.
+    """
+    features = three_strengths()
+    background = flat(2. * features[0].get_intensity() ** 0.5)
+
+    half_widths = amplitude_half_widths(WINDOW_0_10, [*features, background], dynrange=100.)
+
+    assert half_widths == pytest.approx([5. * (1000. ** 2 - 1) ** 0.5, 5. * (10. ** 2 - 1) ** 0.5, 5., 0.])
+
+
+def test_intensity_half_widths_give_a_flat_feature_0():
+    """the peak: gamma 5, dynrange 101, no margin -> 5 * sqrt(100) = 50"""
+    assert intensity_half_widths(WINDOW_0_10, [feat(A=5., gamma=5.), flat()], dynrange=101.,
+                                 box_range_safety_margin=0.) == pytest.approx([50., 0.])
+
+
+def test_intensity_half_widths_scaled_count_a_flat_feature_as_inside():
+    """
+    The peak and a background 4 times its intensity: max_intensity is the background's, so the peak's
+    k = 100 / 4 = 25 -> 5 * sqrt(24). A background alone is enough as the feature inside.
+    """
+    peak = feat(A=5., gamma=5.)
+    background = flat(2. * peak.get_intensity() ** 0.5)
+
+    half_widths = intensity_half_widths(WINDOW_0_10, [peak, background], dynrange=100., box_range_safety_margin=0.,
+                                        scale_wrt_max_intensity=True)
+
+    assert half_widths == pytest.approx([5. * 24. ** 0.5, 0.])
+    assert intensity_half_widths(WINDOW_0_10, [background], dynrange=100., scale_wrt_max_intensity=True) == [0.]
+
+
+@pytest.mark.parametrize('box', [WINDOW_0_10, Box({'A': (0., 10.), 'B': (-5., 5.)})])
+def test_window_from_features_gives_a_flat_feature_the_window_as_its_box(box):
+    """In full_features, whatever its half-width (7 here); the peak next to it keeps its own box."""
+    peak = feat({ax: 5. for ax in box.axes}, gamma=5.)
+
+    window = SpectralWindow.from_features(box, [peak, flat()], [3., 7.])
+
+    [boxed_peak, boxed_flat] = window.full_features
+    assert window.contrib_features == []
+    assert boxed_flat.is_flat and boxed_flat.feat_box == box
+    assert boxed_peak.feat_box == Box({ax: (2., 8.) for ax in box.axes})
 
 
 ## RectangularDomain --------------------------------------------------------
