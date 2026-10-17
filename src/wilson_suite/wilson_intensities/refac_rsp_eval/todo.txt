@@ -4,7 +4,8 @@ Moved to wilson_system/todo.txt (2026-10-17), as they block nothing here: D4, D5
 G9 and the failing test_getting_data (the reader).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
-Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are on debug_rendering.
+Commits named in this file: on this branch (rsp_eval_refactor) 01a11d8, 96bcc63, 27408f9, 3612e5b, 7463870,
+d93cc7b; 11e3d0a is main; all others (e.g. 0c2de12, 5062d5e, 27f41ee, 40621bd) are on debug_rendering.
 The old code before its removal (E9), on rsp_eval_refactor: d93cc7b is the last commit with all of it (amplitudes/,
 its tests in wilson_intensities/tests, the old-vs-new scripts c2_variations.py, c2_leaves.py, c3_spectrum.py).
 A deleted file, or the file list of a folder, at that commit:
@@ -18,7 +19,7 @@ Errors in either one need a check on that side.
 the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (G6).
 
 
-Tests (run 2026-10-16, branch rsp_eval_refactor)
+Tests (run 2026-10-17, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
     refac_rsp_eval   684     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
@@ -26,18 +27,20 @@ Tests (run 2026-10-16, branch rsp_eval_refactor)
     rest of src      218     1     1      -   none
     tests/ (root)      4    16     -      -   none
 Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The 1 in the rest of src: test_wilson_data_obtainer
-(test_getting_data). Before E9 deleted the old tests the rest of src had 323 / 4 / 3 (pass / fail / skip): 3612e5b
-deleted the old unit and integration tests, 7463870 test_integration_rendering.py (2 pass, 2 skip).
+(test_getting_data; wilson_system/todo.txt R2). The 16 in tests/: E9 stage 3 (C). Before E9 deleted the old
+tests the rest of src had 323 / 4 / 3 (pass / fail / skip): 3612e5b deleted the old unit and integration tests,
+7463870 test_integration_rendering.py (2 pass, 2 skip).
 A fresh checkout (e.g. a git worktree) fails more: some tests read files that git ignores,
 e.g. src/wilson_suite/terms_fuller_flat.json.
 
 
-Status (2026-10-16)
+Status (2026-10-17)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
-agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
+agrees. ACDM (42 modes): 5.7 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-In progress: deleting the old code (E9: stages 1, 2, 5 done; 3, 4 in part).
+Deleting the old code (E9): stages 1, 2, 4, 5 done; stage 6 (comments) open; stage 3 (old scripts and tests,
+README quick start) comes last, right before the pull request (decided 2026-10-17).
 Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
@@ -80,20 +83,23 @@ checked without them: test_evv_reference.py against evv_reference.json.
 
 Order of work
 -------------
-The rule of 2026-10-14 (no big moves or removals outside refac_rsp_eval) was lifted 2026-10-16: steps 4 and 5
-can go ahead. Steps 1-3 may use the old code; step 4 deletes it.
+The rule of 2026-10-14 (no big moves or removals outside refac_rsp_eval) was lifted 2026-10-16: step 4 can go
+ahead. Steps 1-3 may use the old code; step 4 deletes it. Step 5 moved to wilson_system/todo.txt (2026-10-17).
     #  item  what                                               state
     1  D4    decide who owns VibState, MolecularProperty,       done 2026-10-14: wilson_system
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                in progress: stages 1, 2, 5 of 6 done (E9)
+    4  E9    delete the old code                                stages 1, 2, 4, 5 done; 6 open; 3 last,
+                                                                right before the pull request (E9)
     5  D4    the code move                                      moved to wilson_system/todo.txt 2026-10-17
     6  E4    README, with the data-dict contract (D5, in        postponed 2026-10-14
              wilson_system/todo.txt)
 
 Other items:
-    small, any time      H8 (keep or drop a rule)
+    small, any time      H8 (keep or drop a rule), E9 stage 6 (comments that name the old code)
+    last, before the PR  E9 stage 3 (C, D in todo_oldcode_rm.txt)
+    kept, unused         E16 (the domains)
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
     next (2026-10-16)    E12 (flat background)
@@ -203,8 +209,8 @@ E. Pipeline
         the code does not follow):
             git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md
 [ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
-        [outside]. Until E9, the old pipeline runs, double count included (C3). From E9 until E6b,
-        WilsonSimulation.evaluate raises NotImplementedError, and the entry point is the library calls below
+        [outside]. Since E9 (2026-10-16) WilsonSimulation.evaluate raises NotImplementedError until E6b (before,
+        it ran the old pipeline, double count included, C3). The entry point is the library calls below
         (e.g. tests/example_evaluate_response_terms.py, tests/example_plot_spectrum.py).
             molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
             result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
@@ -218,8 +224,8 @@ E. Pipeline
             laser_pol         numbers, e.g. (1, 1, 1)                      exp.polarization_avg_vector
             propagator_param  cm-1, a number or a function (E5)            ev_info.Gamma, ev_info.Gamma_unit
             exclude_modes     mode numbers, from 0                         vib_ana_setup.exclude_modes
-            window            grid.Box, cm-1, one range per axis           ev_info.spectral_window.box (another Box
-                                                                           class, spectrum_composition: convert)
+            window            grid.Box, cm-1, one range per axis           ev_info.spectral_window (typed Any since
+                                                                           E9; held the old SpectralWindow, deleted)
             dim_sizes         grid points per axis, both edges included    ev_info.grid_resolution
             box_rule          features.BoxRule, knobs by functools.partial,
                               e.g. partial(amplitude_half_widths, dynrange=500.)
@@ -233,7 +239,8 @@ E. Pipeline
                               grid_mesh (a full array per axis; the old spec_eval_setup.grid),
                               grid_axes (1D points per axis), spectral_window (features and boxes)
         Not supported: data from more than one source (the old eval_by_prop_name); MolSystemData.load takes one
-        origin. The old-vs-new check matches only without excluded modes (the two codes exclude differently).
+        origin (wilson_system/todo.txt S8). The old-vs-new check matched only without excluded modes (the two
+        codes exclude differently).
 [ ] E8  Lines and planes (later). Fewer independent conditions than the axes they use: the resonance is a line or
         a plane, not a point, e.g. one condition on A + B (a diagonal line). B7 rejects these terms when compiling.
         (A term on fewer axes than the spectrum, e.g. only B in an (A, B) spectrum, is not one of these: it is a
@@ -248,20 +255,21 @@ E. Pipeline
         same everywhere along A - B. The drawing already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would draw such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. In progress since 2026-10-16: stages 1, 2, 5 of 6 done; 3, 4 in part (below).
+[ ] E9  Delete the old code. Since 2026-10-16: stages 1, 2, 4, 5 of 6 done; 6 open; 3 last, right before the pull
+        request (decided 2026-10-17).
         d93cc7b is the last commit with all of the old code (see the top of this file). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
-          (workflow_abstractions.py:356, imports the old EvaluationWorkflow) raises NotImplementedError until then.
-          These call it and break with it (fix or drop with E9): README.md (the quick start),
-          examples/quick_start.ipynb, script_example.py, wilson_analysis/tests/test_integration_rendering.py,
-          wilson_main/tests/test_saving_in_workflow.py (test_save_wilsonsim), and in tests/:
-          test_intensities_testing.py, evv_tester.py, evv_tester_general_evaluator.py, pulse_exp_var_tester.py.
+          (workflow_abstractions.py:352; it ran the old EvaluationWorkflow) raises NotImplementedError until then.
+          These called it: README.md (the quick start), examples/quick_start.ipynb, script_example.py,
+          wilson_analysis/tests/test_integration_rendering.py, wilson_main/tests/test_saving_in_workflow.py
+          (test_save_wilsonsim), and in tests/: test_intensities_testing.py, evv_tester.py,
+          evv_tester_general_evaluator.py, pulse_exp_var_tester.py. test_integration_rendering.py is deleted and
+          test_save_wilsonsim cut (todo_oldcode_rm.txt B); the rest is stage 3.
         - no need to wait for G7: its old-vs-new part was dropped (see G7).
         Size (2026-10-16): amplitudes/ 4444 lines (averaging.py, 485 of them, stays); wilson_intensities/tests/unit
         and integration 5167 lines, 4401 of them for the old code (deleted, stage 2).
-        Code outside refac_rsp_eval still imports the old code: deleting amplitudes/ today breaks importing
-        pipeline.py. Stages, each checked (every test's outcome and the import of every module under src, diffed
-        against the stage before):
+        Stages, each checked (every test's outcome and the import of every module under src, diffed against the
+        stage before):
         1 [x] the old-vs-new scripts tests/c2_variations.py, c2_leaves.py, c3_spectrum.py (3612e5b).
         2 [x] the old tests in wilson_intensities/tests: 16 unit and 2 integration files, 4401 lines, 106 tests
               (3612e5b). Kept: test_averaging.py (averaging.py stays), test_spectrum_utils.py, test_tags.py, the
@@ -269,18 +277,18 @@ E. Pipeline
               from test_resonances.py; the helper moved into test_latex.py.
         3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). Categorized in
               todo_oldcode_rm.txt (B, C, D). Done as the prep for stage 5: B (test_integration_rendering.py
-              deleted; test_save_wilsonsim without its old part). Open: C, D.
-        4 [ ] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E). Done as the prep for stage 5: A1
-              (EvaluationInfo.spectral_window: Any), E1 (evaluate raises NotImplementedError). Open: E2-E5.
-              spectrum_abstractions.py, line 5, imports SpectralWindow from amplitudes/spectrum_composition.py; it is
-              the type of EvaluationInfo.spectral_window (line 270).
-              workflow_abstractions.py: WilsonSimulation.evaluate raises NotImplementedError instead of running the
-              old EvaluationWorkflow; VibState.
+              deleted; test_save_wilsonsim without its old part). Open: C, D; done last, right before the pull
+              request (decided 2026-10-17).
+        4 [x] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E). Done as the prep for stage 5: A1
+              (spectrum_abstractions.py line 5 no longer imports the old SpectralWindow;
+              EvaluationInfo.spectral_window: Any), E1 (WilsonSimulation.evaluate raises NotImplementedError).
+              E2-E5 stay for E6b and E7b: no more changes to WilsonSimulation in this refactor, since they do not
+              involve the new evaluator (decided 2026-10-17).
         5 [x] the 14 old modules of amplitudes/, 3941 lines (2026-10-16). Check: no test changed; only the 14 modules
               left the import list. Only category C (todo_oldcode_rm.txt) still imports them, and it failed before.
-              The example tests/example_evaluate_response_terms.py runs (0.9 s). With them went: the domains
-              (find_clusters_by_featboxes, RectangularDomain; unused since E10 and E7, only c3_spectrum.py used
-              them) and the old pipeline's copy of the box rule (spectrum_composition.py; its tests went in stage 2).
+              The example tests/example_evaluate_response_terms.py runs (0.9 s). With them went the old pipeline's
+              copies of the domains and of the box rule (spectrum_composition.py; their tests went in stage 2).
+              The new code's domains stay, unused (E16).
               amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
               get_pol_laser from it, and pipeline.py imports from it too.
               amplitudes/__init__.py imported spectrum_composition, evaluation_wf, term_parts: now only the
@@ -288,7 +296,7 @@ E. Pipeline
         6 [ ] todo.txt, docstrings and comments that name the old code. Left 2026-10-16: features.py:507,
               evaluate.py:689, plan.py:40-42, system_data.py:14, tests/helpers.py:78, tests/test_evv_reference.py:8;
               commented-out code in wilson_analysis/analysis/pre_eval.py (lines 4, 136, 178).
-        Stage 5 needs line 5 of spectrum_abstractions.py changed first (stage 4). Two dry runs, 2026-10-16 (the
+        Stage 5 needed line 5 of spectrum_abstractions.py changed first (stage 4, A1). Dry runs, 2026-10-16 (the
         files restored after):
             stage 5 alone             import wilson_suite fails (wilson_main/__init__.py imports
                                       spectrum_abstractions), so no test is collected (24 errors)
@@ -334,7 +342,7 @@ E. Pipeline
         Domains (each feature drawn on the rectangle around all the boxes it overlaps): not needed for interference;
         all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of the old cut
         (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the own box is
-        enough. They go with E9.
+        enough. The new code's domains stay, unused (E16).
         intensity_half_widths vs the old dress_these_with_boxes: returns half-widths (no deep copy); never drops a
         feature; no error for a feature stronger than max_intensity. Same knobs (box_range_safety_margin 0.1,
         unscaled, minimum_box_padding 0 cm-1), plus dynrange.
@@ -409,6 +417,24 @@ E. Pipeline
         draw_by_domains went with c3_spectrum.py (E9, stage 1); the counts above are from before, when c3_spectrum.py
         had 8 of the uses.
         When: before E6b and the merge to main; no code outside this branch calls the names yet.
+[-] E16 Domains in the new code: unused, kept for now (decided 2026-10-17). A domain is the rectangle around a
+        cluster of features whose boxes overlap. No evaluation code calls them, only tests. The last other caller,
+        draw_by_domains in tests/c3_spectrum.py, went in E9 stage 1. Why unused: E10 (with amplitude boxes each
+        feature on its own box is enough).
+        What exists:
+            grid.py:175-246       compute_box_adjacency: an n x n matrix, True where two boxes overlap on every
+                                  axis (touch_inclusive: touching counts too); connected_components_from_adjacency:
+                                  the groups of objects linked through the matrix (depth-first search)
+            features.py:363-376   features_to_clusters: the features grouped by overlapping feature boxes
+                                  (feat_box; raises for a feature without one)
+            features.py:652-661   SpectralWindow.find_clusters_by_featboxes: one RectangularDomain per cluster of
+                                  the window's features (full_features and contrib_features together)
+            features.py:664-707   RectangularDomain: box (the union of its features' boxes), full_features,
+                                  contrib_features, __hash__, from_features; 4 add_* methods marked UNUSED
+        Tests: test_grid.py:291-376 (13: adjacency, connected components, features_to_clusters); test_features.py
+        (7, at lines 511, 580, 844, 853, 858, 868, 940).
+        Possible use, none planned: groups of nearby peaks, e.g. to choose zoom windows or slice positions (E14).
+        Delete with their tests (H1) once nothing needs them.
 
 
 F. Speed
@@ -421,8 +447,9 @@ examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points
     load                  4 s      once per molecule
     build_contributions   3.3 s    17101 rows, 7595 zero; runs again for each polarization, states or axis choice
     drawing               2.5 s    1.5 s since E10 (amplitude boxes, eps 0.1)
-    per spectrum          5.9 s    measured before E10
-History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand).
+    per spectrum          5.7 s    5.9 s before E10 (f2_speed.py docstring)
+History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (leaves on demand); 5.7 s
+after E10 (2026-10-14).
 What a changed setting needs again (measured 2026-10-15, ACDM). build_contributions under cProfile: the loop over
 index sets about 90 % (892584 calls; inside it the averaged lookups 11 %, non-averaged 22 %, energy-difference
 denominators 23 %, 1/omega 5 %), location solves 4 %, the averaged einsum about 0 %.
@@ -439,7 +466,8 @@ denominators 23 %, 1/omega 5 %), location solves 4 %, the averaged einsum about 
     excluded modes, molecule   everything                 full rerun              no
     a subset of terms          which rows count           possible: table.where + dataclasses.replace (filter
                                                           zero too); not documented, not tested
-FeatureResult.leaves(row): 0.1 ms per row (2026-10-15; its docstring and Done say 1 ms).
+FeatureResult.leaves(row): 0.27 ms per row (2026-10-17: 2000 random rows, 37 leaves per row on average; 0.1 ms
+on 2026-10-15, 1 ms on 2026-10-12).
 Better than caching: the sum as arrays (the first line below). It speeds every rerun, and bigger molecules and
 4D need it: 4 IR + UV terms have up to 4 labels, about 1e10 index sets on ACDM (EVV: 0.9 million), about half a
 day with the loop (estimate).
@@ -516,7 +544,7 @@ checking side.
 [ ] G6  [aside] Near-zero energy differences: the smallest |E| per term and molecule. A value near zero makes a
         term huge; otf_vibdiffdenom raises only at exactly zero (the evaluator's part). Which energies come near
         each other is a property of the molecule's states (the data).
-[ ] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below), and the hand calculations for CARS
+[x] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below), and the hand calculations for CARS
         and 3 IR (2026-10-16, Done). Old vs new dropped 2026-10-16: correctness is checked by numerical tests
         against hand calculations, not against the old code (which shares derive, the reader and the averaging).
         Left: nothing for now; more hand calculations when a new setup is used. The scripts named here do not run
@@ -666,12 +694,12 @@ Built
     F2   Speed test on ACDM (2026-10-12): 80 s per spectrum, of which averaging 47 s, deepcopy 16 s.
     F3   Denominators split once per term (2026-10-12; CompiledTerm.freq_vibenedenom, freq_pert_wf_diff).
          ACDM build_contributions 22 s -> 3.9 s.
-    -    Leaves on demand (2026-10-12): FeatureResult.leaves(row), about 1 ms per row on ACDM (keeping all: 357 MB).
+    -    Leaves on demand (2026-10-12): FeatureResult.leaves(row), 0.27 ms per row on ACDM (keeping all: 357 MB).
          build_contributions 3.9 s -> 3.3 s.
     -    States by choice, and MolSystemData.load (2026-10-12), see Decisions.
     D3   ParameterSet (plan.py) holds exactly the given labels (2026-10-14): no hidden 'zero' entry, no '' -> 'zero'
-         remap, no order (__lt__ and SpectralFeature.sort_by_params deleted). The old code keeps its two copies
-         (term_parts.py, func_abstractions.py).
+         remap, no order (__lt__ and SpectralFeature.sort_by_params deleted). The old code's two copies
+         (term_parts.py, func_abstractions.py) went in E9 stage 5.
     D5   Load checks (2026-10-14); the coordinates part checked (2026-10-11).
 Checked: the numbers are right
     C1   Empty placeholder tests filled; new tests for the averaging and the denominators (they found B6).

@@ -26,9 +26,9 @@ The new evaluator reads the states from the file (MolSystemData.load).
 Decisions
 ---------
 - wilson_system owns VibState, MolecularProperty, MolPropsCollection (2026-10-14, D4); wilson_main imports them.
-- Imports free of cycles (2026-10-14): refac_rsp_eval's plan.py imports system_data only for type hints
-  (if TYPE_CHECKING); system_data.py does not import plan.py; evaluate.py and pipeline.py import system_data for
-  real. wilson_system imports nothing from wilson_intensities.
+- Imports free of cycles (2026-10-14): system_data.py imports nothing from wilson_intensities. In refac_rsp_eval,
+  evaluate.py, features.py and pipeline.py import system_data; plan.py does not import it at all (checked
+  2026-10-17).
 - One MolSystemData = one origin (2026-10-17): one DataOriginInfo, i.e. one file or calculation.
   MolSystemData.load(origin, names) reads everything from that origin in one reader call.
 - The anharmonic state calculation goes to wilson_system (2026-10-17): vpt2.py and the step that turns its output

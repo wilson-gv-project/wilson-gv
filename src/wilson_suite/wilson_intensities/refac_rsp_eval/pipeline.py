@@ -154,7 +154,7 @@ class FeatureResult:
             An index set whose average or non-averaged part is 0 holds only the factors made before the stop,
             e.g. {'AVRG': 0.}.
         Computed again from row.term_id and row.params, with the terms, data, polarization and excluded modes of
-        this result, so the leaves add up to row.coeff. About 1 ms per row on ACDM (42 modes); build_contributions
+        this result, so the leaves add up to row.coeff. About 0.3 ms per row on ACDM (42 modes); build_contributions
         does not keep them, since every row's leaves would take 357 MB there.
         """
         if (self.compiled is None or self.molsys is None or self.polarization_linear_comb is None
