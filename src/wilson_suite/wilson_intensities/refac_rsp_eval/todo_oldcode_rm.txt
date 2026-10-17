@@ -124,7 +124,8 @@ E5  EvaluationInfo fields that only the old code reads (no reader left after sta
     grid_resolution, box_range_safety_margin, scale_wrt_max_intensity, minimum_box_padding. spectral_axes has no
     reader today. The E6 table (todo.txt) maps them to the new inputs: window, dim_sizes, box_rule.
     SpecEvalSetup.is_ready_evaluate (lines 334-342) checks spectral_window, grid_resolution and dynamic_range.
-Not E9: workflow_abstractions.py line 14 imports VibState from wilson_main/abstractions.py (D4).
+Not E9: workflow_abstractions.py line 14 imports VibState from wilson_main/abstractions.py (D4,
+wilson_system/todo.txt).
 proposal: E1 as decided; E2 stays (it raises through evaluate); E3 goes with C (its only callers); E4, E5 stay for
 E6b and E7b.
 
@@ -135,7 +136,8 @@ F1  wilson_utils/useful_shortcuts.py: its import fails today (PlotConfig, line 1
     pipeline (bare_wsim_for_EVVpGVPT2, makeSpecSetup2D, make_plot_config). Users: C1 only
     (wilson_analysis/analysis/pre_eval.py has the import commented out).
 F2  src/wilson_suite/calcsetups.py, molprops.py: their import fails today, on main too: DataOriginInfo(program=...),
-    a field DataOriginInfo does not have (it has source_type). molprops.py is one of D4's 7 files.
+    a field DataOriginInfo does not have (it has source_type). molprops.py is one of D4's 7 files
+    (wilson_system/todo.txt).
 F3  src/wilson_suite/vibana.py: its import fails today (wilson_suite.fixtures has no mol_system).
 
 

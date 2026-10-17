@@ -342,7 +342,7 @@ def test_load_raises_for_data_that_does_not_fit_and_names_the_source():
         MolSystemData.load(ORIGIN, ['cff'], obtainer=fake_obtainer(data, []))
 
 
-## check_data_dict: the data dict fits what the evaluator reads (refac_rsp_eval/todo.txt D5) ----------------
+## check_data_dict: the data dict fits what the evaluator reads (wilson_system/todo.txt D5) -----------------
 # TOY_DATA fits: 2 modes. Each test breaks one rule; from_datadict runs the same check.
 
 def test_prop_index_counts_every_order_has_its_own_name():

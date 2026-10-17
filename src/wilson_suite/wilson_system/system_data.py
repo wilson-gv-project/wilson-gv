@@ -388,7 +388,7 @@ class MolSystemData:
 
 def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
     """
-    raises ValueError if data_dict does not fit what the evaluator reads (refac_rsp_eval/todo.txt D5), with every
+    raises ValueError if data_dict does not fit what the evaluator reads (wilson_system/todo.txt D5), with every
     problem found:
         names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
                       'anharmonic_states' may be missing: MolSystemData.check_states_choice raises if it is asked for.

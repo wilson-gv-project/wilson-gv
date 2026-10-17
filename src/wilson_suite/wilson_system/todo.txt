@@ -1,0 +1,254 @@
+wilson_system — TODO
+started 2026-10-17, branch rsp_eval_refactor
+wilson_system holds the data of one molecule: MolSystemData and its parts (system_data.py). Planned: the anharmonic
+state calculation (VPT2) moves here from wilson_intensities/anharmonic_treatment (decided 2026-10-17).
+The evaluator refactor has its own list, wilson_intensities/refac_rsp_eval/todo.txt. Its items are named here with
+"refac", e.g. refac E6b. Moved here from that list on 2026-10-17, as they block nothing in the evaluator: D4 and D5
+(wilson_system's classes), G2, G8, G9 and the failing test_getting_data (the reader, R2).
+
+[wilson_main] = a change in wilson_main (the old workflow).
+[outside] = a change in CQCParse (the parser that wilson_data_obtainer calls; a separate repo).
+
+
+Status (2026-10-17)
+-------------------
+In wilson_system now: system_data.py (DataOriginInfo, VibState, VibStatesData, VibDiff, MolSystemData,
+check_data_dict, MolecularProperty, MolPropsCollection) and tests/test_system_data.py.
+D4 (one copy of VibState, MolecularProperty, MolPropsCollection): checked by a dry run, the move not started.
+D5 (the data-dict contract): the load checks are done; the table is not in a README yet.
+The reader (wilson_utils/wilson_data_obtainer.py) moves here after the refactor is merged into main (R1, decided
+2026-10-17). Its checks: G2 in part, G8 and G9 not started; test_getting_data fails (R2).
+The anharmonic part (S1-S6) is not started. It waits until the evaluator refactor is done (decided 2026-10-17).
+Until then Wilson computes anharmonic states only in wilson_main's old workflow (VibAnaSetup, anharm_analyzer_data).
+The new evaluator reads the states from the file (MolSystemData.load).
+
+
+Decisions
+---------
+- wilson_system owns VibState, MolecularProperty, MolPropsCollection (2026-10-14, D4); wilson_main imports them.
+- Imports free of cycles (2026-10-14): refac_rsp_eval's plan.py imports system_data only for type hints
+  (if TYPE_CHECKING); system_data.py does not import plan.py; evaluate.py and pipeline.py import system_data for
+  real. wilson_system imports nothing from wilson_intensities.
+- One MolSystemData = one origin (2026-10-17): one DataOriginInfo, i.e. one file or calculation.
+  MolSystemData.load(origin, names) reads everything from that origin in one reader call.
+- The anharmonic state calculation goes to wilson_system (2026-10-17): vpt2.py and the step that turns its output
+  into states. VPT2 gives state energies of the molecule, the data MolSystemData holds. vpt2.py moves too, so that
+  wilson_system does not import wilson_intensities: refac_rsp_eval (in wilson_intensities) imports wilson_system.
+
+
+Order of work
+-------------
+    any time                 D4 for VibState and MolPropsCollection (import lines only)
+    with refac E6b           D4 for MolecularProperty
+    after the refactor       S1 (move vpt2.py) -> S2 (with_states) -> S3 (anharmonic_states) -> S4 (tests)
+                             -> S6 (remove the old path)
+    after the merge          R1 (move wilson_data_obtainer.py here)
+    any time                 S5 (eig -> eigh), R2 (test_getting_data)
+    when needed              G2 (if the reader changes), G8 (before CFOUR data is used), G9 (when normal_modes
+                             are needed)
+    open points              S7 (MolecularProperty from a description), S8 (two origins in one run)
+
+
+Related items in refac_rsp_eval/todo.txt
+----------------------------------------
+    refac E4    the README. Its contents include D5's table.
+    refac E6b   the caller (WilsonSimulation) moves to the new code. Then find_props has a replacement
+                (pipeline.prop_names) and wilson_main's MolecularProperty has no job left (D4).
+
+
+D. Data model
+-------------
+[ ] D4  VibState, MolecularProperty, MolPropsCollection exist twice: wilson_main/abstractions.py and
+        wilson_system/system_data.py. Decided 2026-10-14: wilson_system owns them; wilson_main imports them, and
+        its copies are dropped. Keep wilson_main's import line after the move: the pickles of S4 store the classes
+        by the path wilson_suite.wilson_main.abstractions, and load only while that module has the three names.
+        The two copies differ (checked 2026-10-16), so a caller of wilson_main's copies needs more than a new
+        import line:
+            MolecularProperty    wilson_main's has prop_spec (required), calc_setup, vals as an InitVar;
+                                 wilson_system's has trivial_name, vals, extra_data. find_props
+                                 (wilson_main/main_functions.py, the old pipeline's property list) and molprops.py
+                                 build it with prop_spec.
+            MolPropsCollection   .get of an unknown name: wilson_main's raises ValueError, wilson_system's returns
+                                 None (its [] raises KeyError)
+            VibState             defaults: state_label None / '', harmonic_WF None / False (wilson_main /
+                                 wilson_system); get_1q_states only in wilson_system (no caller)
+        Files that use wilson_main's copies: 7. main_functions.py, workflow_abstractions.py, molprops.py,
+        anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py,
+        wilson_intensities/tests/integration/test_anharm_analyzer.py,
+        wilson_main/tests/abstractions/test_abstr_classes.py. 13 more went with refac E9 (stages 2 and 5).
+        Dry run 2026-10-17: wilson_main/abstractions.py imports wilson_system's three classes, its copies deleted
+        (the files restored after). 10 tests go from pass to fail, all in wilson_main's old workflow:
+        test_main_functions.py 4, integration/test_anharm_analyzer.py 3, test_saving_in_workflow.py 2,
+        test_abstr_classes.py 1. All 10 fail on MolecularProperty; VibState and MolPropsCollection change no test.
+        Each error hides the next; patched by hand one at a time:
+            1  MolecularProperty(pdict, trivial_name=...): TypeError. The first argument of wilson_system's class
+               is trivial_name. main_functions.py:44-70 and 205; molprops.py (26 calls; its import fails today
+               anyway, refac_rsp_eval/todo_oldcode_rm.txt F2)
+            2  .h(1) missing. find_props and find_residual_vib_info drop duplicate properties by h(1), a hash of
+               prop_spec. main_functions.py:207, 247, 263
+            3  addCalcSetup, calc_setup, addValues missing. workflow_abstractions.py:242, 252, 298;
+               main_functions.py:276, 328
+        With 1-3 patched, 2 tests still fail. Both test the old class itself: test_MolecularProperty, and
+        test_find_props_and_max_state_lvl (calls h(1)).
+        Not seen in tests:
+            - vals given at creation. wilson_main's MolecularProperty(spec, trivial_name='dipgrad', vals=arr).vals is
+              None: vals is an InitVar, and no __post_init__ reads it. wilson_system's keeps arr.
+            - to_dict: {prop_spec, trivial_name} -> {trivial_name, extra_data}. extra_data of cff and qff is a numpy
+              array, so WilsonSimulation.writeToJsonFile would fail. Its only call is commented out
+              (tests/evv_tester.py:242).
+            - == between two properties with array values raises ValueError in wilson_system's class (it compares
+              vals). No code compares properties with ==.
+            - VibState: anharm_analyzer_data makes states without a label, so state_label is '' instead of None.
+              do_anharmonic_analysis sets the labels right after. No code reads harmonic_WF.
+        Steps: VibState and MolPropsCollection: import lines only. MolecularProperty: patches 1 and 2 go when
+        find_props uses pipeline.prop_names (refac E6b; on EVV both give the same 5 names, see S7); patch 3
+        (a data source per property) goes with S8.
+[ ] D5  Data-dict contract: what MolSystemData.from_datadict, and so the evaluator, expects. Delivering a dict that
+        fits is the reader's job [outside].
+        To do: write the table below into the README (refac E4).
+        Load checks done 2026-10-14: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load
+        too). It lists every problem in one ValueError. Passes on formaldehyde, water, CO, ACDM; 52 ms at 42 modes.
+            rule            what                                              load check
+            names           properties: dipgrad, polgrad, polhess, diphess,   every needed name is there;
+                            cff, ...; frequencies: 'nc_sqrt_eigval';          anharmonic states only when asked
+                            states: 'harmonic_states', 'anharmonic_states'    for (check_states_choice)
+            layout          mode indices first, then x, y, z, e.g.            shapes (PROP_INDEX_COUNTS; none for
+                            polhess[a, b, x, y]; modes 0 .. n-1               'B', 'coriolis'); frequency keys
+                            (n = number of frequencies)                       are 0 .. n-1
+            full tensors    every index order is filled, e.g. cff[a, c, c]    symmetric in the mode indices
+                            and cff[c, a, c]                                  (rtol 1e-12, atol 1e-18)
+            units           properties in au; frequencies and state           -
+                            energies in cm-1 (converted to Eh inside)
+            coordinates     plain derivatives in mass-weighted coordinates,   none possible. Gaussian reader
+              [outside]     au; derive's formulas fit only this form          fits (2026-10-11); CFOUR: not checked
+            state energies  relative to the ground state (0);                 the fundamentals are there;
+                            key ('0', '0') = 2 quanta in mode 0               warning (no error) for energies <= 0
+            zero            |value| < 1e-18 counts as 0 (rounding noise       -
+                            ~1e-19; real values 1e-9 or more)
+        ACDM's anharmonic states (GVPT2) have 66 of 14189 energies <= 0, e.g. the fundamentals of modes 41, 40, 39:
+        -136.1, -128.0, -54.7 cm-1 (harmonic: positive); the lowest, ('40', '41', '41'), -596.7 cm-1. The
+        low-frequency modes of the dimer. refac F2 and E10 use them anyway.
+        Tests with toy dicts must use a dict that fits (TOY_DATA, test_system_data.py).
+
+
+R. Reader (wilson_data_obtainer -> CQCParse)
+--------------------------------------------
+Old and new evaluator read the same data dict, so refac C2, C3 and G1 would all miss a reader error: the checks
+below matter for the final spectra.
+[ ] R1  Move wilson_utils/wilson_data_obtainer.py (89 lines) to wilson_system, e.g. wilson_system/data_obtainer.py.
+        Decided 2026-10-17; after the refactor is merged into main.
+        Why: MolSystemData.load is the new code's only caller (the evaluator reads no data, refac decision of
+        2026-10-14). D5, G2, G8, G9 are about the dict it returns. In wilson_utils it imports DataOriginInfo from
+        wilson_main (wilson_data_obtainer.py:1); in wilson_system it imports DataOriginInfo from system_data.
+        Contents: wilson_data_obtainer (groups the request by origin, calls CQCParse parse_from_source; source type
+        'wilson' raises NotImplementedError) and save_obtained_data (.pkl; .json raises NotImplementedError).
+        Import cycle: none at import time. MolSystemData.load imports the obtainer inside the function
+        (system_data.py:363); that stays.
+        Callers (2026-10-17): 11 files import the module path wilson_suite.wilson_utils.wilson_data_obtainer:
+        system_data.py, test_hand_calculation.py, test_integration.py, integration/test_anharm_analyzer.py,
+        test_main_functions.py, test_saving_in_workflow.py, test_wilson_data_obtainer.py, tests/evv_tester.py,
+        tests/evv_tester_general_evaluator.py, tests/pulse_exp_var_tester.py, examples/quick_start.ipynb.
+        2 more use the package: wilson_utils/__init__.py re-exports wilson_data_obtainer and save_obtained_data;
+        workflow_abstractions.py:333 imports save_obtained_data from wilson_utils.
+        Steps: move the file and its test (wilson_utils/tests/test_wilson_data_obtainer.py); keep a one-line
+        re-export at the old path, so every caller keeps working; change the import lines later, then delete the
+        re-export.
+[ ] R2  test_getting_data (wilson_utils/tests/test_wilson_data_obtainer.py) fails, on main too: the reader returns
+        one key more than the test expects, 'reindex_modes' (the expected keys: test line 103).
+        open: add the key to the test, or the reader stops returning it [outside].
+[ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
+        harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
+        and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for
+        mass-weighted derivatives, D5). Left: one anharmonic fundamental; polhess ("Polarizability tensor
+        [Alpha(0,0)] : 2 quanta" rows). Make it a test only if the reader changes.
+[ ] G8  CFOUR reader: not checked. It turns dimensionless derivatives into mass-weighted ones (times sqrt(w)).
+        qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass factor;
+        getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
+[ ] G9  normal_modes: the reader fails on ACDM and ACAC ("cannot reshape ... into shape (0,3,3)", 2026-10-12).
+        The evaluator does not need normal_modes (MolSystemData.load does not ask for it), so ACDM runs end to end.
+
+
+S. Anharmonic states and the data model
+---------------------------------------
+[ ] S1  Move vpt2.py (544 lines) from wilson_intensities/anharmonic_treatment/ to wilson_system/. vpt2.py imports
+        only numpy, copy and logging. Import lines that change:
+            wilson_intensities/anharmonic_treatment/__init__.py         from .vpt2 import anharm_corr_energies, get_X
+            wilson_intensities/anharmonic_treatment/anharmonic_analyzer.py
+            wilson_intensities/tests/unit/test_vpt2_new.py              from ...anharmonic_treatment.vpt2 import ...
+        get_vpt2_corrected_levels (vpt2.py:462) has no caller.
+[ ] S2  MolSystemData.with_states(states_choice, states) -> MolSystemData: a copy with one more state set, e.g.
+        states['anharmonic'] from S3. MolSystemData is frozen:
+            dataclasses.replace(self, states={**self.states, states_choice: states})
+[ ] S3  anharmonic_states(molsys, regime, exclude_modes) -> VibStatesData, next to vpt2.py. Replaces
+        anharm_analyzer_data (anharmonic_analyzer.py), which takes wilson_main's list of MolecularProperty.
+        Inputs from molsys: eigenvals (nc_sqrt_eigval); cff_rc and qff_rc (cubic and quartic force constants in
+        cm-1); B; coriolis. regime: 'VPT2', 'GVPT2' or 'DVPT2', as in anharm_analyzer_data.
+        Output: anharm_analyzer_data builds {('0',): E, ('0', '1'): E, ...} (anharmonic_analyzer.py:52-70), the
+        format of the data dict's 'anharmonic_states'. So _make_hq_states_from_datadict can build the VibState
+        objects, with labels from make_state_label. anharm_analyzer_data leaves state_label unset; wilson_main's
+        do_anharmonic_analysis sets the labels afterwards.
+        Use:
+            molsys = MolSystemData.load(origin, prop_names(terms) + ['cff', 'qff', 'B', 'coriolis'])
+            molsys = molsys.with_states('anharmonic', anharmonic_states(molsys, 'GVPT2', exclude_modes=[]))
+        Checked 2026-10-17, water HF/STO-3G (data_for_tests/g16_h2o_HF_STO3G.out): load reads cff, qff, B and
+        coriolis. anharm_corr_energies on load's eigenvals, B, coriolis and the reader's cff_rc, qff_rc gives the
+        file's anharmonic fundamentals to 0.0006 cm-1, for VPT2, GVPT2 and DVPT2 alike.
+        open: how cff_rc and qff_rc get into MolSystemData. The reader returns them only next to 'cff' and 'qff';
+            a request for 'cff_rc' by name gets nothing, and load raises. MolPropsCollection.fill_from keeps only
+            the requested names, so load drops cff_rc and qff_rc. wilson_main put them into extra_data of cff and
+            qff (fill_props_results). cff_rc is not cff times one factor: cff_rc / cff is 8.0e7 to 2.2e8 over the
+            entries (water HF/STO-3G); the formula is in CQCParse (get_cubic_post).
+            Ways: the extra_data fill in from_datadict; the reader returns 'cff_rc' by name [outside]; the
+            conversion from cff to cff_rc done in wilson_system.
+        open: where the Fermi resonances go. anharm_analyzer_data also returns {'fermi_resonances': ...};
+            MolSystemData has no place for them.
+        open: the states choice key. 'anharmonic' replaces the file's anharmonic states; a second key (e.g.
+            'anharmonic_wilson') keeps both, and states_choice picks one.
+        open: MolSystemData.data_origin names the file only. Nothing records that Wilson computed the states.
+        [outside] The reader fails on 'cff' without 'nc_sqrt_eigval' in the same request (UnboundLocalError,
+            CQCParse parse_gaussian16_output). load always requests nc_sqrt_eigval, so load is not affected.
+[ ] S4  Tests to move or rewrite (all pass today):
+            wilson_intensities/tests/unit/test_vpt2_new.py              24 tests, no files read: move with vpt2.py
+            wilson_intensities/tests/unit/test_unit_anharm_analyzer.py  4 tests: Wilson's states vs Gaussian's,
+                                                                        within 0.0013 to 0.003 cm-1
+            wilson_intensities/tests/integration/test_anharm_analyzer.py
+                                                                        3 tests run. 1 checks that the corrected
+                                                                        fundamentals differ from the harmonic ones;
+                                                                        2 check only that nothing raises.
+                                                                        test_anharm_analyzer_vibana is defined
+                                                                        twice: the second hides the first.
+        test_unit_anharm_analyzer.py reads wilson_intensities/tests/datafiles/HF_STO_3G_*.pkl. The pickles hold
+        wilson_main's VibAnaSetup, MolecularProperty and VibState, stored by the module path
+        wilson_suite.wilson_main.abstractions. A pickle loads only while that module has those three names (after
+        D4, wilson_main imports them from wilson_system). Before wilson_main's classes go (S6): store the data as
+        a plain data dict, the format MolSystemData.from_datadict reads.
+        The integration tests read data_for_tests/g16_h2o_HF_STO3G.out through wilson_main's workflow
+        (find_residual_vib_info, fill_props_results). New version: MolSystemData.load + S3, compared with the
+        file's anharmonic states, as in the S3 check.
+[ ] S5  vpt2.py:425 (adjust_for_fermi_resonance, GVPT2) copies np.linalg.eig's eigenvalues into a real array.
+        numpy warns "ComplexWarning: Casting complex values to real discards the imaginary part" in 7 tests.
+        Water HF/STO-3G (2026-10-17): the matrix is exactly symmetric and every imaginary part is 0.0; eig returns
+        complex128 anyway. np.linalg.eigh (for symmetric matrices) returns real eigenvalues. After the switch:
+        check that the states stay the same.
+[ ] S6  [wilson_main] Remove the old anharmonic path, after S3 and S4, together with refac E6b:
+            main_functions.py       tell_needed_props_for_vib_analysis, find_residual_vib_info,
+                                    do_full_vib_analysis, do_anharmonic_analysis, fill_residual_vib_info_results,
+                                    get_data_for_vibanalysers
+            anharmonic_analyzer.py  anharm_analyzer_data
+        VibAnaSetup's data fields have MolSystemData equivalents: nc_sqrt_eigval -> eigenvals, states -> states.
+        Its settings become arguments: regime -> anharmonic_states(regime=...) and states_choice;
+        exclude_modes -> anharmonic_states(exclude_modes=...).
+[ ] S7  MolecularProperty: built from a description of the property, then filled with values (MolSystemData.load).
+        wilson_main builds it from a pdict, e.g. polgrad {'ops': ('g', 'f', 'f'), 'freq': (0.0, 0.0, 0.0)}.
+        wilson_system builds it from the trivial name only, e.g. MolecularProperty(trivial_name='polgrad').
+        The name holds the same two numbers as ops (derivative order 1, field order 2): the 49 order pairs
+        (0-6 x 0-6) give 49 different names (PROP_INDEX_COUNTS). freq is not in the name. Every property is
+        static today: find_props raises for other frequencies.
+        Checked 2026-10-17, EVV terms (fixtures.evv_experiment): find_props and pipeline.prop_names give the same
+        5 properties (dipgrad, polhess, polgrad, diphess, cff), in another order.
+        open: a freq field (or the pdict) for frequency-dependent properties, when they come.
+[ ] S8  Properties from two origins in one run. wilson_main allows this (WilsonSimulation.eval_by_prop_name).
+        Example, molprops.py:26: cff, qff, diphess, polhess from calc_setup2; dipgrad, polgrad from calc_setup1.
+        With one origin per MolSystemData and one MolSystemData per evaluation, the new code has no place for
+        such a run (refac E6: "Not supported: data from more than one source").
+        open: drop such runs, or merge several MolSystemData into one for the evaluation.

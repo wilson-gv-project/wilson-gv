@@ -1,5 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-16, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+updated 2026-10-17, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+Moved to wilson_system/todo.txt (2026-10-17), as they block nothing here: D4, D5 (wilson_system's classes), G2, G8,
+G9 and the failing test_getting_data (the reader).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
 Commits named in this file without a branch (e.g. 0c2de12, 5062d5e, 27f41ee) are on debug_rendering.
@@ -35,7 +37,7 @@ Status (2026-10-16)
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
 agrees. ACDM (42 modes): 5.9 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
-In progress: deleting the old code (E9: stages 1, 2, 5 done; 3, 4 in part), then the D4 code move (Order of work).
+In progress: deleting the old code (E9: stages 1, 2, 5 done; 3, 4 in part).
 Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
@@ -80,16 +82,15 @@ Order of work
 -------------
 The rule of 2026-10-14 (no big moves or removals outside refac_rsp_eval) was lifted 2026-10-16: steps 4 and 5
 can go ahead. Steps 1-3 may use the old code; step 4 deletes it.
-E9 before the D4 move (2026-10-16): wilson_system's MolecularProperty has no prop_spec, which the old code needs;
-after E9 the move changes 7 files instead of 20 (D4).
     #  item  what                                               state
     1  D4    decide who owns VibState, MolecularProperty,       done 2026-10-14: wilson_system
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
     4  E9    delete the old code                                in progress: stages 1, 2, 5 of 6 done (E9)
-    5  D4    the code move                                      after E9; the two copies differ (D4)
-    6  E4    README, with the data-dict contract (D5)           postponed 2026-10-14
+    5  D4    the code move                                      moved to wilson_system/todo.txt 2026-10-17
+    6  E4    README, with the data-dict contract (D5, in        postponed 2026-10-14
+             wilson_system/todo.txt)
 
 Other items:
     small, any time      H8 (keep or drop a rule)
@@ -101,12 +102,10 @@ Other items:
                          F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
-    [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes), G2, G8 (reader
-                         checks), G9 (normal_modes); derive's flat term list and to_str, then compat.py goes
-                         (see Branch)
-    no item yet          - the failing test in the rest of src (test_wilson_data_obtainer, see Tests) fails on main
-                           too; open whether it belongs to the refactor
-                         - from the old README: is single-component Cartesian selection a wanted feature?
+    [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes); derive's flat
+                         term list and to_str, then compat.py goes (see Branch)
+    moved                the reader checks G2, G8, G9 and the failing test_getting_data: wilson_system/todo.txt
+    no item yet          - from the old README: is single-component Cartesian selection a wanted feature?
 
 
 Decisions and known limits
@@ -192,58 +191,16 @@ D. Data model
         D1 and D2 block nothing: rows store term_id and motif, not the CompiledTerm. They would block a cache keyed
         on CompiledTerm (F, "same terms, other experiment"): with this ==, such a cache returns the rows of [p1, p2]
         for [p1]. Key on term_to_str instead, or fix D1 and D2 first.
-[ ] D4  VibState, MolecularProperty, MolPropsCollection exist twice: wilson_main/abstractions.py and
-        wilson_system/system_data.py. Decided 2026-10-14: wilson_system owns them; wilson_main imports.
-        The code move comes after E9 (Order of work). Keep the imports free of cycles: plan.py imports
-        system_data only for type hints (if TYPE_CHECKING); system_data.py does not import plan.py;
-        evaluate.py and pipeline.py import system_data for real.
-        wilson_main's copies are dropped. They differ from wilson_system's (checked 2026-10-16), so a caller of
-        wilson_main's copies needs more than a new import line:
-            MolecularProperty    wilson_main's has prop_spec (required), calc_setup, vals as an InitVar;
-                                 wilson_system's has trivial_name, vals, extra_data. find_props
-                                 (wilson_main/main_functions.py, the old pipeline's property list) and molprops.py
-                                 build it with prop_spec.
-            MolPropsCollection   .get of an unknown name: wilson_main's raises ValueError, wilson_system's returns
-                                 None (its [] raises KeyError)
-            VibState             defaults: state_label None / '', harmonic_WF None / False (wilson_main /
-                                 wilson_system); get_1q_states only in wilson_system (no caller)
-        Files that use wilson_main's copies: 20. 13 go with E9 (6 old amplitudes modules; 7 of their unit tests in
-        wilson_intensities/tests/unit, deleted in 3612e5b). 7 stay: main_functions.py, workflow_abstractions.py,
-        molprops.py, anharmonic_treatment/anharmonic_analyzer.py, tests/test_intensities_testing.py,
-        test_anharm_analyzer.py, wilson_main/tests/abstractions/test_abstr_classes.py. So after E9 the move changes
-        7 files instead of 20; find_props' prop_spec goes with the caller's rework (E6b).
-[ ] D5  Data-dict contract: what the evaluator expects. Delivering a dict that fits is the reader's job [outside].
-        To do: write the table below into the README (E4).
-        Load checks done 2026-10-14: system_data.check_data_dict, run by MolSystemData.from_datadict (so by load
-        too). It lists every problem in one ValueError. Passes on formaldehyde, water, CO, ACDM; 52 ms at 42 modes.
-            rule            what                                              load check
-            names           properties: dipgrad, polgrad, polhess, diphess,   every needed name is there;
-                            cff, ...; frequencies: 'nc_sqrt_eigval';          anharmonic states only when asked
-                            states: 'harmonic_states', 'anharmonic_states'    for (check_states_choice)
-            layout          mode indices first, then x, y, z, e.g.            shapes (PROP_INDEX_COUNTS; none for
-                            polhess[a, b, x, y]; modes 0 .. n-1               'B', 'coriolis'); frequency keys
-                            (n = number of frequencies)                       are 0 .. n-1
-            full tensors    every index order is filled, e.g. cff[a, c, c]    symmetric in the mode indices
-                            and cff[c, a, c]                                  (rtol 1e-12, atol 1e-18)
-            units           properties in au; frequencies and state           -
-                            energies in cm-1 (converted to Eh inside)
-            coordinates     plain derivatives in mass-weighted coordinates,   none possible. Gaussian reader
-              [outside]     au; derive's formulas fit only this form          fits (2026-10-11); CFOUR: not checked
-            state energies  relative to the ground state (0);                 the fundamentals are there;
-                            key ('0', '0') = 2 quanta in mode 0               warning (no error) for energies <= 0
-            zero            |value| < 1e-18 counts as 0 (rounding noise       -
-                            ~1e-19; real values 1e-9 or more)
-        ACDM's anharmonic states (GVPT2) have 66 of 14189 energies <= 0, e.g. the fundamentals of modes 41, 40, 39:
-        -136.1, -128.0, -54.7 cm-1 (harmonic: positive); the lowest, ('40', '41', '41'), -596.7 cm-1. The
-        low-frequency modes of the dimer. F2 and E10 use them anyway.
-        Tests with toy dicts must use a dict that fits (TOY_DATA, test_system_data.py).
+D4 (one copy of VibState, MolecularProperty, MolPropsCollection) and D5 (the data-dict contract): moved to
+wilson_system/todo.txt (2026-10-17).
 
 
 E. Pipeline
 -----------
-[-] E4  README. Postponed 2026-10-14; after D4. Contents: the pipeline (pipeline.py docstring), the drawing
-        (from_features, draw_window; draw_all as the reference; the size of the cut), the data-dict contract (D5),
-        the decisions above. The old README (removed 2026-10-09; it described designs the code does not follow):
+[-] E4  README. Postponed 2026-10-14. Contents: the pipeline (pipeline.py docstring), the drawing
+        (from_features, draw_window; draw_all as the reference; the size of the cut), the data-dict contract (D5,
+        in wilson_system/todo.txt), the decisions above. The old README (removed 2026-10-09; it described designs
+        the code does not follow):
             git show 5062d5e:src/wilson_suite/wilson_intensities/refac_rsp_eval/README.md
 [ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
         [outside]. Until E9, the old pipeline runs, double count included (C3). From E9 until E6b,
@@ -645,9 +602,9 @@ H8  "One module imports wilson_derive" is broken: plan.py and compat.py both do 
 
 Outside the refactor [outside]
 ------------------------------
-These connect the evaluator to its caller (E6b), rework the render code (E7b), or check the reader. Old and new
-read the same data dict, so C2, C3 and G1 would all miss a reader error: the reader items matter for the final
-spectra.
+These connect the evaluator to its caller (E6b), rework the render code (E7b), or change derive (E13).
+The reader checks (G2, G8, G9) moved to wilson_system/todo.txt (2026-10-17). Old and new read the same data dict,
+so C2, C3 and G1 would all miss a reader error: those checks matter for the final spectra.
 [ ] E6b The caller (left the refactor 2026-10-14). After the new WilsonSimulation procedure is known.
         - Where the two calls go, and where the outputs are kept.
         - Make the MolSystemData once: from_datadict (data already read) or load(origin, prop_names(terms)).
@@ -675,16 +632,6 @@ spectra.
         cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
         4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data and
         terms compiled by hand (G10, test_dimensions.py).
-[ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
-        harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
-        and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for
-        mass-weighted derivatives, D5). Left: one anharmonic fundamental; polhess ("Polarizability tensor
-        [Alpha(0,0)] : 2 quanta" rows). Make it a test only if the reader changes.
-[ ] G8  CFOUR reader: not checked. It turns dimensionless derivatives into mass-weighted ones (times sqrt(w)).
-        qff is not converted from reduced cm-1 (CQCParse getQuarticPost only divides by the mass factor;
-        getCubicPost converts). No EVV term uses qff. Check before any CFOUR data is used.
-[ ] G9  normal_modes: the reader fails on ACDM and ACAC ("cannot reshape ... into shape (0,3,3)", 2026-10-12).
-        The evaluator does not need normal_modes (MolSystemData.load does not ask for it), so ACDM runs end to end.
 
 
 Done
