@@ -115,9 +115,9 @@ workflow_abstractions.py, class WilsonSimulation (line numbers of 2026-10-17, af
 E1  evaluate (lines 352-365). Before E1 it imported evaluation_wf when called (not at import) and ran the old
     EvaluationWorkflow; it wrote self._workflow, self.diagn['artifacts'], self.spec_eval_setup.grid, self.spec.
     After stage 5 a call would have raised ModuleNotFoundError. Callers: B1, B2, D1, D2.
-    Done 2026-10-16 (todo.txt E9): raises NotImplementedError until E6b; the message names the library calls
+    Done 2026-10-16 (todo.txt E9): raises NotImplementedError until E6b. The message named the library calls
     (MolSystemData.load, evaluate_response_terms, spectrum_on_grid; draw_spectrum until the rename, E15) and their
-    modules.
+    modules; since 2650eb8 (2026-10-18) only the docstring points to them (pipeline.py). Now lines 352-359.
 E2  evaluate_with_default_setup_fill (lines 367-373): calls attempt_setup_fill_with_defaults (its body: pass),
     then evaluate. No caller.
 E3  evaluateSpectrum (lines 375-411): takes an evaluator function; no old import. Its docstring: "unused now ...
@@ -153,7 +153,8 @@ Order
        breaks imports.
 2. [x] B1: the file deleted. B2: test_save_wilsonsim without its old part (no spectral_window, no
        sim.evaluate); it still passes.
-3. [x] E1: evaluate raises NotImplementedError; the message names the library calls and their modules.
+3. [x] E1: evaluate raises NotImplementedError; the docstring points to the library calls (the message named
+       them until 2650eb8).
    Steps 1-3 (2026-10-16, the prep for stage 5) were checked one by one: no other test changed. A dry run of
    stage 5 after them changes no test; only the 14 old modules leave the import list.
 4. [ ] C, D: after the merge to main, once the new pipeline (with the convolution) is further along (decided

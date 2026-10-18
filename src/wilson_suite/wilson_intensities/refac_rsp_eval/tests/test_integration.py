@@ -9,7 +9,6 @@ from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     _make_func_to_compute_avrg,
     calculate_avrg_tensor_einsum,
@@ -22,13 +21,13 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     compile_terms,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
     MolecularProperty,
     MolPropsCollection,
     MolSystemData,
 )
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
@@ -57,11 +56,9 @@ def term_to_str(term: VibPerturbedTerm):
     return f"{float(term.coeff)} * ( {pp} ) / ( {ft} ) / {res}"
 
 
-# loading EVV terms from json file
-evv_terms = VibPerturbedTerm.load_many_from_json(SUITE_ROOT+'/wilson_intensities/refac_rsp_eval/tests/test_terms.json')
-
-axis_choice = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}) # type: ignore
-translated_terms = translate_terms_to_axis_variables(evv_terms, axis_choice)
+# the 14 EVV terms, already translated to A = w1, B = -w1 + w2 (stored_terms.py)
+translated_terms = load_setup('evv').terms
+evv_terms = translated_terms    # prop_names reads only the props
 cmpl_terms = compile_terms(terms=translated_terms)
 
 

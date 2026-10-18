@@ -686,7 +686,7 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
         So one condition is the denominator (E_sl - E_sr) - (signed sum of pf).
       - pf signs: '-A' means axis A enters that sum with -1. The sign comes from the pulse
         interaction (+w or -w, dressWithPulseInteractions) and from the axis choice
-        (e.g. B = -w1 + w2, term_var_translate).
+        (e.g. B = -w1 + w2; the translation is done before, data_for_tests/translated_terms).
       - The term coefficients from derive are made for this denominator, e.g. the -1 / +1 of the
         D1 / D2 terms in vib_rsp_sos. freq - E would flip every condition: an extra (-1)^N for
         a motif with N conditions, which the coefficients do not know about.

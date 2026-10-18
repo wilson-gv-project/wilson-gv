@@ -297,7 +297,7 @@ def test_harmonic_denom_needs_eigenvals(molsys):
 
 
 ## Averaged properties, on the fly ---------------------------------------------
-# EVV terms average three properties over four cartesian slots, e.g. term 8 of test_terms.json:
+# EVV terms average three properties over four cartesian slots, e.g. term 8 of evv.json (data_for_tests/translated_terms):
 #     polgrad[b] (ops 0, 3) * dipgrad[a] (op 1) * dipgrad[c] (op 2)
 # The op number is the slot in a polarization key: for key (i, j, k, l), polgrad reads the cartesian
 # pair (i, l), the first dipgrad j, the second dipgrad k. The data has no symmetry, so reading a
@@ -591,7 +591,7 @@ def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
 def term8_like() -> CompiledTerm:
     """
     0.25 * cff[a,b,c] * <polgrad[b] dipgrad[a] dipgrad[c]> * 1/(E_ab - E_c) * 1/(omega_a omega_b omega_c)
-    The same shape as term 8 of test_terms.json; resonance labels a, b; c is summed.
+    The same shape as term 8 of evv.json (data_for_tests/translated_terms); resonance labels a, b; c is summed.
     """
     return CompiledTerm(
         avrg_props=evv_avrg_expr('bac'),

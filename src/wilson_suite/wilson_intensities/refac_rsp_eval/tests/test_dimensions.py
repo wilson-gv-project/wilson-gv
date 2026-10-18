@@ -6,7 +6,8 @@ as derive writes them for pulses at different times (G7 survey), on a toy molecu
 4 quanta (more than the Gaussian files have). The term is compiled by hand, so 4D needs no translation to axes
 (derive's translation stops at 3 axes, E13). Rank 2 averaging (TOY_RECIPE): odd ranks would need A15 fixed first.
 
-Real data, terms from derive, data from formaldehyde's Gaussian file:
+Real data: derive's terms of three G7 survey setups, stored translated to the experiment's canonical axes
+(stored_terms.py), data from formaldehyde's Gaussian file:
     1D  CARS: polgrad only
     1D  IR absorption: 3 of its 5 terms have no resonance conditions, a flat background (E12)
     3D  3 IR: two sets of resonance axes, {A, B} (14 terms) and {A, B, C} (2 terms), so one evaluation per set (E11)
@@ -18,8 +19,6 @@ from functools import partial
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_experiment.experiment_abstractions as wexp
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import derive_terms
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import all_features_on_grid, eval_feature_on_grid
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
@@ -46,6 +45,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     toy_term,
     vibdiff,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import StoredSetup, load_setup
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -173,54 +173,33 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
     assert np.abs(spec.grid_result - every_point).max() > 0
 
 
-## real data: experiments as in the G7 survey (g7_survey.py), every pulse and the detector along x -------------
+## real data: setups of the G7 survey (g7_survey.py), every pulse and the detector along x ---------------------
+# Terms and settings from data_for_tests/translated_terms (stored_terms.py): derive's terms, translated to the
+# experiment's canonical axes; laser_pol is the experiment's polarization_avg_vector.
 
-def pulse(tc: float, cf_uv: float, pulse_id: int):
-    """an IR pulse for cf_uv 0, else a UV pulse"""
-    return wexp.make_impulsive_gaussian_pulse(tc=tc, cf=0.0, cf_uv=cf_uv, maxstr=1e-5, wv=(0., 0., 1.),
-                                              pol=(1., 0., 0.), id=pulse_id)
-
-
-def experiment(pulses, wv_filter: dict, magn_conditions=None) -> wexp.VibExperiment:
-    detector = wexp.SpecDetector(detection_method='freq', detector_location=(0., 0., 1.),
-                                 detection_polarization=(1., 0., 0.),
-                                 detection_range=[0.003 + 0.0001 * i for i in range(101)], wv_filter=[wv_filter])
-    scan = wexp.SpecScan(scan_objs=(wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0),
-                                    wexp.ScanObject('detector', 'detection_range', id=0, coeff=1.0)),
-                         range=[0.0001 * i for i in range(101)])
-    return wexp.VibExperiment(field=wexp.ElectricField(tuple(pulses)), detector=detector, scans=(scan,),
-                              magn_conditions=magn_conditions)
-
-
-def evaluate_on_formaldehyde(exp: wexp.VibExperiment, terms: list) -> FeatureResult:
+def evaluate_on_formaldehyde(setup: StoredSetup, terms: list) -> FeatureResult:
     molsys = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
-    return evaluate_response_terms(terms, axes=exp.canonical_axes, molsys_data=molsys, states_choice='anharmonic',
-                                   laser_pol=exp.polarization_avg_vector, propagator_param=10.)
+    return evaluate_response_terms(terms, molsys_data=molsys, states_choice='anharmonic',
+                                   laser_pol=setup.laser_pol, propagator_param=10.)
 
 
 ## 1D, real data: CARS on formaldehyde -------------------------------------------
 # The setup 'try: CARS': three UV pulses, the first two at the same time, filter +1 -2 +3. One axis, A = w1 - w2.
 
-def cars_experiment() -> wexp.VibExperiment:
-    return experiment((pulse(10., .072, 1), pulse(10., .072, 2), pulse(120., .092, 3)), {1: 1, 2: -1, 3: 1})
-
-
 @pytest.fixture(scope='module')
-def cars() -> tuple[wexp.VibExperiment, list, FeatureResult]:
-    exp = cars_experiment()
-    terms = derive_terms(exp)
-    return exp, terms, evaluate_on_formaldehyde(exp, terms)
+def cars() -> tuple[StoredSetup, list, FeatureResult]:
+    setup = load_setup('try: CARS')
+    return setup, setup.terms, evaluate_on_formaldehyde(setup, setup.terms)
 
 
 def test_cars_derive_gives_4_terms_on_A_with_polgrad_only(cars):
-    exp, terms, _ = cars
+    setup, terms, _ = cars
 
-    assert [(ax.label, [t.pulse_refs for t in ax.var_set.var_set]) for ax in exp.canonical_axes.axes] == [
-        ('A', [(-2, 1)])]                                                                   # A = w1 - w2
-    assert list(exp.polarization_avg_vector) == [1., 1., 1.]                               # rank 4
+    assert setup.axes == {'A': [(-2, 1)]}                                                  # A = w1 - w2
+    assert setup.laser_pol == (1., 1., 1.)                                                 # rank 4
     assert len(terms) == 4
     assert prop_names(terms) == ['polgrad']
-    assert terms_by_axis_set(terms, exp.canonical_axes) == {('A',): [0, 1, 2, 3]}
+    assert terms_by_axis_set(terms) == {('A',): [0, 1, 2, 3]}
 
 
 def test_cars_peaks_are_the_anharmonic_fundamentals_with_both_signs(cars):
@@ -258,25 +237,19 @@ def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
 CM_TO_EH = 4.556335e-6      # 1 cm-1 in Eh
 
 
-def ir_absorption_experiment() -> wexp.VibExperiment:
-    return experiment((pulse(50., 0., 1),), {1: 1})
-
-
 @pytest.fixture(scope='module')
-def ir_absorption() -> tuple[wexp.VibExperiment, list, FeatureResult]:
-    exp = ir_absorption_experiment()
-    terms = derive_terms(exp)
-    return exp, terms, evaluate_on_formaldehyde(exp, terms)
+def ir_absorption() -> tuple[StoredSetup, list, FeatureResult]:
+    setup = load_setup('1D: IR absorption')
+    return setup, setup.terms, evaluate_on_formaldehyde(setup, setup.terms)
 
 
 def test_ir_absorption_derive_gives_3_terms_without_conditions_and_2_on_A(ir_absorption):
-    exp, terms, _ = ir_absorption
+    setup, terms, _ = ir_absorption
 
-    assert [(ax.label, [t.pulse_refs for t in ax.var_set.var_set]) for ax in exp.canonical_axes.axes] == [
-        ('A', [(1,)])]                                                                      # A = w1
-    assert list(exp.polarization_avg_vector) == [1.]                                       # rank 2
+    assert setup.axes == {'A': [(1,)]}                                                     # A = w1
+    assert setup.laser_pol == (1.,)                                                        # rank 2
     assert prop_names(terms) == ['polhess', 'polgrad', 'cff', 'dipgrad']
-    assert terms_by_axis_set(terms, exp.canonical_axes) == {(): [0, 1, 2], ('A',): [3, 4]}
+    assert terms_by_axis_set(terms) == {(): [0, 1, 2], ('A',): [3, 4]}
 
 
 def test_ir_absorption_flat_terms_make_one_feature_next_to_12_peaks(ir_absorption):
@@ -341,35 +314,28 @@ def test_ir_absorption_on_grid_with_the_background_within_eps_floor_of_all_featu
 # The setup 'nb: 3 IR (3D)': three IR pulses at different times, filter -1 +2 +3, magnitude condition -w1 + w2 > 0.
 # Axes A = -w1, B = w2, C = w3.
 
-def three_ir_experiment() -> wexp.VibExperiment:
-    return experiment((pulse(50., 0., 1), pulse(100., 0., 2), pulse(120., 0., 3)), {1: -1, 2: 1, 3: 1},
-                      magn_conditions=((-1, 2),))
-
-
 @pytest.fixture(scope='module')
-def three_ir() -> tuple[wexp.VibExperiment, list, dict[tuple[str, ...], list[int]]]:
-    exp = three_ir_experiment()
-    terms = derive_terms(exp)
-    return exp, terms, terms_by_axis_set(terms, exp.canonical_axes)
+def three_ir() -> tuple[StoredSetup, list, dict[tuple[str, ...], list[int]]]:
+    setup = load_setup('nb: 3 IR (3D)')
+    return setup, setup.terms, terms_by_axis_set(setup.terms)
 
 
 def test_three_ir_terms_resonate_on_two_axis_sets(three_ir):
     """16 terms: 14 on {A, B}, 2 on {A, B, C}. One evaluation of all 16 raises before any row is computed (E11)."""
-    exp, terms, groups = three_ir
+    setup, terms, groups = three_ir
 
-    assert [(ax.label, [t.pulse_refs for t in ax.var_set.var_set]) for ax in exp.canonical_axes.axes] == [
-        ('A', [(-1,)]), ('B', [(2,)]), ('C', [(3,)])]
+    assert setup.axes == {'A': [(-1,)], 'B': [(2,)], 'C': [(3,)]}
     assert {axis_set: len(ids) for axis_set, ids in groups.items()} == {('A', 'B'): 14, ('A', 'B', 'C'): 2}
     with pytest.raises(ValueError, match='2 sets of axes'):
-        evaluate_on_formaldehyde(exp, terms)
+        evaluate_on_formaldehyde(setup, terms)
 
 
 def test_three_ir_each_axis_set_runs_on_its_own(three_ir):
     """{A, B}: 504 pairs, as the 14 EVV terms (340 rows, 164 zero, 68 features). {A, B, C}: 72 rows, one per feature."""
-    exp, terms, groups = three_ir
+    setup, terms, groups = three_ir
 
-    ab = evaluate_on_formaldehyde(exp, [terms[i] for i in groups[('A', 'B')]])
-    abc = evaluate_on_formaldehyde(exp, [terms[i] for i in groups[('A', 'B', 'C')]])
+    ab = evaluate_on_formaldehyde(setup, [terms[i] for i in groups[('A', 'B')]])
+    abc = evaluate_on_formaldehyde(setup, [terms[i] for i in groups[('A', 'B', 'C')]])
 
     assert (len(ab.table), len(ab.zero), len(ab.features)) == (340, 164, 68)
     assert (len(abc.table), len(abc.zero), len(abc.features)) == (72, 0, 72)
@@ -381,8 +347,8 @@ def test_three_ir_abc_set_on_a_3d_grid_within_eps_floor_of_all_features_on_grid(
     The {A, B, C} features +- 100 cm-1, 41 points per axis, amplitude boxes (E10): at most 0.1 floors from
     all_features_on_grid.
     """
-    exp, terms, groups = three_ir
-    result = evaluate_on_formaldehyde(exp, [terms[i] for i in groups[('A', 'B', 'C')]])
+    setup, terms, groups = three_ir
+    result = evaluate_on_formaldehyde(setup, [terms[i] for i in groups[('A', 'B', 'C')]])
     locations = np.array([f.location.values for f in result.features])
     window = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip('ABC', locations.min(0), locations.max(0))})
 

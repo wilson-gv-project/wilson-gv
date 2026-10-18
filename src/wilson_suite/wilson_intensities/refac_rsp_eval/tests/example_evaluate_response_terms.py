@@ -2,7 +2,7 @@
 evaluate_response_terms and spectrum_on_grid, step by step. An example of use, not a test.
 The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B = -w1 + w2.
 
-    1. the inputs: terms as derive writes them, axes, data file, laser polarization, states choice
+    1. the inputs: terms already translated to axes, data file, laser polarization, states choice
     2. load the data, once
     3. features (evaluate_response_terms): how many, and where they are
     4. the spectrum on a grid (spectrum_on_grid), with a width per condition
@@ -17,7 +17,6 @@ from functools import partial
 
 import numpy as np
 
-from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
@@ -25,19 +24,18 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     prop_names,
     spectrum_on_grid,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 
 def main():
     # 1. inputs
-    terms = VibPerturbedTerm.load_many_from_json(
-        f'{SUITE_ROOT}/wilson_intensities/refac_rsp_eval/tests/test_terms.json')   # in pulse IDs
-    axes = make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})                          # A = w1, B = -w1 + w2
+    setup = load_setup('evv')       # data_for_tests/translated_terms/evv.json
+    terms = setup.terms             # translated to setup.axes: A = w1, B = -w1 + w2
     data_origin = DataOriginInfo(source_type='gaussian',
                                  base_file_loc=f'{SUITE_ROOT}/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    laser_pol = (1., 1., 1.)        # pulses and detector along x
+    laser_pol = setup.laser_pol     # (1, 1, 1): pulses and detector along x
     states_choice = 'anharmonic'    # follows the vib analysis regime: GVPT2 -> anharmonic
 
     # 2. data, once, outside the evaluator: the evaluator takes a MolSystemData and reads no file.
@@ -48,7 +46,7 @@ def main():
     width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
     t0 = time.perf_counter()
-    result = evaluate_response_terms(terms, axes=axes, molsys_data=molsys, states_choice=states_choice,
+    result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states_choice,
                                      laser_pol=laser_pol, propagator_param=width)
     t_rows = time.perf_counter() - t0
 

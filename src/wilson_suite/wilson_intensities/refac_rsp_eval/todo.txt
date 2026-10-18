@@ -1,5 +1,5 @@
 refac_rsp_eval — TODO
-updated 2026-10-18, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+updated 2026-10-19, branch rsp_eval_refactor (brings the refactor to main, see Branch)
 Moved to wilson_system/todo.txt (2026-10-17), as they block nothing here: D4, D5 (wilson_system's classes), G2, G8,
 G9 and test_getting_data (the reader; fixed 2026-10-18).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
@@ -22,7 +22,7 @@ the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (
 Tests (run 2026-10-18, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   706     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+    refac_rsp_eval   711     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
     rest of src      254     -     1      -   none
     tests/ (root)      4    16     -      -   none
@@ -41,6 +41,9 @@ The new evaluator is built and checked: the same numbers as the old code (to 2e-
 agrees. ACDM (42 modes): 3.8 s per spectrum (2026-10-18), 80 s before the speed work (F). Nothing calls the new
 code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
+Translated terms in (E18, 2026-10-18): the evaluator takes terms already translated to axes. No file of the new
+code imports wilson_experiment, derive.derive or term_var_translate (tests/test_imports.py). The terms of the
+tests and scripts are stored in data_for_tests/translated_terms.
 Deleting the old code (E9): stages 1, 2, 4, 5, 6 done; stage 3 (old scripts and tests, README quick start) comes
 after the merge to main, once the new pipeline (with the convolution) is further along (decided 2026-10-18).
 The package move (E17): open, to discuss in the PR.
@@ -65,20 +68,20 @@ debug_rendering (the dft_vs_cc PRs #53-#61, the render changes) stays there.
              wilson_utils/some_reprs.py renamed builders.py (as on debug_rendering, 40621bd)
 wilson_derive and wilson_experiment are as on main. Five changes of debug_rendering there were used by the
 refactor; on this branch:
-    flat term list in translate_terms_to_axis_variables     compat.translate_terms_to_axis_variables: wraps the list
-      (40621bd)                                             in main's {i: {j: [terms]}} and unwraps the result
+    flat term list in translate_terms_to_axis_variables     not needed since E18 (2026-10-18): the new code does
+      (40621bd)                                             not translate. make_translated_terms.py wraps the
+                                                            list in main's {i: {j: [terms]}} and unwraps the result
     VibPerturbedTerm.to_str (27bc080)                       compat.term_to_str, a copy (uses term.to_str if the
                                                             term has one, e.g. the fake terms in test_plan.py)
     VibDiffTerm.to_latex gives 'a' for a harmonic factor    main gives 'a,'; test_integration.py expects 'a,'
       (bbe1c77)
     VibPerturbedTerm.anharmonicity (e55257b)                SpectralFeature.anharm_contributions and its 3 tests
                                                             deleted
-    VibExperiment.derive_terms (40621bd)                    compat.derive_terms: main's derive, flattened by
-                                                            derived_terms_flat (test_dimensions.py uses it)
-compat.py goes once derive and the experiment have the flat list, to_str and derive_terms [outside].
-A script that does not run on this branch; pytest does not collect it:
-    tests/g7_survey.py                    calls experiment.derive_terms(), not on main; compat.derive_terms gives
-                                          the same list. It uses no old code, so it stays after E9.
+    VibExperiment.derive_terms (40621bd)                    not needed since E18: make_translated_terms.py runs
+                                                            main's derive, flattened by derived_terms_flat
+compat.py goes once derive has to_str [outside].
+tests/g7_survey.py runs on this branch since E18 (2026-10-18), from the stored terms; pytest does not collect it.
+It uses no old code, so it stays after E9.
 The old-vs-new scripts tests/c3_spectrum.py, c2_variations.py and c2_leaves.py (main's old pipeline; they did not
 run here either) were deleted in 3612e5b (E9, stage 1; d93cc7b has them, see the top of this file). C2 stays
 checked without them: test_evv_reference.py against evv_reference.json.
@@ -108,12 +111,14 @@ Other items:
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
     done (2026-10-17)    E12 (flat background), E15 (rename), E9 stage 6 (comments); H8 left as it is
+    done (2026-10-18)    E18 (translated terms in; tests load stored terms; H8 holds)
     later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
                          F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
-    [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes); derive's flat
-                         term list and to_str, then compat.py goes (see Branch)
+    [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes); derive's
+                         to_str, then compat.py goes (see Branch); the G7 term files made again with
+                         experiment_makeover's derive, which multiplies each coefficient by 1/N (E18)
     moved                the reader checks G2, G8, G9 and test_getting_data (fixed 2026-10-18): wilson_system/todo.txt
     no item yet          - from the old README: is single-component Cartesian selection a wanted feature?
 
@@ -148,6 +153,15 @@ Decisions and known limits
   Unlike the old code on main: its dress_these_with_boxes dropped every feature below the floor when
   minimum_box_padding was 0, the default of main's EvaluationInfo (debug_rendering's default, 10, kept them;
   corrected 2026-10-18, the line said "as in the old code").
+- Translated terms in (E18, 2026-10-18): the evaluator takes terms already translated to axes (each condition's pf in
+  axis labels, e.g. ['A', '-B']) and does not translate. A condition with pulse IDs as derive writes them
+  (integers, e.g. pf [-1, 2]) raises (plan.ResCondKey). evaluate_response_terms and terms_by_axis_set have no axes
+  argument. No file of refac_rsp_eval or wilson_system imports wilson_experiment, derive.derive,
+  term_var_translate, wilson_utils.builders or fixtures, not even for type hints (tests/test_imports.py; the test
+  forbids only these modules). Used from wilson_derive: response_terms (VibPerturbedTerm) and abstractions (its
+  parts). The test reads import lines only: at run time wilson_suite/__init__.py imports fixtures, wilson_main,
+  wilson_experiment, wilson_utils, wilson_intensities, wilson_analysis and wilson_derive, so importing any module
+  of wilson_suite also loads experiment_abstractions, derive.derive and term_var_translate (checked 2026-10-19).
 - The data is the caller's job (2026-10-14): the evaluator takes a MolSystemData, reads no file, and does not
   call wilson_data_obtainer. Loading: MolSystemData.load or MolSystemData.from_datadict (wilson_system).
   The evaluator names the properties the terms use (pipeline.prop_names(terms)) and checks that the data has
@@ -221,13 +235,16 @@ E. Pipeline
         it ran the old pipeline, double count included, C3). The entry point is the library calls below
         (e.g. tests/example_evaluate_response_terms.py, tests/example_plot_spectrum.py).
             molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
-            result = evaluate_response_terms(terms, axes=, molsys_data=, states_choice=, laser_pol=,
+            result = evaluate_response_terms(terms, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)      -> FeatureResult
             spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=)              -> EvalRspResult
         Inputs, and where the old setup keeps each one (for E6b):
-            terms             VibPerturbedTerm list, in pulse IDs          sim.terms
+            terms             VibPerturbedTerm list, translated to axes    sim.terms_in_axis_choice (made by
+                              (E18)                                        setAxisChoiceAndTranslateTerms; sim.terms
+                                                                           holds them in pulse IDs). Without an axis
+                                                                           choice: exp.canonical_axes (planned in
+                                                                           WilsonSimulation's docstring, not built)
             molsys_data       MolSystemData, made by the caller            the origin: eval_uniform (addPropEvalSetup)
-            axes              SpectralAxisSet                              sim.axis_choice, else exp.canonical_axes
             states_choice     'harmonic' or 'anharmonic'                   vib_ana_setup.regime (see Decisions)
             laser_pol         numbers, e.g. (1, 1, 1)                      exp.polarization_avg_vector
             propagator_param  cm-1, a number or a function (E5)            ev_info.Gamma, ev_info.Gamma_unit
@@ -437,13 +454,22 @@ E. Pipeline
         wilson_rsp_evaluate (no top-level package uses an abbreviation).
         wilson_intensities keeps amplitudes/averaging.py (imported by this package and by wilson_experiment),
         utils/ and anharmonic_treatment/ (moves to wilson_system later: wilson_system/todo.txt S1).
-        What the move touches (checked 2026-10-18, before this item was written):
-            - 138 lines in 33 files name refac_rsp_eval; all imports are absolute. 26 of the files are in the
-              package; outside it: wilson_main/workflow_abstractions.py (the NotImplementedError message),
-              wilson_analysis: render/plot_spectrum.py, analysis/pre_eval.py, tests/test_plot_spectrum.py;
-              wilson_intensities/amplitudes/__init__.py; wilson_system: tests/test_system_data.py, todo.txt
-            - tests/test_hand_calculation.py:52 finds data_for_tests by Path(__file__).parents[3]; one folder level
-              less deep: parents[2]. A search-and-replace does not catch it.
+        What the move touches (checked 2026-10-19; 138 lines in 33 files on 2026-10-18, before this item was
+        written):
+            - 147 lines in 34 files under src name refac_rsp_eval (.py, .txt, .json; no tracked file outside src);
+              all imports are absolute. 26 of the files are in the package; outside it:
+              wilson_main/workflow_abstractions.py (evaluate's docstring), wilson_analysis: render/plot_spectrum.py,
+              analysis/pre_eval.py, tests/test_plot_spectrum.py; wilson_intensities/amplitudes/__init__.py;
+              wilson_system: tests/test_system_data.py, todo.txt; data_for_tests/translated_terms/
+              make_translated_terms.py (E18, see below)
+            - tests/test_hand_calculation.py:49 (line 52 before E18) finds data_for_tests by
+              Path(__file__).parents[3]; one folder level less deep: parents[2]. A search-and-replace does not
+              catch it.
+            - since E18 (2026-10-18), outside the package: data_for_tests/translated_terms/make_translated_terms.py
+              names refac_rsp_eval/tests/stored_terms.py, test_imports.py and g7_survey.py in its docstring.
+              stored_terms.py finds data_for_tests by SUITE_ROOT, so the move does not change that path.
+              test_imports.py names the package folder in NEW_CODE ('wilson_intensities/refac_rsp_eval'): the
+              move changes that entry
             - paths in the commands for old commits stay (e.g. git show d93cc7b:src/.../refac_rsp_eval/...):
               those commits have only the old path
             - setup.py (find_packages) finds the package by its __init__.py. A short name in wilson_suite/__init__.py
@@ -525,7 +551,9 @@ Caching and processes (2026-10-16; ACDM, 14 EVV terms, build_contributions 3.06 
                                        term needs the key term string + molecule + states_choice + modes + recipe
                                        (not CompiledTerm: D1, D2). With the sum as arrays a rerun takes 0.2-0.3 s
                                        (estimate), so the cache pays only without the arrays.
-        compile once                   translate + compile_terms: 6 ms for the 14 EVV terms. compute_features takes
+        compile once                   translate + compile_terms: 6 ms for the 14 EVV terms. Since E18 the
+                                       translation is done before: compile_terms alone 2.1-2.4 ms (measured
+                                       2026-10-19). compute_features takes
                                        the compiled list, so a caller that changes laser_pol, states or modes can
                                        compile once. No code change.
         load                           4 s per molecule and session (reading the Gaussian file). A MolSystemData
@@ -564,8 +592,12 @@ checking side.
 [x] G7  Other experiments. The derive + B7 survey is done (2026-10-15, below), and the hand calculations for CARS
         and 3 IR (2026-10-16, Done). Old vs new dropped 2026-10-16: correctness is checked by numerical tests
         against hand calculations, not against the old code (which shares derive, the reader and the averaging).
-        Left: nothing for now; more hand calculations when a new setup is used. The scripts named here do not run
-        on this branch (see Branch); the survey below was run on debug_rendering.
+        Left: nothing for now; more hand calculations when a new setup is used. The survey below was run on
+        debug_rendering. Since E18 (2026-10-18) g7_survey.py runs on this branch, from the stored terms
+        (data_for_tests/translated_terms, made with main's derive and experiment). The terms and pattern counts
+        of every setup agree with the table below except one (checked 2026-10-19): 7-pulse UV raises in main's
+        VibExperiment (__post_init__: polarization_avg_vector = get_pol_laser of 8 polarizations, get_iso_f
+        order 8), so it has no terms file; on debug_rendering derive gave 632 terms.
         Where the experiments come from:
             ~/pre_paper3/try.py      make_experiment; run_experiment prints t.to_str() of every term;
                                      sweep_sign_patterns runs every +/- pattern of the filter. Its
@@ -574,7 +606,8 @@ checking side.
             ~/pre_paper3/try_orig.py                                 an older version of try.py
             ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb     EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
             src/wilson_suite/fixtures.py                             EVV, EVV coincident, beta-alpha CARS
-        Script: tests/g7_survey.py (every setup about 12 min; --only for some setups, --terms for every term).
+        Script: tests/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak memory; --only for some
+        setups, --terms for every term). Making the terms again: make_translated_terms.py, 9.3 min of derive.
         Survey 2026-10-15: derive -> the canonical axes -> B7 -> evaluation on formaldehyde (anharmonic, the
         experiment's laser_pol). The filter's sign patterns only relabel the axes and change the counts a little:
         one row per sweep. Patterns: the axes of each condition, e.g. (A ; A+B) = one condition on A, one on A + B.
@@ -634,16 +667,20 @@ H1  Prefer deleting to designing. A new type, cache or optimization needs a meas
     boxed_features_on_grid came with a test that measures how far it is from all_features_on_grid).
 H2  Make an abstraction on the second real use, not the first. No base classes, no registries, no second
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
-    Not followed yet (seen 2026-10-18): wilson_main/abstractions.py keeps the old DataOriginInfo class commented
-    out (96bcc63, B1); features.py:678 keeps the old body line of the property widths (marked UNUSED) commented out.
+    Not followed yet (seen 2026-10-18): features.py:678 keeps the old body line of the property widths (marked
+    UNUSED) commented out. The old DataOriginInfo class, commented out in wilson_main/abstractions.py (96bcc63,
+    B1), was deleted in a778784.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
     Not frozen yet: Box, SpectralFeature, SpectralWindow, RectangularDomain.
 H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.
-H8  "One module imports wilson_derive" is broken: plan.py and compat.py both do at run time; pipeline.py only for
-    type hints (plan.py's docstring says so; no test checks it). Left as it is (decided 2026-10-17).
+H8  One module of the package (tests not counted) imports wilson_derive at run time: plan.py (abstractions, the
+    parts of a term). compat.py and pipeline.py import VibPerturbedTerm only for type hints. Holds since E18
+    (2026-10-18); from 27408f9 (2026-10-15) to E18 compat.py imported term_var_translate at run time too.
+    tests/test_imports.py checks the modules that must not be imported (derive.derive, term_var_translate,
+    wilson_experiment, ...), not this rule itself.
 
 
 Outside the refactor [outside]
@@ -671,9 +708,11 @@ so C2, C3 and G1 would all miss a reader error: those checks matter for the fina
         59, in find_pulse_id_tuples_as_axis_vars:
             if j > 2:
                 raise ValueError('Current version enables maximum 3 axes')
-        The evaluator hits it in evaluate_response_terms (pipeline.py), through
-        compat.translate_terms_to_axis_variables. These two checks are the only block: the search itself works
-        for any number of axes (the G7 survey used a copy without them: all 5120
+        Since E18 the evaluator does not translate: make_translated_terms.py hits the stop. It stores the 4-axis
+        G7 setups translated by its survey_translate (derive's algorithm without the stop; until E18 in
+        g7_survey.py), settings['translation'] 'survey'. Where both translations work they give the same terms.
+        These two checks are the only block: the search itself works for any number of axes (the G7 survey used
+        a copy without them: all 5120
         4-axis terms translated and passed B7). Without them the limit is 7 axes: the axes are named
         cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
         4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data and
@@ -716,8 +755,34 @@ Built
     E15  The grid functions renamed (2026-10-17): draw_all -> all_features_on_grid, draw_window ->
          boxed_features_on_grid, draw_spectrum -> spectrum_on_grid; test names and text too. "plot" only for
          pictures (plot_spectrum.py: "plot_spectrum plots 1D and 2D spectra"). The NotImplementedError message of
-         WilsonSimulation.evaluate (wilson_main, workflow_abstractions.py:363, 365) names spectrum_on_grid too
-         (2026-10-18, self review).
+         WilsonSimulation.evaluate named spectrum_on_grid too (2026-10-18, self review); since 2650eb8 it names no
+         function, and the docstring points to pipeline.py (wilson_main, workflow_abstractions.py:352-359).
+    E18  Translated terms in, stored terms for the tests (2026-10-18, see Decisions). The evaluator takes terms
+         already translated to axes, from any caller, and reads no file. The tests and scripts read derive's
+         terms, already translated to axes, with their settings, from data_for_tests/translated_terms
+         (tests/stored_terms.py: load_setup, setup_names). make_translated_terms.py there builds the experiments,
+         runs derive and translates (main's derive and experiment; source in each file: the last commit that
+         changed either). Files:
+             evv.json        the 14 EVV terms of evv_in_pulse_ids.json (formerly tests/test_terms.json; stored
+                             terms, not derived by the script), translated to A = [1], B = [-1, 2]
+             g7/*.json.gz    74 G7 setups, 240121 terms, 2.7 MB (2.9 MB on disk). No time stamp: the same
+                             content (terms and settings, source included) gives the same bytes
+             index.json      evv and all 76 G7 setups; the 2 G7 setups without a file hold the error of the
+                             experiment or derive
+         Checked when writing: where both translations work (derive's, survey_translate), they give the same terms;
+         each G7 setup's polarizations are [detector, pulse 1, pulse 2, ...] (VibExperiment.all_polarizations) and
+         its laser_pol is get_pol_laser of them. evv_reference.json made again: only settings.terms_file changed,
+         every row the same. Tests: test_imports.py (the import check), test_pipeline.py (pulse IDs raise),
+         test_evv_reference.py (evv.json's axes and laser_pol). test_a15_polarization_order.py: the test of the
+         experiment's vector became test_polarization_vector_is_det_of_the_polarizations (get_pol_laser on the
+         list in slot order; still fails until A15); its check of all_polarizations' order moved to
+         make_translated_terms.py.
+         Open [outside]: experiment_makeover's derive multiplies each coefficient by 1/N (N: the experiment's
+         number of valid interaction sequences); its VibExperiment cannot be passed to derive() yet. Once it
+         can, the G7 files are made again there (make_translated_terms.py on that branch). evv.json and
+         evv_reference.json do not change then: their 14 terms come from the stored evv_in_pulse_ids.json.
+         Tests with coefficients written by hand for G7 setups (test_hand_calculation.py: CARS, 3 IR;
+         test_dimensions.py: IR absorption term 0) then differ by 1/N wherever N > 1.
     B7   One resonance point per term, checked when compiling (see Decisions).
     F1   einsum for the averaged part (2026-10-12; make_avrg_einsum_subscripts, AvrgTensor). Agrees with the loop
          to 8e-14. ACDM averaging 47 s -> 0.3 s.
@@ -754,7 +819,7 @@ Checked: the numbers are right
          quanta): a toy term per dimensionality with the chain motif (A ; A+B ; A+B+C ; A+B+C+D), compiled by
          hand (no translation, so 4D despite E13). Checked: B7 takes the motif; one row per index set at the
          written-out point; peak = amplitude * (i / gamma)^N = get_intensity; box by box on the grid (each feature's
-         all_features_on_grid value inside its own box). Real data, terms from derive (compat.derive_terms),
+         all_features_on_grid value inside its own box). Real data, derive's terms (stored since E18),
          formaldehyde: CARS (1D: 24 rows, 12 features at +- the anharmonic fundamentals; 0.06 floors from
          all_features_on_grid) and 3 IR (3D: {A, B} 340 rows; {A, B, C} 72 rows, on 41^3 grid points within 0.1
          floors). Not covered: odd ranks (A15 first), 4D from derive (E13).

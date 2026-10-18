@@ -20,9 +20,10 @@ difference comes from the cm-1 per Eh constant (see REL): term 0 has 2 energy fa
 (First done for CO, 1 mode; replaced by water so that the sum over c has more than one entry.)
 
 Beyond EVV (G7, 2026-10-16): CARS (1D) and the {A, B, C} terms of 3 IR (3D), by hand against the evaluator's rows
-on water, coefficients and locations. The terms come from derive, for the setups of test_dimensions.py (every
-pulse and the detector along x); the formulas here are those terms as derive writes them (term_to_str), so these
-two check everything after derive: the evaluator, the experiment's polarization vector, the units.
+on water, coefficients and locations. The terms are derive's, for the setups of test_dimensions.py (every
+pulse and the detector along x), stored translated to the canonical axes (stored_terms.py); the formulas here
+are those terms (term_to_str), so these two check everything after derive: the evaluator, the experiment's
+polarization vector, the units.
 Limit, as for terms 0 and 12: with every field along x, the rank 4 average is the same for any order of the slots,
 so a property in the wrong slot does not show (A15, G3).
 """
@@ -35,16 +36,12 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import derive_terms
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     evaluate_response_terms,
     prop_names,
     terms_by_axis_set,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_dimensions import (
-    cars_experiment,
-    three_ir_experiment,
-)
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
@@ -185,12 +182,12 @@ def three_ir_abc_by_hand(mol: SimpleNamespace, a: int, b: int, states: str) -> l
     return [(coeff, {**at, 'C': energy(a, b) - energy(b)}), (-coeff, {**at, 'C': energy(a)})]
 
 
-def evaluator_rows(exp, terms: list, states: str) -> dict[tuple[int, ...], list[tuple[float, dict[str, float]]]]:
+def evaluator_rows(setup, terms: list, states: str) -> dict[tuple[int, ...], list[tuple[float, dict[str, float]]]]:
     """The evaluator's rows on water, {index values in label order: [(coeff, location in cm-1), ...]}."""
     molsys = MolSystemData.load(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
                                 prop_names(terms))
-    result = evaluate_response_terms(terms, axes=exp.canonical_axes, molsys_data=molsys, states_choice=states,
-                                     laser_pol=exp.polarization_avg_vector, propagator_param=10.)
+    result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states,
+                                     laser_pol=setup.laser_pol, propagator_param=10.)
     assert result.zero == []
     rows = defaultdict(list)
     for r in result.table:
@@ -214,15 +211,14 @@ def assert_rows_match(by_evaluator: dict, by_hand: dict):
 
 @pytest.fixture(scope='module')
 def cars():
-    exp = cars_experiment()
-    return exp, derive_terms(exp)
+    setup = load_setup('try: CARS')
+    return setup, setup.terms
 
 
 @pytest.fixture(scope='module')
 def three_ir_abc():
-    exp = three_ir_experiment()
-    terms = derive_terms(exp)
-    return exp, [terms[i] for i in terms_by_axis_set(terms, exp.canonical_axes)[('A', 'B', 'C')]]
+    setup = load_setup('nb: 3 IR (3D)')
+    return setup, [setup.terms[i] for i in terms_by_axis_set(setup.terms)[('A', 'B', 'C')]]
 
 
 @pytest.mark.parametrize('states', STATES)

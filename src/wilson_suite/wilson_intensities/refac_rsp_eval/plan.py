@@ -1,13 +1,13 @@
 """
 From derive's terms to compiled terms: the symbolic side, no molecular data (todo.txt H6).
 
-  in:  terms (VibPerturbedTerm) in the chosen axes (term_var_translate)
+  in:  terms (VibPerturbedTerm) already translated to axes (data_for_tests/translated_terms)
   out: list[CompiledTerm] (compile_terms)
 
   holds: PropsCollection, FreqTermsCollection, ResCondKey, ResonanceMotif, generate_LHS_motif, ParameterSet,
          ResLocPoint, split_props, CompiledTerm
 
-Imports wilson_derive; pipeline.py does too (term_var_translate, through compat.py), see todo.txt H8.
+The one module that imports wilson_derive at run time: abstractions, the parts of a term (todo.txt H8).
 """
 
 """
@@ -195,11 +195,16 @@ class ResCondCollection:
 class ResCondKey:
     """One resonance condition reduced to identity: quanta labels + perturbing freqs.
     `diff` is (left quanta, right quanta); ground state is ().
-    `pf` is a sum of signed axes, so its order carries no meaning and is sorted."""
+    `pf` is a sum of signed axes, so its order carries no meaning and is sorted.
+    raises ValueError on pulse IDs (int), e.g. pf (-1, 2) as derive writes it: the evaluator takes terms already
+    translated to axes, e.g. pf ('-A', 'B') (data_for_tests/translated_terms)."""
     diff: tuple[tuple[str, ...], tuple[str, ...]]
     pf: tuple[str, ...]
 
     def __post_init__(self):
+        if not all(isinstance(ax, str) for ax in self.pf):
+            raise ValueError(f'resonance condition with pulse IDs, pf {self.pf}: the evaluator takes terms translated '
+                             f"to axes, e.g. pf ('-A', 'B') (data_for_tests/translated_terms)")
         object.__setattr__(self, 'pf', tuple(sorted(self.pf)))
 
     @property
@@ -421,8 +426,8 @@ def split_props(term: 'VibPerturbedTerm') -> tuple[PropsCollection, PropsCollect
     """
     (averaged props, sorted; non-averaged props) of a term: CompiledTerm.avrg_props and .non_avrg_props.
         e.g. EVV term 8: (polgrad[b] dipgrad[a] dipgrad[c],  cff[a,b,c]): the props with field operators are averaged
-    Works in pulse IDs and in axes: the axis translation changes only the resonance conditions, not the props.
-    So the props of a term as derive writes it are what prop_names and make_polarization_linear_comb read.
+    Reads only the props: the translation to axes changes only the resonance conditions, so the props are the
+    ones derive wrote. prop_names and make_polarization_linear_comb read them through here.
     """
     properties = PropsCollection(term.props)
     return properties.get_averaged_props().sort(), properties.get_non_averaged_props()

@@ -79,8 +79,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     row,
     toy_term,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import TERMS_DIR
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 
 def two_terms_one_motif():
@@ -360,11 +360,11 @@ def test_feature_result_cancelling_needs_rel_tol_from_0_to_below_1(rel_tol):
         FeatureResult(ContributionTable([]), zero=[]).cancelling(rel_tol)
 
 
-## terms as derive writes them: what prop_names, averaging_rank, make_polarization_linear_comb read ----------
+## toy terms with props only: what prop_names, averaging_rank, make_polarization_linear_comb read ----------
 # Only the props are read (plan.split_props), so a toy term needs no denominators and no resonance conditions.
 
 def pulse_term(*props: PolProp) -> VibPerturbedTerm:
-    """a term as derive writes it (pulse IDs), with props only"""
+    """a term with props only: no conditions, so neither pulse IDs nor axes"""
     return VibPerturbedTerm(Fraction(1, 2), list(props), [], [])
 
 
@@ -626,7 +626,7 @@ def test_real_data_leaves_add_up_to_every_row_coefficient(evv_formaldehyde):
 
 ## evaluate_response_terms: the top function -----------------------------------
 # Same settings as evv_reference.json, formaldehyde, anharmonic states. The data is loaded once
-# (formaldehyde_molsys), from the terms as derive writes them (pulse IDs). The evv_formaldehyde fixture
+# (formaldehyde_molsys), for the stored EVV terms (already in axes). The evv_formaldehyde fixture
 # runs the same steps one by one, so equal results mean evaluate_response_terms passes every setting to
 # the right step. One run (top_run) serves most tests.
 
@@ -638,7 +638,6 @@ def formaldehyde_molsys() -> MolSystemData:
 
 def evaluate_formaldehyde(molsys, propagator_param, terms=None, **kwargs) -> FeatureResult:
     return evaluate_response_terms(ref.evv_terms() if terms is None else terms,
-                                   axes=make_SpectralAxisSet(ref.AXES),  # type: ignore
                                    molsys_data=molsys,
                                    states_choice='anharmonic',
                                    laser_pol=ref.LASER_POL,
@@ -677,7 +676,7 @@ def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run,
 
 
 def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
-    """the translation to axes works on copies: the caller's terms keep their pulse IDs"""
+    """the caller's terms come back unchanged (H7: never change derive's objects)"""
     assert [term_to_str(t) for t in top_run.terms] == top_run.terms_before
 
 
@@ -704,7 +703,7 @@ def test_evaluate_response_terms_keeps_what_the_grid_and_leaves_need(top_run, fo
 
 
 def test_terms_by_axis_set_the_14_evv_terms_are_one_set():
-    assert terms_by_axis_set(ref.evv_terms(), make_SpectralAxisSet(ref.AXES)) == {('A', 'B'): list(range(14))}  # type: ignore
+    assert terms_by_axis_set(ref.evv_terms()) == {('A', 'B'): list(range(14))}
 
 
 def evv_terms_with_term_0_on_A_only() -> list:
@@ -715,7 +714,7 @@ def evv_terms_with_term_0_on_A_only() -> list:
 
 
 def test_terms_by_axis_set_groups_the_term_ids_in_the_chosen_axes():
-    groups = terms_by_axis_set(evv_terms_with_term_0_on_A_only(), make_SpectralAxisSet(ref.AXES))  # type: ignore
+    groups = terms_by_axis_set(evv_terms_with_term_0_on_A_only())
 
     assert groups == {('A',): [0], ('A', 'B'): list(range(1, 14))}
 
@@ -729,7 +728,7 @@ def test_evaluate_response_terms_raises_for_two_axis_sets_and_runs_per_set(forma
     with pytest.raises(ValueError, match='2 sets of axes'):
         evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms)
 
-    ids = terms_by_axis_set(terms, make_SpectralAxisSet(ref.AXES))[('A', 'B')]  # type: ignore
+    ids = terms_by_axis_set(terms)[('A', 'B')]
     result = evaluate_formaldehyde(formaldehyde_molsys, 4.7, [terms[i] for i in ids])
 
     assert ({(ids[r.term_id], r.params, r.coeff) for r in result.table}
@@ -739,8 +738,22 @@ def test_evaluate_response_terms_raises_for_two_axis_sets_and_runs_per_set(forma
 def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_molsys):
     """positional settings raise: a swapped pair, e.g. states_choice and laser_pol, cannot slip through"""
     with pytest.raises(TypeError, match='positional'):
-        evaluate_response_terms(ref.evv_terms(), make_SpectralAxisSet(ref.AXES), formaldehyde_molsys,  # type: ignore
-                                'anharmonic', ref.LASER_POL, 5.)
+        evaluate_response_terms(ref.evv_terms(), formaldehyde_molsys, 'anharmonic', ref.LASER_POL, 5.)  # type: ignore
+
+
+def evv_terms_in_pulse_ids() -> list[VibPerturbedTerm]:
+    """the 14 EVV terms as derive writes them, before the translation: e.g. pf [-1, 2] where evv.json has ['B']"""
+    return VibPerturbedTerm.load_many_from_json(str(TERMS_DIR / 'evv_in_pulse_ids.json'))
+
+
+def test_evaluate_response_terms_raises_on_terms_in_pulse_ids(formaldehyde_molsys):
+    with pytest.raises(ValueError, match='pulse IDs'):
+        evaluate_formaldehyde(formaldehyde_molsys, 4.7, evv_terms_in_pulse_ids())
+
+
+def test_terms_by_axis_set_raises_on_terms_in_pulse_ids():
+    with pytest.raises(ValueError, match='pulse IDs'):
+        terms_by_axis_set(evv_terms_in_pulse_ids())
 
 
 def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(formaldehyde_molsys, top_run):

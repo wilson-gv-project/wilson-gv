@@ -1,6 +1,7 @@
 """
 Writes evv_reference.json: the rows of the new pipeline (build_contributions) for the 14 EVV terms
-of test_terms.json, for formaldehyde, water and CO, with harmonic and with anharmonic states.
+(the setup 'evv' of stored_terms.py: data_for_tests/translated_terms/evv.json, already translated to AXES),
+for formaldehyde, water and CO, with harmonic and with anharmonic states.
 
 Settings are the ones of the old EVV integration tests (tests/integration/test_integration_evaluation.py; deleted
 with the old code, see git show d93cc7b:src/wilson_suite/wilson_intensities/tests/integration/
@@ -15,7 +16,6 @@ import json
 from pathlib import Path
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     make_polarization_linear_comb,
@@ -26,14 +26,14 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     compile_terms,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 
-TERMS_FILE = 'wilson_intensities/refac_rsp_eval/tests/test_terms.json'   # relative to SUITE_ROOT
-AXES = {'A': [1], 'B': [-1, 2]}
+TERMS_FILE = 'data_for_tests/translated_terms/evv.json'   # relative to SUITE_ROOT: the setup 'evv'
+AXES = {'A': [1], 'B': [-1, 2]}     # the axes of evv.json, A = w1, B = -w1 + w2 (test_evv_reference checks both agree)
 LASER_POL = (1., 1., 1.)
 RANK = 4     # recorded in the file; the recipe takes the rank from the terms (test_pipeline checks both agree)
 DATA_FILES = {'formaldehyde': 'data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out',
@@ -43,13 +43,12 @@ STATES_CHOICES = ('anharmonic', 'harmonic')
 
 
 def evv_terms() -> list[VibPerturbedTerm]:
-    """the 14 terms as derive writes them, in pulse IDs (not yet in axes)"""
-    return VibPerturbedTerm.load_many_from_json(f'{SUITE_ROOT}/{TERMS_FILE}')
+    """the 14 terms, translated to AXES; new objects per call"""
+    return load_setup('evv').terms
 
 
 def compiled_evv_terms() -> list[CompiledTerm]:
-    axes = make_SpectralAxisSet(AXES)  # type: ignore
-    return compile_terms(terms=translate_terms_to_axis_variables(evv_terms(), axes))
+    return compile_terms(terms=evv_terms())
 
 
 def data_origin(molecule: str) -> DataOriginInfo:
@@ -63,7 +62,7 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
     """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
-    terms = evv_terms()     # data and recipe read only the props: the terms in pulse IDs
+    terms = evv_terms()
     molsys = MolSystemData.load(data_origin(molecule), prop_names(terms))
     pol = make_polarization_linear_comb(terms, LASER_POL)
     table, zero = build_contributions(compiled, molsys, pol, states_choice=states_choice)

@@ -27,6 +27,7 @@ import json
 import pytest
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 
 REFERENCE = json.loads(ref.REFERENCE_FILE.read_text())
 CASES = [(b['molecule'], b['states']) for b in REFERENCE['results']]
@@ -59,6 +60,15 @@ def test_reference_file_has_the_settings_of_the_script():
     assert REFERENCE['settings'] == {'terms_file': ref.TERMS_FILE, 'axes': ref.AXES,
                                      'laser_pol': list(ref.LASER_POL), 'rank': ref.RANK}
     assert sorted(CASES) == sorted((m, s) for m in ref.DATA_FILES for s in ref.STATES_CHOICES)
+
+
+def test_terms_file_has_the_axes_and_laser_pol_of_the_script():
+    """evv.json records its translation: A = [1], B = [-1, 2] as {label: [pulse ids of each variable]}"""
+    setup = load_setup('evv')
+
+    assert setup.axes == {label: [(pulse_id,) for pulse_id in ids] for label, ids in ref.AXES.items()}
+    assert setup.laser_pol == ref.LASER_POL
+    assert len(setup.terms) == 14
 
 
 def test_formaldehyde_has_504_pairs_340_rows_164_zero():

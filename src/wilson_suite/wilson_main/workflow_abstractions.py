@@ -355,8 +355,8 @@ class WilsonSimulation:
 		EvaluationWorkflow, which goes with the old code (E9). Until then, use the library calls (pipeline.py).
 		"""
 		raise NotImplementedError(
-			'WilsonSimulation.evaluate ran the old evaluator, which goes with the old code.'
-			'Until the new evaluator is connected here')
+			'WilsonSimulation.evaluate ran the old evaluator, which goes with the old code. '
+			'Until the new evaluator is connected here.')
 
 	def evaluate_with_default_setup_fill(self):
 		"""

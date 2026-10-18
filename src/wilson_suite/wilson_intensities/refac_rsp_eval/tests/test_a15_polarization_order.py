@@ -5,7 +5,9 @@ amplitudes/averaging.py, get_pol_tensor). The cause, slot by slot, and more setu
 
 Slots. Slot 0 is the detected field, slot k is pulse k. VibExperiment lists its polarizations in that order
 (all_polarizations = [detector, pulse 1, pulse 2, ...]) and turns them into polarization_avg_vector with
-get_pol_laser. The evaluator takes that vector as laser_pol (make_polarization_linear_comb).
+get_pol_laser. The evaluator takes that vector as laser_pol (make_polarization_linear_comb). The experiment is
+not used here: get_pol_laser gets the list in slot order directly. make_translated_terms.py
+(data_for_tests/translated_terms) checks the slot order and the vector for every stored setup.
 
 Rank 3, the clearest case. Fields along e0, e1, e2 (slots 0, 1, 2) and a molecular tensor T with three Cartesian
 indices. Averaged over all orientations of the molecule (Andrews and Thirunamachandran, J. Chem. Phys. 67, 5026 (1977)):
@@ -14,7 +16,7 @@ For three transition dipoles, T = mu_a x mu_b x mu_c and eps : T = det(mu_a, mu_
 three dipoles are not in one plane: a chiral molecule. Its mirror image has the opposite det, so the sign of the
 average tells the two mirror images apart.
 With e0, e1, e2 = x, y, z: det = +1, the average is +det(mu) / 6. Today the evaluator gives -det(mu) / 6, the value
-of the mirror-image molecule: VibExperiment hands it polarization_avg_vector [-1.0] instead of [+1.0].
+of the mirror-image molecule: get_pol_laser gives [-1.0] instead of [+1.0].
 
 Rank 5. The error is not always a sign. Beta-alpha CARS form (experiment_beta_alpha_cars in fixtures.py),
 fields x, y, z, x, x: exact -0.963, today +0.598.
@@ -27,7 +29,6 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import calculate_avrg_tensor_einsum
@@ -46,18 +47,9 @@ MU = np.array([[1.0, 0.0, 0.0],
 MU_MIRROR = MU * np.array([1., 1., -1.])
 
 
-def rank_3_experiment(pulse_1_pol, pulse_2_pol) -> wexp.VibExperiment:
-    """detector along x; two pulses with the given polarizations (each wave vector orthogonal to its polarization)"""
-    def pulse(pol, pulse_id, tc):
-        wave_vector = X if pol == Z else Z
-        return wexp.make_impulsive_gaussian_pulse(tc=tc, cf=0.0, cf_uv=0.0, maxstr=1.0e-5, wv=wave_vector, pol=pol,
-                                                  id=pulse_id)
-    detector = wexp.SpecDetector(detection_method='freq', detector_location=(0.0, 1.0, 0.0), detection_polarization=X,
-                                 detection_range=[0.003 + 0.0001 * i for i in range(11)], wv_filter=[{1: 1, 2: 1}])
-    scan = wexp.SpecScan(scan_objs=(wexp.ScanObject('pulse', 'cf', id=1, coeff=1.0),),
-                         range=[0.0001 * i for i in range(11)])
-    return wexp.VibExperiment(wexp.ElectricField((pulse(pulse_1_pol, 1, 50.), pulse(pulse_2_pol, 2, 100.))),
-                              detector, scans=(scan,))
+def rank_3_laser_pol(pulse_1_pol, pulse_2_pol) -> list:
+    """polarization_avg_vector as VibExperiment makes it: detector along x, then pulse 1, pulse 2 (slot order)"""
+    return get_pol_laser([X, pulse_1_pol, pulse_2_pol])
 
 
 def evaluator_average(term: VibPerturbedTerm, laser_pol, data: dict[str, np.ndarray]) -> float:
@@ -74,17 +66,16 @@ THREE_DIPOLES = VibPerturbedTerm(Fraction(1), [polprop(ops=(0,), inds='a'), polp
                                                polprop(ops=(2,), inds='c')], [], [])
 
 
-## rank 3: the experiment, the reference, the evaluator ---------------------------------------------
+## rank 3: the polarization vector, the reference, the evaluator ------------------------------------
 
 @pytest.mark.parametrize('pulse_1_pol, pulse_2_pol, det', [(Y, Z, +1.), (Z, Y, -1.)],
                          ids=['x, y, z: det +1', 'x, z, y: det -1'])
-def test_experiment_gives_the_evaluator_det_of_its_polarizations(pulse_1_pol, pulse_2_pol, det):
+def test_polarization_vector_is_det_of_the_polarizations(pulse_1_pol, pulse_2_pol, det):
     """polarization_avg_vector at rank 3 is [det(detector, pulse 1, pulse 2)]. Today both setups get the other sign."""
-    experiment = rank_3_experiment(pulse_1_pol, pulse_2_pol)
+    laser_pol = rank_3_laser_pol(pulse_1_pol, pulse_2_pol)
 
-    assert experiment.all_polarizations == [X, pulse_1_pol, pulse_2_pol]       # slot order: detector, pulse 1, pulse 2
-    assert experiment.polarization_avg_vector == [det], (
-        f'A15: polarization_avg_vector {experiment.polarization_avg_vector}, right [{det}]: '
+    assert laser_pol == [det], (
+        f'A15: polarization_avg_vector {laser_pol}, right [{det}]: '
         f'the vector of the setup with the polarizations in reverse order')
 
 
@@ -102,7 +93,7 @@ def test_evaluator_three_dipoles_x_y_z_is_det_over_6(mu):
     Experiment x, y, z -> polarization_avg_vector -> recipe -> averaged part of dipgrad[a] dipgrad[b] dipgrad[c].
     Right: +det(mu) / 6. Today: -det(mu) / 6, so the molecule gets its mirror image's value and the other way round.
     """
-    laser_pol = rank_3_experiment(Y, Z).polarization_avg_vector
+    laser_pol = rank_3_laser_pol(Y, Z)
 
     value = evaluator_average(THREE_DIPOLES, laser_pol, {'dipgrad': mu})
 

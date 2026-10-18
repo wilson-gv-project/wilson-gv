@@ -38,7 +38,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed import load_acdm
 from wilson_suite.wilson_system.system_data import MolSystemData
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 DYNRANGE = 500.         # the boxes (amplitude_half_widths) and the plot use the same
 GAMMA_CM = 4.7
@@ -47,8 +46,7 @@ LABELS = {'A': r'A = $\omega_1/2\pi c$, cm$^{-1}$', 'B': r'B = $(-\omega_1+\omeg
 
 
 def evaluate(terms, molsys: MolSystemData, states: str) -> FeatureResult:
-    return evaluate_response_terms(terms, axes=make_SpectralAxisSet(ref.AXES), molsys_data=molsys,  # type: ignore
-                                   states_choice=states, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
+    return evaluate_response_terms(terms, molsys_data=molsys, states_choice=states, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
 
 
 def save(fig, path: Path, dpi: int = 110):

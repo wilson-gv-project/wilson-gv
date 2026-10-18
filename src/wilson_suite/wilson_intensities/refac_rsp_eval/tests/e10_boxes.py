@@ -57,7 +57,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed import load_acdm
 from wilson_suite.wilson_system.system_data import MolSystemData
-from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 GAMMA_CM = 4.7
 STATES = 'anharmonic'
@@ -134,8 +133,7 @@ def main(settings: list[dict]):
     terms = ref.evv_terms()
     for mol, load in (('formaldehyde', lambda: MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))),
                       ('ACDM', lambda: load_acdm(terms))):
-        result = evaluate_response_terms(terms, axes=make_SpectralAxisSet(ref.AXES), molsys_data=load(),  # type: ignore
-                                         states_choice=STATES, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
+        result = evaluate_response_terms(terms, molsys_data=load(), states_choice=STATES, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
         run_case(f'{mol}, quick_start window', result, *QUICK_START, settings)
         zoom, zoom_grid = zoom_around_strongest(result, QUICK_START[0])
         run_case(f'{mol}, zoom {zoom.bounds}', result, zoom, zoom_grid, settings)

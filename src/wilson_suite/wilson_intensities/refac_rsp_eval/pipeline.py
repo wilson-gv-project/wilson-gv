@@ -1,14 +1,16 @@
 """
 Entry point: terms + molecular data -> spectral features -> the spectrum on a grid.
 
-Two calls, from the terms derive writes (in pulse IDs) and the data:
-    result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., laser_pol=...,
+Two calls, from terms already translated to axes and the data:
+    result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=..., laser_pol=...,
                                      propagator_param=..., exclude_modes=...)
                                                                       rows and features: FeatureResult
     spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
-A caller needs only these two calls. The inputs are plain values, derive's terms and a few small types (below).
-evaluate_response_terms: translate to axes -> compile_terms -> make_polarization_linear_comb -> compute_features.
-prop_names and make_polarization_linear_comb read only the props, so they take the terms in pulse IDs.
+A caller needs only these two calls. The inputs are plain values, the terms and a few small types (below).
+evaluate_response_terms: compile_terms -> make_polarization_linear_comb -> compute_features.
+The evaluator neither derives nor translates terms: no file of it imports wilson_experiment, derive.derive or
+term_var_translate (tests/test_imports.py). Translated terms in files, with their settings: data_for_tests/translated_terms
+(tests/stored_terms.py reads them).
 One call is for one set of resonance axes, e.g. {A, B} (check_one_axis_set). Terms on more than one set, e.g. the
 3 IR setup ({A, B} and {A, B, C}): terms_by_axis_set splits them, and each set gets its own call.
 
@@ -19,10 +21,11 @@ MolSystemData (wilson_system) with the properties the terms use, prop_names(term
 evaluate_response_terms checks that molsys has every property the terms use (MolSystemData.check_props).
 
 Inputs
-    terms             VibPerturbedTerm list, as derive writes them (with pulse IDs). row.term_id is the index in it.
+    terms             VibPerturbedTerm list, translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
+                      (derive writes pulse IDs, e.g. [-1, 2]: plan.ResCondKey raises on them). row.term_id is the
+                      index in the list.
     molsys_data       MolSystemData: the properties, frequencies and state sets of one molecule (see above)
-    axes             SpectralAxisSet, e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]}): A = w1, B = -w1 + w2
-    states_choice     'harmonic' or 'anharmonic'. Must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic';
+    states_choice    'harmonic' or 'anharmonic'. Must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic';
                       harmonic -> 'harmonic'. No default: the data cannot know the regime.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
@@ -80,7 +83,6 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     get_iso_f,
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import translate_terms_to_axis_variables
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     boxed_features_on_grid,
     build_contributions,
@@ -106,7 +108,6 @@ from wilson_suite.wilson_system.system_data import MolSystemData
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
     from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
     from wilson_suite.wilson_system.system_data import VibStatesData
@@ -231,28 +232,26 @@ def check_one_axis_set(compiled: Sequence['CompiledTerm']) -> None:
                          f'(terms_by_axis_set splits them); term ids by set: {term_ids}')
 
 
-def terms_by_axis_set(terms: Sequence['VibPerturbedTerm'],
-                      axes: 'SpectralAxisSet') -> dict[tuple[str, ...], list[int]]:
+def terms_by_axis_set(terms: Sequence['VibPerturbedTerm']) -> dict[tuple[str, ...], list[int]]:
     """
-    The term ids (index in `terms`) grouped by the axes their resonance conditions use in the chosen axes, e.g.
+    The term ids (index in `terms`) grouped by the axes their resonance conditions use, e.g.
     the 3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: key ().
     They are a flat background, the same on any grid (E12), and check_one_axis_set does not count them, so they
     can join the call of any set, e.g. IR absorption: {(): [0, 1, 2], ('A',): [3, 4]}, all 5 terms in one call.
-    terms: as derive writes them (pulse IDs); grouping needs the translation to `axes`, so it is done here (copies).
+    terms: translated to axes, as for evaluate_response_terms.
     For the caller: one evaluate_response_terms call per set, e.g.
-        for axis_set, ids in terms_by_axis_set(terms, axes).items():
-            result = evaluate_response_terms([terms[i] for i in ids], axes=axes, ...)
+        for axis_set, ids in terms_by_axis_set(terms).items():
+            result = evaluate_response_terms([terms[i] for i in ids], ...)
     There row.term_id is the index in that call's list: ids[row.term_id] is the index in `terms`.
     """
-    translated = translate_terms_to_axis_variables(terms, axes)
-    return _term_ids_by_axis_set(ResonanceMotif.from_conditions(t.res) for t in translated)
+    return _term_ids_by_axis_set(ResonanceMotif.from_conditions(t.res) for t in terms)
 
 
 def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
     """
     Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: what the caller loads,
     e.g. MolSystemData.load(origin, prop_names(terms)).
-    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
+    Only the props are read (plan.split_props).
     Per term the averaged props first, as in CompiledTerm.prop_names.
     """
     return list(dict.fromkeys(name for term in terms for part in split_props(term) for name in part.names))
@@ -288,7 +287,7 @@ def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
     """
     The orientation-average recipe {(x/y/z per slot): coefficient} that compute_features takes,
     from getGeneralPolarizationAveragingExpression with the rank of the terms (averaging_rank).
-    terms: as derive writes them (pulse IDs) or translated to axes: only the props are read (plan.split_props).
+    Only the props of the terms are read (plan.split_props).
 
     laser_pol: the experiment's polarization_avg_vector. Its length is fixed by the rank
     (rank 4 -> 3 numbers, e.g. (1, 1, 1) when all pulses and the detector are along x).
@@ -317,26 +316,24 @@ def _averaging_recipe(rank: int, laser_pol: tuple[float, ...]) -> PolarizationAv
 
 
 def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
-                            axes: 'SpectralAxisSet',
                             molsys_data: MolSystemData,
                             states_choice: str,
                             laser_pol: Sequence[float],
                             propagator_param: PropagatorParam,
                             exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
-    Terms as derive writes them (in pulse IDs) + data loaded before + experiment settings -> rows and features.
-        1. translate the terms to the chosen axes           compat.translate_terms_to_axis_variables (copies,
-                                                            keeps the order)
-        2. compile                                          compile_terms
-        3. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
+    Terms translated to axes + data loaded before + experiment settings -> rows and features.
+        1. compile                                          compile_terms (raises on a condition in pulse IDs:
+                                                            plan.ResCondKey)
+        2. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
                                                             rank and laser_pol)
-        4. rows, zero pairs, features                       compute_features (raises first if the terms resonate
+        3. rows, zero pairs, features                       compute_features (raises first if the terms resonate
                                                             on more than one set of axes: terms_by_axis_set)
     The spectrum on a grid: spectrum_on_grid(result, window, dim_sizes, box_rule=...), as often as needed; the rows
     stay.
 
-    axes              e.g. make_SpectralAxisSet({'A': [1], 'B': [-1, 2]})
-    molsys_data       MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
+    terms             translated to axes, e.g. stored_terms.load_setup('evv').terms (tests/stored_terms.py)
+    molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
                       loaded once, for any number of runs
     states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
@@ -349,8 +346,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     Every argument after the terms is keyword-only: two swapped arguments raise a TypeError.
     row.term_id is the index in `terms`.
     """
-    translated = translate_terms_to_axis_variables(terms, axes)
-    compiled = compile_terms(translated)
+    compiled = compile_terms(terms)
     recipe = make_polarization_linear_comb(terms, laser_pol)
     return compute_features(compiled, molsys_data, recipe, propagator_param=propagator_param,
                             states_choice=states_choice, exclude_modes=exclude_modes)
