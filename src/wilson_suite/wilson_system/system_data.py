@@ -17,21 +17,23 @@ if TYPE_CHECKING:
 # What every evaluation reads besides the properties: MolSystemData.load requests these from every source.
 EVALUATION_DATA_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states')
 
-# Property name -> (number of mode indices, number of x/y/z indices), e.g. 'polhess' -> (2, 2): shape (n, n, 3, 3).
-# Every name prop_trivname makes from the orders 0-6; the rotational ones ('B', 'coriolis') are not here.
+# Property name -> (g, e): g = number of derivatives by normal modes, e = number of derivatives by the electric field.
+# The array has one index of length n (number of modes) per g, then one index of length 3 (x, y, z) per e.
+# Example: 'polhess' (polarizability, 2nd derivative by modes) -> (2, 2) -> shape (n, n, 3, 3).
 PROP_INDEX_COUNTS = {prop_trivname(ord_geo=g, ord_el=e): (g, e) for g in range(7) for e in range(7)}
 
-# Symmetry in the mode indices: values that differ by less than this count as equal. 1e-18 is the evaluator's
-# zero_tol (au). Measured 2026-10-14 (formaldehyde, water, CO, ACDM): the reader's tensors are exactly symmetric.
+# Symmetry in the mode indices: values that differ by less than this count as equal. 1e-18 is the evaluator's zero_tol (au).
 SYMMETRY_RTOL, SYMMETRY_ATOL = 1e-12, 1e-18
+
+# Label of the ground state (no quanta): make_state_label(()) gives it; VibStatesData adds the state with energy 0.
+ZERO_STATE_LABEL = 'zero'
 
 
 @dataclass(frozen=True)
 class DataOriginInfo:
     """
     Class to represent computational setups for properties obtained external to Wilson
-    Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
-    "get from file"
+    Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/"get from file"
 
     ----
     source_type: String: Options: gaussian, cfour, wilson
@@ -71,18 +73,16 @@ class VibState:
     This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
 
     ----
-    s: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
-    e: float: State energy level
-    d: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
+    harm_quanta_coeffs: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+    energy: float: State energy level
+    displacement: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
+    state_label: str: The modes with quanta, sorted, one entry per quantum (make_state_label), e.g. '2,10' for one quantum
+        in mode 2 and one in mode 10, '1,1' for two quanta in mode 1, ZERO_STATE_LABEL for no quanta (ground state)
+    harmonic_WF: bool: True if the state is a harmonic oscillator state, False otherwise
+    ----
 
-    UPD:
-    dictionary self.s is not JSON-serializable (tuples can't be keys), but self.serial_s is.
-    self.serial_s is set up in post_init; deserialize_state_dict will return original self.s based on self.serial_s.
-
-    Notes:
-    s: InitVar[dict] = field(repr=False) - means that this atribute will not be in repr() of the class instance
-    InitVar - is an init-only variable
-    This seems to be okay for now, but should mind this feature
+    Dictionary self.harm_quanta_coeffs is not JSON-serializable (tuples can't be keys), but self.serial_harm_quanta_coeffs is.
+    self.serial_harm_quanta_coeffs is set up in post_init; deserialize_state_dict will return original self.harm_quanta_coeffs based on self.serial_harm_quanta_coeffs.
     """
     harm_quanta_coeffs: dict[tuple[int, ...], float]
     energy: float = 0.0
@@ -117,6 +117,7 @@ class VibState:
     
     @classmethod
     def get_1q_states(cls, states: list['VibState']):
+        """Get states with exactly one quantum in any mode."""
         return [s for s in states if len(s.state_label.split(','))==1]
 
 
@@ -131,46 +132,37 @@ class VibStatesData:
     
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
-        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label='zero', energy=0.))
+        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
         self.allstates = tuple(tmp_allstates)
         
-        self.allenergies_map = {i.state_label: i.energy for i in self.allstates}
         self.allstates_map = {i.state_label: i for i in self.allstates}
         self._storage = {}
 
 
-    def get_harmonic_osc_states(self):
+    def get_harmonic_osc_states(self) -> dict[int, float]:
         """
-        i.state_label - TODO: make a convention, rules how to describe vibstates
-        now i.state_label is str
+        Get harmonic oscillator states from allstates, filtering by harmonic_osc_states_labels.
+        Returns a dictionary with state labels as keys and energies as values, sorted by state label.
         """
-        harm_states_str = [i for i in self.allstates if ',' not in i.state_label and i.state_label!='zero']
+        harm_states_str = [i for i in self.allstates if ',' not in i.state_label and i.state_label != ZERO_STATE_LABEL]
         harm_states = {int(i.state_label): i.energy for i in harm_states_str if int(i.state_label) in self.harmonic_osc_states_labels}
 
         return dict(sorted(harm_states.items()))
     
-    def get_state_by_label(self, state_label):
+    def get_state_by_label(self, state_label: str) -> VibState | None:
         if state_label in self.allstates_map:
             return self.allstates_map.get(state_label)
         else:
             raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
-    
-    # UNUSED
-    def get_energy_by_label(self, state_label):
-        if state_label in self.allstates_map:
-            return self.allenergies_map.get(state_label)
-        else:
-            raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
 
-def make_state_label(modes) -> str:
+
+def make_state_label(modes: Sequence[int | str]) -> str:
     """
     (10, 2) -> '2,10';  ('1', '0') -> '0,1';  () -> 'zero'
     
     assert make_state_label(('10', '2')) == make_state_label([2, 10]) == '2,10'
-
-    modes is Sequence[int | str]
     """
-    return ','.join(str(m) for m in sorted(int(m) for m in modes)) or 'zero'
+    return ','.join(str(m) for m in sorted(int(m) for m in modes)) or ZERO_STATE_LABEL
 
 
 @dataclass
@@ -186,10 +178,8 @@ class VibDiff:
     def is_zero_state(self, state: VibState) -> bool:
         """
         Check if state is a zero (ground) state.
-
-        #TODO more criteria?
         """
-        return state.state_label == 'zero'
+        return state.state_label == ZERO_STATE_LABEL
     
     def normalized(self) -> 'VibDiff':
         """

@@ -99,7 +99,7 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
     ax.set_aspect('equal', adjustable='box')
 
     cbar = fig.colorbar(contour, ax=ax, ticks=levels)
-    cbar.ax.set_yticklabels([f'{v:.3f}' for v in levels])
+    cbar.ax.set_yticklabels([f'{v:.2g}' for v in levels])
     cbar.set_label(scale_label)
     return fig, ax, contour, cbar
 

@@ -1,5 +1,12 @@
-from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxis, SpectralAxisChoices, SpectralAxisSet, IndependentVariableSet, SignedPulseTuple
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+from wilson_suite.wilson_experiment.indep_vars_and_axes import (
+    IndependentVariableSet,
+    SignedPulseTuple,
+    SpectralAxis,
+    SpectralAxisChoices,
+    SpectralAxisSet,
+)
+
 
 # --------- SpectralAxis and related
 def show_valid_axis_combs(valid_axis_combs: list[SpectralAxisChoices], output=False):
