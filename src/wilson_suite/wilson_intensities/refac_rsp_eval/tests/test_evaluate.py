@@ -1092,7 +1092,7 @@ def test_build_contributions_needs_every_prop_the_terms_use(molsys):
         build_contributions([ab_term()], molsys, TOY_RECIPE, states_choice='harmonic')
 
 
-## exclude_modes: a mode removed everywhere ------------------------------------
+## exclude_modes: a mode left out of the evaluation ----------------------------
 # The toy molecule has 2 modes, 0 and 1. An excluded mode is no value of a resonance label (no row, no zero
 # pair) and no value of a summed label (included_modes; decided 2026-10-13).
 
@@ -1129,7 +1129,7 @@ def test_evaluate_term_coeffs_sums_only_over_the_given_modes(term_and_avrg, mols
     assert total == only
 
 
-def test_build_contributions_excluded_mode_is_removed_everywhere(molsys_a1_zero):
+def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a1_zero):
     """
     Exclude mode 1: the only index set is a = b = 0 (no row and no zero pair with a 1), and its sum over c keeps
     only c = 0. So its coefficient is the c = 0 piece alone; without exclusion it is the sum of the c = 0 and c = 1

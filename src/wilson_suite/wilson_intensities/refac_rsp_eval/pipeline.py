@@ -28,7 +28,8 @@ Inputs
                       The averaging rank fixes its length (rank 4: 3 numbers).
     propagator_param  the peak width, cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam).
                       It sizes both the peak on the grid and its box.
-    exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): removed everywhere. Default: none.
+    exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): left out of the evaluation (the data keeps
+                      them). Default: none.
     window            grid.Box, cm-1, one range per axis, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)})
     dim_sizes         grid points per axis, both window edges included, e.g. {'A': 501, 'B': 201}
     box_rule          features.BoxRule: (window, features) -> one box half-width per feature, cm-1. Knobs by
@@ -191,7 +192,8 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
         per condition and/or per frequency (features.PropagatorParam).
     states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
         GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
-    exclude_modes: modes removed everywhere, e.g. (5,): no peak and no summed value uses them (evaluate.included_modes).
+    exclude_modes: modes left out of the evaluation, e.g. (5,): no peak and no summed value uses them
+    (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) on the grid.
     raises ValueError if the terms resonate on more than one set of axes (check_one_axis_set).
@@ -340,9 +342,10 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.
                       lambda vd, freqs: 0.01 * abs(vd.energy_difference())
-    exclude_modes     modes removed everywhere, counted from 0 as in the data, e.g. (5,) (VibAnaSetup.exclude_modes):
-                      no peak and no summed value uses them, as if the molecule did not have them. The other peaks
-                      change too: their sums lose the excluded modes (evaluate.included_modes). Default: none.
+    exclude_modes     modes left out of the evaluation, counted from 0 as in the data, e.g. (5,)
+                      (VibAnaSetup.exclude_modes): no peak and no summed value uses them; the data keeps them. The
+                      other peaks change too: their sums lose the excluded modes (evaluate.included_modes).
+                      Default: none.
     Every argument after the terms is keyword-only: two swapped arguments raise a TypeError.
     row.term_id is the index in `terms`.
     """

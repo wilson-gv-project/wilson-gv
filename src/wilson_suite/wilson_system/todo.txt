@@ -17,7 +17,7 @@ check_data_dict, MolecularProperty, MolPropsCollection) and tests/test_system_da
 D4 (one copy of VibState, MolecularProperty, MolPropsCollection): checked by a dry run, the move not started.
 D5 (the data-dict contract): the load checks are done; the table is not in a README yet.
 The reader (wilson_utils/wilson_data_obtainer.py) moves here after the refactor is merged into main (R1, decided
-2026-10-17). Its checks: G2 in part, G8 and G9 not started; test_getting_data fails (R2).
+2026-10-17). Its checks: G2 in part, G8 and G9 not started; test_getting_data passes since 2026-10-18 (R2).
 The anharmonic part (S1-S6) is not started. It waits until the evaluator refactor is done (decided 2026-10-17).
 Until then Wilson computes anharmonic states only in wilson_main's old workflow (VibAnaSetup, anharm_analyzer_data).
 The new evaluator reads the states from the file (MolSystemData.load).
@@ -43,7 +43,8 @@ Order of work
     after the refactor       S1 (move vpt2.py) -> S2 (with_states) -> S3 (anharmonic_states) -> S4 (tests)
                              -> S6 (remove the old path)
     after the merge          R1 (move wilson_data_obtainer.py here)
-    any time                 S5 (eig -> eigh), R2 (test_getting_data)
+    any time                 S5 (eig -> eigh)
+    done 2026-10-18          R2 (test_getting_data)
     when needed              G2 (if the reader changes), G8 (before CFOUR data is used), G9 (when normal_modes
                              are needed)
     open points              S7 (MolecularProperty from a description), S8 (two origins in one run)
@@ -153,9 +154,11 @@ below matter for the final spectra.
         Steps: move the file and its test (wilson_utils/tests/test_wilson_data_obtainer.py); keep a one-line
         re-export at the old path, so every caller keeps working; change the import lines later, then delete the
         re-export.
-[ ] R2  test_getting_data (wilson_utils/tests/test_wilson_data_obtainer.py) fails, on main too: the reader returns
-        one key more than the test expects, 'reindex_modes' (the expected keys: test line 103).
-        open: add the key to the test, or the reader stops returning it [outside].
+[x] R2  test_getting_data (wilson_utils/tests/test_wilson_data_obtainer.py) failed, on main too: the reader returns
+        one key more than the test expected, 'reindex_modes' (the expected keys: test line 103).
+        Done 2026-10-18: the key added to the test's expected keys. reindex_modes is CQCParse's flag
+        (parse_wilson_obtainer.py), True if CQCParse renumbered the modes; wilson_data_obtainer never asks it to,
+        so the flag is False and the mode numbers are the Gaussian file's.
 [ ] G2  Data reader vs the Gaussian .out file. Done by hand 2026-10-11 for water (a scratch script, not a test):
         harmonic frequencies, IR intensities (dipgrad), Raman activities (polgrad), reduced cubic constants (cff)
         and the "ELECTRIC" rows of the 2-quanta transition moments (diphess) match to print precision (only for

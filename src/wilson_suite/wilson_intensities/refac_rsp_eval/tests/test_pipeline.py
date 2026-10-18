@@ -743,7 +743,7 @@ def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_mol
                                 'anharmonic', ref.LASER_POL, 5.)
 
 
-def test_evaluate_response_terms_excluded_mode_is_removed_everywhere(formaldehyde_molsys, top_run):
+def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(formaldehyde_molsys, top_run):
     """
     exclude_modes (5,), formaldehyde, 6 modes: 5 x 5 (a, b) pairs per term instead of 6 x 6, none with mode 5.
     Every row's coefficient is the sum of the full run's leaves without mode 5 (top_run: no exclusion), in every

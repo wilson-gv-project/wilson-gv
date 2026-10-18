@@ -571,8 +571,8 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
     """
     The modes the evaluation uses: 0 .. n_modes-1 without exclude_modes, n_modes = len(molsys_data.eigenvals).
         e.g. 6 modes, exclude_modes (5,) -> (0, 1, 2, 3, 4)
-    An excluded mode is removed everywhere (todo.txt Decisions, 2026-10-13): it is no resonance label (no row,
-    no peak) and no value of a summed label, as if the molecule did not have it. So the other peaks change too:
+    An excluded mode is left out of the evaluation (todo.txt Decisions, 2026-10-13): it is no resonance label (no
+    row, no peak) and no value of a summed label; molsys_data keeps it. So the other peaks change too:
     their sums lose the excluded mode. (VibAnaSetup.exclude_modes in the old code: no peaks either, but the sums
     dropped the mode only where the summed label is in the averaged part.)
 
@@ -610,7 +610,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     The number of modes comes from molsys_data.eigenvals, the state energies from
     molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
     polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
-    exclude_modes: modes removed everywhere, e.g. (5,): no index set and no summed value uses them (included_modes).
+    exclude_modes: modes left out of the evaluation, e.g. (5,): no index set and no summed value uses them
+    (included_modes).
     Checks molsys_data first: the frequencies, the chosen states, and values for every property the terms use
     (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.load or from_datadict).
 
