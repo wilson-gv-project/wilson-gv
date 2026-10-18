@@ -15,7 +15,7 @@ Summary
          old pipeline
     C    old-pipeline scripts and tests, broken before   4 scripts, 16 tests   no change: they fail today  no
          E9 for other reasons
-    D    user docs: README quick start, notebook         2 files               no test notices             no
+    D    user docs: README quick start, notebooks        3 files (D3 done)     no test notices             no
     E    wilson_main code that runs the old pipeline     5 parts               fails when called           no
          or reads its result
     F    near the old pipeline, no old-code import       4 files               no change                   no
@@ -116,7 +116,8 @@ E1  evaluate (lines 352-365). Before E1 it imported evaluation_wf when called (n
     EvaluationWorkflow; it wrote self._workflow, self.diagn['artifacts'], self.spec_eval_setup.grid, self.spec.
     After stage 5 a call would have raised ModuleNotFoundError. Callers: B1, B2, D1, D2.
     Done 2026-10-16 (todo.txt E9): raises NotImplementedError until E6b; the message names the library calls
-    (MolSystemData.load, evaluate_response_terms, draw_spectrum) and their modules.
+    (MolSystemData.load, evaluate_response_terms, spectrum_on_grid; draw_spectrum until the rename, E15) and their
+    modules.
 E2  evaluate_with_default_setup_fill (lines 367-373): calls attempt_setup_fill_with_defaults (its body: pass),
     then evaluate. No caller.
 E3  evaluateSpectrum (lines 375-411): takes an evaluator function; no old import. Its docstring: "unused now ...

@@ -545,11 +545,12 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
         dynrange                 the plot's dynamic range, max / floor, e.g. 100. Required.
         box_range_safety_margin  the boxes this much larger, e.g. 0.1 (default): 10 % larger.
         scale_wrt_max_intensity  False (default): each box to 1/dynrange of its own peak. True: to the floor.
-        minimum_box_padding      the smallest half-width, cm-1. Default 0. (The old setup class passed 10.)
+        minimum_box_padding      the smallest half-width, cm-1. Default 0, as the old settings on main.
         max_intensity            used only when scaled. None (default): the strongest peak intensity of the
                                  features inside `window`, as the old callers took it.
-    The old settings' defaults (wilson_main, spectrum_abstractions.py): dynamic_range 100, margin 0.1, unscaled,
-    minimum_box_padding 10.
+    The old settings' defaults (EvaluationInfo, wilson_main/spectrum_abstractions.py): dynamic_range 100, margin 0.1,
+    unscaled, minimum_box_padding 0. So on main the old pipeline dropped every feature below the floor (see below).
+    debug_rendering's EvaluationInfo has minimum_box_padding 10 (bc10f84): there it dropped none.
 
     Changed from dress_these_with_boxes:
         - No feature is dropped (decided 2026-10-09). The old function dropped every feature below the floor

@@ -4,13 +4,13 @@ wilson_system holds the data of one molecule: MolSystemData and its parts (syste
 state calculation (VPT2) moves here from wilson_intensities/anharmonic_treatment (decided 2026-10-17).
 The evaluator refactor has its own list, wilson_intensities/refac_rsp_eval/todo.txt. Its items are named here with
 "refac", e.g. refac E6b. Moved here from that list on 2026-10-17, as they block nothing in the evaluator: D4 and D5
-(wilson_system's classes), G2, G8, G9 and the failing test_getting_data (the reader, R2).
+(wilson_system's classes), G2, G8, G9 and test_getting_data (the reader, R2; fixed 2026-10-18).
 
 [wilson_main] = a change in wilson_main (the old workflow).
 [outside] = a change in CQCParse (the parser that wilson_data_obtainer calls; a separate repo).
 
 
-Status (2026-10-17)
+Status (2026-10-18)
 -------------------
 In wilson_system now: system_data.py (DataOriginInfo, VibState, VibStatesData, VibDiff, MolSystemData,
 check_data_dict, MolecularProperty, MolPropsCollection) and tests/test_system_data.py.
@@ -25,7 +25,8 @@ The new evaluator reads the states from the file (MolSystemData.load).
 
 Decisions
 ---------
-- wilson_system owns VibState, MolecularProperty, MolPropsCollection (2026-10-14, D4); wilson_main imports them.
+- wilson_system owns VibState, MolecularProperty, MolPropsCollection (2026-10-14, D4); wilson_main is to import
+  them. Not done yet: wilson_main/abstractions.py still has its own copies (D4).
 - Imports free of cycles (2026-10-14): system_data.py imports nothing from wilson_intensities. In refac_rsp_eval,
   evaluate.py, features.py and pipeline.py import system_data; plan.py does not import it at all (checked
   2026-10-17).
@@ -144,7 +145,7 @@ below matter for the final spectra.
         Contents: wilson_data_obtainer (groups the request by origin, calls CQCParse parse_from_source; source type
         'wilson' raises NotImplementedError) and save_obtained_data (.pkl; .json raises NotImplementedError).
         Import cycle: none at import time. MolSystemData.load imports the obtainer inside the function
-        (system_data.py:363); that stays.
+        (system_data.py:353); that stays.
         Callers (2026-10-17): 11 files import the module path wilson_suite.wilson_utils.wilson_data_obtainer:
         system_data.py, test_hand_calculation.py, test_integration.py, integration/test_anharm_analyzer.py,
         test_main_functions.py, test_saving_in_workflow.py, test_wilson_data_obtainer.py, tests/evv_tester.py,
@@ -211,7 +212,11 @@ S. Anharmonic states and the data model
         [outside] The reader fails on 'cff' without 'nc_sqrt_eigval' in the same request (UnboundLocalError,
             CQCParse parse_gaussian16_output). load always requests nc_sqrt_eigval, so load is not affected.
 [ ] S4  Tests to move or rewrite (all pass today):
-            wilson_intensities/tests/unit/test_vpt2_new.py              24 tests, no files read: move with vpt2.py
+            wilson_intensities/tests/unit/test_vpt2_new.py              16 tests run, no files read: move with
+                                                                        vpt2.py. 24 defined; 8 sit inside '''
+                                                                        strings, so pytest does not see them
+                                                                        (lines 65-102: test_getX_refactor_equivalence;
+                                                                        lines 232-254: 7 empty stubs)
             wilson_intensities/tests/unit/test_unit_anharm_analyzer.py  4 tests: Wilson's states vs Gaussian's,
                                                                         within 0.0013 to 0.003 cm-1
             wilson_intensities/tests/integration/test_anharm_analyzer.py
