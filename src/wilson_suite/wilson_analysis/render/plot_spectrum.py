@@ -8,7 +8,8 @@ Both show intensity / top, from 1 / dynrange to 1 on a log scale; top: the large
     1D  a line; y axis log
     2D  filled contours, the key steps of MatplotlibRenderer without its setup objects (RenderingInfo,
         EvaluationInfo, PlotConfig): nlevels log-spaced levels; magma; below the lowest level: the axes'
-        background; above the top level: over_color; colorbar ticks as fractions of the top
+        background; above the top level: over_color; colorbar ticks as fractions of the top, 2 significant
+        digits
 """
 from typing import TYPE_CHECKING
 
@@ -99,7 +100,8 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
     ax.set_aspect('equal', adjustable='box')
 
     cbar = fig.colorbar(contour, ax=ax, ticks=levels)
-    cbar.ax.set_yticklabels([f'{v:.2g}' for v in levels])
+    # 2 significant digits, '#' keeps the trailing zeros: 1.0, 0.10, 0.00010 (.3f gives 0.000 below 0.0005)
+    cbar.ax.set_yticklabels([f'{v:#.2g}' for v in levels])
     cbar.set_label(scale_label)
     return fig, ax, contour, cbar
 

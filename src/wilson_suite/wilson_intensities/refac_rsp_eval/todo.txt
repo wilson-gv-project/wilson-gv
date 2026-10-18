@@ -668,9 +668,9 @@ Built
          all_features_on_grid).
     E15  The grid functions renamed (2026-10-17): draw_all -> all_features_on_grid, draw_window ->
          boxed_features_on_grid, draw_spectrum -> spectrum_on_grid; test names and text too. "plot" only for
-         pictures (plot_spectrum.py: "plot_spectrum plots 1D and 2D spectra"). Left: the NotImplementedError message
-         of WilsonSimulation.evaluate (wilson_main, workflow_abstractions.py:363, 365) names draw_spectrum; open:
-         whether to change it there.
+         pictures (plot_spectrum.py: "plot_spectrum plots 1D and 2D spectra"). The NotImplementedError message of
+         WilsonSimulation.evaluate (wilson_main, workflow_abstractions.py:363, 365) names spectrum_on_grid too
+         (2026-10-18, self review).
     B7   One resonance point per term, checked when compiling (see Decisions).
     F1   einsum for the averaged part (2026-10-12; make_avrg_einsum_subscripts, AvrgTensor). Agrees with the loop
          to 8e-14. ACDM averaging 47 s -> 0.3 s.

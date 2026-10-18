@@ -141,8 +141,15 @@ def test_2d_reference_max_puts_the_top_level_at_the_reference_and_intensities_ab
 def test_2d_colorbar_ticks_are_fractions_of_the_max():
     _, _, _, cbar = plot_spectrum(*toy_spectrum(), dynrange=100., nlevels=3)
 
-    assert [t.get_text() for t in cbar.ax.get_yticklabels()] == ['0.010', '0.100', '1.000']
+    assert [t.get_text() for t in cbar.ax.get_yticklabels()] == ['0.010', '0.10', '1.0']
     assert cbar.ax.get_ylabel() == 'intensity / max   (max = 1.00e+02 au)'
+
+
+def test_2d_colorbar_ticks_of_a_large_dynrange_stay_nonzero():
+    """dynrange 10^4: the lowest tick is 0.0001 (a fixed 3 decimals would print 0.000)"""
+    _, _, _, cbar = plot_spectrum(*toy_spectrum(), dynrange=1e4, nlevels=3)
+
+    assert [t.get_text() for t in cbar.ax.get_yticklabels()] == ['0.00010', '0.010', '1.0']
 
 
 def test_2d_first_axis_along_x_second_along_y():

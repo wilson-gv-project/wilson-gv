@@ -360,9 +360,9 @@ class WilsonSimulation:
 			'molsys = MolSystemData.load(origin, prop_names(terms)); '
 			'result = evaluate_response_terms(terms, axes=..., molsys_data=molsys, states_choice=..., '
 			'laser_pol=..., propagator_param=...); '
-			'spec = draw_spectrum(result, window, dim_sizes, box_rule=...). '
+			'spec = spectrum_on_grid(result, window, dim_sizes, box_rule=...). '
 			'MolSystemData: wilson_suite.wilson_system.system_data; prop_names, evaluate_response_terms, '
-			'draw_spectrum: wilson_suite.wilson_intensities.refac_rsp_eval.pipeline')
+			'spectrum_on_grid: wilson_suite.wilson_intensities.refac_rsp_eval.pipeline')
 
 	def evaluate_with_default_setup_fill(self):
 		"""

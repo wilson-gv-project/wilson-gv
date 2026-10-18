@@ -98,6 +98,8 @@ D1  README.md, the quick start (lines 59-182), 4 steps:
                                                pipeline and the old renderer
 D2  examples/quick_start.ipynb, 11 cells, the README's flow: cell 4 some_reprs; cell 6 SpectralWindow, Box;
     cell 8 sim.evaluate, render_spectrum; cell 10 shows the svg.
+D3  examples/terms_inspection.ipynb, cell 1 imported some_reprs (no old code otherwise). Done 2026-10-18 (self
+    review): imports builders; its code runs (14 EVV terms).
 Options:
     a  rewrite steps 3-4 with the new calls: MolSystemData.load, evaluate_response_terms, spectrum_on_grid,
        plot_rsp_func (the flow of tests/example_plot_spectrum.py)
