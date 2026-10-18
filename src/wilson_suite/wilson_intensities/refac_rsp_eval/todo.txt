@@ -40,7 +40,8 @@ The new evaluator is built and checked: the same numbers as the old code (to 2e-
 agrees. ACDM (42 modes): 5.7 s per spectrum, 80 s before the speed work (F). Nothing calls the new code yet.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
 Deleting the old code (E9): stages 1, 2, 4, 5, 6 done; stage 3 (old scripts and tests, README quick start) comes
-last, right before the pull request (decided 2026-10-17).
+after the merge to main, once the new pipeline (with the convolution) is further along (decided 2026-10-18).
+The package move (E17): open, to discuss in the PR.
 Postponed: the README (E4), the polarization order fix (A15).
 Moved outside the refactor: the caller (E6b, 2026-10-14), the rest of the render code (E7b, 2026-10-15).
 Other experiments (G7, G10): 1D, 2D and 3D run end to end from derive's terms (CARS, EVV, 3 IR; 3 IR as one
@@ -90,15 +91,17 @@ ahead. Steps 1-3 may use the old code; step 4 deletes it. Step 5 moved to wilson
              MolPropsCollection
     2  E6a   the evaluator's inputs and outputs (E6)            done 2026-10-14
     3  E7    plot the new result                                done 2026-10-15
-    4  E9    delete the old code                                stages 1, 2, 4, 5, 6 done; 3 last,
-                                                                right before the pull request (E9)
+    4  E9    delete the old code                                stages 1, 2, 4, 5, 6 done; 3 after the
+                                                                merge (E9)
     5  D4    the code move                                      moved to wilson_system/todo.txt 2026-10-17
     6  E4    README, with the data-dict contract (D5, in        postponed 2026-10-14
              wilson_system/todo.txt)
 
 Other items:
-    last, before the PR  E9 stage 3 (C, D in todo_oldcode_rm.txt); E17 (the package move to
-                         wilson_response_evaluate)
+    after the merge      E9 stage 3 (C, D in todo_oldcode_rm.txt), once the new pipeline (with the
+                         convolution) is further along
+    open, in the PR      E17 (the package move to wilson_response_evaluate): before the merge, or later
+                         with the moves to wilson_system
     kept, unused         E16 (the domains)
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
@@ -255,8 +258,9 @@ E. Pipeline
         same everywhere along A - B. The grid code already evaluates each condition at every grid point
         (eval_rescond_resloc), so it would give such a term right. What fails: B7, the location (solve_LSE_motif:
         no single point), the boxes, get_intensity's peak. When needed: allow them in B7, then these four.
-[ ] E9  Delete the old code. Since 2026-10-16: stages 1, 2, 4, 5, 6 of 6 done; 3 last, right before the pull
-        request (decided 2026-10-17).
+[ ] E9  Delete the old code. Since 2026-10-16: stages 1, 2, 4, 5, 6 of 6 done; 3 after the merge to main, once
+        the new pipeline (with the convolution) is further along (decided 2026-10-18; before: right before the
+        pull request, 2026-10-17).
         d93cc7b is the last commit with all of the old code (see the top of this file). Decided 2026-10-16:
         - no need to wait for the caller (E6b): the entry point will change as a whole, so WilsonSimulation.evaluate
           (workflow_abstractions.py:352; it ran the old EvaluationWorkflow) raises NotImplementedError until then.
@@ -277,8 +281,8 @@ E. Pipeline
               from test_resonances.py; the helper moved into test_latex.py.
         3 [ ] the callers of the old pipeline outside wilson_intensities (the list above). Categorized in
               todo_oldcode_rm.txt (B, C, D). Done as the prep for stage 5: B (test_integration_rendering.py
-              deleted; test_save_wilsonsim without its old part). Open: C, D; done last, right before the pull
-              request (decided 2026-10-17).
+              deleted; test_save_wilsonsim without its old part). Open: C, D; after the merge to main
+              (decided 2026-10-18).
         4 [x] wilson_main (carefully). Categorized in todo_oldcode_rm.txt (A, E). Done as the prep for stage 5: A1
               (spectrum_abstractions.py line 5 no longer imports the old SpectralWindow;
               EvaluationInfo.spectral_window: Any), E1 (WilsonSimulation.evaluate raises NotImplementedError).
@@ -409,9 +413,11 @@ E. Pipeline
         (7, at lines 511, 580, 920, 929, 934, 944, 1016).
         Possible use, none planned: groups of nearby peaks, e.g. to choose zoom windows or slice positions (E14).
         Delete with their tests (H1) once nothing needs them.
-[ ] E17 The package move (decided 2026-10-18): refac_rsp_eval -> the top-level package
-        wilson_suite/wilson_response_evaluate. Right before the pull request, with E9 stage 3: the PR then shows
-        only the final name.
+[ ] E17 The package move (name decided 2026-10-18): refac_rsp_eval -> the top-level package
+        wilson_suite/wilson_response_evaluate.
+        When: open (2026-10-18), to discuss in the PR. Either before the merge (the PR then shows only the final
+        name), or later, together with the other moves to wilson_system (wilson_system/todo.txt: D4 VibState,
+        MolecularProperty, MolPropsCollection out of wilson_main; R1 the reader, after the merge; S1 vpt2.py).
         Why: this package evaluates the response function numerically, from derive's symbolic terms.
         wilson_scan_convolute (branch experiment_makeover, ringholm; a stub so far) convolves the response function
         with the electric field. Side by side:

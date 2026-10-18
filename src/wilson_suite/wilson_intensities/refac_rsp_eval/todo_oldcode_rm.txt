@@ -3,7 +3,7 @@ E9 stages 3 and 4 — what outside wilson_intensities still uses the old code, b
 The old code before its removal: d93cc7b (see the top of todo.txt).
 "Stage 5": deleting the 14 old modules of amplitudes/. "Dry run": stage 5 done, the check run, the files restored
 (2026-10-16, see todo.txt E9). "proposal" marks a suggestion. Decided: A1, B, E1 done 2026-10-16 (Order);
-C and D done last, right before the pull request; E2-E5 stay for E6b and E7b (both 2026-10-17); F open.
+C and D after the merge to main (2026-10-18); E2-E5 stay for E6b and E7b (both 2026-10-17); F open.
 
 
 Summary
@@ -91,13 +91,13 @@ D. User docs: no test covers them
 ---------------------------------
 D1  README.md, the quick start (lines 59-182), 4 steps:
         1  the experiment, derive              runs (no old code)
-        2  the axis choice                     imports wilson_utils.some_reprs (line 99), renamed builders.py on
-                                               this branch (27408f9): already broken here; main has some_reprs
+        2  the axis choice                     imported wilson_utils.some_reprs (line 99), renamed builders.py on
+                                               this branch (27408f9); imports builders since 2026-10-18
         3  the setup                           the old SpectralWindow and Box (lines 115, 146)
         4  evaluate and render                 sim.evaluate() (line 175), sim.render_spectrum (line 179): the old
                                                pipeline and the old renderer
-D2  examples/quick_start.ipynb, 11 cells, the README's flow: cell 4 some_reprs; cell 6 SpectralWindow, Box;
-    cell 8 sim.evaluate, render_spectrum; cell 10 shows the svg.
+D2  examples/quick_start.ipynb, 11 cells, the README's flow: cell 4 some_reprs (builders since 2026-10-18); cell 6
+    SpectralWindow, Box; cell 8 sim.evaluate, render_spectrum; cell 10 shows the svg.
 D3  examples/terms_inspection.ipynb, cell 1 imported some_reprs (no old code otherwise). Done 2026-10-18 (self
     review): imports builders; its code runs (14 EVV terms).
 Options:
@@ -105,7 +105,8 @@ Options:
        plot_rsp_func (the flow of tests/example_plot_spectrum.py)
     b  keep the text, with a note: does not run until the new caller (E6b)
     c  leave both for E6b; the merge to main then carries a quick start that does not run
-Step 2 (some_reprs -> builders) is one line in each file, with any option.
+Step 2 (some_reprs -> builders) is one line in each file, with any option: done 2026-10-18 in README.md and
+quick_start.ipynb. Both now fail first at step 3 (the old SpectralWindow), not at the import.
 
 
 E. wilson_main code that runs the old pipeline or reads its result (change carefully)
@@ -154,6 +155,8 @@ Order
 3. [x] E1: evaluate raises NotImplementedError; the message names the library calls and their modules.
    Steps 1-3 (2026-10-16, the prep for stage 5) were checked one by one: no other test changed. A dry run of
    stage 5 after them changes no test; only the 14 old modules leave the import list.
-4. [ ] C, D: last, right before the pull request (decided 2026-10-17).
+4. [ ] C, D: after the merge to main, once the new pipeline (with the convolution) is further along (decided
+       2026-10-18; before: right before the pull request, 2026-10-17). So the merge carries the old scripts and
+       tests (C) and a README quick start and notebook that do not run (D, as option c).
 5. [x] E2-E5: stay for E6b and E7b (decided 2026-10-17).
 6. [ ] F: open, any time; independent of stage 5.
