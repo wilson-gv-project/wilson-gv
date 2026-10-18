@@ -53,46 +53,6 @@ class MolecularSystem:
 		return hash(self.name)
 
 
-
-# @dataclass(frozen=True)
-# class DataOriginInfo:
-# 	"""
-# 	Class to represent computational setups for properties obtained external to Wilson
-# 	Does not need to pertain to an actual program and could also be used for "get from no specific calculation"/
-# 	"get from file"
-
-# 	----
-# 	source_type: String: Options: gaussian, cfour, wilson
-# 	lvl_theory: String: Level of theory
-# 	basis_set: String: Basis set
-# 	base_file_loc: String: path to the base file
-# 	"""
-# 	# Strings
-# 	source_type: str = ''
-	
-# 	lvl_theory: str = ''
-# 	basis_set: str = ''
-
-# 	base_file_loc: str = ''
-
-
-# 	def __hash__(self):
-# 		def to_tuple(x):
-# 			return tuple(sorted(x.items())) if isinstance(x, dict) else x
-# 		return hash((self.source_type, self.lvl_theory, self.basis_set, to_tuple(self.base_file_loc)))
-
-# 	def __eq__(self, other):
-# 		if not isinstance(other, DataOriginInfo):
-# 			return False
-		
-# 		return (
-#             self.source_type == other.source_type and
-#             self.lvl_theory == other.lvl_theory and
-#             self.basis_set == other.basis_set and
-# 			self.base_file_loc == other.base_file_loc
-# 		)
-
-
 @dataclass
 class MolecularProperty:
 	"""
