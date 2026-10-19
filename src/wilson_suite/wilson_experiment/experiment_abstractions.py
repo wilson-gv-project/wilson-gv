@@ -874,21 +874,46 @@ def compounding_patterns_at_order(n) -> list[tuple]:
 
     return comp_patterns
 
-def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000.) -> bool:
+def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000., tol_n_dev = 5.0) -> bool:
     """
     Take an ordered sequence of (compounded) pulses and determine whether the time ordering is
-    (according to threshold) causally valid
+    (according to thresholds) is causally possible (note: Not "determine if definitely causally valid")
+
+    pulses: List of EmPulse instances in order of proposed interaction
+
+    thres_waiting_time: How long to allow wait (allowing for decay of response) after each pulse
+
+    tol_n_dev: Cutoff parameter: For how much time around each pulse to count it as "on"
+
+    FIXME: The current test is not very strict and will likely allow in some orderings that are
+        quite unlikely. Can revisit if this becomes a problem in practice or if (unlikely) known causal
+        orderings are ruled out.
     """
 
     # Singleton sequences are trivially valid
     if len(pulses) == 1:
         return True
 
-    # FIXME: This simply tests for delays between pulse centerpoints and is not sufficiently accurate in the long term
-    #  Needs a revisit and some improvement at a later stage
-    for i in range(len(pulses) - 1):
-        if (pulses[i + 1].tc - pulses[i].tc) > thres_waiting_time:
+    # Initializing current window to any time
+    curr_window = [-infinity, infinity]
+
+    for i in range(len(pulses)):
+
+        # The current pulse is considered "on" during a tol_n_dev*pulse[i].dev window around its time maximum
+        curr_pulse_on = [pulses[i].tc - tol_n_dev * pulses[i].dev,
+                          pulses[i].tc + tol_n_dev * pulses[i].dev]
+
+        # The current pulse must be on during some part of the allowed window, otherwise the interaction
+        # is not considered causally valid
+
+        # Its end time must happen after the window start and its start time must happen before the window end
+        if (curr_pulse_on[1] < curr_window[0]) or (curr_pulse_on[0] > curr_window[1]):
             return False
+
+        # The interaction window for next pulse is here considered as
+        # between whichever came last of the current pulse or the current window's start
+        # and whichever came first of the current pulse's latest "on" time plus a waiting tolerance
+        curr_window = [max(curr_window[0], curr_pulse_on[0]), min(curr_pulse_on[1], curr_window[1]) + thres_waiting_time]
 
     return True
 
@@ -1345,7 +1370,8 @@ class FieldAnalysis:
 
                         # Time-ordering enforcement screening: If also passing this criterion, register this
                         # interaction sequence as valid
-                        if pulse_time_ordering_valid(c_pulses, thres_waiting_time=self.thres_waiting_time):
+                        if pulse_time_ordering_valid(c_pulses, thres_waiting_time=self.thres_waiting_time,
+                                                     tol_n_dev=self.tol_n_dev_t):
 
                             # FIXME: With any compounding, some permutations will be revisited here
                             #  Checking for uniqueness here and will account for this as part of the overall

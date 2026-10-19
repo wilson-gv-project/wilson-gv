@@ -6,6 +6,9 @@ from wilson_suite.wilson_experiment.experiment_abstractions import (SpecDetector
                                                                     make_cw_gaussian_pulse,
                                                                     make_compound_gaussian_pulse,
                                                                     compound_pulses_in_list,
+                                                                    compounding_patterns_at_order,
+                                                                    pulse_time_ordering_valid,
+                                                                    magnitude_conditions_for_ind_var_tuple,
                                                                     ElectricField, VibExperiment, FieldAnalysis)
 
 def test_spec_detector():
@@ -279,6 +282,7 @@ def test_make_cw_gaussian_pulse():
 
 def test_make_compound_gaussian_pulse():
 
+    # Compounding two reasonable Gaussian IR-range pulses
     pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 1000.0, dev=100.0, maxstr=1.0e-5,
                       wv=(0.0, 1.0, 0.0), pol=(1.0, 0.0, 0.0), overall_phase = 1.0 + 0.0j, id=3)
 
@@ -288,15 +292,20 @@ def test_make_compound_gaussian_pulse():
 
     pulse_comp = make_compound_gaussian_pulse(pulse_a, pulse_b)
 
+    # Combination attributes verified by formula
     assert pulse_comp.env == 'gaussian'
+    # Time maximum is in-between
     assert abs(pulse_comp.tc - 173.5294) < 1e-4
+    # Carrier freq is sum
     assert pulse_comp.cf == 3000.0
+    # Deviation is narrower than each individual pulse's
     assert abs(pulse_comp.dev - 51.4496) < 1e-4
     assert abs(pulse_comp.maxstr - 1.3847e-10) < 1e-14
     assert pulse_comp.wv == (0.0, 2.0, 0.0)
     assert pulse_comp.pol is None
     assert pulse_comp.overall_phase == 1.5 + 0.0j
     assert pulse_comp.id is None
+    # Compound polarization and IDs in corresponding ordering
     assert pulse_comp.pol_comp == ( (1.0, 0.0, 0.0),  (0.0, 0.0, 1.0))
     assert pulse_comp.id_comp == (3, 2)
     assert pulse_comp.is_compound
@@ -471,9 +480,37 @@ def test_electric_field():
 
 def test_compounding_patterns_at_order():
 
-    pass
+    # The compounding patterns are all ordered integer partitionings of the order N
+
+    patterns = compounding_patterns_at_order(3)
+    assert sorted(patterns) == sorted([(3,), (2, 1), (1, 2), (1, 1, 1)])
+
+    patterns = compounding_patterns_at_order(5)
+    assert sorted(patterns) == sorted([(5,), (4, 1), (3, 2), (2, 3), (1, 4), (3, 1, 1), (1, 3, 1), (1, 1, 3),
+                                       (2, 2, 1), (2, 1, 2), (1, 2, 2),
+                                       (2, 1, 1, 1), (1, 2, 1, 1), (1, 1, 2, 1), (1, 1, 1, 2), (1, 1, 1, 1, 1),])
 
 def test_pulse_time_ordering_valid():
+
+    # Three reasonably well-spaced pulses
+    p1 = EmPulse(env='gaussian', tc=0.0, dev=20.0, cf=9000., id=1, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    p2 = EmPulse(env='gaussian', tc=300.0, dev=100.0, cf=15000., id=2, wv=(-1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    p3 = EmPulse(env='gaussian', tc=1350.0, dev=30.0, cf=1500., id=3, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+
+    # Singletons trivially valid
+    assert pulse_time_ordering_valid([p1])
+    assert pulse_time_ordering_valid([p2])
+
+    # Default waiting time is 1000 fs, so 1 and 2 should be valid, also 2 and 3, but not 1 and 3
+    assert pulse_time_ordering_valid([p1, p2])
+    assert pulse_time_ordering_valid([p2, p3])
+    assert not pulse_time_ordering_valid([p1, p3])
+
+    # Therefore also 1, 2, 3 with default
+    assert pulse_time_ordering_valid([p1, p2, p3])
+
+    # Not 1, 3, 2
+    assert not pulse_time_ordering_valid([p1, p3, p2])
 
     pass
 
