@@ -89,10 +89,10 @@ def test_spec_scan():
 
     # Making a scan consisting of two objects:
     #   - Scanning pulse 1 carrier frequency by twice the increments of the range
-    #   - Scanning the detector's detection range at the exact increments of the range (default coeff = 1.0)
+    #   - Scanning pulse 2 time maximum by 1 x the increments of the range
     scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=2.0)
-    scan_obj_b = ScanObject('detector', 'detection_range')
-    scan_range = [0.0001 * i for i in range(101)]
+    scan_obj_b = ScanObject('pulse', 'tc', id=2)
+    scan_range = [2.0 * i for i in range(101)]
 
     scan_objs = (scan_obj_a, scan_obj_b)
 
@@ -103,12 +103,12 @@ def test_spec_scan():
     assert scan_a.scan_objs[0].id == 1
     assert scan_a.scan_objs[0].coeff == 2.0
 
-    assert scan_a.scan_objs[1].category == 'detector'
-    assert scan_a.scan_objs[1].subcategory == 'detection_range'
-    assert scan_a.scan_objs[1].id == 0
+    assert scan_a.scan_objs[1].category == 'pulse'
+    assert scan_a.scan_objs[1].subcategory == 'tc'
+    assert scan_a.scan_objs[1].id == 2
     assert scan_a.scan_objs[1].coeff == 1.0
 
-    assert scan_a.range == [0.0001 * i for i in range(101)]
+    assert scan_a.range == [2.0 * i for i in range(101)]
 
     # Scan objects not tuple
     with pytest.raises(TypeError):
