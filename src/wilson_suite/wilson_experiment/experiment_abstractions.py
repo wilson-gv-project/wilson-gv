@@ -241,7 +241,7 @@ class EmPulse:
     dev: float: Time deviation parameter (e.g. time-domain sqrt(variance) of Gaussian pulse: In other functions using
     this class with Gaussian envelopes, dev = sigma in A * e^( -(t- tc)**2 / (2 sigma^2)).
     An impulsive-like pulse can be considered as the dev -> 0.0 limit of a Gaussian pulse.
-    "continuous-wave"-like pulse can be considered as the dev -> infty limit of a Gaussian pulse.
+    A "continuous-wave"-like pulse can be considered as the dev -> infty limit of a Gaussian pulse.
     wv: floats: Unit wavevector propagation direction with respect to laboratory axes
     pol: floats: Polarization: Unit vector describing polarization direction with respect to laboratory axes
         - Must be orthogonal to wavevector
@@ -446,6 +446,9 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
     Returns: An EmPulse instance representing the compounded pulse
     """
 
+    # TODO: When fully incorporating limiting pulse-shapes (fully impulsive or fully adiabatic), extend this routine
+    #  accordingly
+
     if not p1.env == 'gaussian':
         raise ValueError('Pulses to be compounded must be Gaussian')
 
@@ -458,6 +461,8 @@ def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
 
         comp_pulse.id_comp = (copy.deepcopy(p1.id),)
         comp_pulse.id = None
+
+        comp_pulse.is_compound = True
 
         return comp_pulse
 

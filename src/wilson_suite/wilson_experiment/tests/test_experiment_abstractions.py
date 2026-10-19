@@ -4,6 +4,8 @@ from wilson_suite.wilson_experiment.experiment_abstractions import (SpecDetector
                                                                     EmPulse, make_gaussian_pulse,
                                                                     make_impulsive_gaussian_pulse,
                                                                     make_cw_gaussian_pulse,
+                                                                    make_compound_gaussian_pulse,
+                                                                    compound_pulses_in_list,
                                                                     ElectricField, VibExperiment, FieldAnalysis)
 
 def test_spec_detector():
@@ -236,7 +238,6 @@ def test_make_gaussian_pulse():
     assert pulse_a.tc == 100.0
     assert pulse_a.cf == 0.005
     assert pulse_a.dev == 2.0
-    assert pulse_a.cf_uv == 0.0
     assert pulse_a.maxstr == 1.0e-5
     assert pulse_a.wv == (0.0, 1.0, 0.0)
     assert pulse_a.pol == (0.0, 0.0, 1.0)
@@ -249,17 +250,15 @@ def test_make_gaussian_pulse():
 def test_make_impulsive_gaussian_pulse():
 
     # A UV/VIS impulsive-tending pulse. Leaving several parameters to their default values.
-    pulse_b = make_impulsive_gaussian_pulse(tc = 120.0)
+    pulse_b = make_impulsive_gaussian_pulse(tc = 120.0, id=1)
     assert pulse_b.env == 'gaussian'
     assert pulse_b.tc == 120.0
     assert pulse_b.cf is None # Default value
     assert pulse_b.dev == 0.0
-    assert pulse_b.cf_uv == 0.0 # Default
     assert pulse_b.maxstr == 0.0 # Default
     assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
     assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
-    assert pulse_b.overall_phase == 1.0 + 0.0j # Default
-    assert pulse_b.id is None # Default
+    assert pulse_b.overall_phase == 0.0
 
     assert pulse_b.tendsImpulsive()
     assert not(pulse_b.tendsContinuous())
@@ -268,10 +267,11 @@ def test_make_cw_gaussian_pulse():
 
     # A CW-tending IR range pulse. Only the (IR-range) carrier frequency argument needs to be specified.
     from math import inf as infinity
-    pulse_c = make_cw_gaussian_pulse(0.003)
+    pulse_c = make_cw_gaussian_pulse(cf=0.003, id=1)
     assert pulse_c.env == 'gaussian'
     assert pulse_c.tc is None # Default value
     assert pulse_c.cf == 0.003
+    assert pulse_c.id == 1
     assert pulse_c.dev == infinity
 
     assert not(pulse_c.tendsImpulsive())
@@ -279,11 +279,51 @@ def test_make_cw_gaussian_pulse():
 
 def test_make_compound_gaussian_pulse():
 
-    pass
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 1000.0, dev=100.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(1.0, 0.0, 0.0), overall_phase = 1.0 + 0.0j, id=3)
+
+    pulse_b = EmPulse(env='gaussian', tc = 200.0, cf = 2000.0, dev=60.0, maxstr=2.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 0.5 + 0.0j, id=2)
+
+
+    pulse_comp = make_compound_gaussian_pulse(pulse_a, pulse_b)
+
+    assert pulse_comp.env == 'gaussian'
+    assert abs(pulse_comp.tc - 173.5294) < 1e-4
+    assert pulse_comp.cf == 3000.0
+    assert abs(pulse_comp.dev - 51.4496) < 1e-4
+    assert abs(pulse_comp.maxstr - 1.3847e-10) < 1e-14
+    assert pulse_comp.wv == (0.0, 2.0, 0.0)
+    assert pulse_comp.pol is None
+    assert pulse_comp.overall_phase == 1.5 + 0.0j
+    assert pulse_comp.id is None
+    assert pulse_comp.pol_comp == ( (1.0, 0.0, 0.0),  (0.0, 0.0, 1.0))
+    assert pulse_comp.id_comp == (3, 2)
+    assert pulse_comp.is_compound
 
 def test_compound_pulses_in_list():
 
-    pass
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 1000.0, dev=100.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(1.0, 0.0, 0.0), overall_phase = 1.0 + 0.0j, id=3)
+
+    pulse_b = EmPulse(env='gaussian', tc = 200.0, cf = 2000.0, dev=60.0, maxstr=2.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 0.5 + 0.0j, id=2)
+
+    pulse_comp = compound_pulses_in_list([pulse_a, pulse_b])
+
+    assert pulse_comp.env == 'gaussian'
+    assert abs(pulse_comp.tc - 173.5294) < 1e-4
+    assert pulse_comp.cf == 3000.0
+    assert abs(pulse_comp.dev - 51.4496) < 1e-4
+    assert abs(pulse_comp.maxstr - 1.3847e-10) < 1e-14
+    assert pulse_comp.wv == (0.0, 2.0, 0.0)
+    assert pulse_comp.pol is None
+    assert pulse_comp.overall_phase == 1.5 + 0.0j
+    assert pulse_comp.id is None
+    assert pulse_comp.pol_comp == ( (1.0, 0.0, 0.0),  (0.0, 0.0, 1.0))
+    assert pulse_comp.id_comp == (3, 2)
+    assert pulse_comp.is_compound
+
 
 def test_electric_field():
 
