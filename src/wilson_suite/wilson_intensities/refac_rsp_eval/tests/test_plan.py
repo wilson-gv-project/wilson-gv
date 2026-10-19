@@ -2,7 +2,9 @@
 plan.py — the compile stage. Runs with zero molecular data.
 """
 
+import copy
 import pickle
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
 import numpy as np
@@ -106,7 +108,40 @@ def test_propscollection_equal_by_value_and_usable_as_key():
     assert {a: 'tensor'}[b] == 'tensor'
 
 
+def test_propscollection_equality_is_symmetric_ignores_order_and_counts_repeats():
+    p1, p2 = polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')
+    one, both = PropsCollection([p1]), PropsCollection([p1, p2])
+
+    assert one != both and both != one
+    assert PropsCollection([]) != one and one != PropsCollection([])
+    assert PropsCollection([p1, p1]) != one                 # a repeated prop is another product
+    assert both == PropsCollection([p2, p1]) and hash(both) == hash(PropsCollection([p2, p1]))
+
+
+def test_propscollection_equality_counts_the_order_of_slots_in_a_prop():
+    """the slots go to the data array's Cartesian axes in order, so (0, 1) and (1, 0) are different props"""
+    assert PropsCollection([polprop(ops=(0, 1), inds='a')]) != PropsCollection([polprop(ops=(1, 0), inds='a')])
+
+
 ## FreqTermsCollection ------------------------------------------------------
+
+def test_freqterms_equal_by_value_symmetric_and_usable_as_key():
+    a = FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='c', pert=True)])
+    b = FreqTermsCollection([vibdiff(sl='ab', sr='c', pert=True), vibdiff(sl='a')])   # other objects, other order
+
+    assert a == b and hash(a) == hash(b)
+    assert {a: 'rows'}[b] == 'rows'
+    assert FreqTermsCollection([]) != a and a != FreqTermsCollection([])
+    assert a != FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='c', pert=False)])
+    assert FreqTermsCollection([vibdiff(sl='a')] * 2) != FreqTermsCollection([vibdiff(sl='a')])
+
+
+def test_compiled_term_compiled_twice_is_equal():
+    """CompiledTerm's == compares its collections, so the same term compiled twice is equal"""
+    term = _fake_vibpert_term()
+
+    assert CompiledTerm.from_VibPertTerm(term) == CompiledTerm.from_VibPertTerm(term)  # type: ignore
+
 
 def test_freqterms_split_by_pert_wf_diff():
     harmonic = vibdiff(sl='a')                     # 1/omega_a
@@ -244,6 +279,7 @@ def test_resonance_motif_empty_is_the_no_resonance_term():
     assert list(motif) == []
     assert motif.get_max_different_freq_axes() == set()
     assert motif.get_nm_indices() == set()
+    assert motif.get_max_state_lvl() == 0
     assert motif == ResonanceMotif.from_conditions([])
 
 
@@ -401,6 +437,23 @@ def test_res_loc_point_as_dict_returns_a_new_dict():
     assert point['A'] == 1.
 
 
+def test_res_loc_point_is_frozen():
+    point = ResLocPoint({'A': 1.})
+
+    with pytest.raises(FrozenInstanceError):
+        point.coordinates = (('A', 2.),)    # type: ignore
+    assert point.as_dict() == {'A': 1.}
+
+
+def test_res_loc_point_survives_deepcopy_and_pickle():
+    """features.py deepcopies features, and so their locations; slots=True changes how a point is copied."""
+    point = ResLocPoint({'B': 2., 'A': 1.})
+
+    for copied in (copy.deepcopy(point), pickle.loads(pickle.dumps(point))):
+        assert copied == point and hash(copied) == hash(point)
+        assert copied.axes == ('A', 'B')
+
+
 ## CompiledTerm -------------------------------------------------------------
 
 def _fake_vibpert_term(res=(('a', '', ('1',)),)):
@@ -520,6 +573,8 @@ def test_compiled_term_without_conditions_passes():
     ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term(res=())) # type: ignore
 
     assert ct.cmp_resmotf == ResonanceMotif(())
+    assert ct.max_state_lvl == 2                    # from the freqterms: sl 'ab'
+    assert FreqTermsCollection([]).get_max_state_lvl() == 0
 
 
 def test_compile_terms_raises_if_one_term_does_not_fix_one_point():

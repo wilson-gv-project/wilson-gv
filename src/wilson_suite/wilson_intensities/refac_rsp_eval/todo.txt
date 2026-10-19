@@ -112,7 +112,7 @@ Other items:
     optional checks      G3 (rest)
     done (2026-10-17)    E12 (flat background), E15 (rename), E9 stage 6 (comments); H8 left as it is
     done (2026-10-18)    E18 (translated terms in; tests load stored terms; H8 holds)
-    later, when needed   D1, D2, E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
+    later, when needed   D1 (frozen collections), E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
                          F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
@@ -213,12 +213,11 @@ A. Small fixes
 
 D. Data model
 -------------
-[ ] D1  PropsCollection.__eq__ only checks "every prop of A is in B", so [p1] == [p1, p2]. Make it frozen, with
-        __eq__ and __hash__ from one key. No code uses it as a dict key; CompiledTerm's == still compares them.
-[ ] D2  FreqTermsCollection: the same problem, the same fix. Key = sorted (sl.q, sr.q, is_pert_wf_diff).
-        D1 and D2 block nothing: rows store term_id and motif, not the CompiledTerm. They would block a cache keyed
-        on CompiledTerm (F, "same terms, other experiment"): with this ==, such a cache returns the rows of [p1, p2]
-        for [p1]. Key on term_to_str instead, or fix D1 and D2 first.
+[ ] D1  PropsCollection and FreqTermsCollection are not frozen: setting .props or .freqterms after the
+        collection is made changes its hash and leaves PropsCollection.names stale. No code does this. Make both
+        frozen (object.__setattr__ in __post_init__). Their == and hash are right since D2.
+        D1 blocks nothing: rows store term_id and motif, not the CompiledTerm. A cache keyed on CompiledTerm (F,
+        "same terms, other experiment") works as long as no code changes a collection after it is made.
 D4 (one copy of VibState, MolecularProperty, MolPropsCollection) and D5 (the data-dict contract): moved to
 wilson_system/todo.txt (2026-10-17).
 
@@ -833,6 +832,10 @@ Fixed
          missing; VibDiff.from_symbolic calls from_quanta, so a state is found one way only.
     B1   One DataOriginInfo class (system_data.py); the old pipeline ran again (until E9 deleted it).
     B4   Sign of the resonance locations: E - sum(pf) = 0, as derive writes it.
+    D2   == and hash of PropsCollection and FreqTermsCollection from one key (_key, 2026-10-19): symmetric, the
+         order of the entries does not count, repeats do. Before, PropsCollection's == was "every prop of A is in
+         B" ([p1] == [p1, p2]), and FreqTermsCollection's compared memory addresses (VibDiffTerm has no __eq__),
+         so the same term compiled twice gave CompiledTerm == False.
     B    Precalculated path deleted (2026-10-13, H1), with B3, B5, B6: the einsum tensor (AvrgTensor) does its job.
     -    ResLocPoint keeps its own copy of the input dict; locations in cm-1.
     -    Property names made once (2026-10-12): PropsCollection.names, CompiledTerm.all_props, prop_names.
