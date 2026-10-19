@@ -264,18 +264,19 @@ class EmPulse:
 
     id_comp: Tuple: Pulse ID label(s) (used for pulse compounding)
 
-    is_compound: Boolean: Is this a compound pulse?
+    is_compound: Boolean: Is this pulse regarded as a compound pulse?
     """
 
     env: str
-    
+
+    wv: tuple[float]
+
     tc: float | None = None
     cf: float | None = None
     dev: float | None = None
 
     maxstr: float = 0.0
 
-    wv: tuple[float] | None = None
     pol: tuple[float] | None = None
     pol_comp:  tuple[tuple[float]] | None = None
 
@@ -288,7 +289,29 @@ class EmPulse:
     is_compound: bool = False
 
     def __post_init__(self):
-        
+
+        if self.pol is not None and self.pol_comp is not None:
+                raise ValueError('Only one of pol or pol_comp may be specified')
+
+        if self.id is not None and self.id_comp is not None:
+                raise ValueError('Only one of id or id_comp may be specified')
+
+        if self.pol is None and self.pol_comp is None:
+                raise ValueError('One of pol or pol_comp must be specified')
+
+        if self.id is None and self.id_comp is None:
+                raise ValueError('One of id or id_comp must be specified')
+
+        if self.pol_comp is not None:
+            if self.id_comp is None:
+                raise ValueError('Both ID and polarization must be specified')
+            else:
+                self.is_compound = True
+
+        if self.pol is not None:
+            if self.id is None:
+                raise ValueError('Both ID and polarization must be specified')
+
         # Currently only Gaussian envelopes allowed
         allowed_envelopes = ['gaussian']
 
@@ -369,7 +392,6 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
-# FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
 def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
                         wv: tuple[float], pol: tuple[float],
                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0):

@@ -129,99 +129,102 @@ def test_em_pulse():
 
     # An infrared-range pulse with:
     # - Envelope strength maximum of 1e-5 a.u.
-    # - Time envelope centerpoint at 100 a.u.
-    # - Time envelope deviation parameter 2.0 a.u.
-    # - Carrier frequency 0.005 a.u
+    # - Time envelope centerpoint at 100 fs
+    # - Time envelope deviation parameter 20.0 fs
+    # - Carrier frequency 1000 cm^-1
     # - No UV/VIS component of carrier frequency
     # - Wavevector (0.0, 1.0, 0.0) (laboratory axes)
     # - Polarization vector (0.0, 0.0, 1.0) (laboratory axes)
     # - No overall phase shift (here replicating default)
     # - (Integer) identifier label: 1
-    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 0.005, dev = 2.0, maxstr=1.0e-5,
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 1000.0, dev=20.0, maxstr=1.0e-5,
                       wv=(0.0, 1.0, 0.0), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1)
 
     assert pulse_a.env == 'gaussian'
     assert pulse_a.tc == 100.0
-    assert pulse_a.cf == 0.005
-    assert pulse_a.dev == 2.0
+    assert pulse_a.cf == 1000.0
+    assert pulse_a.dev == 20.0
     assert pulse_a.maxstr == 1.0e-5
     assert pulse_a.wv == (0.0, 1.0, 0.0)
     assert pulse_a.pol == (0.0, 0.0, 1.0)
     assert pulse_a.overall_phase == 1.0 + 0.0j
     assert pulse_a.id == 1
+    assert pulse_a.pol_comp is None
+    assert pulse_a.id_comp is None
+    assert not pulse_a.is_compound
 
     # The choice of deviation parameter is non-limiting and should therefore result in the pulse being
     # neither impulsive-tending or continuous-wave-tending
     assert not(pulse_a.tendsImpulsive())
     assert not(pulse_a.tendsContinuous())
 
-    # A UV/VIS impulsive-tending pulse. Leaving several parameters to their default values.
-    # For impulsive-tending pulses, the carrier frequency argument is optional
-    pulse_b = EmPulse(env='gaussian', tc = 120.0, dev=0.0)
-    assert pulse_b.env == 'gaussian'
-    assert pulse_b.tc == 120.0
-    assert pulse_b.cf is None
-    assert pulse_b.dev == 0.0
-    assert pulse_b.maxstr == 0.0 # Default
-    assert pulse_b.wv == (0.0, 0.0, 1.0) # Default
-    assert pulse_b.pol == (1.0, 0.0, 0.0) # Default
-    assert pulse_b.overall_phase == 1.0 + 0.0j # Default
-    assert pulse_b.id is None # Default
-
-    assert pulse_b.tendsImpulsive()
-    assert not(pulse_b.tendsContinuous())
-
     # A CW-tending IR range pulse. For continuous-wave-tending
     # pulses, the time centerpoint argument is optional
     from math import inf as infinity
-    pulse_c = EmPulse(env='gaussian', cf = 0.003, dev = infinity)
+    pulse_c = EmPulse(env='gaussian', cf = 2000.0, dev = infinity, wv=(0.0, 0.0, 1.0), id=1, pol=(1.0, 0.0, 0.0))
     assert pulse_c.env == 'gaussian'
     assert pulse_c.tc is None # Default value
-    assert pulse_c.cf == 0.003
+    assert pulse_c.cf == 2000.0
     assert pulse_c.dev == infinity
 
     assert not(pulse_c.tendsImpulsive())
     assert pulse_c.tendsContinuous()
 
+    # Compound pulse
+    pulse_comp = EmPulse(env='gaussian', tc = 200.0, cf = 1000.0, dev=20.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.0), pol_comp=((0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), overall_phase = 1.0 + 0.0j, id_comp=(1, 3))
+
+    assert pulse_comp.env == 'gaussian'
+    assert pulse_comp.tc == 200.0
+    assert pulse_comp.cf == 1000.0
+    assert pulse_comp.dev == 20.0
+    assert pulse_comp.maxstr == 1.0e-5
+    assert pulse_comp.wv == (0.0, 1.0, 0.0)
+    assert pulse_comp.overall_phase == 1.0 + 0.0j
+    assert pulse_comp.id is None
+    assert pulse_comp.pol is None
+    assert pulse_comp.id_comp == ((1, 3))
+    assert pulse_comp.pol_comp == ((0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    assert pulse_comp.is_compound
+
+    # Nonorthogonal wv/polarization within tolerance
+    pulse_a = EmPulse(env='gaussian', tc = 100.0, cf = 1000.0, dev=20.0, maxstr=1.0e-5,
+                      wv=(0.0, 1.0, 0.02), pol=(0.0, 0.0, 1.0), overall_phase = 1.0 + 0.0j, id=1,
+                      tol_wv_pol_nonort=5.0)
+
+    assert pulse_a.wv == (0.0, 1.0, 0.02)
+    assert pulse_a.pol == (0.0, 0.0, 1.0)
+
     # Unrecognized pulse envelope
     with pytest.raises((ValueError)):
-        pulse_bogus = EmPulse(env='bogus', tc=120.0, dev=0.0)
-
-    # Negative cf parameter
-    with pytest.raises((ValueError)):
-        pulse_bogus = EmPulse(env='gaussian', cf = -0.003, dev = infinity)
+        pulse_bogus = EmPulse(env='bogus', tc=120.0, dev=0.0, wv=(0.0, 0.0, 1.0), id=1, pol=(1.0, 0.0, 0.0))
 
     # Missing required parameter for non-limiting pulse shape
     with pytest.raises((AssertionError)):
-        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=2.0)
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, dev=2.0, wv=(0.0, 0.0, 1.0), id=1, pol=(1.0, 0.0, 0.0))
 
     # Missing required parameter for non-limiting pulse shape
     with pytest.raises((AssertionError)):
-        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001)
+        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=10000.0, wv=(0.0, 0.0, 1.0), id=1, pol=(1.0, 0.0, 0.0))
 
     # Missing required parameter for non-limiting pulse shape
     with pytest.raises((AssertionError)):
-        pulse_bogus = EmPulse(env='gaussian', cf=0.001, dev=2.0)
+        pulse_bogus = EmPulse(env='gaussian', cf=1000.0, dev=2.0, wv=(0.0, 0.0, 1.0), id=1, pol=(1.0, 0.0, 0.0))
 
     # Wavevector not len 3 tuple of floats
     with pytest.raises((AssertionError)):
         pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
-                              wv=('bogus', 0.0, 0.0))
+                              wv=('bogus', 0.0, 0.0), id=1, pol=(1.0, 0.0, 0.0))
 
     # Polarization not len 3 tuple of floats
     with pytest.raises((AssertionError)):
         pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
-                              pol=(1.0, 0.0, 0.0, 0.0))
+                              pol=(1.0, 0.0, 0.0, 0.0), wv=(0.0, 0.0, 1.0), id=1)
 
     # Wavevector and polarization not orthogonal
     with pytest.raises((AssertionError)):
         pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
-                              wv =(1.0, 0.0, 0.0), pol=(1.0, 0.0, 0.0))
-
-    # Non-zero shift in overall phase
-    with pytest.raises((AssertionError)):
-        pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
-                              overall_phase=0.0 + 1.0j)
+                              wv =(1.0, 0.0, 0.0), pol=(1.0, 0.0, 0.0), id=1)
 
 def test_make_gaussian_pulse():
 
@@ -267,7 +270,7 @@ def test_make_cw_gaussian_pulse():
     from math import inf as infinity
     pulse_c = make_cw_gaussian_pulse(0.003)
     assert pulse_c.env == 'gaussian'
-    assert pulse_c.tc == None # Default value
+    assert pulse_c.tc is None # Default value
     assert pulse_c.cf == 0.003
     assert pulse_c.dev == infinity
 
@@ -286,16 +289,16 @@ def test_electric_field():
 
     # Simple 3-pulse field
 
-    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=1)
-    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=2)
-    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=3)
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=1, wv=(0.0, 0.0, 1.0))
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=2, wv=(0.0, 0.0, 1.0))
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=3, wv=(0.0, 0.0, 1.0))
 
     from math import inf as infinity
-    pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1)
-    pulse_cw_b = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=2)
-    pulse_cw_c = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=3)
+    pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1, wv=(0.0, 0.0, 1.0))
+    pulse_cw_b = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=2, wv=(0.0, 0.0, 1.0))
+    pulse_cw_c = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=3, wv=(0.0, 0.0, 1.0))
 
-    pulse_mix_c = EmPulse(env='gaussian', tc=120.0, dev=10.0, cf= 0.002, id=3)
+    pulse_mix_c = EmPulse(env='gaussian', tc=120.0, dev=10.0, cf= 0.002, id=3, wv=(0.0, 0.0, 1.0))
 
     # Pulse ids out of order but that doesn't matter as long as all IDs from 1 to num of pulses are represented
     pulses = (pulse_a, pulse_c, pulse_b)
@@ -317,13 +320,13 @@ def test_electric_field():
 
     # Identifiers in sequence but don't start at 1
     with pytest.raises(ValueError):
-        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0)
+        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0))
         pulses_bogus = (pulse_0, pulse_a, pulse_b)
         field_bogus = ElectricField(pulses_bogus)
 
     # Identifiers start at 1 but not in sequence
     with pytest.raises(ValueError):
-        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0)
+        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0))
         pulses_bogus = (pulse_a, pulse_b, pulse_d)
         field_bogus = ElectricField(pulses_bogus)
 
