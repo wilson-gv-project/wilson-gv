@@ -16,6 +16,7 @@ def test_spec_detector():
 
     detector_a = SpecDetector(detection_method='freq',
                               detection_polarization=(1.0, 0.0, 0.0),
+                              detection_limited_to='same_order',
                               detection_interval=[0.0, 5000.0],
                               interaction_filter=[[-1, 2, 3]])
 
@@ -26,12 +27,43 @@ def test_spec_detector():
     assert detector_a.interaction_filter[0][1] == 2
     assert detector_a.interaction_filter[0][2] == 3
 
+    detector_a_face = SpecDetector(detection_method='freq',
+                                   detection_polarization=(1.0, 0.0, 0.0),
+                                   detection_limited_to='up_to_order',
+                                   detection_interval=[0.0, 5000.0],
+                                   detector_faces=(0.0, 0.0, 1.0),
+                                   detector_max_order=4)
+
+    assert detector_a_face.detector_faces == (0.0, 0.0, 1.0)
+    assert detector_a_face.detector_max_order == 4
+    assert detector_a_face.detection_limited_to == 'up_to_order'
+
     # Unrecognized detection method
     with pytest.raises(ValueError):
         detector_bogus = SpecDetector(detection_method='bogus',
                                       detection_polarization=(1.0, 0.0, 0.0),
+                                      detection_limited_to='up_to_order',
                                       interaction_filter=[[-1, 2, 3]],
                                       detection_interval=[0.0, 5000.0])
+
+    # Specifying both detector_faces and interaction_filter
+    with pytest.raises(ValueError):
+        detector_bogus = SpecDetector(detection_method='bogus',
+                                      detection_polarization=(1.0, 0.0, 0.0),
+                                      detection_limited_to='up_to_order',
+                                      detector_faces=(0.0, 0.0, 1.0),
+                                      interaction_filter=[[-1, 2, 3]],
+                                      detection_interval=[0.0, 5000.0])
+
+    # Specifying detector_max_order with interaction_filter
+    with pytest.raises(ValueError):
+        detector_bogus = SpecDetector(detection_method='bogus',
+                                      detection_polarization=(1.0, 0.0, 0.0),
+                                      detection_limited_to='up_to_order',
+                                      interaction_filter=[[-1, 2, 3]],
+                                      detector_max_order=3,
+                                      detection_interval=[0.0, 5000.0])
+
 
 def test_scan_object():
 
@@ -453,7 +485,8 @@ def test_vib_experiment():
     #
     # - EVV 2-scan experiment OK
     # - CARS OK
-    # - "alpha, beta" cars
+    # - "alpha, beta" cars OK
+    # - SFG OK
     # - TRIVE variant (possibly delays)
     # - Ideal freq domain (with simplifications)
     # - "2D Raman" with/without cascading effects

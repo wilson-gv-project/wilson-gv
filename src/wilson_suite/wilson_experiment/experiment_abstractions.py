@@ -56,7 +56,7 @@ class SpecDetector:
 
     detector_max_order: Maximum order of perturbation at which signals will be detected. Must be specified directly
     if detector_faces is given, or will be derived from the maximum encountered order in interaction_filter if it is
-    that which instead is given.
+    that which instead is given
     """
 
     detection_method: str
@@ -92,11 +92,16 @@ class SpecDetector:
         if self.detection_limited_to not in ('same_order', 'up_to_order', 'only_specified'):
             raise ValueError("The detection limitation must be either 'same_order', 'up_to_order', or 'only_specified'")
 
-        if self.detection_limited_to in ['same_order', 'up_to_order']:
-            if not len(self.interaction_filter) == 1:
-                raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+        if self.interaction_filter is not None and self.detector_faces is not None:
 
-        if self.interaction_filter is not None:
+            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
+
+        elif self.interaction_filter is not None:
+
+            if self.detection_limited_to in ['same_order', 'up_to_order']:
+                if not len(self.interaction_filter) == 1:
+                    raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+
             if not isinstance(self.interaction_filter, list):
                 raise ValueError('The interaction filter must be given as a list of lists')
 
@@ -107,6 +112,9 @@ class SpecDetector:
                 for j in i:
                     if not isinstance(j, int):
                         raise ValueError('The interaction filter IDs must be integers')
+
+            if self.detector_max_order is not None:
+                raise ValueError('The detector_max_order parameter will be automatically filled when specifying an interaction filter')
 
             self.detector_max_order = max([len(i) for i in self.interaction_filter])
 
@@ -126,7 +134,7 @@ class SpecDetector:
 
         else:
 
-            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
+            raise ValueError('One of detector_faces and interaction_filter must be specified')
 
 @dataclass
 class ScanObject:
