@@ -7,8 +7,6 @@ from math import acos as acos
 from math import pi as pi
 import numpy as np
 
-# TODO: Expand functionality according to below TODOs
-
 @dataclass
 class SpecDetector:
     """
