@@ -1,13 +1,12 @@
 """
-Spectral features, and the windows and domains that hold them.
+Spectral features, and the windows that hold them.
 
   in:  ContributionRow tables (built by evaluate.build_contributions), propagator parameters (propagator_param)
-  out: SpectralFeature lists, SpectralWindow, RectangularDomain clusters
+  out: SpectralFeature lists, SpectralWindow
 
-  holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, features_to_clusters,
-         SpectralWindow, RectangularDomain
+  holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, SpectralWindow
 
-Takes Box, box grids and box clustering from grid.py; grid.py never imports from here.
+Takes Box and box grids from grid.py; grid.py never imports from here.
 """
 import copy
 from collections import defaultdict
@@ -19,8 +18,6 @@ import numpy as np
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
-    compute_box_adjacency,
-    connected_components_from_adjacency,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
@@ -31,7 +28,7 @@ from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
-        Dim_bounds,
+        DimBounds,
     )
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         ResLocPoint,
@@ -376,21 +373,6 @@ def condition_states(motif: ResonanceMotif, params: ParameterSet, states: 'VibSt
     return tuple(VibDiff.from_quanta(*key.diff, params.to_dict(), states) for key in motif)
 
 
-def features_to_clusters(features: list['SpectralFeature']) -> dict[int, list['SpectralFeature']]:
-    """
-    takes features and, based on those feature boxes overlapping, returns clusters
-    """
-    feature_boxes = []
-    for f in features:
-        if f.feat_box is None:
-            raise ValueError(f"No feature box for {f}")
-        else:
-            feature_boxes.append(f.feat_box)
-    adjacency = compute_box_adjacency(feature_boxes)
-
-    return connected_components_from_adjacency(adjacency, features)
-
-
 def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
     """
     Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
@@ -665,7 +647,7 @@ class SpectralWindow:
                    contrib_features=[f for f in kept if not (f.is_flat or f.is_inside(box))])
 
     @property
-    def bounds(self) -> dict[str, 'Dim_bounds']:
+    def bounds(self) -> dict[str, 'DimBounds']:
         return self.box.bounds
 
     @property
@@ -683,61 +665,3 @@ class SpectralWindow:
         Regular grid over the window box, see Box.make_grid.
         """
         return self.box.make_grid(dim_sizes)
-
-
-    def find_clusters_by_featboxes(self) -> tuple['RectangularDomain', ...]:
-        all_features = self.full_features + self.contrib_features
-
-        clusters = features_to_clusters(features=all_features)
-
-        return tuple(
-            RectangularDomain.from_features(clusters[c])
-            for c in clusters
-        )
-
-
-@dataclass
-class RectangularDomain:
-    """
-    N-dimensional domain with labeled axes and spectral features.
-    from_features makes one domain per cluster: its box spans the boxes of the cluster's features.
-    """
-    box: Box
-    full_features: list['SpectralFeature'] = field(default_factory=list)
-    contrib_features: list['SpectralFeature'] = field(default_factory=list)
-        
-
-    def __hash__(self):
-        return hash((self.box, tuple(self.full_features), tuple(self.contrib_features)))
-    
-    # -----------------------------------------------------------
-    # Feature utilities
-    # -----------------------------------------------------------
-    # UNUSED by extention
-    def add_full_features(self, features: list['SpectralFeature']):
-        self.full_features.extend(features)
-
-    # UNUSED
-    def add_a_full_feature(self, feature: 'SpectralFeature'):
-        self.full_features.append(feature)
-
-    # UNUSED
-    def add_contrib_features(self, features: list['SpectralFeature']):
-        self.contrib_features.extend(features)
-
-    # UNUSED
-    def add_a_contrib_feature(self, feature: 'SpectralFeature'):
-        self.contrib_features.append(feature)
-
-    @classmethod
-    def from_features(cls, features: list[SpectralFeature]):
-        feats = []
-        for f in features:
-            if f.feat_box is None:
-                raise ValueError(f'feature {f} does not have feat_box')
-            else:
-                feats.append(f.feat_box)
-        return cls(
-            box=Box.union(feats),
-            full_features=features
-        )

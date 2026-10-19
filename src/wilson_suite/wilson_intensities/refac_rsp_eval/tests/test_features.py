@@ -1,5 +1,5 @@
 """
-features.py — contribution rows, spectral features, windows and domains. Runs with zero molecular data.
+features.py — contribution rows, spectral features and windows. Runs with zero molecular data.
 
 Tests marked xfail(strict=True) pin known bugs: they start passing (and so fail the run) once the bug is fixed,
 which is the reminder to drop the marker.
@@ -13,7 +13,6 @@ import pytest
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionTable,
-    RectangularDomain,
     SpectralFeature,
     SpectralWindow,
     amplitude_half_widths,
@@ -508,16 +507,6 @@ def test_sample_grid_is_the_box_grid():
         np.testing.assert_array_equal(grid[ax], box_grid[ax])
 
 
-def test_window_find_clusters_by_featboxes_includes_contributing_features():
-    # boxes (8.5, 10.5) and (10, 12) overlap
-    inside, near = feat(A=9.5, box_extent=1.), feat(A=11., box_extent=1.)
-    window = SpectralWindow(Box({'A': (0., 10.)}), full_features=[inside], contrib_features=[near])
-
-    [domain] = window.find_clusters_by_featboxes()
-
-    assert domain.box == Box({'A': (8.5, 12.)})
-
-
 ## SpectralWindow.from_features ---------------------------------------------
 # Window A (0, 10). Half-width 55 cm-1: a feature at A = 60 has the box (5, 115), at A = 70 the box (15, 125).
 
@@ -575,15 +564,6 @@ def test_window_from_features_does_not_change_input_features():
     SpectralWindow.from_features(WINDOW_0_10, [f], [55.])
 
     assert f.feat_box is None
-
-
-def test_window_from_features_can_be_clustered_right_away():
-    """inside: box (-50, 60), near: box (5, 115). They overlap, so one domain spans both."""
-    window = SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=5.), feat(A=60., gamma=5.)], [55., 55.])
-
-    [domain] = window.find_clusters_by_featboxes()
-
-    assert domain.box.bounds['A'] == pytest.approx((-50., 115.))
 
 
 def test_window_from_features_needs_one_half_width_per_feature():
@@ -915,45 +895,6 @@ def test_window_from_features_gives_a_flat_feature_the_window_as_its_box(box):
     assert boxed_peak.feat_box == Box({ax: (2., 8.) for ax in box.axes})
 
 
-## RectangularDomain --------------------------------------------------------
-
-def test_domain_from_features_spans_feature_boxes():
-    f0, f1 = feat(A=0., box_extent=1.), feat(A=5., box_extent=1.)
-
-    domain = RectangularDomain.from_features([f0, f1])
-
-    assert domain.box == Box({'A': (-1., 6.)})
-    assert domain.full_features == [f0, f1]
-
-
-def test_domain_from_features_needs_feature_boxes():
-    with pytest.raises(ValueError, match='feat_box'):
-        RectangularDomain.from_features([feat(A=0.)])
-
-
-def test_equal_domains_have_equal_hashes():
-    # the old GridManager uses domains as dict keys
-    d1 = RectangularDomain.from_features([feat(A=0., box_extent=1.)])
-    d2 = RectangularDomain.from_features([feat(A=0., box_extent=1.)])
-
-    assert d1 == d2
-    assert hash(d1) == hash(d2)
-    assert {d1: 'region'}[d2] == 'region'
-
-
-def test_domain_add_methods_append_features():
-    domain = RectangularDomain(Box({'A': (0., 10.)}))
-    f0, f1, f2, f3 = feat(A=0.), feat(A=1.), feat(A=2.), feat(A=3.)
-
-    domain.add_full_features([f0])
-    domain.add_a_full_feature(f1)
-    domain.add_contrib_features([f2])
-    domain.add_a_contrib_feature(f3)
-
-    assert domain.full_features == [f0, f1]
-    assert domain.contrib_features == [f2, f3]
-
-
 ## N dimensions (1 to 4 axes) -----------------------------------------------
 # The same checks for every spectrum dimensionality in NDIMS. `last` is the highest axis, e.g. 'C' for ndim=3.
 
@@ -1010,17 +951,4 @@ def test_nd_amplitude_in_window_multiplies_the_tail_of_each_axis_outside(ndim):
 
     assert amplitude_in_window(outside, cube(ndim, 0., 10.)) == pytest.approx(
         inside.get_intensity() ** 0.5 * (5. / np.hypot(100., 5.)) ** ndim)
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_window_find_clusters_by_featboxes(ndim):
-    # boxes: f0 (-1, 1) and f1 (0.5, 2.5) overlap on every axis; f2 sits on f0, except (9, 11) on the last axis
-    f0, f1 = feat(coords(ndim, 0.), box_extent=1.), feat(coords(ndim, 1.5), box_extent=1.)
-    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}), box_extent=1.)
-    window = SpectralWindow(cube(ndim, -5., 15.), full_features=[f0, f1, f2])
-
-    domains = window.find_clusters_by_featboxes()
-
-    assert [d.box for d in domains] == [cube(ndim, -1., 2.5), f2.feat_box]
-    assert [d.full_features for d in domains] == [[f0, f1], [f2]]
 

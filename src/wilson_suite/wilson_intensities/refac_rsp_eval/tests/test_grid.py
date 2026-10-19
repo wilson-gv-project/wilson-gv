@@ -1,27 +1,18 @@
 """
-grid.py — bounds, boxes, box slices and box clustering. Runs with zero molecular data.
-
-The last tests cover features_to_clusters (features.py), the feature-level wrapper of the box clustering.
+grid.py — bounds, boxes, grids and box slices. Runs with zero molecular data.
 """
 
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
-    features_to_clusters,
-)
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
     Box,
     box_slices,
-    compute_box_adjacency,
-    connected_components_from_adjacency,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
     NDIMS,
-    coords,
     cube,
-    feat,
 )
 
 ## Box: construction --------------------------------------------------------
@@ -48,6 +39,12 @@ def test_box_rejects_non_numeric_bounds():
 def test_box_rejects_min_above_max():
     with pytest.raises(ValueError, match='min'):
         Box({'A': (2., 1.)})
+
+
+@pytest.mark.parametrize('bounds', [(np.nan, 1.), (0., np.nan)])
+def test_box_rejects_nan_bounds(bounds):
+    with pytest.raises(ValueError, match='NaN'):
+        Box({'A': bounds})
 
 
 def test_box_equality_and_hash_ignore_input_order():
@@ -77,50 +74,6 @@ def test_box_stores_numpy_numbers_as_plain_floats():
 
 ## Box: operations ----------------------------------------------------------
 
-def test_box_expand_returns_new_box_and_pads_only_given_axes():
-    box = Box({'A': (0., 1.), 'B': (0., 1.)})
-
-    bigger = box.expand({'A': 0.5})
-
-    assert bigger.bounds == {'A': (-0.5, 1.5), 'B': (0., 1.)}
-    assert box.bounds == {'A': (0., 1.), 'B': (0., 1.)}
-
-
-def test_box_expand_inplace_changes_the_box():
-    box = Box({'A': (0., 1.)})
-
-    assert box.expand({'A': 1.}, inplace=True) is box
-    assert box.bounds == {'A': (-1., 2.)}
-
-
-def test_box_intersect_returns_overlap_on_shared_axes():
-    b1 = Box({'A': (0., 2.), 'B': (0., 2.)})
-
-    assert b1.intersect(Box({'A': (1., 3.), 'B': (-1., 1.)})) == Box({'A': (1., 2.), 'B': (0., 1.)})
-    assert b1.intersect(Box({'A': (1., 3.)})) == Box({'A': (1., 2.)})
-
-
-@pytest.mark.parametrize('other', [
-    Box({'A': (5., 6.)}),  # apart
-    Box({'A': (1., 2.)}),  # touching
-    Box({'B': (0., 1.)}),  # no shared axis
-])
-def test_box_intersect_returns_none_without_overlap(other):
-    assert Box({'A': (0., 1.)}).intersect(other) is None
-
-
-def test_box_union_spans_all_boxes_and_all_axes():
-    union = Box.union([Box({'A': (0., 1.)}), Box({'A': (5., 6.), 'B': (2., 3.)})])
-
-    assert union == Box({'A': (0., 6.), 'B': (2., 3.)})
-
-
-def test_box_union_of_one_box_is_that_box():
-    box = Box({'A': (0., 1.), 'B': (2., 3.)})
-
-    assert Box.union([box]) == box
-
-
 def test_box_contains_box():
     outer = Box({'A': (0., 10.)})
 
@@ -137,9 +90,11 @@ def test_box_overlaps_excludes_touching_edges():
     assert not box.overlaps(Box({'A': (3., 4.)}))
 
 
-def test_box_contains_points_needs_one_coord_per_axis():
-    with pytest.raises(ValueError, match='coords'):
-        Box({'A': (0., 1.)}).contains(np.array([[0.5, 0.5]]))
+@pytest.mark.parametrize('method', ['overlaps', 'contains_box'])
+@pytest.mark.parametrize('other', [Box({'B': (0., 1.)}), Box({'A': (0., 1.), 'B': (0., 1.)})])
+def test_box_comparison_needs_the_same_axes(method, other):
+    with pytest.raises(ValueError, match='do not match'):
+        getattr(Box({'A': (0., 1.)}), method)(other)
 
 
 ## Box: grid ----------------------------------------------------------------
@@ -171,6 +126,22 @@ def test_make_grid_runs_from_min_to_max_with_both_edges():
 def test_make_grid_needs_one_size_per_box_axis(dim_sizes):
     with pytest.raises(ValueError, match='one grid size per box axis'):
         Box({'A': (0., 10.)}).make_grid(dim_sizes)
+
+
+def test_make_grid_gives_one_point_on_a_zero_width_axis():
+    axes, grid = Box({'A': (0., 10.), 'B': (5., 5.)}).make_grid({'A': 3, 'B': 1})
+
+    np.testing.assert_array_equal(axes['B'], [5.])
+    assert grid['A'].shape == (3, 1)
+
+
+@pytest.mark.parametrize('dim_sizes', [
+    {'A': 1, 'B': 1},  # 1 point on an axis with min < max: only min
+    {'A': 3, 'B': 0},  # no points
+])
+def test_make_grid_rejects_too_few_points(dim_sizes):
+    with pytest.raises(ValueError, match='needs 2 or more points'):
+        Box({'A': (0., 10.), 'B': (5., 5.)}).make_grid(dim_sizes)
 
 
 ## box_slices ---------------------------------------------------------------
@@ -209,6 +180,11 @@ def test_box_slices_follow_the_axis_order_of_coords():
     assert box_slices(Box({'A': (101., 102.), 'B': (5., 7.)}), coords) == (slice(5, 8), slice(1, 3))
 
 
+def test_box_slices_needs_points_on_every_grid_axis():
+    with pytest.raises(ValueError, match='have no points'):
+        box_slices(Box({'A': (2., 4.)}), {'A': np.array([])})
+
+
 @pytest.mark.parametrize('coords', [{'A': np.arange(10.), 'B': np.arange(10.)}, {'B': np.arange(10.)}])
 def test_box_slices_needs_the_grid_axes_of_the_box(coords):
     with pytest.raises(ValueError, match='do not match grid axes'):
@@ -233,12 +209,11 @@ def test_nd_box_slices_one_slice_per_axis(ndim):
 ## Box: N dimensions (1 to 4 axes) ------------------------------------------
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_box_intersect_union_and_contains_box(ndim):
-    b1, b2 = cube(ndim, 0., 2.), cube(ndim, 1., 3.)
+def test_nd_box_contains_box_needs_every_axis(ndim):
+    outer = cube(ndim, 0., 3.)
 
-    assert b1.intersect(b2) == cube(ndim, 1., 2.)
-    assert Box.union([b1, b2]) == cube(ndim, 0., 3.)
-    assert Box.union([b1, b2]).contains_box(b1)
+    assert outer.contains_box(cube(ndim, 1., 2.))
+    assert not outer.contains_box(cube(ndim, 1., 2., **{AXES[ndim - 1]: (2., 4.)}))
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
@@ -248,16 +223,6 @@ def test_nd_box_overlap_needs_every_axis(ndim):
 
     assert box.overlaps(cube(ndim, 1., 3.))
     assert not box.overlaps(apart_on_last_axis)
-    assert box.intersect(apart_on_last_axis) is None
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_box_contains_points_with_edges_included(ndim):
-    points = np.array([[0.5] * ndim,
-                       [1.] * ndim,                  # max corner: edges count as inside
-                       [0.5] * (ndim - 1) + [2.]])  # outside on the last axis only
-
-    np.testing.assert_array_equal(cube(ndim, 0., 1.).contains(points), [True, True, False])
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
@@ -284,95 +249,3 @@ def test_nd_make_grid_has_both_edges_and_ij_indexing(ndim):
         # numpy's default indexing='xy' swaps the first two dimensions, so this check catches it.
         for j in range(ndim):
             np.testing.assert_allclose(np.diff(grid[ax], axis=j), 5. if j == i else 0.)
-
-
-## Box clustering -----------------------------------------------------------
-
-def test_adjacency_is_symmetric_with_false_diagonal():
-    boxes = [Box({'A': (0., 2.)}), Box({'A': (1., 3.)}), Box({'A': (10., 11.)})]
-
-    np.testing.assert_array_equal(compute_box_adjacency(boxes), [[False, True, False],
-                                                                 [True, False, False],
-                                                                 [False, False, False]])
-
-
-def test_adjacency_counts_touching_boxes_only_when_inclusive():
-    boxes = [Box({'A': (0., 1.)}), Box({'A': (1., 2.)})]
-
-    assert compute_box_adjacency(boxes, touch_inclusive=True)[0, 1]
-    assert not compute_box_adjacency(boxes, touch_inclusive=False)[0, 1]
-
-
-def test_adjacency_needs_overlap_on_every_checked_axis():
-    boxes = [Box({'A': (0., 2.), 'B': (0., 1.)}), Box({'A': (1., 3.), 'B': (5., 6.)})]
-
-    assert not compute_box_adjacency(boxes)[0, 1]
-    assert compute_box_adjacency(boxes, axis_order=('A',))[0, 1]
-
-
-def test_adjacency_counts_touching_corners():
-    boxes = [Box({'A': (0., 1.), 'B': (0., 1.)}), Box({'A': (1., 2.), 'B': (1., 2.)})]
-
-    assert compute_box_adjacency(boxes)[0, 1]
-
-
-def test_adjacency_of_no_boxes_is_empty():
-    assert compute_box_adjacency([]).shape == (0, 0)
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_adjacency_needs_overlap_on_every_axis(ndim):
-    boxes = [cube(ndim, 0., 2.), cube(ndim, 1., 3.), cube(ndim, 1., 3., **{AXES[ndim - 1]: (5., 6.)})]
-
-    adjacency = compute_box_adjacency(boxes)
-
-    assert adjacency[0, 1]
-    assert not adjacency[0, 2]
-
-
-def test_connected_components_follow_chains():
-    # a-b and b-c are linked, d is alone
-    adjacency = np.zeros((4, 4), dtype=bool)
-    adjacency[0, 1] = adjacency[1, 0] = True
-    adjacency[1, 2] = adjacency[2, 1] = True
-
-    clusters = connected_components_from_adjacency(adjacency, ['a', 'b', 'c', 'd'])
-
-    assert {k: sorted(v) for k, v in clusters.items()} == {0: ['a', 'b', 'c'], 1: ['d']}
-
-
-def test_connected_components_of_unlinked_objects_are_singletons():
-    clusters = connected_components_from_adjacency(np.zeros((3, 3), dtype=bool), ['a', 'b', 'c'])
-
-    assert clusters == {0: ['a'], 1: ['b'], 2: ['c']}
-
-
-def test_connected_components_of_nothing_is_empty():
-    assert connected_components_from_adjacency(np.zeros((0, 0), dtype=bool), []) == {}
-
-
-def test_features_to_clusters_joins_touching_boxes():
-    # boxes: (-1, 1) and (1, 3) touch at 1
-    f0, f1 = feat(A=0., box_extent=1.), feat(A=2., box_extent=1.)
-
-    assert list(features_to_clusters([f0, f1]).values()) == [[f0, f1]]
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_features_to_clusters_needs_overlap_on_every_axis(ndim):
-    # boxes: f0 (-1, 1) and f1 (0.5, 2.5) on every axis; f2 sits on f0, except (9, 11) on the last axis
-    f0, f1 = feat(coords(ndim, 0.), box_extent=1.), feat(coords(ndim, 1.5), box_extent=1.)
-    f2 = feat(coords(ndim, 0., **{AXES[ndim - 1]: 10.}), box_extent=1.)
-
-    assert list(features_to_clusters([f0, f1, f2]).values()) == [[f0, f1], [f2]]
-
-
-def test_features_to_clusters_needs_feature_boxes():
-    """A feature that was never dressed has no box: clustering it raises."""
-    with pytest.raises(ValueError, match='feature box'):
-        features_to_clusters([feat(A=0., box_extent=1.), feat(A=1.)])
-
-
-def test_features_to_clusters_of_no_features_is_empty():
-    assert features_to_clusters([]) == {}
-

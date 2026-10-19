@@ -67,9 +67,20 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
   │ 4. group by (motif, location), add the coeffs
   v
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
-  │ 5. peak width, boxes (a box rule, e.g. features.amplitude_half_widths), spectral window
+  │    evaluate_response_terms ends here (FeatureResult.features); spectrum_on_grid goes on:
+  │ 5. half-widths: box_rule(window, features), one per feature, cm-1   ← window, box_rule
+  │    e.g. amplitude_half_widths: from each feature's amplitude; strong peaks get big boxes
+  │ 6. boxes: SpectralWindow.from_features, a box of location ± half-width per feature.
+  │    Keeps a feature if its box reaches into the window: full_features (location inside),
+  │    contrib_features (outside). A flat feature's box is the window
+  │ 7. grid: sample_grid, dim_sizes[ax] points per axis, both edges included   ← dim_sizes
+  │ 8. values: boxed_features_on_grid, each feature on its own cut of the grid (box_slices),
+  │    added into one complex array; where cuts overlap, amplitudes add before squaring
   v
-spectrum array on a grid                                   spectrum_on_grid (evaluate.boxed_features_on_grid)
+EvalRspResult(grid_axes, grid_result, spectral_window)    the spectrum on the grid
+  │ 9. intensity = abs(grid_result)**2, e.g. plot_rsp_func (wilson_analysis/render)
+  v
+the plot
 """
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Sequence
@@ -381,8 +392,15 @@ def spectrum_on_grid(feature_result: FeatureResult,
                   *,
                   box_rule: BoxRule) -> EvalRspResult:
     """
-    The features of feature_result on a grid over `window`: boxes, grid, the values on it. The rows are not computed
-    again (the slow part: build_contributions), so a new window, grid, width or box rule runs only the grid part:
+    The features of feature_result on a grid over `window`, in four steps:
+        1. box_rule(window, features): one box half-width per feature, cm-1
+        2. SpectralWindow.from_features: a box around each feature; keeps the features
+           whose box reaches into the window
+        3. sample_grid: the grid, dim_sizes[ax] points per axis, both edges included
+        4. boxed_features_on_grid: each feature on its own cut of the grid, all added into
+           one array (the steps and an example are there)
+    The rows are not computed again (the slow part: build_contributions), so a new window,
+    grid, width or box rule runs only the grid part:
         boxes = partial(amplitude_half_widths, dynrange=500.)
         again = spectrum_on_grid(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
         wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
@@ -401,8 +419,14 @@ def spectrum_on_grid(feature_result: FeatureResult,
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
     features = feature_result.features
-    half_widths = box_rule(window, features)                                              # boxes: width at the peak
+    
+    # boxes: width at the peak
+    half_widths = box_rule(window, features)
+
     spectral_window = SpectralWindow.from_features(window, features, half_widths)
     grid_axes, _ = spectral_window.sample_grid(dim_sizes)
-    grid_result = boxed_features_on_grid(spectral_window, feature_result.states, grid_axes)   # width on the grid
+    
+    # width on the grid
+    grid_result = boxed_features_on_grid(spectral_window, feature_result.states, grid_axes)
+    
     return EvalRspResult(feature_result, grid_axes, grid_result, spectral_window)

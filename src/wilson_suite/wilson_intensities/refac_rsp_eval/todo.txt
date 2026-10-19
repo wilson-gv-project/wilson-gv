@@ -22,7 +22,7 @@ the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (
 Tests (run 2026-10-19, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   703     -     -     19   all 19 xfails: 5 in tests/test_a15_polarization_order.py,
+    refac_rsp_eval   682     -     -     19   all 19 xfails: 5 in tests/test_a15_polarization_order.py,
                                               14 in tests/test_averaging_pol_order.py
     rest of src      259     -     1      -   none
     tests/ (root)      4    16     -      -   none
@@ -107,11 +107,11 @@ Other items:
                          convolution) is further along
     open, in the PR      E17 (the package move to wilson_response_evaluate): before the merge, or later
                          with the moves to wilson_system
-    kept, unused         E16 (the domains)
     postponed            A15 (polarization order, one line), E4 (README)
     optional checks      G3 (rest)
     done (2026-10-17)    E12 (flat background), E15 (rename), E9 stage 6 (comments); H8 left as it is
     done (2026-10-18)    E18 (translated terms in; tests load stored terms; H8 holds)
+    done (2026-10-19)    E16 (the domains deleted)
     later, when needed   D1 (frozen collections), E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
                          F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
@@ -315,7 +315,7 @@ E. Pipeline
               left the import list. Only category C (todo_oldcode_rm.txt) still imports them, and it failed before.
               The example tests/example_evaluate_response_terms.py runs (0.9 s). With them went the old pipeline's
               copies of the domains and of the box rule (spectrum_composition.py; their tests went in stage 2).
-              The new code's domains stay, unused (E16).
+              The new code's domains went later (E16, 2026-10-19).
               amplitudes/averaging.py stays at this path (needs only numpy): wilson_experiment imports
               get_pol_laser from it, and pipeline.py imports from it too.
               amplitudes/__init__.py imported spectrum_composition, evaluation_wf, term_parts: now only the
@@ -372,7 +372,7 @@ E. Pipeline
         Domains (each feature evaluated on the rectangle around all the boxes it overlaps): not needed for
         interference; all boxes cut the same grid, amplitudes add, and squaring comes once. They only hid part of
         the old cut (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the
-        own box is enough. The new code's domains stay, unused (E16).
+        own box is enough. The new code's domains were deleted (E16, 2026-10-19).
         intensity_half_widths vs the old dress_these_with_boxes: returns half-widths (no deep copy); never drops a
         feature; no error for a feature stronger than max_intensity. Same knobs and defaults as main's
         EvaluationInfo (box_range_safety_margin 0.1, unscaled, minimum_box_padding 0 cm-1), plus dynrange.
@@ -418,24 +418,15 @@ E. Pipeline
             slanted slice   e.g. along A = B: eval_feature_on_grid takes any points, but box_slices needs a grid
                             along the axes.
         Slices do not depend on each other: one process per slice, each sends back one 2D array (201 x 201: 0.65 MB).
-[-] E16 Domains in the new code: unused, kept for now (decided 2026-10-17). A domain is the rectangle around a
-        cluster of features whose boxes overlap. No evaluation code calls them, only tests. The last other caller,
-        draw_by_domains in tests/c3_spectrum.py, went in E9 stage 1. Why unused: E10 (with amplitude boxes each
-        feature on its own box is enough).
-        What exists:
-            grid.py:175-246       compute_box_adjacency: an n x n matrix, True where two boxes overlap on every
-                                  axis (touch_inclusive: touching counts too); connected_components_from_adjacency:
-                                  the groups of objects linked through the matrix (depth-first search)
-            features.py:379-391   features_to_clusters: the features grouped by overlapping feature boxes
-                                  (feat_box; raises for a feature without one)
-            features.py:688-697   SpectralWindow.find_clusters_by_featboxes: one RectangularDomain per cluster of
-                                  the window's features (full_features and contrib_features together)
-            features.py:700-743   RectangularDomain: box (the union of its features' boxes), full_features,
-                                  contrib_features, __hash__, from_features; 4 add_* methods marked UNUSED
-        Tests: test_grid.py:291-376 (13: adjacency, connected components, features_to_clusters); test_features.py
-        (7, at lines 511, 580, 920, 929, 934, 944, 1016).
-        Possible use, none planned: groups of nearby peaks, e.g. to choose zoom windows or slice positions (E14).
-        Delete with their tests (H1) once nothing needs them.
+[x] E16 Domains in the new code: deleted 2026-10-19 (H1), with their tests. A domain was the rectangle around a
+        cluster of features whose boxes overlap. No evaluation code called them, only tests. Why not needed: E10
+        (with amplitude boxes each feature on its own box is enough).
+        Not a way to group nearby peaks either (zoom windows, slice positions: E14): strong features get boxes
+        that span the whole window, so all features of a window fall into one cluster. Grouping peaks needs
+        another rule, e.g. the distance between peak locations.
+        Deleted: grid.py compute_box_adjacency, connected_components_from_adjacency, Box.union; features.py
+        features_to_clusters, SpectralWindow.find_clusters_by_featboxes, RectangularDomain; 14 tests in
+        test_grid.py, 7 in test_features.py. The old code: git log -S 'class RectangularDomain'.
 [ ] E17 The package move (name decided 2026-10-18): refac_rsp_eval -> the top-level package
         wilson_suite/wilson_response_evaluate.
         When: open (2026-10-18), to discuss in the PR. Either before the merge (the PR then shows only the final
@@ -669,7 +660,7 @@ H2  Make an abstraction on the second real use, not the first. No base classes, 
     B1), was deleted in a778784.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
-    Not frozen yet: Box, SpectralFeature, SpectralWindow, RectangularDomain.
+    Not frozen yet: Box, SpectralFeature, SpectralWindow.
 H5  Validate when an object is built; check types only at entry points.
 H6  plan.py runs, and its output can be checked, without molecular data (test_plan.py).
 H7  Never change derive's objects (VibPerturbedTerm and its parts). test_pipeline.py checks it.

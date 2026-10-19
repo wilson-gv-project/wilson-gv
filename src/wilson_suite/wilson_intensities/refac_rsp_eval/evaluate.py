@@ -762,17 +762,21 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     return feature.amplitude_coeff * resonance_factor
 
 
-# every feature on every grid point: no boxes, no domains
+# features on every point of coords_cm, no boxes
 def all_features_on_grid(features: Iterable['SpectralFeature'],
              vibstates_data: 'VibStatesData',
              coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
-    Sum of eval_feature_on_grid over all features, each on the whole grid. Nothing is cut off, so this is
-    the reference for the evaluation box by box (boxed_features_on_grid). Slow for many features on big grids.
+    Sum of eval_feature_on_grid over `features`, each on every point of coords_cm:
+    the whole grid, or one cut of it (box_slices).
+    The points are every combination of the 1D points (ij indexing),
+    e.g. A with 5 points, B with 3 -> 15 points, shape (5, 3).
+    On the whole grid nothing is cut off, so this is the reference for the evaluation
+    box by box (boxed_features_on_grid). Slow for many features on big grids.
 
-    coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid.
-    Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm (ij indexing),
-    e.g. coords_cm A with 5 points, B with 3 -> shape (5, 3). intensity = abs(amplitude)**2
+    coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid
+    Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm.
+    intensity = abs(amplitude)**2
     """
     mesh = dict(zip(coords_cm, np.meshgrid(*coords_cm.values(), indexing='ij')))
     total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
@@ -781,34 +785,57 @@ def all_features_on_grid(features: Iterable['SpectralFeature'],
     return total
 
 
-# the window's features, each on its own box
+# the window's features, each on its own cut of the grid
 def boxed_features_on_grid(window: 'SpectralWindow',
                 vibstates_data: 'VibStatesData',
                 coords_cm: dict[str, np.ndarray]) -> np.ndarray:
     """
-    Every feature of the window (full_features and contrib_features) on its own box only: the part of the grid
-    under its box (box_slices). Each box is a cut-out of the same grid points, so where boxes overlap their
-    amplitudes add, as in all_features_on_grid; squaring comes later, on the whole grid. Only each feature's tail
-    beyond its box is left out.
+    The spectrum on the grid: every feature of the window on its own cut of the grid.
 
-    Size of the cut: set by the box sizes. With amplitude_half_widths (features.py) the intensity error stays near
-    eps * the plot's floor (measured against all_features_on_grid: tests/e10_boxes.py, todo.txt E10). To check a case,
-    compare with all_features_on_grid.
-    Until 2026-10-14 features were evaluated by domains (boxes that overlap, each feature on the whole domain box):
-    that hid part of the cut of the old boxes, at up to 20 times the cost. With amplitude boxes the own box is enough.
+    How the result comes together:
+      1. total: one complex 0 per grid point, e.g. shape (501, 201)
+      2. for each feature (full_features, then contrib_features):
+         a. box_slices: the index range per axis that covers its box, cut at the grid
+            edges; None for a box outside the grid: that feature adds nothing
+         b. the cut: the 1D points of coords_cm in those ranges. The cut is a part of
+            the same grid, not a new grid
+         c. the feature on the cut (all_features_on_grid), added into total at the cut
+      3. total, not squared: intensity = abs(total)**2
 
-    window    - e.g. from SpectralWindow.from_features, so every feature has its box (a flat feature: the window)
-    coords_cm - one 1D array per window axis, cm-1, e.g. the first output of window.sample_grid
-    Returns the complex amplitude in au, laid out as in all_features_on_grid. A box outside the grid adds nothing.
+    e.g. grid points A = 0, 1, ..., 10; box of f1 (1.5, 4.5), box of f2 (3., 7.):
+        f1 -> slice(1, 6), points 1 to 5;  f2 -> slice(3, 8), points 3 to 7
+        total: points 3 to 5 get f1 + f2, points 1 and 2 f1, points 6 and 7 f2, the rest 0
+
+    Where cuts overlap, the amplitudes add before squaring, as in all_features_on_grid,
+    so overlapping peaks interfere. Left out: each feature's tail beyond its cut.
+    A flat feature's box is the window, so its cut is the whole grid; the same holds for
+    a box that covers the window. The run time grows with the number of points in all
+    cuts.
+
+    The box sizes set what is left out. With amplitude_half_widths (features.py) the
+    intensity error stays near eps * the plot's floor. To check a case, compare with
+    all_features_on_grid.
+    Until 2026-10-14 features were evaluated by domains (boxes that overlap, each feature
+    on the whole domain box): that hid part of the cut of the old boxes, at up to 20 times
+    the cost. With amplitude boxes the own box is enough.
+
+    window    - e.g. from SpectralWindow.from_features, so every feature has its box
+                (a flat feature: the window)
+    coords_cm - one 1D array per window axis, cm-1, e.g. the first output of
+                window.sample_grid
+    Returns the complex amplitude in au, laid out as in all_features_on_grid.
     """
     total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
     for feature in window.full_features + window.contrib_features:
         if feature.feat_box is None:
             raise ValueError(f'feature {feature} has no box: SpectralWindow.from_features gives one')
+        # a. the index range per axis that covers the box
         slices = box_slices(feature.feat_box, coords_cm)
         if slices is None:
             continue
+        # b. the cut: the grid's 1D points in those ranges
         box_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
+        # c. the feature on the cut, added into total at the same points
         total[slices] += all_features_on_grid([feature], vibstates_data, box_coords)
     return total
 
