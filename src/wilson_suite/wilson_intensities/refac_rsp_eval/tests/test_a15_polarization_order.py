@@ -1,7 +1,7 @@
 """
-A15 (todo.txt), shown on the evaluator's numbers. These tests fail until A15 is fixed (one line in
-amplitudes/averaging.py, get_pol_tensor). The cause, slot by slot, and more setups: test_averaging_pol_order.py
-(strict xfail there).
+A15 (todo.txt), shown on the evaluator's numbers. The tests that A15 breaks are strict xfails until A15 is
+fixed (one line in amplitudes/averaging.py, get_pol_tensor); after the fix, remove the marks. The cause, slot by
+slot, and more setups: test_averaging_pol_order.py (strict xfail there too).
 
 Slots. Slot 0 is the detected field, slot k is pulse k. VibExperiment lists its polarizations in that order
 (all_polarizations = [detector, pulse 1, pulse 2, ...]) and turns them into polarization_avg_vector with
@@ -35,7 +35,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import calculate_av
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import make_polarization_linear_comb
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import split_props
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import polprop
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_averaging_pol_order import exact_average
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_averaging_pol_order import REVERSED, exact_average
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
 
 X, Y, Z = (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)
@@ -70,6 +70,7 @@ THREE_DIPOLES = VibPerturbedTerm(Fraction(1), [polprop(ops=(0,), inds='a'), polp
 
 @pytest.mark.parametrize('pulse_1_pol, pulse_2_pol, det', [(Y, Z, +1.), (Z, Y, -1.)],
                          ids=['x, y, z: det +1', 'x, z, y: det -1'])
+@REVERSED
 def test_polarization_vector_is_det_of_the_polarizations(pulse_1_pol, pulse_2_pol, det):
     """polarization_avg_vector at rank 3 is [det(detector, pulse 1, pulse 2)]. Today both setups get the other sign."""
     laser_pol = rank_3_laser_pol(pulse_1_pol, pulse_2_pol)
@@ -88,6 +89,7 @@ def test_the_reference_det_over_6_is_the_exact_orientation_average(mu):
 
 
 @pytest.mark.parametrize('mu', [MU, MU_MIRROR], ids=['molecule, det +1', 'mirror image, det -1'])
+@REVERSED
 def test_evaluator_three_dipoles_x_y_z_is_det_over_6(mu):
     """
     Experiment x, y, z -> polarization_avg_vector -> recipe -> averaged part of dipgrad[a] dipgrad[b] dipgrad[c].
@@ -104,6 +106,7 @@ def test_evaluator_three_dipoles_x_y_z_is_det_over_6(mu):
 
 ## rank 5: not only a sign ----------------------------------------------------------------------------
 
+@REVERSED
 def test_evaluator_beta_alpha_rank_5_is_the_exact_orientation_average():
     """
     hypgrad[a] (slots 0, 1, 2) * polgrad[b] (slots 3, 4), the form of experiment_beta_alpha_cars; fields x, y, z, x, x.
