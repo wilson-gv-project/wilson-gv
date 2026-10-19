@@ -329,16 +329,16 @@ def test_electric_field():
 
     # Simple 3-pulse field
 
-    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=1, wv=(0.0, 0.0, 1.0))
-    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=2, wv=(0.0, 0.0, 1.0))
-    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=3, wv=(0.0, 0.0, 1.0))
+    pulse_a = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=1, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
+    pulse_b = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=2, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
+    pulse_c = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=3, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
 
     from math import inf as infinity
-    pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1, wv=(0.0, 0.0, 1.0))
-    pulse_cw_b = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=2, wv=(0.0, 0.0, 1.0))
-    pulse_cw_c = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=3, wv=(0.0, 0.0, 1.0))
+    pulse_cw_a = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=1, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
+    pulse_cw_b = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=2, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
+    pulse_cw_c = EmPulse(env='gaussian', cf=0.003, dev=infinity, id=3, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
 
-    pulse_mix_c = EmPulse(env='gaussian', tc=120.0, dev=10.0, cf= 0.002, id=3, wv=(0.0, 0.0, 1.0))
+    pulse_mix_c = EmPulse(env='gaussian', tc=120.0, dev=10.0, cf= 0.002, id=3, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
 
     # Pulse ids out of order but that doesn't matter as long as all IDs from 1 to num of pulses are represented
     pulses = (pulse_a, pulse_c, pulse_b)
@@ -360,13 +360,13 @@ def test_electric_field():
 
     # Identifiers in sequence but don't start at 1
     with pytest.raises(ValueError):
-        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0))
+        pulse_0 = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
         pulses_bogus = (pulse_0, pulse_a, pulse_b)
         field_bogus = ElectricField(pulses_bogus)
 
     # Identifiers start at 1 but not in sequence
     with pytest.raises(ValueError):
-        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0))
+        pulse_d = EmPulse(env='gaussian', tc=120.0, dev=0.0, cf=0.072, id=0, wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0))
         pulses_bogus = (pulse_a, pulse_b, pulse_d)
         field_bogus = ElectricField(pulses_bogus)
 
@@ -431,24 +431,27 @@ def test_electric_field():
                            (-1, -1, 1, 3), (-1, 1, 1, 3), (-5, -1, -1, 1, 1), (-1, -1, 1, 1, 3)  ])
 
     # Testing wavevector matching routine
-    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -2, 3, -4), filter='same_order')
+    wv_dir = (1.0, -4.0, -4.0) # 1 - 2 + 3 - 4
+    matching_wv = field_gen.wavevectors_matching_direction(direction=wv_dir, max_order=4, filter='same_order')
 
     # NOTE: All the following matching_wv results are verified for positive ID but not for false negatives
-    assert matching_wv == [(-4, -2, 1, 3), (-4, -2, 3, 3), (-6, -4, 3, 3), (-6, -4, 1, 3), (-4, -2, 1, 1), (-6, -4, 1, 1)]
+    assert sorted(matching_wv) == sorted([(-4, -2, 1, 3), (-4, -2, 3, 3), (-6, -4, 3, 3), (-6, -4, 1, 3), (-4, -2, 1, 1), (-6, -4, 1, 1)])
 
-    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -1, 6, -5), filter='same_order')
-    assert matching_wv == [(-5, -1, 1, 6), (-5, -3, 2, 3), (-5, -3, 3, 6), (-5, -1, 2, 3), (-5, -1, 3, 6),
+    wv_dir = (1.0, 1.0, 4.0) # 1 - 1 + 6 - 5
+    matching_wv = field_gen.wavevectors_matching_direction(direction=wv_dir, max_order=4, filter='same_order')
+    assert sorted(matching_wv) == sorted([(-5, -1, 1, 6), (-5, -3, 2, 3), (-5, -3, 3, 6), (-5, -1, 2, 3), (-5, -1, 3, 6),
                            (-5, -3, 1, 2), (-5, -3, 1, 6), (-5, -1, 1, 2), (-5, -2, 2, 2), (-6, -5, 2, 2),
                            (-5, -5, 2, 2), (-5, -2, 2, 6), (-5, -4, 2, 4), (-6, -5, 2, 6), (-5, -5, 2, 6),
                            (-5, -5, 2, 5), (-5, -2, 6, 6), (-5, -4, 4, 6), (-6, -5, 6, 6), (-5, -5, 6, 6),
-                           (-5, -5, 5, 6)]
+                           (-5, -5, 5, 6)])
+
+    wv_dir = (0.0, 1.0, -4.0) # 1 - 3 + 5
+    matching_wv = field_gen.wavevectors_matching_direction(direction=wv_dir, max_order=3, filter='up_to_order')
+    assert sorted(matching_wv) == sorted([(-3, 1, 5), (5,), (5, 5), (-3, 3, 5), (-1, 3, 5), (-1, 1, 5), (-2, 2, 5),
+                           (-6, 2, 5), (-2, 5, 6), (-4, 4, 5), (-6, 5, 6), (5, 5, 5), (-5, 5, 5)])
 
 
-    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -3, 5), filter='up_to_order')
-    assert matching_wv == [(-3, 1, 5), (5,), (5, 5), (-3, 3, 5), (-1, 3, 5), (-1, 1, 5), (-2, 2, 5),
-                           (-6, 2, 5), (-2, 5, 6), (-4, 4, 5), (-6, 5, 6), (5, 5, 5), (-5, 5, 5)]
-
-
+    # Testing resonance screening
     pulse_gen_a = EmPulse(env='gaussian', tc=0.0, dev=20.0, cf=9000., id=1, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
     pulse_gen_b = EmPulse(env='gaussian', tc=400.0, dev=100.0, cf=15000., id=2, wv=(-1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
     pulse_gen_c = EmPulse(env='gaussian', tc=500.0, dev=30.0, cf=1500., id=3, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
@@ -456,15 +459,15 @@ def test_electric_field():
 
     field_gen = ElectricField((pulse_gen_a, pulse_gen_b, pulse_gen_c, pulse_gen_d))
 
+    # Several pulses are overlapping in time (and are eligible as compound pulses) but some of them don't
+    # have frequency envelopes that can create vibrational resonance
+
     ovl_pulses = field_gen.overlapping_pulses_for_interaction_pattern(pattern=(1, -2, 3, 4))
-    matching_wv = field_gen.wavevectors_matching_ids(ids=(1, -2, 3, 4), filter='same_order')
+    assert sorted(ovl_pulses) == sorted([(-2,), (1,), (3,), (4,), (-2, 1), (-2, 3), (-2, 4), (3, 4), (-2, 3, 4)])
 
     screened_compound_pulses = field_gen.all_resonance_screened_compound_pulses(ovl_pulses)
+    assert sorted(list(screened_compound_pulses)) == sorted(list(([(1,), (3,), (-2, 1), (-2, 4), (-2, 3, 4)])))
 
-    print('ovl pulses', ovl_pulses)
-    print('matching_wv', matching_wv)
-
-    print('screened compound pulses', screened_compound_pulses.keys())
 
 def test_compounding_patterns_at_order():
 
