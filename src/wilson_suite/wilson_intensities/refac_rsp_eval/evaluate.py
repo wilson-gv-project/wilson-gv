@@ -107,9 +107,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
 
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
-    if molsys_data.eigenvals is not None:
-        n_modes = len(molsys_data.eigenvals)
-    else: raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
+    n_modes = len(molsys_data.eigenvals)
     summed_values = range(n_modes) if modes is None else modes
 
     if avrg_tensor is None:
@@ -471,18 +469,15 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_
 
 def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData') -> float:
     """product of 1/omega_i, harmonic omega in Eh; one mode per denominator"""
-    if molsys_data.eigenvals is not None:
-        product = 1.
-        for vd in freqterms:
-            if vd.sr.q: # type: ignore
-                raise ValueError(f"this VibDiffTerm's ket state is not a ground state: {vd}")
-            
-            (label,) = vd.sl.q          # type: ignore ; raises if a denominator has more than one mode
+    product = 1.
+    for vd in freqterms:
+        if vd.sr.q: # type: ignore
+            raise ValueError(f"this VibDiffTerm's ket state is not a ground state: {vd}")
 
-            product /= convNu2Ene(molsys_data.eigenvals[index_dict[label]])
-        return product
-    else:
-        raise ValueError("molsys_data.eigenvals is None")
+        (label,) = vd.sl.q          # type: ignore ; raises if a denominator has more than one mode
+
+        product /= convNu2Ene(molsys_data.eigenvals[index_dict[label]])
+    return product
 
 
 ## ----------------------------------------------------------------
@@ -578,8 +573,6 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
 
     raises ValueError for a mode that does not exist (modes count from 0), or if no mode is left
     """
-    if molsys_data.eigenvals is None:
-        raise ValueError('molsys_data.eigenvals is absent - number of modes is required')
     n_modes = len(molsys_data.eigenvals)
     excluded = set(exclude_modes)
     unknown = [m for m in excluded if m not in range(n_modes)]

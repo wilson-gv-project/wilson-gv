@@ -291,11 +291,6 @@ def test_harmonic_denom_needs_one_mode_per_denominator(molsys):
         harmonic_denom(FreqTermsCollection([vibdiff(sl='ab')]), {'a': 0, 'b': 1}, molsys)
 
 
-def test_harmonic_denom_needs_eigenvals(molsys):
-    with pytest.raises(ValueError, match='eigenvals'):
-        harmonic_denom(FreqTermsCollection([vibdiff(sl='a')]), {'a': 0}, replace(molsys, eigenvals=None))
-
-
 ## Averaged properties, on the fly ---------------------------------------------
 # EVV terms average three properties over four cartesian slots, e.g. term 8 of evv.json (data_for_tests/translated_terms):
 #     polgrad[b] (ops 0, 3) * dipgrad[a] (op 1) * dipgrad[c] (op 2)
@@ -895,15 +890,6 @@ def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
         evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='harmonic')
 
 
-def test_evaluate_term_coeffs_needs_eigenvals(term_and_avrg, molsys):
-    """The number of modes to sum over is len(eigenvals); without eigenvals there is nothing to sum over."""
-    term, avrg = term_and_avrg
-
-    with pytest.raises(ValueError, match='eigenvals'):
-        evaluate_term_coeff_sumover(term, {'a': 0}, replace(molsys, eigenvals=None), avrg_tensor=avrg,
-                                    states_choice='harmonic')
-
-
 def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
     """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 leaves."""
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
@@ -1078,13 +1064,6 @@ def test_build_contributions_cache_keeps_motifs_apart(molsys_a1_zero):
 
 
 # -- input checks --------------------------------------------------------------------
-
-def test_build_contributions_needs_eigenvals(molsys_a1_zero):
-    """The number of modes comes from molsys_data.eigenvals."""
-    with pytest.raises(ValueError, match='eigenvals'):
-        build_contributions([ab_term()], replace(molsys_a1_zero, eigenvals=None), TOY_RECIPE,
-                            states_choice='harmonic')
-
 
 def test_build_contributions_needs_every_prop_the_terms_use(molsys):
     """ab_term uses polgrad and cff, molsys has cff only: a ValueError before any row, not a KeyError deep inside"""

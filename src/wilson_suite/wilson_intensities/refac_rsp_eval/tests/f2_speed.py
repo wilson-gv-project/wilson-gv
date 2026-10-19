@@ -109,7 +109,7 @@ def main():
 
     # 1. load
     molsys, t_load = timed(load_acdm, terms)
-    n_modes = len(molsys.eigenvals)  # type: ignore
+    n_modes = len(molsys.eigenvals)
     print(f'ACDM: {n_modes} modes, {STATES} states, load {t_load:.1f} s')
 
     # 2. build_contributions

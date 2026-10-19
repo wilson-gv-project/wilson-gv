@@ -44,6 +44,9 @@ from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 @pytest.fixture
 def states() -> VibStatesData:
+    """
+    state('0', E0), state('1', E1), state('0,1', E01), state('0,0', E00)
+    """
     return toy_states()
 
 
@@ -99,17 +102,14 @@ def test_from_quanta_maps_symbols_sorts_and_names_ground(states):
     assert VibDiff.from_quanta((), ('b', 'a'), {'a': 1, 'b': 0}, states) == VibDiff(zero, s01)
 
 
-def test_vibdiff_normalized_puts_ground_left_then_label_order():
+def test_vibdiff_order_sets_equality_and_energy_sign():
     zero, s0, s1 = state('zero', 0.), state('0', E0), state('1', E1)
 
-    assert VibDiff(s0, zero).normalized() == VibDiff(zero, s0)
     assert VibDiff(s0, zero) != VibDiff(zero, s0)
     assert VibDiff(s0, zero).energy_difference() == s0.energy
     assert VibDiff(zero, s0).energy_difference() == -s0.energy
 
-    assert VibDiff(s1, s0).normalized() == VibDiff(s0, s1)
     assert VibDiff(s1, s0) != VibDiff(s0, s1)
-    assert VibDiff(s0, s1).normalized() == VibDiff(s0, s1)
 
 
 def test_vibdiff_energy_difference_cm1_and_au():
@@ -449,8 +449,21 @@ def test_check_data_dict_names_every_problem_at_once():
 
 def test_load_extra_keys_never_collide_with_property_names():
     """
-    load puts the property names and EVALUATION_DATA_KEYS into one request, and from_datadict reads one data dict:
-    a shared name would make a property and, e.g., the frequencies one entry.
+    Guards load against a name clash between a property and the extra data that every evaluation needs.
+
+    load asks the reader for everything in one dict, with the names as keys. For example,
+    MolSystemData.load(origin, ['cff']) asks for
+        {'cff': origin, 'nc_sqrt_eigval': origin, 'harmonic_states': origin, 'anharmonic_states': origin}
+    The last three keys are EVALUATION_DATA_KEYS: the harmonic frequencies and the two state lists.
+    The reader answers with one data dict, with the same keys.
+
+    Suppose a property had the same name as one of those keys, e.g. a property called 'nc_sqrt_eigval'.
+    The property and the frequencies would then share one key, so both would get the same value from one read.
+    One of the two would hold wrong numbers, and nothing would raise an error.
+
+    So the test makes every property name there can be, and checks that none is one of EVALUATION_DATA_KEYS.
+    The names: prop_trivname for 0-6 derivatives by normal modes and 0-6 by the electric field (e.g. 'dipgrad',
+    'polhess', 'cff'), plus 'B' and 'coriolis'. No name clashes today; the test fails if a new name ever does.
     """
     names = {prop_trivname(ord_geo=g, ord_el=e) for g in range(7) for e in range(7)}
     names |= {prop_trivname(ord_rot=1), prop_trivname(ord_rot=1, ord_geo=2)}   # 'B', 'coriolis'

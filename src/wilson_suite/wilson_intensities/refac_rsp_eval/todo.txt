@@ -19,10 +19,10 @@ Errors in either one need a check on that side.
 the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (G6).
 
 
-Tests (run 2026-10-18, branch rsp_eval_refactor)
+Tests (run 2026-10-19, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   711     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
+    refac_rsp_eval   708     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
     rest of src      254     -     1      -   none
     tests/ (root)      4    16     -      -   none

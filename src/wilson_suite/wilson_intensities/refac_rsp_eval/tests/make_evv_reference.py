@@ -71,7 +71,7 @@ def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: st
         'molecule': molecule,
         'data_file': DATA_FILES[molecule],
         'states': states_choice,
-        'n_modes': len(molsys.eigenvals),  # type: ignore
+        'n_modes': len(molsys.eigenvals),
         'counts': {'rows': len(rows), 'zero': len(zero)},
         'rows': [{'term': r.term_id, 'params': _params(r.params), 'coeff': r.coeff,
                   'location': r.location.as_dict()} for r in rows],

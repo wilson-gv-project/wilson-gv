@@ -74,7 +74,7 @@ class VibState:
 
     ----
     harm_quanta_coeffs: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
-    energy: float: State energy level
+    energy: float: State energy level in cm-1
     displacement: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
     state_label: str: The modes with quanta, sorted, one entry per quantum (make_state_label), e.g. '2,10' for one quantum
         in mode 2 and one in mode 10, '1,1' for two quanta in mode 1, ZERO_STATE_LABEL for no quanta (ground state)
@@ -170,7 +170,7 @@ class VibDiff:
     """
     Represents difference between two vibrational states.
     Numerical representation that holds values, as opposed to VibDiffTerm which is symbolic.
-    Handles special case of zero states (ground state) in comparisons.
+    Handles special case of zero states (ground state) in energy_difference.
     """
     left: VibState | None
     right: VibState | None
@@ -181,30 +181,9 @@ class VibDiff:
         """
         return state.state_label == ZERO_STATE_LABEL
     
-    def normalized(self) -> 'VibDiff':
-        """
-        Return normalized form where left <= right.
-        Zero states are considered smaller than any other state.
-        """
-        if self.left is None or self.right is None:
-            raise ValueError("Both left and right states must be provided for normalization.")
-        left_is_zero = self.is_zero_state(self.left)
-        right_is_zero = self.is_zero_state(self.right)
-        
-        # If both are zero states or neither is zero, use standard comparison
-        if left_is_zero == right_is_zero:
-            if self.left < self.right:
-                return VibDiff(self.left, self.right)
-            return VibDiff(self.right, self.left)
-            
-        # Zero state should always be on the left
-        if left_is_zero:
-            return VibDiff(self.left, self.right)
-        return VibDiff(self.right, self.left)
-    
     def energy_difference(self, *, au=False) -> float:
         """
-        Calculate energy difference between states.
+        Calculate energy difference between states in cm-1 (in Eh if au=True).
         For zero states, energy is considered to be 0.0
         """
         if self.left is None or self.right is None:
@@ -240,19 +219,28 @@ class VibDiff:
 @dataclass(frozen=True)
 class MolSystemData:
     """
-    data and holding abstractions.
+    The data of one molecule for the evaluation: harmonic frequencies, property values and state energies.
+    Built before the evaluation, then passed to it (e.g. build_contributions). Two ways to build one:
+        MolSystemData.load(origin, ['polgrad', 'dipgrad', 'cff'])    reads the data from one source, e.g. a file
+        MolSystemData.from_datadict(mol_props, data_dict)             from a data dict already read
 
-    would be constructed outside of evaluation, and passed in to evaluation functions
-
-    SHOULD HAVE DATA FILLED FOR EVALUATION (ALL ATTRIBUTES CONTAIN NUMBERS)
-
-    states: every state set the data has, by states choice, e.g. {'harmonic': ..., 'anharmonic': ...}.
-        The data holds no choice: the evaluation takes one (states_choice) and reads states[states_choice].
-        The choice must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'.
-        The two differ, e.g. in 272 of 340 formaldehyde coefficients of the 14 EVV terms.
+    The evaluator reads three fields:
+        eigenvals   the harmonic frequency of each mode in cm-1 (data key 'nc_sqrt_eigval'), e.g. {0: 2878.7,
+                    1: 1820.4}. Gives the number of modes, and the frequency where a term needs one.
+        mol_props   the property values, e.g. polgrad, dipgrad, cff. Each array has the mode indices first, then
+                    x, y, z (PROP_INDEX_COUNTS). A property with no values has vals None; check_props raises if a
+                    term needs it.
+        states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
+                    Gives the energy differences where a term needs them.
+                    The data holds no choice: the evaluation takes one (states_choice) and reads
+                    states[states_choice]. The choice must follow the vib analysis regime: GVPT2, VPT2 ->
+                    'anharmonic'; harmonic -> 'harmonic'. The two differ, e.g. in 272 of 340 formaldehyde
+                    coefficients of the 14 EVV terms.
+    The evaluator does not read the other fields: name (a label), eigenvecs (the normal modes; load does not read
+    them), natoms, geo, geo_extra, linear, data_origin (where the data comes from).
     """
     name: str
-    eigenvals: dict[int, float] | None
+    eigenvals: dict[int, float]
     eigenvecs: np.ndarray | None
     mol_props: 'MolPropsCollection'
     states: dict[str, 'VibStatesData']
@@ -320,8 +308,8 @@ class MolSystemData:
         natoms = len(geo) if geo is not None else 0
 
         return cls(name=name,
-                   eigenvals=data_dict.get('nc_sqrt_eigval', None), # FIXME: none values should be handled better
-                   eigenvecs=data_dict.get('normal_modes', None), # FIXME: none values should be handled better
+                   eigenvals=data_dict['nc_sqrt_eigval'],
+                   eigenvecs=data_dict.get('normal_modes', None),
                    mol_props=mol_props,
                    natoms=natoms,
                    states=states,
@@ -350,7 +338,9 @@ class MolSystemData:
         """
         if obtainer is None:
             # imported here, not at the top: wilson_data_obtainer imports DataOriginInfo from this module
-            from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+            from wilson_suite.wilson_utils.wilson_data_obtainer import (
+                wilson_data_obtainer,
+            )
             obtainer = wilson_data_obtainer
 
         names = list(dict.fromkeys(prop_names))        # each name once, in the given order

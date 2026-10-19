@@ -171,7 +171,7 @@ def test_evaluate_term():
 
     from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
     
-    w = {m: convNu2Ene(e) for m, e in molsys.eigenvals.items()}  # type: ignore   # harmonic omega, Eh
+    w = {m: convNu2Ene(e) for m, e in molsys.eigenvals.items()}  # harmonic omega, Eh
 
     assert contribs['NON_AVRG'] == molsys.mol_props['cff'].vals[0, 1, 1]        # cff[a, c, c]
     assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[0])                  # E_a - E_0
@@ -193,7 +193,7 @@ def test_evaluate_term():
     total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1},
                                                 molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                                 states_choice='harmonic')
-    n_modes = len(molsys.eigenvals) # type: ignore
+    n_modes = len(molsys.eigenvals)
     by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_tensor=avrg_tensor,
                                            states_choice='harmonic')[0]
                   for c in range(n_modes))
