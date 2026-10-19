@@ -73,7 +73,8 @@ class VibState:
     This is for a "concrete" vibrational state and not the same as its symbolic namesake in wilson-derive.
 
     ----
-    harm_quanta_coeffs: dictionary {(harm. quanta): coeff, (harm. quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs
+    harm_quanta_coeffs: dictionary {(modes with quanta): coeff, ...}: Specify the state in terms of harm. osc. WFs,
+        e.g. {('0', '1'): 1.0}: one quantum in mode 0 and one in mode 1. From the data dict the modes are str
     energy: float: State energy level in cm-1
     displacement: type not specified: Should be some form of vector to represent displacement in terms of atomic coordinates
     state_label: str: The modes with quanta, sorted, one entry per quantum (make_state_label), e.g. '2,10' for one quantum
@@ -82,9 +83,10 @@ class VibState:
     ----
 
     Dictionary self.harm_quanta_coeffs is not JSON-serializable (tuples can't be keys), but self.serial_harm_quanta_coeffs is.
-    self.serial_harm_quanta_coeffs is set up in post_init; deserialize_state_dict will return original self.harm_quanta_coeffs based on self.serial_harm_quanta_coeffs.
+    self.serial_harm_quanta_coeffs is set up in post_init; deserialize_state_dict rebuilds the tuple keys from it, with
+    int modes: ('0', '1') comes back as (0, 1).
     """
-    harm_quanta_coeffs: dict[tuple[int, ...], float]
+    harm_quanta_coeffs: dict[tuple[int | str, ...], float]
     energy: float = 0.0
     displacement: Any = None
     serial_harm_quanta_coeffs: dict[str, float] = field(init=False)
@@ -110,39 +112,33 @@ class VibState:
             return NotImplemented
         return self.state_label == other.state_label and bool(np.isclose(self.energy, other.energy))
 
-    def __lt__(self, other: 'VibState') -> bool:
-        if not isinstance(other, VibState):
-            return NotImplemented
-        return self.state_label < other.state_label
-    
     @classmethod
     def get_1q_states(cls, states: list['VibState']):
-        """Get states with exactly one quantum in any mode."""
-        return [s for s in states if len(s.state_label.split(','))==1]
+        """Get states with exactly one quantum in any mode. The ground state ('zero', no quanta) is not one."""
+        return [s for s in states if s.state_label != ZERO_STATE_LABEL and ',' not in s.state_label]
 
 
 @dataclass
 class VibStatesData:
     """
-    Holds vib states data and can compute vib states energy differences
+    Holds the vibrational states of one state set (e.g. the harmonic states), looked up by label.
+    Adds the ground state itself ('zero', energy 0). VibDiff computes the energy differences.
     """
     allstates: Sequence[VibState]
     harmonic_osc_states_labels: Sequence[int] = ()
-    number_of_nmodes: int = 0
-    
+
     def __post_init__(self):
         tmp_allstates = list(self.allstates)
         tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
         self.allstates = tuple(tmp_allstates)
-        
+
         self.allstates_map = {i.state_label: i for i in self.allstates}
-        self._storage = {}
 
 
     def get_harmonic_osc_states(self) -> dict[int, float]:
         """
         Get harmonic oscillator states from allstates, filtering by harmonic_osc_states_labels.
-        Returns a dictionary with state labels as keys and energies as values, sorted by state label.
+        Returns {mode: energy} of these 1-quantum states, sorted by mode, e.g. {0: 1000., 1: 1500.}.
         """
         harm_states_str = [i for i in self.allstates if ',' not in i.state_label and i.state_label != ZERO_STATE_LABEL]
         harm_states = {int(i.state_label): i.energy for i in harm_states_str if int(i.state_label) in self.harmonic_osc_states_labels}
@@ -282,7 +278,7 @@ class MolSystemData:
                       *,
                       name: str = 'from_data_dict'):
         """
-        loading data into self.props (and optionally to self.vib_ana_setup)
+        Build a MolSystemData from a data dict already read (load reads one and calls this).
 
         data_dict: dict - {data_name: values}
         states: one VibStatesData per state list in data_dict, by states choice:
@@ -378,27 +374,33 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
         full tensors  each property is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
                       (SYMMETRY_RTOL, SYMMETRY_ATOL)
         fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
+        ground state  a state list may hold the ground state, key (), but only at 0 cm-1: energies count from it
     prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
                 (MolSystemData.check_props); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no shape check.
-    warns (UserWarning), no error: a state at or below 0 cm-1, the ground state, in any state list,
+    warns (UserWarning), no error: an excited state at or below 0 cm-1, the ground state, in any state list,
         e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1 (todo.txt D5).
     Not checked (no check is possible from the values): units, coordinates.
     """
+    problems = []
+
     for key in ('harmonic_states', 'anharmonic_states'):
-        low = sorted((energy, state) for state, energy in (data_dict.get(key) or {}).items() if energy <= 0.)
+        excited = {state: energy for state, energy in (data_dict.get(key) or {}).items() if state != ()}
+        low = sorted((energy, state) for state, energy in excited.items() if energy <= 0.)
         if low:
             lowest = ', '.join(f'{state} {energy:.1f}' for energy, state in low[:3])
-            warnings.warn(f'{key}: {len(low)} of {len(data_dict[key])} state energies are at or below 0 cm-1, '
+            warnings.warn(f'{key}: {len(low)} of {len(excited)} state energies are at or below 0 cm-1, '
                           f'the ground state; lowest: {lowest}', stacklevel=3)
-
-    problems = []
+        ground = (data_dict.get(key) or {}).get(())
+        if ground is not None and ground != 0.:
+            problems.append(f"'{key}': the ground state () at {ground} cm-1; it must be at 0, as the energies "
+                            f"count from it")
 
     freqs = data_dict.get('nc_sqrt_eigval')
     n = None
     if freqs is None:
         problems.append("no 'nc_sqrt_eigval' (the harmonic frequencies)")
-    elif not isinstance(freqs, dict) or not freqs or sorted(freqs) != list(range(len(freqs))):
-        keys = sorted(freqs) if isinstance(freqs, dict) else type(freqs).__name__
+    elif not isinstance(freqs, dict) or not freqs or set(freqs) != set(range(len(freqs))):
+        keys = list(freqs) if isinstance(freqs, dict) else type(freqs).__name__
         problems.append(f"'nc_sqrt_eigval': needs a dict with the modes 0 .. n-1 as keys, got {keys}")
     else:
         n = len(freqs)
@@ -439,6 +441,7 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
     """
     Construct tuple['VibState'] from data_dict.
+    The ground state key () is left out: VibStatesData adds the ground state itself, with energy 0.
     """
 
     harm_states = ()
@@ -446,14 +449,18 @@ def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tup
         states_dict: dict = data_dict['harmonic_states']
 
         for state, energy in states_dict.items():
-            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=make_state_label(state)),)
+            if state != ():
+                harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
+                                         state_label=make_state_label(state)),)
 
     anharm_states = ()
     if 'anharmonic_states' in data_dict:
         states_dict: dict = data_dict['anharmonic_states']
 
         for state, energy in states_dict.items():
-            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy, state_label=make_state_label(state)),)
+            if state != ():
+                anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
+                                           state_label=make_state_label(state)),)
 
     return harm_states, anharm_states
 
@@ -464,10 +471,10 @@ class MolecularProperty:
     Class to represent a molecular (energy derivative or similar) property
 
     holds name (key), values; 
-        does not hold provenance info but would be retireved from MolSystemData with this info
-    
+        does not hold provenance info but would be retrieved from MolSystemData with this info
+
     ----
-    triv_name: String: Trivial name For simplified reference
+    trivial_name: String: Trivial name For simplified reference
     vals: Form not specified: Values of properties - could be array or dictionary
     """
     trivial_name: str | None = None
@@ -496,9 +503,12 @@ class MolPropsCollection:
         return prop
 
     def __contains__(self, item: str | MolecularProperty) -> bool:
-        """Allow `name in coll` syntax."""
+        """
+        Allow `name in coll` syntax. A MolecularProperty counts only as that very object: == would compare the
+        values, and two numpy arrays there raise ValueError.
+        """
         if isinstance(item, MolecularProperty):
-            return item in self.properties
+            return any(p is item for p in self.properties)
         return any(p.trivial_name == item for p in self.properties)
 
     def __iter__(self):
@@ -522,7 +532,7 @@ class MolPropsCollection:
     def fill_from(self, data_dict: dict):
         """Load obtained data into each property's .vals."""
         for p in self.properties:
-            # resets values, because props in collection shold be from the same source
+            # resets values, because props in collection should be from the same source
             p.vals = None
             if p.trivial_name in data_dict:
                 p.vals = data_dict[p.trivial_name]

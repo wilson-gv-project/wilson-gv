@@ -24,7 +24,7 @@ Tests (run 2026-10-19, branch rsp_eval_refactor)
                     pass  fail  skip  xfail   on purpose until A15 is fixed
     refac_rsp_eval   708     5     -     14   all 5 fails (tests/test_a15_polarization_order.py),
                                               all 14 xfails (tests/test_averaging_pol_order.py)
-    rest of src      254     -     1      -   none
+    rest of src      259     -     1      -   none
     tests/ (root)      4    16     -      -   none
 Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The rest of src has none since 2026-10-18:
 test_getting_data fixed (wilson_system/todo.txt R2). The 16 in tests/: E9 stage 3 (C). Before E9 deleted the old

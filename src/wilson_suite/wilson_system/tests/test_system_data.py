@@ -63,7 +63,6 @@ def test_vibstate_equality_is_label_and_energy():
     assert state('0', 1000.) == state('0', 1000. + 1e-12)
     assert state('0', 1000.) != state('1', 1000.)
     assert state('0', 1000.) != state('0', 1001.)
-    assert state('0', 1.) < state('1', 0.)
 
 
 def test_vibstatesdata_appends_ground_state(states):
@@ -82,6 +81,11 @@ def test_vibstatesdata_harmonic_osc_states_filters_by_label_choice():
                          harmonic_osc_states_labels=(0,1))
 
     assert data.get_harmonic_osc_states() == {0: E0, 1: E1}
+
+
+def test_get_1q_states_leaves_out_the_ground_state(states):
+    """'zero' has no comma, like a 1-quantum label, but no quanta at all"""
+    assert [s.state_label for s in VibState.get_1q_states(list(states.allstates))] == ['0', '1']
 
 
 def test_make_hq_states_from_datadict_joins_quanta_labels():
@@ -179,6 +183,30 @@ def test_vibstatesdata_ground_state_energy_is_zero_even_if_the_data_says_otherwi
     assert data.get_state_by_label('zero').energy == 0.
 
 
+# -- the data dict: the ground state key ()
+
+def test_from_datadict_takes_the_ground_state_key_at_0():
+    """VibStatesData adds the ground state itself, so the data's () entry is left out; no warning for it"""
+    data = {**TOY_DATA, 'harmonic_states': {(): 0., **TOY_DATA['harmonic_states']}}
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        molsys = MolSystemData.from_datadict(MolPropsCollection([]), data)
+
+    harmonic = molsys.states['harmonic']
+    assert [s.state_label for s in harmonic.allstates].count('zero') == 1
+    assert harmonic.get_state_by_label('zero').energy == 0.
+    assert harmonic.harmonic_osc_states_labels == (0, 1)
+
+
+def test_check_data_dict_ground_state_key_must_be_at_0():
+    """an energy there means the energies do not count from the ground state"""
+    data = {**TOY_DATA, 'anharmonic_states': {(): 5., **TOY_DATA['anharmonic_states']}}
+
+    with pytest.raises(ValueError, match=r"'anharmonic_states': the ground state \(\) at 5\.0 cm-1; it must be at 0"):
+        check_data_dict(data, [])
+
+
 # -- VibDiff
 
 def test_vibdiff_counts_a_zero_labelled_state_as_energy_zero():
@@ -223,6 +251,15 @@ def test_molpropscollection_lookup(props):
     assert props['polgrad'] is props.get('polgrad')
     assert len(props) == 2
     assert props.get('hess') is None
+
+
+def test_molpropscollection_contains_a_property_only_as_that_object():
+    """== would compare the values: with numpy arrays there it raises ValueError"""
+    cff = MolecularProperty(trivial_name='cff', vals=np.ones((2, 2, 2)))
+    coll = MolPropsCollection([cff])
+
+    assert cff in coll
+    assert MolecularProperty(trivial_name='cff', vals=np.ones((2, 2, 2))) not in coll
 
 
 def test_molpropscollection_fill_from_and_is_filled(props):
@@ -369,8 +406,9 @@ def test_check_data_dict_needs_frequencies_and_harmonic_states(drop, message):
         MolSystemData.from_datadict(MolPropsCollection([]), data)
 
 
-@pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval]],
-                         ids=['modes from 1', 'no modes', 'a list'])
+@pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
+                                   {0: E0_eigval, '1': E1_eigval}],
+                         ids=['modes from 1', 'no modes', 'a list', 'a str key'])
 def test_check_data_dict_frequencies_are_a_dict_with_the_modes_from_0(freqs):
     with pytest.raises(ValueError, match=r"'nc_sqrt_eigval': needs a dict with the modes 0 \.\. n-1"):
         check_data_dict({**TOY_DATA, 'nc_sqrt_eigval': freqs}, [])
