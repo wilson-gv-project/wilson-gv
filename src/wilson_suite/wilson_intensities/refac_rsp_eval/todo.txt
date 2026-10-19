@@ -599,11 +599,9 @@ checking side.
         VibExperiment (__post_init__: polarization_avg_vector = get_pol_laser of 8 polarizations, get_iso_f
         order 8), so it has no terms file; on debug_rendering derive gave 632 terms.
         Where the experiments come from:
-            ~/pre_paper3/try.py      make_experiment; run_experiment prints t.to_str() of every term;
-                                     sweep_sign_patterns runs every +/- pattern of the filter. Its
-                                     experiment_cahrs() has 3 pulses and a 5-entry filter: VibExperiment raises
-                                     (UnboundLocalError).
-            ~/pre_paper3/try_orig.py                                 an older version of try.py
+            data_for_tests/translated_terms/make_translated_terms.py  G7_SETUPS: every setup of the survey. CAHRS
+                                                                     with 3 pulses and a 5-entry filter:
+                                                                     VibExperiment raises (UnboundLocalError).
             ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb     EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
             src/wilson_suite/fixtures.py                             EVV, EVV coincident, beta-alpha CARS
         Script: tests/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak memory; --only for some
@@ -717,6 +715,13 @@ so C2, C3 and G1 would all miss a reader error: those checks matter for the fina
         cap_alpha_labels[j] (A-G), so they must be labelled A, B, C, ... in order.
         4D also needs 4-quanta states: the Gaussian files have up to 3 (formaldehyde, ACDM). Tests: mock data and
         terms compiled by hand (G10, test_dimensions.py).
+        Why 3: aac2ccc (2025-11-05) cut cap_alpha_labels to A-C and added these checks, and the same checks in
+        the experiment's axis code. fbc7a0c (2025-11-28) put the labels back to A-G, but removed only the
+        experiment's checks.
+        To fix (outside this refactor, in wilson_derive): in both checks, j > 2 becomes j > 6, and the message
+        becomes 'Current version enables maximum 7 axes' (7 = len(cap_alpha_labels)). Then make_translated_terms.py
+        can drop express and survey_translate, and its 4-axis G7 setups can be made again with derive's
+        translation.
 
 
 Done

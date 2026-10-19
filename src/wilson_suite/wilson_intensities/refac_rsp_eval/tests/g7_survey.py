@@ -1,6 +1,6 @@
 """
 G7: other experiments, from derive's terms through the new evaluator (todo.txt G7; also E8, E11, E12, E13).
-The setups: ~/pre_paper3/try.py (its named experiments, explicit runs and sign sweeps), the seminar notebook
+The setups: single experiments, sign sweeps (every sign pattern of the filter), the seminar notebook
 ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb, and two 1D setups (IR absorption, IR + vis SFG). Their
 terms are stored, translated to axes (stored_terms.py; make_translated_terms.py in data_for_tests/translated_terms
 builds the experiments, runs derive and translates): this script imports neither wilson_experiment nor
