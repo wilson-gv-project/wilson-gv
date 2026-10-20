@@ -512,11 +512,43 @@ def test_pulse_time_ordering_valid():
     # Not 1, 3, 2
     assert not pulse_time_ordering_valid([p1, p3, p2])
 
-    pass
-
 def test_magnitude_conditions_for_ind_var_tuple():
 
-    pass
+    # A selection of typical pulses
+    p1 = EmPulse(env='gaussian', tc=0.0, dev=20.0, cf=2000., id=1, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    p2 = EmPulse(env='gaussian', tc=300.0, dev=100.0, cf=15000., id=2, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+    p3 = EmPulse(env='gaussian', tc=750.0, dev=80.0, cf=12000., id=3, wv=(1.0, 0.0, 0.0), pol=(0.0, 0.0, 1.0))
+
+    field = ElectricField((p1, p2, p3))
+
+    # Derived pulses
+    pm1 = field.signed_pulses[-1]
+    pm2 = field.signed_pulses[-2]
+    pm3 = field.signed_pulses[-3]
+
+    p12 = compound_pulses_in_list([p1, p2])
+    p33 = compound_pulses_in_list([p3, p3])
+    p1m1 = compound_pulses_in_list([p1, pm1])
+    pm23 = compound_pulses_in_list([pm2, p3])
+    pm2m2 = compound_pulses_in_list([pm2, pm2])
+
+    # All relevant pulses plus a few extra
+    all_pulses = {(1,): p1, (2,): p2, (-2,): pm2, (3,): p3, (-1, 1): p1m1, (1, 2): p12, (-2, 3): pm23, (-2, -2): pm2m2, (3, 3): p33}
+
+    mc_p, mc_m = magnitude_conditions_for_ind_var_tuple(((1,), (1, 2,), (-2, 3,)), all_pulses, thres_magn=500.0, tol_n_dev=3.0)
+
+    # Note (0, 2) (i.e. 1 + (-2, 3)) not included, mean is positive but spread most likely across zero
+    # These interaction number combinations are deemed positive
+    assert mc_p == ((0,), (1,), (0, 1), (1, 2), (0, 1, 2))
+    # These interaction number combinations are deemed negative
+    assert mc_m == ((2,),)
+
+    # A bit more involved case
+    mc_p, mc_m = magnitude_conditions_for_ind_var_tuple(((-1, 1), (2,), (-2,), (3,)), all_pulses, thres_magn=200.0)
+
+    assert mc_p == ((1,), (3,), (0, 1), (0, 3), (1, 3), (0, 1, 3), (1, 2, 3), (0, 1, 2, 3))
+    assert mc_m == ((2,), (0, 2), (2, 3), (0, 2, 3))
+
 
 def test_field_analysis():
 

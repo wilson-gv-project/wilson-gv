@@ -917,7 +917,7 @@ def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_wait
 
     return True
 
-def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: tuple[tuple], thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
+def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: dict[tuple, EmPulse], thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
     """
     Take a tuple of independent variables, consider its powerset sans {} and for each such element,
     evaluate if the frequency-domain range of the corresponding tuple of (possibly compound) pulses is
@@ -927,10 +927,10 @@ def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: 
 
     ind_var_tuple: A tuple of independent variables (a pulse interaction ordering at a compounding pattern)
 
-    pulses: A bank of pulse data TODO: Consider instead using (compound) pulse frequency ranges here
+    pulses: A bank of pulse data (indexed by (compound) pulse indices)
 
-    thres_magn: A threshold defining a margin which the frequency-domain ranges must surpassed in order to be deemed
-    eligible for the output plus/minus bins
+    thres_magn: A threshold defining a margin which the frequency-domain ranges must surpass in order to be deemed
+    eligible for the output plus/minus bins ("must be >/< 0 by at least this margin")
 
     tol_n_dev: A frequency-domain tolerance parameter (number of standard deviations for a Gaussian pulse) for
     constructing a bounded bandwidth interval for a (compound) pulse
@@ -1075,7 +1075,7 @@ class FieldAnalysis:
 
         # Get polarization "average vector" bank and interaction sequences indexed by order, compounding pattern and
         # polarization averaging category
-        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.get_pol_avg_bank_and_int_seq_icp()
+        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.get_pol_avg_bank_and_int_seq_ocp()
 
         # Making an "all valid pulses" bank that is a union of res_and_time_ and time_not_res_ pulse tuples
         all_valid_pulses = copy.deepcopy(self.res_and_time_comp_pulses)
@@ -1230,7 +1230,11 @@ class FieldAnalysis:
 
         return comp_patterns_at_order
 
-    def get_pol_avg_bank_and_int_seq_icp(self):
+    def get_pol_avg_bank_and_int_seq_ocp(self):
+        """
+        Helper method: Get macroscopic orientational avg. polarization vector "bank" and valid interaction
+        sequences indexed by order, compounding pattern and polarization motif
+        """
 
         from itertools import permutations as permutations
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
@@ -1313,7 +1317,6 @@ class FieldAnalysis:
                                 c_pulses.append(self.res_and_time_comp_pulses[c_pulse_ind])
                                 c_pulse_inds.append(c_pulse_ind)
 
-                            # FIXME: Adapt to pattern one order higher
                             # If this is the last interaction, only the time-overlapping criterion applies
                             else:
 
@@ -1336,7 +1339,7 @@ class FieldAnalysis:
 
                             pol_avg_vector = get_pol_laser(all_polarizations)
 
-                            # FIXME: May need to introduce tolerances here
+                            # FIXME: May want to introduce tolerances here (see after some usage)
                             # Check if pol avg vector is nonzero
                             if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
 
@@ -1378,6 +1381,7 @@ class FieldAnalysis:
                             #  permutations--coefficient question for these cases
                             #  Permutation should here be OK under the dipole approximation (symmetry of alpha, beta...)?
                             #  In general case may need to register separate or two different polarization situations
+                            #  This can be revisited when the first version of the integrator is ready
                             if not tuple(c_pulse_inds) in int_sequences_by_order_comp_pol[ord][c][pol_bank_ind]:
                                 if not pol_bank_ind in pol_actually_used:
                                     pol_actually_used.append(pol_bank_ind)
