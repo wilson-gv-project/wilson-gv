@@ -1329,47 +1329,48 @@ class FieldAnalysis:
 
                             c_ctr += c_elem_len
 
-                            # Determine orientational avg polarization vector
-                            all_polarizations = [copy.deepcopy(self.polarization_filter)]
+                        # Determine orientational avg polarization vector
+                        all_polarizations = [copy.deepcopy(self.polarization_filter)]
 
-                            # Could probably be done more elegantly but works
-                            for j in c_pulse_inds:
-                                for k in j:
-                                    all_polarizations.append(copy.deepcopy(self.field.signed_pulses[k].pol))
-
-                            pol_avg_vector = get_pol_laser(all_polarizations)
-
-                            # FIXME: May want to introduce tolerances here (see after some usage)
-                            # Check if pol avg vector is nonzero
-                            if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
-
-                                # Check against bank; determine bank index or make new bank entry
-                                found_in_bank = False
-
-                                for j in pol_avg_vector_bank:
-                                    pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in
-                                                    range(len(pol_avg_vector_bank[j]))])
-
-                                    if pol_diff == 0.0:
-                                        found_in_bank = True
-                                        pol_bank_ind = j
-                                        break
-
-                                if not found_in_bank:
-                                    pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
-                                    pol_bank_ind = pol_avg_vector_bank_ctr
-                                    pol_avg_vector_bank_ctr += 1
-
-                            #  Otherwise cycle
-                            else:
-                                continue
-
-                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
-                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
+                        # Could probably be done more elegantly but works
+                        for j in c_pulse_inds:
+                            for k in j:
+                                all_polarizations.append(copy.deepcopy(self.field.signed_pulses[k].pol))
 
                         # Cycle if any (compound) pulse was invalid
                         if not comp_valid:
                             continue
+
+                        pol_avg_vector = get_pol_laser(all_polarizations)
+
+                        # FIXME: May want to introduce tolerances here (see after some usage)
+                        # Check if pol avg vector is nonzero
+                        if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
+
+                            # Check against bank; determine bank index or make new bank entry
+                            found_in_bank = False
+
+                            for j in pol_avg_vector_bank:
+                                pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in
+                                                range(len(pol_avg_vector_bank[j]))])
+
+                                if pol_diff == 0.0:
+                                    found_in_bank = True
+                                    pol_bank_ind = j
+                                    break
+
+                            if not found_in_bank:
+                                pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
+                                pol_bank_ind = pol_avg_vector_bank_ctr
+                                pol_avg_vector_bank_ctr += 1
+
+                        #  Otherwise cycle
+                        else:
+                            continue
+
+                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
+                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
+
 
                         # Time-ordering enforcement screening: If also passing this criterion, register this
                         # interaction sequence as valid

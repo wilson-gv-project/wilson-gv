@@ -552,45 +552,78 @@ def test_magnitude_conditions_for_ind_var_tuple():
 
 def test_field_analysis():
 
-    pass
+    # Using EVV-style setup
+    pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
+                                     wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
+    pulse_ir_2 = make_gaussian_pulse(tc=600.0, cf=1000.0, dev=100.0, maxstr=1.0e-5,
+                                     wv=(0.0, 0.025, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
+    pulse_uvvis_1 = make_gaussian_pulse(tc=1100.0, cf=15000.0, dev=100.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3)
+
+    pulses = (pulse_ir_1, pulse_ir_2, pulse_uvvis_1)
+    field_evv = ElectricField(pulses)
+
+    fa = FieldAnalysis(
+        field=field_evv,
+        polarization_filter=(1.0, 0.0, 0.0),
+        detection_limited_to='same_order',
+        max_ord=3,
+        detector_faces=None,
+        interaction_filter=[[-1, 2, 3]],
+        tol_n_dev_t=3.0,
+        tol_n_dev_w=2.5,
+        thres_freq=7000.0,
+        thres_magn=0.0,
+        thres_waiting_time=200.0
+    )
+
+    present_field_analysis(fa)
+
+    assert fa.valid_int_patterns == [(-1, 2, 3)]
+    assert fa.int_pattern_orders == [3]
+    assert fa.int_patterns_by_order == {3: [(-1, 2, 3)]}
+    assert fa.time_ovl_tuples == [(2,), (-1,), (2, 3), (-1, 2), (3,)]
+    assert fa.res_and_time_ovl_tuples == ((2,), (-1,), (-1, 2))
+    # NOTE: The emission is counted in the compounding pattern, therefore one higher than the order number
+    # (which refers to the number of incoming pulses) (i.e. "three pulses make a four-wave mixing process")
+    assert fa.comp_patterns_at_order == {3: [(2, 2), (2, 1, 1), (1, 3), (1, 2, 1), (1, 1, 2), (1, 1, 1, 1)]}
+    assert fa.pol_avg_vector_bank == {0: [1.0, 1.0, 1.0]}
+    assert fa.int_sequences_by_order_comp_pol == {3: {(1, 1, 2): {0: [((-1,), (2,), (3,))]}}}
+    assert fa.magnitude_condition_bank == {0: (((1,), (2,), (0, 2), (1, 2), (0, 1, 2)), ((0,), (0, 1)))}
+    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(1, 1, 2): {0: {0: ((-1,), (2,), (3,))}}}}
+
+# Diagnostic function to print key FieldAnalysis attributes, kept for later use
 def present_field_analysis(e: FieldAnalysis):
 
-    print(e)
-    print('valid int patterns', e.valid_int_patterns)
-    print('int pattern orders', e.int_pattern_orders)
-    print('int patterns by order', e.int_patterns_by_order)
-    print('time_ovl_tuples', e.time_ovl_tuples)
-    print('res_and_time_ovl_tuples', e.res_and_time_ovl_tuples)
+    print('Valid interaction patterns:', e.valid_int_patterns)
+    print('Interaction pattern orders:', e.int_pattern_orders)
+    print('Interaction patterns by order:', e.int_patterns_by_order)
+    print('Time-overlapping pulse tuples:', e.time_ovl_tuples)
+    print('Time-overlapping and vib. resonance possible pulse tuples:', e.res_and_time_ovl_tuples)
 
-    print('comp_patterns_at_order', e.comp_patterns_at_order)
-    print('pol_avg_vector_bank', e.pol_avg_vector_bank)
-    print('int_sequences_by_order_comp_pol', e.int_sequences_by_order_comp_pol)
+    print('Compounding patterns at order:', e.comp_patterns_at_order)
+    print('Macroscopic polarization bank:', e.pol_avg_vector_bank)
+    print('Interaction sequences by order, compounding, polarization:', e.int_sequences_by_order_comp_pol)
 
-    print('magnitude_condition_bank', e.magnitude_condition_bank)
-    print('int_sequences_by_order_comp_pol_magn', e.int_sequences_by_order_comp_pol_magn)
+    print('Magnitude condition bank', e.magnitude_condition_bank)
+    print('Interaction sequences by order, compounding, polarization, magn. conditions:', e.int_sequences_by_order_comp_pol_magn)
 
     return
 
 
 def test_vib_experiment():
 
-    # TODO: More extensive tests, covering more relevant cases
-
-    # Rough wishlist:
+    # Suggestions for further tests if needed:
     #
     # Overall setups:
     #
-    # - EVV 2-scan experiment OK
-    # - CARS OK
-    # - "alpha, beta" cars OK
-    # - SFG OK
     # - TRIVE variant (possibly delays)
-    # - Ideal freq domain (with simplifications)
+    # - Ideal freq domain (with simplifications) once implemented
     # - "2D Raman" with/without cascading effects
     #
-    # Situations (some may be covered by above setups):
+    # Variations:
     #
     # - Tolerances changing outcome: Pathways in/out etc.
     # - Different scan setups: Differing dimensionalities, scans making field analyses nonhomogeneous over scans
@@ -598,15 +631,9 @@ def test_vib_experiment():
     # - More than one wavevector combination overlapping
     # - Testing both "same_order", "up_to_order", and "only_specified"
     # - Interacting more than one time with same pulse
-    #
-    # Specific attributes to verify (cannot test all exhaustively)
-    #
     # - Compounding patterns identified
     # - Pol. avgs.
     # - Compound pulse bandwidths/positions in time
-    #
-    #
-
 
     # "Alpha-beta CARS"
 
@@ -636,7 +663,6 @@ def test_vib_experiment():
                           thres_waiting_time=600.0,)
 
     present_field_analysis(exp_ab_cars.field_analyses[()])
-
 
     # EVV 2-scan
 
