@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
+import wilson_suite.wilson_intensities.refac_rsp_eval.lineshape as lineshape_mod
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
@@ -31,7 +32,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     get_RHS_motif,
     harmonic_denom,
     included_modes,
-    lorentzian_propagator,
     make_avrg_einsum_subscripts,
     otf_vibdiffdenom,
     solve_LSE_motif,
@@ -1136,8 +1136,9 @@ def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a
 # eval_rescond_resloc and eval_resonance_factor take grids in Eh; eval_feature_on_grid takes cm-1.
 # resonance_residuals (top of this file) writes  E_left - E_right - sum_j s_j w_j  out independently.
 #
-# The lorentzian_propagator tests, the get_intensity test and the hand-worked values (eval_resonance_factor,
-# eval_feature_on_grid) use the Lorentzian. The other tests pass a RecordingPropagator, so they hold for any propagator.
+# The get_intensity test and the hand-worked values (eval_resonance_factor, eval_feature_on_grid) use the
+# Lorentzian (test_lineshape.py tests it alone). The other tests swap in a recording factor (the fixture
+# `recorded`), so they hold for any line shape.
 
 G_CM = 5.                   # propagator_param parameter, cm-1
 G_AU = convNu2Ene(G_CM)
@@ -1168,30 +1169,21 @@ def feature_at_solved_location(motif, params: ParameterSet, states, coeffs=(0.3,
     return SpectralFeature(location=location, rows=rows, propagator_param=propagator_param, conditions=conditions)
 
 
-class RecordingPropagator:
-    """Stands in for any propagator: stores each (resloc, gamma) it gets, returns resloc + i*gamma (not a Lorentzian)."""
-    def __init__(self):
-        self.calls = []
+@pytest.fixture
+def recorded(monkeypatch) -> list:
+    """
+    Stands in for any line shape on the grid: lineshape.factor, swapped for one test, stores
+    each (resloc, gamma) it gets and returns resloc + i*gamma (not a Lorentzian).
+    Returns the list of calls, in order.
+    """
+    calls = []
 
-    def __call__(self, resloc, gamma):
-        self.calls.append((resloc, gamma))
+    def factor(resloc, gamma):
+        calls.append((resloc, gamma))
         return resloc + 1j * gamma
 
-
-# -- lorentzian_propagator ------------------------------------------------------
-
-def test_lorentzian_propagator_at_resonance_is_i_over_gamma():
-    assert lorentzian_propagator(0., 0.5) == pytest.approx(1. / (-1j * 0.5))
-
-
-def test_lorentzian_propagator_imaginary_part():
-    """-i*gamma: Im = gamma / (x^2 + gamma^2) > 0, Re = x / (x^2 + gamma^2)"""
-    x, gamma = np.linspace(-3., 3., 7), 0.5
-
-    value = lorentzian_propagator(x, gamma)
-
-    np.testing.assert_allclose(value.imag, gamma / (x**2 + gamma**2))  # type: ignore
-    np.testing.assert_allclose(value.real, x / (x**2 + gamma**2))      # type: ignore
+    monkeypatch.setattr(lineshape_mod, 'factor', factor)
+    return calls
 
 
 # -- eval_rescond_resloc --------------------------------------------------------
@@ -1232,49 +1224,46 @@ def test_eval_rescond_resloc_is_zero_at_the_solved_location(motif, params_obj, s
 # -- eval_resonance_factor ------------------------------------------------------
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_resonance_factor_calls_the_propagator_once_per_condition_with_E_minus_freq(motif, params_obj, states):
+def test_eval_resonance_factor_calls_the_line_shape_once_per_condition_with_E_minus_freq(motif, params_obj, states,
+                                                                                         recorded):
     """
     e.g. MOTIF_AB, a=0, b=1 (in cm-1): two calls, with resloc 1600 - A and 500 - B.
     Checked on a 3x3 grid in Eh against resonance_residuals.
     """
     res_motif = ResonanceMotif.from_tuples(motif)
     grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
-    propagator = RecordingPropagator()
 
-    eval_resonance_factor(res_motif, params_obj, states, grid, propagator, lambda _vd: G_AU)
+    eval_resonance_factor(res_motif, params_obj, states, grid, lambda _vd: G_AU)
 
     residuals = resonance_residuals(res_motif, grid, params_obj.to_dict(), states)  # type: ignore
-    assert len(propagator.calls) == len(res_motif)
-    for (resloc, _), expected in zip(propagator.calls, residuals):
+    assert len(recorded) == len(res_motif)
+    for (resloc, _), expected in zip(recorded, residuals):
         np.testing.assert_allclose(resloc, expected)
 
 
-def test_eval_resonance_factor_gives_each_condition_its_own_gamma(params_obj, states):
+def test_eval_resonance_factor_gives_each_condition_its_own_gamma(params_obj, states, recorded):
     """
     gamma(vd) is asked once per condition, so a width per pair of states is possible.
     Here gamma returns the condition's own E (cm-1). At freq = 0, resloc is E in Eh,
     so each call must get resloc == convNu2Ene(gamma).
     """
-    propagator = RecordingPropagator()
-
     eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, {'A': 0., 'B': 0.},  # type: ignore
-                          propagator, propagator_param=lambda vd: vd.energy_difference())
+                          propagator_param=lambda vd: vd.energy_difference())
 
-    assert sorted(g for _, g in propagator.calls) == pytest.approx(sorted([E01 - E0, E1 - E0]))
-    for resloc, g in propagator.calls:
+    assert sorted(g for _, g in recorded) == pytest.approx(sorted([E01 - E0, E1 - E0]))
+    for resloc, g in recorded:
         assert resloc == pytest.approx(convNu2Ene(g))
 
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_resonance_factor_multiplies_the_propagator_values(motif, params_obj, states):
-    """e.g. MOTIF_AB: propagator(resloc_1, gamma) * propagator(resloc_2, gamma), at every grid point."""
+def test_eval_resonance_factor_multiplies_the_line_shape_factors(motif, params_obj, states, recorded):
+    """e.g. MOTIF_AB: factor(resloc_1, gamma) * factor(resloc_2, gamma), at every grid point."""
     res_motif = ResonanceMotif.from_tuples(motif)
     grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
-    propagator = RecordingPropagator()
 
-    value = eval_resonance_factor(res_motif, params_obj, states, grid, propagator, lambda _vd: G_AU)
+    value = eval_resonance_factor(res_motif, params_obj, states, grid, lambda _vd: G_AU)
 
-    np.testing.assert_allclose(value, np.prod([r + 1j * g for r, g in propagator.calls], axis=0))
+    np.testing.assert_allclose(value, np.prod([r + 1j * g for r, g in recorded], axis=0))
 
 
 def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(params_obj, states):
@@ -1289,7 +1278,7 @@ def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(para
     grid = to_au({'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])})
 
     value = eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, grid,
-                                  lorentzian_propagator, lambda vd: vd.energy_difference(au=True) / 100) # type: ignore
+                                  lambda vd: vd.energy_difference(au=True) / 100) # type: ignore
 
     expected = [-0.0125, -0.00625 + 0.00625j, -0.00625 + 0.00625j]
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
@@ -1299,20 +1288,19 @@ def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(para
 
 @pytest.mark.parametrize('ps', [PS_01, PS_10])
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif, ps, states):
+def test_eval_feature_on_grid_gives_the_line_shape_resloc_and_gamma_in_eh(motif, ps, states, recorded):
     """
-    Grid and propagator_param go in as cm-1. The propagator must get E_i - freq_i and gamma in Eh.
+    Grid and propagator_param go in as cm-1. The line shape must get E_i - freq_i and gamma in Eh.
     The states come from the feature's own params: a=0, b=1 and a=1, b=0 resonate at different places.
     """
     f = feature_at_solved_location(motif, ps, states)
     mesh_cm = grid_around(f.location.as_dict(), G_CM)
-    propagator = RecordingPropagator()
 
-    eval_feature_on_grid(f, states, mesh_cm, propagator)
+    eval_feature_on_grid(f, states, mesh_cm)
 
     residuals = resonance_residuals(ResonanceMotif.from_tuples(motif), to_au(mesh_cm), ps.to_dict(), states)  # type: ignore
-    assert len(propagator.calls) == len(motif)
-    for (resloc, gamma), expected in zip(propagator.calls, residuals):
+    assert len(recorded) == len(motif)
+    for (resloc, gamma), expected in zip(recorded, residuals):
         np.testing.assert_allclose(resloc, expected, atol=1e-15)   # atol: the centre point is 0
         assert gamma == pytest.approx(G_AU)
 
@@ -1320,9 +1308,10 @@ def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif,
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED, MOTIF_AB_EXTRA])
 def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, states):
     """
-    Lorentzian only. get_intensity (features.py) assumes the peak is |amplitude / (-i*gamma)^N|^2,
-    N the number of conditions, and sizes the feature boxes with it. The default propagator must
-    give the same peak, also with more conditions than axes (MOTIF_AB_EXTRA: N = 3 on 2 axes).
+    get_intensity (features.py) and the grid take the line shape from lineshape.py, so the peak on
+    the grid is the peak get_intensity gives (and sizes the boxes with): for the Lorentzian
+    |amplitude / (-i*gamma)^N|^2, N the number of conditions, also with more conditions than
+    axes (MOTIF_AB_EXTRA: N = 3 on 2 axes).
     """
     f = feature_at_solved_location(motif, params_obj, states)
 
@@ -1331,16 +1320,15 @@ def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, stat
     assert abs(value) ** 2 == pytest.approx(f.get_intensity())
 
 
-def test_eval_feature_on_grid_uses_the_summed_and_scaled_amplitude(params_obj, states):
+def test_eval_feature_on_grid_uses_the_summed_amplitude(params_obj, states):
     """Rows add up before the resonance factor, which is applied once per feature (not once per row,
-    see C3 in todo.txt). scale (normalize_coeffs_to_max) multiplies too."""
+    see C3 in todo.txt)."""
     one = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(1.,))
     two = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(0.3, 0.5))
     grid = grid_around(one.location.as_dict(), G_CM)
     base = eval_feature_on_grid(one, states, grid)
 
     np.testing.assert_allclose(eval_feature_on_grid(two, states, grid), 0.8 * base)
-    np.testing.assert_allclose(eval_feature_on_grid(replace(two, scale=0.5), states, grid), 0.4 * base)
 
 
 # Hand-worked values, default Lorentzian, coeff 0.3, gamma 5 cm-1. One condition is

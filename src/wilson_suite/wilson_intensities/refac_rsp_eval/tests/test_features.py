@@ -88,41 +88,15 @@ def test_table_group_by_keeps_first_appearance_order():
     assert list(groups[False]) == [R1]
 
 
-def test_table_by_params_and_by_motif():
+def test_table_group_by_index_set_and_by_motif():
     table = ContributionTable([R0, R1, R2])
 
-    assert {ps: list(g) for ps, g in table.by_params().items()} == {ParameterSet({'a': 0}): [R0, R2],
-                                                                     ParameterSet({'a': 1}): [R1]}
-    assert {m: list(g) for m, g in table.by_motif().items()} == {ResonanceMotif(()): [R0, R1],
-                                                                 OTHER_MOTIF: [R2]}
+    by_params = table.group_by(lambda r: r.params)
+    by_motif = table.group_by(lambda r: r.motif)
 
-
-def test_table_by_location_rounds_to_steps_of_tol_cm():
-    """Steps, not a distance: rows 0.002 apart can be split, rows 0.008 apart can share a step."""
-    r_004, r_006, r_014 = (row(location=ResLocPoint({'A': v}), a=0) for v in (1650.004, 1650.006, 1650.014))
-
-    groups = ContributionTable([r_004, r_006, r_014]).by_location(tol_cm=0.01)
-
-    assert [list(g) for g in groups.values()] == [[r_004], [r_006, r_014]]
-
-
-def test_table_by_location_never_joins_different_axes():
-    on_a = row(location=ResLocPoint({'A': 1.}), a=0)
-    on_ab = row(location=ResLocPoint({'A': 1., 'B': 0.}), a=0)
-
-    assert len(ContributionTable([on_a, on_ab]).by_location()) == 2
-
-
-def test_table_axis_range_skips_rows_without_the_axis():
-    table = ContributionTable([R0, R1, R2])
-
-    assert table.axis_range('A') == (1600., 1700.)
-    assert table.axis_range('B') == (10., 10.)
-
-
-def test_table_axis_range_needs_a_row_with_the_axis():
-    with pytest.raises(ValueError, match="no row has axis 'C'"):
-        ContributionTable([R0, R1, R2]).axis_range('C')
+    assert {ps: list(g) for ps, g in by_params.items()} == {ParameterSet({'a': 0}): [R0, R2],
+                                                            ParameterSet({'a': 1}): [R1]}
+    assert {m: list(g) for m, g in by_motif.items()} == {ResonanceMotif(()): [R0, R1], OTHER_MOTIF: [R2]}
 
 
 ## SpectralFeature: basics --------------------------------------------------
@@ -140,15 +114,13 @@ def test_replace_keeps_the_box():
     """dataclasses.replace runs __post_init__ again; that used to reset a dressed box to location +- gamma."""
     dressed = feat(A=100., box_extent=50.)
 
-    assert replace(dressed, scale=0.5).feat_box == Box({'A': (50., 150.)})
+    assert replace(dressed, propagator_param=6.).feat_box == Box({'A': (50., 150.)})
 
 
-def test_feature_amplitude_is_scale_times_sum_of_row_coeffs():
+def test_feature_amplitude_is_the_sum_of_row_coeffs():
     f = feat(A=0., rows=(row(0.3, a=0), row(-0.12, a=1)))
 
     assert f.amplitude_coeff == pytest.approx(0.18)
-    f.scale = 2.
-    assert f.amplitude_coeff == pytest.approx(0.36)
 
 
 def test_feature_without_rows_has_no_amplitude():
@@ -163,7 +135,6 @@ def test_feature_net_fraction_is_abs_sum_over_sum_of_abs(coeffs, expected):
     f = feat(A=0., rows=tuple(row(c, term_id=i, a=0) for i, c in enumerate(coeffs)))
 
     assert f.net_fraction == pytest.approx(expected)
-    assert replace(f, scale=3.).net_fraction == pytest.approx(expected)
 
 
 @pytest.mark.parametrize('rows', [(), (row(0., a=0), row(0., term_id=1, a=0))])
@@ -194,40 +165,19 @@ def test_feature_motif_rejects_rows_of_two_motifs():
         _ = f.motif
 
 
-def test_feature_equality_uses_location_gamma_rows_and_scale():
-    scaled = feat(A=1.)
-    scaled.scale = 2.
-
+def test_feature_equality_uses_location_gamma_and_rows():
     assert feat(A=1.) == feat(A=1.)
     assert feat(A=1.) != feat(A=2.)
     assert feat(A=1., gamma=1.) != feat(A=1., gamma=2.)
     assert feat(A=1., amp=1.) != feat(A=1., amp=5.)         # rows differ in coeff
     assert feat(A=1., rows=(row(a=0),)) != feat(A=1., rows=(row(motif=OTHER_MOTIF, a=0),))
-    assert scaled != feat(A=1.)
-
-
-def test_feature_hash_matches_equality():
-    assert hash(feat(A=1.)) == hash(feat(A=1.))
-    assert len({feat(A=1.), feat(A=1.), feat(A=2.), feat(A=1., amp=5.)}) == 3
-
-
-def test_feature_is_not_equal_or_ordered_with_other_types():
     assert feat(A=0.) != 'feature'
-    assert feat(A=0.).__lt__(1.) is NotImplemented # type: ignore
 
 
-def test_feature_orders_by_absolute_amplitude():
-    assert feat(A=0., amp=1.) < feat(A=0., amp=-2.)
-    assert not feat(A=0., amp=-3.) < feat(A=0., amp=2.)
-
-
-def test_feature_order_needs_amplitudes():
-    with pytest.raises(ValueError, match='amplitude_coeff'):
-        sorted([feat(A=0., amp=None), feat(A=0., amp=1.)])
-
-
-def test_feature_order_accepts_zero_amplitude():
-    assert feat(A=0., amp=0.) < feat(A=1., amp=1.)
+def test_feature_equality_leaves_out_the_box_and_the_conditions():
+    """The same feature in two windows gets two boxes; the conditions follow from the rows."""
+    assert feat(A=1., box_extent=5.) == feat(A=1., box_extent=50.) == feat(A=1.)
+    assert replace(feat(A=1.), conditions=(SimpleNamespace(E=1.),)) == feat(A=1.)
 
 
 ## features_from_rows -------------------------------------------------------
@@ -300,51 +250,6 @@ def test_features_from_rows_without_states_gives_a_propagator_param_function_no_
 
 def test_features_from_rows_of_empty_table_is_empty():
     assert features_from_rows(ContributionTable([])) == []
-
-
-## SpectralFeature: list helpers --------------------------------------------
-
-def test_normalize_coeffs_divides_by_largest_absolute_amplitude():
-    feats = [feat(A=0., amp=2.), feat(A=1., amp=-4.)]
-
-    result = SpectralFeature.normalize_coeffs_to_max(feats)
-
-    assert [f.amplitude_coeff for f in result] == [0.5, -1.]
-    assert [f.amplitude_coeff for f in feats] == [2., -4.]
-    assert [f.rows for f in result] == [f.rows for f in feats]      # only scale changes
-
-
-def test_normalize_coeffs_uses_external_max():
-    result = SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=2.)], external_max=-8.)
-
-    assert result[0].amplitude_coeff == 0.25
-
-
-def test_normalize_coeffs_rejects_missing_amplitude():
-    with pytest.raises(ValueError, match='no amplitude_coeff'):
-        SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=None)], external_max=1.)
-
-
-def test_normalize_coeffs_keeps_zero_amplitude():
-    result = SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=2.), feat(A=1., amp=0.)])
-
-    assert result[1].amplitude_coeff == 0.
-
-
-def test_normalize_coeffs_rejects_all_zero_amplitudes():
-    with pytest.raises(ValueError, match='nonzero amplitude_coeff'):
-        SpectralFeature.normalize_coeffs_to_max([feat(A=0., amp=0.), feat(A=1., amp=0.)])
-
-
-def test_get_feats_with_params_matches_any_row():
-    f0 = feat(A=0., rows=(row(a=0, b=1), row(a=1, b=0)))
-    f1 = feat(A=1., rows=(row(a=1, b=1),))
-
-    assert SpectralFeature.get_feats_with_params([f0, f1], {'a': 1, 'b': 0}) == [f0]
-
-
-def test_get_feats_with_params_skips_features_without_rows():
-    assert SpectralFeature.get_feats_with_params([feat(A=0., amp=None)], {'a': 0}) == []
 
 
 ## SpectralFeature: relation to a box ---------------------------------------
@@ -481,35 +386,6 @@ def test_amplitude_half_widths_take_the_largest_peak_width():
     assert amplitude_half_widths(window, [f], dynrange=101., a_max=1e6 * f.get_intensity() ** 0.5) == [16.]
 
 
-def test_max_intensity_feat_by_intensity_or_by_amplitude():
-    narrow = feat(A=0., amp=2., gamma=1.)  # intensity ~ 2**2 / 1**2 = 4
-    broad = feat(A=1., amp=3., gamma=2.)   # intensity ~ 3**2 / 2**2 = 2.25
-
-    assert SpectralFeature.get_max_intensity_feat([broad, narrow]) is narrow
-    assert SpectralFeature.get_max_intensity_feat([broad, narrow], by='coeff') is broad
-
-
-def test_max_intensity_feat_by_amplitude_compares_absolute_values():
-    positive, negative = feat(A=0., amp=2.), feat(A=1., amp=-3.)
-
-    assert SpectralFeature.get_max_intensity_feat([positive, negative], by='coeff') is negative
-
-
-def test_max_intensity_feat_rejects_an_unknown_measure():
-    with pytest.raises(ValueError, match="'intensity' or 'coeff'"):
-        SpectralFeature.get_max_intensity_feat([feat(A=0.)], by='abs()**2')
-
-
-def test_max_intensity_feat_rejects_empty_list():
-    with pytest.raises(ValueError, match='empty list'):
-        SpectralFeature.get_max_intensity_feat([])
-
-
-def test_max_intensity_feat_rejects_features_that_all_have_zero_intensity():
-    with pytest.raises(ValueError, match='None of the 2 features has a nonzero intensity'):
-        SpectralFeature.get_max_intensity_feat([feat(A=0., amp=0.), feat(A=1., amp=0.)])
-
-
 ## SpectralWindow.from_features ---------------------------------------------
 # Window A (0, 10). Half-width 55 cm-1: a feature at A = 60 has the box (5, 115), at A = 70 the box (15, 125).
 
@@ -621,13 +497,6 @@ def test_amplitude_half_widths_min_gammas_sets_the_smallest_box(min_gammas, weak
     assert half_widths == pytest.approx([5. * (2000. ** 2 - 1) ** 0.5, 5. * (20. ** 2 - 1) ** 0.5, weakest])
 
 
-def test_amplitude_half_widths_max_cm_caps_the_boxes():
-    """cap 50 cm-1: the two strong boxes (9999.999 and 99.87) are cut to 50, the weakest (5) stays"""
-    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100., max_cm=50.)
-
-    assert half_widths == pytest.approx([50., 50., 5.])
-
-
 def test_amplitude_half_widths_a_max_given_replaces_the_estimate():
     """a_max twice the strongest peak: every k halves, 1000, 10, 0.1"""
     features = three_strengths()
@@ -698,7 +567,7 @@ def test_window_from_amplitude_boxes_keeps_weak_features():
 
 
 @pytest.mark.parametrize('setting, value', [('dynrange', 1.), ('dynrange', 0.5), ('eps', 0.), ('eps', -0.1),
-                                            ('min_gammas', -1.), ('max_cm', 0.), ('a_max', 0.)])
+                                            ('min_gammas', -1.), ('a_max', 0.)])
 def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
     settings = {'dynrange': 100., setting: value}
 

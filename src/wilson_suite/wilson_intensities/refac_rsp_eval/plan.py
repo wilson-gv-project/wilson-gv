@@ -296,7 +296,7 @@ class ParameterSet(Mapping[str, int]):
     The mode numbers chosen for a term's mode labels (one index set), e.g.
     ParameterSet({'a': 0, 'b': 1, 'c': 4}): label a is mode 0, b is mode 1, c is mode 4.
     Immutable and hashable, unlike a dict, so it can be a dict key
-    (leaves, ContributionTable.by_params).
+    (leaves, ContributionTable.group_by).
     Holds exactly the given labels. The ground state needs no entry: it has no quanta
     (VibDiff.from_quanta, make_state_label(()) -> 'zero').
     == and hash ignore the order of the labels; there is no <, so sorted() raises TypeError.

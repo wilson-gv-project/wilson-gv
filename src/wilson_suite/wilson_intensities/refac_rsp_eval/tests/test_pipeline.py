@@ -895,11 +895,10 @@ def test_spectrum_on_grid_uses_the_boxes_of_its_box_rule(top_run):
 def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
     """
     partial(amplitude_half_widths, **knobs): the boxes on the grid are its half-widths with the same settings.
-    min_gammas 2 and max_cm 20 (gamma 4.7): the 68 boxes lie between 9.4 and 20 cm-1, both bounds reached.
+    min_gammas 2 (gamma 4.7): the smallest box is 9.4 cm-1.
     """
     features = top_run.result.features
-    knobs = dict(dynrange=1001., eps=0.3, min_gammas=2., max_cm=20.,
-                 a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
+    knobs = dict(dynrange=1001., eps=0.3, min_gammas=2., a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
 
     spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM,
                          box_rule=partial(amplitude_half_widths, **knobs))
@@ -907,7 +906,7 @@ def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
     kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
     expected = amplitude_half_widths(WINDOW_AROUND_STRONGEST, features, **knobs)
     assert kept and all(get_box_extent(f) == pytest.approx(expected[features.index(f)]) for f in kept)
-    assert (min(expected), max(expected)) == pytest.approx((9.4, 20.))
+    assert min(expected) == pytest.approx(9.4)
 
 
 def test_spectrum_on_grid_with_the_intensity_rule(top_run):

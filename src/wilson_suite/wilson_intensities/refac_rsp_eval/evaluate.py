@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from wilson_suite.wilson_intensities.refac_rsp_eval import lineshape
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     ContributionTable,
@@ -657,18 +658,11 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
 ##          evaluating resonance conditions (resonance factors) on the grid
 ## -----------------------------------------------------------------------------
 
-## evaluating func(resloc, parameter) for each resonance condition in a motif, then multiplying them together
+## the line shape's factor (lineshape.factor) for each resonance condition in a motif,
+## multiplied together
 
 
-def lorentzian_propagator(resloc: float | np.ndarray, gamma: float | np.ndarray) -> np.ndarray | complex:
-    """
-    1 / (resloc - i*gamma); gamma in the same units as resloc, one number or one per grid point.
-    With resloc = E - freq (eval_rescond_resloc) this is 1 / (E - freq - i*gamma).
-    """
-    return 1 / (resloc - 1j * gamma)
-
-
-# evaluating resloc for, e.g., 1 / (resloc - i*gamma) - lorentzian propagator
+# resloc = E - freq, the input of the line shape's factor, e.g. 1 / (resloc - i*gamma)
 def eval_rescond_resloc(res_cond_key: 'ResCondKey',
                          vib_diff: VibDiff,
                          mesh_au: Mesh) -> float | np.ndarray:
@@ -697,19 +691,18 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
     return vib_diff.energy_difference(au=True) - freq
 
 
-# evaluating full resonance factor, e.g., 1 / (resloc1 - i*gamma1) / ...
+# the full resonance factor, e.g. 1 / (resloc1 - i*gamma1) / (resloc2 - i*gamma2) / ...
 def eval_resonance_factor(motif: 'ResonanceMotif',
                           parameters: ParameterSet,
                           vibstates_data: 'VibStatesData',
                           mesh_au: Mesh,
-                          propagator: Callable[[float|np.ndarray, float|np.ndarray], complex],
                           propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray: # FIXME change VibDiff to any or smth
     """
-    One motif consists of resonance conditions from a single term.
+    One motif consists of resonance conditions from a single term. Each condition's factor is
+    lineshape.factor(resloc, parameter), e.g. the Lorentzian's 1 / (resloc - i*gamma).
 
     mesh_au - the grid points in Eh (grid.Mesh), as for eval_rescond_resloc
-    propagator - function that takes (resloc, parameter) and returns the resonance factor, e.g., lorentzian_propagator
-    propagator_param - vd -> the propagator's parameter in Eh, one call per condition. The Eh form of
+    propagator_param - vd -> the line shape's parameter in Eh, one call per condition. The Eh form of
                        feature.propagator_param (cm-1, a number or a (vd, freqs) function), which
                        eval_feature_on_grid converts to this.
     """
@@ -721,7 +714,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 
         resloc = eval_rescond_resloc(res_cond_key, vd, mesh_au)
 
-        result *= propagator(resloc, propagator_param(vd))
+        result *= lineshape.factor(resloc, propagator_param(vd))
 
     return result
 
@@ -729,13 +722,13 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 # feature is one amplitude (the sum of the row coefficients) times one resonance factor
 def eval_feature_on_grid(feature: 'SpectralFeature',
                          vibstates_data: 'VibStatesData',
-                         mesh_cm: Mesh,
-                         propagator: Callable=lorentzian_propagator) -> complex | np.ndarray:
+                         mesh_cm: Mesh) -> complex | np.ndarray:
     """
     amplitude_coeff * resonance factor of the feature's motif, at every point of mesh_cm (grid.Mesh, cm-1).
-    Result in au, of the mesh's shape.
+    Result in au, of the mesh's shape. The line shape comes from lineshape.py, as for get_intensity
+    and the box rules (features.py).
 
-    The propagator's parameter is feature.propagator_param, cm-1 (converted to Eh here):
+    The line shape's parameter is feature.propagator_param, cm-1 (converted to Eh here):
         a number   -> the same on every condition
         a function -> propagator_param(vd, mesh_cm) for each condition (features.PropagatorParam):
                       a number per condition, or an array of the grid's shape for one that changes with
@@ -765,7 +758,7 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     mesh_au = {ax: convNu2Ene(v) for ax, v in mesh_cm.items()}
 
     resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
-                                             mesh_au, propagator, propagator_param=param_au)
+                                             mesh_au, propagator_param=param_au)
 
     return feature.amplitude_coeff * resonance_factor
 

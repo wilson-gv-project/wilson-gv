@@ -27,7 +27,7 @@ A setting: rule (the box rule; amplitude_half_widths if not given) and its knobs
 SETTINGS or RULES and run as above, or, from a notebook, with your own result and window:
     from wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes import reference, score
     ref = reference(result, window, dim_sizes)                                  # once: all_features_on_grid
-    score(result, window, dim_sizes, ref, dynrange=500., eps=0.3, max_cm=300.)  # as often as wanted
+    score(result, window, dim_sizes, ref, dynrange=500., eps=0.3)               # as often as wanted
     score(result, window, dim_sizes, ref, intensity_half_widths, dynrange=500.) # the old code's rule
 
 Result 2026-10-14 (todo.txt E10, also the boxes before E10 and the evaluation by domains): with eps 0.1, at most
@@ -68,7 +68,6 @@ SETTINGS = [
     dict(dynrange=dynrange, eps=eps) for dynrange in (100., 500., 1000.) for eps in (0.1, 0.3)
 ] + [
     dict(dynrange=500., eps=0.1, min_gammas=3.),
-    dict(dynrange=500., eps=0.1, max_cm=500.),
 ]
 RULES = [
     setting for dynrange in (100., 500., 1000.) for setting in (

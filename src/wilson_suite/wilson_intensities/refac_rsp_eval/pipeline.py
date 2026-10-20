@@ -29,8 +29,9 @@ Inputs
                       harmonic -> 'harmonic'. No default: the data cannot know the regime.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
-    propagator_param  the peak width, cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam).
-                      It sizes both the peak on the grid and its box.
+    propagator_param  the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
+                      Lorentzian's half width gamma: a number, or a function (vd, freqs) -> cm-1
+                      (features.PropagatorParam). It sizes both the resonance on the grid and its box.
     exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): left out of the evaluation (the data keeps
                       them). Default: none.
     window            grid.Box, cm-1, one range per axis, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)})
@@ -83,7 +84,7 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
   │    evaluate_response_terms ends here (FeatureResult.features); spectrum_on_grid goes on:
   │ 5. half-widths: box_rule(window, features), one per feature, cm-1   ← window, box_rule
-  │    e.g. amplitude_half_widths: from each feature's amplitude; strong peaks get big boxes
+  │    e.g. amplitude_half_widths: from each feature's amplitude; strong features get big boxes
   │ 6. boxes: SpectralWindow.from_features, a box of location ± half-width per feature.
   │    Keeps a feature if its box meets the window (touching counts): full_features
   │    (location inside), contrib_features (outside). A flat feature's box is the window
