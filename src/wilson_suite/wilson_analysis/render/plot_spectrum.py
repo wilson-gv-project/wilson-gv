@@ -160,10 +160,14 @@ def plot_feature_boxes(ax: 'Axes', spec: 'EvalRspResult', *,
                         markersize=10, transform=ax.get_xaxis_transform(), clip_on=False)
             continue
         y = names[1]
+        # Rectangle((x min, y min), width, height)
         rects = [Rectangle((f.feat_box.bounds[x][0], f.feat_box.bounds[y][0]),  # type: ignore
                            f.feat_box.bounds[x][1] - f.feat_box.bounds[x][0],  # type: ignore
                            f.feat_box.bounds[y][1] - f.feat_box.bounds[y][0])  # type: ignore
                  for f in boxed]
+        # a PatchCollection draws many shapes as one object on the axes. Its style applies
+        # to every rectangle; each Rectangle's own colors are ignored (match_original=False).
+        # facecolor='none' draws only the outline, so the spectrum stays visible inside.
         ax.add_collection(PatchCollection(rects, facecolor='none', edgecolor=color,
                                           linestyle=style, linewidth=linewidth))
         if peaks:
