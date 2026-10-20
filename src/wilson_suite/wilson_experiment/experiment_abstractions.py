@@ -368,7 +368,7 @@ class EmPulse:
             else:
                 raise AssertionError('The polarization must be a len 3 tuple of floats')
 
-    def tendsImpulsive(self):
+    def tendsImpulsive(self) -> bool:
         """
         Does this pulse tend to impulsive?
         """
@@ -380,7 +380,7 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
-    def tendsContinuous(self):
+    def tendsContinuous(self) -> bool:
         """
         Does this pulse tend to being continuous-wave-like?
         """
@@ -392,9 +392,9 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
-def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
-                        wv: tuple[float], pol: tuple[float],
-                        overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0):
+def make_gaussian_pulse(tc: float | int, cf: float | int, dev: float | int, maxstr: float | int,
+                        wv: tuple[float| int], pol: tuple[float| int],
+                        overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0) -> EmPulse:
     """
     Helper function: Makes a Gaussian EmPulse instance with the selected parameters.
     See EmPulse for a definition of these parameters.
@@ -406,9 +406,9 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, maxstr: float,
                    pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort= tol_wv_pol_nonort)
 
 
-def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0,
-                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort =0.0):
+def make_impulsive_gaussian_pulse(tc: float | int, cf: float | int = None, maxstr: float | int=0.0,
+                         wv: tuple[float | int] = (0.0, 0.0, 1.0), pol: tuple[float | int] = (1.0, 0.0, 0.0),
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort: float | int =0.0)-> EmPulse:
     """
     Helper function: Makes an impulsive-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -421,9 +421,9 @@ def make_impulsive_gaussian_pulse(tc: float, cf: float = None, maxstr: float=0.0
     return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, maxstr = maxstr, wv = wv,
                    pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort = tol_wv_pol_nonort)
 
-def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
-                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0):
+def make_cw_gaussian_pulse(cf: float | int, tc: float | int = None, maxstr: float | int=0.0,
+                         wv: tuple[float | int] = (0.0, 0.0, 1.0), pol: tuple[float | int] = (1.0, 0.0, 0.0),
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort: float | int = 0.0)-> EmPulse:
     """
     Helper function: Makes a continuous-wave-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -591,7 +591,8 @@ class ElectricField:
             signed_pulses[i.id] = copy.deepcopy(i)
 
             # Negative component
-            # FIXME: I think the polarization and overall phase are complex conjugated here, should verify this
+            # NOTE: The polarization and overall phase should be complex conjugated here as I understand it, return to
+            # if there are problems
             signed_pulses[-1 * i.id] = EmPulse(env = i.env, tc = i.tc, cf = -1 * i.cf, dev = i.dev, maxstr = i.maxstr,
                                                wv = tuple([-1.0*j for j in i.wv]),
                                                pol = tuple([j.real - j.imag for j in i.pol]),
@@ -603,7 +604,7 @@ class ElectricField:
 
     # Take a reference to an interaction pattern and return all interaction patterns whose vector sum
     # corresponds to the same direction
-    def wavevectors_matching_direction(self, direction: tuple[float], max_order: int, filter: str='same_order') -> list[tuple]:
+    def wavevectors_matching_direction(self, direction: tuple[float | int], max_order: int, filter: str='same_order') -> list[tuple]:
         """
         direction: The 3D direction along for which matching wavevectors will be searched
 
@@ -874,7 +875,8 @@ def compounding_patterns_at_order(n) -> list[tuple]:
 
     return comp_patterns
 
-def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000., tol_n_dev = 5.0) -> bool:
+def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000.,
+                              tol_n_dev: float | int = 5.0) -> bool:
     """
     Take an ordered sequence of (compounded) pulses and determine whether the time ordering is
     (according to thresholds) is causally possible (note: Not "determine if definitely causally valid")
@@ -917,7 +919,8 @@ def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_wait
 
     return True
 
-def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: dict[tuple, EmPulse], thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
+def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: dict[tuple, EmPulse],
+                                           thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
     """
     Take a tuple of independent variables, consider its powerset sans {} and for each such element,
     evaluate if the frequency-domain range of the corresponding tuple of (possibly compound) pulses is
@@ -1091,7 +1094,7 @@ class FieldAnalysis:
         self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.get_magn_cond_bank_and_int_seq_icpm()
 
 
-    def get_interaction_patterns(self):
+    def get_interaction_patterns(self) -> list[tuple]:
         """
         Helper method: Get valid interaction patterns
         """
@@ -1150,7 +1153,7 @@ class FieldAnalysis:
         return valid_int_patterns
 
 
-    def get_time_freq_valid_pulses_and_tuples(self):
+    def get_time_freq_valid_pulses_and_tuples(self) -> tuple:
         """
         Helper method: Get (compound) pulses and tuples that are both "time overlap" and "vib. resonance" valid,
         and ditto for "time overlap" tuples and "time overlap" but not "vib. resonance" pulses
@@ -1180,7 +1183,7 @@ class FieldAnalysis:
         return time_ovl_tuples, res_and_time_ovl_tuples, res_and_time_compound_pulses, time_not_res_compound_pulses
 
 
-    def get_comp_patterns_at_order(self):
+    def get_comp_patterns_at_order(self) -> dict:
         """
         Helper method: Get compounding patterns at valid orders
         """
@@ -1230,7 +1233,7 @@ class FieldAnalysis:
 
         return comp_patterns_at_order
 
-    def get_pol_avg_bank_and_int_seq_ocp(self):
+    def get_pol_avg_bank_and_int_seq_ocp(self) -> tuple:
         """
         Helper method: Get macroscopic orientational avg. polarization vector "bank" and valid interaction
         sequences indexed by order, compounding pattern and polarization motif
@@ -1447,7 +1450,7 @@ class FieldAnalysis:
 
         return pol_avg_vector_bank, int_sequences_by_order_comp_pol
 
-    def get_magn_cond_bank_and_int_seq_icpm(self):
+    def get_magn_cond_bank_and_int_seq_icpm(self) -> tuple:
 
         # Making a bank for conformity with the pol avg vector indexing even though the magnitude
         # condition tuples are hashable by themselves
