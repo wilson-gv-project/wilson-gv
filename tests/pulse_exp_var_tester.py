@@ -22,8 +22,8 @@ detector_a = ws.experiment.abstractions.SpecDetector(detection_method='freq',
                                                      detector_location=[0.0, 0.0, 1.0],
                                                      detection_polarization=[0.0, 0.0, 1.0],
                                                      detection_range=[0.003 + 0.0001 * i for i in range(101)],
-                                                     interaction_filter=[
-                                                         [-1, 2, 3]])
+                                                     wv_filter=[
+                                                         {1: -1, 2: 1, 3: 1}])
 
 # Push one carrier freq
 scan_obj_a = [['pulse', 1, 'cf', 1.0], ['detector', 0, 'detection_range', 1.0]]
