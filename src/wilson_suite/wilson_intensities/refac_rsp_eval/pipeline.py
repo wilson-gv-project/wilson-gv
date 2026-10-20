@@ -38,6 +38,8 @@ Inputs
     box_rule          features.BoxRule: (window, features) -> one box half-width per feature, cm-1. Knobs by
                       functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
                       dynamic range (max / floor), required. intensity_half_widths: the old code's rule.
+    cut_tails         False (default): the boxes choose the features, each kept one on the whole grid.
+                      True: each feature on its own box only, faster, its tail beyond cut off.
 
 Outputs
     FeatureResult     the evaluation, before any grid:
@@ -86,8 +88,9 @@ SpectralFeature(location, rows)                            "what" layer   featur
   │    Keeps a feature if its box meets the window (touching counts): full_features
   │    (location inside), contrib_features (outside). A flat feature's box is the window
   │ 7. grid: axis_points = window.grid_points(dim_sizes), both edges included   ← dim_sizes
-  │ 8. values: boxed_features_on_grid, each feature on its own cut of the grid (box_slices),
-  │    added into one complex array; where cuts overlap, amplitudes add before squaring
+  │ 8. values: the kept features added into one complex array, amplitudes before squaring:
+  │    each on the whole grid (all_features_on_grid; default), or with cut_tails=True each on
+  │    its own cut of the grid (boxed_features_on_grid, box_slices)
   v
 EvalRspResult(axis_points, amplitude, spectral_window)    the spectrum on the grid
   │ 9. intensity = abs(amplitude)**2, e.g. plot_rsp_func (wilson_analysis/render)
@@ -107,6 +110,7 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    all_features_on_grid,
     boxed_features_on_grid,
     build_contributions,
     evaluate_term_coeff_sumover,
@@ -389,7 +393,8 @@ class EvalRspResult:
                      with 201 points each: the grid is every combination of them
     amplitude        complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
                      axis_points, e.g. shape (201, 201). intensity = abs(amplitude)**2
-    spectral_window  the window as used: its features, each with its box (each evaluated on its own box only).
+    spectral_window  the window as used: its features, each with its box (evaluated on the whole grid, or on
+                     its own box only with cut_tails=True in spectrum_on_grid).
                      full_features: inside the window; contrib_features: outside, with a box that reaches in.
     mesh             (property) every grid point, one full array per axis (grid.Mesh, grid.make_mesh),
                      mesh['A'][i, j] = axis_points['A'][i]: what the old EvaluatedSpectrum.axes held and the
@@ -409,15 +414,19 @@ def spectrum_on_grid(feature_result: FeatureResult,
                   window: 'Box',
                   dim_sizes: dict[str, int],
                   *,
-                  box_rule: BoxRule) -> EvalRspResult:
+                  box_rule: BoxRule,
+                  cut_tails: bool = False) -> EvalRspResult:
     """
     The features of feature_result on a grid over `window`, in four steps:
         1. box_rule(window, features): one box half-width per feature, cm-1
         2. SpectralWindow.from_features: a box around each feature; keeps the features
            whose box meets the window (touching counts)
         3. window.grid_points: the grid, dim_sizes[ax] points per axis, both edges included
-        4. boxed_features_on_grid: each feature on its own cut of the grid, all added into
-           one array (the steps and an example are there)
+        4. the kept features on the grid, all added into one array:
+               cut_tails=False (default)  all_features_on_grid: each feature on the whole grid.
+                                          The boxes only choose the features; nothing is cut.
+               cut_tails=True             boxed_features_on_grid: each feature on its own cut
+                                          of the grid (the steps and an example are there)
     The rows are not computed again (the slow part: build_contributions), so a new window,
     grid, width or box rule runs only the grid part:
         boxes = partial(amplitude_half_widths, dynrange=500.)
@@ -435,6 +444,10 @@ def spectrum_on_grid(feature_result: FeatureResult,
                    partial(intensity_half_widths, dynrange=500.)   by intensity, the old code's rule: cuts more
                dynrange: the plot's dynamic range (max / floor). Required by both: the plot decides it.
                Any other function works too, e.g. lambda window, features: [20.] * len(features).
+    cut_tails  False (default): each kept feature on the whole grid, so only the dropped features are
+               missing; the run time grows with (kept features) x (grid points). True: each feature only
+               on its box, its tail beyond cut off; faster, e.g. ACDM, 1509 kept features on 700 x 700
+               points: 0.5 s instead of 14 s.
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
     features = feature_result.features
@@ -446,6 +459,10 @@ def spectrum_on_grid(feature_result: FeatureResult,
     axis_points = window.grid_points(dim_sizes)
 
     # width on the grid
-    amplitude = boxed_features_on_grid(spectral_window, feature_result.states, axis_points)
+    if cut_tails:
+        amplitude = boxed_features_on_grid(spectral_window, feature_result.states, axis_points)
+    else:
+        kept = spectral_window.full_features + spectral_window.contrib_features
+        amplitude = all_features_on_grid(kept, feature_result.states, axis_points)
 
     return EvalRspResult(feature_result, axis_points, amplitude, spectral_window)

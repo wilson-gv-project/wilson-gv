@@ -824,9 +824,8 @@ def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
     j = np.argmin(np.abs(spec.axis_points['B']))
     assert intensity[i, j] == pytest.approx(strongest.get_intensity(), rel=0.05)
 
-    # box by box (boxed_features_on_grid) vs every feature on the whole grid (all_features_on_grid): at most
-    # eps = 0.1 floors (floor: max / dynrange), measured 0.05 (4.8e-5 of the max; 0.3 % with the boxes of before
-    # 2026-10-14)
+    # the kept features on the whole grid (the default, cut_tails=False) vs every feature on the whole grid
+    # (all_features_on_grid): at most eps = 0.1 floors (floor: max / dynrange)
     reference = np.abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
     assert np.max(np.abs(intensity - reference)) < 0.1 * reference.max() / 1001.
 
@@ -913,18 +912,45 @@ def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
 
 def test_spectrum_on_grid_with_the_intensity_rule(top_run):
     """
-    The old code's rule, unscaled, dynrange 101: every box 4.7 * sqrt(100) * 1.1 = 51.7 cm-1. It cuts more than
-    the amplitude rule: against all_features_on_grid, 2.6 floors off (floor: max / 101; measured 2026-10-14);
-    amplitude boxes with the same dynrange: 0.03 floors.
+    The old code's rule, unscaled, dynrange 101: every box 4.7 * sqrt(100) * 1.1 = 51.7 cm-1. With cut_tails=True
+    it cuts more than the amplitude rule: against all_features_on_grid, 2.6 floors off (floor: max / 101;
+    measured 2026-10-14); amplitude boxes with the same dynrange: 0.03 floors.
     """
     spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                         box_rule=partial(intensity_half_widths, dynrange=101.))
+                         box_rule=partial(intensity_half_widths, dynrange=101.), cut_tails=True)
 
     kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
     assert kept and all(get_box_extent(f) == pytest.approx(51.7) for f in kept)
     intensity = np.abs(spec.amplitude) ** 2
     reference = np.abs(all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points)) ** 2
     assert np.max(np.abs(intensity - reference)) > reference.max() / 101.
+
+
+def test_spectrum_on_grid_without_cut_puts_each_kept_feature_on_the_whole_grid(top_run):
+    """
+    cut_tails=False (default): the boxes only choose the features (the same ones as with cuts), and each
+    kept feature is on the whole grid: all_features_on_grid of the kept features. With cut_tails=True the
+    contrib features' tails end at their boxes, so the two spectra differ.
+    """
+    cut = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES,
+                           cut_tails=True)
+
+    uncut = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+
+    kept = uncut.spectral_window.full_features + uncut.spectral_window.contrib_features
+    assert kept == cut.spectral_window.full_features + cut.spectral_window.contrib_features
+    np.testing.assert_allclose(uncut.amplitude, all_features_on_grid(kept, top_run.result.states, uncut.axis_points))
+    assert not np.allclose(uncut.amplitude, cut.amplitude)
+
+
+def test_spectrum_on_grid_without_cut_keeping_every_feature_is_the_uncut_spectrum(top_run):
+    """A box rule that keeps every feature (half-width 1e6 cm-1), no cut: every feature on every grid point."""
+    keep_all = lambda window, features: [1e6] * len(features)
+
+    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=keep_all, cut_tails=False)
+
+    np.testing.assert_allclose(spec.amplitude,
+                               all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points))
 
 
 def test_spectrum_on_grid_with_a_new_width_reuses_the_rows(formaldehyde_molsys):

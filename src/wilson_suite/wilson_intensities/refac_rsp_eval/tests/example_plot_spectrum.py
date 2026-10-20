@@ -7,7 +7,8 @@ test. The 14 EVV terms, axes A = w1, B = -w1 + w2, gamma 4.7 cm-1, boxes and plo
     2b. 1D: the row of 2 through the strongest peak, with plot_spectrum on plain arrays
     3. formaldehyde, harmonic vs anharmonic states side by side, on one shared scale (reference_max)
     4. ACDM (42 modes), anharmonic states: the window of examples/quick_start.ipynb, 700 x 700 points
-       (about 10 s: loading the data takes most of it; the loading warns about anharmonic states below 0)
+       (about 20 s: loading the data about 4 s, the rows and the grid about 14 s; the loading warns about
+       anharmonic states below 0)
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.example_plot_spectrum [out_dir]
 out_dir: where the png files go; default plot_spectrum_figures (made if missing).

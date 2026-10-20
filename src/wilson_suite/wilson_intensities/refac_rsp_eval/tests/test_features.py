@@ -30,6 +30,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
+    MOTIF_AB_EXTRA,
     NDIMS,
     coords,
     cube,
@@ -65,6 +66,17 @@ def test_table_where_keeps_matching_rows_and_returns_a_table():
     assert isinstance(kept, ContributionTable)
     assert list(kept) == [R0, R2]
     assert len(table) == 3                  # the original table is unchanged
+
+
+@pytest.mark.parametrize('keep, expected', [
+    (lambda r: r.term_id in {0, 2},                 [R0, R2]),   # some terms
+    (lambda r: r.params['a'] == 1,                  [R1]),       # a mode
+    (lambda r: r.motif == OTHER_MOTIF,              [R2]),       # a motif
+    (lambda r: 1620. <= r.location['A'] <= 1680.,   [R0]),       # a range of A, cm-1
+    (lambda r: abs(r.coeff) >= 0.2,                 [R0, R2]),   # large |coeff|
+])
+def test_table_where_selects_rows_by_any_row_field(keep, expected):
+    assert list(ContributionTable([R0, R1, R2]).where(keep)) == expected
 
 
 def test_table_group_by_keeps_first_appearance_order():
@@ -398,11 +410,6 @@ def test_intensity_of_zero_amplitude_is_zero():
     assert feat(A=0., amp=0.).get_intensity() == 0.
 
 
-def test_intensity_supports_only_abs_squared():
-    with pytest.raises(NotImplementedError):
-        feat(A=0.).get_intensity('real()')
-
-
 ## SpectralFeature: propagator_param function, peak widths --------------------------
 # A propagator_param function gets each condition's pair of states; here stand-ins that only have an energy difference.
 
@@ -414,8 +421,12 @@ def with_width_per_condition(f: SpectralFeature) -> SpectralFeature:
     return replace(f, propagator_param=WIDTH_1_PERCENT, conditions=TWO_CONDITIONS)
 
 
-def test_peak_widths_of_a_number_is_one_per_axis():
+def test_peak_widths_of_a_number_is_one_per_condition():
+    """One width per condition, whichever axes it uses: 3 conditions on 2 axes give 3 widths."""
+    extra = row(motif=ResonanceMotif.from_tuples(MOTIF_AB_EXTRA), a=0, b=1)
+
     assert feat(A=100., B=200., gamma=5.).peak_widths() == (5., 5.)
+    assert feat(A=100., B=200., gamma=5., rows=(extra,)).peak_widths() == (5., 5., 5.)
 
 
 def test_peak_widths_of_a_function_is_one_per_condition():
@@ -475,13 +486,18 @@ def test_max_intensity_feat_by_intensity_or_by_amplitude():
     broad = feat(A=1., amp=3., gamma=2.)   # intensity ~ 3**2 / 2**2 = 2.25
 
     assert SpectralFeature.get_max_intensity_feat([broad, narrow]) is narrow
-    assert SpectralFeature.get_max_intensity_feat([broad, narrow], intensity_expr=None) is broad
+    assert SpectralFeature.get_max_intensity_feat([broad, narrow], by='coeff') is broad
 
 
 def test_max_intensity_feat_by_amplitude_compares_absolute_values():
     positive, negative = feat(A=0., amp=2.), feat(A=1., amp=-3.)
 
-    assert SpectralFeature.get_max_intensity_feat([positive, negative], intensity_expr=None) is negative
+    assert SpectralFeature.get_max_intensity_feat([positive, negative], by='coeff') is negative
+
+
+def test_max_intensity_feat_rejects_an_unknown_measure():
+    with pytest.raises(ValueError, match="'intensity' or 'coeff'"):
+        SpectralFeature.get_max_intensity_feat([feat(A=0.)], by='abs()**2')
 
 
 def test_max_intensity_feat_rejects_empty_list():

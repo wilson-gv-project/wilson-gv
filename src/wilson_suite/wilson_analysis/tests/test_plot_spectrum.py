@@ -34,13 +34,19 @@ How the tests read a 2D plot
     contour.zmax             the largest plotted value
     contour.norm             turns a value into a place on the colour scale: 0 at the lowest level, 1 at the top
 """
+from dataclasses import replace
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.collections import PatchCollection
 from matplotlib.colors import to_rgba
 
-from wilson_suite.wilson_analysis.render.plot_spectrum import plot_rsp_func, plot_spectrum
+from wilson_suite.wilson_analysis.render.plot_spectrum import plot_feature_boxes, plot_rsp_func, plot_spectrum
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature, SpectralWindow
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import EvalRspResult
+from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ResLocPoint
 
 
 def toy_axes(a_range=(-20., 20.), b_range=(-20., 20.)) -> dict[str, np.ndarray]:
@@ -521,3 +527,74 @@ def test_plot_rsp_func_passes_the_options_on():
     assert ax_out is ax
     np.testing.assert_allclose(np.asarray(contour.levels), [0.01, 0.1, 1.])
     assert cbar.ax.get_ylabel() == 'intensity / reference   (reference = 5.00e+01 au)'
+
+
+## plot_feature_boxes ---------------------------------------------------------
+
+def boxed_result(axes: dict[str, np.ndarray]) -> EvalRspResult:
+    """
+    toy_result with a window of three features, on the axes of `axes` (A, or A and B):
+        inside   peak at A = 0, B = 0; box A (-5, 5), B (-3, 3)       a full feature
+        outside  peak at A = 30, B = 0; box A (15, 45), B (-10, 10)   a contrib feature: its box reaches
+                                                                      into the window A (-20, 20)
+        flat     no axes; its box is the window                       gets no outline
+    """
+    def feature(peak: dict, box: dict) -> SpectralFeature:
+        return SpectralFeature(ResLocPoint({ax: peak[ax] for ax in axes}), propagator_param=3.,
+                               feat_box=Box({ax: box[ax] for ax in axes}))
+
+    window = Box({ax: (float(points[0]), float(points[-1])) for ax, points in axes.items()})
+    inside = feature({'A': 0., 'B': 0.}, {'A': (-5., 5.), 'B': (-3., 3.)})
+    outside = feature({'A': 30., 'B': 0.}, {'A': (15., 45.), 'B': (-10., 10.)})
+    flat = SpectralFeature(ResLocPoint({}), propagator_param=3., feat_box=window)
+    return replace(toy_result(axes), spectral_window=SpectralWindow(window, [inside, flat], [outside]))
+
+
+def rectangles(collection: PatchCollection) -> list[tuple[float, ...]]:
+    """(x min, x max, y min, y max) of each rectangle in the collection."""
+    return [tuple(path.get_extents().extents[[0, 2, 1, 3]]) for path in collection.get_paths()]
+
+
+def test_feature_boxes_2d_one_rectangle_per_box_solid_inside_dashed_outside():
+    """
+    One rectangle per box, at the box's bounds: inside solid, outside dashed. The flat feature gets
+    none. The view stays the window, although the outside box reaches A = 45.
+    """
+    spec = boxed_result(toy_axes())
+    _, ax, _, _ = plot_rsp_func(spec, dynrange=100.)
+    view = (ax.get_xlim(), ax.get_ylim())
+
+    plot_feature_boxes(ax, spec)
+
+    inside, outside = [c for c in ax.collections if isinstance(c, PatchCollection)]
+    assert rectangles(inside) == [(-5., 5., -3., 3.)]
+    assert rectangles(outside) == [(15., 45., -10., 10.)]
+    assert inside.get_linestyle()[0][1] is None and outside.get_linestyle()[0][1] is not None  # dash pattern
+    assert (ax.get_xlim(), ax.get_ylim()) == view
+
+
+def test_feature_boxes_2d_mark_each_peak():
+    spec = boxed_result(toy_axes())
+    _, ax, _, _ = plot_rsp_func(spec, dynrange=100.)
+
+    plot_feature_boxes(ax, spec)
+
+    marks = [(list(line.get_xdata()), list(line.get_ydata())) for line in ax.lines if line.get_marker() == 'x']
+    assert marks == [([0.], [0.]), ([30.], [0.])]
+
+
+def test_feature_boxes_1d_are_lines_at_the_box_edges():
+    """1D: a vertical line at each edge, solid inside (-5, 5), dashed outside (15, 45)."""
+    spec = boxed_result({'A': toy_axes()['A']})
+    _, ax, _, _ = plot_rsp_func(spec, dynrange=100.)
+
+    plot_feature_boxes(ax, spec, peaks=False)
+
+    edges = {(line.get_xdata()[0], line.get_linestyle()) for line in ax.lines[1:]}   # [0]: the spectrum
+    assert edges == {(-5., '-'), (5., '-'), (15., '--'), (45., '--')}
+
+
+def test_plot_rsp_func_boxes_outlines_the_boxes():
+    _, ax, _, _ = plot_rsp_func(boxed_result(toy_axes()), dynrange=100., boxes=True)
+
+    assert len([c for c in ax.collections if isinstance(c, PatchCollection)]) == 2

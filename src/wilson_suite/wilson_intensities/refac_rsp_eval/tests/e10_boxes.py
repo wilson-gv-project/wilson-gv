@@ -10,7 +10,8 @@ box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists o
 Each takes a few minutes, mostly all_features_on_grid on ACDM.
 
 Per case, all_features_on_grid once (the reference: slow, about 70 s on ACDM in the quick_start window), then
-spectrum_on_grid with each setting. Scores per setting:
+spectrum_on_grid with each setting and cut_tails=True (each feature on its own box only, as when these results
+were measured). Scores per setting:
     err      the largest intensity error, in floors (floor = max / dynrange: the faintest the plot shows)
     worst    the worst relative error at a grid point above the floor (a point the plot shows)
     >10%     the share of those points more than 10 % off
@@ -90,7 +91,7 @@ def score(result: FeatureResult, window: Box, dim_sizes: dict[str, int], referen
           rule: BoxRule = amplitude_half_widths, **knobs) -> dict:
     """spectrum_on_grid with `rule` and its `knobs` (dynrange required) against the reference: the scores above"""
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(result, window, dim_sizes, box_rule=partial(rule, **knobs))
+    spec = spectrum_on_grid(result, window, dim_sizes, box_rule=partial(rule, **knobs), cut_tails=True)
     t_on_grid = time.perf_counter() - t0
 
     intensity = np.abs(spec.amplitude) ** 2

@@ -61,6 +61,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E1,
     MOTIF_A,
     MOTIF_AB,
+    MOTIF_AB_EXTRA,
     MOTIF_B_TWICE,
     MOTIF_MIXED,
     PS_00,
@@ -1316,11 +1317,12 @@ def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif,
         assert gamma == pytest.approx(G_AU)
 
 
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED, MOTIF_AB_EXTRA])
 def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, states):
     """
-    Lorentzian only. get_intensity (features.py) assumes the peak is |amplitude / (-i*gamma)^N|^2
-    and sizes the feature boxes with it. The default propagator must give the same peak.
+    Lorentzian only. get_intensity (features.py) assumes the peak is |amplitude / (-i*gamma)^N|^2,
+    N the number of conditions, and sizes the feature boxes with it. The default propagator must
+    give the same peak, also with more conditions than axes (MOTIF_AB_EXTRA: N = 3 on 2 axes).
     """
     f = feature_at_solved_location(motif, params_obj, states)
 
@@ -1424,6 +1426,7 @@ def test_eval_feature_on_grid_axis_outside_the_motif_changes_nothing(states):
     (MOTIF_AB,    5.,  -0.012),     # 0.3 / (-5i)^2  = -0.3 / 25
     (MOTIF_AB,    10., -0.003),
     (MOTIF_MIXED, 5.,  -0.012),
+    (MOTIF_AB_EXTRA, 5., -0.0024j),   # 0.3 / (-5i)^3 = 0.3 * (i / 5)^3 = -0.3i / 125
 ])
 def test_eval_feature_on_grid_peak_is_coeff_times_i_over_gamma_to_the_N(motif, gamma, expected_cm1, params_obj, states):
     """

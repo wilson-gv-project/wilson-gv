@@ -3,6 +3,7 @@
     plot_spectrum(intensity, grid, ...)   any intensity array on a grid
     plot_rsp_func(spec, ...)              the new evaluator's result (EvalRspResult, refac_rsp_eval):
                                           plot_spectrum of |spec.amplitude|^2 on spec.mesh
+    plot_feature_boxes(ax, spec)          the outline of each feature's box on a plot of spec
 Both show intensity / top, from 1 / dynrange to 1 on a log scale; top: the largest intensity, or reference_max
 (spectra on one shared scale).
     1D  a line; y axis log
@@ -15,7 +16,9 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.collections import PatchCollection
 from matplotlib.colors import LogNorm
+from matplotlib.patches import Rectangle
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -106,11 +109,66 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
     return fig, ax, contour, cbar
 
 
-def plot_rsp_func(spec: 'EvalRspResult', *, dynrange: float, **options):
+def plot_rsp_func(spec: 'EvalRspResult', *, dynrange: float, boxes: bool = False, **options):
     """
     The new evaluator's spectrum (spectrum_on_grid), 1D or 2D: plot_spectrum of |spec.amplitude|^2 on
     spec.mesh.
         fig, ax, contour, cbar = plot_rsp_func(spec, dynrange=500.)
-    options: the keyword arguments of plot_spectrum, e.g. reference_max, ax, axis_labels
+    boxes    also outline each feature's box (plot_feature_boxes, default look)
+    options  the keyword arguments of plot_spectrum, e.g. reference_max, ax, axis_labels
     """
-    return plot_spectrum(np.abs(spec.amplitude) ** 2, spec.mesh, dynrange=dynrange, **options)
+    out = plot_spectrum(np.abs(spec.amplitude) ** 2, spec.mesh, dynrange=dynrange, **options)
+    if boxes:
+        plot_feature_boxes(out[1], spec)
+    return out
+
+
+def plot_feature_boxes(ax: 'Axes', spec: 'EvalRspResult', *,
+                       full_color: str = '#00BFFF',
+                       contrib_color: str = '#7FFF00',
+                       linewidth: float = 0.8,
+                       peaks: bool = True):
+    """
+    Outlines each feature's box on a plot of spec. With spectrum_on_grid's default (cut_tails=False)
+    the box only decided that the feature is kept; with cut_tails=True the box is the part of the
+    grid where the feature was evaluated, and its tail beyond is cut off.
+        fig, ax, _, _ = plot_rsp_func(spec, dynrange=500.)
+        plot_feature_boxes(ax, spec)
+    2D: one rectangle per box. 1D: a vertical line at each box edge.
+        full_features (peak inside the window)   solid lines, full_color
+        contrib_features (peak outside)          dashed lines, contrib_color
+    peaks: also mark each peak, 2D with a cross, 1D with a tick at the bottom.
+    A flat feature's box is the whole window, so it gets no outline. The axes limits stay as they
+    are: of a box larger than the plot, only the part inside shows.
+    """
+    names = list(spec.axis_points)
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    window = spec.spectral_window
+    for features, color, style in ((window.full_features, full_color, '-'),
+                                   (window.contrib_features, contrib_color, '--')):
+        boxed = [f for f in features if not f.is_flat and f.feat_box is not None]
+        if not boxed:
+            continue
+        x = names[0]
+        if len(names) == 1:
+            for f in boxed:
+                for edge in f.feat_box.bounds[x]:  # type: ignore
+                    ax.axvline(edge, color=color, linestyle=style, linewidth=linewidth)
+            if peaks:
+                # x in data units, y as a fraction of the axes height
+                ax.plot([f.location[x] for f in boxed], [0.] * len(boxed), '|', color=color,
+                        markersize=10, transform=ax.get_xaxis_transform(), clip_on=False)
+            continue
+        y = names[1]
+        rects = [Rectangle((f.feat_box.bounds[x][0], f.feat_box.bounds[y][0]),  # type: ignore
+                           f.feat_box.bounds[x][1] - f.feat_box.bounds[x][0],  # type: ignore
+                           f.feat_box.bounds[y][1] - f.feat_box.bounds[y][0])  # type: ignore
+                 for f in boxed]
+        ax.add_collection(PatchCollection(rects, facecolor='none', edgecolor=color,
+                                          linestyle=style, linewidth=linewidth))
+        if peaks:
+            ax.plot([f.location[x] for f in boxed], [f.location[y] for f in boxed], 'x',
+                    color=color, markersize=4)
+    # the boxes must not widen the view
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)

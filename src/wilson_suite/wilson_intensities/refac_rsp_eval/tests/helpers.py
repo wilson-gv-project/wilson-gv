@@ -84,6 +84,10 @@ MOTIF_A = (((('a', 'b'), ('a',)), ('A',)),)                                    #
 MOTIF_MIXED = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))             # A - B in one condition
 MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           # two conditions, one axis
 
+# MOTIF_AB plus A - B = E_ab - E_b, which follows from the other two: 3 conditions on 2 axes.
+# compile_terms rejects such a motif; solve_LSE_motif accepts it, since the conditions agree.
+MOTIF_AB_EXTRA = MOTIF_AB + (((('a', 'b'), ('b',)), ('A', '-B')),)
+
 
 # --- toy molecule data and a term with resonance labels a, b (build_contributions, compute_features) ---
 # The fixtures `states`, `molsys` and `molsys_a1_zero` (conftest.py) are built from these.
@@ -124,19 +128,31 @@ def row(coeff: float = 1., term_id: int = 0, motif: ResonanceMotif = ResonanceMo
                            location=ResLocPoint({'A': 0.}) if location is None else location, coeff=coeff)
 
 
+def cumulative_motif(axes: tuple[str, ...]) -> ResonanceMotif:
+    """
+    The shape of the stored response terms: condition k on the sum of the first k axes, e.g.
+    ('A', 'B', 'C') -> A = E_a - E_0, A + B = E_ab - E_0, A + B + C = E_abc - E_0.
+    As many conditions as axes. No axes -> ResonanceMotif(()), a flat background.
+    """
+    labels = 'abcd'
+    return ResonanceMotif.from_tuples([((tuple(labels[:k + 1]), ()), tuple(axes[:k + 1]))
+                                       for k in range(len(axes))])
+
+
 def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0, amp: float | None = 1.0,
          rows: tuple | None = None, box_extent: float | None = None, **coords: float) -> SpectralFeature:
     """
     A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1.
     The dict form is for N-dimensional tests: feat(coords(3, 100.)).
-    Without `rows`, the feature gets one row with coeff=amp and a=0 (amp=None -> no rows, so no amplitude).
+    Without `rows`, the feature gets one row with coeff=amp, a=0 and the motif
+    cumulative_motif(axes), so one width per axis (amp=None -> no rows, so no amplitude).
     No box, as before SpectralWindow.from_features gives one. box_extent gives it the box location +- box_extent on
     every axis (box_extent: the half-width in from_features, from the location to each box face), e.g.
     feat(A=0., box_extent=1.) has the box (-1, 1).
     """
     loc = ResLocPoint({**(location or {}), **coords})
     if rows is None:
-        rows = () if amp is None else (row(amp, location=loc, a=0),)
+        rows = () if amp is None else (row(amp, location=loc, motif=cumulative_motif(loc.axes), a=0),)
     box = None if box_extent is None else Box({ax: (v - box_extent, v + box_extent) for ax, v in loc.coordinates})
     return SpectralFeature(location=loc, rows=rows, propagator_param=gamma, feat_box=box)
 
