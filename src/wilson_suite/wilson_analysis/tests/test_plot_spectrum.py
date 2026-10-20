@@ -46,7 +46,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import EvalRspResul
 def toy_axes(a_range=(-20., 20.), b_range=(-20., 20.)) -> dict[str, np.ndarray]:
     """
     The grid points along each axis, in cm-1. A: 81 points over a_range. B: 41 points over b_range.
-    Same form as EvalRspResult.grid_axes.
+    Same form as EvalRspResult.axis_points.
     """
     return {'A': np.linspace(*a_range, 81), 'B': np.linspace(*b_range, 41)}
 
@@ -66,7 +66,7 @@ def toy_spectrum(a_range=(-20., 20.), peak=(0., 0.), amplitude=10.) -> tuple[np.
     """
     The 2D toy spectrum, as plot_spectrum takes it: (intensity, grid).
     intensity: shape (81, 41).
-    grid: one (81, 41) array per axis, like EvalRspResult.grid_mesh.
+    grid: one (81, 41) array per axis, like EvalRspResult.mesh.
     a_range moves the A axis. B always runs from -20 to 20.
     """
     axes = toy_axes(a_range)
@@ -85,11 +85,11 @@ def toy_spectrum_1d(peak=0., amplitude=10.) -> tuple[np.ndarray, dict[str, np.nd
 
 def toy_result(axes: dict[str, np.ndarray], peak=(0., 0.)) -> EvalRspResult:
     """
-    An EvalRspResult with only the two fields plot_rsp_func reads: grid_axes and grid_result.
-    grid_result: the toy amplitude, peak height 100. The other fields are None.
-    plot_rsp_func also uses grid_mesh. EvalRspResult builds grid_mesh from grid_axes.
+    An EvalRspResult with only the two fields plot_rsp_func reads: axis_points and amplitude.
+    amplitude: the toy amplitude, peak height 100. The other fields are None.
+    plot_rsp_func also uses mesh. EvalRspResult builds mesh from axis_points.
     """
-    return EvalRspResult(feature_result=None, grid_axes=axes, grid_result=toy_amplitude(axes, peak),  # type: ignore
+    return EvalRspResult(feature_result=None, axis_points=axes, amplitude=toy_amplitude(axes, peak),  # type: ignore
                          spectral_window=None)  # type: ignore
 
 
@@ -448,10 +448,11 @@ def test_raises_for_one_grid_axis_with_2d_intensity():
         plot_spectrum(intensity, {'A': grid['A']}, dynrange=100.)
 
 
-def test_raises_for_grid_axes_that_are_not_full_arrays():
+def test_raises_for_axis_points_that_are_not_full_arrays():
     """
-    The grid must hold one full array per axis, of the intensity's shape (81, 41), like grid_mesh.
-    Here the grid holds the 1D points instead, shapes (81,) and (41,), like grid_axes. This raises ValueError.
+    The grid must hold one full array per axis, of the intensity's shape (81, 41), like EvalRspResult.mesh.
+    Here the grid holds the points along each axis instead, shapes (81,) and (41,), like
+    EvalRspResult.axis_points. This raises ValueError.
     """
     intensity, _ = toy_spectrum()
 
@@ -478,16 +479,16 @@ def test_raises_when_no_intensity_is_above_0(spectrum):
 
 ## plot_rsp_func --------------------------------------------------------------
 
-def test_plot_rsp_func_plots_the_intensity_of_the_amplitudes_on_the_grid_mesh():
+def test_plot_rsp_func_plots_the_intensity_of_the_amplitudes_on_the_mesh():
     """
-    plot_rsp_func(spec) must give the same plot as plot_spectrum(|grid_result|^2, grid_mesh).
+    plot_rsp_func(spec) must give the same plot as plot_spectrum(|amplitude|^2, mesh).
     The test compares the levels, the top band (get_paths()[-2]) and the axis labels.
     The peak sits off centre (A = 10, B = -5). So swapped axes would move the top band, and the test would fail.
     """
     spec = toy_result(toy_axes(), peak=(10., -5.))
 
     _, ax, contour, _ = plot_rsp_func(spec, dynrange=100., nlevels=3)
-    _, ax_direct, direct, _ = plot_spectrum(np.abs(spec.grid_result) ** 2, spec.grid_mesh, dynrange=100., nlevels=3)
+    _, ax_direct, direct, _ = plot_spectrum(np.abs(spec.amplitude) ** 2, spec.mesh, dynrange=100., nlevels=3)
 
     np.testing.assert_allclose(np.asarray(contour.levels), np.asarray(direct.levels))
     np.testing.assert_allclose(np.asarray(contour.get_paths()[-2].vertices),
@@ -496,12 +497,12 @@ def test_plot_rsp_func_plots_the_intensity_of_the_amplitudes_on_the_grid_mesh():
 
 
 def test_plot_rsp_func_plots_a_1d_result():
-    """A result with one axis (A). The line must show |grid_result|^2 / max. No colorbar."""
+    """A result with one axis (A). The line must show |amplitude|^2 / max. No colorbar."""
     spec = toy_result({'A': toy_axes()['A']}, peak=(5.,))
 
     _, _, line, colorbar = plot_rsp_func(spec, dynrange=100.)
 
-    intensity = np.abs(spec.grid_result) ** 2
+    intensity = np.abs(spec.amplitude) ** 2
     np.testing.assert_allclose(np.asarray(line.get_ydata()), intensity / intensity.max())
     assert colorbar is None
 

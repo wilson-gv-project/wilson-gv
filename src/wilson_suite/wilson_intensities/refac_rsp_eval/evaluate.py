@@ -21,7 +21,12 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     ContributionRow,
     ContributionTable,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import box_slices
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+    AxisPoints,
+    Mesh,
+    box_slices,
+    make_mesh,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResLocPoint,
@@ -666,12 +671,13 @@ def lorentzian_propagator(resloc: float | np.ndarray, gamma: float | np.ndarray)
 # evaluating resloc for, e.g., 1 / (resloc - i*gamma) - lorentzian propagator
 def eval_rescond_resloc(res_cond_key: 'ResCondKey',
                          vib_diff: VibDiff,
-                         grid: dict[str, np.ndarray]) -> float | np.ndarray:
+                         mesh_au: Mesh) -> float | np.ndarray:
     """
     Distance from resonance of one condition at every grid point: E - freq, in Eh.
         E    = vib_diff.energy_difference(au=True) = E_left - E_right
         freq = signed sum of the grid axes in res_cond_key.pf, e.g. ('-A', 'B') -> B - A
-    Zero where freq = E: the same point solve_LSE_motif finds. grid must be in Eh.
+    Zero where freq = E: the same point solve_LSE_motif finds.
+    mesh_au: the grid points in Eh (grid.Mesh), or one number per axis for one point.
 
     Sign: E - freq, because derive defines a resonance condition that way.
       - ResonanceCondition (wilson_derive/abstractions.py): "perturbing frequencies to be subtracted".
@@ -687,7 +693,7 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
         everywhere, so |amplitude|^2 stays the same. -i*gamma matches to_str and the old code
         (deleted in E9; d93cc7b is the last commit with it).
     """
-    freq = sum((-1 if ax.startswith('-') else 1) * grid[ax.lstrip('-')] for ax in res_cond_key.pf)
+    freq = sum((-1 if ax.startswith('-') else 1) * mesh_au[ax.lstrip('-')] for ax in res_cond_key.pf)
     return vib_diff.energy_difference(au=True) - freq
 
 
@@ -695,12 +701,13 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
 def eval_resonance_factor(motif: 'ResonanceMotif',
                           parameters: ParameterSet,
                           vibstates_data: 'VibStatesData',
-                          grid: dict[str, np.ndarray],
+                          mesh_au: Mesh,
                           propagator: Callable[[float|np.ndarray, float|np.ndarray], complex],
                           propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray: # FIXME change VibDiff to any or smth
     """
     One motif consists of resonance conditions from a single term.
 
+    mesh_au - the grid points in Eh (grid.Mesh), as for eval_rescond_resloc
     propagator - function that takes (resloc, parameter) and returns the resonance factor, e.g., lorentzian_propagator
     propagator_param - vd -> the propagator's parameter in Eh, one call per condition. The Eh form of
                        feature.propagator_param (cm-1, a number or a (vd, freqs) function), which
@@ -712,7 +719,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 
         vd = VibDiff.from_quanta(*res_cond_key.diff, index_dict=parameters.to_dict(), vibstates_data=vibstates_data)
 
-        resloc = eval_rescond_resloc(res_cond_key, vd, grid)
+        resloc = eval_rescond_resloc(res_cond_key, vd, mesh_au)
 
         result *= propagator(resloc, propagator_param(vd))
 
@@ -722,14 +729,15 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 # feature is one amplitude (the sum of the row coefficients) times one resonance factor
 def eval_feature_on_grid(feature: 'SpectralFeature',
                          vibstates_data: 'VibStatesData',
-                         grid_cm: dict[str, np.ndarray],
+                         mesh_cm: Mesh,
                          propagator: Callable=lorentzian_propagator) -> complex | np.ndarray:
     """
-    amplitude_coeff * resonance factor of the feature's motif. grid in cm-1, result in au.
+    amplitude_coeff * resonance factor of the feature's motif, at every point of mesh_cm (grid.Mesh, cm-1).
+    Result in au, of the mesh's shape.
 
     The propagator's parameter is feature.propagator_param, cm-1 (converted to Eh here):
         a number   -> the same on every condition
-        a function -> propagator_param(vd, grid_cm) for each condition (features.PropagatorParam):
+        a function -> propagator_param(vd, mesh_cm) for each condition (features.PropagatorParam):
                       a number per condition, or an array of the grid's shape for one that changes with
                       the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
     The box and get_intensity take the same propagator_param, at the peak (SpectralFeature.peak_widths).
@@ -739,7 +747,7 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     if param is None:
         raise ValueError(f'feature {feature} has no propagator_param')
     if callable(param):
-        param_au = lambda vd: convNu2Ene(param(vd, grid_cm)) # type: ignore
+        param_au = lambda vd: convNu2Ene(param(vd, mesh_cm)) # type: ignore
     else:
         gamma_au = convNu2Ene(param)
         param_au = lambda _vd: gamma_au
@@ -751,60 +759,60 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
         raise ValueError(f'feature {feature} has no amplitude_coeff')
 
     if feature.is_flat:
-        shape = np.broadcast_shapes(*(np.shape(v) for v in grid_cm.values()))
+        shape = np.broadcast_shapes(*(np.shape(v) for v in mesh_cm.values()))
         return np.full(shape, complex(feature.amplitude_coeff))
 
-    grid_au = {ax: convNu2Ene(v) for ax, v in grid_cm.items()}
+    mesh_au = {ax: convNu2Ene(v) for ax, v in mesh_cm.items()}
 
     resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
-                                             grid_au, propagator, propagator_param=param_au)
+                                             mesh_au, propagator, propagator_param=param_au)
 
     return feature.amplitude_coeff * resonance_factor
 
 
-# features on every point of coords_cm, no boxes
+# features on every point of axis_points_cm, no boxes
 def all_features_on_grid(features: Iterable['SpectralFeature'],
              vibstates_data: 'VibStatesData',
-             coords_cm: dict[str, np.ndarray]) -> np.ndarray:
+             axis_points_cm: AxisPoints) -> np.ndarray:
     """
-    Sum of eval_feature_on_grid over `features`, each on every point of coords_cm:
+    Sum of eval_feature_on_grid over `features`, each on every point of the grid:
     the whole grid, or one cut of it (box_slices).
-    The points are every combination of the 1D points (ij indexing),
-    e.g. A with 5 points, B with 3 -> 15 points, shape (5, 3).
+    The grid points are every combination of the points along each axis (grid.make_mesh,
+    ij indexing), e.g. A with 5 points, B with 3 -> 15 points, shape (5, 3).
     On the whole grid nothing is cut off, so this is the reference for the evaluation
     box by box (boxed_features_on_grid). Slow for many features on big grids.
 
-    coords_cm - one 1D array per axis, cm-1, e.g. the first output of Box.make_grid
-    Returns the complex amplitude in au; array dimension i is the i-th axis of coords_cm.
+    axis_points_cm - the grid (grid.AxisPoints), cm-1, e.g. Box.grid_points of the window
+    Returns the complex amplitude in au; array dimension k is the k-th axis of axis_points_cm.
     intensity = abs(amplitude)**2
     """
-    mesh = dict(zip(coords_cm, np.meshgrid(*coords_cm.values(), indexing='ij')))
-    total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
+    mesh_cm = make_mesh(axis_points_cm)
+    amplitude = np.zeros(tuple(len(points) for points in axis_points_cm.values()), dtype=complex)
     for feature in features:
-        total += eval_feature_on_grid(feature, vibstates_data, mesh)
-    return total
+        amplitude += eval_feature_on_grid(feature, vibstates_data, mesh_cm)
+    return amplitude
 
 
 # the window's features, each on its own cut of the grid
 def boxed_features_on_grid(window: 'SpectralWindow',
                 vibstates_data: 'VibStatesData',
-                coords_cm: dict[str, np.ndarray]) -> np.ndarray:
+                axis_points_cm: AxisPoints) -> np.ndarray:
     """
     The spectrum on the grid: every feature of the window on its own cut of the grid.
 
     How the result comes together:
-      1. total: one complex 0 per grid point, e.g. shape (501, 201)
+      1. amplitude: one complex 0 per grid point, e.g. shape (501, 201)
       2. for each feature (full_features, then contrib_features):
-         a. box_slices: the index range per axis that covers its box, cut at the grid
-            edges; None for a box outside the grid: that feature adds nothing
-         b. the cut: the 1D points of coords_cm in those ranges. The cut is a part of
+         a. cut = box_slices(its box): the index range per axis that covers the box, cut
+            at the grid edges; None for a box outside the grid: that feature adds nothing
+         b. cut_points: the points of axis_points_cm in those ranges. The cut is a part of
             the same grid, not a new grid
-         c. the feature on the cut (all_features_on_grid), added into total at the cut
-      3. total, not squared: intensity = abs(total)**2
+         c. the feature on cut_points (all_features_on_grid), added into amplitude[cut]
+      3. amplitude, not squared: intensity = abs(amplitude)**2
 
     e.g. grid points A = 0, 1, ..., 10; box of f1 (1.5, 4.5), box of f2 (3., 7.):
         f1 -> slice(1, 6), points 1 to 5;  f2 -> slice(3, 8), points 3 to 7
-        total: points 3 to 5 get f1 + f2, points 1 and 2 f1, points 6 and 7 f2, the rest 0
+        amplitude: points 3 to 5 get f1 + f2, points 1 and 2 f1, points 6 and 7 f2, the rest 0
 
     Where cuts overlap, the amplitudes add before squaring, as in all_features_on_grid,
     so overlapping peaks interfere. Left out: each feature's tail beyond its cut.
@@ -819,23 +827,23 @@ def boxed_features_on_grid(window: 'SpectralWindow',
     on the whole domain box): that hid part of the cut of the old boxes, at up to 20 times
     the cost. With amplitude boxes the own box is enough.
 
-    window    - e.g. from SpectralWindow.from_features, so every feature has its box
-                (a flat feature: the window)
-    coords_cm - one 1D array per window axis, cm-1, e.g. the first output of
-                window.sample_grid
+    window         - e.g. from SpectralWindow.from_features, so every feature has its box
+                     (a flat feature: the window)
+    axis_points_cm - the grid (grid.AxisPoints), cm-1, one axis per window axis, e.g.
+                     window.box.grid_points(dim_sizes)
     Returns the complex amplitude in au, laid out as in all_features_on_grid.
     """
-    total = np.zeros(tuple(len(points) for points in coords_cm.values()), dtype=complex)
+    amplitude = np.zeros(tuple(len(points) for points in axis_points_cm.values()), dtype=complex)
     for feature in window.full_features + window.contrib_features:
         if feature.feat_box is None:
             raise ValueError(f'feature {feature} has no box: SpectralWindow.from_features gives one')
         # a. the index range per axis that covers the box
-        slices = box_slices(feature.feat_box, coords_cm)
-        if slices is None:
+        cut = box_slices(feature.feat_box, axis_points_cm)
+        if cut is None:
             continue
-        # b. the cut: the grid's 1D points in those ranges
-        box_coords = {ax: points[s] for (ax, points), s in zip(coords_cm.items(), slices)}
-        # c. the feature on the cut, added into total at the same points
-        total[slices] += all_features_on_grid([feature], vibstates_data, box_coords)
-    return total
+        # b. the grid's points in those ranges
+        cut_points = {ax: points[s] for (ax, points), s in zip(axis_points_cm.items(), cut)}
+        # c. the feature on the cut, added into amplitude at the same points
+        amplitude[cut] += all_features_on_grid([feature], vibstates_data, cut_points)
+    return amplitude
 

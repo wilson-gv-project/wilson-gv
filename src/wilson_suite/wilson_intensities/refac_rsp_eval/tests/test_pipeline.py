@@ -199,8 +199,8 @@ def test_spectrum_on_grid_adds_a_term_without_conditions_on_every_grid_point(mol
     spec = spectrum_on_grid(with_flat, window, dim_sizes, box_rule=boxes)
 
     assert flat.amplitude_coeff != 0.
-    alone_on_grid = spectrum_on_grid(alone, window, dim_sizes, box_rule=boxes).grid_result
-    np.testing.assert_allclose(spec.grid_result, alone_on_grid + flat.amplitude_coeff)
+    alone_on_grid = spectrum_on_grid(alone, window, dim_sizes, box_rule=boxes).amplitude
+    np.testing.assert_allclose(spec.amplitude, alone_on_grid + flat.amplitude_coeff)
 
 
 def test_feature_result_made_by_hand_gives_a_propagator_param_function_no_conditions():
@@ -812,22 +812,22 @@ def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
     assert strongest.peak_widths() == pytest.approx((3. + 0.002 * 2682.765, 3.))
 
     # the grid: 101 points per axis, from edge to edge of the window
-    assert list(spec.grid_axes) == ['A', 'B']
+    assert list(spec.axis_points) == ['A', 'B']
     for ax, (mn, mx) in WINDOW_AROUND_STRONGEST.bounds.items():
-        points = spec.grid_axes[ax]
+        points = spec.axis_points[ax]
         assert (points[0], points[-1], len(points)) == pytest.approx((mn, mx, 101))
-    assert spec.grid_result.shape == (101, 101)
-    intensity = np.abs(spec.grid_result) ** 2
+    assert spec.amplitude.shape == (101, 101)
+    intensity = np.abs(spec.amplitude) ** 2
 
     # at the strongest feature: its own peak height (get_intensity), plus about 2 % from its neighbours
-    i = np.argmin(np.abs(spec.grid_axes['A'] - 2682.765))
-    j = np.argmin(np.abs(spec.grid_axes['B']))
+    i = np.argmin(np.abs(spec.axis_points['A'] - 2682.765))
+    j = np.argmin(np.abs(spec.axis_points['B']))
     assert intensity[i, j] == pytest.approx(strongest.get_intensity(), rel=0.05)
 
     # box by box (boxed_features_on_grid) vs every feature on the whole grid (all_features_on_grid): at most
     # eps = 0.1 floors (floor: max / dynrange), measured 0.05 (4.8e-5 of the max; 0.3 % with the boxes of before
     # 2026-10-14)
-    reference = np.abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
+    reference = np.abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
     assert np.max(np.abs(intensity - reference)) < 0.1 * reference.max() / 1001.
 
 
@@ -838,16 +838,16 @@ def test_spectrum_on_grid_width_function_of_a_constant_gives_the_same_as_the_num
     function = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
                              WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
 
-    np.testing.assert_allclose(function.grid_result, number.grid_result)
+    np.testing.assert_allclose(function.amplitude, number.amplitude)
 
 
-def test_spectrum_on_grid_grid_mesh_holds_every_grid_point(top_run):
-    """grid_mesh['A'][i, j] = grid_axes['A'][i], grid_mesh['B'][i, j] = grid_axes['B'][j]: the form the renderer reads"""
+def test_spectrum_on_grid_mesh_holds_every_grid_point(top_run):
+    """mesh['A'][i, j] = axis_points['A'][i], mesh['B'][i, j] = axis_points['B'][j]: the form the renderer reads"""
     spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
-    mesh, points = spec.grid_mesh, spec.grid_axes
+    mesh, points = spec.mesh, spec.axis_points
 
     assert list(mesh) == ['A', 'B']
-    assert mesh['A'].shape == mesh['B'].shape == spec.grid_result.shape == (101, 101)
+    assert mesh['A'].shape == mesh['B'].shape == spec.amplitude.shape == (101, 101)
     for k in (0, 7, 100):
         np.testing.assert_array_equal(mesh['A'][:, k], points['A'])
         np.testing.assert_array_equal(mesh['B'][k, :], points['B'])
@@ -922,8 +922,8 @@ def test_spectrum_on_grid_with_the_intensity_rule(top_run):
 
     kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
     assert kept and all(get_box_extent(f) == pytest.approx(51.7) for f in kept)
-    intensity = np.abs(spec.grid_result) ** 2
-    reference = np.abs(all_features_on_grid(top_run.result.features, top_run.result.states, spec.grid_axes)) ** 2
+    intensity = np.abs(spec.amplitude) ** 2
+    reference = np.abs(all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points)) ** 2
     assert np.max(np.abs(intensity - reference)) > reference.max() / 101.
 
 
@@ -938,7 +938,7 @@ def test_spectrum_on_grid_with_a_new_width_reuses_the_rows(formaldehyde_molsys):
     assert all(f.propagator_param == 8. for f in wider.feature_result.features)
     new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
                             box_rule=AMPLITUDE_BOXES)
-    np.testing.assert_allclose(wider.grid_result, new_run.grid_result)
+    np.testing.assert_allclose(wider.amplitude, new_run.amplitude)
 
 
 def test_spectrum_on_grid_on_another_window_reuses_the_features(formaldehyde_molsys):
@@ -950,7 +950,7 @@ def test_spectrum_on_grid_on_another_window_reuses_the_features(formaldehyde_mol
 
     assert again.feature_result is result
     new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), other, sizes, box_rule=AMPLITUDE_BOXES)
-    np.testing.assert_allclose(again.grid_result, new_run.grid_result)
+    np.testing.assert_allclose(again.amplitude, new_run.amplitude)
 
 
 def test_spectrum_on_grid_takes_the_box_rule_by_keyword(top_run):

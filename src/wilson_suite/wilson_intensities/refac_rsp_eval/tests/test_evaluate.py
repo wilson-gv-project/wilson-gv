@@ -43,7 +43,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     amplitude_half_widths,
     condition_states,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices, make_mesh
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     FreqTermsCollection,
@@ -1304,12 +1304,12 @@ def test_eval_feature_on_grid_gives_the_propagator_resloc_and_gamma_in_eh(motif,
     The states come from the feature's own params: a=0, b=1 and a=1, b=0 resonate at different places.
     """
     f = feature_at_solved_location(motif, ps, states)
-    grid_cm = grid_around(f.location.as_dict(), G_CM)
+    mesh_cm = grid_around(f.location.as_dict(), G_CM)
     propagator = RecordingPropagator()
 
-    eval_feature_on_grid(f, states, grid_cm, propagator)
+    eval_feature_on_grid(f, states, mesh_cm, propagator)
 
-    residuals = resonance_residuals(ResonanceMotif.from_tuples(motif), to_au(grid_cm), ps.to_dict(), states)  # type: ignore
+    residuals = resonance_residuals(ResonanceMotif.from_tuples(motif), to_au(mesh_cm), ps.to_dict(), states)  # type: ignore
     assert len(propagator.calls) == len(motif)
     for (resloc, gamma), expected in zip(propagator.calls, residuals):
         np.testing.assert_allclose(resloc, expected, atol=1e-15)   # atol: the centre point is 0
@@ -1445,9 +1445,9 @@ def test_eval_feature_on_grid_propagator_param_function_gives_each_condition_its
     (-1 + i)/160 -> -0.001875 + 0.001875i.
     """
     f = feature_at_solved_location(MOTIF_AB, PS_01, states, propagator_param=lambda vd, freqs: vd.energy_difference() / 100)
-    grid_cm = {'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])}
+    mesh_cm = {'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])}
 
-    value = eval_feature_on_grid(f, states, grid_cm)
+    value = eval_feature_on_grid(f, states, mesh_cm)
 
     expected = [-0.00375, -0.001875 + 0.001875j, -0.001875 + 0.001875j]
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
@@ -1527,25 +1527,25 @@ def test_eval_feature_on_grid_flat_feature_is_its_coefficient_on_every_point(gri
 def test_all_features_on_grid_is_the_sum_of_the_features_on_the_whole_grid(states):
     peak = feature_at_solved_location(MOTIF_AB, PS_01, states)
     ridge = feature_at_solved_location(MOTIF_A, PS_10, states)
-    coords = {'A': np.array([1100., 1600.]), 'B': np.array([495., 500., 505.])}
-    mesh = dict(zip(coords, np.meshgrid(*coords.values(), indexing='ij')))
+    axis_points = {'A': np.array([1100., 1600.]), 'B': np.array([495., 500., 505.])}
+    mesh = make_mesh(axis_points)
 
-    value = all_features_on_grid([peak, ridge], states, coords)
+    value = all_features_on_grid([peak, ridge], states, axis_points)
 
     expected = eval_feature_on_grid(peak, states, mesh) + eval_feature_on_grid(ridge, states, mesh)
     np.testing.assert_allclose(value, expected)
 
 
 def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(states):
-    """ij indexing: value[i, j] belongs to A = coords['A'][i], B = coords['B'][j]; A has 5 points, B has 3."""
+    """ij indexing: value[i, j] belongs to A = axis_points['A'][i], B = axis_points['B'][j]; A has 5 points, B has 3."""
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    coords = {'A': 1600. + np.array([-10., -5., 0., 5., 10.]), 'B': 500. + np.array([-5., 0., 5.])}
+    axis_points = {'A': 1600. + np.array([-10., -5., 0., 5., 10.]), 'B': 500. + np.array([-5., 0., 5.])}
 
-    value = all_features_on_grid([f], states, coords)
+    value = all_features_on_grid([f], states, axis_points)
 
     assert value.shape == (5, 3)
-    for i, a in enumerate(coords['A']):
-        for j, b in enumerate(coords['B']):
+    for i, a in enumerate(axis_points['A']):
+        for j, b in enumerate(axis_points['B']):
             assert value[i, j] == pytest.approx(eval_feature_on_grid(f, states, {'A': a, 'B': b}))  # type: ignore
 
 
@@ -1556,9 +1556,9 @@ def test_all_features_on_grid_adds_amplitudes_so_opposite_features_cancel(states
     """
     plus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(0.3,))
     minus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(-0.3,))
-    coords = {'A': np.array([1595., 1600.]), 'B': np.array([500., 505.])}
+    axis_points = {'A': np.array([1595., 1600.]), 'B': np.array([500., 505.])}
 
-    np.testing.assert_allclose(all_features_on_grid([plus, minus], states, coords), 0.)
+    np.testing.assert_allclose(all_features_on_grid([plus, minus], states, axis_points), 0.)
 
 
 def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
@@ -1580,13 +1580,13 @@ def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_b
     """
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
     window = SpectralWindow.from_features(Box({'A': (1500., 1700.), 'B': (300., 700.)}), [f], [55.])
-    coords, _ = window.sample_grid({'A': 201, 'B': 401})
+    axis_points = window.box.grid_points({'A': 201, 'B': 401})
 
-    value = boxed_features_on_grid(window, states, coords)
+    value = boxed_features_on_grid(window, states, axis_points)
 
     inside = np.zeros(value.shape, dtype=bool)
-    inside[box_slices(window.full_features[0].feat_box, coords)] = True  # type: ignore
-    np.testing.assert_allclose(value[inside], all_features_on_grid([f], states, coords)[inside])
+    inside[box_slices(window.full_features[0].feat_box, axis_points)] = True  # type: ignore
+    np.testing.assert_allclose(value[inside], all_features_on_grid([f], states, axis_points)[inside])
     assert not value[~inside].any()
 
 
@@ -1599,11 +1599,11 @@ def test_boxed_features_on_grid_overlapping_boxes_add_their_amplitudes(states):
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [550., 550.])
-    coords, _ = window.sample_grid({'A': 251})
+    axis_points = window.box.grid_points({'A': 251})
 
-    value = boxed_features_on_grid(window, states, coords)
+    value = boxed_features_on_grid(window, states, axis_points)
 
-    np.testing.assert_allclose(value, all_features_on_grid([weak, strong], states, coords))
+    np.testing.assert_allclose(value, all_features_on_grid([weak, strong], states, axis_points))
 
 
 def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(states):
@@ -1614,13 +1614,13 @@ def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(states):
     weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
     strong = feature_at_solved_location(MOTIF_A, PS_10, states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [10., 550.])
-    coords, _ = window.sample_grid({'A': 251})        # A = 900, 901, ..., 1150
+    axis_points = window.box.grid_points({'A': 251})        # A = 900, 901, ..., 1150
 
-    value = boxed_features_on_grid(window, states, coords)
+    value = boxed_features_on_grid(window, states, axis_points)
 
-    weak_box = (coords['A'] >= 940.) & (coords['A'] <= 960.)
-    expected = all_features_on_grid([strong], states, coords)
-    expected[weak_box] += all_features_on_grid([weak], states, {'A': coords['A'][weak_box]})
+    weak_box = (axis_points['A'] >= 940.) & (axis_points['A'] <= 960.)
+    expected = all_features_on_grid([strong], states, axis_points)
+    expected[weak_box] += all_features_on_grid([weak], states, {'A': axis_points['A'][weak_box]})
     np.testing.assert_allclose(value, expected)
 
 
@@ -1632,9 +1632,9 @@ def test_boxed_features_on_grid_differs_from_all_features_on_grid_only_by_the_cu
     """
     features = [feature_at_solved_location(MOTIF_A, PS_10, states), feature_at_solved_location(MOTIF_A, PS_01, states)]
     window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), features, [55., 55.])
-    coords, _ = window.sample_grid({'A': 701})
+    axis_points = window.box.grid_points({'A': 701})
 
-    difference = boxed_features_on_grid(window, states, coords) - all_features_on_grid(features, states, coords)
+    difference = boxed_features_on_grid(window, states, axis_points) - all_features_on_grid(features, states, axis_points)
 
     at_box_edge = [abs(eval_feature_on_grid(f, states, {'A': f.location['A'] + get_box_extent(f)}))  # type: ignore
                    for f in window.full_features]
@@ -1648,9 +1648,9 @@ def on_grid_with_amplitude_boxes(features, window: Box, n_points: int, states, d
     """
     spectral_window = SpectralWindow.from_features(window, features,
                                                    amplitude_half_widths(window, features, dynrange=dynrange))
-    coords, _ = spectral_window.sample_grid({'A': n_points})
-    return (spectral_window, abs(boxed_features_on_grid(spectral_window, states, coords)) ** 2,
-            abs(all_features_on_grid(features, states, coords)) ** 2)
+    axis_points = spectral_window.box.grid_points({'A': n_points})
+    return (spectral_window, abs(boxed_features_on_grid(spectral_window, states, axis_points)) ** 2,
+            abs(all_features_on_grid(features, states, axis_points)) ** 2)
 
 
 def test_boxed_features_on_grid_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_strong_peak(states):
@@ -1721,8 +1721,8 @@ def test_boxed_features_on_grid_adds_a_flat_feature_on_every_grid_point(states):
     peak, box = feature_at_solved_location(MOTIF_AB, PS_01, states), Box({'A': (1500., 1700.), 'B': (300., 700.)})
     alone = SpectralWindow.from_features(box, [peak], [55.])
     with_flat = SpectralWindow.from_features(box, [peak, flat_feature(0.3)], [55., 0.])
-    coords, _ = alone.sample_grid({'A': 201, 'B': 401})
+    axis_points = alone.box.grid_points({'A': 201, 'B': 401})
 
-    value = boxed_features_on_grid(with_flat, states, coords)
+    value = boxed_features_on_grid(with_flat, states, axis_points)
 
-    np.testing.assert_allclose(value, boxed_features_on_grid(alone, states, coords) + 0.3)
+    np.testing.assert_allclose(value, boxed_features_on_grid(alone, states, axis_points) + 0.3)

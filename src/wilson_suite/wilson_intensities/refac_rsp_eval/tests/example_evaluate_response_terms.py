@@ -69,11 +69,11 @@ def main():
     t_on_grid = time.perf_counter() - t0
 
     # 5. what came out
-    grid_axes = spec.grid_axes                    # 1D points per axis, cm-1
-    mesh = spec.grid_mesh                         # every grid point, mesh['A'][i, j]: what a renderer reads
-    intensity = np.abs(spec.grid_result) ** 2     # grid_result: complex amplitude in au, [i_A, i_B]
+    axis_points = spec.axis_points                # the points along each axis, cm-1
+    mesh = spec.mesh                              # every grid point, mesh['A'][i, j]: what a renderer reads
+    intensity = np.abs(spec.amplitude) ** 2       # amplitude: complex, in au, [i_A, i_B]
     print(f'\ngrid {intensity.shape}: ' + ', '.join(
-        f'{ax} {pts[0]:.0f} .. {pts[-1]:.0f} cm-1, step {pts[1] - pts[0]:.2f}' for ax, pts in grid_axes.items()))
+        f'{ax} {pts[0]:.0f} .. {pts[-1]:.0f} cm-1, step {pts[1] - pts[0]:.2f}' for ax, pts in axis_points.items()))
 
     i, j = np.unravel_index(np.argmax(intensity), intensity.shape)
     print(f'brightest grid point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
@@ -108,7 +108,7 @@ def main():
     wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
     t_again = time.perf_counter() - t0
 
-    print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.grid_result) ** 2):.3e} au; '
+    print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.amplitude) ** 2):.3e} au; '
           f'rows reused: {wider.feature_result.table is result.table}; '
           f'rows {t_rows:.3f} s, first grid {t_on_grid:.3f} s, grid again {t_again:.3f} s')
 

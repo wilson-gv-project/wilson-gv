@@ -2,7 +2,7 @@
 1D and 2D spectra:
     plot_spectrum(intensity, grid, ...)   any intensity array on a grid
     plot_rsp_func(spec, ...)              the new evaluator's result (EvalRspResult, refac_rsp_eval):
-                                          plot_spectrum of |amplitude|^2 on spec.grid_mesh
+                                          plot_spectrum of |spec.amplitude|^2 on spec.mesh
 Both show intensity / top, from 1 / dynrange to 1 on a log scale; top: the largest intensity, or reference_max
 (spectra on one shared scale).
     1D  a line; y axis log
@@ -40,7 +40,7 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
     intensity      1D or 2D, real, e.g. abs(amplitude)**2, in au. Values <= 0 count as below the lowest level.
     grid           one entry per dimension of intensity, each a full array of the grid points with intensity's
                    shape: 1D the points themselves; 2D e.g. np.meshgrid(a_points, b_points, indexing='ij'),
-                   EvalRspResult.grid_mesh or the old spec_eval_setup.grid
+                   EvalRspResult.mesh or the old spec_eval_setup.grid
     dynrange       the plot's dynamic range, top / lowest intensity shown, e.g. 500. For a spectrum from
                    spectrum_on_grid, use the box rule's dynrange: with a larger one the plot shows where the boxes
                    cut the tails.
@@ -108,9 +108,9 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
 
 def plot_rsp_func(spec: 'EvalRspResult', *, dynrange: float, **options):
     """
-    The new evaluator's spectrum (spectrum_on_grid), 1D or 2D: plot_spectrum of |spec.grid_result|^2 on
-    spec.grid_mesh.
+    The new evaluator's spectrum (spectrum_on_grid), 1D or 2D: plot_spectrum of |spec.amplitude|^2 on
+    spec.mesh.
         fig, ax, contour, cbar = plot_rsp_func(spec, dynrange=500.)
     options: the keyword arguments of plot_spectrum, e.g. reference_max, ax, axis_labels
     """
-    return plot_spectrum(np.abs(spec.grid_result) ** 2, spec.grid_mesh, dynrange=dynrange, **options)
+    return plot_spectrum(np.abs(spec.amplitude) ** 2, spec.mesh, dynrange=dynrange, **options)

@@ -259,9 +259,10 @@ E. Pipeline
                 defaults); max_intensity (None: strongest in window)       scale_wrt_max_intensity, minimum_box_padding
         Outputs:
             FeatureResult     the rows (table), zero, features, states; leaves(row), cancelling(rel_tol)
-            EvalRspResult     grid_result (complex amplitude in au per grid point; the old sim.spec),
-                              grid_mesh (a full array per axis; the old spec_eval_setup.grid),
-                              grid_axes (1D points per axis), spectral_window (features and boxes)
+            EvalRspResult     amplitude (complex, in au, per grid point; the old sim.spec),
+                              mesh (a full array per axis; the old spec_eval_setup.grid),
+                              axis_points (the points along each axis), spectral_window (features and boxes)
+                              Until 2026-10-20: grid_result, grid_mesh, grid_axes.
         Not supported: data from more than one source (the old eval_by_prop_name); MolSystemData.load takes one
         origin (wilson_system/todo.txt S8). The old-vs-new check matched only without excluded modes (the two
         codes exclude differently).
@@ -388,8 +389,8 @@ E. Pipeline
             plot (plot_rsp_func, plot_spectrum)          1D and 2D only: raises for a slice of shape (201, 201, 1)
         The evaluation: a window zero-wide on the fixed axes, with 1 grid point there, e.g.
             spectrum_on_grid(result, Box({'A': (a0, a1), 'B': (b0, b1), 'C': (c0, c0)}), {'A': 201, 'B': 201, 'C': 1},
-                             box_rule=...)        -> grid_result (201, 201, 1), grid_axes['C'] = [c0]
-        Box allows min = max, make_grid gives 1 point, box_slices finds it, Box.overlaps keeps every feature whose
+                             box_rule=...)        -> amplitude (201, 201, 1), axis_points['C'] = [c0]
+        Box allows min = max, grid_points gives 1 point, box_slices finds it, Box.overlaps keeps every feature whose
         box reaches c0. Checked (a scratch script, not in git): 3 IR {A, B, C} on formaldehyde (72 features, gamma
         10 cm-1), slice (A, B) at the C of the strongest feature: 0.000 floors from all_features_on_grid,
         0.04-0.07 s per slice, 60 of 72 features reach the slice (1 on it). 4D chain term (mock data,
@@ -398,8 +399,8 @@ E. Pipeline
         for one complex array. So 4D needs slices.
         To do:
         [ ] the plot: plot_rsp_func drops the 1-point axes and shows their values in the title (about 5 lines).
-            By hand, today: plot_spectrum(abs(spec.grid_result[:, :, 0])**2,
-                                          {ax: m[:, :, 0] for ax, m in spec.grid_mesh.items() if ax != 'C'}, ...)
+            By hand, today: plot_spectrum(abs(spec.amplitude[:, :, 0])**2,
+                                          {ax: m[:, :, 0] for ax, m in spec.mesh.items() if ax != 'C'}, ...)
         [ ] the slice as an input: spectrum_on_grid(fixed={'C': c0}), or a helper that makes the window and dim_sizes.
             Test: the slice against all_features_on_grid.
         [ ] slice positions from the feature locations. Peaks are points: a slice 37 cm-1 from the strongest peak
@@ -655,9 +656,9 @@ H1  Prefer deleting to designing. A new type, cache or optimization needs a meas
     boxed_features_on_grid came with a test that measures how far it is from all_features_on_grid).
 H2  Make an abstraction on the second real use, not the first. No base classes, no registries, no second
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
-    Not followed yet (seen 2026-10-18): features.py:678 keeps the old body line of the property widths (marked
-    UNUSED) commented out. The old DataOriginInfo class, commented out in wilson_main/abstractions.py (96bcc63,
-    B1), was deleted in a778784.
+    Followed since 2026-10-20: the property SpectralWindow.widths (marked UNUSED, with its old body line
+    commented out) was deleted with the other unused window properties. The old DataOriginInfo class, commented
+    out in wilson_main/abstractions.py (96bcc63, B1), was deleted in a778784.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
     Not frozen yet: Box, SpectralFeature, SpectralWindow.

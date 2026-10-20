@@ -6,7 +6,7 @@ Spectral features, and the windows that hold them.
 
   holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, SpectralWindow
 
-Takes Box and box grids from grid.py; grid.py never imports from here.
+Takes Box from grid.py; grid.py never imports from here.
 """
 import copy
 from collections import defaultdict
@@ -27,9 +27,6 @@ from wilson_suite.wilson_system.system_data import VibDiff
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
-        DimBounds,
-    )
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
         ResLocPoint,
     )
@@ -64,7 +61,7 @@ K = TypeVar('K', bound=Hashable)   # group_by key
 #   a number   -> the same on every resonance condition, everywhere
 #   a function -> (vd, freqs) -> cm-1, called once per condition
 #       vd     the condition's pair of states (VibDiff), e.g. vd.energy_difference(), vd.left.state_label
-#       freqs  {axis: cm-1}: the grid points, on the grid (arrays of the grid's shape), the feature's location
+#       freqs  {axis: cm-1}: the grid points, on the grid (grid.Mesh: arrays of the grid's shape), the feature's location
 #              for its box and peak height (numbers, the feature's own axes only)
 #       e.g. lambda vd, freqs: 0.01 * abs(vd.energy_difference())    one width per condition
 #            lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])        changes with the frequency on A
@@ -249,15 +246,12 @@ class SpectralFeature:
         Return boolean for whether the feature location lies inside `box`, edges included.
         """
         self._check_same_axes(box)
-
-        inside = True
-        for ax, (mn, mx) in box.bounds.items():
-            inside &= (self.location[ax] >= mn) & (self.location[ax] <= mx)
-        return inside
+        return box.contains_point(self.location.as_dict())
 
     def feat_box_overlaps(self, box: Box) -> bool:
         """
-        Return boolean for whether the feature box (feat_box) overlaps `box`, touching edges excluded.
+        Return boolean for whether the feature box (feat_box) overlaps `box`, touching edges included
+        (a shared face, edge or corner; see Box.overlaps).
         """
         self._check_same_axes(box)
 
@@ -502,7 +496,7 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
                           dynrange: float,
                           box_range_safety_margin: float = 0.1,
                           scale_wrt_max_intensity: bool = False,
-                          minimum_box_padding: float = 0.,
+                          minimum_box_padding: float = 10.,
                           max_intensity: float | None = None) -> list[float]:
     """
     The box half-width of each feature, cm-1, in the order of `features`: the old code's rule,
@@ -527,7 +521,7 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
         dynrange                 the plot's dynamic range, max / floor, e.g. 100. Required.
         box_range_safety_margin  the boxes this much larger, e.g. 0.1 (default): 10 % larger.
         scale_wrt_max_intensity  False (default): each box to 1/dynrange of its own peak. True: to the floor.
-        minimum_box_padding      the smallest half-width, cm-1. Default 0, as the old settings on main.
+        minimum_box_padding      the smallest half-width, cm-1. Default 10, as debug_rendering's (main's: 0).
         max_intensity            used only when scaled. None (default): the strongest peak intensity of the
                                  features inside `window`, as the old callers took it.
     The old settings' defaults (EvaluationInfo, wilson_main/spectrum_abstractions.py): dynamic_range 100, margin 0.1,
@@ -535,6 +529,7 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     debug_rendering's EvaluationInfo has minimum_box_padding 10 (bc10f84): there it dropped none.
 
     Changed from dress_these_with_boxes:
+        - minimum_box_padding defaults to 10, not 0 (2026-10-20).
         - No feature is dropped (decided 2026-10-09). The old function dropped every feature below the floor
           (i < min_intensity) when minimum_box_padding was 0, scaled or not. Here such a feature keeps its box as
           above: unscaled the usual one; scaled, half-width minimum_box_padding (with 0: evaluated only on the grid
@@ -611,7 +606,8 @@ class SpectralWindow:
           1. a box around every feature: its location +- its half-width, the same on every axis
              half_widths: cm-1, one per feature, in the order of `features`, e.g. from a box rule (BoxRule):
              amplitude_half_widths or intensity_half_widths. The window does not care how they were chosen.
-          2. keep the features whose box overlaps `box` (touching edges excluded):
+          2. keep the features whose box overlaps `box` (touching edges included, so a feature with half-width 0
+             on the edge of `box` stays):
              location inside `box` -> full_features, outside -> contrib_features
           No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):
             - a weak feature stays, however weak
@@ -645,23 +641,3 @@ class SpectralWindow:
         return cls(box,
                    full_features=[f for f in kept if f.is_flat or f.is_inside(box)],
                    contrib_features=[f for f in kept if not (f.is_flat or f.is_inside(box))])
-
-    @property
-    def bounds(self) -> dict[str, 'DimBounds']:
-        return self.box.bounds
-
-    @property
-    def ndim(self) -> int:
-        return len(self.bounds)
-
-    # UNUSED
-    @property
-    def widths(self) -> dict[str, float]:
-        # return tuple(mx - mn for mn, mx in self.bounds)
-        return {k: (v[1]-v[0]) for k, v in self.bounds.items()}
-
-    def sample_grid(self, dim_sizes: dict[str, int]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
-        """
-        Regular grid over the window box, see Box.make_grid.
-        """
-        return self.box.make_grid(dim_sizes)

@@ -4,7 +4,8 @@ box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists o
     SETTINGS  tune the knobs of amplitude_half_widths
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes
     RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity (the old code's
-              rule) unscaled, scaled, and scaled with minimum_box_padding 10 cm-1 (the old setup's padding)
+              rule) unscaled, scaled with minimum_box_padding 0 (main's old default) and 10 cm-1 (the default here,
+              debug_rendering's)
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes rules
 Each takes a few minutes, mostly all_features_on_grid on ACDM.
 
@@ -72,7 +73,7 @@ RULES = [
     setting for dynrange in (100., 500., 1000.) for setting in (
         dict(dynrange=dynrange),
         dict(rule=intensity_half_widths, dynrange=dynrange),
-        dict(rule=intensity_half_widths, dynrange=dynrange, scale_wrt_max_intensity=True),
+        dict(rule=intensity_half_widths, dynrange=dynrange, scale_wrt_max_intensity=True, minimum_box_padding=0.),
         dict(rule=intensity_half_widths, dynrange=dynrange, scale_wrt_max_intensity=True, minimum_box_padding=10.),
     )
 ]
@@ -81,8 +82,8 @@ SHORT = {'scale_wrt_max_intensity': 'scaled', 'minimum_box_padding': 'padding', 
 
 def reference(result: FeatureResult, window: Box, dim_sizes: dict[str, int]) -> np.ndarray:
     """the intensity with nothing cut off: all_features_on_grid, on spectrum_on_grid's grid"""
-    coords, _ = window.make_grid(dim_sizes)
-    return np.abs(all_features_on_grid(result.features, result.states, coords)) ** 2
+    axis_points = window.grid_points(dim_sizes)
+    return np.abs(all_features_on_grid(result.features, result.states, axis_points)) ** 2
 
 
 def score(result: FeatureResult, window: Box, dim_sizes: dict[str, int], reference_intensity: np.ndarray,
@@ -92,7 +93,7 @@ def score(result: FeatureResult, window: Box, dim_sizes: dict[str, int], referen
     spec = spectrum_on_grid(result, window, dim_sizes, box_rule=partial(rule, **knobs))
     t_on_grid = time.perf_counter() - t0
 
-    intensity = np.abs(spec.grid_result) ** 2
+    intensity = np.abs(spec.amplitude) ** 2
     floor = reference_intensity.max() / knobs['dynrange']
     visible = reference_intensity > floor
     err = np.abs(intensity - reference_intensity)

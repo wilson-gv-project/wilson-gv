@@ -128,16 +128,16 @@ def main():
     features, t_feat = timed(features_from_rows, table, GAMMA_CM)
     half_widths, t_boxes = timed(amplitude_half_widths, box, features, dynrange=DYNRANGE, eps=EPS)
     window, t_window = timed(SpectralWindow.from_features, box, features, half_widths)
-    (coords, _), t_grid = timed(window.sample_grid, GRID)
-    spec, t_on_grid = timed(boxed_features_on_grid, window, molsys.states[STATES], coords)
+    axis_points, t_grid = timed(box.grid_points, GRID)
+    amplitude, t_on_grid = timed(boxed_features_on_grid, window, molsys.states[STATES], axis_points)
 
     n_in = len(window.full_features) + len(window.contrib_features)
     print(f'features_from_rows:          {t_feat:7.2f} s, {len(features)} features')
     print(f'amplitude_half_widths:       {t_boxes:7.2f} s')
     print(f'SpectralWindow.from_features: {t_window:6.2f} s, {n_in} features near the window '
           f'({len(window.full_features)} inside)')
-    print(f'sample_grid {GRID}:   {t_grid:6.2f} s')
-    print(f'boxed_features_on_grid:                 {t_on_grid:7.2f} s, max intensity {np.max(np.abs(spec)) ** 2:.3e}')
+    print(f'grid_points {GRID}:   {t_grid:6.2f} s')
+    print(f'boxed_features_on_grid:                 {t_on_grid:7.2f} s, max intensity {np.max(np.abs(amplitude)) ** 2:.3e}')
 
     t_rest = t_feat + t_boxes + t_window + t_grid + t_on_grid
     print(f'\ntotal without load: {t_build + t_rest:.1f} s (build_contributions {t_build:.1f} s, rest {t_rest:.1f} s)')

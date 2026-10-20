@@ -165,12 +165,12 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
 
     expected = np.zeros((POINTS[ndim],) * ndim, dtype=complex)
     for f in [*spec.spectral_window.full_features, *spec.spectral_window.contrib_features]:
-        inside = box_slices(f.feat_box, spec.grid_axes)  # type: ignore
-        expected[inside] += all_features_on_grid([f], chain_result.states, spec.grid_axes)[inside]
-    assert spec.grid_result.shape == expected.shape
-    np.testing.assert_allclose(spec.grid_result, expected)
-    every_point = all_features_on_grid(chain_result.features, chain_result.states, spec.grid_axes)
-    assert np.abs(spec.grid_result - every_point).max() > 0
+        inside = box_slices(f.feat_box, spec.axis_points)  # type: ignore
+        expected[inside] += all_features_on_grid([f], chain_result.states, spec.axis_points)[inside]
+    assert spec.amplitude.shape == expected.shape
+    np.testing.assert_allclose(spec.amplitude, expected)
+    every_point = all_features_on_grid(chain_result.features, chain_result.states, spec.axis_points)
+    assert np.abs(spec.amplitude - every_point).max() > 0
 
 
 ## real data: setups of the G7 survey (g7_survey.py), every pulse and the detector along x ---------------------
@@ -225,8 +225,8 @@ def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
 
     spec = spectrum_on_grid(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.))
 
-    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
-    assert 0. < np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.
+    reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
+    assert 0. < np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.
 
 
 ## 1D, real data: IR absorption on formaldehyde, with a flat background (E12) ----------------
@@ -306,8 +306,8 @@ def test_ir_absorption_on_grid_with_the_background_within_eps_floor_of_all_featu
 
     [flat] = [f for f in spec.spectral_window.full_features if f.is_flat]
     assert flat.feat_box == window
-    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
-    assert np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.
+    reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
+    assert np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.
 
 
 ## 3D, real data: 3 IR on formaldehyde -------------------------------------------
@@ -355,6 +355,6 @@ def test_three_ir_abc_set_on_a_3d_grid_within_eps_floor_of_all_features_on_grid(
     spec = spectrum_on_grid(result, window, {ax: 41 for ax in 'ABC'},
                             box_rule=partial(amplitude_half_widths, dynrange=500.))
 
-    reference = abs(all_features_on_grid(result.features, result.states, spec.grid_axes)) ** 2
-    assert spec.grid_result.shape == (41, 41, 41)
-    assert 0. < np.abs(abs(spec.grid_result) ** 2 - reference).max() < 0.1 * reference.max() / 500.
+    reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
+    assert spec.amplitude.shape == (41, 41, 41)
+    assert 0. < np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.

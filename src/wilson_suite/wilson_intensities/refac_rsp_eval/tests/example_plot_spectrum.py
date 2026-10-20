@@ -78,17 +78,17 @@ def main(out: Path):
     save(fig, out / '2_formaldehyde_zoom.png')
 
     # 2b. 1D: the zoom's row at B = b0, with plot_spectrum on plain arrays
-    j = int(np.argmin(np.abs(spec.grid_axes['B'] - b0)))
-    intensity = np.abs(spec.grid_result[:, j]) ** 2
-    fig, ax, _, _ = plot_spectrum(intensity, {'A': spec.grid_axes['A']}, dynrange=DYNRANGE, axis_labels=LABELS)
-    ax.set_title(f'1D: the zoom at B = {spec.grid_axes["B"][j]:.1f} cm$^{{-1}}$')
+    j = int(np.argmin(np.abs(spec.axis_points['B'] - b0)))
+    intensity = np.abs(spec.amplitude[:, j]) ** 2
+    fig, ax, _, _ = plot_spectrum(intensity, {'A': spec.axis_points['A']}, dynrange=DYNRANGE, axis_labels=LABELS)
+    ax.set_title(f'1D: the zoom at B = {spec.axis_points["B"][j]:.1f} cm$^{{-1}}$')
     save(fig, out / '2b_formaldehyde_zoom_1d.png')
 
     # 3. harmonic vs anharmonic: reference_max = the larger of the two maxima, so both share one scale
     window, sizes = Box({'A': (1100., 3000.), 'B': (5., 3000.)}), {'A': 401, 'B': 401}
     specs = {name: spectrum_on_grid(result, window, sizes, box_rule=BOXES)
              for name, result in (('anharmonic', anharmonic), ('harmonic', harmonic))}
-    reference_max = max(np.max(np.abs(s.grid_result)) ** 2 for s in specs.values())
+    reference_max = max(np.max(np.abs(s.amplitude)) ** 2 for s in specs.values())
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
     for ax, (name, spec) in zip(axes, specs.items()):
         plot_rsp_func(spec, dynrange=DYNRANGE, reference_max=reference_max, ax=ax, axis_labels=LABELS)

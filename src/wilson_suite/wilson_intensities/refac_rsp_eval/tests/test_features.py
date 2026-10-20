@@ -352,11 +352,19 @@ def test_feature_is_inside_includes_edges(a, inside):
     assert feat(A=a).is_inside(Box({'A': (0., 10.)})) == inside
 
 
-def test_feature_box_overlaps_excludes_touching_edges():
+def test_feature_box_overlaps_includes_touching_edges():
     box = Box({'A': (0., 10.)})
 
     assert feat(A=10.5, box_extent=1.).feat_box_overlaps(box)
-    assert not feat(A=11., box_extent=1.).feat_box_overlaps(box)  # boxes only touch
+    assert feat(A=11., box_extent=1.).feat_box_overlaps(box)  # boxes only touch
+    assert not feat(A=11.5, box_extent=1.).feat_box_overlaps(box)
+
+
+def test_window_from_features_keeps_a_feature_with_half_width_0_on_the_edge():
+    """its box is one point, on the window edge: it touches the window, so it stays (in full_features)"""
+    on_edge = feat(A=10., gamma=5.)
+
+    assert SpectralWindow.from_features(Box({'A': (0., 10.)}), [on_edge], [0.]).full_features == [on_edge]
 
 
 def test_feature_box_overlaps_needs_a_feature_box():
@@ -484,27 +492,6 @@ def test_max_intensity_feat_rejects_empty_list():
 def test_max_intensity_feat_rejects_features_that_all_have_zero_intensity():
     with pytest.raises(ValueError, match='None of the 2 features has a nonzero intensity'):
         SpectralFeature.get_max_intensity_feat([feat(A=0., amp=0.), feat(A=1., amp=0.)])
-
-
-## SpectralWindow -----------------------------------------------------------
-
-def test_window_bounds_ndim_and_widths():
-    window = SpectralWindow(Box({'B': (0., 4.), 'A': (10., 20.)}))
-
-    assert window.bounds == {'A': (10., 20.), 'B': (0., 4.)}
-    assert window.ndim == 2
-    assert window.widths == {'A': 10., 'B': 4.}
-
-
-def test_sample_grid_is_the_box_grid():
-    box = Box({'A': (0., 10.), 'B': (100., 200.)})
-
-    axes, grid = SpectralWindow(box).sample_grid({'A': 5, 'B': 3})
-    box_axes, box_grid = box.make_grid({'A': 5, 'B': 3})
-
-    for ax in ('A', 'B'):
-        np.testing.assert_array_equal(axes[ax], box_axes[ax])
-        np.testing.assert_array_equal(grid[ax], box_grid[ax])
 
 
 ## SpectralWindow.from_features ---------------------------------------------
@@ -712,7 +699,8 @@ def test_amplitude_half_widths_need_a_feature_with_rows_and_width(f, message):
 ## intensity_half_widths: the old code's box rule (dress_these_with_boxes until 2026-10-14) ---------
 # Unscaled: gamma * sqrt(dynrange - 1), the same for every strength.
 # Scaled: gamma * sqrt(dynrange * i / max_intensity - 1), 0 at or below the floor.
-# Then times (1 + box_range_safety_margin), at least minimum_box_padding (cm-1). gamma 5 cm-1: dynrange 101 -> 50 cm-1.
+# Then times (1 + box_range_safety_margin), at least minimum_box_padding (cm-1, default 10). gamma 5 cm-1: dynrange
+# 101 -> 50 cm-1.
 
 def test_intensity_half_widths_unscaled_are_the_same_for_every_strength():
     """three_strengths (intensities 1, 1e-4 and 1e-8 of the max), dynrange 101, no margin: 50 cm-1 each"""
@@ -758,14 +746,17 @@ def test_intensity_half_widths_scaled_never_drop_a_feature_below_the_floor(paddi
 
 
 def test_intensity_half_widths_scaled_by_a_given_max_intensity():
-    """max_intensity twice the strongest peak: k halves, 101 -> 50.5, so 5 * sqrt(49.5) for the strongest"""
+    """
+    max_intensity twice the strongest peak: k halves, 101 -> 50.5, so 5 * sqrt(49.5) for the strongest.
+    The two below the floor: the default minimum_box_padding, 10 cm-1.
+    """
     features = three_strengths()
 
     half_widths = intensity_half_widths(WINDOW_0_10, features, dynrange=101., box_range_safety_margin=0.,
                                         scale_wrt_max_intensity=True,
                                         max_intensity=2. * features[0].get_intensity())
 
-    assert half_widths == pytest.approx([5. * 49.5 ** 0.5, 0., 0.])
+    assert half_widths == pytest.approx([5. * 49.5 ** 0.5, 10., 10.])
 
 
 def test_intensity_half_widths_scaled_take_a_stronger_feature_outside_the_window():
@@ -942,6 +933,27 @@ def test_nd_window_from_features_needs_box_overlap_on_every_axis(ndim):
     assert window.full_features == [inside]
     assert window.contrib_features == [near]
     assert [get_box_extent(window.full_features[0], ax) for ax in AXES[:ndim]] == pytest.approx([55.] * ndim)
+
+
+@pytest.mark.parametrize('ndim', NDIMS)
+def test_nd_window_from_features_keeps_features_whose_box_touches_the_window(ndim):
+    """
+    Window (0, 10) on every axis.
+        on_corner  at 10 on every axis, half-width 0: its box is the window's corner point -> full_features
+                   (a location on the edge counts as inside)
+        touching   at 5 on every axis, 12 on the last, half-width 2: its box starts at 10 on the last axis, on the
+                   window's face -> contrib_features
+        apart      the same at 12.5: its box starts at 10.5 -> dropped
+    """
+    last = AXES[ndim - 1]
+    on_corner = feat(coords(ndim, 10.), gamma=5.)
+    touching = feat(coords(ndim, 5., **{last: 12.}), gamma=5.)
+    apart = feat(coords(ndim, 5., **{last: 12.5}), gamma=5.)
+
+    window = SpectralWindow.from_features(cube(ndim, 0., 10.), [on_corner, touching, apart], [0., 2., 2.])
+
+    assert window.full_features == [on_corner]
+    assert window.contrib_features == [touching]
 
 
 @pytest.mark.parametrize('ndim', NDIMS)

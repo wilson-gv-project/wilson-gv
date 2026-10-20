@@ -49,11 +49,23 @@ Outputs
                         leaves(row)     the summed index sets behind one row, computed again on demand
                         cancelling(rel_tol)   the features whose rows (nearly) cancel
     EvalRspResult     the spectrum on the grid:
-                        grid_axes       1D points per axis, cm-1
-                        grid_result     complex amplitude in au, one per grid point; intensity = abs(grid_result)**2
-                        grid_mesh       the grid points, one full array per axis: what the renderer reads
+                        axis_points     the points along each axis, cm-1: the grid is every combination of them
+                        amplitude       complex amplitude in au, one per grid point; intensity = abs(amplitude)**2
+                        mesh            every grid point, one full array per axis: what the renderer reads
                         spectral_window the features as evaluated on the grid, each with its box
                         feature_result  the FeatureResult it was made from
+
+Names in the grid part, one per kind of data (the types are in grid.py), e.g. A from 2600 to 2800 with 5 points:
+    window, feat_box  a Box: the range of each axis        {'A': (2600., 2800.)}
+    dim_sizes         the number of points per axis        {'A': 5}
+    axis_points       the points along each axis           {'A': [2600., 2650., 2700., 2750., 2800.]}
+                      (grid.AxisPoints, made by Box.grid_points); the grid is every combination of them
+    mesh              every grid point, one full array per axis (grid.Mesh, made by grid.make_mesh):
+                      mesh['A'][i, j] = axis_points['A'][i]. Built where it is used, one cut at a time
+    cut               where a feature's box sits in the grid: one slice per axis (grid.box_slices);
+                      cut_points: the axis_points inside the cut
+    amplitude         the complex amplitude, au, one value per grid point; intensity = abs(amplitude)**2
+    _cm, _au          the unit, where both occur: evaluate.py converts cm-1 to Eh (todo.txt H3)
 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
@@ -71,14 +83,14 @@ SpectralFeature(location, rows)                            "what" layer   featur
   │ 5. half-widths: box_rule(window, features), one per feature, cm-1   ← window, box_rule
   │    e.g. amplitude_half_widths: from each feature's amplitude; strong peaks get big boxes
   │ 6. boxes: SpectralWindow.from_features, a box of location ± half-width per feature.
-  │    Keeps a feature if its box reaches into the window: full_features (location inside),
-  │    contrib_features (outside). A flat feature's box is the window
-  │ 7. grid: sample_grid, dim_sizes[ax] points per axis, both edges included   ← dim_sizes
+  │    Keeps a feature if its box meets the window (touching counts): full_features
+  │    (location inside), contrib_features (outside). A flat feature's box is the window
+  │ 7. grid: axis_points = window.grid_points(dim_sizes), both edges included   ← dim_sizes
   │ 8. values: boxed_features_on_grid, each feature on its own cut of the grid (box_slices),
   │    added into one complex array; where cuts overlap, amplitudes add before squaring
   v
-EvalRspResult(grid_axes, grid_result, spectral_window)    the spectrum on the grid
-  │ 9. intensity = abs(grid_result)**2, e.g. plot_rsp_func (wilson_analysis/render)
+EvalRspResult(axis_points, amplitude, spectral_window)    the spectrum on the grid
+  │ 9. intensity = abs(amplitude)**2, e.g. plot_rsp_func (wilson_analysis/render)
   v
 the plot
 """
@@ -109,6 +121,12 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralWindow,
     features_from_rows,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+    AxisPoints,
+    Box,
+    Mesh,
+    make_mesh,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ParameterSet,
     ResonanceMotif,
@@ -120,7 +138,6 @@ from wilson_suite.wilson_system.system_data import MolSystemData
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
-    from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
     from wilson_suite.wilson_system.system_data import VibStatesData
 
 
@@ -368,22 +385,24 @@ class EvalRspResult:
     """
     The spectrum on a grid, made by spectrum_on_grid. Every field is set.
     feature_result   rows, features, and what they came from (molsys, polarization recipe, states_choice)
-    grid_axes        1D points per axis, cm-1, both window edges included, e.g. A and B with 201 points each
-    grid_result      complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
-                     grid_axes, e.g. shape (201, 201). intensity = abs(grid_result)**2
+    axis_points      the points along each axis, cm-1, both window edges included (grid.AxisPoints), e.g. A and B
+                     with 201 points each: the grid is every combination of them
+    amplitude        complex amplitude in au, one value per grid point; array dimension k is the k-th axis of
+                     axis_points, e.g. shape (201, 201). intensity = abs(amplitude)**2
     spectral_window  the window as used: its features, each with its box (each evaluated on its own box only).
                      full_features: inside the window; contrib_features: outside, with a box that reaches in.
-    grid_mesh        (property) the grid points as one full array per axis (ij meshgrid), grid_mesh['A'][i, j]:
-                     what the old EvaluatedSpectrum.axes held and the renderer reads
+    mesh             (property) every grid point, one full array per axis (grid.Mesh, grid.make_mesh),
+                     mesh['A'][i, j] = axis_points['A'][i]: what the old EvaluatedSpectrum.axes held and the
+                     renderer reads
     """
     feature_result: FeatureResult
-    grid_axes: dict[str, np.ndarray]
-    grid_result: np.ndarray
+    axis_points: AxisPoints
+    amplitude: np.ndarray
     spectral_window: SpectralWindow
 
     @cached_property
-    def grid_mesh(self) -> dict[str, np.ndarray]:
-        return dict(zip(self.grid_axes, np.meshgrid(*self.grid_axes.values(), indexing='ij')))
+    def mesh(self) -> Mesh:
+        return make_mesh(self.axis_points)
 
 
 def spectrum_on_grid(feature_result: FeatureResult,
@@ -395,8 +414,8 @@ def spectrum_on_grid(feature_result: FeatureResult,
     The features of feature_result on a grid over `window`, in four steps:
         1. box_rule(window, features): one box half-width per feature, cm-1
         2. SpectralWindow.from_features: a box around each feature; keeps the features
-           whose box reaches into the window
-        3. sample_grid: the grid, dim_sizes[ax] points per axis, both edges included
+           whose box meets the window (touching counts)
+        3. window.grid_points: the grid, dim_sizes[ax] points per axis, both edges included
         4. boxed_features_on_grid: each feature on its own cut of the grid, all added into
            one array (the steps and an example are there)
     The rows are not computed again (the slow part: build_contributions), so a new window,
@@ -424,9 +443,9 @@ def spectrum_on_grid(feature_result: FeatureResult,
     half_widths = box_rule(window, features)
 
     spectral_window = SpectralWindow.from_features(window, features, half_widths)
-    grid_axes, _ = spectral_window.sample_grid(dim_sizes)
-    
+    axis_points = window.grid_points(dim_sizes)
+
     # width on the grid
-    grid_result = boxed_features_on_grid(spectral_window, feature_result.states, grid_axes)
-    
-    return EvalRspResult(feature_result, grid_axes, grid_result, spectral_window)
+    amplitude = boxed_features_on_grid(spectral_window, feature_result.states, axis_points)
+
+    return EvalRspResult(feature_result, axis_points, amplitude, spectral_window)

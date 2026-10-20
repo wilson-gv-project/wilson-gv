@@ -2,14 +2,22 @@
 Pure geometry: bounds, boxes and grids. No physics, no SpectralFeature logic.
 
   in:  (min, max) bounds per named axis
-  out: Box, regular grid over a Box, the part of a grid that covers a Box (slices)
+  out: Box, the points of a regular grid over a Box (AxisPoints), every grid point (Mesh),
+       the cut of a Box in a grid (slices)
 
-  holds: Box, box_slices
+  holds: Box, make_mesh, box_slices
+
+The three forms of a grid's extent, e.g. A from 0 to 10 with 3 points, B from -1 to 1 with 2:
+    Box.bounds     the range of each axis, 2 numbers   {'A': (0., 10.), 'B': (-1., 1.)}
+    AxisPoints     the points along each axis          {'A': [0., 5., 10.], 'B': [-1., 1.]}
+    Mesh           every grid point, 3 x 2 of them     {'A': [[0., 0.], [5., 5.], [10., 10.]],
+                                                        'B': [[-1., 1.], [-1., 1.], [-1., 1.]]}
 
 Imports nothing from the rest of the package.
 """
 import math
 import numbers
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -18,6 +26,10 @@ import numpy as np
 MinBound = float
 MaxBound = float
 DimBounds = tuple[MinBound, MaxBound]
+# the points along each axis, ascending: the grid is every combination of them (Box.grid_points makes them)
+AxisPoints = dict[str, np.ndarray]
+# every grid point, one full array per axis, ij indexing: mesh['A'][i, j] = axis_points['A'][i] (make_mesh)
+Mesh = dict[str, np.ndarray]
 
 
 @dataclass
@@ -31,7 +43,7 @@ class Box:
         """
         Check and sort the bounds, given as dict[str, (min, max)],
         e.g. {'B': (5.0, 10.0), 'A': (0.0, 1.0)}.
-        Sets self.axes (sorted axis names) and self.ndim.
+        Sets self.axes (sorted axis names).
         """
         # --- Check the shape, sort by axis ---
         # Each value must be a (min, max) pair
@@ -61,17 +73,23 @@ class Box:
                 )
         # store plain floats, also for int and numpy inputs
         self.bounds = {ax: (float(mn), float(mx)) for ax, (mn, mx) in self.bounds.items()}
-        self.ndim = len(self.bounds)
 
     def __hash__(self):
         return hash(tuple(self.bounds.items()))
 
-    # -------------------------------------------------
-    # Box operations
-    # -------------------------------------------------
     def _check_same_axes(self, other: "Box"):
         if self.axes != other.axes:
             raise ValueError(f"box axes {self.axes} do not match {other.axes}")
+
+    def contains_point(self, point: Mapping[str, float]) -> bool:
+        """
+        True if `point` lies inside this box, edges included.
+        point: one coordinate per box axis, e.g. {'A': 0.5, 'B': 2.}.
+        e.g. A (0, 1) contains A = 0, 0.5 and 1, not 1.5.
+        """
+        if tuple(sorted(point)) != self.axes:
+            raise ValueError(f"point axes {tuple(sorted(point))} do not match box axes {self.axes}")
+        return all(mn <= point[ax] <= mx for ax, (mn, mx) in self.bounds.items())
 
     def contains_box(self, other: "Box") -> bool:
         """
@@ -88,72 +106,96 @@ class Box:
 
     def overlaps(self, other: "Box") -> bool:
         """
-        True if the boxes overlap on every axis; boxes that only touch count as apart.
-        Both boxes need the same axes. e.g. A (0, 1) overlaps A (0.5, 2), not A (1, 2).
+        True if the boxes have at least one point in common: on every axis their ranges meet, edges included.
+        So boxes that only touch overlap, on one axis (a shared face) or on more (a shared edge or corner).
+        Touching on one axis but apart on another: no point in common, no overlap.
+        Both boxes need the same axes. e.g. A (0, 1) overlaps A (0.5, 2), A (1, 2) (one point in common) and
+        A (1, 1), not A (1.5, 2). 2D, A (0, 1) B (0, 1) overlaps A (1, 2) B (0.5, 2) (a shared edge) and
+        A (1, 2) B (1, 2) (the corner (1, 1)), not A (1, 2) B (1.5, 2) (touches on A, apart on B).
         """
         self._check_same_axes(other)
         return all(
-            not (self.bounds[ax][1] <= other.bounds[ax][0]
-                 or other.bounds[ax][1] <= self.bounds[ax][0])
+            self.bounds[ax][0] <= other.bounds[ax][1] and other.bounds[ax][0] <= self.bounds[ax][1]
             for ax in self.axes
         )
 
-    def make_grid(
-        self, dim_sizes: dict[str, int]
-    ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    def grid_points(self, dim_sizes: dict[str, int]) -> AxisPoints:
         """
-        Generate a regular grid of points spanning the box.
+        The points of a regular grid over the box, along each axis (AxisPoints).
         Each axis gets n = dim_sizes[ax] points from min to max, both edges included:
         step = (max - min) / (n - 1). So n >= 2, except on a zero-width axis
         (min = max): n = 1.
-        Returns (1D coords per axis, meshgrid per axis); meshgrids use ij indexing,
-        array dimension i = self.axes[i].
+        e.g. A (0, 10) with 3 points, B (5, 5) with 1: {'A': [0., 5., 10.], 'B': [5.]}
         """
         if set(dim_sizes) != set(self.axes):
             raise ValueError(f"Expected one grid size per box axis {self.axes}, "
                              f"got sizes for {tuple(sorted(dim_sizes))}")
-        coords = {}
+        axis_points = {}
         for ax, (mn, mx) in self.bounds.items():
             n = dim_sizes[ax]
             if n < 1 or (n == 1 and mn < mx):
                 raise ValueError(f"Grid size {n} for {ax} on ({mn}, {mx}): "
                                  f"needs 2 or more points, or 1 with min = max")
-            coords[ax] = np.linspace(mn, mx, n)
-
-        mesh = np.meshgrid(*coords.values(), indexing="ij")
-        return coords, dict(zip(coords, mesh))
+            axis_points[ax] = np.linspace(mn, mx, n)
+        return axis_points
 
 
-def box_slices(box: Box, coords: dict[str, np.ndarray]) -> tuple[slice, ...] | None:
+def make_mesh(axis_points: AxisPoints) -> Mesh:
     """
-    Where `box` sits in a grid: one slice per axis, in the order of `coords`
-    (the grid's array dimensions). The smallest index range that covers the box:
-    the last grid point at or below min to the first at or above max, so the cut-out
-    grid holds the whole box. Cut at the grid edges.
-    None if the box lies outside the grid.
+    Every grid point, one full array per axis (Mesh), ij indexing: array dimension k is the
+    k-th axis of axis_points, e.g. A with 3 points, B with 2: mesh['A'] and mesh['B'] of
+    shape (3, 2), mesh['A'][i, j] = axis_points['A'][i], mesh['B'][i, j] = axis_points['B'][j].
+    Takes one float per grid point per axis, 
+    e.g. 8 bytes (float64) per grid point per axis, e.g. 201^3 points x 8 B = 65 MB per axis.
+    """
+    return dict(zip(axis_points, np.meshgrid(*axis_points.values(), indexing="ij")))
 
-    coords - one ascending, non-empty 1D array per axis, e.g. the first output of
-             Box.make_grid; same axes as the box.
 
-    e.g. grid points A = 0, 1, ..., 9:
-        box (2.5, 4.5)  ->  slice(2, 6)   points 2, 3, 4, 5
+def box_slices(box: Box, axis_points: AxisPoints) -> tuple[slice, ...] | None:
+    """
+    Where a box sits in the grid (its cut), as index ranges: one slice per grid axis.
+    It only marks the cut: no array is made or cut out here. The caller cuts with the slices,
+    e.g. boxed_features_on_grid (evaluate.py): amplitude[cut] += the feature on its cut.
+
+    The slices come in the order of axis_points, the order of the grid array's dimensions (not
+    the box's sorted axes), so they index the grid directly:
+        array[cut]                  the values on the cut, e.g. amplitude[cut] += ...
+        axis_points['A'][cut[0]]    the cut's points along the grid's first axis, here A
+
+    The rule, on each axis on its own: from the last grid point at or below the box's min to
+    the first at or above its max.
+      - A box edge between two grid points: the range takes the point beyond it, so the cut
+        holds the whole box.
+      - A box edge on a grid point: nothing more.
+      - A box that sticks out of the grid: the range stops at the grid's end. A box that only
+        touches the grid's end still gets that one point.
+    None if the box misses the grid on any one axis.
+
+    axis_points - the grid (AxisPoints), e.g. Box.grid_points of the window: one ascending,
+                  non-empty 1D array per axis; the same axes as the box.
+
+    e.g. one axis, grid points A = 0, 1, ..., 9:
+        box (2.5, 4.5)  ->  slice(2, 6)   points 2, 3, 4, 5: one more on each side
         box (3., 4.)    ->  slice(3, 5)   points 3, 4: edges on grid points
-        box (-5., 0.5)  ->  slice(0, 2)   cut at the grid edge
-        box (9., 12.)   ->  slice(9, 10)  touches the grid edge: point 9 lies in the box
-        box (12., 15.)  ->  None
+        box (-5., 0.5)  ->  slice(0, 2)   points 0, 1: stops at the grid's end
+        box (9., 12.)   ->  slice(9, 10)  point 9: the box touches the grid's end there
+        box (12., 15.)  ->  None          misses the grid
+    Two axes, each by the same rule: grid A = 0, 1, ..., 9 and B = 0, 5, ..., 45:
+        box A (2.5, 4.5), B (12., 18.)  ->  (slice(2, 6), slice(2, 5))   B points 10, 15, 20
+        box A (2.5, 4.5), B (50., 60.)  ->  None                         misses on B: enough
     """
-    if set(coords) != set(box.axes):
-        raise ValueError(f'box axes {box.axes} do not match grid axes {tuple(coords)}')
-    empty = [ax for ax, points in coords.items() if len(points) == 0]
+    if set(axis_points) != set(box.axes):
+        raise ValueError(f'box axes {box.axes} do not match grid axes {tuple(axis_points)}')
+    empty = [ax for ax, points in axis_points.items() if len(points) == 0]
     if empty:
         raise ValueError(f'grid axes {empty} have no points')
 
-    slices = []
-    for ax, points in coords.items():
+    cut = []
+    for ax, points in axis_points.items():
         mn, mx = box.bounds[ax]
         if mx < points[0] or mn > points[-1]:
             return None
         i_min = max(int(np.searchsorted(points, mn, side='right')) - 1, 0)
         i_max = min(int(np.searchsorted(points, mx, side='left')), len(points) - 1)
-        slices.append(slice(i_min, i_max + 1))
-    return tuple(slices)
+        cut.append(slice(i_min, i_max + 1))
+    return tuple(cut)
