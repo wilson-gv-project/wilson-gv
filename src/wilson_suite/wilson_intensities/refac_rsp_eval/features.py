@@ -1,10 +1,15 @@
 """
 Spectral features, and the windows that hold them.
 
-  in:  ContributionRow tables (built by evaluate.build_contributions), propagator parameters (propagator_param)
+  in:  ContributionRow tables (built by evaluate.build_contributions), propagator parameters (PropagatorParam)
   out: SpectralFeature lists, SpectralWindow
 
-  holds: ContributionRow, ContributionTable, SpectralFeature, features_from_rows, SpectralWindow
+  holds:
+    ContributionRow, ContributionTable     one row per (term, index set), and tools to filter and group rows
+    SpectralFeature, features_from_rows    one peak per (motif, location), made from the rows
+    amplitude_half_widths,                 box rules (BoxRule): how far around its peak each feature is
+      intensity_half_widths                  evaluated on the grid
+    SpectralWindow                         the spectrum range with the features that reach into it
 
 Takes Box from grid.py; grid.py never imports from here.
 """
@@ -61,19 +66,28 @@ K = TypeVar('K', bound=Hashable)   # group_by key
 #   a number   -> the same on every resonance condition, everywhere
 #   a function -> (vd, freqs) -> cm-1, called once per condition
 #       vd     the condition's pair of states (VibDiff), e.g. vd.energy_difference(), vd.left.state_label
-#       freqs  {axis: cm-1}: the grid points, on the grid (grid.Mesh: arrays of the grid's shape), the feature's location
-#              for its box and peak height (numbers, the feature's own axes only)
+#       freqs  {axis: cm-1}, the frequencies where the width is needed:
+#                on the grid: the grid points (grid.Mesh, one array of the grid's shape per axis)
+#                for the box and the peak height: the feature's location (one number per axis, its own axes only)
 #       e.g. lambda vd, freqs: 0.01 * abs(vd.energy_difference())    one width per condition
 #            lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])        changes with the frequency on A
-#       abs(): energy_difference is signed (left - right). A negative width conjugates the feature.
-#   A function needs the feature's conditions (features_from_rows with the states).
+#       Use abs(): energy_difference is signed (left - right), and a negative width gives the complex
+#       conjugate of the feature.
+#   A function needs each feature's conditions: pass the states to features_from_rows.
 PropagatorParamFunction = Callable[[VibDiff, dict[str, float | np.ndarray]], float | np.ndarray]
 PropagatorParam = float | PropagatorParamFunction
 
 
 @dataclass(frozen=True)
 class ContributionRow:
-    """One term at one index set. The term itself is terms[term_id]."""
+    """
+    One term evaluated at one index set.
+        term_id   the term's position in the term list: the term itself is terms[term_id]
+        motif     the term's resonance conditions
+        params    the index set: one mode per resonance label, e.g. {'a': 0, 'b': 1}
+        location  where the conditions resonate, cm-1 (one coordinate per axis)
+        coeff     the term's coefficient at this index set, summed over its other labels
+    """
     term_id: int
     motif: ResonanceMotif
     params: ParameterSet
@@ -82,6 +96,10 @@ class ContributionRow:
 
 
 class ContributionTable:
+    """
+    A read-only list of ContributionRows, with tools to filter rows (where) and to group them (group_by).
+    Filtering and grouping return new tables; the rows themselves are never changed.
+    """
     def __init__(self, rows: Iterable[ContributionRow]):
         self._rows = tuple(rows)
 
@@ -93,9 +111,14 @@ class ContributionTable:
 
     # the two general tools
     def where(self, keep: Callable[[ContributionRow], bool]) -> 'ContributionTable':
+        """The rows for which keep(row) is True, e.g. table.where(lambda r: r.term_id == 3)."""
         return ContributionTable(r for r in self._rows if keep(r))
 
     def group_by(self, key: Callable[[ContributionRow], K]) -> dict[K, 'ContributionTable']:
+        """
+        {key(row): table of the rows with that key}, keys in the order they first appear,
+        e.g. table.group_by(lambda r: r.term_id).
+        """
         groups = defaultdict(list)
         for r in self._rows:
             groups[key(r)].append(r)
@@ -109,9 +132,14 @@ class ContributionTable:
         return self.group_by(lambda r: r.motif)
 
     def by_location(self, tol_cm: float = 0.01):
+        """
+        Groups rows by location. Each coordinate is rounded to a whole multiple of tol_cm (cm-1), and rows whose
+        rounded locations are the same form one group. The keys are the rounded values, ((axis, multiple), ...).
+        """
         return self.group_by(lambda r: tuple((ax, round(v / tol_cm)) for ax, v in r.location.coordinates))
 
     def axis_range(self, axis):
+        """(min, max) of the row locations on `axis`, cm-1. Raises ValueError if no row has that axis."""
         vals = [r.location[axis] for r in self._rows if axis in r.location.axes]
         if not vals:
             raise ValueError(f'no row has axis {axis!r}')
@@ -122,15 +150,22 @@ class ContributionTable:
 class SpectralFeature:
     """
     One peak: the rows of one motif at one location (made by features_from_rows).
-    Same motif + same point -> same peak shape, so the coefficients of the rows add.
-    location and propagator_param are in cm-1; propagator_param is a number or a function (PropagatorParam).
-    feat_box: None until SpectralWindow.from_features gives the feature its box, so a feature without one raises
-        on the grid (boxed_features_on_grid) and in clustering.
-    conditions: the pair of states of each resonance condition, in motif order, from rows[0].params (as
-        evaluate.eval_feature_on_grid). features_from_rows sets them for a propagator_param function, which
-        needs them for the box and the peak height (peak_widths). Not part of == or hash: the rows fix them.
-    Rows without resonance conditions make a flat background (is_flat, todo.txt E12): no peak, the same amplitude
-    on every grid point.
+    Same motif + same location -> same peak shape, so the coefficients of the rows add up.
+
+        location          where the peak is, cm-1
+        rows              the ContributionRows that make up the peak
+        propagator_param  the peak width, cm-1: a number or a function (PropagatorParam)
+        scale             a factor on the summed coefficients (see amplitude_coeff); the rows are never changed
+        feat_box          the region of the grid where the feature is evaluated. None until
+                          SpectralWindow.from_features gives the feature its box; boxed_features_on_grid raises
+                          for a feature without one.
+        conditions        the pair of states of each resonance condition, in motif order, taken at rows[0].params
+                          (as evaluate.eval_feature_on_grid does). features_from_rows sets them when
+                          propagator_param is a function, which needs them for the box and the peak height
+                          (peak_widths). Not part of == or hash: the rows already fix them.
+
+    Rows without resonance conditions make a flat background (is_flat): no peak, the same amplitude on every
+    grid point.
     """
     location: 'ResLocPoint'
     rows: tuple[ContributionRow, ...] = ()
@@ -149,10 +184,11 @@ class SpectralFeature:
     @property
     def net_fraction(self) -> float | None:
         """
-        How much of the rows is left in their sum: |sum of coeffs| / sum of |coeffs|. scale does not change it.
-            1: no cancellation (one row, or rows of one sign);  0: the rows cancel
+        How much of the rows survives in their sum, i.e. how much they cancel each other:
+        |sum of coeffs| / sum of |coeffs|. scale does not change it.
+            1: no cancellation (one row, or rows of one sign);  0: the rows cancel completely
             e.g. rows 0.5, -0.4 -> 0.1 / 0.9 = 0.11;  rows 0.5, -0.5 -> 0
-        None without rows, or if every row is 0 (nothing cancels there).
+        None without rows, or if every row is 0 (nothing to cancel).
         """
         total = sum(abs(r.coeff) for r in self.rows)
         if total == 0.:
@@ -161,6 +197,7 @@ class SpectralFeature:
 
     @property
     def motif(self) -> ResonanceMotif | None:
+        """The motif shared by all rows; None without rows. Raises ValueError if the rows have different motifs."""
         motifs = {r.motif for r in self.rows}
         if len(motifs) > 1:
             raise ValueError(f'Expected one motif per feature, got {len(motifs)}')
@@ -179,10 +216,10 @@ class SpectralFeature:
     @property
     def is_flat(self) -> bool:
         """
-        A flat background (todo.txt E12): the rows of terms without resonance conditions, at the location without
-        axes (solve_LSE_motif). amplitude_coeff is its value on every grid point: no peak, no width, no box of its
-        own (SpectralWindow.from_features gives it the whole window).
-            e.g. IR absorption: 3 of its 5 terms, such as 1/4 * polhess_(a,a) / <a>
+        True for a flat background: the rows come from terms without resonance conditions, so the location has
+        no axes (see evaluate.solve_LSE_motif). amplitude_coeff is its value on every grid point: no peak, no width,
+        no box of its own (SpectralWindow.from_features gives it the whole window).
+            e.g. an IR absorption term such as 1/4 * polhess_(a,a) / <a>
         """
         return not self.location.axes
 
@@ -211,9 +248,12 @@ class SpectralFeature:
     @classmethod
     def normalize_coeffs_to_max(cls, features: list['SpectralFeature'], external_max: float | None = None):
         """
-        returns a new list; each copy gets scale / |max|, the rows stay as they are
+        Returns copies of `features` scaled so that the largest |amplitude_coeff| becomes 1:
+        each copy's scale is divided by |max|. The input features and all rows stay as they are.
 
-        external_max - can take external input for max , instead of finding max of the given list
+        external_max - divide by this value instead of the largest |amplitude_coeff| of `features`,
+                       e.g. to put several lists on the same scale
+        Raises ValueError if a feature has no rows.
         """
         if external_max is None:
             max_feat_coeff = cls.get_max_intensity_feat(features, intensity_expr=None).amplitude_coeff
@@ -231,8 +271,8 @@ class SpectralFeature:
     @classmethod
     def get_feats_with_params(cls, features: list['SpectralFeature'], params: dict):
         """
-        e.g.:
-            params = {'a': 0, 'b': 1}
+        The features that have at least one row at exactly this index set.
+            e.g. params = {'a': 0, 'b': 1}
         """
         target = ParameterSet(params)
         return [f for f in features if target in f.param_sets]
@@ -243,15 +283,16 @@ class SpectralFeature:
 
     def is_inside(self, box: Box) -> bool:
         """
-        Return boolean for whether the feature location lies inside `box`, edges included.
+        True if the feature's location lies inside `box`, edges included. The axes must match.
         """
         self._check_same_axes(box)
         return box.contains_point(self.location.as_dict())
 
     def feat_box_overlaps(self, box: Box) -> bool:
         """
-        Return boolean for whether the feature box (feat_box) overlaps `box`, touching edges included
-        (a shared face, edge or corner; see Box.overlaps).
+        True if the feature's own box (feat_box) overlaps `box`, touching included
+        (a shared face, edge or corner; see Box.overlaps). The axes must match.
+        Raises ValueError if the feature has no box yet.
         """
         self._check_same_axes(box)
 
@@ -263,7 +304,10 @@ class SpectralFeature:
     def get_max_intensity_feat(cls, features: list['SpectralFeature'],
                           intensity_expr: str | None = 'abs()**2') -> 'SpectralFeature':
         """
-        amplitude of a feature is given by: amplitude_coeff / propagator_param**2
+        The strongest feature of `features`:
+            intensity_expr 'abs()**2' (default) -> the largest peak intensity (get_intensity)
+            intensity_expr None                 -> the largest |amplitude_coeff|; features without rows are skipped
+        Raises ValueError for an empty list, or if every feature has intensity (or amplitude_coeff) 0.
         """
         result = None
         num_result = 0
@@ -292,8 +336,9 @@ class SpectralFeature:
 
     def peak_widths(self) -> tuple[float, ...]:
         """
-        propagator_param at the peak, cm-1, one per resonance condition: what get_intensity and the boxes use.
-            a number gamma -> (gamma, gamma, ...), one per axis (as many as conditions, B7)
+        The peak width at the peak, cm-1, one per resonance condition. get_intensity and the box rules use these.
+            a number gamma -> (gamma, gamma, ...), one per axis (a motif fixes one point, so it has one
+                              condition per axis)
             a function     -> propagator_param(vd, location) for each condition: needs `conditions`
             a flat feature (is_flat) -> (): no conditions
         For a function that changes with the frequency, this is the width at the peak, not farther out.
@@ -314,10 +359,12 @@ class SpectralFeature:
 
     def get_intensity(self, intensity_expr: str = 'abs()**2') -> float:
         """
-        |peak amplitude|^2 in au. At the peak every condition gives 1 / (-i * gamma_i), so
-            |amplitude_coeff / ((-i * gamma_1) * (-i * gamma_2) * ...)|^2
-        gamma_i: peak_widths, cm-1 (converted here). One number -> amplitude_coeff / (-i * gamma)^N.
+        The intensity at the peak, |peak amplitude|^2, in au (atomic units).
+        At the peak each condition's Lorentzian 1 / (E - freq - i * gamma_i) becomes 1 / (-i * gamma_i), so
+            intensity = |amplitude_coeff / ((-i * gamma_1) * (-i * gamma_2) * ...)|^2
+        gamma_i: peak_widths, cm-1 (converted to au here). With one number gamma: amplitude_coeff / (-i * gamma)^N.
         A flat feature (is_flat): no conditions, so |amplitude_coeff|^2, its intensity on every grid point.
+        Only intensity_expr 'abs()**2' is implemented. Raises ValueError if a width at the peak is <= 0.
         """
 
         if self.amplitude_coeff is None or self.propagator_param is None:
@@ -336,6 +383,7 @@ class SpectralFeature:
     
     @classmethod
     def print_list_features(cls, features: list['SpectralFeature']):
+        """Prints each feature (location, box, amplitude_coeff) and its rows."""
         for feat in features:
             print('\n -- A feature at the location', feat.location, 'with featbox', feat.feat_box, 'with amplitude_coeff', feat.amplitude_coeff)
             for r in feat.rows:
@@ -345,12 +393,14 @@ class SpectralFeature:
 def features_from_rows(table: ContributionTable, propagator_param: PropagatorParam | None = None,
                        states: 'VibStatesData | None' = None) -> list[SpectralFeature]:
     """
-    One feature per (motif, location). Same motif + same point -> same peak shape, so the
-    coefficients add. Rows of different motifs at one point stay separate features;
-    the grid adds them up as complex numbers.
+    Groups the rows into features: one feature per (motif, location). Same motif + same location ->
+    same peak shape, so the coefficients add up. Rows of different motifs at one location stay separate
+    features, because their peak shapes differ; on the grid their amplitudes add up as complex numbers.
 
-    states: for a propagator_param function, each feature gets its conditions (condition_states), which
-        the function needs for the box and the peak height. A number needs no states and gets no conditions.
+    propagator_param: the peak width given to every feature (PropagatorParam).
+    states: needed when propagator_param is a function. Each feature then gets its conditions
+        (condition_states), which the function needs for the box and the peak height. Without states such a
+        feature has no conditions, and peak_widths raises. A number needs no states and gets no conditions.
     """
     groups = table.group_by(lambda r: (r.motif, r.location))
     with_conditions = callable(propagator_param) and states is not None
@@ -361,7 +411,8 @@ def features_from_rows(table: ContributionTable, propagator_param: PropagatorPar
 
 def condition_states(motif: ResonanceMotif, params: ParameterSet, states: 'VibStatesData') -> tuple[VibDiff, ...]:
     """
-    The pair of states of each condition of `motif` at `params`, in motif order (as evaluate.eval_resonance_factor).
+    The pair of states (VibDiff) of each resonance condition of `motif` at the index set `params`, in motif order
+    (the same pairs evaluate.eval_resonance_factor uses).
         e.g. conditions <ab - a> and <b - a> at a=0, b=1: states ('0,1', '0') and ('1', '0')
     """
     return tuple(VibDiff.from_quanta(*key.diff, params.to_dict(), states) for key in motif)
@@ -369,19 +420,17 @@ def condition_states(motif: ResonanceMotif, params: ParameterSet, states: 'VibSt
 
 def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> float:
     """
-    Helper function: For a Lorentzian lineshape with parameter gamma, with the functional form
-    L(w) = | A / ((w - w_0) - i*gamma) |^2
-    after applying absolute square for intensity,
-    at which radius (units same as gamma) must an n-dimensional sphere be placed around the
-    resonance location w_0 (the maximum) of the lineshape so that this lineshape's intensity is < 1/dynrange of the
-    maximum's intensity everywhere outside the sphere?
+    How far from its peak a Lorentzian intensity drops to 1/dynrange of the peak intensity.
+    Farther out it is weaker still. Same units as gamma.
 
-    Found by evaluating L(x - x_0)/L(x_0) = k, with L from the above expression, and solving for the x that
-    gives the desired k (where k = 1/dynrange)
+    The Lorentzian intensity is L(w) = |A / ((w - w_0) - i*gamma)|^2, with its peak at w_0. Solving
+    L(w) / L(w_0) = 1/dynrange for the distance d = |w - w_0| gives
+        d = gamma * sqrt(dynrange - 1)
+        e.g. gamma 5, dynrange 101 -> 50
     """
 
-    # If called with effective dynamic range, it is possible to request dynrange < 0 but this corresponds
-    # to a negative box size (and the default formula will return NaN) - therefore return 0.0 instead
+    # Below 1 there is no such distance (the formula would take the square root of a negative number):
+    # the whole Lorentzian, peak included, is already below that level, so return 0.0
     if dynrange < 1.0:
         return 0.0
 
@@ -390,7 +439,7 @@ def lorentzian_distance_to_dynrange_weaker_than_max(gamma: float, dynrange) -> f
 
 
 def _check_has_rows_and_width(f: SpectralFeature):
-    """raises ValueError for a feature that cannot get a box or go on the grid: no propagator_param or no rows"""
+    """Raises ValueError for a feature that cannot get a box or go on the grid: no propagator_param or no rows."""
     if f.propagator_param is None:
         raise ValueError(f'feature {f} has no propagator_param, so no box size')
     if f.amplitude_coeff is None:
@@ -399,11 +448,13 @@ def _check_has_rows_and_width(f: SpectralFeature):
 
 def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
     """
-    The feature's largest amplitude inside `window`, au, without evaluating it on a grid.
-        inside:   its peak amplitude, sqrt(get_intensity())
-        outside:  its amplitude at the nearest point of the window, the Lorentzian of each axis it lies outside on,
-                  e.g. 100 cm-1 outside on A, gamma 5: peak * 5 / hypot(100, 5) = peak * 0.05
-        flat:     |amplitude_coeff|, the same on every grid point (is_flat, todo.txt E12)
+    The feature's largest amplitude inside `window`, au, estimated without evaluating it on a grid.
+        peak inside:   its peak amplitude, sqrt(get_intensity())
+        peak outside:  its amplitude at the nearest point of the window: the peak amplitude times the Lorentzian
+                       factor gamma / sqrt(d**2 + gamma**2) for each axis it lies outside on (d: the distance
+                       to the window on that axis),
+                       e.g. 100 cm-1 outside on A, gamma 5: peak * 5 / hypot(100, 5) = peak * 0.05
+        flat:          |amplitude_coeff|, the same on every grid point (is_flat)
     gamma: the largest of its peak_widths, as for its box.
     """
     amplitude = np.sqrt(f.get_intensity())
@@ -416,9 +467,10 @@ def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
     return float(amplitude)
 
 
-# A box rule: (window, features) -> the box half-width of each feature, cm-1, in the order of `features`
-# (the input of SpectralWindow.from_features; spectrum_on_grid takes the rule). Two rules: amplitude_half_widths and
-# intensity_half_widths. functools.partial gives a rule its knobs, e.g. partial(amplitude_half_widths, dynrange=500.)
+# A box rule: (window, features) -> the box half-width of each feature, cm-1, in the order of `features`.
+# The half-widths are the input of SpectralWindow.from_features; pipeline.spectrum_on_grid takes the rule itself.
+# Two rules: amplitude_half_widths and intensity_half_widths.
+# functools.partial sets a rule's knobs, e.g. partial(amplitude_half_widths, dynrange=500.)
 BoxRule = Callable[[Box, Sequence[SpectralFeature]], Sequence[float]]
 
 
@@ -429,37 +481,40 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
                           max_cm: float | None = None,
                           a_max: float | None = None) -> list[float]:
     """
-    The box half-width of each feature, cm-1, in the order of `features`, from its amplitude (todo.txt E10):
+    The box half-width of each feature, cm-1, in the order of `features`, chosen from its amplitude:
     strong features get big boxes, weak ones small. A box rule (BoxRule).
 
-    Why: the plot shows intensities down to its floor, a_max**2 / dynrange. The grid adds amplitudes, then squares,
-    so a tail t cut off where it meets an amplitude A changes the intensity by about 2 * A * t, much more than t**2.
-    The rule takes the worst case, A = a_max, and keeps that change below eps * floor:
+    Why amplitude: the plot shows intensities down to its floor, a_max**2 / dynrange. The grid first adds the
+    amplitudes of all features, then squares the sum. So a cut-off tail of size t, at a point where the other
+    features add up to an amplitude A, changes the intensity there by about 2 * A * t. That is much more than t**2,
+    the change a feature alone would see. The rule takes the worst case, A = a_max, and keeps the change below
+    eps * floor:
         k          = 2 * dynrange * a / (eps * a_max)     a: the feature's peak amplitude, sqrt(get_intensity())
-        half-width = gamma * sqrt(k**2 - 1)               there its Lorentzian tail, a * gamma / sqrt(d**2 + gamma**2),
-                                                          is down to eps * a_max / (2 * dynrange)
+        half-width = gamma * sqrt(k**2 - 1)               at this distance its Lorentzian tail,
+                                                          a * gamma / sqrt(d**2 + gamma**2), is down to
+                                                          eps * a_max / (2 * dynrange)
         then at least min_gammas * gamma, and at most max_cm
-    gamma: the largest of the feature's peak_widths, on every axis. With one width for every feature,
+    gamma: the largest of the feature's peak_widths, used on every axis. When all features have the same width,
     a / a_max = |coeff| / max |coeff|.
-        e.g. gamma 4.7, dynrange 500, eps 0.1:  a / a_max = 1 -> 47000 cm-1 (the whole window), 0.1 -> 4700,
-             0.01 -> 470, 0.001 -> 47, 1e-4 or less -> 4.7 (1 gamma)
+        e.g. gamma 4.7, dynrange 500, eps 0.1:  a / a_max = 1 -> 47000 cm-1, 0.1 -> 4700, 0.01 -> 470,
+             0.001 -> 47, 1e-4 or less -> 4.7 (1 gamma)
 
-    The knobs, to tune against all_features_on_grid (tests/e10_boxes.py):
+    The knobs (to check a setting, compare the result with evaluate.all_features_on_grid, which cuts nothing off):
         dynrange    the plot's dynamic range, max / floor, e.g. 500. Required: it says what the plot shows.
         eps         the allowed error, as a fraction of the floor. Smaller: bigger boxes, more accurate, slower.
-                    Measured 2026-10-14 (formaldehyde, ACDM, dynrange 100-1000): eps 0.1 -> at most 0.13 floors,
-                    the worst visible point 2.2 % off; eps 0.3 -> 0.47 floors, 4.9 %.
         min_gammas  the smallest half-width, in gammas: how much of a weak peak is on the grid. Its tail beyond
-                    k gammas is below the error anyway; more only changes how a weak peak looks. Default 1.
-        max_cm      the largest half-width, cm-1; None (default): no cap. A cap bounds the cost of the strong
+                    this is below the allowed error anyway; a larger value only changes how a weak peak looks.
+                    Default 1.
+        max_cm      the largest half-width, cm-1; None (default): no limit. A limit bounds the cost of the strong
                     features, but then eps no longer bounds the error.
-        a_max       the strongest amplitude in the window, au; None (default): estimated without the grid, the
-                    largest amplitude_in_window of `features` (0.4-10 % from the true max, todo.txt E10).
-                    Pass it e.g. to give two windows the same boxes, or to try the true max of a grid result.
-    Every feature needs rows and a propagator_param > 0. A run whose features all have amplitude 0 gets the
-    smallest boxes: it adds nothing to the grid.
-    A flat feature (is_flat, todo.txt E12) gets 0: it has no peak, and SpectralWindow.from_features gives it the
-    whole window. Its amplitude counts for a_max: it is there on every grid point.
+        a_max       the strongest amplitude in the window, au. None (default): estimated without the grid, as the
+                    largest amplitude_in_window of `features`. This estimate ignores how features add up on the
+                    grid, so it can differ from the true maximum. Pass a_max e.g. to give two windows the same
+                    boxes, or to use the true maximum of a grid result.
+    Every feature needs rows and a propagator_param > 0. If every feature has amplitude 0, each gets the
+    smallest box: they add nothing to the grid.
+    A flat feature (is_flat) gets 0: it has no peak, and SpectralWindow.from_features gives it the whole window.
+    Its amplitude does count for a_max, since it is there on every grid point.
     """
     if not dynrange > 1.:
         raise ValueError(f'dynrange must be > 1, got {dynrange}')
@@ -499,52 +554,40 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
                           minimum_box_padding: float = 10.,
                           max_intensity: float | None = None) -> list[float]:
     """
-    The box half-width of each feature, cm-1, in the order of `features`: the old code's rule,
-    SpectralFeature.dress_these_with_boxes (until 2026-10-14), as a box rule (BoxRule). The old knobs keep their
-    names, meanings and defaults.
+    The box half-width of each feature, cm-1, in the order of `features`, chosen from its intensity.
+    A box rule (BoxRule).
 
-    dynrange: the old function took max_intensity and min_intensity, and computed
-    implied_dynrange = max_intensity / min_intensity. Both of its callers in the old pipeline (deleted in E9;
-    d93cc7b is the last commit with it) set min_intensity = max_intensity / dynamic_range, so
-    implied_dynrange is the plot's dynamic range: `dynrange` here. min_intensity = max_intensity / dynrange.
-
-    Per feature, as in the old function (gamma: the largest of its peak_widths, on every axis; i: its peak
-    intensity, get_intensity()):
-        unscaled (default):  d = gamma * sqrt(dynrange - 1)                      down to 1/dynrange of its own peak
-        scaled:              d = gamma * sqrt(dynrange * i / max_intensity - 1)   down to min_intensity, the floor;
-                                                                                  0 for a feature at or below it
-        half-width (the old box_extent) = max(d * (1 + box_range_safety_margin), minimum_box_padding)
+    Per feature (gamma: the largest of its peak_widths, used on every axis; i: its peak intensity, get_intensity()):
+        unscaled (default):  d = gamma * sqrt(dynrange - 1)                      where it drops to 1/dynrange of
+                                                                                  its own peak
+        scaled:              d = gamma * sqrt(dynrange * i / max_intensity - 1)   where it drops to the plot's floor,
+                                                                                  max_intensity / dynrange;
+                                                                                  0 for a feature at or below the floor
+        half-width = max(d * (1 + box_range_safety_margin), minimum_box_padding)
         e.g. gamma 5, dynrange 101, margin 0: unscaled 50 cm-1 for every feature; scaled 50 cm-1 for the
              strongest, 0 (or minimum_box_padding) for a feature 101 times weaker or weaker still
 
     The knobs:
         dynrange                 the plot's dynamic range, max / floor, e.g. 100. Required.
-        box_range_safety_margin  the boxes this much larger, e.g. 0.1 (default): 10 % larger.
-        scale_wrt_max_intensity  False (default): each box to 1/dynrange of its own peak. True: to the floor.
-        minimum_box_padding      the smallest half-width, cm-1. Default 10, as debug_rendering's (main's: 0).
+        box_range_safety_margin  makes the boxes this much larger, e.g. 0.1 (default): 10 % larger.
+        scale_wrt_max_intensity  False (default): each box ends at 1/dynrange of the feature's own peak.
+                                 True: each box ends at the plot's floor.
+        minimum_box_padding      the smallest half-width, cm-1. Default 10.
         max_intensity            used only when scaled. None (default): the strongest peak intensity of the
-                                 features inside `window`, as the old callers took it.
-    The old settings' defaults (EvaluationInfo, wilson_main/spectrum_abstractions.py): dynamic_range 100, margin 0.1,
-    unscaled, minimum_box_padding 0. So on main the old pipeline dropped every feature below the floor (see below).
-    debug_rendering's EvaluationInfo has minimum_box_padding 10 (bc10f84): there it dropped none.
+                                 features inside `window`.
 
-    Changed from dress_these_with_boxes:
-        - minimum_box_padding defaults to 10, not 0 (2026-10-20).
-        - No feature is dropped (decided 2026-10-09). The old function dropped every feature below the floor
-          (i < min_intensity) when minimum_box_padding was 0, scaled or not. Here such a feature keeps its box as
-          above: unscaled the usual one; scaled, half-width minimum_box_padding (with 0: evaluated only on the grid
-          points around its peak). Dropping is not offered for now; it could come back as a knob.
-        - No error for a feature stronger than max_intensity: a stronger feature outside the window is normal
-          (ACDM, quick_start window: 4 of them). Scaled, it gets a box larger than the unscaled one.
-        - Returns half-widths, not copies of the features with boxes: SpectralWindow.from_features makes those.
+    No feature is dropped: a feature below the floor still gets a box (scaled: half-width minimum_box_padding;
+    with 0, it is evaluated only on the grid points around its peak).
+    A feature stronger than max_intensity is allowed, e.g. a strong feature outside the window. Scaled, it gets a
+    box larger than the unscaled one.
 
-    Cuts more than amplitude_half_widths: a box ends by the feature's own intensity, but the cut tail adds to the
-    amplitude of its neighbours (see amplitude_half_widths). Measured 2026-10-14 (todo.txt E10), unscaled, each
-    feature on its own box: 1.7-12 floors off; amplitude_half_widths with eps 0.1: at most 0.13 floors.
+    This rule cuts off more than amplitude_half_widths: each box ends by the feature's own intensity, but on the
+    grid a cut-off tail also changes the intensity of its neighbours, because amplitudes add before squaring
+    (see amplitude_half_widths). To see the error for a case, compare with evaluate.all_features_on_grid.
     Every feature needs rows and a propagator_param > 0. Scaled, without max_intensity, at least one feature must
-    lie inside `window` (the old callers raised too).
-    A flat feature (is_flat, todo.txt E12; the old code had none) gets 0, as in amplitude_half_widths. Scaled, it
-    counts as inside the window: its intensity is there on every grid point.
+    lie inside `window`.
+    A flat feature (is_flat) gets 0, as in amplitude_half_widths. Scaled, it counts as inside the window: its
+    intensity is there on every grid point.
     """
     if not dynrange > 1.:
         raise ValueError(f'dynrange must be > 1, got {dynrange}')
@@ -577,7 +620,7 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
             continue
         gamma = max(f.peak_widths())
         if scale_wrt_max_intensity:
-            # implied_dynrange * feat_intensity_wrt_max, as in the old function; 0 if every peak inside is 0
+            # the feature's peak over the floor, i / (i_max / dynrange); 0 if every peak inside is 0
             k = dynrange * f.get_intensity() / i_max if i_max > 0. else 0.
         else:
             k = dynrange
@@ -591,8 +634,9 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
 class SpectralWindow:
     """
     The full spectrum range (a Box) with the features evaluated in it (made by from_features).
-        full_features: location inside the box
-        contrib_features: location outside the box, but the feature's box overlaps it
+        full_features:    the feature's location is inside the box (flat features are here too)
+        contrib_features: the feature's location is outside the box, but its own box overlaps it,
+                          so its tail still adds to the spectrum
     """
     box: 'Box'
     full_features: list['SpectralFeature'] = field(default_factory=list)
@@ -602,22 +646,22 @@ class SpectralWindow:
     def from_features(cls, box: Box, features: Sequence['SpectralFeature'],
                       half_widths: Sequence[float]) -> 'SpectralWindow':
         """
-        The window over `box` with the features that add amplitude inside it, each with its box. In this order:
+        The window over `box` with the features that add amplitude inside it, each with its own box. In this order:
           1. a box around every feature: its location +- its half-width, the same on every axis
              half_widths: cm-1, one per feature, in the order of `features`, e.g. from a box rule (BoxRule):
              amplitude_half_widths or intensity_half_widths. The window does not care how they were chosen.
           2. keep the features whose box overlaps `box` (touching edges included, so a feature with half-width 0
              on the edge of `box` stays):
              location inside `box` -> full_features, outside -> contrib_features
-          No feature is dropped for its amplitude (decided 2026-10-09; the old code kept them too, C3):
+          No feature is dropped for its amplitude:
             - a weak feature stays, however weak
             - a term with coefficient 0 never becomes a row (build_contributions puts it in `zero`)
             - a feature whose rows cancel (amplitude 0) stays as a record of it; it adds nothing to the grid
 
         e.g. half-width 55 cm-1, `box` A (0, 10): a feature at A = 60 is kept (its box starts at 5), a feature at
         A = 70 is not (its box starts at 15).
-        A flat feature (is_flat, todo.txt E12) has no location to put a box around: its box is `box` itself, and it
-        goes into full_features. Its half-width is not used.
+        A flat feature (is_flat) has no location to put a box around: its box is `box` itself, and it goes into
+        full_features. Its half-width is not used.
 
         Returns copies with boxes; the input features stay as they are. Every feature needs rows and a
         propagator_param: the evaluation on the grid needs both.
