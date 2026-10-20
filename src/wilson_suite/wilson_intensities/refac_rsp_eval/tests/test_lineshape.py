@@ -8,11 +8,11 @@ import pytest
 from wilson_suite.wilson_intensities.refac_rsp_eval import lineshape
 
 
-def test_factor_real_and_imaginary_parts():
+def test_lorentzian_factor_real_and_imaginary_parts():
     """Lorentzian, -i*gamma: Im = gamma / (x^2 + gamma^2) > 0, Re = x / (x^2 + gamma^2)"""
     x, gamma = np.linspace(-3., 3., 7), 0.5
 
-    value = lineshape.factor(x, gamma)
+    value = lineshape.lorentzian_factor(x, gamma)
 
     np.testing.assert_allclose(value.imag, gamma / (x**2 + gamma**2))
     np.testing.assert_allclose(value.real, x / (x**2 + gamma**2))
