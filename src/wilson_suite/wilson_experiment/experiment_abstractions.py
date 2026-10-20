@@ -1489,7 +1489,7 @@ class FieldAnalysis:
                             new_magn_dict[found_where].append(copy.deepcopy(m))
 
                         else:
-                            new_magn_dict[found_where] = copy.deepcopy(m)
+                            new_magn_dict[found_where] = [copy.deepcopy(m)]
 
                     # Affix the new structure that groups by magnitude regime
                     int_sequences_by_order_comp_pol_magn[ord][comp][pol] = copy.deepcopy(new_magn_dict)

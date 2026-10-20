@@ -579,12 +579,13 @@ def test_field_analysis():
         thres_waiting_time=200.0
     )
 
-    present_field_analysis(fa)
-
     assert fa.valid_int_patterns == [(-1, 2, 3)]
+    # Only 3rd order effects included
     assert fa.int_pattern_orders == [3]
     assert fa.int_patterns_by_order == {3: [(-1, 2, 3)]}
+    # Pulse 1 and 3 are ruled not overlapping
     assert fa.time_ovl_tuples == [(2,), (-1,), (2, 3), (-1, 2), (3,)]
+    # Of these, no tuples with 3 can make vibrational resonance
     assert fa.res_and_time_ovl_tuples == ((2,), (-1,), (-1, 2))
     # NOTE: The emission is counted in the compounding pattern, therefore one higher than the order number
     # (which refers to the number of incoming pulses) (i.e. "three pulses make a four-wave mixing process")
@@ -592,7 +593,8 @@ def test_field_analysis():
     assert fa.pol_avg_vector_bank == {0: [1.0, 1.0, 1.0]}
     assert fa.int_sequences_by_order_comp_pol == {3: {(1, 1, 2): {0: [((-1,), (2,), (3,))]}}}
     assert fa.magnitude_condition_bank == {0: (((1,), (2,), (0, 2), (1, 2), (0, 1, 2)), ((0,), (0, 1)))}
-    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(1, 1, 2): {0: {0: ((-1,), (2,), (3,))}}}}
+    # One valid compounding pattern at (the one valid) order 3, with one polarization and magnitude condition motif
+    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(1, 1, 2): {0: {0: [((-1,), (2,), (3,))]}}}}
 
 # Diagnostic function to print key FieldAnalysis attributes, kept for later use
 def present_field_analysis(e: FieldAnalysis):
@@ -615,7 +617,7 @@ def present_field_analysis(e: FieldAnalysis):
 
 def test_vib_experiment():
 
-    # Suggestions for further tests if needed:
+    # Suggestions for further tests if warranted later:
     #
     # Overall setups:
     #
@@ -635,37 +637,7 @@ def test_vib_experiment():
     # - Pol. avgs.
     # - Compound pulse bandwidths/positions in time
 
-    # "Alpha-beta CARS"
-
-    pulse_uvvis_1 = make_gaussian_pulse(tc=0.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
-                                        wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1, tol_wv_pol_nonort=5.0)
-
-    pulse_uvvis_2 = make_gaussian_pulse(tc=350.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
-                                        wv=(0.0, 0.012, 1.0), pol=(0.0, 1.0, 0.0), id=2, tol_wv_pol_nonort=5.0)
-
-    pulse_uvvis_3 = make_gaussian_pulse(tc=750.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
-                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3, tol_wv_pol_nonort=5.0)
-
-    pulses = (pulse_uvvis_1, pulse_uvvis_2, pulse_uvvis_3)
-
-    field_ab_cars = ElectricField(pulses)
-
-    detector_ab_cars = SpecDetector(detection_method='freq',
-                                 detection_polarization=(0.0, 0.0, 1.0),
-                                 detection_limited_to='same_order',
-                                 interaction_filter=[[1, -2, 3, 3]])
-
-    exp_ab_cars = VibExperiment(field=field_ab_cars,
-                          detector=detector_ab_cars,
-                          scans=(),
-                          tol_n_dev_t=3.0,
-                          tol_n_dev_w=3.0,
-                          thres_waiting_time=600.0,)
-
-    present_field_analysis(exp_ab_cars.field_analyses[()])
-
     # EVV 2-scan
-
     pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
@@ -691,7 +663,7 @@ def test_vib_experiment():
 
     # Push another carrier freq
     scan_obj_b = ScanObject('pulse', 'cf', id=2, coeff=1.0)
-    scan_range_b = [50.0* i for i in range(10)]
+    scan_range_b = [50.0* i for i in range(20)]
     scan_b = SpecScan(scan_objs=(scan_obj_b,), range=scan_range_b)
 
     exp_evv = VibExperiment(field=field_evv,
@@ -701,19 +673,25 @@ def test_vib_experiment():
                           tol_n_dev_w=2.0,
                           thres_waiting_time=600.0)
 
-    present_field_analysis(exp_evv.field_analyses[0,0])
 
-    # Some attribute testing given a light touch since already covered by respective class tests
+    # Doing some attribute testing, given a light touch since already covered by respective class tests
+
+    # There are resp. 10 and 20 scan points along each scan, so 10 x 20 analyses
+    assert exp_evv.field_analyses.shape == (10, 20)
+
+    fa = exp_evv.field_analyses[0, 0]
+
+    # No pulses deemed overlapping in time
+    assert sorted(fa.time_ovl_tuples) == sorted([(2,), (3,), (-1,)])
+    # One interaction sequence remains
+    assert fa.int_sequences_by_order_comp_pol == {3: {(1, 1, 2): {0: [((-1,), (2,), (3,))]}}}
     assert len(exp_evv.field.pulses) == 3
     assert exp_evv.detector.detection_method == 'int'
     assert len(exp_evv.scans) == 2
-
-    # Assertions about post-init attributes: When these are obtained using VibExperiment methods, these assertions
-    # also serve to cover those methods
+    # Two scans and integrated detection = two-dimensional result
     assert exp_evv.dim == 2
 
     # CARS
-
     pulse_uvvis_1 = make_gaussian_pulse(tc=0.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
                                         wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
@@ -739,31 +717,96 @@ def test_vib_experiment():
                           tol_n_dev_w=3.0,
                           thres_waiting_time=600.0,)
 
-    present_field_analysis(exp_cars.field_analyses[()])
+    # In this case no scan so only the "empty index" element in field_analyses
+    assert exp_cars.field_analyses.shape == ()
 
-    # "SFG-style"
+    fa = exp_cars.field_analyses[()]
 
+    # Only 1 and 2 deemed overlapping
+    assert fa.res_and_time_ovl_tuples == ((-2, 1),)
+    # Only the CARS contribution (2,2) - i.e. "alpha**2" - remains
+    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(2, 2): {0: {0: [((-2, 1), (3,))]}}}}
+    # The second ind var (3,) is > 0 and so is the first, second combination (-2, 1) and (3,)
+    assert fa.magnitude_condition_bank == {0: (((1,), (0, 1)), ())}
+    # No scans and frequency (spectrometer) detection = one-dimensional result
+    assert exp_cars.dim == 1
+
+    # "SFG-style" 1-scan
     pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=1500.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
-
 
     pulse_uvvis_1 = make_gaussian_pulse(tc=500.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
                                         wv=(0.02, 0.0, 1.0), pol=(0.0, 1.0, 0.0), id=2)
 
     pulses = (pulse_ir_1, pulse_uvvis_1)
 
+    # Push one carrier freq
+    scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
+    scan_range_a = [10.0* i for i in range(100)]
+    scan_a = SpecScan(scan_objs=(scan_obj_a,), range=scan_range_a)
+
     field_sfg = ElectricField(pulses)
 
-    detector_sfg = SpecDetector(detection_method='freq',
+    detector_sfg = SpecDetector(detection_method='int',
                                  detection_polarization=(0.0, 0.0, 1.0),
                                  detection_limited_to='same_order',
                                  interaction_filter=[[1, 2]])
 
     exp_sfg = VibExperiment(field=field_sfg,
                           detector=detector_sfg,
+                          scans=(scan_a,),
+                          tol_n_dev_t=3.0,
+                          tol_n_dev_w=3.0,
+                          thres_waiting_time=600.0,)
+
+    fa = exp_sfg.field_analyses[20]
+
+    # One sequence (1 then 2) at the (1, 2) ("mu alpha") compounding pattern
+    assert fa.int_sequences_by_order_comp_pol_magn == {2: {(1, 2): {0: {0: [((1,), (2,))]}}}}
+    # One scan with 100 scan points
+    assert exp_sfg.field_analyses.shape == (100,)
+    # One scan and integrated detection = one-dimensional result
+    assert exp_sfg.dim == 1
+
+    # "Alpha-beta CARS" with three pulses (and four interactions)
+    pulse_uvvis_1 = make_gaussian_pulse(tc=0.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.02, 1.0), pol=(1.0, 0.0, 0.0), id=1, tol_wv_pol_nonort=5.0)
+
+    pulse_uvvis_2 = make_gaussian_pulse(tc=350.0, cf=15000.0, dev=10.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.012, 1.0), pol=(0.0, 1.0, 0.0), id=2, tol_wv_pol_nonort=5.0)
+
+    pulse_uvvis_3 = make_gaussian_pulse(tc=650.0, cf=15000.0, dev=120.0, maxstr=1.0e-5,
+                                        wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=3, tol_wv_pol_nonort=5.0)
+
+    pulses = (pulse_uvvis_1, pulse_uvvis_2, pulse_uvvis_3)
+
+    field_ab_cars = ElectricField(pulses)
+
+    detector_ab_cars = SpecDetector(detection_method='freq',
+                                 detection_polarization=(0.0, 0.0, 1.0),
+                                 detection_limited_to='same_order',
+                                 interaction_filter=[[1, -2, 3, 3]])
+
+    exp_ab_cars = VibExperiment(field=field_ab_cars,
+                          detector=detector_ab_cars,
                           scans=(),
                           tol_n_dev_t=3.0,
                           tol_n_dev_w=3.0,
                           thres_waiting_time=600.0,)
 
-    present_field_analysis(exp_sfg.field_analyses[()])
+
+    # No scans and frequency (spectrometer) detection = one-dimensional result
+    assert exp_ab_cars.dim == 1
+
+    fa = exp_ab_cars.field_analyses[()]
+    # These tuples are valid for the last interaction (with emission) even though they are not potentially vib. resonant
+    assert (3, 3) in fa.time_ovl_tuples
+    assert (1, 3) in fa.time_ovl_tuples
+    assert (-2, 1, 3, 3) in fa.time_ovl_tuples
+    # While several more tuples are deemed to have at least some overlap, only these are deemed potentially vib. resonant
+    assert fa.res_and_time_ovl_tuples ==  ((-2, 1), (-2, 3))
+    assert fa.magnitude_condition_bank ==  {0: (((0,),), ()), 1: (((1,), (0, 1)), ())}
+    # Here, the (nonresonant) ZPVA third hyperpolarizability makes the cut (compounding pattern (5,)
+    # Also two interaction sequences for the "intended" alpha-beta CARS contribution  (comp. pattern (2, 3)) remain
+    assert fa.int_sequences_by_order_comp_pol_magn == {4: {(5,): {0: {0: [((-2, 1, 3, 3),)]}},
+                                                        (2, 3): {0: {1: [((-2, 1), (3, 3)), ((-2, 3), (1, 3))]}}}}
