@@ -5,7 +5,7 @@ Mock data, 1D-4D. One toy term per dimensionality, its resonance conditions a ch
 as derive writes them for pulses at different times, on a toy molecule with 2 modes and states up to
 4 quanta (more than the Gaussian files have). The term is compiled by hand, so 4D needs no translation to axes
 (derive's translation stops at 3 axes). Rank 2 averaging (TOY_RECIPE): odd ranks would need the slot order of
-get_pol_tensor fixed first (test_averaging_pol_order.py).
+get_pol_tensor fixed first.
 
 Real data: derive's terms of three experiments, stored translated to the experiment's canonical axes
 (stored_terms.py), data from formaldehyde's Gaussian file:

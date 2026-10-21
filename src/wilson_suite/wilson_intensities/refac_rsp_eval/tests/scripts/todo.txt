@@ -7,9 +7,9 @@ G9 and test_getting_data (the reader; fixed 2026-10-18).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
 Commits named in this file (checked 2026-10-21): on this branch (rsp_eval_refactor) only: 01a11d8, 96bcc63,
-27408f9, 3612e5b, 7463870, d93cc7b, a778784, 2650eb8, 9f17da0, be20efb, 59a4149, a005c10, 48182f2, 51ca458.
-On main, so on every branch: 11e3d0a (where this branch starts), 18c5fac, aac2ccc, fbc7a0c. All others (e.g.
-0c2de12, 5062d5e, 27f41ee, 40621bd) are on debug_rendering only.
+27408f9, 3612e5b, 7463870, d93cc7b, a778784, 2650eb8, 9f17da0, be20efb, 59a4149, a005c10, 48182f2, 51ca458,
+efaa790. On main, so on every branch: 11e3d0a (where this branch starts), 18c5fac, aac2ccc, fbc7a0c. All others
+(e.g. 0c2de12, 5062d5e, 27f41ee, 40621bd) are on debug_rendering only.
 The old code before its removal (E9), on rsp_eval_refactor: d93cc7b is the last commit with all of it (amplitudes/,
 its tests in wilson_intensities/tests, the old-vs-new scripts c2_variations.py, c2_leaves.py, c3_spectrum.py).
 A deleted file, or the file list of a folder, at that commit:
@@ -25,11 +25,10 @@ the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (
 
 Tests (run 2026-10-21, branch rsp_eval_refactor)
 ------------------------------------------------
-                    pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   755     -     -     19   all 19 xfails: 5 in tests/test_a15_polarization_order.py,
-                                              14 in tests/test_averaging_pol_order.py
-    rest of src      263     -     1      -   none
-    tests/ (root)      4    16     -      -   none
+                    pass  fail  skip
+    refac_rsp_eval   740     -     -
+    rest of src      263     -     1
+    tests/ (root)      4    16     -
 Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The rest of src has none since 2026-10-18:
 test_getting_data fixed (wilson_system/todo.txt R2). The 16 in tests/: E9 stage 3 (C). Before E9 deleted the old
 tests the rest of src had 323 / 4 / 3 (pass / fail / skip): 3612e5b deleted the old unit and integration tests,
@@ -72,8 +71,7 @@ debug_rendering (the dft_vs_cc PRs #53-#61, the render changes) stays there.
              debug_rendering 3d18259
     96bcc63  one DataOriginInfo class: wilson_main/abstractions.py imports it from wilson_system (B1; debug_rendering
              f7c0b92)
-    27408f9  compat.py; test_averaging_pol_order.py moved from wilson_intensities/tests/unit into tests/;
-             wilson_utils/some_reprs.py renamed builders.py (as on debug_rendering, 40621bd)
+    27408f9  compat.py; wilson_utils/some_reprs.py renamed builders.py (as on debug_rendering, 40621bd)
 wilson_derive and wilson_experiment are as on main. Five changes of debug_rendering there were used by the
 refactor; on this branch:
     flat term list in translate_terms_to_axis_variables     not needed since E18 (2026-10-18): the new code does
@@ -200,7 +198,7 @@ Decisions and known limits
 
 A. Small fixes
 --------------
-[-] A15 Polarization order. Postponed 2026-10-14; until then the A15 tests are strict xfails (see Tests).
+[-] A15 Polarization order. Postponed 2026-10-14. Its tests were deleted 2026-10-21 (see below).
         get_pol_tensor (amplitudes/averaging.py, the recursive return line) builds the polarization product in
         reverse: slot k gets the polarization of slot n-1-k. derive numbers the slots 0 = detector, k = pulse k
         (dressWithPulseInteractions, response_terms.py). e.g. get_pol_laser([x, y, z]) gives [-1.0]; should be +1.
@@ -211,12 +209,18 @@ A. Small fixes
                         x, y, z, x, x: +0.598 instead of -0.963
         Fix, checked against the exact average (G4), ranks 2-6 (rank 4 old vs fixed: 4e-15):
             return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
-        Then remove the 19 xfail marks (they turn into XPASS failures). Tests that pin it:
-            refac_rsp_eval/tests/test_averaging_pol_order.py            14 strict xfails; 13 pass either way
-            refac_rsp_eval/tests/test_a15_polarization_order.py         5 strict xfails; 2 pass either way
+        With the fix applied in memory, the tests below pass, and nothing else changes.
+        Tests, deleted 2026-10-21 (19 strict xfails until the fix, 15 pass either way); at efaa790:
+            git show efaa790:src/wilson_suite/wilson_intensities/refac_rsp_eval/tests/test_averaging_pol_order.py
+            git show efaa790:src/wilson_suite/wilson_intensities/refac_rsp_eval/tests/test_a15_polarization_order.py
+        The first: get_pol_tensor slot by slot, get_pol_laser, the recipe against the exact average (G4), ranks
+        2-6. The second: the same in the evaluator's averaged part, rank 3 (det(mu) / 6) and rank 5.
         debug_rendering also has wilson_intensities/tests/unit/test_get_pol_tensor.py (7 fail until the fix,
         1 control passes); not on this branch.
-        With the fix applied in memory all of them pass, and nothing else changes.
+        Sources. The average A . f M g . T: D. L. Andrews and T. Thirunamachandran, J. Chem. Phys. 67, 5026
+        (1977). The notation, as in averaging.py: D. H. Friese, M. T. P. Beerepoot and K. Ruud, J. Chem. Phys.
+        141, 204103 (2014). The rank 4 Raman values that check the exact average: D. A. Long, The Raman Effect
+        (Wiley, 2002), chapter 5.
         When it matters (checked 2026-10-15). An odd-rank average (3, 5) is built from the Levi-Civita tensor, so it
         changes sign in a mirror. It is nonzero only if both:
             - the molecule is chiral. An achiral one (a mirror plane or an inversion centre) gives 0: formaldehyde
@@ -234,8 +238,6 @@ A. Small fixes
           test_plan.py and test_evaluate.py on real data; its own term_to_str next to compat.term_to_str. Its
           einsum-against-loop tests on the 14 EVV terms (3 laser_pol) and the rotation test have no other
           real-data copy. proposal: keep these (e.g. in test_evaluate.py), drop the rest.
-        - tests/test_a15_polarization_order.py and tests/test_averaging_pol_order.py: one cause (A15), two files,
-          the first imports from the second. Options: merge them; or fix A15 and keep them as plain tests.
         - tests/scripts/f2_speed.py: its "deepcopy" line reports 0 calls (the profiled run reuses the
           denominator split that the plain run before it kept on each CompiledTerm). Its docstring says it runs
           for minutes: 17 s on 2026-10-21.
@@ -616,7 +618,7 @@ checking side.
         Limit: a rotation test cannot catch wrong weights (any mix of isotropic tensors passes, e.g. laser_pol
         (0.3, -1.2, 2.0), test_evaluate.py). G3 checks which slot each property reads; G4 checks the weights.
 [ ] G4  [aside] Averaging weights against the exact orientation average, numpy only. exact_average
-        (test_averaging_pol_order.py): Euler angles z-y-z, 8 x 8 x 8 = 512 rotations (Gauss-Legendre in cos beta),
+        (deleted with the A15 tests, see A15): Euler angles z-y-z, 8 x 8 x 8 = 512 rotations (Gauss-Legendre in cos beta),
         exact for ranks 1-6; checked against textbook values (rank 2; rank 4 Raman, zzzz and zxzx).
         Found: the weights are right; ranks 3, 5, 6 read the polarizations in reverse order (A15).
         Left: the 5 polarization setups of C2; M x Gram(f) = identity for ranks 2-6, with Gram(f)[r, s] = sum over
@@ -834,10 +836,7 @@ Built
          each G7 setup's polarizations are [detector, pulse 1, pulse 2, ...] (VibExperiment.all_polarizations) and
          its laser_pol is get_pol_laser of them. evv_reference.json made again: only settings.terms_file changed,
          every row the same. Tests: test_imports.py (the import check), test_pipeline.py (pulse IDs raise),
-         test_evv_reference.py (evv.json's axes and laser_pol). test_a15_polarization_order.py: the test of the
-         experiment's vector became test_polarization_vector_is_det_of_the_polarizations (get_pol_laser on the
-         list in slot order; a strict xfail until A15); its check of all_polarizations' order moved to
-         make_translated_terms.py.
+         test_evv_reference.py (evv.json's axes and laser_pol).
          Open [outside]: experiment_makeover's derive multiplies each coefficient by 1/N (N: the experiment's
          number of valid interaction sequences); its VibExperiment cannot be passed to derive() yet. Once it
          can, the G7 files are made again there (make_translated_terms.py on that branch). evv.json and

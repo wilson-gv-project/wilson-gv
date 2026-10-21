@@ -24,8 +24,6 @@ there too: todo.txt and todo_oldcode_rm.txt. [scripts/README.md](scripts/README.
 | test_grid_reference.py | the whole spectrum has not changed, grid point by grid point, against grid_reference.npz. Run as a script, it writes that file again | formaldehyde |
 | test_hand_calculation.py | the numbers are right: rows of EVV, CARS and 3 IR terms by hand, with numpy and textbook formulas; control cases with the wrong denominator | water |
 | test_imports.py | no file of refac_rsp_eval or wilson_system imports the experiment or derive | the source files |
-| test_averaging_pol_order.py | the slot order of get_pol_tensor (amplitudes/averaging.py): slot k gets pol[n-1-k]. Ranks 2 and 4 are not affected. Strict xfails mark the right results | none |
-| test_a15_polarization_order.py | the same slot order, seen in the evaluator's averaged part at rank 3 and rank 5. Strict xfails mark the right results | none |
 | test_integration.py | the 14 EVV terms compiled; the data reader; the factors of one term; the einsum average against the plain loop on real data, also with the molecule rotated | formaldehyde |
 
 ## Support files
