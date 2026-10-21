@@ -6,8 +6,10 @@ Moved to wilson_system/todo.txt (2026-10-17), as they block nothing here: D4, D5
 G9 and test_getting_data (the reader; fixed 2026-10-18).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
     git show 0c2de12:src/wilson_suite/wilson_intensities/refac_rsp_eval/todo.txt
-Commits named in this file: on this branch (rsp_eval_refactor) 01a11d8, 96bcc63, 27408f9, 3612e5b, 7463870,
-d93cc7b; 11e3d0a is main; all others (e.g. 0c2de12, 5062d5e, 27f41ee, 40621bd) are on debug_rendering.
+Commits named in this file (checked 2026-10-21): on this branch (rsp_eval_refactor) only: 01a11d8, 96bcc63,
+27408f9, 3612e5b, 7463870, d93cc7b, a778784, 2650eb8, 9f17da0, be20efb, 59a4149, a005c10, 48182f2, 51ca458.
+On main, so on every branch: 11e3d0a (where this branch starts), 18c5fac, aac2ccc, fbc7a0c. All others (e.g.
+0c2de12, 5062d5e, 27f41ee, 40621bd) are on debug_rendering only.
 The old code before its removal (E9), on rsp_eval_refactor: d93cc7b is the last commit with all of it (amplitudes/,
 its tests in wilson_intensities/tests, the old-vs-new scripts c2_variations.py, c2_leaves.py, c3_spectrum.py).
 A deleted file, or the file list of a folder, at that commit:
@@ -86,8 +88,8 @@ refactor; on this branch:
     VibExperiment.derive_terms (40621bd)                    not needed since E18: make_translated_terms.py runs
                                                             main's derive, flattened by derived_terms_flat
 compat.py goes once derive has to_str [outside].
-tests/scripts/g7_survey.py runs on this branch since E18 (2026-10-18), from the stored terms; pytest does not
-collect it. It uses no old code, so it stays after E9.
+g7_survey.py ran on this branch from E18 (2026-10-18), from the stored terms. Deleted 2026-10-21 with the
+survey's term files (see G7).
 The old-vs-new scripts tests/c3_spectrum.py, c2_variations.py and c2_leaves.py (main's old pipeline; they did not
 run here either) were deleted in 3612e5b (E9, stage 1; d93cc7b has them, see the top of this file). C2 stays
 checked without them: test_evv_reference.py against evv_reference.json.
@@ -120,7 +122,8 @@ Other items:
     done (2026-10-18)    E18 (translated terms in; tests load stored terms; H8 holds)
     done (2026-10-19)    E16 (the domains deleted)
     done (2026-10-20)    lineshape.py, cut_tails, test_grid_reference.py (see Done)
-    done (2026-10-21)    the tests and scripts sorted, with READMEs (see Done)
+    done (2026-10-21)    the tests and scripts sorted, with READMEs; the stored terms cut to the 3 test setups,
+                         g7_survey.py deleted (see Done, G7)
     later, when needed   D1 (frozen collections), E8 (lines and planes), E14 (slices of 3D and 4D spectra),
                          E10 (tune the knobs), F (the sum as arrays; for 4D also the rows as arrays; reuse on a
                          new axis choice)
@@ -485,8 +488,8 @@ E. Pipeline
         wilson_intensities keeps amplitudes/averaging.py (imported by this package and by wilson_experiment),
         utils/ and anharmonic_treatment/ (moves to wilson_system later: wilson_system/todo.txt S1).
         What the move touches (checked 2026-10-21; 147 lines in 34 files on 2026-10-19):
-            - 164 lines in 37 files under src name refac_rsp_eval (.py, .txt, .md; no tracked file outside src);
-              all imports are absolute. 29 of the files are in the package; outside it:
+            - 156 lines in 36 files under src name refac_rsp_eval (.py, .txt, .md; no tracked file outside src);
+              all imports are absolute. 28 of the files are in the package; outside it:
               wilson_main/workflow_abstractions.py (evaluate's docstring), wilson_analysis: render/plot_spectrum.py,
               analysis/pre_eval.py, tests/test_plot_spectrum.py; wilson_intensities/amplitudes/__init__.py;
               wilson_system: tests/test_system_data.py, todo.txt; data_for_tests/translated_terms/
@@ -495,7 +498,7 @@ E. Pipeline
               Path(__file__).parents[3]; one folder level less deep: parents[2]. A search-and-replace does not
               catch it.
             - since E18 (2026-10-18), outside the package: data_for_tests/translated_terms/make_translated_terms.py
-              names refac_rsp_eval/tests/stored_terms.py, test_imports.py, tests/scripts/g7_survey.py and
+              names refac_rsp_eval/tests/stored_terms.py, test_imports.py, make_evv_reference.py and
               tests/scripts/todo.txt in its docstring.
             - the refac-status skill (.claude/skills, not in git) reads this file by its path
               stored_terms.py finds data_for_tests by SUITE_ROOT, so the move does not change that path.
@@ -631,14 +634,18 @@ checking side.
         of every setup agree with the table below except one (checked 2026-10-19): 7-pulse UV raises in main's
         VibExperiment (__post_init__: polarization_avg_vector = get_pol_laser of 8 polarizations, get_iso_f
         order 8), so it has no terms file; on debug_rendering derive gave 632 terms.
-        Where the experiments come from:
-            data_for_tests/translated_terms/make_translated_terms.py  G7_SETUPS: every setup of the survey. CAHRS
-                                                                     with 3 pulses and a 5-entry filter:
-                                                                     VibExperiment raises (UnboundLocalError).
-            ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb     EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
-            src/wilson_suite/fixtures.py                             EVV, EVV coincident, beta-alpha CARS
-        Script: tests/scripts/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak memory; --only for
-        some setups, --terms for every term). Making the terms again: make_translated_terms.py, 9.3 min of derive.
+        Since 2026-10-21 only the 3 setups that the tests use are stored: CARS (try), 3 IR (3D) (nb), IR
+        absorption (1D); 2 KB. Other experiments are explored with the library itself (experiment, derive,
+        translation, evaluation). The survey's 76 setups (74 files, 2.9 MB; 60 of them sign sweeps) and
+        tests/scripts/g7_survey.py were deleted; 51ca458 has them, e.g.
+            git show 51ca458:src/wilson_suite/data_for_tests/translated_terms/make_translated_terms.py
+        Where the experiments came from:
+            make_translated_terms.py (51ca458)    G7_SETUPS: every setup of the survey. CAHRS with 3 pulses and a
+                                                  5-entry filter: VibExperiment raises (UnboundLocalError).
+            a seminar demo notebook (not in git)  EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
+            src/wilson_suite/fixtures.py          EVV, EVV coincident, beta-alpha CARS
+        Script, until 2026-10-21: tests/scripts/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak
+        memory). Making all 76 setups: make_translated_terms.py, 9.3 min of derive; the 3 kept setups and evv: 1 s.
         Survey 2026-10-15: derive -> the canonical axes -> B7 -> evaluation on formaldehyde (anharmonic, the
         experiment's laser_pol). The filter's sign patterns only relabel the axes and change the counts a little:
         one row per sweep. Patterns: the axes of each condition, e.g. (A ; A+B) = one condition on A, one on A + B.
@@ -741,9 +748,10 @@ so C2, C3 and G1 would all miss a reader error: those checks matter for the fina
         59, in find_pulse_id_tuples_as_axis_vars:
             if j > 2:
                 raise ValueError('Current version enables maximum 3 axes')
-        Since E18 the evaluator does not translate: make_translated_terms.py hits the stop. It stores the 4-axis
-        G7 setups translated by its survey_translate (derive's algorithm without the stop; until E18 in
-        g7_survey.py), settings['translation'] 'survey'. Where both translations work they give the same terms.
+        Since E18 the evaluator does not translate: make_translated_terms.py hits the stop. Until 2026-10-21 it
+        stored the 4-axis G7 setups translated by its own survey_translate (derive's algorithm without the stop;
+        the same terms as derive's where both work). No 4-axis setup is stored since then, and survey_translate
+        is deleted (51ca458 has it).
         These two checks are the only block: the search itself works for any number of axes (the G7 survey used
         a copy without them: all 5120
         4-axis terms translated and passed B7). Without them the limit is 7 axes: the axes are named
@@ -754,9 +762,8 @@ so C2, C3 and G1 would all miss a reader error: those checks matter for the fina
         the experiment's axis code. fbc7a0c (2025-11-28) put the labels back to A-G, but removed only the
         experiment's checks.
         To fix (outside this refactor, in wilson_derive): in both checks, j > 2 becomes j > 6, and the message
-        becomes 'Current version enables maximum 7 axes' (7 = len(cap_alpha_labels)). Then make_translated_terms.py
-        can drop express and survey_translate, and its 4-axis G7 setups can be made again with derive's
-        translation.
+        becomes 'Current version enables maximum 7 axes' (7 = len(cap_alpha_labels)). Then a 4-axis setup can be
+        stored with derive's translation (added to G7_SETUPS in make_translated_terms.py).
 
 
 Done
@@ -787,6 +794,10 @@ Built
     -    Tests and scripts sorted (2026-10-21): the scripts and these two notes in tests/scripts/;
          make_evv_reference.py stays in tests/ (the tests import its loaders). tests/README.md lists the test and
          support files, tests/scripts/README.md the scripts.
+    -    Stored terms cut to the test setups (2026-10-21): data_for_tests/translated_terms keeps evv.json and the
+         3 G7 setups that the tests read (CARS, 3 IR (3D), IR absorption). make_translated_terms.py lost the
+         sign sweeps, survey_translate and express; its files lost the keys translation and derive_translation
+         (the terms are the same). g7_survey.py and stored_terms.setup_names deleted. 51ca458 has all of it.
     E11  One resonance axis set per evaluation (2026-10-16, see Decisions). pipeline.check_one_axis_set:
          compute_features raises before any row is computed and lists the term ids per set; before, such a mix
          failed only on the grid ("Expected SpectralFeature with axes ..."). pipeline.terms_by_axis_set: the term
@@ -808,16 +819,18 @@ Built
     E18  Translated terms in, stored terms for the tests (2026-10-18, see Decisions). The evaluator takes terms
          already translated to axes, from any caller, and reads no file. The tests and scripts read derive's
          terms, already translated to axes, with their settings, from data_for_tests/translated_terms
-         (tests/stored_terms.py: load_setup, setup_names). make_translated_terms.py there builds the experiments,
+         (tests/stored_terms.py: load_setup). make_translated_terms.py there builds the experiments,
          runs derive and translates (main's derive and experiment; source in each file: the last commit that
          changed either). Files:
              evv.json        the 14 EVV terms of evv_in_pulse_ids.json (formerly tests/test_terms.json; stored
                              terms, not derived by the script), translated to A = [1], B = [-1, 2]
-             g7/*.json.gz    74 G7 setups, 240121 terms, 2.7 MB (2.9 MB on disk). No time stamp: the same
-                             content (terms and settings, source included) gives the same bytes
-             index.json      evv and all 76 G7 setups; the 2 G7 setups without a file hold the error of the
-                             experiment or derive
-         Checked when writing: where both translations work (derive's, survey_translate), they give the same terms;
+             g7/*.json.gz    74 G7 setups, 240121 terms, 2.7 MB (2.9 MB on disk); since 2026-10-21 the 3 that
+                             the tests use (see G7). No time stamp: the same content (terms and settings, source
+                             included) gives the same bytes
+             index.json      evv and the G7 setups; a G7 setup without a file holds the error of the experiment
+                             or derive (2 of the 76 until 2026-10-21)
+         Checked when writing: where both translations work (derive's, survey_translate; until 2026-10-21), they
+         give the same terms;
          each G7 setup's polarizations are [detector, pulse 1, pulse 2, ...] (VibExperiment.all_polarizations) and
          its laser_pol is get_pol_laser of them. evv_reference.json made again: only settings.terms_file changed,
          every row the same. Tests: test_imports.py (the import check), test_pipeline.py (pulse IDs raise),

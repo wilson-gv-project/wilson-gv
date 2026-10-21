@@ -17,8 +17,6 @@
     ]
   },
   "axes_from": "fixed: the old EVV integration tests (make_evv_reference.py)",
-  "translation": "derive",
-  "derive_translation": "ok",
   "laser_pol": [
     1.0,
     1.0,

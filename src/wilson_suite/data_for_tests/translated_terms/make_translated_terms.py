@@ -6,6 +6,8 @@ wilson_intensities/refac_rsp_eval/tests/stored_terms.py.
 Why the terms are stored: the new evaluator code must not import wilson_experiment, derive.derive or
 term_var_translate (refac_rsp_eval/tests/test_imports.py checks the imports). This script imports all three. The
 script sits outside the new code and saves their output to files.
+Only the setups that the tests use are stored. Other experiments are explored with the library itself: build the
+experiment, run derive, translate the terms to axes, evaluate them.
 
 Words used below:
     w1              the frequency of pulse 1 (pulse ids start at 1)
@@ -25,9 +27,7 @@ What the script does for each G7 setup (make_g7_file):
     2. Run derive on the experiment. derive gives the terms, with pf in pulse ids.
     3. Pick the axes: the experiment's canonical_axes. If the experiment has none: the first of its valid axis
        choices (valid_axis_combs).
-    4. Translate the terms twice: with derive's term_var_translate, and with survey_translate below.
-       derive's translation raises for 4 or more axes (E13). survey_translate has no such limit.
-       Where both translations work, the script checks that both give the same terms.
+    4. Translate the terms with derive's term_var_translate. It raises for 4 or more axes (E13).
     5. Check the polarizations (see the keys below), then write the file.
 
 Files:
@@ -35,16 +35,16 @@ Files:
                             stored earlier, with pf in pulse ids). Translated to A = w1, B = -w1 + w2.
                             laser_pol (1, 1, 1). These are the settings of the old EVV integration tests
                             (refac_rsp_eval/tests/make_evv_reference.py).
-    g7/NN_<name>.json.gz    one file per G7 setup. NN is the setup's number in G7_SETUPS. G7 is a survey of other
-                            experiments: refac_rsp_eval/tests/scripts/g7_survey.py evaluates the terms of these files.
+    g7/NN_<name>.json.gz    one file per G7 setup. NN is the setup's number in G7_SETUPS. The G7 setups are the
+                            experiments other than EVV that the tests use: CARS (1D), IR absorption (1D),
+                            3 IR (3D).
     index.json              one entry per setup, in order: its file and its number of terms. A setup that the
                             experiment or derive cannot take has no file. Its entry holds the error instead.
 
-The start of a G7 setup's name puts the setups in groups:
-    try:            single experiments, e.g. 'try: CARS'
-    nb:             the experiments of the seminar notebook ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb
-    1D:             1D spectra: IR absorption, IR + vis SFG
-    sweep:          one set of pulses, once per sign pattern of wv_filter (see sweep below)
+The start of a G7 setup's name tells where the setup comes from:
+    try:            a single experiment, e.g. 'try: CARS'
+    nb:             an experiment of a seminar demo notebook
+    1D:             a 1D spectrum
 
 Keys of a G7 file:
     name                the setup's name, e.g. 'try: CARS'
@@ -53,8 +53,6 @@ Keys of a G7 file:
     axes                {label: [variables]}. A variable is a list of signed pulse ids. The axis is the sum of all
                         its variables. {'A': [[-2, 1]]}: A = w1 - w2. {'B': [[-1], [2]]}: B = -w1 + w2.
     axes_from           'canonical_axes' or 'first valid choice' (step 3)
-    translation         the translation of the stored terms: 'derive', or 'survey' where derive's translation raised
-    derive_translation  'ok', or the error that derive's translation raised
     polarizations       the polarization vectors in this order: detector, pulse 1, pulse 2, ...
                         The script checks this order against the experiment's all_polarizations.
     laser_pol           the experiment's polarization_avg_vector. The script checks that
@@ -62,28 +60,25 @@ Keys of a G7 file:
     source              the hash of the last commit that changed wilson_derive or wilson_experiment. The hash gets
                         ' + uncommitted changes' if either folder had changes not yet committed.
     terms               the translated terms, each as VibPerturbedTerm.to_dict
-evv.json has name, axes, axes_from, translation, derive_translation, laser_pol, source and terms, plus
-source_terms: the file the terms come from.
+evv.json has name, axes, axes_from, laser_pol, source and terms, plus source_terms: the file the terms come from.
 The .gz files hold no time stamp. The same terms give the same bytes, so git sees no change.
 
 The stored files were made with wilson_derive and wilson_experiment as at commit
 57776f0b7134c418361fa6a2e3640b1a7242e7b0 (2026-06-04, on main). Every stored file has this hash as its source.
 
 Run the script again only on purpose: after derive or the experiment changed.
-    python -m wilson_suite.data_for_tests.translated_terms.make_translated_terms                  every setup, ~10 min
+    python -m wilson_suite.data_for_tests.translated_terms.make_translated_terms                  every setup
     python -m wilson_suite.data_for_tests.translated_terms.make_translated_terms --only evv "3 IR (3D)"
 --only runs only the setups whose name contains one of the given words. The other setups keep their files and
-their entries in index.json. Case matters: 'evv' picks evv.json only. 'EVV' picks the G7 setups with EVV in the name.
+their entries in index.json. Case matters: 'evv' picks evv.json only.
 After a run, check the git diff of index.json and evv.json. The .gz files are binary: git diff shows no lines of them.
 """
 import argparse
-import copy
 import gzip
 import json
 import re
 import subprocess
 from dataclasses import replace
-from itertools import product
 from pathlib import Path
 
 import wilson_suite.wilson_experiment.experiment_abstractions as wexp
@@ -132,63 +127,10 @@ def make_experiment(pulses, wv_filter: dict, magn_conditions=None) -> wexp.VibEx
                               magn_conditions=magn_conditions)
 
 
-def sweep(name: str, pulses, fixed: dict | None = None) -> list:
-    """
-    One setup per sign pattern of wv_filter.
-    The pulses in `fixed` keep their sign. Every other pulse gets -1 and +1.
-    Example: 3 pulses, fixed={3: 1} gives 4 setups: '<name> [-1 -2 +3]', '<name> [-1 +2 +3]', '<name> [+1 -2 +3]',
-    '<name> [+1 +2 +3]'.
-    """
-    fixed = fixed or {}
-    free = [i + 1 for i in range(len(pulses)) if i + 1 not in fixed]
-    setups = []
-    for signs in product([-1, 1], repeat=len(free)):
-        wv_filter = {**fixed, **dict(zip(free, signs))}
-        label = ' '.join(f"{'+' if wv_filter[k] > 0 else '-'}{k}" for k in sorted(wv_filter))
-        setups.append((f'{name} [{label}]', pulses, wv_filter, None))
-    return setups
-
-
-IR_50, IR_80, UV_7 = ir(50.), ir(80.), uv(90., 0.192)
 G7_SETUPS = [   # (name, pulses, wv_filter, magn_conditions)
-    # single experiments
     ('try: CARS', (uv(10., .072), uv(10., .072), uv(120., .092)), {1: 1, 2: -1, 3: 1}, None),
-    ('try: CAHRS (3 pulses, 5-entry filter)', (uv(10., .072), uv(10., .072), uv(120., .092)),
-     {1: 1, 2: 1, 3: 1, 4: 1, 5: 1}, None),
-    ('try: beta-alpha CARS', (uv(10., .072), uv(10., .072), uv(10., .144), uv(120., .072)),
-     {1: 1, 2: 1, 3: -1, 4: 1}, None),
-    ('try: EVV, IR 1 and 2 at the same time', (ir(100.), ir(100.), uv(120., .072)), {1: -1, 2: 1, 3: 1},
-     ((-1, 2),)),
-    ('try: CAHRS?? (5 UV)', (uv(10., .05), uv(10., .05), uv(10., .1), uv(110., .05), uv(110., .05)),
-     {1: 1, 2: 1, 3: -1, 4: 1, 5: 1}, ((1, 2, -3),)),
-    ('try: 3 IR + UV, IR 1 and 2 at the same time', (IR_50, IR_50, IR_80, UV_7), {1: -1, 2: -1, 3: 1, 4: 1}, None),
-    ('try: 4 IR + UV, IR in 2 same-time pairs, UV with the 2nd',
-     (ir(10.), ir(10.), ir(20.), ir(20.), uv(20., .092)), {1: -1, 2: -1, 3: -1, 4: -1, 5: 1}, None),
-    ('try: 4 IR + UV, different times', (ir(10.), ir(20.), ir(40.), ir(70.), uv(120., .092)),
-     {1: -1, 2: 1, 3: 1, 4: -1, 5: 1}, None),
-    ('try: 7-pulse UV', (uv(10., .072), uv(10., .072), uv(50., .144), uv(50., .144), uv(90., .092),
-                         uv(90., .092), uv(90., .192)), {1: 1, 2: -1, 3: 1, 4: -1, 5: 1, 6: -1, 7: 1}, None),
-    # the seminar notebook (~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb)
-    ('nb: EVV', (ir(50.), ir(100.), uv(120., .072)), {1: -1, 2: 1, 3: 1}, ((-1, 2),)),
-    ('nb: EVV + 2nd UV', (ir(50.), ir(100.), uv(120., .072), uv(120., .092)), {1: -1, 2: 1, 3: 1, 4: 1},
-     ((-1, 2),)),
     ('nb: 3 IR (3D)', (ir(50.), ir(100.), ir(120.)), {1: -1, 2: 1, 3: 1}, ((-1, 2),)),
-    ('nb: CARS (cf_uv .072 .072 .144)', (uv(10., .072), uv(10., .072), uv(40., .144)), {1: 1, 2: -1, 3: 1},
-     ((-1, 2),)),
-    ('nb: CARS (cf_uv all .072)', (uv(10., .072), uv(10., .072), uv(40., .072)), {1: 1, 2: -1, 3: 1}, ((-1, 2),)),
-    # 1D
     ('1D: IR absorption', (ir(50.),), {1: 1}, None),
-    ('1D: IR + vis SFG', (ir(50.), uv(120., .072)), {1: 1, 2: 1}, None),
-    # sign sweeps: one set of pulses, once per sign pattern of wv_filter
-    *sweep('sweep: 3 IR + UV, all 3 IR at the same time', (IR_50, IR_50, IR_50, UV_7)),
-    *sweep('sweep: 3 IR + UV, IR 1 and 2 at the same time', (IR_50, IR_50, IR_80, UV_7)),
-    *sweep('sweep: 3 IR + UV, different times', (IR_50, ir(70.), IR_80, UV_7)),
-    *sweep('sweep: 4 IR + UV, different times', (ir(10.), ir(30.), ir(50.), ir(90.), uv(120., .092)),
-           {3: 1, 4: 1, 5: 1}),
-    *sweep('sweep: 4 IR + UV, IR in 2 same-time pairs', (ir(10.), ir(10.), ir(20.), ir(20.), uv(120., .092)),
-           {3: 1, 4: 1, 5: 1}),
-    *sweep('sweep: 4 IR + UV, IR in 2 same-time pairs, UV with the 2nd',
-           (ir(10.), ir(10.), ir(20.), ir(20.), uv(20., .092)), {3: 1, 4: -1, 5: 1}),
 ]
 
 
@@ -218,43 +160,6 @@ def axes_dict(axis_set) -> dict[str, list[tuple]]:
     return {ax.label: [p.pulse_refs for p in ax.var_set.var_set] for ax in axis_set.axes}
 
 
-def express(id_tuple: tuple, axes: dict) -> dict[str, int]:
-    """
-    Writes a signed sum of pulse ids as a signed sum of axes. Returns {label: 1 or -1}.
-    Example: axes A = w1, B = -w1 + w2. id_tuple (-1, 2) means -w1 + w2, so the result is {'B': 1}.
-    The search tries each sign -1, 0, +1 for each axis, as derive's find_pulse_id_tuples_as_axis_vars does,
-    but for any number of axes. id_tuple must be sorted. Raises AssertionError if no signs fit.
-    """
-    labels = list(axes)
-    for signs in product([-1, 0, 1], repeat=len(labels)):
-        running = []
-        for label, sign in zip(labels, signs):
-            for pulses in (axes[label] if sign else ()):
-                for k in pulses:
-                    if sign == -1:
-                        running.remove(k) if k in running else running.append(-k)
-                    else:
-                        running.remove(-k) if -k in running else running.append(k)
-        if tuple(sorted(running)) == id_tuple:
-            return {label: sign for label, sign in zip(labels, signs) if sign}
-    raise AssertionError(f'{id_tuple} cannot be written in the axes {axes}')
-
-
-def survey_translate(terms, axes: dict) -> list[VibPerturbedTerm]:
-    """
-    Translates the terms as derive's translation does, but for any number of axes (derive's stops at 3, E13).
-    Returns copies. Each condition's pf goes from pulse ids to axis labels, e.g. [-1, 2] becomes ['B'].
-    """
-    translated = []
-    for term in terms:
-        term = copy.deepcopy(term)
-        for rc in term.res:
-            rc.pf = [label if sign == 1 else '-' + label
-                     for label, sign in express(tuple(sorted(rc.pf)), axes).items()]
-        translated.append(term)
-    return translated
-
-
 # ---- the files ----
 def source() -> str:
     """
@@ -270,15 +175,9 @@ def source() -> str:
 def file_stem(number: int, name: str) -> str:
     """
     The file name of a G7 setup, without the suffix: the number, then the name in lower case with _ between
-    the words. The signs + and - of a sweep become p and m.
-    Example: 17, 'sweep: 3 IR + UV, all 3 IR at the same time [-1 +2 -3 +4]'
-        -> '17_sweep_3_ir_uv_all_3_ir_at_the_same_time_m1_p2_m3_p4'
+    the words. Example: 2, 'nb: 3 IR (3D)' -> '02_nb_3_ir_3d'
     """
-    base, _, signs = name.partition(' [')
-    stem = re.sub(r'[^a-z0-9]+', '_', base.lower()).strip('_')
-    if signs:
-        stem += '_' + '_'.join(s.replace('+', 'p').replace('-', 'm') for s in signs.rstrip(']').split())
-    return f'{number:02d}_{stem}'
+    return f"{number:02d}_{re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')}"
 
 
 def as_json_data(content: dict) -> dict:
@@ -300,23 +199,16 @@ def write_file(path: Path, content: dict) -> None:
         path.write_text(json.dumps(content, indent=2) + '\n')
 
 
-def same_terms(a: list[VibPerturbedTerm], b: list[VibPerturbedTerm]) -> bool:
-    """True if a and b hold the same terms in the same order. Compares the terms' to_dict."""
-    return [t.to_dict() for t in a] == [t.to_dict() for t in b]
-
-
 def make_evv_file(src: str) -> dict:
     """
     Writes evv.json: the terms of evv_in_pulse_ids.json, translated to EVV_AXES. src: the hash from source().
-    Checks that derive's translation and survey_translate give the same terms. Returns the entry for index.json.
+    Returns the entry for index.json.
     """
     terms = VibPerturbedTerm.load_many_from_json(str(EVV_SOURCE))
     axis_set = make_SpectralAxisSet(EVV_AXES)  # type: ignore
     translated = derive_translate(terms, axis_set)
-    assert same_terms(translated, survey_translate(terms, axes_dict(axis_set)))
     content = as_json_data({'name': 'evv', 'source_terms': EVV_SOURCE.name, 'axes': axes_dict(axis_set),
                             'axes_from': 'fixed: the old EVV integration tests (make_evv_reference.py)',
-                            'translation': 'derive', 'derive_translation': 'ok',
                             'laser_pol': list(EVV_LASER_POL), 'source': src,
                             'terms': [t.to_dict() for t in translated]})
     write_file(HERE / 'evv.json', content)
@@ -326,8 +218,8 @@ def make_evv_file(src: str) -> dict:
 def make_g7_file(number: int, name: str, pulses, wv_filter: dict, magn_conditions, src: str) -> dict:
     """
     Writes the file of one G7 setup: steps 1-5 of the module docstring. src: the hash from source().
-    Returns the entry for index.json. No file is written if the experiment or derive raises, or if the experiment
-    has no axes. The entry then holds the error.
+    Returns the entry for index.json. No file is written if the experiment, derive or the translation raises,
+    or if the experiment has no axes. The entry then holds the error.
     """
     entry = {'name': name, 'group': 'g7', 'file': None, 'n_terms': None, 'error': None}
     try:
@@ -343,15 +235,10 @@ def make_g7_file(number: int, name: str, pulses, wv_filter: dict, magn_condition
         if not choices:
             return {**entry, 'n_terms': len(terms), 'error': 'no canonical axes and no valid axis choice'}
         axis_set, axes_from = choices[0], 'first valid choice'
-    axes = axes_dict(axis_set)
-
-    by_survey = survey_translate(terms, axes)
     try:
-        by_derive, derive_translation = derive_translate(terms, axis_set), 'ok'
+        translated = derive_translate(terms, axis_set)
     except (ValueError, AssertionError) as e:
-        by_derive, derive_translation = None, f'raises: {e}'
-    if by_derive is not None:
-        assert same_terms(by_derive, by_survey), f"{name}: derive's and the survey's translation differ"
+        return {**entry, 'n_terms': len(terms), 'error': f"derive's translation raises: {e}"}
 
     polarizations = [experiment.detector.detection_polarization,
                      *(p.pol for p in sorted(experiment.field.pulses, key=lambda p: p.id))]
@@ -364,12 +251,10 @@ def make_g7_file(number: int, name: str, pulses, wv_filter: dict, magn_condition
         'pulses': [{'id': p.id, 'tc': p.tc, 'cf_uv': p.cf_uv, 'pol': p.pol, 'wv': p.wv}
                    for p in sorted(experiment.field.pulses, key=lambda p: p.id)],
         'wv_filter': wv_filter, 'magn_conditions': magn_conditions,
-        'axes': axes, 'axes_from': axes_from,
-        'translation': 'derive' if by_derive is not None else 'survey',
-        'derive_translation': derive_translation,
+        'axes': axes_dict(axis_set), 'axes_from': axes_from,
         'polarizations': polarizations, 'laser_pol': [float(x) for x in experiment.polarization_avg_vector],
         'source': src,
-        'terms': [t.to_dict() for t in (by_derive if by_derive is not None else by_survey)]})
+        'terms': [t.to_dict() for t in translated]})
     write_file(HERE / file, content)
     return {**entry, 'file': file, 'n_terms': len(terms)}
 

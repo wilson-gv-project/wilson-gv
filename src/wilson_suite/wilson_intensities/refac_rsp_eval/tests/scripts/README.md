@@ -20,7 +20,6 @@ The todo items are those of todo.txt here.
 | example_plot_spectrum.py | Example of plots with plot_rsp_func and plot_spectrum (wilson_analysis/render/plot_spectrum.py): formaldehyde in the whole window, a zoom, a 1D cut through the strongest peak, harmonic and anharmonic states on one scale; ACDM | out_dir (default: plot_spectrum_figures) | 5 png files in out_dir | 20 s | E7 (plots) |
 | f2_speed.py | Run time of each step on ACDM (14 EVV terms, anharmonic states, a 700 x 700 grid): load, build_contributions (also under cProfile), features, boxes, window, grid | none | text: the time of each step, the 15 slowest functions of build_contributions | 20 s | F (speed; F2 was its first run), A17 |
 | e10_boxes.py | Box sizes (a box is the part of the grid where one feature is evaluated): spectrum_on_grid with the tails cut, for each setting of a box rule, against all_features_on_grid with nothing cut. Formaldehyde and ACDM, each on a big window and on a zoom | `rules`: compare the amplitude and intensity rules; default: settings of amplitude_half_widths | text, one line per setting: the largest error, the worst visible point, the grid time, the features kept | 1 min (default) | E10 (tune the knobs, open), A17 |
-| g7_survey.py | Survey of other experiments, from the stored terms. Per setup: the axes, the kinds of resonance conditions, the averaging rank, the most quanta, missing properties; then an evaluation on formaldehyde if nothing blocks it | `--only WORD ...`: setups whose name holds a word; `--terms FILE`: also write every unique term | text per setup; with --terms, the terms in FILE | 2 min, 530 MB for every setup | G7 (the survey), E8 (lines and planes), E13 (4 axes) |
 
 Parts used elsewhere: f2_speed.load_acdm loads ACDM for e10_boxes.py and example_plot_spectrum.py.
 e10_boxes.reference and e10_boxes.score also run from a notebook, on any result and window.
@@ -34,8 +33,7 @@ e10_boxes.reference and e10_boxes.score also run from a notebook, on any result 
 
 ## Code from outside the refactor
 
-The refactor's code is refac_rsp_eval and wilson_system. ../README.md lists what the evaluator
-and the tests use from elsewhere; the scripts use the same, plus one module:
+The refactor's code is refac_rsp_eval and wilson_system. The scripts also use:
 
 | module | what it gives | used by |
 |---|---|---|

@@ -7,7 +7,6 @@ and derive.derive; no file of the evaluator imports those: test_imports.py).
     setup.axes           {label: [pulse ids of each variable]}, e.g. {'A': [(-2, 1)]}: A = w1 - w2
     setup.laser_pol      the experiment's polarization_avg_vector, e.g. (1., 1., 1.)
     setup.settings       everything else in the file (make_translated_terms.py lists it), e.g. settings['pulses']
-    setup_names('g7')    the setups of g7_survey.py, in its order; 'evv': ['evv']
 A setup that the experiment or derive could not take has no file: load_setup raises, and index()[name]['error']
 holds the error.
 """
@@ -43,10 +42,6 @@ class StoredSetup:
 def index() -> dict[str, dict]:
     """{setup name: its entry in index.json}: file, n_terms, error, group ('evv' or 'g7')"""
     return {entry['name']: entry for entry in json.loads((TERMS_DIR / 'index.json').read_text())}
-
-
-def setup_names(group: str) -> list[str]:
-    return [name for name, entry in index().items() if entry['group'] == group]
 
 
 def load_setup(name: str) -> StoredSetup:

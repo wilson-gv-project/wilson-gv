@@ -2,12 +2,12 @@
 The evaluator with 1, 2, 3 and 4 axes. The other real-data tests are 2D only (EVV).
 
 Mock data, 1D-4D. One toy term per dimensionality, its resonance conditions a chain (A ; A+B ; A+B+C ; A+B+C+D),
-as derive writes them for pulses at different times (g7_survey.py), on a toy molecule with 2 modes and states up to
+as derive writes them for pulses at different times, on a toy molecule with 2 modes and states up to
 4 quanta (more than the Gaussian files have). The term is compiled by hand, so 4D needs no translation to axes
 (derive's translation stops at 3 axes). Rank 2 averaging (TOY_RECIPE): odd ranks would need the slot order of
 get_pol_tensor fixed first (test_averaging_pol_order.py).
 
-Real data: derive's terms of three survey setups (g7_survey.py), stored translated to the experiment's canonical axes
+Real data: derive's terms of three experiments, stored translated to the experiment's canonical axes
 (stored_terms.py), data from formaldehyde's Gaussian file:
     1D  CARS: polgrad only
     1D  IR absorption: 3 of its 5 terms have no resonance conditions, a flat background
@@ -179,7 +179,7 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
     assert np.abs(spec.amplitude - every_point).max() > 0
 
 
-## real data: setups of g7_survey.py, every pulse and the detector along x ---------------------------------------
+## real data: stored setups, every pulse and the detector along x ------------------------------------------------
 # Terms and settings from data_for_tests/translated_terms (stored_terms.py): derive's terms, translated to the
 # experiment's canonical axes; laser_pol is the experiment's polarization_avg_vector.
 

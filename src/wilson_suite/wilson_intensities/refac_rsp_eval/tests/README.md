@@ -5,8 +5,8 @@ with their helpers and reference data. Run them with pytest:
 
     python -m pytest src/wilson_suite/wilson_intensities/refac_rsp_eval/tests
 
-Scripts that are run by hand are in [scripts/](scripts/): speed, box sizes, a survey of other
-experiments, and two examples of use. pytest collects none of them. The refactor's notes are
+Scripts that are run by hand are in [scripts/](scripts/): speed, box sizes, and two examples of
+use. pytest collects none of them. The refactor's notes are
 there too: todo.txt and todo_oldcode_rm.txt. [scripts/README.md](scripts/README.md) lists them all.
 
 ## Test files
@@ -35,7 +35,7 @@ there too: todo.txt and todo_oldcode_rm.txt. [scripts/README.md](scripts/README.
 | \_\_init\_\_.py | empty: makes tests a package, so the files can import each other | every file here |
 | conftest.py | pytest fixtures of the toy molecule: states, molsys, molsys_a1_zero | test_evaluate.py, test_pipeline.py |
 | helpers.py | small hand-built objects: toy states and terms, resonance motifs, row(), feat(), helpers for 1 to 4 axes; the averaged part as a plain loop, the reference for its einsum | most test files here, wilson_system/tests/test_system_data.py |
-| stored_terms.py | reads the stored terms, already translated to axes (data_for_tests/translated_terms): load_setup, setup_names, index | the real-data tests, make_evv_reference.py, the scripts |
+| stored_terms.py | reads the stored terms, already translated to axes (data_for_tests/translated_terms): load_setup, index | the real-data tests, make_evv_reference.py, the scripts |
 | make_evv_reference.py | the settings and loaders of the 14 EVV terms (evv_terms, data_origin, LASER_POL, ...). Run as a script, it writes evv_reference.json | test_evv_reference.py, test_pipeline.py, test_dimensions.py, test_grid_reference.py, the scripts |
 | evv_reference.json | the rows of the 14 EVV terms: formaldehyde, water and CO, harmonic and anharmonic states | test_evv_reference.py, test_hand_calculation.py, test_pipeline.py |
 | grid_reference.npz | the spectra of the test_grid_reference.py cases | test_grid_reference.py |
