@@ -2,7 +2,7 @@
 The evaluator takes terms already translated to axes; the tests and scripts load theirs from files (stored_terms.py).
 No file of refac_rsp_eval or wilson_system (tests and scripts too) imports a module of FORBIDDEN, not even for
 type hints or inside a function. make_translated_terms.py (data_for_tests/translated_terms) does, outside the
-new code: it writes the term files.
+evaluator: it writes the term files.
 Used from wilson_derive: the classes a term is made of (response_terms.VibPerturbedTerm, abstractions); the test
 forbids only the modules of FORBIDDEN.
 Import lines only: at run time wilson_suite/__init__.py loads wilson_experiment and wilson_derive.derive anyway.

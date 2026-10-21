@@ -151,17 +151,31 @@ PolarizationAveragingRecipe = dict[tuple[int, ...], float]  # (ax0, ax1, ...) ->
 
 @dataclass(frozen=True)
 class FeatureResult:
-    table: ContributionTable                          # all rows: the source
-    zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
-    propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
-    # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # factors_by_index_set() needs the first four, and sums over the modes left after exclude_modes; spectrum_on_grid needs
-    # the states (FeatureResult.states). References only: nothing is copied. compare=False: == leaves them out.
+    """
+    The evaluation of a term list before any grid: its rows and features (made by compute_features).
+        table             one ContributionRow per (term, index set) with coeff != 0
+        zero              the (term_id, params) pairs with coeff 0: no row
+        propagator_param  cm-1, a number or a function (features.PropagatorParam)
+    What the rows were computed from, kept by reference, not copied:
+        compiled                  the compiled terms; row.term_id is the index in them
+        molsys                    the data
+        polarization_linear_comb  the orientation-average recipe
+        states_choice             the state set, e.g. 'anharmonic'
+        exclude_modes             sorted, e.g. (5,): the sums skip them (evaluate.included_modes)
+    Their field options:
+        default=None (exclude_modes: ())  a result made by hand may leave them out
+        compare=False                     == ignores them: results with the same rows are equal
+        repr=False                        print does not show compiled, molsys and the recipe: large
+    factors_by_index_set needs all five. spectrum_on_grid needs molsys and states_choice (states).
+    """
+    table: ContributionTable
+    zero: list[tuple[int, ParameterSet]]
+    propagator_param: PropagatorParam | None = None
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
     states_choice: str | None = field(default=None, compare=False)
-    exclude_modes: tuple[int, ...] = field(default=(), compare=False)   # sorted, e.g. (5,): evaluate.included_modes
+    exclude_modes: tuple[int, ...] = field(default=(), compare=False)
 
     @cached_property
     def features(self) -> list[SpectralFeature]:
@@ -337,7 +351,8 @@ def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
     n_expected = len(get_iso_f(rank))
     if len(laser_pol) != n_expected:
         raise ValueError(f'rank {rank} needs laser_pol with {n_expected} numbers, got {len(laser_pol)}: {laser_pol}')
-
+    
+    # copies only the outer dict
     return dict(_averaging_recipe(rank, tuple(laser_pol)))
 
 

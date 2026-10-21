@@ -2,24 +2,9 @@
 Term-level evaluation of the 14 EVV terms, against evv_reference.json (written by make_evv_reference.py).
 For every pair (term, fixed resonance labels): the coefficient and the resonance location,
 and which pairs are zero. Formaldehyde, water and CO; anharmonic and harmonic states.
-Features and the spectrum are not checked here (C3).
+Features and the spectrum are not checked here.
 
-C2, checked 2026-10-07: these numbers equal the old pipeline's (relative difference below 1e-12), for all
-3 molecules, GVPT2 (anharmonic states) and harmonic regime. Old side (deleted in E9; d93cc7b is the last commit
-with it): EvaluationWorkflow set up as in test_full_integration_EVV_axes. Formaldehyde, GVPT2:
-    - 2664 full label sets, factor by factor (NON_AVRG, AVRG, VIBDIFF_TERMS, VIBENE_DENOM):
-      old evaluate_single_index_dict = new evaluate_full_index_dict
-    - 504 coefficients per (term, fixed labels): old evaluate_term_coeffs = new evaluate_term_coeff_sumover
-    - 504 locations: old resonances.solve_LSE_motif = new solve_LSE_motif
-On these 14 terms the old and new pipelines do not differ at all.
-They differ only for motifs none of the 14 terms has:
-    - one condition, on B only: the old code raises IndexError, the new one gives the location (test_evaluate.py).
-    - conditions that contradict each other: the old code prints and returns None; the new compile_terms raises
-      (B7, test_plan.py).
-    - one condition on A + B (a line, not a point): the old code raises ValueError; the new compile_terms raises
-      (B7, test_plan.py).
-
-A deliberate change of numbers: rerun make_evv_reference.py, check the diff, name the change above.
+A deliberate change of numbers: rerun make_evv_reference.py and check the diff.
 """
 
 import json

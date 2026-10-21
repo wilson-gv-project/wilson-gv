@@ -28,7 +28,11 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ResLocPoint,
     ResonanceMotif,
 )
-from wilson_suite.wilson_system.system_data import MolPropsCollection, VibState, VibStatesData
+from wilson_suite.wilson_system.system_data import (
+    MolPropsCollection,
+    VibState,
+    VibStatesData,
+)
 
 
 def polprop(ops: tuple[int, ...] = (), inds: str = '') -> PolProp:
@@ -46,24 +50,36 @@ def state(label: str, energy: float) -> VibState:
     return VibState(harm_quanta_coeffs={}, energy=energy, state_label=label)
 
 
-# Two modes; energies in cm-1 chosen so every difference is distinct.
-E0, E1, E01, E00 = 1000., 1500., 2600., 1950.
+# Two modes, cm-1. Harmonic frequencies (Hessian eigenvalues) E0_eigval, E1_eigval; the anharmonic states
+# lie below them, as in real data: fundamentals about 5 % lower, 2-quanta states below the sum of their
+# fundamentals ('0,1' by 100, '0,0' by 50). Every energy difference is distinct.
+E0, E1, E01, E00 = 1000., 1500., 2400., 1950.
 E0_eigval, E1_eigval = 1100., 1580.
 
 
 def toy_states() -> VibStatesData:
+    """The anharmonic states, the ones the tests use: states_choice='anharmonic'."""
     return VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E01), state('0,0', E00)),
+                         harmonic_osc_states_labels=(0, 1))
+
+
+def toy_harmonic_states() -> VibStatesData:
+    """The harmonic states: fundamentals at the eigenvalues, 2-quanta states at the sums."""
+    return VibStatesData(allstates=(state('0', E0_eigval), state('1', E1_eigval),
+                                    state('0,1', E0_eigval + E1_eigval), state('0,0', 2 * E0_eigval)),
                          harmonic_osc_states_labels=(0, 1))
 
 
 def toy_term() -> CompiledTerm:
     """
-    0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a ; sum over b, c ; a fixed.
+    0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a, with one resonance condition,
+    A = E_a - E_0. The condition fixes a; b and c are summed.
+    Hand-built: a real term has one 1/omega per mode label.
     """
     return CompiledTerm(
         avrg_props=PropsCollection([polprop(ops=(0, 1), inds='a')]),
         non_avrg_props=PropsCollection([polprop(inds='abc')]),
-        cmp_resmotf=ResonanceMotif(()),
+        cmp_resmotf=cumulative_motif(('A',)),
         cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='ab', sr='a', pert=True)]),
         frac_factor=0.5,
         idx_summ=('b', 'c'),
@@ -77,48 +93,68 @@ def toy_term() -> CompiledTerm:
 # sign s_j ('-B' -> s = -1). Fixing the mode labels (a, b, ...) to modes turns the motif into
 # a linear system  LHS @ w = RHS  whose solution is where on the axes the term resonates.
 #
-# The four motifs below are the ones the old code used in its tests (deleted in E9; d93cc7b is the last commit
-# with them).
+# Real motifs are cumulative in pulse ids (condition k on pulses 1..k); the axes of a setup set
+# their shape in axes. The condition of pulse 1 always has the ground state on one side.
 # With toy_states() and a=0, b=1:  E_a = E0, E_b = E1, E_ab = E01, E_0 = 0.
 
-MOTIF_AB = (((('a', 'b'), ('a',)), ('A',)), ((('b',), ('a',)), ('B',)))        # one axis per condition
-MOTIF_A = (((('a', 'b'), ('a',)), ('A',)),)                                    # single condition
-MOTIF_MIXED = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))             # A - B in one condition
-MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))           # two conditions, one axis
+# Real shapes:
+#   MOTIF_AB  the EVV shape (axes A = w1, B = -w1 + w2): -A = E_0 - E_a, B = E_ab - E_a,
+#             so A = E_a, B = E_ab - E_a
+#   MOTIF_A   one condition: A = E_a - E_0
+MOTIF_AB = ((((), ('a',)), ('-A',)), ((('a', 'b'), ('a',)), ('B',)))
+MOTIF_A = (((('a',), ()), ('A',)),)
 
-# MOTIF_AB plus A - B = E_ab - E_b, which follows from the other two: 3 conditions on 2 axes.
-# compile_terms rejects such a motif; solve_LSE_motif accepts it, since the conditions agree.
-MOTIF_AB_EXTRA = MOTIF_AB + (((('a', 'b'), ('b',)), ('A', '-B')),)
+# Edge cases, not real shapes:
+#   MOTIF_MIXED    A - B in one condition: a minus sign inside a sum of axes
+#   MOTIF_B_TWICE  two conditions on one axis; compile_terms rejects it
+#   MOTIF_AB_EXTRA MOTIF_AB plus A + B = E_ab - E_0, which follows from the other two: 3 conditions
+#                  on 2 axes. compile_terms rejects it; solve_LSE_motif accepts it, since the
+#                  conditions agree.
+MOTIF_MIXED = ((((), ('a',)), ('B',)), (((), ('a',)), ('A', '-B')))
+MOTIF_B_TWICE = ((((), ('a',)), ('B',)), ((('b',), ('a',)), ('B',)))
+MOTIF_AB_EXTRA = MOTIF_AB + (((('a', 'b'), ()), ('A', 'B')),)
 
 
 # --- toy molecule data and a term with resonance labels a, b (build_contributions, compute_features) ---
 # The fixtures `states`, `molsys` and `molsys_a1_zero` (conftest.py) are built from these.
 
-CFF = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.   # cff[a, b, c] = 1 + 4a + 2b + c
+# The symmetry of real data: mode 0 is totally symmetric, mode 1 is not. A property entry is then
+# nonzero only where mode 1 appears an even number of times.
 
-# The averaged part <polgrad>[a] of toy_term, from data and a recipe:
-#   TOY_RECIPE reads polgrad[a, x, x] + 2 * polgrad[a, y, y] = (4 + 2 * 3, 0 + 2 * 0) = (10, 0)
-# so every index set with a = 1 has coeff 0. Every other polgrad entry is 100: a wrong slot changes the result.
-TOY_POLGRAD = np.full((2, 3, 3), 100.)
-TOY_POLGRAD[:, 0, 0] = [4., 0.]
-TOY_POLGRAD[:, 1, 1] = [3., 0.]
-TOY_RECIPE = {(0, 0): 1., (1, 1): 2.}
+# cff: symmetric in its mode indices; cff[0,0,1] and cff[1,1,1] are 0 by symmetry.
+CFF = np.zeros((2, 2, 2))
+CFF[0, 0, 0] = 3.
+CFF[0, 1, 1] = CFF[1, 0, 1] = CFF[1, 1, 0] = 2.
+
+# polgrad[mode, i, j]: symmetric in i, j. Mode 0 has a diagonal only, mode 1 one off-diagonal pair (yz).
+# TOY_RECIPE is the real rank-2 recipe (laser_pol (1,)): xx, yy, zz, 1/3 each, so <polgrad>[a] is the
+# trace / 3 = (0.6 / 3, 0) = (0.2, 0). Every index set with a = 1 has coeff 0, for the symmetry reason.
+TOY_POLGRAD = np.zeros((2, 3, 3))
+TOY_POLGRAD[0] = np.diag([0.1, 0.3, 0.2])
+TOY_POLGRAD[1, 1, 2] = TOY_POLGRAD[1, 2, 1] = 0.08
+TOY_RECIPE = {(0, 0): 1 / 3, (1, 1): 1 / 3, (2, 2): 1 / 3}
 
 PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
 PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})
 
 
 def ab_term(motif=MOTIF_AB) -> CompiledTerm:
-    """toy_term() with resonance labels a, b (fixed by the index sets) and summation label c."""
-    return replace(toy_term(), cmp_resmotf=ResonanceMotif.from_tuples(motif), idx_summ=('c',), idx_nonsumm=('a', 'b'))
+    """
+    toy_term() with `motif`. The labels in the motif are fixed by the index sets, the others of a, b, c
+    are summed, as derive splits them: MOTIF_AB fixes a, b and sums c; MOTIF_A fixes a and sums b, c.
+    """
+    res_motif = ResonanceMotif.from_tuples(motif)
+    fixed = tuple(sorted(res_motif.get_nm_indices()))
+    return replace(toy_term(), cmp_resmotf=res_motif, idx_summ=tuple(i for i in 'abc' if i not in fixed),
+                   idx_nonsumm=fixed)
 
 
 def flat_term() -> CompiledTerm:
     """
-    toy_term() as derive writes a term without resonance conditions (todo.txt E12): no label to fix, a, b and c
+    toy_term() without resonance conditions, as derive writes such a term: no label to fix, a, b and c
     all summed. A flat background: the same amplitude on every grid point.
     """
-    return replace(toy_term(), idx_summ=('a', 'b', 'c'), idx_nonsumm=())
+    return replace(toy_term(), cmp_resmotf=ResonanceMotif(()), idx_summ=('a', 'b', 'c'), idx_nonsumm=())
 
 
 # --- spectral features (grid.py, features.py) ---

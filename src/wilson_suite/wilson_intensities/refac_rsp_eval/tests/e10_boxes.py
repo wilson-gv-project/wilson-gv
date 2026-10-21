@@ -1,17 +1,15 @@
 """
-E10: the box sizes (a box rule and its knobs: features.amplitude_half_widths or intensity_half_widths, the
+The box sizes (a box rule and its knobs: features.amplitude_half_widths or intensity_half_widths, the
 box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists of settings:
     SETTINGS  tune the knobs of amplitude_half_widths
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes
-    RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity (the old code's
-              rule) unscaled, scaled with minimum_box_padding 0 (main's old default) and 10 cm-1 (the default here,
-              debug_rendering's)
+    RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity unscaled,
+              scaled with minimum_box_padding 0 and 10 cm-1 (the default)
                   python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes rules
 Each takes a few minutes, mostly all_features_on_grid on ACDM.
 
 Per case, all_features_on_grid once (the reference: slow, about 70 s on ACDM in the quick_start window), then
-spectrum_on_grid with each setting and cut_tails=True (each feature on its own box only, as when these results
-were measured). Scores per setting:
+spectrum_on_grid with each setting and cut_tails=True (each feature on its own box only). Scores per setting:
     err      the largest intensity error, in floors (floor = max / dynrange: the faintest the plot shows)
     worst    the worst relative error at a grid point above the floor (a point the plot shows)
     >10%     the share of those points more than 10 % off
@@ -28,12 +26,7 @@ SETTINGS or RULES and run as above, or, from a notebook, with your own result an
     from wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes import reference, score
     ref = reference(result, window, dim_sizes)                                  # once: all_features_on_grid
     score(result, window, dim_sizes, ref, dynrange=500., eps=0.3)               # as often as wanted
-    score(result, window, dim_sizes, ref, intensity_half_widths, dynrange=500.) # the old code's rule
-
-Result 2026-10-14 (todo.txt E10, also the boxes before E10 and the evaluation by domains): with eps 0.1, at most
-0.13 floors, the worst visible point 2.2 % off, no visible point more than 10 % off; eps 0.3: 0.47 floors, 4.9 %.
-RULES, 2026-10-14: amplitude 0.03-0.13 floors (2.2 %); intensity unscaled 1.7-12 floors, scaled 0.7-39 floors
-(visible points up to 229 % off), with padding 10 about the same.
+    score(result, window, dim_sizes, ref, intensity_half_widths, dynrange=500.) # the intensity rule
 """
 import sys
 import time

@@ -76,6 +76,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     make_func_to_compute_avrg,
     polprop,
     row,
+    state,
     toy_term,
     vibdiff,
 )
@@ -83,6 +84,7 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolPropsCollection,
     VibDiff,
+    VibStatesData,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -119,8 +121,8 @@ def resonance_residuals(motif: ResonanceMotif,
 # One entry per condition: -(E_left - E_right), in Eh by default, cm-1 on request.
 
 @pytest.mark.parametrize('motif, expected_cm1', [
-    (MOTIF_AB,      [-(E01 - E0), -(E1 - E0)]),
-    (MOTIF_A,       [-(E01 - E0)]),
+    (MOTIF_AB,      [E0, -(E01 - E0)]),           # -(E_0 - E_a), -(E_ab - E_a)
+    (MOTIF_A,       [-E0]),                       # -(E_a - E_0)
     (MOTIF_MIXED,   [E0, E0]),                    # -(E_0 - E_a)
     (MOTIF_B_TWICE, [E0, -(E1 - E0)]),
 ])
@@ -134,7 +136,7 @@ def test_get_RHS_motif_defaults_to_hartree(params_obj, states):
     motif = ResonanceMotif.from_tuples(MOTIF_AB)
 
     assert get_RHS_motif(motif, params_obj, states) == get_RHS_motif(motif, params_obj, states, unit='Eh')
-    assert get_RHS_motif(motif, params_obj, states) == pytest.approx([convNu2Ene(-(E01 - E0)), convNu2Ene(-(E1 - E0))])
+    assert get_RHS_motif(motif, params_obj, states) == pytest.approx([convNu2Ene(E0), convNu2Ene(-(E01 - E0))])
 
 
 def test_get_RHS_motif_follows_the_mode_assignment(states):
@@ -143,18 +145,18 @@ def test_get_RHS_motif_follows_the_mode_assignment(states):
 
     swapped = get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 0}), states, unit='cm-1')
 
-    assert swapped == pytest.approx([-(E01 - E1), -(E0 - E1)])
+    assert swapped == pytest.approx([E1, -(E01 - E1)])
 
 
 @pytest.mark.parametrize('unit', ['cm', 'cm^-1', 'eh', 'au'])
 def test_get_RHS_motif_unknown_unit_raises(unit, params_obj, states):
-    """Before, every text except 'Eh' silently meant cm-1."""
+    """Only 'Eh' and 'cm-1': any other text raises, rather than being read as cm-1."""
     with pytest.raises(ValueError, match="unit must be 'Eh' or 'cm-1'"):
         get_RHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, unit=unit)
 
 
 def test_get_RHS_motif_unknown_state_raises(states):
-    motif = ResonanceMotif.from_tuples(MOTIF_A)
+    motif = ResonanceMotif.from_tuples(MOTIF_AB)
 
     with pytest.raises(ValueError):          # a=b=1 needs state '1,1', which `states` lacks
         get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 1}), states)
@@ -163,8 +165,8 @@ def test_get_RHS_motif_unknown_state_raises(states):
 ## solve_LSE_motif ------------------------------------------------------------
 
 @pytest.mark.parametrize('motif, expected', [
-    (MOTIF_AB,    {'A': E01 - E0, 'B': E1 - E0}),
-    (MOTIF_A,     {'A': E01 - E0}),
+    (MOTIF_AB,    {'A': E0, 'B': E01 - E0}),     # -w_A = -E0 ; w_B = E01 - E0
+    (MOTIF_A,     {'A': E0}),
     (MOTIF_MIXED, {'A': -2 * E0, 'B': -E0}),     # w_B = -E0 ; w_A - w_B = -E0
 ])
 def test_solve_LSE_motif_cm1(motif, expected, params_obj, states):
@@ -219,19 +221,21 @@ def test_solve_LSE_motif_single_axis_other_than_A(params_obj, states):
 
 
 def test_solve_LSE_motif_empty_motif_is_the_location_without_axes(params, states):
-    """A term without resonance conditions is a flat background (todo.txt E12): no axes, nothing to solve."""
+    """A term without resonance conditions is a flat background: no axes, nothing to solve."""
     assert solve_LSE_motif(ResonanceMotif(()), params, states) == ResLocPoint({})
 
 
 ## Evaluation kernels -------------------------------------------------------
 
-POLGRAD_AVRG = np.array([10., 20.])                    # already-averaged <polgrad>[a]
+POLGRAD_AVRG = np.array([0.2, 0.])     # <polgrad>[a] of the toy molecule: TOY_POLGRAD with TOY_RECIPE
 
 
-def test_eval_non_avrg_reads_tensor_by_symbol_order(molsys):
+def test_eval_non_avrg_reads_the_tensor_at_the_modes_of_its_labels(molsys):
+    """cff[a,b,c] at a=1, b=0, c=1 is CFF[1, 0, 1] = 2; at a=1, b=0, c=0 it is 0 (mode 1 once: 0 by symmetry)."""
     expr = PropsCollection([polprop(inds='abc')])
 
-    assert eval_non_avrg_per_indexdict(expr, {'a': 1, 'b': 0, 'c': 1}, molsys) == CFF[1, 0, 1]
+    assert eval_non_avrg_per_indexdict(expr, {'a': 1, 'b': 0, 'c': 1}, molsys) == CFF[1, 0, 1] == 2.
+    assert eval_non_avrg_per_indexdict(expr, {'a': 1, 'b': 0, 'c': 0}, molsys) == 0.
 
 
 def test_eval_non_avrg_short_circuits_on_zero(molsys):
@@ -255,20 +259,20 @@ def test_eval_non_avrg_missing_property_raises(molsys):
 def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
     freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
 
-    value = otf_vibdiffdenom(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='harmonic')
+    value = otf_vibdiffdenom(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='anharmonic')
 
     assert value == pytest.approx(1. / convNu2Ene(E01 - E0) / convNu2Ene(E1))
 
 
 def test_otf_vibdiffdenom_of_no_terms_is_one(molsys):
-    assert otf_vibdiffdenom(FreqTermsCollection([]), {}, molsys, states_choice='harmonic') == 1.
+    assert otf_vibdiffdenom(FreqTermsCollection([]), {}, molsys, states_choice='anharmonic') == 1.
 
 
 def test_otf_vibdiffdenom_zero_difference_raises(molsys):
     """a = b = 0: both sides are state '0', so the difference is 0."""
     with pytest.raises(ZeroDivisionError):
         otf_vibdiffdenom(FreqTermsCollection([vibdiff(sl='a', sr='b', pert=True)]), {'a': 0, 'b': 0}, molsys,
-                         states_choice='harmonic')
+                         states_choice='anharmonic')
 
 
 def test_harmonic_denom_uses_eigenvals_not_state_energies(molsys):
@@ -436,21 +440,21 @@ def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero():
 @pytest.mark.parametrize('v, expected', [(1e-18, 0.), (-1e-18, 0.), (1.0000001e-18, 1.0000001e-18), (-2e-18, -2e-18)],
                          ids=['+zero_tol', '-zero_tol', 'just above', 'below -zero_tol'])
 def test_eval_avrg_per_indexdict_zero_tol_itself_counts_as_zero(v, expected):
-    """|v| <= zero_tol is 0, as np.isclose(v, 0, atol=zero_tol, rtol=0) gave before F3"""
+    """|v| <= zero_tol is 0, the same test as np.isclose(v, 0, atol=zero_tol, rtol=0)"""
     assert eval_avrg_per_indexdict(one_value(v), {'a': 0}, zero_tol=1e-18) == expected
 
 
 @pytest.mark.parametrize('v, expected', [(1e-20, 0.), (-1e-20, 0.), (1e-18, 0.), (-1e-18, 0.),
                                          (2e-18, 2e-18), (-2e-18, -2e-18)])
 def test_eval_non_avrg_turns_values_up_to_zero_tol_into_zero(v, expected, molsys):
-    """|v| <= zero_tol is 0, as np.isclose(v, 0, atol=zero_tol, rtol=0) gave before F3"""
+    """|v| <= zero_tol is 0, the same test as np.isclose(v, 0, atol=zero_tol, rtol=0)"""
     molsys.mol_props['cff'].vals = np.full((2, 2, 2), v)
 
     assert eval_non_avrg_per_indexdict(PropsCollection([polprop(inds='abc')]), {'a': 0, 'b': 0, 'c': 0},
                                        molsys, zero_tol=1e-18) == expected
 
 
-# -- make_avrg_einsum_subscripts: the symbolic averaged part as one einsum (todo.txt F1) ---------
+# -- make_avrg_einsum_subscripts: the symbolic averaged part as one einsum ---------------------
 # One operand per property: its mode labels, then the slot letter of each Cartesian axis (I, J, K, L = slot 0, 1, 2, 3),
 # as the data is laid out (modes first, then x, y, z). Then W: the slot letters in slot order.
 # Output: the distinct mode labels, alphabetical. No data needed.
@@ -497,7 +501,7 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 #   'bac'  terms 8, 13        expression order b, a, c; tensor axes a, b, c (alphabetical, tensor.labels).
 #                             Right: read with tensor.labels, as AvrgTensor.at does:
 #                                 {'a': 0, 'b': 1, 'c': 2} -> values[0, 1, 2]
-#                             Wrong: read in expression order (b, a, c), as the deleted precalculated path did (B6):
+#                             Wrong: read in expression order (b, a, c):
 #                                 {'a': 0, 'b': 1, 'c': 2} -> values[1, 0, 2], the value of a=1, b=0, c=2.
 #   'abc'  no EVV term        expression order = axis order: the plain case.
 #   'cab'  terms 3, 6         polgrad read at c, the last axis.
@@ -514,8 +518,6 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 #                     slots 1 and 2, or of the two polgrad axes; not a swap of slots 0 and 1 (the same pair).
 #   (0.3, -1.2, 2.0)  no setup of unit vectors gives these numbers. Each pairing has its own weight, so every
 #                     slot mix-up changes the value.
-#   Checked 2026-10-12 by giving term 8 wrong slots on purpose: (1, 1, 1) gives the same values (to 2e-16);
-#   (1, 0, 0) and (0.3, -1.2, 2.0) differ by about 1.
 @pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
 @pytest.mark.parametrize('labels', ['bac', 'abc', 'cab', 'bab', 'baa'])
 def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels, laser_pol):
@@ -542,7 +544,7 @@ def test_avrg_tensor_einsum_term8_axes_are_a_b_c_not_the_expression_order():
     assert tensor.values.shape == (N_MODES,) * 3
     assert tensor.values[0, 1, 2] == pytest.approx(by_hand, rel=1e-12, abs=0)
     assert tensor.at({'a': 0, 'b': 1, 'c': 2}) == tensor.values[0, 1, 2]
-    assert tensor.values[1, 0, 2] != pytest.approx(by_hand)      # read as (b, a, c): another number (B6)
+    assert tensor.values[1, 0, 2] != pytest.approx(by_hand)      # read as (b, a, c): another number
 
 
 def test_avrg_tensor_einsum_without_c_has_no_c_axis():
@@ -584,15 +586,15 @@ def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
 
 # -- one EVV-shaped term, every factor on the fly -------------------------------------
 
-def term8_like() -> CompiledTerm:
+def evv_shaped_term() -> CompiledTerm:
     """
-    0.25 * cff[a,b,c] * <polgrad[b] dipgrad[a] dipgrad[c]> * 1/(E_ab - E_c) * 1/(omega_a omega_b omega_c)
-    The same shape as term 8 of evv.json (data_for_tests/translated_terms); resonance labels a, b; c is summed.
+    0.25 * cff[a,b,c] * <polgrad[b] dipgrad[a] dipgrad[c]> * 1/(E_ab - E_c) * 1/(omega_a omega_b omega_c),
+    the shape of an EVV term: resonance labels a, b (MOTIF_AB); c is summed.
     """
     return CompiledTerm(
         avrg_props=evv_avrg_expr('bac'),
         non_avrg_props=PropsCollection([polprop(inds='abc')]),
-        cmp_resmotf=ResonanceMotif(()),
+        cmp_resmotf=ResonanceMotif.from_tuples(MOTIF_AB),
         cmp_freqdenom=FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b'), vibdiff(sl='c'),
                                            vibdiff(sl='ab', sr='c', pert=True)]),
         frac_factor=0.25,
@@ -607,32 +609,32 @@ def with_evv_props(molsys):
 
 
 def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys):
-    term = term8_like()
+    term = evv_shaped_term()
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 0}, with_evv_props(molsys), tensor,
-                                               states_choice='harmonic')
+    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, with_evv_props(molsys), tensor,
+                                               states_choice='anharmonic')
 
-    # a=0, b=1, c=0: states ab = '0,1' and c = '0'; omegas from eigenvals
-    avrg = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD_3[1], DIPGRAD_3[0], DIPGRAD_3[0])
-    expected = {'NON_AVRG': CFF[0, 1, 0],
+    # a=0, b=1, c=1: states ab = '0,1' and c = '1'; omegas from eigenvals
+    avrg = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD_3[1], DIPGRAD_3[0], DIPGRAD_3[1])
+    expected = {'NON_AVRG': CFF[0, 1, 1],
                 'AVRG': avrg,
-                'VIBDIFF_TERMS': 1. / convNu2Ene(E01 - E0),
-                'VIBENE_DENOM': 1. / (convNu2Ene(E0_eigval) * convNu2Ene(E1_eigval) * convNu2Ene(E0_eigval))}
+                'VIBDIFF_TERMS': 1. / convNu2Ene(E01 - E1),
+                'VIBENE_DENOM': 1. / (convNu2Ene(E0_eigval) * convNu2Ene(E1_eigval) * convNu2Ene(E1_eigval))}
     assert contribs == pytest.approx(expected)
     assert value == pytest.approx(0.25 * np.prod(list(expected.values())))
 
 
 def test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes(molsys):
-    term = term8_like()
+    term = evv_shaped_term()
     otf_molsys = with_evv_props(molsys)
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
 
     by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, tensor,
-                                           states_choice='harmonic')[0] for c in (0, 1))
+                                           states_choice='anharmonic')[0] for c in (0, 1))
     assert set(factors) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
     assert total == pytest.approx(by_hand) != 0.
 
@@ -642,11 +644,11 @@ def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_state
     dipgrad = DIPGRAD_3.copy()
     dipgrad[1] = 0.
     otf_molsys = replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props(dipgrad=dipgrad)]))
-    term = term8_like()
+    term = evv_shaped_term()
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, otf_molsys.mol_props, ISO4)
 
     value, contribs = evaluate_full_index_dict(term, {'a': 1, 'b': 1, 'c': 0}, otf_molsys, tensor,
-                                               states_choice='harmonic')
+                                               states_choice='anharmonic')
 
     assert (value, contribs) == (0., {'AVRG': 0.})
 
@@ -655,8 +657,8 @@ def test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given(molsys):
     """No polarization: the average must come from the given tensor, not from a new einsum."""
     given = AvrgTensor(('a', 'b', 'c'), np.full((2, 2, 2), 7.))
 
-    _, factors = evaluate_term_coeff_sumover(term8_like(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
-                                             states_choice='harmonic')
+    _, factors = evaluate_term_coeff_sumover(evv_shaped_term(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
+                                             states_choice='anharmonic')
 
     assert [contribs['AVRG'] for contribs in factors.values()] == [7., 7.]
 
@@ -677,7 +679,7 @@ def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeyp
     monkeypatch.setattr(evaluate_mod, 'calculate_avrg_tensor_einsum', counting_einsum)
     monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', stub_coeff)
 
-    build_contributions([term8_like(), term8_like()], with_evv_props(molsys), ISO4, states_choice='harmonic')
+    build_contributions([evv_shaped_term(), evv_shaped_term()], with_evv_props(molsys), ISO4, states_choice='anharmonic')
 
     assert len(made) == 2
     assert len(passed) == 2 * 4                              # 2 terms x 4 index sets (a, b over 2 modes)
@@ -686,7 +688,7 @@ def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeyp
 
 def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zero, monkeypatch):
     """
-    F3: the split into 1/omega and energy-difference denominators is made once per term and kept
+    The split into 1/omega and energy-difference denominators is made once per term and kept
     (CompiledTerm.freq_vibenedenom, freq_pert_wf_diff), not once per index set. Each split builds a new
     FreqTermsCollection with a deepcopy: per index set, that was 11 of 22 s of build_contributions on ACDM.
     Here: per term, a = 0 with b, c over 2 modes gives 4 index sets that reach the denominators.
@@ -700,7 +702,7 @@ def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zer
             return _original(self)
         monkeypatch.setattr(FreqTermsCollection, name, counting)
 
-    build_contributions([ab_term(), ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    build_contributions([ab_term(), ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
@@ -716,7 +718,7 @@ def test_build_contributions_keeps_no_factors_by_index_set(molsys_a1_zero, monke
         return sumover(*args, **kwargs)
     monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', recording)
 
-    build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert asked == [False] * 4                              # 4 index sets (a, b over 2 modes)
 
@@ -736,7 +738,7 @@ def test_evaluate_single_index_dict_multiplies_the_four_factors(term_and_avrg, m
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
                                                molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
-                                               states_choice='harmonic')
+                                               states_choice='anharmonic')
 
     # a=0, b=1, c=1:  0.5 * cff[0,1,1] * <polgrad>[0] * 1/(E_01 - E_0) * 1/omega_0
     assert value == pytest.approx(0.5 * CFF[0, 1, 1] * POLGRAD_AVRG[0] / convNu2Ene(E01 - E0) / convNu2Ene(E0_eigval))
@@ -751,7 +753,7 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_avrg, 
 
     value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1},
                                                molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
-                                               states_choice='harmonic')
+                                               states_choice='anharmonic')
 
     assert value == 0.
     assert contribs['NON_AVRG'] == 0.
@@ -797,7 +799,7 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     )
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
     total, factors = evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
 
     assert total == expected_total
     assert {tuple(index_set[k] for k in 'abc') for index_set in factors} == expected_index_sets
@@ -817,7 +819,7 @@ def test_evaluate_term_coeffs_resonance_labels_must_be_fixed(fixed, not_fixed, m
                         idx_summ=('c',), idx_nonsumm=('a', 'b'))
 
     with pytest.raises(ValueError) as err:
-        evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, states_choice='harmonic')
+        evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, states_choice='anharmonic')
     assert str(err.value) == f'resonance labels {not_fixed} must be fixed, not summed'
 
 
@@ -837,11 +839,11 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     term, avrg = term_and_avrg
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
 
     per_index_set = {
         index_set: evaluate_full_index_dict(term, index_set.to_dict(), molsys_data=molsys, avrg_tensor=avrg,
-                                            zero_tol=1e-18, states_choice='harmonic')
+                                            zero_tol=1e-18, states_choice='anharmonic')
         for index_set in factors}
     assert len(factors) == 4             # b, c in {0, 1}
     assert total == pytest.approx(sum(value for value, _ in per_index_set.values()))
@@ -856,32 +858,26 @@ def test_evaluate_term_coeffs_hand_computed_total(term_and_avrg, molsys):
     term, avrg = term_and_avrg
 
     total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
-                                           states_choice='harmonic')
+                                           states_choice='anharmonic')
 
     by_b = ((CFF[0, 0, 0] + CFF[0, 0, 1]) / convNu2Ene(E00 - E0)
             + (CFF[0, 1, 0] + CFF[0, 1, 1]) / convNu2Ene(E01 - E0))
     assert total == pytest.approx(0.5 * POLGRAD_AVRG[0] / convNu2Ene(E0_eigval) * by_b)
 
 
-def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_avrg, molsys):
+def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_avrg, molsys_a1_zero):
     """
-    No tensor given -> <polgrad>[a] is built from polarization_linear_comb and the raw
-    'polgrad' data:  <polgrad>[a] = sum over (i, j) of coeff_ij * polgrad[a, i, j] .
-    polgrad is chosen so that this gives POLGRAD_AVRG again (4 + 2*3 = 10, 8 + 2*6 = 20);
-    every other entry is 100, so reading a wrong cartesian slot changes the result.
+    No tensor given -> <polgrad>[a] is built from polarization_linear_comb and the raw 'polgrad' data:
+    <polgrad>[a] = sum over (i, j) of coeff_ij * polgrad[a, i, j], with TOY_RECIPE the trace / 3 of
+    TOY_POLGRAD[a]: (0.6 / 3, 0) = POLGRAD_AVRG, the given tensor. Both ways give the same total.
     """
     term, avrg = term_and_avrg
-    polgrad = np.full((2, 3, 3), 100.)
-    polgrad[:, 0, 0] = [4., 8.]
-    polgrad[:, 1, 1] = [3., 6.]
-    props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
-    molsys = replace(molsys, mol_props=props)
 
-    given_total, given_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                             states_choice='harmonic')
-    recipe_total, recipe_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
-                                                               polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
-                                                               states_choice='harmonic')
+    given_total, given_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys_a1_zero, avrg_tensor=avrg,
+                                                             states_choice='anharmonic')
+    recipe_total, recipe_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys_a1_zero,
+                                                               polarization_linear_comb=TOY_RECIPE,
+                                                               states_choice='anharmonic')
 
     assert recipe_total == pytest.approx(given_total)
     assert set(recipe_factors) == set(given_factors)
@@ -890,7 +886,7 @@ def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_
 
 def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
     with pytest.raises(ValueError, match='polarization_linear_comb is required when no avrg_tensor is given'):
-        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='harmonic')
+        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='anharmonic')
 
 
 def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
@@ -900,7 +896,7 @@ def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, mol
     three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
 
     assert total == 9.
     assert {(index_set['b'], index_set['c']) for index_set in factors} == {(b, c) for b in range(3) for c in range(3)}
@@ -913,7 +909,7 @@ def test_evaluate_term_coeffs_zero_avrg_index_sets_are_kept(molsys):
     """
     total, factors = evaluate_term_coeff_sumover(toy_term(), {'a': 1}, molsys,
                                                  avrg_tensor=AvrgTensor(('a',), np.array([10., 0.])),
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
 
     assert total == 0.
     assert len(factors) == 4
@@ -925,9 +921,9 @@ def test_evaluate_term_coeffs_without_factors_gives_the_same_total(term_and_avrg
     term, avrg = term_and_avrg
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                 states_choice='harmonic')
+                                                 states_choice='anharmonic')
     total_only, no_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                         keep_factors=False, states_choice='harmonic')
+                                                         keep_factors=False, states_choice='anharmonic')
 
     assert no_factors is None
     assert len(factors) == 4
@@ -936,13 +932,14 @@ def test_evaluate_term_coeffs_without_factors_gives_the_same_total(term_and_avrg
 
 def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
     """
-    Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print).
-    Currently: {ParameterSet(idx_dict): (total, {ParameterSet(full idx): contribs})}, one key only.
+    Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print):
+    (total, {ParameterSet(full index set): factors}). cff[0, 0, 1] = 0 by symmetry, so c = 1 stops after
+    NON_AVRG.
     """
     term, avrg = term_and_avrg
 
     result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, avrg_tensor=avrg,
-                                         states_choice='harmonic')
+                                         states_choice='anharmonic')
 
     from pprint import pprint
     pprint(result)
@@ -950,30 +947,33 @@ def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
     total, factors = result
     assert isinstance(total, float)
     assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
-    assert all(set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'} for contribs in factors.values())
+    assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 0})]) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'}
+    assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 1})]) == {'NON_AVRG', 'AVRG'}
 
 
 ## build_contributions --------------------------------------------------------
-# One row per (term, index set) with a nonzero coefficient. The toy term fixes a, b (its motif's
-# labels) and sums over c. molsys_a1_zero with TOY_RECIPE gives <polgrad>[a] = (10, 0), so every pair
+# One row per (term, index set) with a nonzero coefficient. ab_term fixes a, b (its motif's
+# labels) and sums over c. molsys_a1_zero with TOY_RECIPE gives <polgrad>[a] = (0.2, 0), so every pair
 # with a=1 has coeff 0: 2 rows (a=0) and 2 zero pairs (a=1). a=b=1 needs state '1,1', which `states`
-# lacks, so solving any a=1 pair would raise: these tests also show that zero pairs never reach solve_LSE_motif.
+# lacks, so solving that pair would raise: these tests also show that zero pairs never reach solve_LSE_motif.
+# MOTIF_AB at a=0: A = E0 = 1000; B = E00 - E0 = 950 for b=0, E01 - E0 = 1400 for b=1.
 
-def test_toy_polgrad_and_recipe_give_10_and_0(molsys_a1_zero):
+def test_toy_polgrad_and_recipe_give_0_2_and_0(molsys_a1_zero):
     """
-    The averaged part the build_contributions and compute_features tests use. polgrad is 100 outside the two
-    entries the recipe reads, so a wrong slot gives another number.
+    The averaged part the build_contributions and compute_features tests use: trace / 3 of each mode's polgrad.
+    TOY_RECIPE is the real rank-2 recipe.
     """
     tensor = calculate_avrg_tensor_einsum(ab_term().avrg_props, molsys_a1_zero.mol_props, TOY_RECIPE)
 
+    assert TOY_RECIPE == pytest.approx(getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,)))
     assert tensor.labels == ('a',)
-    np.testing.assert_array_equal(tensor.values, [10., 0.])
+    np.testing.assert_allclose(tensor.values, [0.2, 0.], rtol=1e-15, atol=0)
 
 
 # -- what becomes a row: rows, zero pairs ------------------------------------------
 
 def test_build_contributions_one_row_per_nonzero_pair(molsys_a1_zero):
-    rows, zero = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    rows, zero = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert {r.params for r in rows} == {PS_00, PS_01}
     assert all(r.term_id == 0 and r.motif == ResonanceMotif.from_tuples(MOTIF_AB) for r in rows)
@@ -984,27 +984,27 @@ def test_build_contributions_one_row_per_nonzero_pair(molsys_a1_zero):
 def test_build_contributions_term_built_by_hand_without_a_single_point_stops_the_run(molsys_a1_zero):
     """
     MOTIF_B_TWICE asks w_B = -E_a and w_B = E_b - E_a at once: no point for any a=0 pair.
-    A compiled term cannot have this motif (B7: CompiledTerm.from_VibPertTerm raises);
+    A compiled term cannot have this motif (CompiledTerm.from_VibPertTerm raises);
     a term built by hand can, and then the run stops instead of dropping the pair.
     """
     with pytest.raises(np.linalg.LinAlgError, match='inconsistent'):
-        build_contributions([ab_term(MOTIF_B_TWICE)], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+        build_contributions([ab_term(MOTIF_B_TWICE)], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
 def test_build_contributions_without_terms_is_empty(molsys):
-    rows, zero = build_contributions([], molsys, TOY_RECIPE, states_choice='harmonic')
+    rows, zero = build_contributions([], molsys, TOY_RECIPE, states_choice='anharmonic')
 
     assert (len(rows), zero) == (0, [])
 
 
 def test_build_contributions_term_without_conditions_is_one_row_summing_every_label(molsys_a1_zero):
     """
-    A flat background (todo.txt E12): no label to fix, so one index set, {}, at the location without axes.
+    A flat background: no label to fix, so one index set, {}, at the location without axes.
     Its coefficient sums every (a, b, c): the rows and zero pairs of ab_term (the same summand) added up.
     """
-    resonant, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    resonant, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
-    rows, zero = build_contributions([flat_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    rows, zero = build_contributions([flat_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     [flat] = rows
     assert zero == []
@@ -1018,20 +1018,20 @@ def test_build_contributions_term_without_conditions_is_one_row_summing_every_la
 def test_build_contributions_coeff_is_evaluate_term_coeff_sumover(molsys_a1_zero):
     term = ab_term()
 
-    rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     for r in rows:
         expected, _ = evaluate_term_coeff_sumover(term, {'a': r.params['a'], 'b': r.params['b']}, molsys_a1_zero,
-                                                  TOY_RECIPE, states_choice='harmonic')
+                                                  TOY_RECIPE, states_choice='anharmonic')
         assert r.coeff == expected != 0.
 
 
 def test_build_contributions_locations_are_in_cm1(molsys_a1_zero):
-    rows, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    rows, _ = build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     location = {r.params: r.location for r in rows}
-    assert location[PS_01].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # 1600, 500 cm-1
-    assert location[PS_00].as_dict() == pytest.approx({'A': E00 - E0, 'B': 0.})
+    assert location[PS_01].as_dict() == pytest.approx({'A': E0, 'B': E01 - E0})   # 1000, 1400 cm-1
+    assert location[PS_00].as_dict() == pytest.approx({'A': E0, 'B': E00 - E0})   # 1000, 950 cm-1
 
 
 # -- the location cache: one solve per (motif, params) -------------------------------
@@ -1047,7 +1047,7 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys_a1_zero, monk
     term = ab_term()
 
     rows, _ = build_contributions([term, replace(term, frac_factor=2.)], molsys_a1_zero, TOY_RECIPE,
-                                  states_choice='harmonic')
+                                  states_choice='anharmonic')
 
     assert Counter(solved) == Counter([PS_00, PS_01])           # each once, in any order
     row = {(r.term_id, r.params): r for r in rows}
@@ -1057,13 +1057,17 @@ def test_build_contributions_one_solve_per_motif_and_params(molsys_a1_zero, monk
 
 
 def test_build_contributions_cache_keeps_motifs_apart(molsys_a1_zero):
-    """Same index sets, different motifs: each motif gets its own location. A cache keyed by params alone fails this."""
-    rows, _ = build_contributions([ab_term(MOTIF_AB), ab_term(MOTIF_A)], molsys_a1_zero, TOY_RECIPE,
-                                  states_choice='harmonic')
+    """
+    Same index sets, different motifs: each motif gets its own location. A cache keyed by params alone fails this.
+    The second motif is the other EVV shape: B = E_b - E_a instead of E_ab - E_a.
+    """
+    other_evv = ((((), ('a',)), ('-A',)), ((('b',), ('a',)), ('B',)))
+    rows, _ = build_contributions([ab_term(MOTIF_AB), ab_term(other_evv)], molsys_a1_zero, TOY_RECIPE,
+                                  states_choice='anharmonic')
 
     location = {(r.term_id, r.params): r.location for r in rows}
-    assert location[(0, PS_01)].as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})   # MOTIF_AB: axes A, B
-    assert location[(1, PS_01)].as_dict() == pytest.approx({'A': E01 - E0})                 # MOTIF_A: axis A only
+    assert location[(0, PS_01)].as_dict() == pytest.approx({'A': E0, 'B': E01 - E0})   # 1000, 1400 cm-1
+    assert location[(1, PS_01)].as_dict() == pytest.approx({'A': E0, 'B': E1 - E0})    # 1000, 500 cm-1
 
 
 # -- input checks --------------------------------------------------------------------
@@ -1071,12 +1075,12 @@ def test_build_contributions_cache_keeps_motifs_apart(molsys_a1_zero):
 def test_build_contributions_needs_every_prop_the_terms_use(molsys):
     """ab_term uses polgrad and cff, molsys has cff only: a ValueError before any row, not a KeyError deep inside"""
     with pytest.raises(ValueError, match=r"no values for \['polgrad'\]"):
-        build_contributions([ab_term()], molsys, TOY_RECIPE, states_choice='harmonic')
+        build_contributions([ab_term()], molsys, TOY_RECIPE, states_choice='anharmonic')
 
 
 ## exclude_modes: a mode left out of the evaluation ----------------------------
 # The toy molecule has 2 modes, 0 and 1. An excluded mode is no value of a resonance label (no row, no zero
-# pair) and no value of a summed label (included_modes; decided 2026-10-13).
+# pair) and no value of a summed label (included_modes).
 
 def test_included_modes_without_exclusion_is_every_mode(molsys):
     assert included_modes(molsys) == (0, 1)
@@ -1103,33 +1107,33 @@ def test_evaluate_term_coeffs_sums_only_over_the_given_modes(term_and_avrg, mols
     """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one index set instead of four"""
     term, avrg = term_and_avrg
 
-    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='harmonic',
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='anharmonic',
                                                  modes=(0,))
 
-    only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='harmonic')
+    only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='anharmonic')
     assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
     assert total == only
 
 
 def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a1_zero):
     """
-    Exclude mode 1: the only index set is a = b = 0 (no row and no zero pair with a 1), and its sum over c keeps
-    only c = 0. So its coefficient is the c = 0 piece alone; without exclusion it is the sum of the c = 0 and c = 1
-    pieces (cff[0, 0, 0] = 1 and cff[0, 0, 1] = 2).
+    Exclude mode 1: toy_term's only index set is a = 0 (no row and no zero pair with a 1), and its sum over b, c
+    keeps only b = c = 0. So its coefficient is that piece alone; without exclusion the b = c = 1 piece adds to it
+    (cff[0, 1, 1] = 2; the pieces with b != c are 0, as cff[0, 0, 1] = 0 by symmetry).
     """
-    term = ab_term()
+    term = toy_term()
 
-    rows, zero = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic',
+    rows, zero = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic',
                                      exclude_modes=(1,))
-    full_rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    full_rows, _ = build_contributions([term], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     [row] = rows
-    assert (row.params, zero) == (PS_00, [])
+    assert (row.params, zero) == (ParameterSet({'a': 0}), [])
     avrg = calculate_avrg_tensor_einsum(term.avrg_props, molsys_a1_zero.mol_props, TOY_RECIPE)
     c0_only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys_a1_zero, avrg,
-                                          states_choice='harmonic')
+                                          states_choice='anharmonic')
     assert row.coeff == pytest.approx(c0_only, rel=1e-14, abs=0)
-    full = {r.params: r.coeff for r in full_rows}[PS_00]
+    full = {r.params: r.coeff for r in full_rows}[ParameterSet({'a': 0})]
     assert row.coeff != pytest.approx(full)
 
 
@@ -1229,7 +1233,7 @@ def test_eval_rescond_resloc_is_zero_at_the_solved_location(motif, params_obj, s
 def test_eval_resonance_factor_calls_the_line_shape_once_per_condition_with_E_minus_freq(motif, params_obj, states,
                                                                                          recorded):
     """
-    e.g. MOTIF_AB, a=0, b=1 (in cm-1): two calls, with resloc 1600 - A and 500 - B.
+    e.g. MOTIF_AB, a=0, b=1 (in cm-1): two calls, with resloc A - 1000 ('-A') and 1400 - B.
     Checked on a 3x3 grid in Eh against resonance_residuals.
     """
     res_motif = ResonanceMotif.from_tuples(motif)
@@ -1252,7 +1256,7 @@ def test_eval_resonance_factor_gives_each_condition_its_own_gamma(params_obj, st
     eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, {'A': 0., 'B': 0.},  # type: ignore
                           propagator_param=lambda vd: vd.energy_difference())
 
-    assert sorted(g for _, g in recorded) == pytest.approx(sorted([E01 - E0, E1 - E0]))
+    assert sorted(g for _, g in recorded) == pytest.approx(sorted([-E0, E01 - E0]))
     for resloc, g in recorded:
         assert resloc == pytest.approx(convNu2Ene(g))
 
@@ -1270,19 +1274,20 @@ def test_eval_resonance_factor_multiplies_the_line_shape_factors(motif, params_o
 
 def test_eval_resonance_factor_lorentzian_values_with_a_width_per_condition(params_obj, states):
     """
-    A width per condition. MOTIF_AB, a=0, b=1, width = E / 100: 16 cm-1 for the A condition (E = 1600), 5 cm-1 for B (E = 500).
-        1 / ((1600 - A - 16i) * (500 - B - 5i))   in cm-1, times CM1_PER_EH**2
-    Peak: (i/16) * (i/5) = -1/80. One width off the peak on either axis gives the same value,
-        (1584, 500):  (1 + i)/32 * i/5  =  (-1 + i) / 160
-        (1600, 495):  i/16 * (1 + i)/10 =  (-1 + i) / 160
+    A width per condition. MOTIF_AB, a=0, b=1, width = |E| / 100: 10 cm-1 for the A condition (E = -1000),
+    14 cm-1 for B (E = 1400).
+        1 / ((A - 1000 - 10i) * (1400 - B - 14i))   in cm-1, times CM1_PER_EH**2
+    Peak: (i/10) * (i/14) = -1/140. One width off the peak on either axis gives the same value,
+        (1010, 1400):  (1 + i)/20 * i/14  =  (-1 + i) / 280
+        (1000, 1386):  i/10 * (1 + i)/28  =  (-1 + i) / 280
     which only holds if each condition gets its own width (swapped widths give different values).
     """
-    grid = to_au({'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])})
+    grid = to_au({'A': np.array([1000., 1010., 1000.]), 'B': np.array([1400., 1400., 1386.])})
 
     value = eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, grid,
-                                  lambda vd: vd.energy_difference(au=True) / 100) # type: ignore
+                                  lambda vd: abs(vd.energy_difference(au=True)) / 100) # type: ignore
 
-    expected = [-0.0125, -0.00625 + 0.00625j, -0.00625 + 0.00625j]
+    expected = [-1 / 140, (-1 + 1j) / 280, (-1 + 1j) / 280]
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
 
 
@@ -1323,8 +1328,7 @@ def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, stat
 
 
 def test_eval_feature_on_grid_uses_the_summed_amplitude(params_obj, states):
-    """Rows add up before the resonance factor, which is applied once per feature (not once per row,
-    see C3 in todo.txt)."""
+    """Rows add up before the resonance factor, which is applied once per feature (not once per row)."""
     one = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(1.,))
     two = feature_at_solved_location(MOTIF_AB, params_obj, states, coeffs=(0.3, 0.5))
     grid = grid_around(one.location.as_dict(), G_CM)
@@ -1338,8 +1342,8 @@ def test_eval_feature_on_grid_uses_the_summed_amplitude(params_obj, states):
 # so a motif with N conditions picks up CM1_PER_EH**N. The numbers below are the cm-1 part.
 # Grid centres are written out (not taken from solve_LSE_motif).
 
-@pytest.mark.parametrize('ps, centre', [(PS_01, 1600.),     # E_ab - E_a = E01 - E0
-                                        (PS_10, 1100.)])    # E01 - E1
+@pytest.mark.parametrize('ps, centre', [(PS_01, 1000.),     # E_a - E_0 = E0
+                                        (PS_10, 1500.)])    # E1
 def test_eval_feature_on_grid_values_one_condition(ps, centre, states):
     """
     MOTIF_A: 0.3 / (centre - A - 5i) at A = centre -10, -5, 0, +5, +10 cm-1, e.g.
@@ -1358,19 +1362,21 @@ def test_eval_feature_on_grid_values_one_condition(ps, centre, states):
 
 def test_eval_feature_on_grid_values_two_conditions(states):
     """
-    MOTIF_AB, a=0, b=1: 0.3 / ((1600 - A - 5i) * (500 - B - 5i)), one factor per axis.
-    3x3 grid, A = 1600 +- 5 (rows), B = 500 +- 5 (columns). Per axis, 1 / (x - 5i) is
+    MOTIF_AB, a=0, b=1: 0.3 / ((A - 1000 - 5i) * (1400 - B - 5i)), one factor per axis; A enters as
+    A - 1000, since the A condition is on -A.
+    3x3 grid, A = 1000 +- 5 (rows), B = 1400 +- 5 (columns). Per axis, 1 / (x - 5i) is
         x = +5: 0.1 + 0.1i      x = 0: 0.2i      x = -5: -0.1 + 0.1i
-    and each entry is 0.3 times the product of the two, e.g. the peak 0.3 * (0.2i)^2 = -0.012.
+    with x = A - 1000 on A and x = 1400 - B on B. Each entry is 0.3 times the product of the two,
+    e.g. the peak 0.3 * (0.2i)^2 = -0.012.
     """
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    grid = grid_around({'A': 1600., 'B': 500.}, 5.)
+    grid = grid_around({'A': 1000., 'B': 1400.}, 5.)
 
     value = eval_feature_on_grid(f, states, grid)
 
-    expected = [[0.006j,          -0.006 + 0.006j, -0.006],
+    expected = [[-0.006,          -0.006 - 0.006j, -0.006j],
                 [-0.006 + 0.006j, -0.012,          -0.006 - 0.006j],
-                [-0.006,          -0.006 - 0.006j, -0.006j]]
+                [0.006j,          -0.006 + 0.006j, -0.006]]
     assert np.shape(value) == (3, 3)
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
 
@@ -1399,7 +1405,7 @@ def test_eval_feature_on_grid_values_with_a_minus_axis(states):
 def test_eval_feature_on_grid_axis_outside_the_motif_changes_nothing(states):
     """MOTIF_A only has a condition on A. On an A x B grid every column is the 1D result: a ridge along B."""
     f = feature_at_solved_location(MOTIF_A, PS_01, states)
-    grid = grid_around({'A': 1600., 'B': 0.}, 5.)
+    grid = grid_around({'A': 1000., 'B': 0.}, 5.)
 
     value = eval_feature_on_grid(f, states, grid)
 
@@ -1433,16 +1439,16 @@ def test_eval_feature_on_grid_peak_is_coeff_times_i_over_gamma_to_the_N(motif, g
 
 def test_eval_feature_on_grid_propagator_param_function_gives_each_condition_its_own_width(states):
     """
-    Same points and widths as the eval_resonance_factor test above (16 cm-1 on A, 5 cm-1 on B), with the
-    width function on the feature, in cm-1. Values are 0.3 times that test's: -0.0125 -> -0.00375,
-    (-1 + i)/160 -> -0.001875 + 0.001875i.
+    Same points and widths as the eval_resonance_factor test above (10 cm-1 on A, 14 cm-1 on B), with the
+    width function on the feature, in cm-1. Values are 0.3 times that test's.
     """
-    f = feature_at_solved_location(MOTIF_AB, PS_01, states, propagator_param=lambda vd, freqs: vd.energy_difference() / 100)
-    mesh_cm = {'A': np.array([1600., 1584., 1600.]), 'B': np.array([500., 500., 495.])}
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states,
+                                   propagator_param=lambda vd, freqs: abs(vd.energy_difference()) / 100)
+    mesh_cm = {'A': np.array([1000., 1010., 1000.]), 'B': np.array([1400., 1400., 1386.])}
 
     value = eval_feature_on_grid(f, states, mesh_cm)
 
-    expected = [-0.00375, -0.001875 + 0.001875j, -0.001875 + 0.001875j]
+    expected = 0.3 * np.array([-1 / 140, (-1 + 1j) / 280, (-1 + 1j) / 280])
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
 
 
@@ -1458,13 +1464,13 @@ def test_eval_feature_on_grid_propagator_param_function_of_a_constant_equals_the
 def test_eval_feature_on_grid_propagator_param_function_can_depend_on_the_frequency(states):
     """
     The function gets the grid as freqs and returns one value per grid point.
-    Here width = A - 1595 cm-1: 5 at A = 1600, 10 at A = 1605. MOTIF_A, peak at 1600:
-        A = 1600:  0.3 / (-5i)       = 0.06i
-        A = 1605:  0.3 / (-5 - 10i)  = 0.3 * (-5 + 10i) / 125 = -0.012 + 0.024i
+    Here width = A - 995 cm-1: 5 at A = 1000, 10 at A = 1005. MOTIF_A, peak at 1000:
+        A = 1000:  0.3 / (-5i)       = 0.06i
+        A = 1005:  0.3 / (-5 - 10i)  = 0.3 * (-5 + 10i) / 125 = -0.012 + 0.024i
     """
-    f = feature_at_solved_location(MOTIF_A, PS_01, states, propagator_param=lambda vd, freqs: freqs['A'] - 1595.)
+    f = feature_at_solved_location(MOTIF_A, PS_01, states, propagator_param=lambda vd, freqs: freqs['A'] - 995.)
 
-    value = eval_feature_on_grid(f, states, {'A': np.array([1600., 1605.])})
+    value = eval_feature_on_grid(f, states, {'A': np.array([1000., 1005.])})
 
     np.testing.assert_allclose(value, CM1_PER_EH * np.array([0.06j, -0.012 + 0.024j]))
 
@@ -1472,9 +1478,9 @@ def test_eval_feature_on_grid_propagator_param_function_can_depend_on_the_freque
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
 def test_eval_feature_on_grid_peak_matches_get_intensity_with_a_propagator_param_function(motif, params_obj, states):
     """
-    E5: the peak on the grid and get_intensity (so the box size) take one width. Here a width per condition,
-    1 % of |E| (MOTIF_AB, a=0, b=1: 16 and 5 cm-1), plus a part that changes with A.
-    abs(): MOTIF_MIXED has E = -1000 on both conditions.
+    The peak on the grid and get_intensity (so the box size) take one width. Here a width per condition,
+    1 % of |E| (MOTIF_AB, a=0, b=1: 10 and 14 cm-1), plus a part that changes with A.
+    abs(): E is -1000 on MOTIF_AB's A condition and on both conditions of MOTIF_MIXED.
     """
     width = lambda vd, freqs: 0.01 * abs(vd.energy_difference()) + 0.001 * np.abs(freqs['A'])
     f = feature_at_solved_location(motif, params_obj, states, propagator_param=width)
@@ -1499,7 +1505,7 @@ def test_eval_feature_on_grid_needs_rows(states):
 
 
 def flat_feature(coeff: float = 0.3) -> SpectralFeature:
-    """A flat background (todo.txt E12): one row of a term without conditions, at the location without axes."""
+    """A flat background: one row of a term without conditions, at the location without axes."""
     return SpectralFeature(location=ResLocPoint({}), rows=(row(coeff, location=ResLocPoint({})),),
                            propagator_param=G_CM)
 
@@ -1514,13 +1520,13 @@ def test_eval_feature_on_grid_flat_feature_is_its_coefficient_on_every_point(gri
 
 
 # -- all_features_on_grid -------------------------------------------------------------------
-# Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1600, B = 500.  With a=1, b=0 (PS_10): MOTIF_A at A = 1100,
+# Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1000, B = 1400.  With a=1, b=0 (PS_10): MOTIF_A at A = 1500,
 # a ridge along B.
 
 def test_all_features_on_grid_is_the_sum_of_the_features_on_the_whole_grid(states):
     peak = feature_at_solved_location(MOTIF_AB, PS_01, states)
     ridge = feature_at_solved_location(MOTIF_A, PS_10, states)
-    axis_points = {'A': np.array([1100., 1600.]), 'B': np.array([495., 500., 505.])}
+    axis_points = {'A': np.array([1000., 1500.]), 'B': np.array([1395., 1400., 1405.])}
     mesh = make_mesh(axis_points)
 
     value = all_features_on_grid([peak, ridge], states, axis_points)
@@ -1532,7 +1538,7 @@ def test_all_features_on_grid_is_the_sum_of_the_features_on_the_whole_grid(state
 def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(states):
     """ij indexing: value[i, j] belongs to A = axis_points['A'][i], B = axis_points['B'][j]; A has 5 points, B has 3."""
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    axis_points = {'A': 1600. + np.array([-10., -5., 0., 5., 10.]), 'B': 500. + np.array([-5., 0., 5.])}
+    axis_points = {'A': 1000. + np.array([-10., -5., 0., 5., 10.]), 'B': 1400. + np.array([-5., 0., 5.])}
 
     value = all_features_on_grid([f], states, axis_points)
 
@@ -1549,7 +1555,7 @@ def test_all_features_on_grid_adds_amplitudes_so_opposite_features_cancel(states
     """
     plus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(0.3,))
     minus = feature_at_solved_location(MOTIF_AB, PS_01, states, coeffs=(-0.3,))
-    axis_points = {'A': np.array([1595., 1600.]), 'B': np.array([500., 505.])}
+    axis_points = {'A': np.array([995., 1000.]), 'B': np.array([1400., 1405.])}
 
     np.testing.assert_allclose(all_features_on_grid([plus, minus], states, axis_points), 0.)
 
@@ -1563,16 +1569,23 @@ def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
 
 
 # -- boxed_features_on_grid ----------------------------------------------------------------
-# MOTIF_A (one condition, on A) peaks: a=0, b=0 (PS_00) at A = 950; PS_10 at 1100; PS_01 at 1600.
+# MOTIF_A (one condition, A = E_a) peaks: a=0 (PS_00, PS_01) at A = 1000; a=1 (PS_10) at 1500.
+# box_states puts the fundamentals at 950 and 1100 cm-1 instead: a weak peak 150 cm-1 from a strong one.
 # Width G_CM = 5 cm-1. Half-widths given by hand, except in the amplitude_half_widths tests.
+
+
+@pytest.fixture
+def box_states() -> VibStatesData:
+    """Two fundamentals, at 950 and 1100 cm-1: MOTIF_A peaks at A = 950 (a=0) and 1100 (a=1)."""
+    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), harmonic_osc_states_labels=(0, 1))
 
 def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_box_and_zero_outside(states):
     """
-    MOTIF_AB peak at A = 1600, B = 500, half-width 55: box (1545, 1655) x (445, 555).
-    Grid A = 1500 ... 1700 (201 points), B = 300 ... 700 (401 points): the box covers a different part of each axis.
+    MOTIF_AB peak at A = 1000, B = 1400, half-width 55: box (945, 1055) x (1345, 1455).
+    Grid A = 900 ... 1100 (201 points), B = 1200 ... 1600 (401 points): the box covers a different part of each axis.
     """
     f = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    window = SpectralWindow.from_features(Box({'A': (1500., 1700.), 'B': (300., 700.)}), [f], [55.])
+    window = SpectralWindow.from_features(Box({'A': (900., 1100.), 'B': (1200., 1600.)}), [f], [55.])
     axis_points = window.box.grid_points({'A': 201, 'B': 401})
 
     value = boxed_features_on_grid(window, states, axis_points)
@@ -1583,48 +1596,48 @@ def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_b
     assert not value[~inside].any()
 
 
-def test_boxed_features_on_grid_overlapping_boxes_add_their_amplitudes(states):
+def test_boxed_features_on_grid_overlapping_boxes_add_their_amplitudes(box_states):
     """
     A weak peak next to a strong one: PS_00 at A = 950 (coeff 0.03), PS_10 at A = 1100 (coeff 0.3).
     Half-widths 550: boxes (400, 1500) and (550, 1650) both cover the grid A = 900 ... 1150, so nothing is cut
     off: the result is all_features_on_grid's, the strong peak's tail under the weak peak included.
     """
-    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
-    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
+    weak = feature_at_solved_location(MOTIF_A, PS_00, box_states, coeffs=(0.03,))
+    strong = feature_at_solved_location(MOTIF_A, PS_10, box_states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [550., 550.])
     axis_points = window.box.grid_points({'A': 251})
 
-    value = boxed_features_on_grid(window, states, axis_points)
+    value = boxed_features_on_grid(window, box_states, axis_points)
 
-    np.testing.assert_allclose(value, all_features_on_grid([weak, strong], states, axis_points))
+    np.testing.assert_allclose(value, all_features_on_grid([weak, strong], box_states, axis_points))
 
 
-def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(states):
+def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(box_states):
     """
     The strong peak's box (550) covers the grid, the weak peak's box is (940, 960). The weak peak is evaluated on
-    its own box only, not on the strong peak's box around it (as the domains did until 2026-10-14).
+    its own box only, not on the strong peak's box around it.
     """
-    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
-    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
+    weak = feature_at_solved_location(MOTIF_A, PS_00, box_states, coeffs=(0.03,))
+    strong = feature_at_solved_location(MOTIF_A, PS_10, box_states)
     window = SpectralWindow.from_features(Box({'A': (900., 1150.)}), [weak, strong], [10., 550.])
     axis_points = window.box.grid_points({'A': 251})        # A = 900, 901, ..., 1150
 
-    value = boxed_features_on_grid(window, states, axis_points)
+    value = boxed_features_on_grid(window, box_states, axis_points)
 
     weak_box = (axis_points['A'] >= 940.) & (axis_points['A'] <= 960.)
-    expected = all_features_on_grid([strong], states, axis_points)
-    expected[weak_box] += all_features_on_grid([weak], states, {'A': axis_points['A'][weak_box]})
+    expected = all_features_on_grid([strong], box_states, axis_points)
+    expected[weak_box] += all_features_on_grid([weak], box_states, {'A': axis_points['A'][weak_box]})
     np.testing.assert_allclose(value, expected)
 
 
 def test_boxed_features_on_grid_differs_from_all_features_on_grid_only_by_the_cut_off_tails(states):
     """
-    Peaks at A = 1100 and 1600, half-widths 55: boxes (1045, 1155) and (1545, 1655).
+    Peaks at A = 1500 and 1000, half-widths 55: boxes (1445, 1555) and (945, 1055).
     boxed_features_on_grid leaves each feature out beyond its box, all_features_on_grid does not. A Lorentzian only
     gets smaller further out, so the difference is at most the sum of the two features' values at their box edges.
     """
     features = [feature_at_solved_location(MOTIF_A, PS_10, states), feature_at_solved_location(MOTIF_A, PS_01, states)]
-    window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), features, [55., 55.])
+    window = SpectralWindow.from_features(Box({'A': (900., 1600.)}), features, [55., 55.])
     axis_points = window.box.grid_points({'A': 701})
 
     difference = boxed_features_on_grid(window, states, axis_points) - all_features_on_grid(features, states, axis_points)
@@ -1646,43 +1659,41 @@ def on_grid_with_amplitude_boxes(features, window: Box, n_points: int, states, d
             abs(all_features_on_grid(features, states, axis_points)) ** 2)
 
 
-def test_boxed_features_on_grid_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_strong_peak(states):
+def test_boxed_features_on_grid_with_amplitude_boxes_cuts_less_than_eps_floor_next_to_a_strong_peak(box_states):
     """
     Strong peak at A = 1100 (coeff 0.3), weak at A = 950 (coeff 0.003). dynrange 101, eps 0.1 (default):
     the strong box covers the grid, the weak one is 100.9 cm-1. Error against all_features_on_grid: at most 0.1 floors
-    (floor: max / dynrange), measured 0.034. The boxes of before 2026-10-14 (5 * sqrt(100) * 1.1 = 55 for both):
-    0.8 floors.
+    (floor: max / dynrange).
     """
-    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
-    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.003,))
+    strong = feature_at_solved_location(MOTIF_A, PS_10, box_states)
+    weak = feature_at_solved_location(MOTIF_A, PS_00, box_states, coeffs=(0.003,))
 
-    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1200.)}), 351, states,
-                                                             dynrange=101.)
+    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1200.)}), 351,
+                                                             box_states, dynrange=101.)
 
     floor = reference.max() / 101.
     assert get_box_extent(window.full_features[1]) == pytest.approx(100.9, abs=0.1)
     assert 0. < np.abs(intensity - reference).max() < 0.1 * floor
 
 
-def test_boxed_features_on_grid_with_amplitude_boxes_includes_a_strong_peak_outside_the_window(states):
+def test_boxed_features_on_grid_with_amplitude_boxes_includes_a_strong_peak_outside_the_window(box_states):
     """
     Window A = 850 ... 1050 holds the weak peak (A = 950, coeff 0.03); the strong one (A = 1100, coeff 0.3) is
-    outside. Its box reaches in, so it is on the grid: error below 0.1 floors (measured 0). With the boxes of before
-    2026-10-14 (55 cm-1 for both), its tail was cut at 1045: 58 floors, and a visible point 511 % off.
+    outside. Its box reaches in, so it is on the grid: error below 0.1 floors.
     """
-    strong = feature_at_solved_location(MOTIF_A, PS_10, states)
-    weak = feature_at_solved_location(MOTIF_A, PS_00, states, coeffs=(0.03,))
+    strong = feature_at_solved_location(MOTIF_A, PS_10, box_states)
+    weak = feature_at_solved_location(MOTIF_A, PS_00, box_states, coeffs=(0.03,))
 
-    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1050.)}), 201, states,
-                                                             dynrange=101.)
+    window, intensity, reference = on_grid_with_amplitude_boxes([strong, weak], Box({'A': (850., 1050.)}), 201,
+                                                             box_states, dynrange=101.)
 
     assert window.contrib_features == [strong]
     assert np.abs(intensity - reference).max() < 0.1 * reference.max() / 101.
 
 
 def test_boxed_features_on_grid_skips_a_feature_whose_box_is_outside_the_grid(states):
-    """The grid covers only A = 1000 ... 1200 of the window; the peak at 1600 (box 1545 ... 1655) adds nothing."""
-    f = feature_at_solved_location(MOTIF_A, PS_01, states)
+    """The grid covers only A = 1000 ... 1200 of the window; the peak at 1500 (box 1445 ... 1555) adds nothing."""
+    f = feature_at_solved_location(MOTIF_A, PS_10, states)
     window = SpectralWindow.from_features(Box({'A': (1000., 1700.)}), [f], [55.])
 
     value = boxed_features_on_grid(window, states, {'A': np.linspace(1000., 1200., 201)})
@@ -1708,10 +1719,10 @@ def test_boxed_features_on_grid_without_features_is_zero_on_the_grid(states):
 
 def test_boxed_features_on_grid_adds_a_flat_feature_on_every_grid_point(states):
     """
-    The peak of test_boxed_features_on_grid_one_feature_..., plus a flat background of 0.3 (todo.txt E12): its box
+    The peak of test_boxed_features_on_grid_one_feature_..., plus a flat background of 0.3: its box
     is the window, so the grid is the peak's grid plus 0.3 everywhere, outside the peak's box too.
     """
-    peak, box = feature_at_solved_location(MOTIF_AB, PS_01, states), Box({'A': (1500., 1700.), 'B': (300., 700.)})
+    peak, box = feature_at_solved_location(MOTIF_AB, PS_01, states), Box({'A': (900., 1100.), 'B': (1200., 1600.)})
     alone = SpectralWindow.from_features(box, [peak], [55.])
     with_flat = SpectralWindow.from_features(box, [peak, flat_feature(0.3)], [55., 0.])
     axis_points = alone.box.grid_points({'A': 201, 'B': 401})

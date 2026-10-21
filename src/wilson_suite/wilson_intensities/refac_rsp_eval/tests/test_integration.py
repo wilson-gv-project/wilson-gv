@@ -86,7 +86,7 @@ def test_plan_compiled_term():
         cmpl_terms[8].frac_factor = 0.5 # type: ignore
 
     freqdenom_idx = sorted([freqt.to_latex() for freqt in cmpl_terms[8].cmp_freqdenom])
-    # main's VibDiffTerm.to_latex keeps the comma of an empty ket: 'a,' (debug_rendering drops it for harmonic factors: 'a')
+    # VibDiffTerm.to_latex keeps the comma of an empty ket: 'a,'
     assert freqdenom_idx == sorted(['a,', 'b,', 'c,', 'a+b,c'])
 
 
@@ -234,8 +234,7 @@ def evv_props(polgrad, dipgrad) -> MolPropsCollection:
 def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
     """
     Every index set: sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k].
-    Tolerance: rel 1e-12, abs 0, so the small values count too: they go from 1e-23 to 5e-6. Measured 2026-10-14:
-    rel at most 1.6e-15.
+    Tolerance: rel 1e-12, abs 0, so the small values count too: they go from 1e-23 to 5e-6.
     """
     term, molsys = term8
     assert [(tuple(o.o for o in p.ops), p.inds) for p in term.avrg_props] == [((0, 3), ['b']), ((1,), ['a']), ((2,), ['c'])]
@@ -253,9 +252,8 @@ def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
 def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(term8):
     """
     Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged.
-    Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). Measured 2026-10-14:
-    72 of the 216 values are 6.4e-9 or more and agree to rel 2e-15; the other 144 are rounding noise, below 2.4e-19,
-    and change with the rotation by up to 34 % of their size.
+    Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). The values below it
+    are rounding noise and change with the rotation by a large part of their size.
     """
     term, molsys = term8
     polgrad, dipgrad = molsys.mol_props['polgrad'].vals, molsys.mol_props['dipgrad'].vals
@@ -269,10 +267,10 @@ def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(t
     assert [func(idx, rotated) for idx in ALL_ABC] == pytest.approx(values, rel=1e-12, abs=1e-18)
 
 
-## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde (todo.txt F1) ----------------
+## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde -----------------------------
 # Each term reads the tensor with its own labels, e.g. term 8: 'bIL,aJ,cK,IJKL->abc', read at {'a', 'b', 'c'}.
-# Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). Measured 2026-10-12:
-# rel at most 7e-14 (a value of 6e-13 next to values of 5e-6); where the loop gives 0, einsum gives at most 4e-19.
+# Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0): where the loop gives 0,
+# einsum gives rounding noise.
 
 EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc',
                   'aIL,aJ,bK,IJKL->ab', 'aIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc', 'bIL,aJ,bK,IJKL->ab',

@@ -11,6 +11,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     TOY_POLGRAD,
     E0_eigval,
     E1_eigval,
+    toy_harmonic_states,
     toy_states,
 )
 from wilson_suite.wilson_system.system_data import (
@@ -23,18 +24,20 @@ from wilson_suite.wilson_system.system_data import (
 
 @pytest.fixture
 def states() -> VibStatesData:
+    """The anharmonic states of the toy molecule."""
     return toy_states()
 
 
 @pytest.fixture
 def molsys(states) -> MolSystemData:
+    """The toy molecule with cff, both state sets; the tests choose 'anharmonic'."""
     props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=CFF, extra_data={})])
     return MolSystemData(name='toy', eigenvals={0: E0_eigval, 1: E1_eigval}, eigenvecs=None, mol_props=props,
-                         states={'harmonic': states})
+                         states={'harmonic': toy_harmonic_states(), 'anharmonic': states})
 
 
 @pytest.fixture
 def molsys_a1_zero(molsys) -> MolSystemData:
-    """molsys plus polgrad: with helpers.TOY_RECIPE, <polgrad>[a] = (10, 0), so every index set with a=1 has coeff 0."""
+    """molsys plus polgrad: with helpers.TOY_RECIPE, <polgrad>[a] = (0.2, 0), so every index set with a=1 has coeff 0."""
     polgrad = MolecularProperty(trivial_name='polgrad', vals=TOY_POLGRAD, extra_data={})
     return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, polgrad]))

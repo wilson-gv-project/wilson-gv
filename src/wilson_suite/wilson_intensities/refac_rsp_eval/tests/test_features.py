@@ -111,7 +111,7 @@ def test_feature_has_no_box_until_its_window_gives_one():
 
 
 def test_replace_keeps_the_box():
-    """dataclasses.replace runs __post_init__ again; that used to reset a dressed box to location +- gamma."""
+    """dataclasses.replace runs __post_init__ again; it must not reset a dressed box to location +- gamma."""
     dressed = feat(A=100., box_extent=50.)
 
     assert replace(dressed, propagator_param=6.).feat_box == Box({'A': (50., 150.)})
@@ -395,7 +395,6 @@ WINDOW_0_10 = Box({'A': (0., 10.)})
 def test_window_from_features_keeps_features_whose_box_overlaps_the_window():
     """
     A = 60: box (5, 115) overlaps the window -> contrib_features.  A = 70: box (15, 125) does not -> dropped.
-    (The old rule, location within 2 * gamma of the window, dropped A = 60 too.)
     """
     inside, near, far = feat(A=5., gamma=5.), feat(A=60., gamma=5.), feat(A=70., gamma=5.)
 
@@ -466,7 +465,7 @@ def test_window_from_features_needs_rows():
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., amp=None)], [55.])
 
 
-## amplitude_half_widths: box size by amplitude (todo.txt E10) ----------------
+## amplitude_half_widths: box size by amplitude ----------------------------------
 # k = 2 * dynrange * a / (eps * a_max), half-width = gamma * sqrt(k**2 - 1), at least min_gammas * gamma.
 # dynrange 100, eps 0.1 (default): k = 2000 * a / a_max. One gamma (5 cm-1) for all: a / a_max = amp / max amp.
 
@@ -552,7 +551,7 @@ def test_amplitude_half_widths_of_no_features_is_empty():
 
 def test_window_from_amplitude_boxes_keeps_weak_features():
     """
-    No feature is dropped for being weak (decided 2026-10-09). Amplitudes 1, 1e-6 inside, 1e-6 at A = 12, outside:
+    No feature is dropped for being weak. Amplitudes 1, 1e-6 inside, 1e-6 at A = 12, outside:
     the weak ones get the smallest box, 1 gamma; at A = 12 that is (7, 17), so it still reaches into the window.
     """
     strong, weakest, weak_outside = feat(A=5., amp=1., gamma=5.), feat(A=7., amp=1e-6, gamma=5.), feat(A=12., amp=1e-6, gamma=5.)
@@ -581,7 +580,7 @@ def test_amplitude_half_widths_need_a_feature_with_rows_and_width(f, message):
         amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
-## intensity_half_widths: the old code's box rule (dress_these_with_boxes until 2026-10-14) ---------
+## intensity_half_widths: box size by intensity -------------------------------------------------------
 # Unscaled: gamma * sqrt(dynrange - 1), the same for every strength.
 # Scaled: gamma * sqrt(dynrange * i / max_intensity - 1), 0 at or below the floor.
 # Then times (1 + box_range_safety_margin), at least minimum_box_padding (cm-1, default 10). gamma 5 cm-1: dynrange
@@ -595,7 +594,7 @@ def test_intensity_half_widths_unscaled_are_the_same_for_every_strength():
 
 
 def test_intensity_half_widths_safety_margin_widens_the_boxes():
-    """default margin 0.1: 50 * 1.1 = 55 cm-1, the boxes of before 2026-10-14"""
+    """default margin 0.1: 50 * 1.1 = 55 cm-1"""
     assert intensity_half_widths(WINDOW_0_10, [feat(A=5., gamma=5.)], dynrange=101.) == pytest.approx([55.])
 
 
@@ -619,7 +618,7 @@ def test_intensity_half_widths_scaled_shrink_for_weaker_features():
 def test_intensity_half_widths_scaled_never_drop_a_feature_below_the_floor(padding):
     """
     three_strengths, dynrange 101: k = 101, 0.0101 and 1e-6. The two below the floor (k <= 1) get half-width
-    minimum_box_padding and stay in the window. dress_these_with_boxes dropped them when the padding was 0.
+    minimum_box_padding and stay in the window, also with padding 0.
     """
     features = three_strengths()
 
@@ -659,7 +658,7 @@ def test_intensity_half_widths_scaled_take_a_stronger_feature_outside_the_window
 
 
 def test_intensity_half_widths_scaled_need_a_feature_inside_or_max_intensity():
-    """no feature inside: no strongest peak to scale by, as in the old callers. Unscaled needs none."""
+    """no feature inside: no strongest peak to scale by. Unscaled needs none."""
     outside = feat(A=60., gamma=5.)
 
     with pytest.raises(ValueError, match='pass max_intensity'):
@@ -695,7 +694,7 @@ def test_intensity_half_widths_need_a_feature_with_rows_and_width(f, message):
         intensity_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
-## A flat background: rows without resonance conditions (todo.txt E12) ---------------------------
+## A flat background: rows without resonance conditions ----------------------------------------
 # The rows of a term without conditions sit at the location without axes. The feature has the same amplitude on
 # every grid point: no peak, no width, no box of its own.
 

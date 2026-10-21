@@ -5,7 +5,7 @@ then MolSystemData.load + compute_features on real data (14 EVV terms + formalde
 The steps have their own tests (build_contributions in test_evaluate.py, features_from_rows in
 test_features.py). Here: the steps are joined right, and FeatureResult keeps the table as its source.
 
-The toy term fixes a, b and sums over c. <polgrad>[1] = 0 (molsys_a1_zero with TOY_RECIPE), so index sets
+ab_term fixes a, b and sums over c. <polgrad>[1] = 0 (molsys_a1_zero with TOY_RECIPE), so index sets
 with a=1 have coeff 0: per term, 2 rows (a=0) at 2 different locations and 2 zero pairs (a=1).
 """
 
@@ -64,7 +64,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     E0,
     E00,
     E01,
-    E1,
     MOTIF_A,
     MOTIF_AB,
     PS_00,
@@ -92,11 +91,11 @@ def two_terms_one_motif():
 ## compute_features ---------------------------------------------------------
 
 def test_compute_features_one_feature_per_location_holding_both_terms(molsys_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     f00, f01 = result.features
-    assert f00.location.as_dict() == pytest.approx({'A': E00 - E0, 'B': 0.})
-    assert f01.location.as_dict() == pytest.approx({'A': E01 - E0, 'B': E1 - E0})
+    assert f00.location.as_dict() == pytest.approx({'A': E0, 'B': E00 - E0})
+    assert f01.location.as_dict() == pytest.approx({'A': E0, 'B': E01 - E0})
     for f, ps in ((f00, PS_00), (f01, PS_01)):
         assert f.motif == ResonanceMotif.from_tuples(MOTIF_AB)
         assert f.param_sets == (ps,)
@@ -106,25 +105,25 @@ def test_compute_features_one_feature_per_location_holding_both_terms(molsys_a1_
 def test_compute_features_amplitude_adds_both_terms(molsys_a1_zero):
     terms = two_terms_one_motif()
 
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     for f, idx in zip(result.features, ({'a': 0, 'b': 0}, {'a': 0, 'b': 1})):
         single, _ = evaluate_term_coeff_sumover(terms[0], idx, molsys_a1_zero, TOY_RECIPE,
-                                                states_choice='harmonic')
+                                                states_choice='anharmonic')
         assert single != 0.
         # 1x (term 0) + 4x (term 1) -- 0.5 and 2.0 frac_factor, so 5x single
         assert f.amplitude_coeff == pytest.approx(5 * single)
 
 
 def test_compute_features_reports_zero_pairs(molsys_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
 
 
 def test_compute_features_gives_every_feature_the_propagator_param(molsys_a1_zero):
     result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, propagator_param=5.,
-                              states_choice='harmonic')
+                              states_choice='anharmonic')
 
     assert len(result.features) == 2
     assert all(f.propagator_param == 5. for f in result.features)
@@ -135,23 +134,23 @@ def test_compute_features_gives_every_feature_the_propagator_param(molsys_a1_zer
 def test_compute_features_gives_a_propagator_param_function_the_conditions(molsys_a1_zero):
     """
     The function gets the pair of states of each condition, from the result's states. ab_term (MOTIF_AB), a=0:
-    conditions <ab - a> and <b - a>, so with width 5 + 1 % of |E|:
-        b=0:  E00 - E0 = 950,   E0 - E0 = 0    ->  14.5,  5 cm-1
-        b=1:  E01 - E0 = 1600,  E1 - E0 = 500  ->  21,   10 cm-1
+    conditions <0 - a> and <ab - a>, so with width 5 + 1 % of |E|:
+        b=0:  0 - E0 = -1000,  E00 - E0 = 950   ->  15, 14.5 cm-1
+        b=1:  0 - E0 = -1000,  E01 - E0 = 1400  ->  15, 19 cm-1
     """
     width = lambda vd, freqs: 5. + 0.01 * abs(vd.energy_difference())
 
     result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, propagator_param=width,
-                              states_choice='harmonic')
+                              states_choice='anharmonic')
 
     assert all(f.propagator_param is width for f in result.features)
-    assert [f.peak_widths() for f in result.features] == [pytest.approx((14.5, 5.)), pytest.approx((21., 10.))]
+    assert [f.peak_widths() for f in result.features] == [pytest.approx((15., 14.5)), pytest.approx((15., 19.))]
 
 
-## one set of resonance axes per evaluation (todo.txt E11) ----------------------
+## one set of resonance axes per evaluation ----------------------
 # MOTIF_AB resonates on {A, B}, MOTIF_A on {A}, MOTIF_B on {B}.
 
-MOTIF_B = (((('b',), ('a',)), ('B',)),)
+MOTIF_B = (((('a',), ()), ('B',)),)           # B = E_a - E_0
 
 
 def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
@@ -162,23 +161,23 @@ def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
     terms = [ab_term(MOTIF_AB), ab_term(MOTIF_A), ab_term(MOTIF_AB)]
 
     with pytest.raises(ValueError, match=re.escape("term ids by set: {('A', 'B'): [0, 2], ('A',): [1]}")):
-        compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+        compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
 def test_compute_features_raises_for_terms_on_A_only_and_on_B_only(molsys_a1_zero):
     """{A} and {B} are different sets: in an (A, B) plane the first is a stripe along B, the second along A."""
     with pytest.raises(ValueError, match='2 sets of axes'):
-        compute_features([ab_term(MOTIF_A), ab_term(MOTIF_B)], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+        compute_features([ab_term(MOTIF_A), ab_term(MOTIF_B)], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
 def test_check_one_axis_set_does_not_count_a_term_without_conditions():
-    """A term without conditions has no axes (E12): it is not a set of its own."""
-    check_one_axis_set([ab_term(MOTIF_AB), toy_term()])
+    """A term without conditions has no axes: it is not a set of its own."""
+    check_one_axis_set([ab_term(MOTIF_AB), flat_term()])
 
 
 def test_compute_features_term_without_conditions_is_one_flat_feature(molsys_a1_zero):
-    """E12: flat_term in the same call as ab_term: ab_term's 2 features, and 1 flat feature with flat_term's row."""
-    result = compute_features([ab_term(), flat_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='harmonic')
+    """flat_term in the same call as ab_term: ab_term's 2 features, and 1 flat feature with flat_term's row."""
+    result = compute_features([ab_term(), flat_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='anharmonic')
 
     flat = [f for f in result.features if f.is_flat]
     assert len(result.features) == 3
@@ -187,13 +186,13 @@ def test_compute_features_term_without_conditions_is_one_flat_feature(molsys_a1_
 
 def test_spectrum_on_grid_adds_a_term_without_conditions_on_every_grid_point(molsys_a1_zero):
     """
-    ab_term alone, then with flat_term in the same call (E12): the two grid results differ by the flat feature's
+    ab_term alone, then with flat_term in the same call: the two grid results differ by the flat feature's
     coefficient on every grid point. Boxes of 20 cm-1 for both, so the peaks are cut alike.
     """
     window, dim_sizes = Box({'A': (1500., 1700.), 'B': (300., 700.)}), {'A': 101, 'B': 101}
     boxes = lambda window, features: [20.] * len(features)
-    alone = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='harmonic')
-    with_flat = compute_features([ab_term(), flat_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='harmonic')
+    alone = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='anharmonic')
+    with_flat = compute_features([ab_term(), flat_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='anharmonic')
     [flat] = [f for f in with_flat.features if f.is_flat]
 
     spec = spectrum_on_grid(with_flat, window, dim_sizes, box_rule=boxes)
@@ -220,14 +219,14 @@ def test_feature_result_table_is_what_build_contributions_returns(molsys_a1_zero
     terms = two_terms_one_motif()
     
     # compute_features calls build_contributions, so this is a bit redundant, but it checks that the table is preserved
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
-    table, _ = build_contributions(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
+    table, _ = build_contributions(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert list(result.table) == list(table)
 
 
 def test_feature_result_features_hold_every_row_of_the_table_once(molsys_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     rows_in_features = [r for f in result.features for r in f.rows]
 
@@ -236,13 +235,13 @@ def test_feature_result_features_hold_every_row_of_the_table_once(molsys_a1_zero
 
 
 def test_feature_result_builds_features_once(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert result.features is result.features
 
 
 def test_feature_result_is_frozen(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         result.table = ContributionTable([])  # type: ignore
@@ -262,20 +261,20 @@ def index_set_value(term: CompiledTerm, contribs: dict) -> float:
 def test_feature_result_factors_by_index_set_of_a_row_are_its_summed_index_sets(molsys_a1_zero):
     """ab_term fixes a, b and sums c over 2 modes: 2 index sets per row, the same as evaluate_term_coeff_sumover gives"""
     terms = two_terms_one_motif()
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     for r in result.table:
         factors = result.factors_by_index_set(r)
 
         _, expected = evaluate_term_coeff_sumover(terms[r.term_id], r.params.to_dict(), molsys_a1_zero,
-                                                  TOY_RECIPE, states_choice='harmonic')
+                                                  TOY_RECIPE, states_choice='anharmonic')
         assert set(factors) == {ParameterSet({'a': r.params['a'], 'b': r.params['b'], 'c': c}) for c in (0, 1)}
         assert factors == expected
 
 
 def test_feature_result_factors_by_index_set_add_up_to_the_row_coefficient(molsys_a1_zero):
     terms = two_terms_one_motif()
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     for r in result.table:
         total = sum(index_set_value(terms[r.term_id], contribs) for contribs in result.factors_by_index_set(r).values())
@@ -295,7 +294,7 @@ def test_feature_result_factors_by_index_set_use_the_polarization_of_the_result(
         [*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})]))
     recipe = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
 
-    result = compute_features(terms, otf_molsys, recipe, states_choice='harmonic')
+    result = compute_features(terms, otf_molsys, recipe, states_choice='anharmonic')
 
     assert result.polarization_linear_comb is recipe
     assert len(result.table) == 2                       # a = 0, b = 0 and 1
@@ -307,7 +306,7 @@ def test_feature_result_factors_by_index_set_use_the_polarization_of_the_result(
 def test_feature_result_keeps_its_inputs_without_copying(molsys_a1_zero):
     terms = two_terms_one_motif()
 
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
+    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
     assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms)) # type: ignore
     assert result.molsys is molsys_a1_zero
@@ -676,7 +675,7 @@ def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run,
 
 
 def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
-    """the caller's terms come back unchanged (H7: never change derive's objects)"""
+    """the caller's terms come back unchanged (never change derive's objects)"""
     assert [term_to_str(t) for t in top_run.terms] == top_run.terms_before
 
 
@@ -760,8 +759,8 @@ def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(form
     """
     exclude_modes (5,), formaldehyde, 6 modes: 5 x 5 (a, b) pairs per term instead of 6 x 6, none with mode 5.
     Every row's coefficient is the sum of the full run's index sets without mode 5 (top_run: no exclusion), in every
-    term. That includes the terms whose averaged part has no c (2, 4, 5, 7, 9-12), where the old code still
-    summed over the excluded mode: for term 2 the coefficients change.
+    term. That includes the terms whose averaged part has no c (2, 4, 5, 7, 9-12): their sums lose mode 5 too, so
+    for term 2 the coefficients change.
     """
     result = evaluate_formaldehyde(formaldehyde_molsys, 4.7, exclude_modes=(5,))
 
@@ -911,9 +910,9 @@ def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
 
 def test_spectrum_on_grid_with_the_intensity_rule(top_run):
     """
-    The old code's rule, unscaled, dynrange 101: every box 4.7 * sqrt(100) * 1.1 = 51.7 cm-1. With cut_tails=True
-    it cuts more than the amplitude rule: against all_features_on_grid, 2.6 floors off (floor: max / 101;
-    measured 2026-10-14); amplitude boxes with the same dynrange: 0.03 floors.
+    intensity_half_widths, unscaled, dynrange 101: every box 4.7 * sqrt(100) * 1.1 = 51.7 cm-1. With cut_tails=True
+    it cuts more than the amplitude rule: against all_features_on_grid, 2.6 floors off (floor: max / 101);
+    amplitude boxes with the same dynrange: 0.03 floors.
     """
     spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM,
                          box_rule=partial(intensity_half_widths, dynrange=101.), cut_tails=True)

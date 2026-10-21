@@ -1,7 +1,7 @@
 """
-G7: other experiments, from derive's terms through the new evaluator (todo.txt G7; also E8, E11, E12, E13).
-The setups: single experiments, sign sweeps (every sign pattern of the filter), the seminar notebook
-~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb, and two 1D setups (IR absorption, IR + vis SFG). Their
+Other experiments, from derive's terms through the evaluator.
+The setups: single experiments, sign sweeps (every sign pattern of the filter), the setups of a seminar demo,
+and two 1D setups (IR absorption, IR + vis SFG). Their
 terms are stored, translated to axes (stored_terms.py; make_translated_terms.py in data_for_tests/translated_terms
 builds the experiments, runs derive and translates): this script imports neither wilson_experiment nor
 derive.derive.
@@ -11,26 +11,22 @@ Per setup:
     axes        the canonical axes (VibExperiment.canonical_axes; else its first valid choice)
     patterns    per term, the axes of each condition in those axes, e.g. (A ; A+B) = one condition on A, one on
                 A + B. Kinds:
-                    point{AB}    a point on the axes A, B (B7 passes); the same along any other axis (E11)
-                    line, plane  fewer independent conditions than the axes they use (B7 rejects them, E8)
-                    flat         no conditions (E12)
+                    point{AB}    a point on the axes A, B (compile_terms passes); the same along any other axis
+                    line, plane  fewer independent conditions than the axes they use (compile_terms rejects them)
+                    flat         no conditions
     rank        the averaging rank of each term (pipeline.averaging_rank allows only one per run, 2 to 6)
     quanta      the most quanta in a state of any term (the Gaussian files have up to 3)
     missing     the props the Gaussian reader does not give (on formaldehyde)
-    derive tr.  derive's own translation: ok, or where it stops (3 axes at most, E13); the 4-axis setups are
+    derive tr.  derive's own translation: ok, or where it stops (3 axes at most); the 4-axis setups are
                 stored in the translation without that stop (settings['translation'] 'survey')
     evaluation  compute_features on formaldehyde (anharmonic states, gamma 10 cm-1, the experiment's laser_pol),
-                unless something blocks it: B7, more than one rank, props, more than 3 quanta, size
+                unless something blocks it: not one point, more than one rank, props, more than 3 quanta, size
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey                  every setup
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey --only CARS "3 IR (nb)"
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey --terms terms.txt
 --only: the setups whose name holds one of the words. --terms: also write every unique term (in axes, to_str) to
 that file.
-
-Result 2026-10-15: todo.txt G7 (the table of patterns, and what runs). 1D and 2D run end to end (CARS, EVV).
-Pulses at different times give only points; pulses at the same time give lines and planes. Setups with more
-than 2 axes mix axis sets (3 IR: {A, B} and {A, B, C}). 4 IR + UV: 4 axes, stopped by derive's translation.
 """
 import argparse
 import time
@@ -147,7 +143,7 @@ def survey(name, terms_file=None) -> None:
 
     blocks = []
     if any(kind in ('line', 'plane', 'over') or kind.endswith('D') for kind in kinds):
-        blocks.append('B7')
+        blocks.append('not one point')
     if len(ranks) > 1:
         blocks.append('more than one rank')
     if missing:

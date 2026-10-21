@@ -244,7 +244,7 @@ def test_nd_box_slices_use_each_axis_own_points_in_the_order_of_axis_points(ndim
 ])
 def test_nd_box_slices_on_a_grid_with_one_point_on_the_last_axis(ndim, bounds, expected):
     """
-    A slice of a spectrum (todo.txt E14): the window is zero-wide on the last axis, so the grid has one point
+    A slice of a spectrum: the window is zero-wide on the last axis, so the grid has one point
     there, 5. The other axes: 0, 1, ..., 9, box (2.5, 4.5).
     """
     last = AXES[ndim - 1]

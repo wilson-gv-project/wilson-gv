@@ -1,16 +1,17 @@
 """
-G10 (todo.txt): the evaluator with 1, 2, 3 and 4 axes. The other real-data tests are 2D only (EVV).
+The evaluator with 1, 2, 3 and 4 axes. The other real-data tests are 2D only (EVV).
 
 Mock data, 1D-4D. One toy term per dimensionality, its resonance conditions a chain (A ; A+B ; A+B+C ; A+B+C+D),
-as derive writes them for pulses at different times (G7 survey), on a toy molecule with 2 modes and states up to
+as derive writes them for pulses at different times (g7_survey.py), on a toy molecule with 2 modes and states up to
 4 quanta (more than the Gaussian files have). The term is compiled by hand, so 4D needs no translation to axes
-(derive's translation stops at 3 axes, E13). Rank 2 averaging (TOY_RECIPE): odd ranks would need A15 fixed first.
+(derive's translation stops at 3 axes). Rank 2 averaging (TOY_RECIPE): odd ranks would need the slot order of
+get_pol_tensor fixed first (test_averaging_pol_order.py).
 
-Real data: derive's terms of three G7 survey setups, stored translated to the experiment's canonical axes
+Real data: derive's terms of three survey setups (g7_survey.py), stored translated to the experiment's canonical axes
 (stored_terms.py), data from formaldehyde's Gaussian file:
     1D  CARS: polgrad only
-    1D  IR absorption: 3 of its 5 terms have no resonance conditions, a flat background (E12)
-    3D  3 IR: two sets of resonance axes, {A, B} (14 terms) and {A, B, C} (2 terms), so one evaluation per set (E11)
+    1D  IR absorption: 3 of its 5 terms have no resonance conditions, a flat background
+    3D  3 IR: two sets of resonance axes, {A, B} (14 terms) and {A, B, C} (2 terms), so one evaluation per set
 """
 
 import itertools
@@ -39,7 +40,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     AXES,
-    CFF,
     NDIMS,
     TOY_RECIPE,
     toy_term,
@@ -64,14 +64,19 @@ def mock_energy(modes) -> float:
 
 
 def mock_data() -> dict:
-    """A data dict the load checks take (check_data_dict): harmonic states up to 4 quanta, polgrad, a symmetric cff."""
-    states = {tuple(str(m) for m in modes): mock_energy(modes)
-              for n in range(1, 5) for modes in itertools.combinations_with_replacement((0, 1), n)}
-    polgrad = np.full((2, 3, 3), 100.)
-    polgrad[:, 0, 0] = [4., 3.]
-    polgrad[:, 1, 1] = [3., 2.]     # with TOY_RECIPE: <polgrad>[a] = (10, 7), so no index set has coefficient 0
-    cff = sum(np.transpose(CFF, p) for p in itertools.permutations(range(3))) / 6   # symmetric in the mode indices
-    return {'nc_sqrt_eigval': EIGVALS, 'harmonic_states': states, 'polgrad': polgrad, 'cff': cff}
+    """
+    A data dict the load checks take (check_data_dict): harmonic and anharmonic states up to 4 quanta, polgrad,
+    a symmetric cff. Both modes are totally symmetric, so no entry is 0 by symmetry and no index set has
+    coefficient 0: polgrad is diagonal, and with TOY_RECIPE <polgrad>[a] = trace / 3 = (0.2, 0.15).
+    """
+    all_modes = [modes for n in range(1, 5) for modes in itertools.combinations_with_replacement((0, 1), n)]
+    harmonic = {tuple(str(m) for m in modes): sum(EIGVALS[m] for m in modes) for modes in all_modes}
+    anharmonic = {tuple(str(m) for m in modes): mock_energy(modes) for modes in all_modes}
+    polgrad = np.array([np.diag([0.1, 0.3, 0.2]), np.diag([0.05, 0.25, 0.15])])
+    base = np.arange(8, dtype=float).reshape(2, 2, 2) + 1.
+    cff = sum(np.transpose(base, p) for p in itertools.permutations(range(3))) / 6   # symmetric in the mode indices
+    return {'nc_sqrt_eigval': EIGVALS, 'harmonic_states': harmonic, 'anharmonic_states': anharmonic,
+            'polgrad': polgrad, 'cff': cff}
 
 
 @pytest.fixture(scope='module')
@@ -112,12 +117,12 @@ def chain_location(params: dict[str, int]) -> dict[str, float]:
 
 @pytest.fixture(scope='module', params=NDIMS, ids=[f'{n}D' for n in NDIMS])
 def chain_result(request, mock_molsys) -> FeatureResult:
-    return compute_features([chain_term(request.param)], mock_molsys, TOY_RECIPE, G_CM, states_choice='harmonic')
+    return compute_features([chain_term(request.param)], mock_molsys, TOY_RECIPE, G_CM, states_choice='anharmonic')
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
 def test_chain_motif_fixes_one_point_on_its_ndim_axes(ndim):
-    """B7: as many conditions as axes, all independent (rank), the check from_VibPertTerm runs on derive's terms."""
+    """As many conditions as axes, all independent (rank), the check from_VibPertTerm runs on derive's terms."""
     lhs, axes = generate_LHS_motif(chain_motif(ndim))
 
     assert axes == tuple(AXES[:ndim])
@@ -155,7 +160,7 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
     Boxes of 3 gamma (60 cm-1) with cut_tails=True cut every feature: the spectrum is each feature's
     all_features_on_grid value inside its own box, 0 outside, added up, in every dimensionality. Window: the
     features +- 100 cm-1 on every axis.
-    (The amplitude boxes of E10 would give these features the whole window: they are of similar strength.)
+    (amplitude_half_widths would give these features the whole window: they are of similar strength.)
     """
     locations = np.array([f.location.values for f in chain_result.features])
     ndim = locations.shape[1]
@@ -174,7 +179,7 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
     assert np.abs(spec.amplitude - every_point).max() > 0
 
 
-## real data: setups of the G7 survey (g7_survey.py), every pulse and the detector along x ---------------------
+## real data: setups of g7_survey.py, every pulse and the detector along x ---------------------------------------
 # Terms and settings from data_for_tests/translated_terms (stored_terms.py): derive's terms, translated to the
 # experiment's canonical axes; laser_pol is the experiment's polarization_avg_vector.
 
@@ -220,8 +225,7 @@ def test_cars_peaks_are_the_anharmonic_fundamentals_with_both_signs(cars):
 
 def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
     """
-    1D, the features +- 200 cm-1, 2001 points, cut_tails=True: at most 0.1 floors from all_features_on_grid
-    (G7 survey: 0.06).
+    1D, the features +- 200 cm-1, 2001 points, cut_tails=True: at most 0.1 floors from all_features_on_grid.
     """
     _, _, result = cars
     locations = [f.location['A'] for f in result.features]
@@ -234,7 +238,7 @@ def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
     assert 0. < np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.
 
 
-## 1D, real data: IR absorption on formaldehyde, with a flat background (E12) ----------------
+## 1D, real data: IR absorption on formaldehyde, with a flat background ----------------------
 # The setup '1D: IR absorption': one IR pulse, filter +1. One axis, A = w1; rank 2. derive gives 5 terms: 3 without
 # resonance conditions (polhess, and polgrad * cff twice), a flat background, and 2 on A (dipgrad * dipgrad, the
 # conditions E_a = A and -E_a = A). All 5 go into one call: the background interferes with the peaks.
@@ -326,7 +330,7 @@ def three_ir() -> tuple[StoredSetup, list, dict[tuple[str, ...], list[int]]]:
 
 
 def test_three_ir_terms_resonate_on_two_axis_sets(three_ir):
-    """16 terms: 14 on {A, B}, 2 on {A, B, C}. One evaluation of all 16 raises before any row is computed (E11)."""
+    """16 terms: 14 on {A, B}, 2 on {A, B, C}. One evaluation of all 16 raises before any row is computed."""
     setup, terms, groups = three_ir
 
     assert setup.axes == {'A': [(-1,)], 'B': [(2,)], 'C': [(3,)]}
@@ -349,7 +353,7 @@ def test_three_ir_each_axis_set_runs_on_its_own(three_ir):
 
 def test_three_ir_abc_set_on_a_3d_grid_within_eps_floor_of_all_features_on_grid(three_ir):
     """
-    The {A, B, C} features +- 100 cm-1, 41 points per axis, amplitude boxes (E10), cut_tails=True: at most
+    The {A, B, C} features +- 100 cm-1, 41 points per axis, amplitude boxes (amplitude_half_widths), cut_tails=True: at most
     0.1 floors from all_features_on_grid.
     """
     setup, terms, groups = three_ir

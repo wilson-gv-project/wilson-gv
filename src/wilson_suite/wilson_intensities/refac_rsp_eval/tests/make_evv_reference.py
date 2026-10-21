@@ -1,12 +1,10 @@
 """
-Writes evv_reference.json: the rows of the new pipeline (build_contributions) for the 14 EVV terms
+Writes evv_reference.json: the rows of the pipeline (build_contributions) for the 14 EVV terms
 (the setup 'evv' of stored_terms.py: data_for_tests/translated_terms/evv.json, already translated to AXES),
 for formaldehyde, water and CO, with harmonic and with anharmonic states.
 
-Settings are the ones of the old EVV integration tests (tests/integration/test_integration_evaluation.py; deleted
-with the old code, see git show d93cc7b:src/wilson_suite/wilson_intensities/tests/integration/
-test_integration_evaluation.py): axes A = [1], B = [-1, 2]; laser polarization (1, 1, 1), rank 4. The data files are GVPT2 runs,
-so the old pipeline uses anharmonic states for them; harmonic is stored too.
+Settings: axes A = [1], B = [-1, 2]; laser polarization (1, 1, 1), rank 4. The data files are GVPT2 runs, so
+their regime takes anharmonic states; harmonic is stored too.
 
 Run it again only on purpose (a deliberate change of numbers), then check the diff:
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.make_evv_reference
@@ -61,7 +59,7 @@ def _params(ps: ParameterSet) -> dict[str, int]:
 
 
 def compute_block(compiled: list[CompiledTerm], molecule: str, states_choice: str) -> dict:
-    """What the new pipeline gives now for one molecule and one states choice, as plain json data."""
+    """What the pipeline gives for one molecule and one states choice, as plain json data."""
     terms = evv_terms()
     molsys = MolSystemData.load(data_origin(molecule), prop_names(terms))
     pol = make_polarization_linear_comb(terms, LASER_POL)
@@ -102,7 +100,7 @@ def _to_json_text(header: dict, blocks: list[dict]) -> str:
 def main():
     compiled = compiled_evv_terms()
     header = {
-        'about': ('Rows of the new pipeline (build_contributions) for the 14 EVV terms. '
+        'about': ('Rows of the pipeline (build_contributions) for the 14 EVV terms. '
                   'Written by make_evv_reference.py. coeff in au, location in cm-1. '
                   'params: the fixed resonance labels; the other labels are summed.'),
         'settings': {'terms_file': TERMS_FILE, 'axes': AXES, 'laser_pol': list(LASER_POL), 'rank': RANK},

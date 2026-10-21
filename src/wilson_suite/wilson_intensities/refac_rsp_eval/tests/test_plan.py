@@ -306,7 +306,7 @@ def test_resonance_motif_pickle_roundtrip():
 # -sum_j s_j w_j = -(E_left - E_right).
 
 @pytest.mark.parametrize('motif, expected, expected_axes', [
-    (MOTIF_AB,      [[-1., 0.], [0., -1.]], ('A', 'B')),
+    (MOTIF_AB,      [[1., 0.], [0., -1.]],  ('A', 'B')),   # '-A' -> +1
     (MOTIF_A,       [[-1.]],                ('A',)),
     (MOTIF_MIXED,   [[-1., 1.], [0., -1.]], ('A', 'B')),   # '-B' -> +1 ; ('A', '-B') sorts before ('B',)
     (MOTIF_B_TWICE, [[-1.], [-1.]],         ('B',)),       # two conditions, one axis -> 2x1
@@ -343,7 +343,7 @@ def test_generate_LHS_motif_ignores_states():
 ## ParameterSet -------------------------------------------------------------
 
 def test_parameterset_holds_exactly_the_given_labels():
-    """no hidden entry (until 2026-10-14: 'zero': 'zero', and '' looked up as 'zero'; todo.txt D3)"""
+    """no hidden entry, e.g. none for the ground state"""
     ps = ParameterSet({'a': 0, 'b': 3})
 
     assert len(ps) == 2
@@ -414,7 +414,7 @@ def test_res_loc_point_is_not_equal_to_other_types():
 
 
 def test_res_loc_point_ignores_later_changes_to_the_input_dict():
-    """Before, the point kept the caller's dict: the values changed, but the hash did not."""
+    """The point copies the caller's dict: changing the dict later changes neither the values nor the hash."""
     coord = {'A': 1.}
     point = ResLocPoint(coord)
     before = hash(point)
@@ -526,7 +526,7 @@ def test_compiled_term_prop_names_one_per_distinct_trivial_name(avrg, non_avrg, 
 
 
 def test_compiled_term_split_is_made_once_and_kept():
-    """F3: evaluate_full_index_dict reads the split for every index set; it must not be made again each time"""
+    """evaluate_full_index_dict reads the split for every index set; it must not be made again each time"""
     ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
 
     assert ct.freq_vibenedenom is ct.freq_vibenedenom
@@ -540,7 +540,7 @@ def test_compile_terms_one_compiled_per_term():
     assert all(isinstance(c, CompiledTerm) for c in compiled)
 
 
-# B7: a term's resonance conditions must fix exactly one point, in the axes the term uses.
+# A term's resonance conditions must fix exactly one point, in the axes the term uses.
 # number of conditions = number of axes = rank of the condition matrix. No data needed.
 
 @pytest.mark.parametrize('res', [

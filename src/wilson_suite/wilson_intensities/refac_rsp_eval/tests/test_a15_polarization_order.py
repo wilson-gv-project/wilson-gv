@@ -1,6 +1,6 @@
 """
-A15 (todo.txt), shown on the evaluator's numbers. The tests that A15 breaks are strict xfails until A15 is
-fixed (one line in amplitudes/averaging.py, get_pol_tensor); after the fix, remove the marks. The cause, slot by
+The slot order of get_pol_tensor (amplitudes/averaging.py), shown on the evaluator's numbers. The tests it breaks
+are strict xfails until it is fixed (one line in get_pol_tensor); after the fix, remove the marks. The cause, slot by
 slot, and more setups: test_averaging_pol_order.py (strict xfail there too).
 
 Slots. Slot 0 is the detected field, slot k is pulse k. VibExperiment lists its polarizations in that order
@@ -15,11 +15,11 @@ indices. Averaged over all orientations of the molecule (Andrews and Thirunamach
 For three transition dipoles, T = mu_a x mu_b x mu_c and eps : T = det(mu_a, mu_b, mu_c). That is nonzero only if the
 three dipoles are not in one plane: a chiral molecule. Its mirror image has the opposite det, so the sign of the
 average tells the two mirror images apart.
-With e0, e1, e2 = x, y, z: det = +1, the average is +det(mu) / 6. Today the evaluator gives -det(mu) / 6, the value
+With e0, e1, e2 = x, y, z: det = +1, the average is +det(mu) / 6. The evaluator gives -det(mu) / 6, the value
 of the mirror-image molecule: get_pol_laser gives [-1.0] instead of [+1.0].
 
 Rank 5. The error is not always a sign. Beta-alpha CARS form (experiment_beta_alpha_cars in fixtures.py),
-fields x, y, z, x, x: exact -0.963, today +0.598.
+fields x, y, z, x, x: exact -0.963, the evaluator +0.598.
 
 Rank 2 and rank 4 (the 14 EVV terms) are right: test_rank_2_and_4_do_not_see_the_order in test_averaging_pol_order.py.
 """
@@ -72,11 +72,11 @@ THREE_DIPOLES = VibPerturbedTerm(Fraction(1), [polprop(ops=(0,), inds='a'), polp
                          ids=['x, y, z: det +1', 'x, z, y: det -1'])
 @REVERSED
 def test_polarization_vector_is_det_of_the_polarizations(pulse_1_pol, pulse_2_pol, det):
-    """polarization_avg_vector at rank 3 is [det(detector, pulse 1, pulse 2)]. Today both setups get the other sign."""
+    """polarization_avg_vector at rank 3 is [det(detector, pulse 1, pulse 2)]. Both setups get the other sign."""
     laser_pol = rank_3_laser_pol(pulse_1_pol, pulse_2_pol)
 
     assert laser_pol == [det], (
-        f'A15: polarization_avg_vector {laser_pol}, right [{det}]: '
+        f'polarization_avg_vector {laser_pol}, right [{det}]: '
         f'the vector of the setup with the polarizations in reverse order')
 
 
@@ -93,7 +93,7 @@ def test_the_reference_det_over_6_is_the_exact_orientation_average(mu):
 def test_evaluator_three_dipoles_x_y_z_is_det_over_6(mu):
     """
     Experiment x, y, z -> polarization_avg_vector -> recipe -> averaged part of dipgrad[a] dipgrad[b] dipgrad[c].
-    Right: +det(mu) / 6. Today: -det(mu) / 6, so the molecule gets its mirror image's value and the other way round.
+    Right: +det(mu) / 6. The evaluator: -det(mu) / 6, so the molecule gets its mirror image's value and the other way round.
     """
     laser_pol = rank_3_laser_pol(Y, Z)
 
@@ -101,7 +101,7 @@ def test_evaluator_three_dipoles_x_y_z_is_det_over_6(mu):
 
     expected = np.linalg.det(mu) / 6
     assert value == pytest.approx(expected, rel=1e-12, abs=0), (
-        f'A15: evaluator {value:+.4f}, exact {expected:+.4f}: the value of the mirror image')
+        f'evaluator {value:+.4f}, exact {expected:+.4f}: the value of the mirror image')
 
 
 ## rank 5: not only a sign ----------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def test_evaluator_beta_alpha_rank_5_is_the_exact_orientation_average():
     """
     hypgrad[a] (slots 0, 1, 2) * polgrad[b] (slots 3, 4), the form of experiment_beta_alpha_cars; fields x, y, z, x, x.
     Random molecular data, polgrad symmetric as a real polarizability. Right: the exact average (quadrature),
-    -0.963. Today +0.598: the exact average of the reversed list x, x, z, y, x.
+    -0.963. The evaluator: +0.598, the exact average of the reversed list x, x, z, y, x.
     laser_pol from get_pol_laser, as VibExperiment makes it.
     """
     rng = np.random.default_rng(15)
@@ -126,5 +126,5 @@ def test_evaluator_beta_alpha_rank_5_is_the_exact_orientation_average():
     T = np.einsum('ijk,lm->ijklm', hypgrad[0], polgrad[1])      # T[slot 0, ..., slot 4] at a=0, b=1
     expected = exact_average(pol, T)
     assert value == pytest.approx(expected, rel=1e-10, abs=0), (
-        f'A15: evaluator {value:+.4f}, exact {expected:+.4f}; '
+        f'evaluator {value:+.4f}, exact {expected:+.4f}; '
         f'exact average of the reversed list x, x, z, y, x: {exact_average(pol[::-1], T):+.4f}')

@@ -1,13 +1,13 @@
 """
 The terms that the tests and scripts evaluate, read from files: already translated to axes, with their settings.
 The files are in data_for_tests/translated_terms; make_translated_terms.py there writes them (from the experiment
-and derive.derive; no file of the new code imports those: test_imports.py).
+and derive.derive; no file of the evaluator imports those: test_imports.py).
     setup = load_setup('try: CARS')
     setup.terms          VibPerturbedTerm list, each condition's pf in axes, e.g. ['A', '-B']; new objects per call
     setup.axes           {label: [pulse ids of each variable]}, e.g. {'A': [(-2, 1)]}: A = w1 - w2
     setup.laser_pol      the experiment's polarization_avg_vector, e.g. (1., 1., 1.)
     setup.settings       everything else in the file (make_translated_terms.py lists it), e.g. settings['pulses']
-    setup_names('g7')    the G7 survey setups, in the survey's order; 'evv': ['evv']
+    setup_names('g7')    the setups of g7_survey.py, in its order; 'evv': ['evv']
 A setup that the experiment or derive could not take has no file: load_setup raises, and index()[name]['error']
 holds the error.
 """

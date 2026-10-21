@@ -1,28 +1,15 @@
 """
-F2: runtime on a real bigger molecule (todo.txt F2). ACDM, the acetic acid dimer: 16 atoms, 42 modes.
+Run time on a bigger molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes.
 The 14 EVV terms, axes A = w1, B = -w1 + w2, laser_pol (1, 1, 1), anharmonic states (the file is a GVPT2 run).
 
 Steps:
   1. load: MolSystemData.load, only the terms' properties + frequencies + states. The reader fails on ACDM at
-     normal_modes (todo.txt F2, [outside]); the evaluator does not use normal_modes.
+     normal_modes; the evaluator does not use normal_modes.
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
-     (before F1 the loop, compute_for_idx_choice; since F1 calculate_avrg_tensor_einsum + AvrgTensor.at) and of
-     the deepcopy (FreqTermsCollection.__post_init__).
+     (calculate_avrg_tensor_einsum + AvrgTensor.at) and of the deepcopy (FreqTermsCollection.__post_init__).
   3. the rest: features_from_rows, amplitude_half_widths, SpectralWindow.from_features, boxed_features_on_grid
      on one grid.
-     Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1 (E10).
-
-Result 2026-10-12 (also todo.txt F2): load 4 s; build_contributions 78 s (averaging 47 s, deepcopy 16 s, the rest
-15 s); features, window and boxed_features_on_grid 2.5 s. Total without load: 80 s.
-After F1, the same day (todo.txt F1): build_contributions 22 s (averaging 0.3 s, deepcopy 11 s). Total: 24 s.
-After F3, the same day (todo.txt F3): build_contributions 3.9 s (no deepcopy per index set: the split is made
-once per term). Total: 6.5 s. The deepcopy line shows 0 calls: the timed run before the profile made the splits.
-After the factors per index set on demand, the same day (todo.txt Done): build_contributions 3.3 s (it
-builds no factors per index set).
-Total: 5.9 s.
-Boxes by amplitude, each feature on its own box (E10, 2026-10-14): the grid part 2.5 s -> 1.5 s
-(amplitude_half_widths 0.04 s, boxed_features_on_grid 1.3 s; 1509 features near the window instead of the domains).
-Total: 5.7 s.
+     Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1.
 
 A script, not a test: it runs for minutes.
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed
@@ -95,9 +82,8 @@ def profile_build_contributions(compiled, molsys, pol) -> dict:
 
     post_init = FreqTermsCollection.__post_init__.__code__
     out = {'total': cum('build_contributions', 'evaluate.py'),
-           'averaging, loop (before F1)': cum('compute_for_idx_choice', 'evaluate.py'),
-           'averaging, einsum (F1)': cum('calculate_avrg_tensor_einsum', 'evaluate.py'),
-           'averaging, lookup (F1)': cum('at', 'evaluate.py'),
+           'averaging, einsum': cum('calculate_avrg_tensor_einsum', 'evaluate.py'),
+           'averaging, lookup': cum('at', 'evaluate.py'),
            'deepcopy': cum('__post_init__', post_init.co_filename, post_init.co_firstlineno)}
     print('\nbuild_contributions under cProfile, top 15 by own time:')
     pstats.Stats(prof).sort_stats('tottime').print_stats(15)

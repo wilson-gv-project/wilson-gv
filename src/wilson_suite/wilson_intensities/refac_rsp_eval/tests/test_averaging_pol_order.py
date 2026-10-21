@@ -1,5 +1,5 @@
 """
-A15 (refac_rsp_eval/todo.txt): get_pol_laser reads the polarization vectors in reverse order.
+get_pol_laser reads the polarization vectors in reverse order.
 
 Convention. A polarization property has one Cartesian slot per field interaction. derive numbers the slots
 0 = the detected field, k = pulse k (op_omega_label_int = 0 and op_labels_int = [1, 2, ...] in
@@ -27,10 +27,9 @@ The checking side. exact_average is the orientation average computed directly: a
 products of up to 7 rotation-matrix elements, so for ranks 2-6. It uses numpy only: no f, no M.
 test_exact_average_gives_the_textbook_values checks it against two textbook results.
 
-Marks. A strict xfail marks the right result, which the code misses today. The fix, one line in get_pol_tensor:
+Marks. A strict xfail marks the right result, which the code misses. The fix, one line in get_pol_tensor:
     return get_pol_tensor(np.kron(pol_tensor, np.array(pol[0])), pol[1:])
-makes them pass. Strict turns an unexpected pass into a failure: after the fix, remove the marks.
-Checked 2026-10-12 with the fix applied in memory: every test here passes.
+makes every test here pass. Strict turns an unexpected pass into a failure: after the fix, remove the marks.
 """
 
 import numpy as np
@@ -45,7 +44,7 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 X, Y, Z = (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)
 AXES = {'x': X, 'y': Y, 'z': Z}
 LETTERS = 'abcdef'
-REVERSED = pytest.mark.xfail(strict=True, reason='A15: get_pol_tensor builds pol[n-1] x ... x pol[0]')
+REVERSED = pytest.mark.xfail(strict=True, reason='get_pol_tensor builds pol[n-1] x ... x pol[0]')
 
 
 ## The checking side: the exact orientation average ------------------------------------------------
@@ -102,8 +101,7 @@ def exact_average(pol, T: np.ndarray) -> float:
     Why exact and not an estimate. The signal in step 2 is a polynomial in the entries of R, one R per field.
     _rotations is a quadrature rule that integrates such polynomials exactly up to 7 fields, as Simpson's rule
     integrates cubics exactly. So for ranks 1-6 the weighted sum is the integral over all orientations, up to
-    rounding. Checked 2026-10-13: ranks 1-6, random T and pol, 512 rotations against 4096 (16 points per angle):
-    differences at most 1.5e-14. And against textbook values: test_exact_average_gives_the_textbook_values,
+    rounding. test_exact_average_gives_the_textbook_values checks it against textbook values,
     e.g. rank 2, <mu_Z mu_Z> = |mu|^2 / 3.
     """
     in_molecule = [np.einsum('rij,i->rj', ROTATIONS, np.asarray(p, dtype=float)) for p in pol]
@@ -151,7 +149,7 @@ def test_exact_average_gives_the_textbook_values():
 
 @REVERSED
 def test_pol_tensor_of_x_y_z_has_its_one_at_0_1_2():
-    """pol = [x, y, z]: slot 0 is x (0), slot 1 is y (1), slot 2 is z (2). Today the 1 sits at A[2, 1, 0]."""
+    """pol = [x, y, z]: slot 0 is x (0), slot 1 is y (1), slot 2 is z (2). The code puts the 1 at A[2, 1, 0]."""
     A = get_pol_tensor(1.0, [X, Y, Z]).reshape(3, 3, 3)
 
     assert np.argwhere(A != 0).tolist() == [[0, 1, 2]]
@@ -161,7 +159,7 @@ def test_pol_tensor_of_x_y_z_has_its_one_at_0_1_2():
 @pytest.mark.parametrize('rank', [2, 3, 4, 5, 6])
 def test_pol_tensor_puts_pol_k_on_slot_k(rank):
     """
-    A[i0, i1, ...] = pol[0][i0] * pol[1][i1] * ...  Today A is wrong at every rank, rank 2 and 4 included:
+    A[i0, i1, ...] = pol[0][i0] * pol[1][i1] * ...  A is wrong at every rank, rank 2 and 4 included:
     get_pol_laser hides the error there (test_rank_2_and_4_do_not_see_the_order).
     """
     pol = setup_vectors('random', rank)
@@ -175,18 +173,18 @@ def test_pol_tensor_puts_pol_k_on_slot_k(rank):
 
 ## get_pol_laser: the vector A . f --------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason='A15: today [-1.0]')
+@pytest.mark.xfail(strict=True, reason='get_pol_laser gives [-1.0]')
 def test_pol_laser_rank_3_x_y_z_is_plus_one():
-    """f = epsilon, so the value is det(pol[0], pol[1], pol[2]) = x . (y x z) = +1. Today z . (y x x) = -1."""
+    """f = epsilon, so the value is det(pol[0], pol[1], pol[2]) = x . (y x z) = +1. The code gives z . (y x x) = -1."""
     assert get_pol_laser([X, Y, Z]) == [1.0]
 
 
-@pytest.mark.xfail(strict=True, reason='A15: today [0, 0, 0, -1, 0, 0]')
+@pytest.mark.xfail(strict=True, reason='get_pol_laser gives [0, 0, 0, -1, 0, 0]')
 def test_pol_laser_rank_5_x_y_z_x_x():
     """
     Element 0 of f, delta_34 eps_012: (pol[3] . pol[4]) det(pol[0], pol[1], pol[2]) = 1 * 1 = 1.
     Elements 1-5 pair x with y or z (delta_24, delta_23, delta_14, delta_13, delta_12): 0.
-    Today element 3, delta_14 eps_023, reads x . x = 1 and det(x, z, y) = -1.
+    The code reads element 3, delta_14 eps_023: x . x = 1 and det(x, z, y) = -1.
     """
     assert get_pol_laser([X, Y, Z, X, X]) == [1., 0., 0., 0., 0., 0.]
 
@@ -196,7 +194,7 @@ def test_rank_2_and_4_do_not_see_the_order(rank):
     """
     Reversing the slots maps every rank-2 and rank-4 f element onto itself, e.g. delta_01 delta_23 -> delta_32 delta_10.
     So get_pol_laser gives the same vector for pol and for pol reversed, and the reversed A does no harm:
-    the 14 EVV terms (rank 4) are right. Passes before and after the fix.
+    the 14 EVV terms (rank 4) are right. Passes with and without the fix.
     """
     pol = setup_vectors('random', rank)
 
@@ -220,7 +218,7 @@ def test_rank_2_and_4_do_not_see_the_order(rank):
 def test_recipe_gives_the_exact_orientation_average(rank, setup):
     """
     sum of recipe[k] * T[k] = the exact average of A . T_lab, for a random molecular tensor T.
-    Today the code gives the exact average of the reversed list, e.g. rank 5, xyzxx: the exact average of xxzyx.
+    The code gives the exact average of the reversed list, e.g. rank 5, xyzxx: the exact average of xxzyx.
     Rank 2, rank 4 and slot-symmetric setups pass.
     T's entries are about 1, so the averages are 0.01-1; abs 1e-12 only matters where the average is 0 (2, 'xy').
     """

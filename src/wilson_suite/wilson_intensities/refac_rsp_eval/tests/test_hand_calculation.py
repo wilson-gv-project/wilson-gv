@@ -1,31 +1,28 @@
 """
-G1 (todo.txt): two EVV coefficients by hand, for water, against evv_reference.json.
-C2 and C3 show old = new; this shows the numbers are right. The checking side is numpy and textbook formulas,
-no wilson code, so an error in code that old and new share (derive's terms, units, the averaging) shows here.
+Two EVV coefficients by hand, for water, against evv_reference.json: the numbers are right. The checking side is
+numpy and textbook formulas, no wilson code, so an error in shared code (derive's terms, units, the averaging)
+shows here.
 
 Water has 3 modes (0, 1, 2): every pair of fixed labels (a, b) is checked, and term 12's sum over c has 3 entries.
-Inputs: the data dict of data_for_tests/g16_h2o_HF_STO3G.out, read with wilson_data_obtainer (input side only;
-G2 checks the data dict against the .out file). A change in the reader would still show: the stored numbers
-of evv_reference.json would no longer match.
+Inputs: the data dict of data_for_tests/g16_h2o_HF_STO3G.out, read with wilson_data_obtainer (input side only).
+A change in the reader would still show: the stored numbers of evv_reference.json would no longer match.
 Settings of evv_reference.json: laser_pol (1, 1, 1), i.e. all pulses and the detector along x.
 
-Two kinds of denominator (rule from the user, 2026-10-10):
+Two kinds of denominator:
     w            the Hessian eigenvalue (nc_sqrt_eigval), the same for any states choice
     E(1) - E(0)  a state energy difference: harmonic or anharmonic states
 to_str prints both as <['a'],[]>; derive's is_pert_wf_diff says which is which (True: state energy difference).
 
-Checked 2026-10-10, both states choices: term 0, 9 pairs, largest relative difference 5.4e-13; term 12, 6 pairs at
-1.07e-12, and the 3 pairs with a = 2 exactly 0, as stored (cff_(2,c,c) = 0: mode 2 is antisymmetric). All of the
-difference comes from the cm-1 per Eh constant (see REL): term 0 has 2 energy factors, term 12 has 4.
-(First done for CO, 1 mode; replaced by water so that the sum over c has more than one entry.)
+Term 12's 3 pairs with a = 2 are exactly 0, as stored (cff_(2,c,c) = 0: mode 2 is antisymmetric). The remaining
+differences come from the cm-1 per Eh constant (see REL): term 0 has 2 energy factors, term 12 has 4.
 
-Beyond EVV (G7, 2026-10-16): CARS (1D) and the {A, B, C} terms of 3 IR (3D), by hand against the evaluator's rows
+Beyond EVV: CARS (1D) and the {A, B, C} terms of 3 IR (3D), by hand against the evaluator's rows
 on water, coefficients and locations. The terms are derive's, for the setups of test_dimensions.py (every
 pulse and the detector along x), stored translated to the canonical axes (stored_terms.py); the formulas here
 are those terms (term_to_str), so these two check everything after derive: the evaluator, the experiment's
 polarization vector, the units.
 Limit, as for terms 0 and 12: with every field along x, the rank 4 average is the same for any order of the slots,
-so a property in the wrong slot does not show (A15, G3).
+so a property in the wrong slot does not show.
 """
 
 import json
@@ -150,7 +147,7 @@ def test_term_0_needs_w_not_the_state_energy_difference(water):
             assert term_0(with_e1, a, b, 'anharmonic') != pytest.approx(coeff, rel=0.02, abs=0)
 
 
-## beyond EVV (G7): CARS and the {A, B, C} terms of 3 IR ----------------------------------------------------------
+## beyond EVV: CARS and the {A, B, C} terms of 3 IR ---------------------------------------------------------------
 # Every denominator of these terms is w (none is a state energy difference): the states choice changes only the
 # locations. A location solves each condition E_left - E_right - (sum of axes) = 0, E = 0 for the ground state.
 
