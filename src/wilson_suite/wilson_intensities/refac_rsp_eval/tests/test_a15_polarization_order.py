@@ -31,11 +31,18 @@ import pytest
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import calculate_avrg_tensor_einsum
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import make_polarization_linear_comb
+from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+    calculate_avrg_tensor_einsum,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+    make_polarization_linear_comb,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.plan import split_props
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import polprop
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_averaging_pol_order import REVERSED, exact_average
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_averaging_pol_order import (
+    REVERSED,
+    exact_average,
+)
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
 
 X, Y, Z = (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)

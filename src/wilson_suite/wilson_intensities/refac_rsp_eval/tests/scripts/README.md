@@ -7,7 +7,9 @@ Run a script by its module name:
 
 Each script's docstring says what it prints and which settings it uses. The scripts load the
 stored terms with ../stored_terms.py and the settings of the 14 EVV terms from
-../make_evv_reference.py. ACDM below is the acetic acid dimer: 16 atoms, 42 modes.
+../make_evv_reference.py. The stored terms are in src/wilson_suite/data_for_tests/translated_terms;
+make_translated_terms.py there writes them (see the last section). ACDM below is the acetic acid
+dimer: 16 atoms, 42 modes.
 The todo items are those of todo.txt here.
 
 ## Scripts
@@ -29,3 +31,26 @@ e10_boxes.reference and e10_boxes.score also run from a notebook, on any result 
 |---|---|
 | todo.txt | the refactor's list: status, order of work, decisions with dates, checks, open items |
 | todo_oldcode_rm.txt | every use of the old evaluator code and what happened to it (todo item E9) |
+
+## Code from outside the refactor
+
+The refactor's code is refac_rsp_eval and wilson_system. ../README.md lists what the evaluator
+and the tests use from elsewhere; the scripts use the same, plus one module:
+
+| module | what it gives | used by |
+|---|---|---|
+| wilson_analysis/render/plot_spectrum.py (written for the refactor, E7) | plot_rsp_func, plot_spectrum | example_plot_spectrum.py |
+| wilson_intensities/amplitudes/averaging.py (old evaluator code), through pipeline.py | the averaging recipe | every script |
+| wilson_utils.wilson_data_obtainer (the reader), through MolSystemData.load | the data of a Gaussian output file | every script |
+
+No script imports the experiment or derive. The stored terms come from
+data_for_tests/translated_terms/make_translated_terms.py, which runs main's code outside the refactor:
+
+| module | what it gives |
+|---|---|
+| wilson_experiment.experiment_abstractions | VibExperiment: the setups, their canonical axes, polarizations and polarization vector (laser_pol) |
+| wilson_derive.derive | get_fully_enhanced_terms: the terms |
+| wilson_derive.term_var_translate | the translation of the terms to axes |
+| wilson_utils.termdict_from_symb_term | derived_terms_flat: derive's terms as one list |
+| wilson_utils.builders | make_SpectralAxisSet: the EVV axes, A = w1, B = -w1 + w2 |
+| wilson_intensities/amplitudes/averaging.py (old evaluator code) | get_pol_laser: checks each setup's polarization vector |

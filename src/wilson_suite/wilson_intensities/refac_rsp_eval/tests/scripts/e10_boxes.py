@@ -50,7 +50,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed import load_acdm
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed import (
+    load_acdm,
+)
 from wilson_suite.wilson_system.system_data import MolSystemData
 
 GAMMA_CM = 4.7

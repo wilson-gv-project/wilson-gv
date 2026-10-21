@@ -49,7 +49,11 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import index, load_setup, setup_names
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import (
+    index,
+    load_setup,
+    setup_names,
+)
 from wilson_suite.wilson_system.system_data import MolSystemData
 
 N_MODES = 6             # formaldehyde
