@@ -398,10 +398,10 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     Why amplitude: the plot shows intensities down to its floor, a_max**2 / dynrange. A box
     leaves out the feature's amplitude beyond its edge: all of it if the feature is dropped,
     its tail if it is cut (cut_tails=True). The grid first adds the amplitudes of all
-    features, then squares the sum. So a left-out amplitude t, at a point where the other
-    features add up to an amplitude A, changes the intensity there by about 2 * A * t. That
-    is much more than t**2, the change a feature alone would see. The rule takes the worst
-    case, A = a_max, and keeps the change below eps * floor:
+    features, then squares the sum. So a left-out amplitude a_out, at a point where the
+    other features add up to an amplitude A, changes the intensity there by about
+    2 * A * a_out. That is much more than a_out**2, the change a feature alone would see.
+    The rule takes the worst case, A = a_max, and keeps the change below eps * floor:
         k          = 2 * dynrange * a / (eps * a_max)
                      a: the feature's peak amplitude, sqrt(get_intensity())
         half-width = lineshape.distance(1 / k, gamma), 0 for k <= 1
