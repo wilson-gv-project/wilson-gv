@@ -1,8 +1,10 @@
 """
 Small hand-built objects shared by the unit tests of plan.py, evaluate.py, system_data.py, grid.py, features.py
 and pipeline.py. No VibPerturbedTerm, no data files.
+Also the averaged part as a plain loop, the reference for its einsum (make_func_to_compute_avrg).
 """
 
+from collections.abc import Callable
 from dataclasses import replace
 
 import numpy as np
@@ -26,7 +28,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ResLocPoint,
     ResonanceMotif,
 )
-from wilson_suite.wilson_system.system_data import VibState, VibStatesData
+from wilson_suite.wilson_system.system_data import MolPropsCollection, VibState, VibStatesData
 
 
 def polprop(ops: tuple[int, ...] = (), inds: str = '') -> PolProp:
@@ -177,3 +179,57 @@ def coords(ndim: int, value: float = 0., **override: float) -> dict[str, float]:
 def cube(ndim: int, mn: float, mx: float, **override: tuple[float, float]) -> Box:
     """(mn, mx) on the first ndim axes; override sets single axes, e.g. cube(2, 0., 1., B=(5., 6.))."""
     return Box({ax: override.get(ax, (mn, mx)) for ax in AXES[:ndim]})
+
+
+# --- the averaged part, one index set at a time (evaluate.py) ---
+
+def make_func_to_compute_avrg(*,
+                              avrg_expression: PropsCollection,
+                              polarization_linear_comb: dict
+                              ) -> Callable[[dict, MolPropsCollection], float]:
+    """
+    The averaged part for one index set, as a loop over the recipe keys: the reference for
+    evaluate.calculate_avrg_tensor_einsum, which gives every index set at once.
+    Returns f(index_choices, props_data) -> the value, e.g. f({'a': 0, 'b': 1, 'c': 0}, props).
+    """
+    props_and_names = tuple(zip(avrg_expression, avrg_expression.names))     # names once, not per call
+
+    def compute_for_idx_choice(index_choices: dict, props_data: MolPropsCollection) -> float:
+        """The averaged part at index_choices, from the data in props_data."""
+
+        if not isinstance(props_data, MolPropsCollection):
+            raise TypeError(
+                f"props_data must be a MolPropsCollection, got {type(props_data).__name__}"
+            )
+
+        # Validate index_choices has all required keys
+        required_inds = {i for prop in avrg_expression for i in prop.inds} # type: ignore
+        missing = required_inds - index_choices.keys()
+        if missing:
+            raise KeyError(
+                f"index_choices is missing required mode indices: {missing}"
+            )
+
+        total = 0.
+
+        for cart_axes in polarization_linear_comb:
+
+            # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
+            # couldn't think of any but want to discuss and double check for safety
+
+            product = 1.
+
+            for prop, prop_tuple_key in props_and_names:
+
+                nm_inds = tuple([index_choices[i] for i in prop.inds]) # type: ignore
+                cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
+                all_inds = (*nm_inds, *cart_inds)
+
+                # retrieve data for property (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
+                product *= props_data[prop_tuple_key].vals[all_inds]
+
+            total += product * polarization_linear_comb[cart_axes]
+
+        return total
+
+    return compute_for_idx_choice

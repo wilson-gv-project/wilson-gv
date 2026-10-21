@@ -8,6 +8,15 @@ The numbers: term coefficients, resonance locations, and the spectrum on a grid.
   holds: the four factors of one index set (evaluate_full_index_dict), the sum over the summation labels
          (evaluate_term_coeff_sumover), the averaged part as one einsum per term (AvrgTensor), the resonance
          location (solve_LSE_motif), the resonance factors on the grid, the features on the grid
+
+The property data reaches the evaluation in four steps; the property name (PropsCollection.names) is
+the key all the way:
+  1. build the request   "fetch 'polgrad' from CFOUR": MolSystemData.load, names from
+                         CompiledTerm.prop_names
+  2. obtainer returns    data_dict = {'polgrad': array, ...}
+  3. fill mol_props      data_dict['polgrad'] goes into the 'polgrad' slot (MolSystemData.from_datadict)
+  4. evaluate            read mol_props['polgrad'].vals[mode, i, j]: calculate_avrg_tensor_einsum
+                         (averaged part), eval_non_avrg_per_indexdict (non-averaged part)
 """
 
 import string
@@ -35,7 +44,6 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
 )
 from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
-    MolPropsCollection,
     MolSystemData,
     VibDiff,
 )
@@ -53,18 +61,11 @@ if TYPE_CHECKING:
         ResCondKey,
         ResonanceMotif,
     )
-    from wilson_suite.wilson_system.system_data import VibStatesData
+    from wilson_suite.wilson_system.system_data import (
+        MolPropsCollection,
+        VibStatesData,
+    )
 
-
-"""
-The data then passes through these steps; the property name (PropsCollection.names) is the key all the way:
-
-1. build the request      "please fetch 'polgrad' from CFOUR"      MolSystemData.load, names from CompiledTerm.prop_names
-2. obtainer returns       data_dict = {'polgrad': array, ...}
-3. fill mol_props         put data_dict['polgrad'] into the 'polgrad' slot      MolSystemData.from_datadict
-4. evaluate               read mol_props['polgrad'].vals[mode, i, j]    calculate_avrg_tensor_einsum (averaged),
-                                                                        eval_non_avrg_per_indexdict (non-averaged)
-"""
 
 ## ----------------------------------------------------
 ##          coefficient per index set/ParameterSet
@@ -148,17 +149,16 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                *,
                                states_choice: str) -> tuple[float, dict]:
     """
-    Evaluate the term for a single index dictionary.
+    The term's coefficient at one full index set:
+        frac_factor * NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
+    index_dict: a mode for every label of the term, e.g. {'a': 0, 'b': 1, 'c': 0}
     avrg_tensor: the term's averaged part for every index set (calculate_avrg_tensor_einsum)
+    zero_tol: an averaged part or a non-averaged property with |value| <= zero_tol counts as 0
     states_choice: the state set for the energy differences, molsys_data.states[states_choice]
-    Parameters:
-        (same as evaluate_term_coeffs)
-    
-    Returns:
-        float: The computed coefficient for the given index dictionary.
-    ---
-        compl_term: 'CompiledTerm',    # term
-        index_dict: dict,            # index choice (a,b,c...)
+
+    returns (coefficient, factors): factors maps each factor's name to its value. It stops at the
+        first factor that is 0, e.g. (0.0, {'AVRG': 0.0})
+    raises ValueError if index_dict has no mode for a label of the term
     """
     # requested nm indices dict should hold values for all indices in the term
     t_indices = sorted(set(compl_term.idx_summ+compl_term.idx_nonsumm))
@@ -177,7 +177,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     if NON_AVRG == 0.0:
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
 
-    # Evaluate VIBDIFF_TERMS (split once per term, not per index set: todo.txt F3)
+    # Evaluate VIBDIFF_TERMS (CompiledTerm splits the denominators once per term, not per index set)
     extra_freqterms = compl_term.freq_pert_wf_diff
 
     VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
@@ -220,7 +220,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         prop: MolecularProperty = molsys_data.mol_props[triv_name]
         NON_AVRG = prop.vals[na_prop_inds]
 
-        # = np.isclose(NON_AVRG, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call (F3)
+        # = np.isclose(NON_AVRG, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call
         if abs(NON_AVRG) <= zero_tol:
             return 0.
         else:
@@ -241,67 +241,11 @@ def eval_avrg_per_indexdict(avrg_tensor: 'AvrgTensor', index_dict: dict, zero_to
     """
     result = avrg_tensor.at(index_dict)
 
-    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, and faster (F3)
+    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, and faster
     return 0. if abs(result) <= zero_tol else result
 
 
-def _make_func_to_compute_avrg(*,
-                              avrg_expression: 'PropsCollection',
-                              polarization_linear_comb: dict
-                              ) -> Callable[[dict, 'MolPropsCollection'], float]:
-    """
-    for an expression with properties data values,
-    compute average with given polarization setup for a choice of normal mode indices
-
-    The pipeline uses calculate_avrg_tensor_einsum (every index set at once). This loop stays as its
-    reference in the tests.
-    """
-    props_and_names = tuple(zip(avrg_expression, avrg_expression.names))     # names once, not per call
-
-    def compute_for_idx_choice(index_choices: dict, props_data: 'MolPropsCollection') -> float:
-        """
-        index_choices: dict, props_data: 'MolPropsCollection'
-        """
-
-        if not isinstance(props_data, MolPropsCollection):
-            raise TypeError(
-                f"props_data must be a MolPropsCollection, got {type(props_data).__name__}"
-            )
-
-        # Validate index_choices has all required keys
-        required_inds = {i for prop in avrg_expression for i in prop.inds} # type: ignore
-        missing = required_inds - index_choices.keys()
-        if missing:
-            raise KeyError(
-                f"index_choices is missing required mode indices: {missing}"
-            )
-
-        total = 0.
-
-        for cart_axes in polarization_linear_comb:
-
-            # Comment (MR): Noting that I considered if there would be any issues with this in generalized routine,
-            # couldn't think of any but want to discuss and double check for safety
-
-            product = 1.
-
-            for prop, prop_tuple_key in props_and_names:
-
-                nm_inds = tuple([index_choices[i] for i in prop.inds]) # type: ignore
-                cart_inds = tuple([cart_axes[i.o] for i in prop.ops])
-                all_inds = (*nm_inds, *cart_inds)
-
-                # retrieve data for property (prop_key) and idxs_key which is (tuple(mode inds), tuple(cart inds))
-                product *= props_data[prop_tuple_key].vals[all_inds]
-
-            total += product * polarization_linear_comb[cart_axes]
-
-        return total
-
-    return compute_for_idx_choice
-
-
-# EVALUATION OF THE AVRG PART FOR EVERY INDEX SET AT ONCE - one einsum (todo.txt F1)
+# EVALUATION OF THE AVRG PART FOR EVERY INDEX SET AT ONCE - one einsum
 AVRG_SLOT_LETTERS = 'IJKLMN'    # einsum letter of cartesian slot 0, 1, 2, ... (ranks 2 to 6); slot: see calculate_avrg_tensor_einsum
 
 
@@ -311,7 +255,7 @@ class AvrgTensor:
     The averaged part of one term, for every choice of its mode labels (calculate_avrg_tensor_einsum).
         labels  the distinct mode labels of the averaged part, alphabetical, e.g. ('a', 'b', 'c')
         values  one axis per label, in the order of `labels`: values[0, 1, 2] is the value for a=0, b=1, c=2
-    The labels travel with the values, so a lookup cannot read the axes in another order (the B6 trap).
+    The labels travel with the values, so a lookup cannot read the axes in another order.
     """
     labels: tuple[str, ...]
     values: np.ndarray
@@ -328,7 +272,7 @@ def make_avrg_einsum_subscripts(avrg_expression: 'PropsCollection') -> str:
     """
     The averaged part as one einsum: one operand per property, then the recipe W, then the output.
 
-    For one index set, the on-the-fly loop (_make_func_to_compute_avrg) computes
+    For one index set, the averaged part is
         sum over recipe keys (i_0, i_1, ...) of  W[i_0, i_1, ...] * product over properties of prop[modes..., carts...]
     Each property reads its mode indices first, then one Cartesian index per Cartesian axis (entry of prop.ops):
     the key's index at that axis's slot (op.o). einsum writes the same sum with one letter per index:
@@ -343,7 +287,7 @@ def make_avrg_einsum_subscripts(avrg_expression: 'PropsCollection') -> str:
         T[a, b, c]           'abc'    the distinct mode labels, alphabetical
         -> 'bIL,aJ,cK,IJKL->abc':  T[a, b, c] = sum over I, J, K, L of polgrad[b, I, L] dipgrad[a, J] dipgrad[c, K] W[I, J, K, L]
     A label in two properties (term 10: dipgrad[a] twice) multiplies two values of the same mode. A label twice
-    in one property (polhess[a, a]) reads its diagonal. Both are einsum's own rules, and both match the loop.
+    in one property (polhess[a, a]) reads its diagonal. Both are einsum's own rules, and both match the sum above.
 
     raises ValueError if a mode label is not one lowercase letter (slots use upper case), or if the slots are
     not 0 .. rank-1, each once
@@ -370,8 +314,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
                                  props_data: 'MolPropsCollection',
                                  polarization_linear_comb: dict) -> AvrgTensor:
     """
-    The averaged part for every index set at once: the values that the on-the-fly loop
-    (_make_func_to_compute_avrg) gives one index set at a time, from one einsum.
+    The averaged part for every index set at once, from one einsum.
 
     Slot: one interaction of the molecule with a light field, numbered by the field:
         slot 0 = the detected field,  slot k = the pulse with id k (pulse ids are 1, 2, ...; ElectricField checks)
@@ -386,8 +329,8 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     each Cartesian axis to its field. Term 8 with the properties reversed: 'cK,aJ,bIL,IJKL->abc', the same tensor.
     The order of the Cartesian axes inside one property does matter: it sets which data axis goes with which slot.
         e.g. polgrad[b] with ops (0, 3): in polgrad[b, i, j], i is the direction at slot 0, j at slot 3.
-    For polgrad and polhess both orders give the same value: they are symmetric in i, j (formaldehyde data:
-    exactly). dipgrad and diphess have one Cartesian axis, so no order.
+    For polgrad and polhess both orders give the same value: they are symmetric in i, j.
+    dipgrad and diphess have one Cartesian axis, so no order.
 
     rank = the number of slots = the number of Cartesian axes of all properties together (term 8: 2 + 1 + 1 = 4).
     A recipe key has one direction per slot, in slot order:
@@ -395,7 +338,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     The recipe comes from the lab side, with the same numbering: the experiment lists its polarizations as
     (detector, pulse 1, pulse 2, ...) (all_polarizations, experiment_abstractions.py), and laser_pol and the
     recipe are made from that list. So key position k and op.o = k both mean "the field of slot k".
-        Not yet for ranks 3, 5 and 6: get_pol_tensor reverses the slots (todo.txt A15). Ranks 2 and 4 (EVV) are
+        Not yet for ranks 3, 5 and 6: get_pol_tensor reverses the slots. Ranks 2 and 4 (EVV) are
         not affected.
         A pulse that acts twice would give two Cartesian axes the same op.o: make_avrg_einsum_subscripts raises.
     The molecule turns at random, so the average weighs every combination of directions with the recipe
@@ -404,7 +347,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
         1. subscripts from the expression (make_avrg_einsum_subscripts), e.g. term 8: 'bIL,aJ,cK,IJKL->abc'
         2. W: the recipe {(i_0, i_1, ...): coefficient} as a dense 3 x 3 x ... array, one axis per slot;
            0 where the recipe has no entry
-        3. one operand per property: its data array, found by its name, as the loop finds it (PropsCollection.names)
+        3. one operand per property: its data array, found by its name (PropsCollection.names)
         4. np.einsum: one axis per distinct mode label, alphabetical
     Size: n_modes ** (number of distinct labels), e.g. 42 modes, 3 labels: 74088 values, 0.6 MB.
 
@@ -422,7 +365,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     # 2. The recipe as a dense array W: one axis of length 3 (x, y, z) per slot.
     #    The recipe holds only the nonzero keys: rank 4 has 21 of the 3**4 = 81 keys.
     #    e.g. laser_pol (1, 1, 1): key (0, 0, 1, 1) has 1/15, so W[x, x, y, y] = 1/15.
-    #    A key that is not in the recipe stays 0 in W, so einsum adds nothing for it (the loop never visits it).
+    #    A key that is not in the recipe stays 0 in W, so einsum adds nothing for it.
     #    A key of the wrong length would not raise in numpy: W[(0, 0)] = c fills the whole block W[0, 0, :, :].
     #    So the length is checked here.
     W = np.zeros((3,) * rank)
@@ -432,7 +375,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
         W[key] = coeff
 
     # 3. One data array per property, in the order of the expression: the order of the operands in the string.
-    #    The name comes from the property's orders (PropsCollection.names, as in the loop):
+    #    The name comes from the property's orders (PropsCollection.names):
     #        1 Cartesian axis, 1 mode -> 'dipgrad' (n, 3)        2 Cartesian axes, 1 mode -> 'polgrad' (n, 3, 3)
     #        1 Cartesian axis, 2 modes -> 'diphess' (n, n, 3)    2 Cartesian axes, 2 modes -> 'polhess' (n, n, 3, 3)
     #    n = the number of modes. Mode axes first, then x, y, z: the layout the string assumes.
@@ -447,10 +390,10 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     #    in the output: the slot letters I, J, K, L. The mode letters a, b, c are in the output: not summed.
     #    term 8, shape (n, n, n):
     #        values[a, b, c] = sum over I, J, K, L of  polgrad[b, I, L] * dipgrad[a, J] * dipgrad[c, K] * W[I, J, K, L]
-    #    For one (a, b, c), this is the sum the loop computes: one product per recipe key, times its coefficient.
+    #    For one (a, b, c), this is the sum in make_avrg_einsum_subscripts: one product per recipe key, times
+    #    its coefficient.
     #    optimize=True: numpy multiplies two arrays at a time, in a cheap order, instead of one loop over all
-    #    7 letters. Only the order of the additions changes, so the values match the loop up to rounding
-    #    (8e-14 relative on ACDM, todo.txt F1).
+    #    7 letters. Only the order of the additions changes, so the result is the same up to rounding.
     return AvrgTensor(labels, np.einsum(subscripts, *operands, W, optimize=True))
 
 
@@ -495,12 +438,12 @@ def get_RHS_motif(motif: 'ResonanceMotif',
             parameters: ParameterSet, vibstates_data: 'VibStatesData',
             unit: str='Eh'):
     """
-    making a constants vector from a list of tuples
-    resonance_tuples = [(1, (-1,)), (2, (-1, 2)), (3, (-2, 3))]
-    ind_tuple = (1, 2, 3) --- 
-    vibdiffbank: VibDiffBank instance
-
-    output: [5, -3, 2]
+    The right-hand side b of the motif's system A @ w = b (solve_LSE_motif): one entry per
+    resonance condition, -(E_left - E_right) at the modes in `parameters`, from vibstates_data.
+        e.g. conditions A = E_ab - E_a and B = E_b - E_a, parameters {'a': 0, 'b': 1}
+             ->  [-(E_01 - E_0), -(E_1 - E_0)]    E_01: the state with one quantum in modes 0 and 1
+    unit: 'Eh' or 'cm-1'
+    raises ValueError for another unit
     """
     if unit not in ('Eh', 'cm-1'):
         raise ValueError(f"unit must be 'Eh' or 'cm-1', got {unit!r}")
@@ -531,12 +474,12 @@ def solve_LSE_motif(motif: 'ResonanceMotif',
              [-1,  1]]                           then w_B from row 1
 
     The location is {axis: w} over the motif's own axes: always a point, every axis has a value.
-    A motif without conditions (a term without resonance conditions, a flat background, todo.txt E12) has no axes:
+    A motif without conditions (a term without resonance conditions, a flat background) has no axes:
     its location is ResLocPoint({}), and the feature is the same on every grid point.
 
     raises np.linalg.LinAlgError if the location is not a point (fewer independent conditions
     than axes, e.g. a single condition on A + B) or the conditions are inconsistent.
-    Compiled terms always pass (CompiledTerm.from_VibPertTerm checks the motif, B7); these
+    Compiled terms always pass (CompiledTerm.from_VibPertTerm checks the motif); these
     checks guard motifs built by hand.
     """
     if len(motif) == 0:
@@ -572,10 +515,8 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
     """
     The modes the evaluation uses: 0 .. n_modes-1 without exclude_modes, n_modes = len(molsys_data.eigenvals).
         e.g. 6 modes, exclude_modes (5,) -> (0, 1, 2, 3, 4)
-    An excluded mode is left out of the evaluation (todo.txt Decisions, 2026-10-13): it is no resonance label (no
-    row, no peak) and no value of a summed label; molsys_data keeps it. So the other peaks change too:
-    their sums lose the excluded mode. (VibAnaSetup.exclude_modes in the old code: no peaks either, but the sums
-    dropped the mode only where the summed label is in the averaged part.)
+    An excluded mode is left out of the evaluation: it is no resonance label (no row, no peak) and no value
+    of a summed label; molsys_data keeps it. So the other peaks change too: their sums lose the excluded mode.
 
     raises ValueError for a mode that does not exist (modes count from 0), or if no mode is left
     """
@@ -618,9 +559,9 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
         zero   - (term_id, params) with coeff == 0: no row, no location solved
 
     Every nonzero pair gets a location: CompiledTerm.from_VibPertTerm checks that the motif fixes
-    one point (B7). A term built by hand skips that check; if its motif has no single point,
+    one point. A term built by hand skips that check; if its motif has no single point,
     solve_LSE_motif raises and the run stops.
-    A term without resonance conditions (a flat background, todo.txt E12) has no label to fix: one index set, {},
+    A term without resonance conditions (a flat background) has no label to fix: one index set, {},
     whose coefficient sums every label, at the location without axes (ResLocPoint({})).
     """
     modes = included_modes(molsys_data, exclude_modes)
@@ -638,9 +579,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
             ps = ParameterSet(idxset)
 
             # no leaves: FeatureResult.leaves computes a row's leaves again when asked
-            coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, polarization_linear_comb,
-                                                   avrg_tensor=avrg_tensor, keep_leaves=False,
-                                                   states_choice=states_choice, modes=modes)
+            coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, avrg_tensor=avrg_tensor,
+                                                   keep_leaves=False, states_choice=states_choice, modes=modes)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))
@@ -679,13 +619,12 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
         So one condition is the denominator (E_sl - E_sr) - (signed sum of pf).
       - pf signs: '-A' means axis A enters that sum with -1. The sign comes from the pulse
         interaction (+w or -w, dressWithPulseInteractions) and from the axis choice
-        (e.g. B = -w1 + w2; the translation is done before, data_for_tests/translated_terms).
+        (e.g. B = -w1 + w2; the terms arrive already translated to the axes).
       - The term coefficients from derive are made for this denominator, e.g. the -1 / +1 of the
         D1 / D2 terms in vib_rsp_sos. freq - E would flip every condition: an extra (-1)^N for
         a motif with N conditions, which the coefficients do not know about.
       - -i*gamma is not fixed by derive (no damping there). +i*gamma gives the complex conjugate
-        everywhere, so |amplitude|^2 stays the same. -i*gamma matches to_str and the old code
-        (deleted in E9; d93cc7b is the last commit with it).
+        everywhere, so |amplitude|^2 stays the same. -i*gamma matches to_str.
     """
     freq = sum((-1 if ax.startswith('-') else 1) * mesh_au[ax.lstrip('-')] for ax in res_cond_key.pf)
     return vib_diff.energy_difference(au=True) - freq
@@ -734,7 +673,7 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
                       a number per condition, or an array of the grid's shape for one that changes with
                       the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
     The box and get_intensity take the same propagator_param, at the peak (SpectralFeature.peak_widths).
-    A flat feature (no conditions, todo.txt E12): amplitude_coeff on every grid point, an array of the grid's shape.
+    A flat feature (no conditions): amplitude_coeff on every grid point, an array of the grid's shape.
     """
     param = feature.propagator_param
     if param is None:
@@ -816,9 +755,6 @@ def boxed_features_on_grid(window: 'SpectralWindow',
     The box sizes set what is left out. With amplitude_half_widths (features.py) the
     intensity error stays near eps * the plot's floor. To check a case, compare with
     all_features_on_grid.
-    Until 2026-10-14 features were evaluated by domains (boxes that overlap, each feature
-    on the whole domain box): that hid part of the cut of the old boxes, at up to 20 times
-    the cost. With amplitude boxes the own box is enough.
 
     window         - e.g. from SpectralWindow.from_features, so every feature has its box
                      (a flat feature: the window)

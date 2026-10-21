@@ -10,7 +10,6 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
-    _make_func_to_compute_avrg,
     calculate_avrg_tensor_einsum,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
@@ -21,6 +20,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     CompiledTerm,
     compile_terms,
 )
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import make_func_to_compute_avrg
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
@@ -243,7 +243,7 @@ def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
     C = np.zeros((3,) * 4)
     for key, coeff in ISO4.items():
         C[key] = coeff
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
 
     for idx in ALL_ABC:
         expected = np.einsum('ijkl,il,j,k->', C, polgrad[idx['b']], dipgrad[idx['a']], dipgrad[idx['c']])
@@ -262,7 +262,7 @@ def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(t
     ca, sa, cb, sb = np.cos(0.7), np.sin(0.7), np.cos(1.9), np.sin(1.9)
     R = np.array([[1., 0., 0.], [0., cb, -sb], [0., sb, cb]]) @ np.array([[ca, -sa, 0.], [sa, ca, 0.], [0., 0., 1.]])
     rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, polgrad), np.einsum('ip,np->ni', R, dipgrad))
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=ISO4)
 
     values = [func(idx, molsys.mol_props) for idx in ALL_ABC]
     assert any(v != 0. for v in values)
@@ -301,7 +301,7 @@ def test_evv_einsum_subscripts():
 def test_evv_einsum_tensor_is_the_on_the_fly_average_for_every_index_set(term_id, laser_pol, evv_molsys):
     term = cmpl_terms[term_id]
     pol = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=laser_pol)
-    func = _make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=pol)
+    func = make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=pol)
 
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_molsys.mol_props, pol)
 

@@ -17,7 +17,6 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     AvrgTensor,
-    _make_func_to_compute_avrg,
     all_features_on_grid,
     boxed_features_on_grid,
     build_contributions,
@@ -74,6 +73,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     ab_term,
     flat_term,
     get_box_extent,
+    make_func_to_compute_avrg,
     polprop,
     row,
     toy_term,
@@ -336,11 +336,11 @@ def rotation(alpha: float, beta: float) -> np.ndarray:
 ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(N_MODES), repeat=3)]
 
 
-# -- _make_func_to_compute_avrg: one value for one index set --------------------------
+# -- make_func_to_compute_avrg: one value for one index set --------------------------
 
 def test_avrg_func_reads_the_cartesian_slot_of_each_operator():
     """One polarization entry, key (2, 0, 1, 1): polgrad[b] reads (2, 1), dipgrad[a] reads 0, dipgrad[c] reads 1."""
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(2, 0, 1, 1): 3.})
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(2, 0, 1, 1): 3.})
 
     value = func({'a': 0, 'b': 1, 'c': 2}, evv_props())
 
@@ -349,7 +349,7 @@ def test_avrg_func_reads_the_cartesian_slot_of_each_operator():
 
 def test_avrg_func_is_the_full_contraction_with_the_averaging_coefficients():
     """sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k], written with einsum."""
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
 
     for idx in ALL_ABC:
         expected = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD_3[idx['b']], DIPGRAD_3[idx['a']], DIPGRAD_3[idx['c']])
@@ -365,9 +365,9 @@ def test_avrg_func_does_not_change_when_the_molecule_is_rotated(laser_pol):
     """
     R = rotation(0.7, 1.9)
     rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, POLGRAD_3), np.einsum('ip,np->ni', R, DIPGRAD_3))
-    average = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(),
+    average = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(),
                                          polarization_linear_comb=getGeneralPolarizationAveragingExpression(4, laser_pol))
-    one_element = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(0, 0, 0, 0): 1.})
+    one_element = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(0, 0, 0, 0): 1.})
 
     for idx in ALL_ABC:
         assert average(idx, rotated) == pytest.approx(average(idx, evv_props()))
@@ -377,33 +377,33 @@ def test_avrg_func_does_not_change_when_the_molecule_is_rotated(laser_pol):
 def test_avrg_func_with_a_repeated_mode_label():
     """dipgrad[a] * dipgrad[a], rank 2: both factors read mode a."""
     expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
-    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb={(0, 0): 1., (1, 2): 3.})
+    func = make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb={(0, 0): 1., (1, 2): 3.})
 
     assert func({'a': 2}, evv_props()) == pytest.approx(DIPGRAD_3[2, 0] ** 2 + 3. * DIPGRAD_3[2, 1] * DIPGRAD_3[2, 2])
 
 
 def test_avrg_func_without_polarization_entries_is_zero():
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={})
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={})
 
     assert func({'a': 0, 'b': 1, 'c': 2}, evv_props()) == 0.
 
 
 def test_avrg_func_needs_every_mode_label():
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
 
     with pytest.raises(KeyError, match="'c'"):
         func({'a': 0, 'b': 1}, evv_props())
 
 
 def test_avrg_func_needs_a_mol_props_collection():
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
 
     with pytest.raises(TypeError, match='MolPropsCollection'):
         func({'a': 0, 'b': 1, 'c': 2}, {'polgrad': POLGRAD_3, 'dipgrad': DIPGRAD_3})  # type: ignore
 
 
 def test_avrg_func_needs_every_property_in_the_data():
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
     no_polgrad = MolPropsCollection([MolecularProperty(trivial_name='dipgrad', vals=DIPGRAD_3, extra_data={})])
 
     with pytest.raises(KeyError):
@@ -520,7 +520,7 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 @pytest.mark.parametrize('labels', ['bac', 'abc', 'cab', 'bab', 'baa'])
 def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels, laser_pol):
     pol = getGeneralPolarizationAveragingExpression(4, laser_pol)
-    func = _make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(labels), polarization_linear_comb=pol)
+    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(labels), polarization_linear_comb=pol)
 
     tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(labels), evv_props(), pol)
 
@@ -559,7 +559,7 @@ def test_avrg_tensor_einsum_reads_the_diagonal_for_a_label_twice_in_one_property
     props = MolPropsCollection([MolecularProperty(trivial_name='polhess', vals=polhess, extra_data={})])
     expr = PropsCollection([polprop(ops=(0, 1), inds='aa')])
     pol = {(0, 0): 1., (1, 2): 3.}
-    func = _make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=pol)
+    func = make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb=pol)
 
     tensor = calculate_avrg_tensor_einsum(expr, props, pol)
 
