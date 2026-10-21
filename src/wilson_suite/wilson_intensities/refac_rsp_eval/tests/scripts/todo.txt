@@ -1,5 +1,7 @@
 refac_rsp_eval — TODO
-updated 2026-10-19, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+updated 2026-10-21, branch rsp_eval_refactor (brings the refactor to main, see Branch)
+In tests/scripts/ since 2026-10-21 (before: refac_rsp_eval/). Paths here are relative to refac_rsp_eval
+(tests/..., plan.py) or to src/wilson_suite (wilson_*/..., data_for_tests/...).
 Moved to wilson_system/todo.txt (2026-10-17), as they block nothing here: D4, D5 (wilson_system's classes), G2, G8,
 G9 and test_getting_data (the reader; fixed 2026-10-18).
 Shortened 2026-10-15. The long version (all measurements and reasons), on debug_rendering:
@@ -19,12 +21,12 @@ Errors in either one need a check on that side.
 the polarization vector (G4, G5; amplitudes/averaging.py), the data's energies (G6).
 
 
-Tests (run 2026-10-19, branch rsp_eval_refactor)
+Tests (run 2026-10-21, branch rsp_eval_refactor)
 ------------------------------------------------
                     pass  fail  skip  xfail   on purpose until A15 is fixed
-    refac_rsp_eval   682     -     -     19   all 19 xfails: 5 in tests/test_a15_polarization_order.py,
+    refac_rsp_eval   755     -     -     19   all 19 xfails: 5 in tests/test_a15_polarization_order.py,
                                               14 in tests/test_averaging_pol_order.py
-    rest of src      259     -     1      -   none
+    rest of src      263     -     1      -   none
     tests/ (root)      4    16     -      -   none
 Every fail outside refac_rsp_eval fails on main (11e3d0a) too. The rest of src has none since 2026-10-18:
 test_getting_data fixed (wilson_system/todo.txt R2). The 16 in tests/: E9 stage 3 (C). Before E9 deleted the old
@@ -35,11 +37,15 @@ it the tests import the main folder's editable install). The earlier note "a fre
 holds; terms_fuller_flat.json, its example, has been in git since 18c5fac.
 
 
-Status (2026-10-18)
+Status (2026-10-21)
 -------------------
 The new evaluator is built and checked: the same numbers as the old code (to 2e-15), and a hand calculation
-agrees. ACDM (42 modes): 3.8 s per spectrum (2026-10-18), 80 s before the speed work (F). Nothing calls the new
-code yet.
+agrees. ACDM (42 modes): 3.8 s per spectrum with cut_tails=True, 17 s with the default cut_tails=False
+(2026-10-21; see F), 80 s before the speed work. Nothing calls the new code yet.
+Since 2026-10-20: one line shape for the grid, the peak heights and the boxes (lineshape.py); the boxes only
+pick the features unless cut_tails=True (see Decisions); the whole spectrum pinned by test_grid_reference.py.
+Since 2026-10-21: the scripts and these notes in tests/scripts/; tests/README.md and tests/scripts/README.md
+list the files.
 Done: the two calls, with inputs and outputs in the pipeline.py docstring (E6a); plotting (E7, plot_rsp_func).
 Translated terms in (E18, 2026-10-18): the evaluator takes terms already translated to axes. No file of the new
 code imports wilson_experiment, derive.derive or term_var_translate (tests/test_imports.py). The terms of the
@@ -80,8 +86,8 @@ refactor; on this branch:
     VibExperiment.derive_terms (40621bd)                    not needed since E18: make_translated_terms.py runs
                                                             main's derive, flattened by derived_terms_flat
 compat.py goes once derive has to_str [outside].
-tests/g7_survey.py runs on this branch since E18 (2026-10-18), from the stored terms; pytest does not collect it.
-It uses no old code, so it stays after E9.
+tests/scripts/g7_survey.py runs on this branch since E18 (2026-10-18), from the stored terms; pytest does not
+collect it. It uses no old code, so it stays after E9.
 The old-vs-new scripts tests/c3_spectrum.py, c2_variations.py and c2_leaves.py (main's old pipeline; they did not
 run here either) were deleted in 3612e5b (E9, stage 1; d93cc7b has them, see the top of this file). C2 stays
 checked without them: test_evv_reference.py against evv_reference.json.
@@ -108,12 +114,16 @@ Other items:
     open, in the PR      E17 (the package move to wilson_response_evaluate): before the merge, or later
                          with the moves to wilson_system
     postponed            A15 (polarization order, one line), E4 (README)
+    open, small          A17 (tests and scripts: the points of the review of 2026-10-21)
     optional checks      G3 (rest)
     done (2026-10-17)    E12 (flat background), E15 (rename), E9 stage 6 (comments); H8 left as it is
     done (2026-10-18)    E18 (translated terms in; tests load stored terms; H8 holds)
     done (2026-10-19)    E16 (the domains deleted)
-    later, when needed   D1 (frozen collections), E8 (lines and planes), E14 (slices of 3D and 4D spectra), E10 (tune the knobs),
-                         F (the sum as arrays; for 4D also the rows as arrays; reuse on a new axis choice)
+    done (2026-10-20)    lineshape.py, cut_tails, test_grid_reference.py (see Done)
+    done (2026-10-21)    the tests and scripts sorted, with READMEs (see Done)
+    later, when needed   D1 (frozen collections), E8 (lines and planes), E14 (slices of 3D and 4D spectra),
+                         E10 (tune the knobs), F (the sum as arrays; for 4D also the rows as arrays; reuse on a
+                         new axis choice)
     [aside]              G4, G5 (averaging weights, polarization vector: needed before polarizations other than
                          all along x, or ranks other than 4, are used), G6 (smallest energy differences)
     [outside]            E6b (the caller), E7b (the render code), E13 (derive: at most 3 axes); derive's
@@ -138,8 +148,8 @@ Decisions and known limits
 - Mock data for what the reader cannot give (2026-10-15): the reader's limits (no hypgrad, states up to 3
   quanta) are not the evaluator's. Tests for 1D-4D use mock data (G10, test_dimensions.py).
 - Denominators (2026-10-10): w is always the harmonic frequency from the Hessian (nc_sqrt_eigval, the square
-  root of its eigenvalue); an energy difference uses the chosen states. derive's is_pert_wf_diff tells them apart (True: energy difference); term_to_str (compat.py)
-  prints both alike, e.g. <['a'],[]>.
+  root of its eigenvalue); an energy difference uses the chosen states. derive's is_pert_wf_diff tells them
+  apart (True: energy difference); term_to_str (compat.py) prints both alike, e.g. <['a'],[]>.
 - states_choice (2026-10-12) must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic ->
   'harmonic'. No default: the data cannot know the regime (formaldehyde: 272 of 340 coefficients differ).
   MolSystemData.states holds every state set the source has; the evaluation reads states[states_choice].
@@ -169,14 +179,20 @@ Decisions and known limits
 - Linear polarization only (2026-10-11): get_pol_laser stores into a real array, so a complex vector (circular
   light) loses its imaginary part with only a ComplexWarning. No complex conjugate for the detected field
   either. Before circular light is used: raise on complex input, then add the conjugates.
-- Boxes by amplitude (E10, 2026-10-14): each feature is evaluated on its own box, sized so that a cut tail changes
-  the plot by at most about eps * floor (floor = max / dynrange). The box rule is an input:
-  spectrum_on_grid(box_rule=), amplitude_half_widths (new) or intensity_half_widths (the old rule). No rule drops
-  a feature.
+- Boxes by amplitude (E10, 2026-10-14): each feature gets a box, sized so that a cut tail changes the plot by at
+  most about eps * floor (floor = max / dynrange). The box rule is an input: spectrum_on_grid(box_rule=),
+  amplitude_half_widths (new) or intensity_half_widths (the old rule). No rule drops a feature for its amplitude.
+- Boxes pick, cut_tails cuts (2026-10-20): spectrum_on_grid keeps the features whose box meets the window.
+  cut_tails=False, the default: each kept feature on the whole grid, nothing cut (all_features_on_grid).
+  cut_tails=True: each feature on its own box only (boxed_features_on_grid). ACDM, quick_start grid (2026-10-21):
+  the grid 14.3 s against 0.6 s, the two spectra 0.05 floors apart.
+- One line shape (2026-10-20): the grid (eval_resonance_factor), the peak heights (get_intensity) and the box
+  rules take it from lineshape.py (factor, distance, peak, tail), so they always agree. In use: the Lorentzian.
+  Another line shape adds its own factor and distance functions.
 - Peak width (E5, 2026-10-13): propagator_param sizes both the peak on the grid and its box. A box uses the largest
   peak width, on every axis; a width that grows away from the peak can still be cut off. A width function gets
-  only the VibDiff; if it ever needs the condition's axes, pass the ResCondKey too (FIXME in
-  eval_resonance_factor).
+  the condition's VibDiff and the frequencies (vd, freqs), not the condition's axes; if it ever needs them, pass
+  the ResCondKey too (eval_resonance_factor).
 
 
 A. Small fixes
@@ -209,6 +225,23 @@ A. Small fixes
         Rank 6 (every 4 IR + UV setup) is even: nonzero for any molecule. There A15 can give wrong values unless the
         polarization list reads the same backwards (e.g. all along x).
         Ranks above 6 are not supported at all (G7: the 7-pulse setup has rank 8).
+[ ] A17 Tests and scripts (review of 2026-10-21; every test passes, each file in under 1 s). Open points:
+        - tests/test_integration.py: test_compiled_terms only prints (no assert); test_eval_molsys_data checks the
+          reader (wilson_system's part); test_plan_compiled_term and test_evaluate_term repeat toy tests of
+          test_plan.py and test_evaluate.py on real data; its own term_to_str next to compat.term_to_str. Its
+          einsum-against-loop tests on the 14 EVV terms (3 laser_pol) and the rotation test have no other
+          real-data copy. proposal: keep these (e.g. in test_evaluate.py), drop the rest.
+        - tests/test_a15_polarization_order.py and tests/test_averaging_pol_order.py: one cause (A15), two files,
+          the first imports from the second. Options: merge them; or fix A15 and keep them as plain tests.
+        - tests/scripts/f2_speed.py: its "deepcopy" line reports 0 calls (the profiled run reuses the
+          denominator split that the plain run before it kept on each CompiledTerm). Its docstring says it runs
+          for minutes: 17 s on 2026-10-21.
+        - tests/scripts/e10_boxes.py docstring: "a few minutes", all_features_on_grid about 70 s on ACDM. On
+          2026-10-21: the default list 53 s, the ACDM reference 36 s.
+        - tests/scripts/example_evaluate_response_terms.py, lines 96-103: debug prints of every row of every
+          feature in the window (334 of its 398 output lines).
+        - the counts 340 rows / 164 zero (EVV, formaldehyde) are checked in 3 files: test_evv_reference.py,
+          test_pipeline.py, test_dimensions.py.
 
 
 D. Data model
@@ -232,11 +265,11 @@ E. Pipeline
 [ ] E6  The evaluator's inputs and outputs. E6a (the evaluator side) done 2026-10-14; E6b (the caller) is
         [outside]. Since E9 (2026-10-16) WilsonSimulation.evaluate raises NotImplementedError until E6b (before,
         it ran the old pipeline, double count included, C3). The entry point is the library calls below
-        (e.g. tests/example_evaluate_response_terms.py, tests/example_plot_spectrum.py).
+        (e.g. tests/scripts/example_evaluate_response_terms.py, tests/scripts/example_plot_spectrum.py).
             molsys = MolSystemData.load(origin, prop_names(terms))                   the caller, once
             result = evaluate_response_terms(terms, molsys_data=, states_choice=, laser_pol=,
                                              propagator_param=, exclude_modes=)      -> FeatureResult
-            spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=)              -> EvalRspResult
+            spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=, cut_tails=)  -> EvalRspResult
         Inputs, and where the old setup keeps each one (for E6b):
             terms             VibPerturbedTerm list, translated to axes    sim.terms_in_axis_choice (made by
                               (E18)                                        setAxisChoiceAndTranslateTerms; sim.terms
@@ -254,14 +287,18 @@ E. Pipeline
             box_rule          features.BoxRule, knobs by functools.partial,
                               e.g. partial(amplitude_half_widths, dynrange=500.)
               dynrange        the plot's dynamic range, required           ev_info.dynamic_range (default 100)
-              amplitude_half_widths: eps, min_gammas, max_cm, a_max        no old equivalent (E10)
-              intensity_half_widths: the old knobs (names, meanings,       box_range_safety_margin,
-                defaults); max_intensity (None: strongest in window)       scale_wrt_max_intensity, minimum_box_padding
+              amplitude_half_widths: eps, min_gammas, a_max                no old equivalent (E10)
+              intensity_half_widths: the old knobs (names, meanings;       box_range_safety_margin,
+                minimum_box_padding 10 cm-1, main 0); max_intensity        scale_wrt_max_intensity, minimum_box_padding
+                (None: strongest in window)
+            cut_tails         False (default): each kept feature on the    no old equivalent (the old code cut)
+                              whole grid; True: on its own box only
         Outputs:
             FeatureResult     the rows (table), zero, features, states; factors_by_index_set(row), cancelling(rel_tol)
             EvalRspResult     amplitude (complex, in au, per grid point; the old sim.spec),
                               mesh (a full array per axis; the old spec_eval_setup.grid),
-                              axis_points (the points along each axis), spectral_window (features and boxes)
+                              axis_points (the points along each axis), spectral_window (features and boxes),
+                              feature_result (the FeatureResult it came from)
                               Until 2026-10-20: grid_result, grid_mesh, grid_axes.
         Not supported: data from more than one source (the old eval_by_prop_name); MolSystemData.load takes one
         origin (wilson_system/todo.txt S8). The old-vs-new check matched only without excluded modes (the two
@@ -332,12 +369,12 @@ E. Pipeline
             stage 5 alone             import wilson_suite fails (wilson_main/__init__.py imports
                                       spectrum_abstractions), so no test is collected (24 errors)
             stage 5, line 5 changed   5 tests change, all to fail: test_integration_rendering.py (4; on 2026-10-16
-                                      2 pass, 2 skip) and test_save_wilsonsim (passed on 2026-10-16). No refac_rsp_eval test
-                                      changes; tests/ (root) fails as before. No test covers README.md,
-                                      quick_start.ipynb, script_example.py.
+                                      2 pass, 2 skip) and test_save_wilsonsim (passed on 2026-10-16). No
+                                      refac_rsp_eval test changes; tests/ (root) fails as before. No test covers
+                                      README.md, quick_start.ipynb, script_example.py.
             after the prep (A1, B, E1)  no test changes; only the 14 modules leave the import list (third dry run)
-[ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/e10_boxes.py scores any
-        knob setting against all_features_on_grid; add cases and knob values, then choose the defaults.
+[ ] E10 Box size by amplitude. Code done 2026-10-14. Left: tune the knobs (later): tests/scripts/e10_boxes.py
+        scores any knob setting against all_features_on_grid; add cases and knob values, then choose the defaults.
         The rule (features.amplitude_half_widths), from the plot's dynamic range D:
             floor = A_max^2 / D                                  the faintest the plot shows
             2 * A_max * tail(d) <= eps * floor                   a cut tail changes the plot by eps * floor at most
@@ -345,8 +382,8 @@ E. Pipeline
             k = 2 * D * a_f / (eps * A_max);  d = gamma * sqrt(k^2 - 1);  k <= 1: 1 gamma
           gamma: the largest of peak_widths(), on every axis. A_max: each feature's amplitude at the nearest
           window point, the largest (0.4-10 % from the true max). Only eps / D counts, e.g. 0.1 / 500 = 2e-4.
-          Knobs: dynrange (required), eps (0.1), min_gammas (1), max_cm (none; a cap breaks the eps bound),
-          a_max (default: the estimate above).
+          Knobs: dynrange (required), eps (0.1), min_gammas (1), a_max (default: the estimate above). max_cm, a cap,
+          was deleted 2026-10-20 (59a4149): it broke the eps bound (see "a cap" below).
           e.g. ACDM, D 500: a feature with 1e-2 of the max intensity gets the whole window; 1e-4: 470 cm-1;
           1e-6: 47 cm-1; 1e-8: 1 gamma.
         Why: the old boxes ended at 1/D of each feature's own peak. But amplitudes add before squaring, so a cut
@@ -375,12 +412,14 @@ E. Pipeline
         the old cut (own box 1.7-12 floors, domains 0.8-7.7) at up to 20 times the cost. With amplitude boxes the
         own box is enough. The new code's domains were deleted (E16, 2026-10-19).
         intensity_half_widths vs the old dress_these_with_boxes: returns half-widths (no deep copy); never drops a
-        feature; no error for a feature stronger than max_intensity. Same knobs and defaults as main's
-        EvaluationInfo (box_range_safety_margin 0.1, unscaled, minimum_box_padding 0 cm-1), plus dynrange.
+        feature; no error for a feature stronger than max_intensity. Same knobs as main's EvaluationInfo, plus
+        dynrange. Same defaults (box_range_safety_margin 0.1, unscaled) except minimum_box_padding: 10 cm-1 since
+        2026-10-20 (9f17da0), main's 0.
         Limits: a Lorentzian tail (gamma / d); the largest width on every axis; a worst case (assumes the cut tail
         meets A_max), so boxes are larger than needed where the plot is weak.
         The grid result no longer matches the old code (the old code cuts more): the reference is all_features_on_grid
-        (test_pipeline.py). The rows are checked against the old code (C2).
+        (test_pipeline.py). The rows are checked against the old code (C2). Since 2026-10-20 the default
+        (cut_tails=False) cuts nothing; the boxes then only pick the features (see Decisions).
         Seen 2026-10-15, not investigated: IR + IR + vis sum frequency (2D, formaldehyde, gamma 10 cm-1, 201 x 201
         points over 11000 cm-1, so steps of 55 cm-1) 0.59 floors from all_features_on_grid,
         above the 0.13 measured here.
@@ -445,19 +484,20 @@ E. Pipeline
         wilson_rsp_evaluate (no top-level package uses an abbreviation).
         wilson_intensities keeps amplitudes/averaging.py (imported by this package and by wilson_experiment),
         utils/ and anharmonic_treatment/ (moves to wilson_system later: wilson_system/todo.txt S1).
-        What the move touches (checked 2026-10-19; 138 lines in 33 files on 2026-10-18, before this item was
-        written):
-            - 147 lines in 34 files under src name refac_rsp_eval (.py, .txt, .json; no tracked file outside src);
-              all imports are absolute. 26 of the files are in the package; outside it:
+        What the move touches (checked 2026-10-21; 147 lines in 34 files on 2026-10-19):
+            - 164 lines in 37 files under src name refac_rsp_eval (.py, .txt, .md; no tracked file outside src);
+              all imports are absolute. 29 of the files are in the package; outside it:
               wilson_main/workflow_abstractions.py (evaluate's docstring), wilson_analysis: render/plot_spectrum.py,
               analysis/pre_eval.py, tests/test_plot_spectrum.py; wilson_intensities/amplitudes/__init__.py;
               wilson_system: tests/test_system_data.py, todo.txt; data_for_tests/translated_terms/
               make_translated_terms.py (E18, see below)
-            - tests/test_hand_calculation.py:49 (line 52 before E18) finds data_for_tests by
+            - tests/test_hand_calculation.py:46 (line 52 before E18) finds data_for_tests by
               Path(__file__).parents[3]; one folder level less deep: parents[2]. A search-and-replace does not
               catch it.
             - since E18 (2026-10-18), outside the package: data_for_tests/translated_terms/make_translated_terms.py
-              names refac_rsp_eval/tests/stored_terms.py, test_imports.py and g7_survey.py in its docstring.
+              names refac_rsp_eval/tests/stored_terms.py, test_imports.py, tests/scripts/g7_survey.py and
+              tests/scripts/todo.txt in its docstring.
+            - the refac-status skill (.claude/skills, not in git) reads this file by its path
               stored_terms.py finds data_for_tests by SUITE_ROOT, so the move does not change that path.
               test_imports.py names the package folder in NEW_CODE ('wilson_intensities/refac_rsp_eval'): the
               move changes that entry
@@ -471,19 +511,21 @@ E. Pipeline
 
 F. Speed
 --------
-Speed test: tests/f2_speed.py on ACDM (the acetic acid dimer, 16 atoms, 42 modes; in git:
+Speed test: tests/scripts/f2_speed.py on ACDM (the acetic acid dimer, 16 atoms, 42 modes; in git:
 wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out).
 14 EVV terms, axes {'A': [1], 'B': [-1, 2]}, laser_pol (1, 1, 1), 'anharmonic'. The grid as in
 examples/quick_start.ipynb: window A (700, 3400), B (10, 3500), 700 x 700 points, gamma 4.7 cm-1, dynrange 500.
-    step                  time     note (run of 2026-10-18)
-    load                  4 s      once per molecule (not timed again)
-    build_contributions   3.1 s    17101 rows, 7595 zero; runs again for each polarization, states or axis choice
-    the rest              0.8 s    features 0.09 s, amplitude boxes 0.03 s, window 0.02 s, boxed_features_on_grid
-                                   0.61 s
+    step                  time     note (run of 2026-10-21)
+    load                  3.6 s    once per molecule (not timed again)
+    build_contributions   3.0 s    17101 rows, 7595 zero; runs again for each polarization, states or axis choice
+    the rest              0.7 s    features 0.02 s, amplitude boxes 0.06 s, window 0.09 s, boxed_features_on_grid
+                                   0.58 s (cut_tails=True)
     per spectrum          3.8 s    without load; one run
-History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (factors per index set on demand); 5.7 s
-after E10 (2026-10-14, f2_speed.py docstring; its parts, build_contributions 3.3 s and grid 1.5 s, add up to 4.8 s
-only); 3.8 s on 2026-10-18 (no speed change in the code since E10; the difference not investigated).
+With the default cut_tails=False the grid part is all_features_on_grid on the 1509 kept features: 14.3 s
+(2026-10-21), so about 17 s per spectrum.
+History, per spectrum (2026-10-12): 80 s (F2) -> 24 s (F1) -> 6.5 s (F3) -> 5.9 s (factors per index set on
+demand); 5.7 s after E10 (2026-10-14; its parts, build_contributions 3.3 s and grid 1.5 s, add up to 4.8 s only);
+3.8 s on 2026-10-18 and 2026-10-21 (no speed change in the code since E10; the difference not investigated).
 What a changed setting needs again (measured 2026-10-15, ACDM). build_contributions under cProfile: the loop over
 index sets about 90 % (892584 calls; inside it the averaged lookups 11 %, non-averaged 22 %, energy-difference
 denominators 23 %, 1/omega 5 %), location solves 4 %, the averaged einsum about 0 %.
@@ -595,8 +637,8 @@ checking side.
                                                                      VibExperiment raises (UnboundLocalError).
             ~/hyllseminar_12062026/hyllseminar_wilson_demo.ipynb     EVV, EVV + 2nd UV, 3 IR ("3D"), 2 CARS
             src/wilson_suite/fixtures.py                             EVV, EVV coincident, beta-alpha CARS
-        Script: tests/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak memory; --only for some
-        setups, --terms for every term). Making the terms again: make_translated_terms.py, 9.3 min of derive.
+        Script: tests/scripts/g7_survey.py (every setup 107 s from the stored terms, 527 MB peak memory; --only for
+        some setups, --terms for every term). Making the terms again: make_translated_terms.py, 9.3 min of derive.
         Survey 2026-10-15: derive -> the canonical axes -> B7 -> evaluation on formaldehyde (anharmonic, the
         experiment's laser_pol). The filter's sign patterns only relabel the axes and change the counts a little:
         one row per sweep. Patterns: the axes of each condition, e.g. (A ; A+B) = one condition on A, one on A + B.
@@ -658,7 +700,9 @@ H2  Make an abstraction on the second real use, not the first. No base classes, 
     orchestrator next to WilsonSimulation. Delete code instead of commenting it out.
     Followed since 2026-10-20: the property SpectralWindow.widths (marked UNUSED, with its old body line
     commented out) was deleted with the other unused window properties. The old DataOriginInfo class, commented
-    out in wilson_main/abstractions.py (96bcc63, B1), was deleted in a778784.
+    out in wilson_main/abstractions.py (96bcc63, B1), was deleted in a778784. 59a4149 (2026-10-20) deleted unused
+    helpers: SpectralFeature.scale and normalize_coeffs_to_max, ContributionTable.by_params, by_motif and
+    by_location, and the max_cm knob of amplitude_half_widths.
 H3  Units in the name (gamma_cm1, coords_cm), converted once at the boundary, never guessed from a number's size.
 H4  Don't store a value that can be derived from other fields; frozen dataclasses where possible.
     Not frozen yet: Box, SpectralFeature, SpectralWindow.
@@ -726,15 +770,23 @@ Built
     E5   Peak width from one source (2026-10-13): propagator_param, a number or a function (vd, freqs) -> cm-1.
          Was lineshape_parameter.
     E6a  The evaluator side of E6 (2026-10-14): inputs and outputs in the pipeline.py docstring; data out of the
-         evaluator; the box rule as an input; grid by make_grid (both edges); the magnitude-condition filter
+         evaluator; the box rule as an input; the grid with both edges (Box.grid_points and grid.make_mesh since
+         2026-10-20, before make_grid); the magnitude-condition filter
          dropped (apply_magn_cond_filter, its 5 tests and diag_margin deleted).
     E7   plot_spectrum, plot_rsp_func (wilson_analysis/render/plot_spectrum.py), 1D and 2D (2026-10-15):
          intensity / top on a log scale from 1 / dynrange to 1; 2D as MatplotlibRenderer (same plot on
          formaldehyde). Left out: RenderingInfo, EvaluationInfo, PlotConfig, the w2 > w1 mask, saving.
-         Tests: wilson_analysis/tests/test_plot_spectrum.py. Example: tests/example_plot_spectrum.py.
+         Box outlines: plot_feature_boxes, plot_rsp_func(boxes=True) (2026-10-20).
+         Tests: wilson_analysis/tests/test_plot_spectrum.py. Example: tests/scripts/example_plot_spectrum.py.
     E10  Code (2026-10-14): amplitude_half_widths, intensity_half_widths, SpectralWindow.from_features,
          boxed_features_on_grid on each feature's own box, spectrum_on_grid(box_rule=). Tests in test_evaluate.py and
-         test_features.py.
+         test_features.py. cut_tails (2026-10-20, be20efb): the cut only with cut_tails=True (see Decisions).
+    -    One line shape (2026-10-20, 59a4149 and 48182f2): lineshape.py (lorentzian_factor, lorentzian_distance;
+         factor, distance, peak, tail), used by the grid, get_intensity, amplitude_in_window and the box rules.
+         Peak widths per condition (SpectralFeature.peak_widths, be20efb). Tests: test_lineshape.py.
+    -    Tests and scripts sorted (2026-10-21): the scripts and these two notes in tests/scripts/;
+         make_evv_reference.py stays in tests/ (the tests import its loaders). tests/README.md lists the test and
+         support files, tests/scripts/README.md the scripts.
     E11  One resonance axis set per evaluation (2026-10-16, see Decisions). pipeline.check_one_axis_set:
          compute_features raises before any row is computed and lists the term ids per set; before, such a mix
          failed only on the grid ("Expected SpectralFeature with axes ..."). pipeline.terms_by_axis_set: the term
@@ -785,8 +837,8 @@ Built
     F2   Speed test on ACDM (2026-10-12): 80 s per spectrum, of which averaging 47 s, deepcopy 16 s.
     F3   Denominators split once per term (2026-10-12; CompiledTerm.freq_vibenedenom, freq_pert_wf_diff).
          ACDM build_contributions 22 s -> 3.9 s.
-    -    Factors per index set on demand (2026-10-12): FeatureResult.factors_by_index_set(row), 0.27 ms per row on ACDM (keeping all: 357 MB).
-         build_contributions 3.9 s -> 3.3 s.
+    -    Factors per index set on demand (2026-10-12): FeatureResult.factors_by_index_set(row), 0.27 ms per row on
+         ACDM (keeping all: 357 MB). build_contributions 3.9 s -> 3.3 s.
     -    States by choice, and MolSystemData.load (2026-10-12), see Decisions.
     D3   ParameterSet (plan.py) holds exactly the given labels (2026-10-14): no hidden 'zero' entry, no '' -> 'zero'
          remap, no order (__lt__ and SpectralFeature.sort_by_params deleted). The old code's two copies
@@ -809,6 +861,10 @@ Checked: the numbers are right
          the {A, B, C} terms of 3 IR (3D, 2 terms, 18 rows). The {A, B} terms of 3 IR are the 14 EVV terms (C2,
          G1). Checked to fail for w swapped with E(1) - E(0), harmonic locations, -C, a and b swapped.
          Limit: every field along x, so a property in the wrong slot does not show (A15, G3).
+    -    Grid reference (2026-10-20, a005c10, test_grid_reference.py): 3 real-data spectra on formaldehyde (evv,
+         evv_width, three_ir) saved in grid_reference.npz and compared point by point. They cover both state sets,
+         a number and a function as the width, both cut_tails settings, 2 and 3 axes. Shows that the numbers did
+         not change, not that they are right.
     A16  test_integration.py, the two term 8 tests (2026-10-14): rel 1e-12; einsum abs=0; rotation abs=1e-18 (the
          evaluator's zero_tol: 144 of 216 values are rounding noise below 2.4e-19).
     G10  1D-4D (2026-10-16, test_dimensions.py). Mock data (MolSystemData.from_datadict: 2 modes, states up to 4
@@ -835,7 +891,8 @@ Fixed
     -    Cleanup (2026-10-13): commented-out code removed (H2); module docstrings of evaluate.py and plan.py.
     -    Top functions (2026-10-13): keyword-only settings; the recipe made once per (rank, laser_pol);
          compute_features_from_terms and rps_evaluation.py deleted.
-    -    exclude_modes (2026-10-13): left out of the evaluation (see Decisions); FeatureResult keeps it for factors_by_index_set().
+    -    exclude_modes (2026-10-13): left out of the evaluation (see Decisions); FeatureResult keeps it for
+         factors_by_index_set().
     -    Data out of the evaluator (2026-10-14): load_molsys_data and PropsCollection.build_request_dict deleted.
          No module of refac_rsp_eval imports DataOriginInfo or wilson_data_obtainer.
 Dropped

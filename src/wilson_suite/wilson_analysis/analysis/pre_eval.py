@@ -1,7 +1,7 @@
 """
 keeping as a source of ideas, notes??
-The old modules named below (e.g. amplitudes.vibene_differences) no longer exist: refac_rsp_eval/todo.txt E9
-deleted them; d93cc7b is the last commit with them.
+The old modules named below (e.g. amplitudes.vibene_differences) no longer exist:
+refac_rsp_eval/tests/scripts/todo.txt E9 deleted them; d93cc7b is the last commit with them.
 """
 # import wilson_suite.wilson_intensities.amplitudes.vibene_differences
 # from ...wilson_intensities.amplitudes import func_evaluation

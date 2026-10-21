@@ -102,7 +102,7 @@ D3  examples/terms_inspection.ipynb, cell 1 imported some_reprs (no old code oth
     review): imports builders; its code runs (14 EVV terms).
 Options:
     a  rewrite steps 3-4 with the new calls: MolSystemData.load, evaluate_response_terms, spectrum_on_grid,
-       plot_rsp_func (the flow of tests/example_plot_spectrum.py)
+       plot_rsp_func (the flow of tests/scripts/example_plot_spectrum.py)
     b  keep the text, with a note: does not run until the new caller (E6b)
     c  leave both for E6b; the merge to main then carries a quick start that does not run
 Step 2 (some_reprs -> builders) is one line in each file, with any option: done 2026-10-18 in README.md and
@@ -111,18 +111,18 @@ quick_start.ipynb. Both now fail first at step 3 (the old SpectralWindow), not a
 
 E. wilson_main code that runs the old pipeline or reads its result (change carefully)
 -------------------------------------------------------------------------------------
-workflow_abstractions.py, class WilsonSimulation (line numbers of 2026-10-17, after E1):
+workflow_abstractions.py, class WilsonSimulation (line numbers of 2026-10-21):
 E1  evaluate (lines 352-365). Before E1 it imported evaluation_wf when called (not at import) and ran the old
     EvaluationWorkflow; it wrote self._workflow, self.diagn['artifacts'], self.spec_eval_setup.grid, self.spec.
     After stage 5 a call would have raised ModuleNotFoundError. Callers: B1, B2, D1, D2.
     Done 2026-10-16 (todo.txt E9): raises NotImplementedError until E6b. The message named the library calls
     (MolSystemData.load, evaluate_response_terms, spectrum_on_grid; draw_spectrum until the rename, E15) and their
     modules; since 2650eb8 (2026-10-18) only the docstring points to them (pipeline.py). Now lines 352-359.
-E2  evaluate_with_default_setup_fill (lines 367-373): calls attempt_setup_fill_with_defaults (its body: pass),
+E2  evaluate_with_default_setup_fill (lines 361-367): calls attempt_setup_fill_with_defaults (its body: pass),
     then evaluate. No caller.
-E3  evaluateSpectrum (lines 375-411): takes an evaluator function; no old import. Its docstring: "unused now ...
+E3  evaluateSpectrum (lines 369-405): takes an evaluator function; no old import. Its docstring: "unused now ...
     should be removed?". Callers: only C1, C3, C4, with evaluator functions that no longer exist.
-E4  render (lines 413-446), render_spectrum (lines 448-470): read self.spec and spec_eval_setup.grid, which only
+E4  render (lines 407-440), render_spectrum (lines 442-464): read self.spec and spec_eval_setup.grid, which only
     evaluate (E1) wrote; since stage 5 nothing fills them. The old renderer: E7b [outside].
 spectrum_abstractions.py:
 E5  EvaluationInfo fields that only the old code reads (no reader left after stage 5): spectral_window (A1),

@@ -1,8 +1,8 @@
 wilson_system — TODO
 wilson_system holds the data of one molecule: MolSystemData and its parts (system_data.py, tests/test_system_data.py).
 The anharmonic state calculation (VPT2) is to move here from wilson_intensities/anharmonic_treatment (S).
-The evaluator refactor has its own list, wilson_intensities/refac_rsp_eval/todo.txt. Its items are named here with
-"refac", e.g. refac E6b.
+The evaluator refactor has its own list, wilson_intensities/refac_rsp_eval/tests/scripts/todo.txt. Its items are
+named here with "refac", e.g. refac E6b.
 
 [wilson_main] = a change in wilson_main (the old workflow).
 [outside]     = a change in CQCParse (the parser that wilson_data_obtainer calls; a separate repo).
@@ -39,7 +39,7 @@ Order of work
                             needed)
     open                    S7, S8
 
-Related items in refac_rsp_eval/todo.txt:
+Related items in refac_rsp_eval/tests/scripts/todo.txt:
     refac E4    the README; it gets D5's table
     refac E6b   the caller (WilsonSimulation) moves to the new code. Then pipeline.prop_names replaces find_props,
                 and wilson_main's MolecularProperty has no job left (D4)

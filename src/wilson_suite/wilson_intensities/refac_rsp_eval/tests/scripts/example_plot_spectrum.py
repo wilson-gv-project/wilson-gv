@@ -10,7 +10,7 @@ test. The 14 EVV terms, axes A = w1, B = -w1 + w2, gamma 4.7 cm-1, boxes and plo
        (about 20 s: loading the data about 4 s, the rows and the grid about 14 s; the loading warns about
        anharmonic states below 0)
 
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.example_plot_spectrum [out_dir]
+    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.example_plot_spectrum [out_dir]
 out_dir: where the png files go; default plot_spectrum_figures (made if missing).
 """
 import sys
@@ -25,8 +25,13 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-from wilson_suite.wilson_analysis.render.plot_spectrum import plot_rsp_func, plot_spectrum
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
+from wilson_suite.wilson_analysis.render.plot_spectrum import (
+    plot_rsp_func,
+    plot_spectrum,
+)
+from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    amplitude_half_widths,
+)
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
@@ -37,7 +42,9 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed import load_acdm
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed import (
+    load_acdm,
+)
 from wilson_suite.wilson_system.system_data import MolSystemData
 
 DYNRANGE = 500.         # the boxes (amplitude_half_widths) and the plot use the same
@@ -50,7 +57,7 @@ def evaluate(terms, molsys: MolSystemData, states: str) -> FeatureResult:
     return evaluate_response_terms(terms, molsys_data=molsys, states_choice=states, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
 
 
-def save(fig, path: Path, dpi: int = 110):
+def save(fig, path: Path, dpi: int = 210):
     fig.savefig(path, dpi=dpi, bbox_inches='tight')
     plt.close(fig)
     print(f'  {path}')
@@ -94,7 +101,7 @@ def main(out: Path):
     for ax, (name, spec) in zip(axes, specs.items()):
         plot_rsp_func(spec, dynrange=DYNRANGE, reference_max=reference_max, ax=ax, axis_labels=LABELS)
         ax.set_title(f'formaldehyde, {name} states')
-    save(fig, out / '3_formaldehyde_harmonic_vs_anharmonic.png', dpi=100)
+    save(fig, out / '3_formaldehyde_harmonic_vs_anharmonic.png', dpi=310)
 
     # 4. ACDM, the quick_start window
     t0 = time.perf_counter()

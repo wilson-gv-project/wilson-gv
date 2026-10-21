@@ -12,7 +12,7 @@ Steps:
      Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1.
 
 A script, not a test: it runs for minutes.
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed
+    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed
 """
 import cProfile
 import pstats

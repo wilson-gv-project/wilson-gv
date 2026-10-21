@@ -22,9 +22,9 @@ Per setup:
     evaluation  compute_features on formaldehyde (anharmonic states, gamma 10 cm-1, the experiment's laser_pol),
                 unless something blocks it: not one point, more than one rank, props, more than 3 quanta, size
 
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey                  every setup
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey --only CARS "3 IR (nb)"
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.g7_survey --terms terms.txt
+    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.g7_survey                  every setup
+    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.g7_survey --only CARS "3 IR (nb)"
+    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.g7_survey --terms terms.txt
 --only: the setups whose name holds one of the words. --terms: also write every unique term (in axes, to_str) to
 that file.
 """

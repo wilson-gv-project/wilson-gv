@@ -1,8 +1,5 @@
 """
 features.py — contribution rows, spectral features and windows. Runs with zero molecular data.
-
-Tests marked xfail(strict=True) pin known bugs: they start passing (and so fail the run) once the bug is fixed,
-which is the reminder to drop the marker.
 """
 
 from dataclasses import replace

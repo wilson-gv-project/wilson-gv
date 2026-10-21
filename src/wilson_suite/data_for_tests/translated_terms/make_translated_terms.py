@@ -18,7 +18,7 @@ Words used below:
                     e.g. A = w1, B = -w1 + w2.
     translate       rewrite each pf from pulse ids to axis labels. With A = w1 and B = -w1 + w2:
                     pf [-1] becomes ['-A'], and pf [-1, 2] becomes ['B']. The new evaluator takes only translated terms.
-    E13, G7         items in wilson_intensities/refac_rsp_eval/todo.txt
+    E13, G7         items in wilson_intensities/refac_rsp_eval/tests/scripts/todo.txt
 
 What the script does for each G7 setup (make_g7_file):
     1. Build the experiment with wilson_experiment.
@@ -36,7 +36,7 @@ Files:
                             laser_pol (1, 1, 1). These are the settings of the old EVV integration tests
                             (refac_rsp_eval/tests/make_evv_reference.py).
     g7/NN_<name>.json.gz    one file per G7 setup. NN is the setup's number in G7_SETUPS. G7 is a survey of other
-                            experiments: refac_rsp_eval/tests/g7_survey.py evaluates the terms of these files.
+                            experiments: refac_rsp_eval/tests/scripts/g7_survey.py evaluates the terms of these files.
     index.json              one entry per setup, in order: its file and its number of terms. A setup that the
                             experiment or derive cannot take has no file. Its entry holds the error instead.
 

@@ -2,10 +2,10 @@
 The box sizes (a box rule and its knobs: features.amplitude_half_widths or intensity_half_widths, the
 box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists of settings:
     SETTINGS  tune the knobs of amplitude_half_widths
-                  python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes
+                  python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.e10_boxes
     RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity unscaled,
               scaled with minimum_box_padding 0 and 10 cm-1 (the default)
-                  python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes rules
+                  python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.e10_boxes rules
 Each takes a few minutes, mostly all_features_on_grid on ACDM.
 
 Per case, all_features_on_grid once (the reference: slow, about 70 s on ACDM in the quick_start window), then
@@ -23,7 +23,7 @@ gamma 4.7 cm-1.
 
 A setting: rule (the box rule; amplitude_half_widths if not given) and its knobs, dynrange required. To tune: edit
 SETTINGS or RULES and run as above, or, from a notebook, with your own result and window:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.tests.e10_boxes import reference, score
+    from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.e10_boxes import reference, score
     ref = reference(result, window, dim_sizes)                                  # once: all_features_on_grid
     score(result, window, dim_sizes, ref, dynrange=500., eps=0.3)               # as often as wanted
     score(result, window, dim_sizes, ref, intensity_half_widths, dynrange=500.) # the intensity rule
@@ -50,7 +50,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.f2_speed import load_acdm
+from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed import load_acdm
 from wilson_suite.wilson_system.system_data import MolSystemData
 
 GAMMA_CM = 4.7
