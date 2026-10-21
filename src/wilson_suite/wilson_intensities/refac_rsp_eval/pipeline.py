@@ -9,8 +9,7 @@ Two calls, from terms already translated to axes and the data:
 A caller needs only these two calls. The inputs are plain values, the terms and a few small types (below).
 evaluate_response_terms: compile_terms -> make_polarization_linear_comb -> compute_features.
 The evaluator neither derives nor translates terms: no file of it imports wilson_experiment, derive.derive or
-term_var_translate (tests/test_imports.py). Translated terms in files, with their settings: data_for_tests/translated_terms
-(tests/stored_terms.py reads them).
+term_var_translate.
 One call is for one set of resonance axes, e.g. {A, B} (check_one_axis_set). Terms on more than one set, e.g. the
 3 IR setup ({A, B} and {A, B, C}): terms_by_axis_set splits them, and each set gets its own call.
 
@@ -38,7 +37,7 @@ Inputs
     dim_sizes         grid points per axis, both window edges included, e.g. {'A': 501, 'B': 201}
     box_rule          features.BoxRule: (window, features) -> one box half-width per feature, cm-1. Knobs by
                       functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
-                      dynamic range (max / floor), required. intensity_half_widths: the old code's rule.
+                      dynamic range (max / floor), required. intensity_half_widths: by intensity, cuts more.
     cut_tails         False (default): the boxes choose the features, each kept one on the whole grid.
                       True: each feature on its own box only, faster, its tail beyond cut off.
 
@@ -49,7 +48,8 @@ Outputs
                         zero            the (term_id, params) pairs with coeff 0: no row
                         features        one SpectralFeature per (motif, location), made from the table
                         states_choice, exclude_modes, propagator_param: as passed
-                        leaves(row)     the summed index sets behind one row, computed again on demand
+                        factors_by_index_set(row)   the summed index sets behind one row, each with its
+                                        factors, computed again on demand
                         cancelling(rel_tol)   the features whose rows (nearly) cancel
     EvalRspResult     the spectrum on the grid:
                         axis_points     the points along each axis, cm-1: the grid is every combination of them
@@ -68,15 +68,15 @@ Names in the grid part, one per kind of data (the types are in grid.py), e.g. A 
     cut               where a feature's box sits in the grid: one slice per axis (grid.box_slices);
                       cut_points: the axis_points inside the cut
     amplitude         the complex amplitude, au, one value per grid point; intensity = abs(amplitude)**2
-    _cm, _au          the unit, where both occur: evaluate.py converts cm-1 to Eh (todo.txt H3)
+    _cm, _au          the unit, where both occur: evaluate.py converts cm-1 to Eh
 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
   │    zero coeff -> `zero`, no row
   │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states[states_choice]
-  │    always one point: compile_terms checked the motif (B7). A term without conditions: the point without
-  │    axes, a flat background on every grid point (E12)
+  │    always one point: compile_terms checked the motif. A term without conditions: the point without
+  │    axes, a flat background on every grid point
   v
 ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evaluate.build_contributions
   │ 4. group by (motif, location), add the coeffs
@@ -155,7 +155,7 @@ class FeatureResult:
     zero: list[tuple[int, ParameterSet]]              # pairs with coeff == 0
     propagator_param: PropagatorParam | None = None   # cm-1: a number or a function (features.PropagatorParam)
     # What the rows were computed from (compute_features fills them; None in a result made by hand).
-    # leaves() needs the first four, and sums over the modes left after exclude_modes; spectrum_on_grid needs
+    # factors_by_index_set() needs the first four, and sums over the modes left after exclude_modes; spectrum_on_grid needs
     # the states (FeatureResult.states). References only: nothing is copied. compare=False: == leaves them out.
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
@@ -181,26 +181,26 @@ class FeatureResult:
                              'keeps them')
         return self.molsys.states[self.states_choice]
 
-    def leaves(self, row: ContributionRow) -> dict:
+    def factors_by_index_set(self, row: ContributionRow) -> dict:
         """
-        The summed index sets behind one row, each with its factors: feature -> rows -> leaves.
+        The summed index sets behind one row, each with its factors.
             e.g. a row of a term with resonance labels a, b and summation label c, at a = 0, b = 1, 42 modes:
-                 42 leaves, {ParameterSet({'a': 0, 'b': 1, 'c': 0}): {'NON_AVRG': ..., 'AVRG': ...,
+                 42 index sets, {ParameterSet({'a': 0, 'b': 1, 'c': 0}): {'NON_AVRG': ..., 'AVRG': ...,
                  'VIBDIFF_TERMS': ..., 'VIBENE_DENOM': ...}, ...,  ParameterSet({'a': 0, 'b': 1, 'c': 41}): {...}}
             An index set whose average or non-averaged part is 0 holds only the factors made before the stop,
             e.g. {'AVRG': 0.}.
         Computed again from row.term_id and row.params, with the terms, data, polarization and excluded modes of
-        this result, so the leaves add up to row.coeff. About 0.3 ms per row on ACDM (42 modes); build_contributions
-        does not keep them, since every row's leaves would take 357 MB there.
+        this result, so the index sets add up to row.coeff. build_contributions does not keep them: each row would
+        keep one dict per summed index set.
         """
         if (self.compiled is None or self.molsys is None or self.polarization_linear_comb is None
                 or self.states_choice is None):
             raise ValueError('this FeatureResult has no terms or data (made by hand?): compute_features keeps them, '
-                             'and leaves need them')
-        _, leaves = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
-                                                self.polarization_linear_comb, states_choice=self.states_choice,
-                                                modes=included_modes(self.molsys, self.exclude_modes))
-        return leaves # type: ignore
+                             'and factors_by_index_set needs them')
+        _, factors = evaluate_term_coeff_sumover(self.compiled[row.term_id], row.params.to_dict(), self.molsys,
+                                                 self.polarization_linear_comb, states_choice=self.states_choice,
+                                                 modes=included_modes(self.molsys, self.exclude_modes))
+        return factors # type: ignore
 
     def cancelling(self, rel_tol: float) -> list[SpectralFeature]:
         """
@@ -229,7 +229,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     exclude_modes: modes left out of the evaluation, e.g. (5,): no peak and no summed value uses them
     (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
-    The result keeps the inputs, for FeatureResult.leaves and for the states (FeatureResult.states) on the grid.
+    The result keeps the inputs, for FeatureResult.factors_by_index_set and for the states (FeatureResult.states) on the grid.
     raises ValueError if the terms resonate on more than one set of axes (check_one_axis_set).
     """
     check_one_axis_set(compiled)
@@ -251,12 +251,13 @@ def _term_ids_by_axis_set(motifs: Iterable[ResonanceMotif]) -> dict[tuple[str, .
 
 def check_one_axis_set(compiled: Sequence['CompiledTerm']) -> None:
     """
-    raises ValueError if the terms resonate on more than one set of axes (todo.txt E11). One evaluation, and its
+    raises ValueError if the terms resonate on more than one set of axes. One evaluation, and its
     grid, is for one set, e.g. {A, B}. The message lists the term ids per set, e.g. the 3 IR setup:
         {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}
     {A} and {B} are different sets: a term on A only is a stripe along B in an (A, B) plane.
-    Terms without conditions (key (), E12) do not count here.
-    Without this check such a mix passes compiling (B7 checks each term on its own axes) and fails only on the grid.
+    Terms without conditions (key ()) do not count here.
+    Without this check such a mix passes compiling (compile_terms checks each term on its own axes) and fails only
+    on the grid.
     """
     term_ids = {axis_set: ids for axis_set, ids in _term_ids_by_axis_set(t.cmp_resmotf for t in compiled).items()
                 if axis_set}
@@ -269,7 +270,7 @@ def terms_by_axis_set(terms: Sequence['VibPerturbedTerm']) -> dict[tuple[str, ..
     """
     The term ids (index in `terms`) grouped by the axes their resonance conditions use, e.g.
     the 3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: key ().
-    They are a flat background, the same on any grid (E12), and check_one_axis_set does not count them, so they
+    They are a flat background, the same on any grid, and check_one_axis_set does not count them, so they
     can join the call of any set, e.g. IR absorption: {(): [0, 1, 2], ('A',): [3, 4]}, all 5 terms in one call.
     terms: translated to axes, as for evaluate_response_terms.
     For the caller: one evaluate_response_terms call per set, e.g.
@@ -293,7 +294,7 @@ def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
 def averaging_rank(terms: Sequence['VibPerturbedTerm']) -> int:
     """
     Rank of the orientation average: the number of Cartesian slots (op.o) in a term's averaged part.
-        e.g. polhess[0,3] * dipgrad[1] * dipgrad[2] -> slots 0, 1, 2, 3 -> rank 4 (all 14 EVV terms)
+        e.g. polhess[0,3] * dipgrad[1] * dipgrad[2] -> slots 0, 1, 2, 3 -> rank 4
 
     compute_features uses one recipe for every term, so all terms must have the same slots.
     The recipe puts slot i at position i, so the slots must be 0 .. rank-1, each once.
@@ -328,8 +329,6 @@ def make_polarization_linear_comb(terms: Sequence['VibPerturbedTerm'],
 
     The recipe depends only on the rank and laser_pol: it is made once per (rank, laser_pol) and kept
     (_averaging_recipe). Each call returns its own copy, so changing one copy changes no other result.
-    Measured 2026-10-13: making a recipe takes 0.13 ms at rank 4, about 5 ms at ranks 5 and 6;
-    averaging_rank (run on every call) 1 ms for the 14 EVV terms.
     """
     rank = averaging_rank(terms)
     if not 2 <= rank <= 6:
@@ -365,7 +364,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     The spectrum on a grid: spectrum_on_grid(result, window, dim_sizes, box_rule=...), as often as needed; the rows
     stay.
 
-    terms             translated to axes, e.g. stored_terms.load_setup('evv').terms (tests/stored_terms.py)
+    terms             translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
     molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
                       loaded once, for any number of runs
     states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
@@ -398,8 +397,7 @@ class EvalRspResult:
                      its own box only with cut_tails=True in spectrum_on_grid).
                      full_features: inside the window; contrib_features: outside, with a box that reaches in.
     mesh             (property) every grid point, one full array per axis (grid.Mesh, grid.make_mesh),
-                     mesh['A'][i, j] = axis_points['A'][i]: what the old EvaluatedSpectrum.axes held and the
-                     renderer reads
+                     mesh['A'][i, j] = axis_points['A'][i]: what the renderer reads
     """
     feature_result: FeatureResult
     axis_points: AxisPoints
@@ -434,21 +432,21 @@ def spectrum_on_grid(feature_result: FeatureResult,
         again = spectrum_on_grid(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
         wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
-    new width, on first use (features_from_rows: 0.02 s for 3524 features on ACDM, F2).
+    new width, on first use (features_from_rows).
 
     window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
     dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}
     box_rule   the box half-width of each feature: a function (window, features) -> cm-1, one per feature
                (features.BoxRule). Two exist in features.py; functools.partial gives them their knobs:
                    partial(amplitude_half_widths, dynrange=500.)   by amplitude: the cut stays below eps * the
-                                                                   plot's floor (E10)
-                   partial(intensity_half_widths, dynrange=500.)   by intensity, the old code's rule: cuts more
+                                                                   plot's floor
+                   partial(intensity_half_widths, dynrange=500.)   by intensity: cuts more
                dynrange: the plot's dynamic range (max / floor). Required by both: the plot decides it.
                Any other function works too, e.g. lambda window, features: [20.] * len(features).
     cut_tails  False (default): each kept feature on the whole grid, so only the dropped features are
                missing; the run time grows with (kept features) x (grid points). True: each feature only
-               on its box, its tail beyond cut off; faster, e.g. ACDM, 1509 kept features on 700 x 700
-               points: 0.5 s instead of 14 s.
+               on its box, its tail beyond cut off; the run time grows with the number of grid points in all
+               boxes.
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
     features = feature_result.features

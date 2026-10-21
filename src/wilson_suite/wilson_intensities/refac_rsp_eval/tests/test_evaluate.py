@@ -578,7 +578,7 @@ def test_avrg_tensor_einsum_without_polarization_entries_is_zero():
 
 def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
     """a rank-2 key for a rank-4 expression would fill a whole 3 x 3 block of W without an error"""
-    with pytest.raises(ValueError, match=r'\(0, 0\) has 2 entries, the averaged part has 4 slots'):
+    with pytest.raises(ValueError, match=r'\(0, 0\) has length 2, the rank is 4'):
         calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {(0, 0): 1.})
 
 
@@ -628,12 +628,12 @@ def test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes(molsys):
     otf_molsys = with_evv_props(molsys)
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
-                                                states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
+                                                 states_choice='harmonic')
 
     by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, tensor,
                                            states_choice='harmonic')[0] for c in (0, 1))
-    assert set(leaves) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
+    assert set(factors) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
     assert total == pytest.approx(by_hand) != 0.
 
 
@@ -655,10 +655,10 @@ def test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given(molsys):
     """No polarization: the average must come from the given tensor, not from a new einsum."""
     given = AvrgTensor(('a', 'b', 'c'), np.full((2, 2, 2), 7.))
 
-    _, leaves = evaluate_term_coeff_sumover(term8_like(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
-                                            states_choice='harmonic')
+    _, factors = evaluate_term_coeff_sumover(term8_like(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
+                                             states_choice='harmonic')
 
-    assert [contribs['AVRG'] for contribs in leaves.values()] == [7., 7.]
+    assert [contribs['AVRG'] for contribs in factors.values()] == [7., 7.]
 
 
 def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeypatch):
@@ -705,13 +705,14 @@ def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zer
     assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
 
-def test_build_contributions_keeps_no_leaves(molsys_a1_zero, monkeypatch):
-    """The rows do not carry leaves; FeatureResult.leaves computes them again when asked (test_pipeline.py)."""
+def test_build_contributions_keeps_no_factors_by_index_set(molsys_a1_zero, monkeypatch):
+    """The rows do not carry their factors per index set; FeatureResult.factors_by_index_set computes them again
+    when asked (test_pipeline.py)."""
     asked = []
     sumover = evaluate_mod.evaluate_term_coeff_sumover
 
     def recording(*args, **kwargs):
-        asked.append(kwargs['keep_leaves'])
+        asked.append(kwargs['keep_factors'])
         return sumover(*args, **kwargs)
     monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', recording)
 
@@ -758,31 +759,31 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_avrg, 
 
 ## evaluate_term_coeffs: sum over whichever of a, b, c the caller left unfixed ---------------
 
-@pytest.mark.parametrize('fixed, expected_leaves, expected_total', [
+@pytest.mark.parametrize('fixed, expected_index_sets, expected_total', [
     ({'a': 1, 'b': 0, 'c': 1}, {(1, 0, 1)},                                 101),  # nothing missing
     ({'a': 1, 'b': 0},         {(1, 0, 0), (1, 0, 1)},                       201),  # sum over c
     ({'a': 1},                 {(1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)}, 422),  # sum over b and c
 ])
 def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
-                                                                    expected_leaves, expected_total,
+                                                                    expected_index_sets, expected_total,
                                                                     molsys, monkeypatch):
     """
     evaluate_term_coeffs takes a term with mode labels (a, b, c) and a list of caller-supplied
     PARTIAL assignments ("relevant indices", e.g. {'a': 1}). For each partial assignment it fills
     every label the caller did not fix with each mode 0..n_modes-1, calls
-    evaluate_single_index_dict once per complete assignment (a "leaf"), and returns
+    evaluate_single_index_dict once per complete assignment (a full index set), and returns
 
-        results[ParameterSet(partial)] = (sum of leaf values, {ParameterSet(leaf): contribs})
+        results[ParameterSet(partial)] = (sum of the values, {ParameterSet(full index set): contribs})
 
     Which labels get summed is decided by what is missing from the partial dict. The term's
     idx_nonsumm labels must all be fixed (see test_evaluate_term_coeffs_resonance_labels_must_be_fixed);
     here idx_nonsumm is just ('a',), so b and c may be left out.
 
     This test checks the enumeration alone: evaluate_full_index_dict is stubbed to return
-    100a + 10b + c, so each leaf value spells out its own assignment and the expected totals
+    100a + 10b + c, so each index set's value spells out its own assignment and the expected totals
     can be added by hand, e.g. {'a': 1} -> 100 + 101 + 110 + 111 = 422.
     """
-    # Stand-in for the per-leaf evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
+    # Stand-in for the per-index-set evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict',
                         lambda term, idx, *_, **__: (100 * idx['a'] + 10 * idx['b'] + idx['c'], {}))
     # the stub term has no averaged props, so the avrg tensor is stubbed out too
@@ -795,11 +796,11 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
         getGeneralPolarizationAveragingExpression,
     )
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
-    total, leaves = evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
-                                                states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
+                                                 states_choice='harmonic')
 
     assert total == expected_total
-    assert {tuple(leaf[k] for k in 'abc') for leaf in leaves} == expected_leaves
+    assert {tuple(index_set[k] for k in 'abc') for index_set in factors} == expected_index_sets
 
 
 @pytest.mark.parametrize('fixed, not_fixed', [
@@ -824,26 +825,27 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     """
     Same summation, now with the real evaluate_single_index_dict and the fixture's toy term
     (0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a). Fix a=0 and let b, c run
-    over the two modes -> four leaves.
+    over the two modes -> four index sets.
 
-    The value of a single leaf is already covered by test_evaluate_single_index_dict_*; here the
-    check is that evaluate_term_coeffs passes leaves through faithfully: the total equals the sum
-    of evaluating each leaf assignment independently (nothing dropped, double-counted or
-    rescaled), and the contribs stored per leaf are exactly what that call returns.
+    The value of a single index set is already covered by test_evaluate_single_index_dict_*; here the
+    check is that evaluate_term_coeffs passes the factors per index set through faithfully: the total equals the sum
+    of evaluating each index set independently (nothing dropped, double-counted or
+    rescaled), and the contribs stored per index set are exactly what that call returns.
 
-    Leaves are keyed by ParameterSet; leaf.to_dict() is the plain (a, b, c) dict needed to re-evaluate a leaf.
+    The index sets are ParameterSets; index_set.to_dict() is the plain (a, b, c) dict needed to evaluate one again.
     """
     term, avrg = term_and_avrg
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
-                                                states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
+                                                 states_choice='harmonic')
 
-    per_leaf = {leaf: evaluate_full_index_dict(term, leaf.to_dict(), molsys_data=molsys, avrg_tensor=avrg, zero_tol=1e-18,
-                                               states_choice='harmonic')
-                for leaf in leaves}
-    assert len(leaves) == 4             # b, c in {0, 1}
-    assert total == pytest.approx(sum(value for value, _ in per_leaf.values()))
-    assert leaves == {leaf: contribs for leaf, (_, contribs) in per_leaf.items()}
+    per_index_set = {
+        index_set: evaluate_full_index_dict(term, index_set.to_dict(), molsys_data=molsys, avrg_tensor=avrg,
+                                            zero_tol=1e-18, states_choice='harmonic')
+        for index_set in factors}
+    assert len(factors) == 4             # b, c in {0, 1}
+    assert total == pytest.approx(sum(value for value, _ in per_index_set.values()))
+    assert factors == {index_set: contribs for index_set, (_, contribs) in per_index_set.items()}
 
 
 def test_evaluate_term_coeffs_hand_computed_total(term_and_avrg, molsys):
@@ -875,15 +877,15 @@ def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_
     props = MolPropsCollection([*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})])
     molsys = replace(molsys, mol_props=props)
 
-    given_total, given_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                            states_choice='harmonic')
-    recipe_total, recipe_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
-                                                              polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
-                                                              states_choice='harmonic')
+    given_total, given_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
+                                                             states_choice='harmonic')
+    recipe_total, recipe_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys,
+                                                               polarization_linear_comb={(0, 0): 1., (1, 1): 2.},
+                                                               states_choice='harmonic')
 
     assert recipe_total == pytest.approx(given_total)
-    assert set(recipe_leaves) == set(given_leaves)
-    assert all(recipe_leaves[leaf]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for leaf in recipe_leaves)
+    assert set(recipe_factors) == set(given_factors)
+    assert all(recipe_factors[index_set]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for index_set in recipe_factors)
 
 
 def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
@@ -892,43 +894,43 @@ def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
 
 
 def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
-    """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 leaves."""
+    """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 index sets."""
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
     term, avrg = term_and_avrg
     three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
-                                                states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
+                                                 states_choice='harmonic')
 
     assert total == 9.
-    assert {(leaf['b'], leaf['c']) for leaf in leaves} == {(b, c) for b in range(3) for c in range(3)}
+    assert {(index_set['b'], index_set['c']) for index_set in factors} == {(b, c) for b in range(3) for c in range(3)}
 
 
-def test_evaluate_term_coeffs_zero_avrg_leaves_are_kept(molsys):
+def test_evaluate_term_coeffs_zero_avrg_index_sets_are_kept(molsys):
     """
-    <polgrad>[1] = 0 -> every leaf with a=1 stops right after AVRG. The leaves are still recorded,
+    <polgrad>[1] = 0 -> every index set with a=1 stops right after AVRG. The index sets are still recorded,
     with only the AVRG entry. The states a=1 would need ('1,1' is missing) are never looked up.
     """
-    total, leaves = evaluate_term_coeff_sumover(toy_term(), {'a': 1}, molsys,
-                                                avrg_tensor=AvrgTensor(('a',), np.array([10., 0.])),
-                                                states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(toy_term(), {'a': 1}, molsys,
+                                                 avrg_tensor=AvrgTensor(('a',), np.array([10., 0.])),
+                                                 states_choice='harmonic')
 
     assert total == 0.
-    assert len(leaves) == 4
-    assert all(contribs == {'AVRG': 0.} for contribs in leaves.values())
+    assert len(factors) == 4
+    assert all(contribs == {'AVRG': 0.} for contribs in factors.values())
 
 
-def test_evaluate_term_coeffs_without_leaves_gives_the_same_total(term_and_avrg, molsys):
-    """keep_leaves=False (build_contributions): no leaves, the same total to the last bit"""
+def test_evaluate_term_coeffs_without_factors_gives_the_same_total(term_and_avrg, molsys):
+    """keep_factors=False (build_contributions): no factors per index set, the same total to the last bit"""
     term, avrg = term_and_avrg
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                states_choice='harmonic')
-    total_only, no_leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
-                                                        keep_leaves=False, states_choice='harmonic')
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
+                                                 states_choice='harmonic')
+    total_only, no_factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg,
+                                                         keep_factors=False, states_choice='harmonic')
 
-    assert no_leaves is None
-    assert len(leaves) == 4
+    assert no_factors is None
+    assert len(factors) == 4
     assert total_only == total != 0.
 
 
@@ -945,10 +947,10 @@ def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
     from pprint import pprint
     pprint(result)
 
-    total, leaves = result
+    total, factors = result
     assert isinstance(total, float)
-    assert set(leaves) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
-    assert all(set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'} for contribs in leaves.values())
+    assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
+    assert all(set(contribs) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'} for contribs in factors.values())
 
 
 ## build_contributions --------------------------------------------------------
@@ -1098,14 +1100,14 @@ def test_included_modes_raises_if_no_mode_is_left(molsys):
 
 
 def test_evaluate_term_coeffs_sums_only_over_the_given_modes(term_and_avrg, molsys):
-    """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one leaf instead of four"""
+    """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one index set instead of four"""
     term, avrg = term_and_avrg
 
-    total, leaves = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='harmonic',
-                                                modes=(0,))
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='harmonic',
+                                                 modes=(0,))
 
     only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='harmonic')
-    assert set(leaves) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
+    assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
     assert total == only
 
 

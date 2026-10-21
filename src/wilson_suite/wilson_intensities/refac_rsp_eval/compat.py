@@ -3,8 +3,7 @@ Adapter to wilson_derive as it is on main. One thing the refactor uses is not th
     term_to_str                         VibPerturbedTerm.to_str, which main does not have
 
 Once derive has it, import it from there and delete this file.
-The translation to axes and derive itself are not used here: the evaluator takes terms already translated
-(data_for_tests/translated_terms, written by make_translated_terms.py there).
+The translation to axes and derive itself are not used here: the evaluator takes terms already translated.
 """
 from typing import TYPE_CHECKING
 
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 def term_to_str(term: 'VibPerturbedTerm', nm_inds_for_sort=None) -> str:
     """
     One line per term, e.g. for an error message: coeff * props / freq terms / resonance conditions.
-    Uses term.to_str when the term has it (debug_rendering's VibPerturbedTerm, the fake terms in test_plan.py).
+    Uses term.to_str when the term has it.
     Sorts the term first if it is not sorted yet, as VibPerturbedTerm.to_str does.
     """
     if hasattr(term, 'to_str'):

@@ -17,7 +17,8 @@ Result 2026-10-12 (also todo.txt F2): load 4 s; build_contributions 78 s (averag
 After F1, the same day (todo.txt F1): build_contributions 22 s (averaging 0.3 s, deepcopy 11 s). Total: 24 s.
 After F3, the same day (todo.txt F3): build_contributions 3.9 s (no deepcopy per index set: the split is made
 once per term). Total: 6.5 s. The deepcopy line shows 0 calls: the timed run before the profile made the splits.
-After the leaves on demand, the same day (todo.txt Done): build_contributions 3.3 s (it builds no leaves).
+After the factors per index set on demand, the same day (todo.txt Done): build_contributions 3.3 s (it
+builds no factors per index set).
 Total: 5.9 s.
 Boxes by amplitude, each feature on its own box (E10, 2026-10-14): the grid part 2.5 s -> 1.5 s
 (amplitude_half_widths 0.04 s, boxed_features_on_grid 1.3 s; 1509 features near the window instead of the domains).

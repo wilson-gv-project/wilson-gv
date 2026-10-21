@@ -248,10 +248,10 @@ def test_feature_result_is_frozen(molsys_a1_zero):
         result.table = ContributionTable([])  # type: ignore
 
 
-def leaf_value(term: CompiledTerm, contribs: dict) -> float:
+def index_set_value(term: CompiledTerm, contribs: dict) -> float:
     """
-    One leaf's part of the row coefficient, from its factors, as evaluate_full_index_dict multiplies them.
-    A leaf that stopped early (average or non-averaged part 0) has fewer factors and gives 0.
+    One index set's part of the row coefficient, from its factors, as evaluate_full_index_dict multiplies them.
+    An index set that stopped early (average or non-averaged part 0) has fewer factors and gives 0.
     """
     if 'VIBENE_DENOM' not in contribs:
         return 0.
@@ -259,32 +259,32 @@ def leaf_value(term: CompiledTerm, contribs: dict) -> float:
                                * contribs['VIBENE_DENOM'])
 
 
-def test_feature_result_leaves_of_a_row_are_its_summed_index_sets(molsys_a1_zero):
-    """ab_term fixes a, b and sums c over 2 modes: 2 leaves per row, the same as evaluate_term_coeff_sumover gives"""
+def test_feature_result_factors_by_index_set_of_a_row_are_its_summed_index_sets(molsys_a1_zero):
+    """ab_term fixes a, b and sums c over 2 modes: 2 index sets per row, the same as evaluate_term_coeff_sumover gives"""
     terms = two_terms_one_motif()
     result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     for r in result.table:
-        leaves = result.leaves(r)
+        factors = result.factors_by_index_set(r)
 
         _, expected = evaluate_term_coeff_sumover(terms[r.term_id], r.params.to_dict(), molsys_a1_zero,
                                                   TOY_RECIPE, states_choice='harmonic')
-        assert set(leaves) == {ParameterSet({'a': r.params['a'], 'b': r.params['b'], 'c': c}) for c in (0, 1)}
-        assert leaves == expected
+        assert set(factors) == {ParameterSet({'a': r.params['a'], 'b': r.params['b'], 'c': c}) for c in (0, 1)}
+        assert factors == expected
 
 
-def test_feature_result_leaves_add_up_to_the_row_coefficient(molsys_a1_zero):
+def test_feature_result_factors_by_index_set_add_up_to_the_row_coefficient(molsys_a1_zero):
     terms = two_terms_one_motif()
     result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='harmonic')
 
     for r in result.table:
-        total = sum(leaf_value(terms[r.term_id], contribs) for contribs in result.leaves(r).values())
+        total = sum(index_set_value(terms[r.term_id], contribs) for contribs in result.factors_by_index_set(r).values())
         assert total == pytest.approx(r.coeff, rel=1e-12, abs=0)
 
 
-def test_feature_result_leaves_use_the_polarization_of_the_result(molsys):
+def test_feature_result_factors_by_index_set_use_the_polarization_of_the_result(molsys):
     """
-    The leaves need the result's own recipe (without it, the average raises), here a real one: rank 2 from
+    factors_by_index_set needs the result's own recipe (without it, the average raises), here a real one: rank 2 from
     getGeneralPolarizationAveragingExpression. ab_term's <polgrad>[a] has slots 0, 1: rank 2. polgrad of mode 1
     is 0, so a = 1 stops at the average, as with molsys_a1_zero: the toy states have no '1,1'.
     """
@@ -300,7 +300,7 @@ def test_feature_result_leaves_use_the_polarization_of_the_result(molsys):
     assert result.polarization_linear_comb is recipe
     assert len(result.table) == 2                       # a = 0, b = 0 and 1
     for r in result.table:
-        total = sum(leaf_value(terms[0], contribs) for contribs in result.leaves(r).values())
+        total = sum(index_set_value(terms[0], contribs) for contribs in result.factors_by_index_set(r).values())
         assert total == pytest.approx(r.coeff, rel=1e-12, abs=0) != 0.
 
 
@@ -321,11 +321,11 @@ def test_feature_result_inputs_do_not_count_for_equality():
     assert FeatureResult(table, zero=[]) == FeatureResult(table, zero=[], compiled=(toy_term(),))
 
 
-def test_feature_result_made_by_hand_has_no_leaves():
+def test_feature_result_made_by_hand_has_no_factors_by_index_set():
     r = row(0.3, a=0)
 
     with pytest.raises(ValueError, match='no terms or data'):
-        FeatureResult(ContributionTable([r]), zero=[]).leaves(r)
+        FeatureResult(ContributionTable([r]), zero=[]).factors_by_index_set(r)
 
 
 def two_rows_at(a_cm: float, c0: float, c1: float):
@@ -608,19 +608,19 @@ def test_real_data_strongest_feature(evv_formaldehyde):
     assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
 
 
-def test_real_data_leaves_add_up_to_every_row_coefficient(evv_formaldehyde):
+def test_real_data_factors_by_index_set_add_up_to_every_row_coefficient(evv_formaldehyde):
     """
-    All 340 rows, on the fly (einsum average) with the result's recipe. One leaf per summed index set:
-    6 modes ** number of summation labels (term 0: none, 1 leaf; a term summing c: 6 leaves).
+    All 340 rows, on the fly (einsum average) with the result's recipe. One entry per summed index set:
+    6 modes ** number of summation labels (term 0: none, 1 entry; a term summing c: 6 entries).
     """
     compiled, result = evv_formaldehyde.compiled, evv_formaldehyde.result
 
     for r in result.table:
         term = compiled[r.term_id]
-        leaves = result.leaves(r)
+        factors = result.factors_by_index_set(r)
 
-        assert len(leaves) == 6 ** len(term.idx_summ)
-        total = sum(leaf_value(term, contribs) for contribs in leaves.values())
+        assert len(factors) == 6 ** len(term.idx_summ)
+        total = sum(index_set_value(term, contribs) for contribs in factors.values())
         assert total == pytest.approx(r.coeff, rel=1e-12, abs=0), r
 
 
@@ -684,9 +684,9 @@ def test_evaluate_response_terms_gives_every_feature_the_propagator_param(top_ru
     assert all(f.propagator_param == 4.7 for f in top_run.result.features)
 
 
-def test_evaluate_response_terms_keeps_what_the_grid_and_leaves_need(top_run, formaldehyde_molsys):
+def test_evaluate_response_terms_keeps_what_the_grid_and_factors_by_index_set_need(top_run, formaldehyde_molsys):
     """
-    the compiled terms, the data with its states (boxed_features_on_grid), the recipe: one row's leaves add up to
+    the compiled terms, the data with its states (boxed_features_on_grid), the recipe: one row's index sets add up to
     its coeff
     """
     result = top_run.result
@@ -699,7 +699,7 @@ def test_evaluate_response_terms_keeps_what_the_grid_and_leaves_need(top_run, fo
 
     r = max(result.table, key=lambda r: abs(r.coeff))
     term = result.compiled[r.term_id]  # type: ignore
-    assert sum(leaf_value(term, c) for c in result.leaves(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
+    assert sum(index_set_value(term, c) for c in result.factors_by_index_set(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
 
 
 def test_terms_by_axis_set_the_14_evv_terms_are_one_set():
@@ -759,7 +759,7 @@ def test_terms_by_axis_set_raises_on_terms_in_pulse_ids():
 def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(formaldehyde_molsys, top_run):
     """
     exclude_modes (5,), formaldehyde, 6 modes: 5 x 5 (a, b) pairs per term instead of 6 x 6, none with mode 5.
-    Every row's coefficient is the sum of the full run's leaves without mode 5 (top_run: no exclusion), in every
+    Every row's coefficient is the sum of the full run's index sets without mode 5 (top_run: no exclusion), in every
     term. That includes the terms whose averaged part has no c (2, 4, 5, 7, 9-12), where the old code still
     summed over the excluded mode: for term 2 the coefficients change.
     """
@@ -774,9 +774,9 @@ def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(form
     changed_in_term_2 = 0
     for r in result.table:
         term = result.compiled[r.term_id]  # type: ignore
-        assert all(5 not in leaf.indices() for leaf in result.leaves(r))
-        full_leaves = top_run.result.leaves(full[(r.term_id, r.params)])
-        without_5 = sum(leaf_value(term, c) for leaf, c in full_leaves.items() if 5 not in leaf.indices())
+        assert all(5 not in index_set.indices() for index_set in result.factors_by_index_set(r))
+        full_factors = top_run.result.factors_by_index_set(full[(r.term_id, r.params)])
+        without_5 = sum(index_set_value(term, c) for index_set, c in full_factors.items() if 5 not in index_set.indices())
         assert r.coeff == pytest.approx(without_5, rel=1e-12, abs=0)
         changed_in_term_2 += r.term_id == 2 and r.coeff != pytest.approx(full[(2, r.params)].coeff)
     assert changed_in_term_2 > 0

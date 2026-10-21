@@ -8,15 +8,6 @@ The numbers: term coefficients, resonance locations, and the spectrum on a grid.
   holds: the four factors of one index set (evaluate_full_index_dict), the sum over the summation labels
          (evaluate_term_coeff_sumover), the averaged part as one einsum per term (AvrgTensor), the resonance
          location (solve_LSE_motif), the resonance factors on the grid, the features on the grid
-
-The property data reaches the evaluation in four steps; the property name (PropsCollection.names) is
-the key all the way:
-  1. build the request   "fetch 'polgrad' from CFOUR": MolSystemData.load, names from
-                         CompiledTerm.prop_names
-  2. obtainer returns    data_dict = {'polgrad': array, ...}
-  3. fill mol_props      data_dict['polgrad'] goes into the 'polgrad' slot (MolSystemData.from_datadict)
-  4. evaluate            read mol_props['polgrad'].vals[mode, i, j]: calculate_avrg_tensor_einsum
-                         (averaged part), eval_non_avrg_per_indexdict (non-averaged part)
 """
 
 import string
@@ -78,7 +69,7 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          polarization_linear_comb: dict | None = None,
                          zero_tol: float = 1e-18,
                          avrg_tensor: 'AvrgTensor | None' = None,
-                         keep_leaves: bool = True,
+                         keep_factors: bool = True,
                          *,
                          states_choice: str,
                          modes: Sequence[int] | None = None) -> tuple[float, dict | None]:
@@ -101,11 +92,13 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         None -> made here from polarization_linear_comb, which is then required.
         build_contributions makes it once per term, so it is not made again for every resonance index set.
 
-    returns (total, leaves): leaves maps each full index set to its factors, e.g. for a = 0, b = 1, 2 modes:
+    returns (total, factors_by_index_set): each full index set mapped to its factors, e.g. for a = 0, b = 1,
+    2 modes:
         {ParameterSet({'a': 0, 'b': 1, 'c': 0}): {'NON_AVRG': ..., 'AVRG': ..., 'VIBDIFF_TERMS': ..., 'VIBENE_DENOM': ...},
          ParameterSet({'a': 0, 'b': 1, 'c': 1}): {...}}
-    keep_leaves False -> leaves is None. build_contributions does not keep them: every row's leaves would take
-        357 MB for ACDM (42 modes). FeatureResult.leaves computes one row's leaves again when they are asked for.
+    keep_factors False -> factors_by_index_set is None. build_contributions does not keep them: each row would keep
+        one dict per summed index set, e.g. 42 modes, one summation label: 42 dicts.
+        FeatureResult.factors_by_index_set computes them again for one row when they are asked for.
     """
     not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
@@ -123,22 +116,22 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
         avrg_tensor = calculate_avrg_tensor_einsum(compl_term.avrg_props, molsys_data.mol_props,
                                                    polarization_linear_comb)
 
-    def sum_over(index_dict: dict, remaining: list, leaves: dict | None) -> float:
+    def sum_over(index_dict: dict, remaining: list, factors_by_index_set: dict | None) -> float:
         if not remaining:
             value, contribs = evaluate_full_index_dict(compl_term, index_dict,
                                                        molsys_data,
                                                        avrg_tensor,
                                                        zero_tol,
                                                        states_choice=states_choice)
-            if leaves is not None:
-                leaves[ParameterSet(index_dict)] = contribs
+            if factors_by_index_set is not None:
+                factors_by_index_set[ParameterSet(index_dict)] = contribs
             return value
         current, rest = remaining[0], remaining[1:]
-        return sum(sum_over({**index_dict, current: v}, rest, leaves) for v in summed_values)
-    
+        return sum(sum_over({**index_dict, current: v}, rest, factors_by_index_set) for v in summed_values)
+
     missing = [i for i in term_idx_all if i not in idx_dict]
-    leaves = {} if keep_leaves else None
-    return sum_over(idx_dict, missing, leaves), leaves
+    factors_by_index_set = {} if keep_factors else None
+    return sum_over(idx_dict, missing, factors_by_index_set), factors_by_index_set
 
 
 # EVALUATION OF A SINGLE TERM - ONE INDEX SET: FULL INDEX SET
@@ -165,14 +158,11 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     if not all(index in list(index_dict.keys()) for index in t_indices):
         raise ValueError('term has indices that do not have values in index_dict.')
 
-
-    # Evaluate AVRG
     AVRG = eval_avrg_per_indexdict(avrg_tensor, index_dict, zero_tol)
 
     if AVRG == 0.0:
         return 0.0, {'AVRG': AVRG}
 
-    # Evaluate NON_AVRG
     NON_AVRG = eval_non_avrg_per_indexdict(compl_term.non_avrg_props, index_dict, molsys_data, zero_tol)
     if NON_AVRG == 0.0:
         return 0.0, {'NON_AVRG': NON_AVRG, 'AVRG': AVRG}
@@ -182,10 +172,8 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
 
     VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
 
-    # Evaluate VIBENE_DENOM
     VIBENE_DENOM = harmonic_denom(compl_term.freq_vibenedenom, index_dict, molsys_data)
 
-    # Compute the product
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
     dict_contribs = {'NON_AVRG': NON_AVRG, 'AVRG': AVRG, 'VIBDIFF_TERMS': VIBDIFF_TERMS, 'VIBENE_DENOM': VIBENE_DENOM}
@@ -204,7 +192,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     order of indices generally: a,b,c,... 
     E.g. in CFF tensor index tuple is (a,b,c)
 
-    TODO: error handling for missing or invalid data for all functions below
+    Data is checked in MolSystemData.from_datadict and build_contributions.
     """
     product_all = 1.
     
@@ -220,7 +208,6 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
         prop: MolecularProperty = molsys_data.mol_props[triv_name]
         NON_AVRG = prop.vals[na_prop_inds]
 
-        # = np.isclose(NON_AVRG, 0., atol=zero_tol, rtol=0.) for one number, without its cost per call
         if abs(NON_AVRG) <= zero_tol:
             return 0.
         else:
@@ -241,7 +228,6 @@ def eval_avrg_per_indexdict(avrg_tensor: 'AvrgTensor', index_dict: dict, zero_to
     """
     result = avrg_tensor.at(index_dict)
 
-    # = np.isclose(result, 0., atol=zero_tol, rtol=0.) for one number, and faster
     return 0. if abs(result) <= zero_tol else result
 
 
@@ -279,15 +265,16 @@ def make_avrg_einsum_subscripts(avrg_expression: 'PropsCollection') -> str:
         mode label  ->  itself ('a', 'b', ...)                not summed: one axis of the output
         slot k      ->  AVRG_SLOT_LETTERS[k] ('I', 'J', ...)  summed: in W and in the property that has slot k
 
-    e.g. term 8, polgrad[b] (slots 0, 3) * dipgrad[a] (slot 1) * dipgrad[c] (slot 2):
+    e.g. polgrad[b] (slots 0, 3) * dipgrad[a] (slot 1) * dipgrad[c] (slot 2):
         polgrad[b, I, L]     'bIL'
         dipgrad[a, J]        'aJ'
         dipgrad[c, K]        'cK'
         W[I, J, K, L]        'IJKL'   W[i, j, k, l] = the recipe coefficient of key (i, j, k, l)
         T[a, b, c]           'abc'    the distinct mode labels, alphabetical
         -> 'bIL,aJ,cK,IJKL->abc':  T[a, b, c] = sum over I, J, K, L of polgrad[b, I, L] dipgrad[a, J] dipgrad[c, K] W[I, J, K, L]
-    A label in two properties (term 10: dipgrad[a] twice) multiplies two values of the same mode. A label twice
-    in one property (polhess[a, a]) reads its diagonal. Both are einsum's own rules, and both match the sum above.
+    A label in two properties multiplies two values of the same mode,
+        e.g. polgrad[b] (slots 0, 3) * dipgrad[a] (slot 1) * dipgrad[a] (slot 2) -> 'bIL,aJ,aK,IJKL->ab'.
+    A label twice in one property (polhess[a, a]) reads its diagonal. Both are einsum's own rules, and both match the sum above.
 
     raises ValueError if a mode label is not one lowercase letter (slots use upper case), or if the slots are
     not 0 .. rank-1, each once
@@ -321,44 +308,42 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     Each property has one Cartesian axis (x, y, z, in the molecule's axes) per field it couples to. In the code,
     prop.ops has one entry per Cartesian axis (derive stores it as a QOperator), and op.o is that axis's slot.
     derive writes op.o: interaction j gets the id of its pulse (dressWithPulseInteractions, response_terms.py).
-        e.g. term 8, in the order of the expression:
+        e.g. polgrad[b] * dipgrad[a] * dipgrad[c], in the order of the expression:
             polgrad[b]  2 Cartesian axes, slots 0, 3   the detected field and pulse 3
             dipgrad[a]  1 Cartesian axis,  slot 1      pulse 1
             dipgrad[c]  1 Cartesian axis,  slot 2      pulse 2
     The order of the properties in the expression does not matter: op.o, not the position of the property, ties
-    each Cartesian axis to its field. Term 8 with the properties reversed: 'cK,aJ,bIL,IJKL->abc', the same tensor.
+    each Cartesian axis to its field. The example with the properties reversed: 'cK,aJ,bIL,IJKL->abc', the same
+    tensor.
     The order of the Cartesian axes inside one property does matter: it sets which data axis goes with which slot.
         e.g. polgrad[b] with ops (0, 3): in polgrad[b, i, j], i is the direction at slot 0, j at slot 3.
     For polgrad and polhess both orders give the same value: they are symmetric in i, j.
     dipgrad and diphess have one Cartesian axis, so no order.
 
-    rank = the number of slots = the number of Cartesian axes of all properties together (term 8: 2 + 1 + 1 = 4).
+    rank = the number of slots = the number of Cartesian axes of all properties together.
     A recipe key has one direction per slot, in slot order:
         key (i_0, i_1, i_2, i_3) = (direction at slot 0, at slot 1, at slot 2, at slot 3), 0 = x, 1 = y, 2 = z
     The recipe comes from the lab side, with the same numbering: the experiment lists its polarizations as
     (detector, pulse 1, pulse 2, ...) (all_polarizations, experiment_abstractions.py), and laser_pol and the
     recipe are made from that list. So key position k and op.o = k both mean "the field of slot k".
-        Not yet for ranks 3, 5 and 6: get_pol_tensor reverses the slots. Ranks 2 and 4 (EVV) are
-        not affected.
-        A pulse that acts twice would give two Cartesian axes the same op.o: make_avrg_einsum_subscripts raises.
-    The molecule turns at random, so the average weighs every combination of directions with the recipe
-    coefficient.
+        Not yet for ranks 3, 5 and 6: get_pol_tensor reverses the slots (FIXME). Ranks 2 and 4 are not affected. 
 
-        1. subscripts from the expression (make_avrg_einsum_subscripts), e.g. term 8: 'bIL,aJ,cK,IJKL->abc'
+        1. subscripts from the expression (make_avrg_einsum_subscripts), for the example: 'bIL,aJ,cK,IJKL->abc'
         2. W: the recipe {(i_0, i_1, ...): coefficient} as a dense 3 x 3 x ... array, one axis per slot;
            0 where the recipe has no entry
         3. one operand per property: its data array, found by its name (PropsCollection.names)
         4. np.einsum: one axis per distinct mode label, alphabetical
     Size: n_modes ** (number of distinct labels), e.g. 42 modes, 3 labels: 74088 values, 0.6 MB.
 
-    raises ValueError if a recipe key does not have one entry per slot
+    raises ValueError if a recipe key's length is not the rank,
+        e.g. key (0, 0) when the rank is 4
     """
     # 1. The einsum string, from the symbolic expression alone (no data yet).
-    #    term 8: polgrad[b] (slots 0, 3) * dipgrad[a] (slot 1) * dipgrad[c] (slot 2)  ->  'bIL,aJ,cK,IJKL->abc'
+    #    e.g. polgrad[b] (slots 0, 3) * dipgrad[a] (slot 1) * dipgrad[c] (slot 2)  ->  'bIL,aJ,cK,IJKL->abc'
     subscripts = make_avrg_einsum_subscripts(avrg_expression)
 
     # rank: the number of slots = the number of Cartesian axes of all properties together (entries of prop.ops).
-    #    term 8: polgrad has 2 Cartesian axes, each dipgrad has 1  ->  rank 4.
+    #    the example in 1.: polgrad has 2 Cartesian axes, each dipgrad has 1  ->  rank 4.
     #    make_avrg_einsum_subscripts has checked that the slots are 0 .. rank-1, each once: slot k is axis k of W.
     rank = sum(len(prop.ops) for prop in avrg_expression)
 
@@ -371,7 +356,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     W = np.zeros((3,) * rank)
     for key, coeff in polarization_linear_comb.items():
         if len(key) != rank:
-            raise ValueError(f'recipe key {key} has {len(key)} entries, the averaged part has {rank} slots')
+            raise ValueError(f'recipe key {key} has length {len(key)}, the rank is {rank}')
         W[key] = coeff
 
     # 3. One data array per property, in the order of the expression: the order of the operands in the string.
@@ -379,7 +364,8 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
     #        1 Cartesian axis, 1 mode -> 'dipgrad' (n, 3)        2 Cartesian axes, 1 mode -> 'polgrad' (n, 3, 3)
     #        1 Cartesian axis, 2 modes -> 'diphess' (n, n, 3)    2 Cartesian axes, 2 modes -> 'polhess' (n, n, 3, 3)
     #    n = the number of modes. Mode axes first, then x, y, z: the layout the string assumes.
-    #    term 8: [polgrad, dipgrad, dipgrad]. The same dipgrad array comes twice: once read at a, once at c.
+    #    the example in 1.: [polgrad, dipgrad, dipgrad]. The same dipgrad array comes twice: once read at a,
+    #    once at c.
     operands = [np.asarray(props_data[name].vals) for name in avrg_expression.names]
 
     # The output axes: the letters after '->', e.g. 'abc' -> ('a', 'b', 'c').
@@ -388,7 +374,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
 
     # 4. One call gives every index set. numpy multiplies the operands and sums over each letter that is not
     #    in the output: the slot letters I, J, K, L. The mode letters a, b, c are in the output: not summed.
-    #    term 8, shape (n, n, n):
+    #    the example in 1., shape (n, n, n):
     #        values[a, b, c] = sum over I, J, K, L of  polgrad[b, I, L] * dipgrad[a, J] * dipgrad[c, K] * W[I, J, K, L]
     #    For one (a, b, c), this is the sum in make_avrg_einsum_subscripts: one product per recipe key, times
     #    its coefficient.
@@ -578,9 +564,9 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
         for idxset in make_idx_sets(modes, sorted(term.idx_nonsumm)):
             ps = ParameterSet(idxset)
 
-            # no leaves: FeatureResult.leaves computes a row's leaves again when asked
+            # no factors per index set: FeatureResult.factors_by_index_set computes them again when asked
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, avrg_tensor=avrg_tensor,
-                                                   keep_leaves=False, states_choice=states_choice, modes=modes)
+                                                   keep_factors=False, states_choice=states_choice, modes=modes)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))
@@ -635,7 +621,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
                           parameters: ParameterSet,
                           vibstates_data: 'VibStatesData',
                           mesh_au: Mesh,
-                          propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray: # FIXME change VibDiff to any or smth
+                          propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray:
     """
     One motif consists of resonance conditions from a single term. Each condition's factor is
     lineshape.factor(resloc, parameter), e.g. the Lorentzian's 1 / (resloc - i*gamma).
