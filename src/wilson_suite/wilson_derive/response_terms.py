@@ -1,9 +1,58 @@
 import copy
 import json
+from dataclasses import dataclass
 from fractions import Fraction
 
 from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, ResonanceCondition, QOperator, \
     HarmOscStateSymbolic, TransitionIntegral
+
+@dataclass
+class ResponseTerms:
+    """
+    Data holder class to collect terms under a common setup
+
+    """
+
+    order: int
+    # TODO: Anharmonicity regime
+    total_anharm_limit: int
+    el_anharm_limit: int
+    mech_anharm_limit: int
+    # Keys are compounding patterns, values are magnitude conditions under each comp. pattern
+    comp_patterns_with_magn_conditions: dict[tuple, tuple]
+
+    def __post_init__(self):
+
+        # Derived properties from original arguments if any
+
+        # Get terms
+        self.terms = self.get_terms()
+
+    def get_terms(self):
+
+        # Get terms grouped by comp_patterns_with_magn_conditions entries
+
+        terms = {}
+
+        return terms
+
+    def determine_needed_props(self, re):
+
+        # Walk through all terms and determine which properties are needed
+        props = []
+
+        # Notes:
+        # - Connect to other definition of properties?
+        # - For non-derivatives properties (energy levels, relaxation parameters):
+        #       - Register the information as state-centered (or numbers of quanta needed?)
+        #       - This should be sufficient for both energy levels and relaxation
+        #           - More refined relaxation models would need to supply further details
+        #               - And would anyway need more detailed derivation
+        #       - Not sure yet how to adapt this for Fermi resolved states but that's for later
+        # - Also register as a derived property the max number of quanta needed?
+
+        return props
+
 
 
 class VibPerturbedTerm:

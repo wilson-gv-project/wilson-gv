@@ -67,6 +67,21 @@ def do_dbl_pert_expand_and_hermaut_with_enh_filtering(sos_terms:
 
     return filtered_terms
 
+def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
+                              comp_patterns: list[tuple], magn_conditions: tuple) -> dict[tuple, list[response_terms.VibPerturbedTerm]]:
+    """
+    Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
+    and magnitude conditions
+
+    FIXME: Group by both comp pattern and magn. conditions? Work out a scheme for this
+
+    """
+
+    pass
+
+
+
+
 def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=1, el_anharm_limit: int=1,
                              mech_anharm_limit: int=1) -> dict:
     """
