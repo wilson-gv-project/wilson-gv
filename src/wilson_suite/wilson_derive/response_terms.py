@@ -6,6 +6,7 @@ from fractions import Fraction
 from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, ResonanceCondition, QOperator, \
     HarmOscStateSymbolic, TransitionIntegral
 
+
 @dataclass
 class ResponseTerms:
     """
@@ -32,7 +33,9 @@ class ResponseTerms:
 
         # Get terms grouped by comp_patterns_with_magn_conditions entries
 
-        terms = {}
+        #terms = get_terms_by_comp_patterns(self.order,
+        #                                   self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
+        #                                   self.comp_patterns_with_magn_conditions)
 
         return terms
 
@@ -61,7 +64,8 @@ class VibPerturbedTerm:
     wilson-derive run.
     """
 
-    def __init__(self, coeff: Fraction, props: list[PolProp], freqterms: list[VibDiffTerm], res: list[ResonanceCondition]):
+    def __init__(self, coeff: Fraction, props: list[PolProp], freqterms: list[VibDiffTerm], res: list[ResonanceCondition],
+                 order_el: int=0, order_mech: int=0, summ_ind: list[str] = []):
         """
         A term consists of the following attributes:
 
@@ -74,6 +78,8 @@ class VibPerturbedTerm:
         by the derivation (list of VibDiffTerm instances)
 
         res: Resonance conditions as identified by the derivation (list of ResonanceCondition instances)
+
+        order_el, order_mech: Order of electrical resp. mechanical anharmonicity: Default 0 for both
         """
 
         if not (isinstance(coeff, Fraction) ):
@@ -94,6 +100,12 @@ class VibPerturbedTerm:
 
         # Boolean: Has this term been sorted according to the below sort method?
         self.was_sorted = False
+
+        self.order_el = order_el
+
+        self.order_mech = order_mech
+
+        self.summ_ind = summ_ind
 
         # Hash (currently indeterminate)
         self.hsh = None
@@ -327,16 +339,6 @@ class VibPerturbedTerm:
         B - A > 0
         """
 
-        # Discernment by frequency ranges implementation not ready
-        #
-        #if field_freq_ranges is not None:
-        #
-        #    for i in self.res:
-        #        if not(i.couldBeResonantWithFieldByRanges(field_freq_ranges)):
-        #            return False
-        #
-        #    return True
-
         if magn_conditions is not None:
 
             prev_res = None
@@ -530,7 +532,8 @@ class VibContribTerm:
     Class to represent a vibrational term in SOS expression up to but not including Hermite treatment
     """
 
-    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition], comp_pattern: tuple[int]):
+    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition], comp_pattern: tuple[int],
+                 order_el: int = 0, order_mech: int = 0):
         """
         A term consists of the following attributes:
 
@@ -560,6 +563,14 @@ class VibContribTerm:
         if not (all([isinstance(i, int) for i in comp_pattern])):
             raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
         self.comp_pattern = comp_pattern
+
+        # Always true for well-formed compounding patterns
+        # Could alternatively get as total number of operators in transition integrals
+        self.order = sum(comp_pattern) - 1
+
+        self.order_el = order_el
+
+        self.order_mech = order_mech
 
         # Initialize frequency difference terms in anticipation of possible addition
         # from mechanical anharmonicity handling

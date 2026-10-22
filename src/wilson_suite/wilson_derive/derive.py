@@ -34,16 +34,13 @@ def get_dressed_vib_sos_with_exp_filtering(order: int, int_sequences: list, epoc
 
     return R_sos_filtered
 
-def do_dbl_pert_expand_and_hermaut_with_enh_filtering(sos_terms:
-                                                      list[response_terms.VibContribTerm],
-                                                      order_el: int, order_mech: int,
-                                                      magn_conditions: tuple) -> list[response_terms.VibPerturbedTerm]:
+
+def do_dbl_pert_expand_and_hermaut(sos_terms: list[response_terms.VibContribTerm],
+                                   order_el: int, order_mech: int) -> list[response_terms.VibPerturbedTerm]:
     """
     Take a list of SOS vibrational contribution response terms, perform a double perturbation expansion according to the
     requested orders of electrical and mechanical anharmonicity, carry out Hermite walk expansions for the resulting
-    terms, simplify these results by coefficient factoring, and filter those results according to whether full
-    enhancement is possible with the imposed magnitude conditions of the experiment.
-     
+    terms and simplify these results by coefficient factoring
     """
 
     # Do double perturbation expansion
@@ -57,18 +54,33 @@ def do_dbl_pert_expand_and_hermaut_with_enh_filtering(sos_terms:
         full_hermaut_terms.extend(hermaut.do_hermaut(k, wu_common.nm_inds))
 
     # Simplify
-    simplified_hermaut_terms = simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds)
+    return list(simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds).values())
+
+def do_dbl_pert_expand_and_hermaut_with_enh_filtering(sos_terms:
+                                                      list[response_terms.VibContribTerm],
+                                                      order_el: int, order_mech: int,
+                                                      magn_conditions: tuple) -> list[response_terms.VibPerturbedTerm]:
+    """
+    Take a list of SOS vibrational contribution response terms, perform a double perturbation expansion according to the
+    requested orders of electrical and mechanical anharmonicity, carry out Hermite walk expansions for the resulting
+    terms, simplify these results by coefficient factoring, and filter those results according to whether full
+    enhancement is possible with the imposed magnitude conditions of the experiment.
+     
+    """
+
+    # Get simplified dbl. pert. expanded and Hermite expanded terms
+    simplified_hermaut_terms = do_dbl_pert_expand_and_hermaut(sos_terms, order_el, order_mech)
 
     # Filter by possibility of full enhancement
     filtered_terms = []
     for k in simplified_hermaut_terms:
-        if (simplified_hermaut_terms[k].full_enhancement_possible(magn_conditions=magn_conditions)):
-            filtered_terms.append(copy.deepcopy(simplified_hermaut_terms[k]))
+        if k.full_enhancement_possible(magn_conditions=magn_conditions):
+            filtered_terms.append(copy.deepcopy(k))
 
     return filtered_terms
 
 def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
-                              comp_patterns: list[tuple], magn_conditions: tuple) -> dict[tuple, list[response_terms.VibPerturbedTerm]]:
+                              comp_patterns_with_magn_conditions: dict[tuple, tuple]) -> dict[tuple, list[response_terms.VibPerturbedTerm]]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
     and magnitude conditions and return fully enhanceable terms
@@ -76,24 +88,52 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
     May return some terms that are not fully enhanceable depending on completeness of magnitude condition handling
     """
 
-    # Get all terms that match requested compounding patterns (and decorate the terms with the pattern)
-    test_terms = vib_rsp_sos.get_vib_sos(order)
+    # Get all SOS terms that match requested compounding patterns
+    # NOTE: Can if needed at very high orders replace get_vib_sos by something that prunes
+    # compounding patterns during the derivation
+    sos_terms = vib_rsp_sos.get_vib_sos(order)
 
+    # For all requested compounding patterns, group SOS terms under each pattern
+    sos_terms_at_comp_pattern = {i: [] for i in list(comp_patterns_with_magn_conditions.keys())}
 
-    for i in test_terms:
+    for i in sos_terms:
 
-        print([j.pf for j in i.res])
-        print(i.comp_pattern)
-        print('')
-    # Then get anharm orders, expand and decorate terms
+        if i.comp_pattern in sos_terms_at_comp_pattern:
+            sos_terms_at_comp_pattern[i.comp_pattern].append(copy.deepcopy(i))
 
+    print(sos_terms_at_comp_pattern)
 
-    # Then do Hermite walk expansion and filter by magnitude conditions
+    # Then get anharm orders
+    anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
 
+    # Do double perturbation expansion, Hermite expansion and simplification
 
-    # Return as structure over
-    pass
+    # Group post-Hermite terms under each requested compounding pattern
+    ph_terms_at_comp_pattern = {i: [] for i in list(sos_terms_at_comp_pattern.keys())}
 
+    for tot_ord in anharm_orders:
+        for ind_ord in anharm_orders[tot_ord]:
+            for i in sos_terms_at_comp_pattern:
+                ph_terms_at_comp_pattern[i].extend(do_dbl_pert_expand_and_hermaut(sos_terms_at_comp_pattern[i],
+                                                   ind_ord[0], ind_ord[1]))
+
+    print(ph_terms_at_comp_pattern)
+
+    # Filter by magnitude conditions
+
+    # Initialize result holder
+    final_terms_at_comp_patt_and_magn = {i:
+                                         {j: [] for j in comp_patterns_with_magn_conditions[i]}
+                                         for i in list(comp_patterns_with_magn_conditions.keys())}
+
+    # Walk through post-Hermite term and screen/group by magnitude conditions
+    for p in final_terms_at_comp_patt_and_magn:
+        for m in final_terms_at_comp_patt_and_magn[p]:
+            for t in ph_terms_at_comp_pattern[p]:
+                if t.full_enhancement_possible(magn_conditions=m):
+                    final_terms_at_comp_patt_and_magn[p][m].append(copy.deepcopy(t))
+
+    return final_terms_at_comp_patt_and_magn
 
 
 

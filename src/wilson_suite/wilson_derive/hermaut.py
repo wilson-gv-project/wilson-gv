@@ -228,6 +228,7 @@ def do_hermaut(term: VibContribTerm, inds: list):
                 j.pf, j.id))
 
         # Create the VibPerturbedTerm instance
-        finished_terms.append(VibPerturbedTerm(new_coeff, new_props, new_freqterms, new_res))
+        finished_terms.append(VibPerturbedTerm(new_coeff, new_props, new_freqterms, new_res,
+                                               order_el=term.order_el, order_mech=term.order_mech))
 
     return finished_terms

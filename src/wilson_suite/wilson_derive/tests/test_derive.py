@@ -236,7 +236,12 @@ def test_do_dbl_pert_expand_and_hermaut_with_enh_filtering():
 
 def test_get_terms_by_comp_patterns():
 
-    get_terms_by_comp_patterns(3, 1, 1, 1, [(2, 1)], ((0,), (1,)))
+    comp_patt_magn_cond = {(2, 1, 1): ((0,), (1,)),
+                           (2, 2): ((0,), (1,))}
+
+    get_terms_by_comp_patterns(3,
+                      1, 1,1,
+                      comp_patt_magn_cond)
 
 
     pass
