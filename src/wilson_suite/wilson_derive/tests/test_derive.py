@@ -2,7 +2,7 @@ import pytest
 
 from wilson_suite.wilson_derive.derive import (get_dressed_vib_sos_with_exp_filtering,
                                                do_dbl_pert_expand_and_hermaut_with_enh_filtering,
-                                               get_fully_enhanced_terms)
+                                               get_fully_enhanced_terms, get_terms_by_comp_patterns)
 from wilson_suite.fixtures import evv_experiment
 
 def test_get_dressed_vib_sos_with_exp_filtering():
@@ -230,6 +230,13 @@ def test_do_dbl_pert_expand_and_hermaut_with_enh_filtering():
 
     assert len(R_result) == 0
 
+
+
+    pass
+
+def test_get_terms_by_comp_patterns():
+
+    get_terms_by_comp_patterns(3, 1, 1, 1, [(2, 1)], ((0,), (1,)))
 
 
     pass

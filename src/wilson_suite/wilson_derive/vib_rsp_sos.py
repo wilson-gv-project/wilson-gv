@@ -63,7 +63,9 @@ def get_vib_sos(maxord: int) -> list[VibContribTerm]:
     states.extend([VibStateSymbolic(wu_common.state_labels[i]) for i in range(maxord)])
 
     # Initialize with order 0 term
-    vib_sos_terms = [[VibContribTerm(Fraction(1), [TransitionIntegral(states[0], states[0], PolProp([op_omega]))], [])]]
+    vib_sos_terms = [[VibContribTerm(Fraction(1),
+                                     [TransitionIntegral(states[0], states[0], PolProp([op_omega]))],
+                                     [], (1,))]]
 
     # Walk through orders and build terms
     for p in range(maxord):
@@ -115,6 +117,21 @@ def get_vib_sos(maxord: int) -> list[VibContribTerm]:
             r_d_2.ints[omega_ind] = TransitionIntegral(states[p + 1], r_d_2.ints[omega_ind].ket, PolProp([op_omega]))
             # Insert the new D2 integral in the position before the re-initialized "omega integral"
             r_d_2.ints.insert(omega_ind, r_D_2_new)
+
+            # Update compounding pattern
+
+            # E term: Increment last compounding by 1
+            e_comp_new = list(r_e.comp_pattern)
+            e_comp_new[-1] += 1
+            r_e.comp_pattern = tuple(e_comp_new)
+
+            # D terms: Append new 1
+            d1_comp_new = list(r_d_1.comp_pattern)
+            d1_comp_new.append(1)
+            r_d_1.comp_pattern = tuple(d1_comp_new)
+            d2_comp_new = list(r_d_2.comp_pattern)
+            d2_comp_new.append(1)
+            r_d_2.comp_pattern = tuple(d2_comp_new)
 
             # Putting results in next order terms holder
             vib_sos_terms[p + 1].append(r_e)

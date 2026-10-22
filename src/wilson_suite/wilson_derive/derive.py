@@ -71,12 +71,27 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
                               comp_patterns: list[tuple], magn_conditions: tuple) -> dict[tuple, list[response_terms.VibPerturbedTerm]]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
-    and magnitude conditions
+    and magnitude conditions and return fully enhanceable terms
 
-    FIXME: Group by both comp pattern and magn. conditions? Work out a scheme for this
-
+    May return some terms that are not fully enhanceable depending on completeness of magnitude condition handling
     """
 
+    # Get all terms that match requested compounding patterns (and decorate the terms with the pattern)
+    test_terms = vib_rsp_sos.get_vib_sos(order)
+
+
+    for i in test_terms:
+
+        print([j.pf for j in i.res])
+        print(i.comp_pattern)
+        print('')
+    # Then get anharm orders, expand and decorate terms
+
+
+    # Then do Hermite walk expansion and filter by magnitude conditions
+
+
+    # Return as structure over
     pass
 
 

@@ -530,7 +530,7 @@ class VibContribTerm:
     Class to represent a vibrational term in SOS expression up to but not including Hermite treatment
     """
 
-    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition]):
+    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition], comp_pattern: tuple[int]):
         """
         A term consists of the following attributes:
 
@@ -539,6 +539,8 @@ class VibContribTerm:
         ints: Transition integrals involving a bra state, one or more operators, and a ket state
 
         res: Resonance conditions as identified by the derivation (list of ResonanceCondition instances)
+
+        comp_pattern: Compounding pattern as a tuple of integers
         """
 
         if not (isinstance(coeff, Fraction) ):
@@ -552,6 +554,12 @@ class VibContribTerm:
         if not (all([isinstance(i, ResonanceCondition) for i in res])):
             raise TypeError('All resonance condition arguments in VibContribTerm must be ResonanceCondition instances')
         self.res = res
+
+        if not (isinstance(comp_pattern, tuple)):
+            raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
+        if not (all([isinstance(i, int) for i in comp_pattern])):
+            raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
+        self.comp_pattern = comp_pattern
 
         # Initialize frequency difference terms in anticipation of possible addition
         # from mechanical anharmonicity handling
