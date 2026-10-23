@@ -4,6 +4,9 @@ from typing import Any
 
 bohr_in_angstroms = constants.physical_constants['Bohr radius'][0]/10**(-10)
 
+per_cm_x_fs = 5308.837458876145
+
+
 def rcm2Eh_a0(rcm_array: np.ndarray, harm_freqs) -> np.ndarray:
     """ Convert from [cm-1] to [Hartree/Bohr^n] """
     
