@@ -1025,6 +1025,46 @@ class FieldAnalysis:
 
     thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
     distant to produce an appreciable signal. Default: 1500.0 (units: fs).
+
+    Attributes created at post-init:
+
+    valid_int_patterns: A list of tuples where each tuple refers to an (unordered) combination of interactions with the
+    pulses of the field, where positive/negative indices denote resp. positive and negative wavevector components. Each
+    interaction pattern listed here was found to be valid under the setup parameters (i.e. they would give signals along
+    the same wavevector and otherwise fulfill the requested detection limitation regime).
+
+    int_pattern_orders: A list telling which unique orders of interactions are represented in valid_int_patterns
+
+    int_patterns_by_order: An {order: [patterns]} dictionary organizing the above information combined
+
+    time_ovl_tuples: List of tuples: From unique subsets of pulse references in valid_int_pattern, tells which out of
+    these subsets were found to overlap sufficiently in time.
+
+    res_and_time_ovl_tuples: Same as time_ovl_tuples but the criterion is now extended to require that subsets also have
+    frequency components able to create vibrational resonance
+
+    res_and_time_comp_pulses: A {tuple: EmPulse} dictionary relating pulse reference tuples in res_and_time_ovl_tuples
+    to actual combined pulse instances formed to represent them
+
+    time_not_res_comp_pulses: Same structure as res_and_time_comp_pulses but instead involves pulse reference tuples
+    that were time-overlapping but NOT able to create vibrational resonance
+
+    all_valid_pulses: Union of res_and_time_comp_pulses and time_not_res_comp_pulses
+
+    comp_patterns_at_order: {order: list[tuples]} dictionary telling the valid compounding patterns at each relevant order
+
+    pol_avg_vector_bank: An {index: vector} dictionary collecting different unique "macroscopic polarization vector" setups
+
+    int_sequences_by_order_comp_pol: Valid interaction sequences indexed as a three-fold dictionary structure as
+    (outer to inner) order, comounding pattern, macroscopic polarization regime: list of interaction sequences (each
+    entry a tuple of tuples)
+
+    magnitude_condition_bank: An {index: (tuple_plus, tuple_minus)} dictionary collecting different unique magnitude
+    condition cases, where tuple_plus contains (in order of interaction index) all tuples whose freq. sum was
+    significantly > 0, and vice versa (significantly < 0) for tuple_minus.
+
+    int_sequences_by_order_comp_pol_magn: As int_sequences_by_order_comp_pol but further subindexed at the innermost
+    level by magnitude condition regime
     """
 
     field: ElectricField
@@ -1046,7 +1086,7 @@ class FieldAnalysis:
         # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
 
         # Get valid interaction patterns
-        self.valid_int_patterns = self.get_interaction_patterns()
+        self.valid_int_patterns = self.__get_interaction_patterns()
 
         # Compile information about which orders of interaction are represented in the interaction patterns
         int_pattern_orders = []
@@ -1071,14 +1111,14 @@ class FieldAnalysis:
         # Generate time-overlapping tuples, time-overlapping and "vib. resonance possible" tuples,
         # time-overlapping and "vib. resonance possible" pulses, and time-overlapping but not "vib. resonance possible"
         # pulses
-        self.time_ovl_tuples, self.res_and_time_ovl_tuples, self.res_and_time_comp_pulses, self.time_not_res_comp_pulses = self.get_time_freq_valid_pulses_and_tuples()
+        self.time_ovl_tuples, self.res_and_time_ovl_tuples, self.res_and_time_comp_pulses, self.time_not_res_comp_pulses = self.__get_time_freq_valid_pulses_and_tuples()
 
         # Generate valid compounding patterns at all relevant orders
-        self.comp_patterns_at_order = self.get_comp_patterns_at_order()
+        self.comp_patterns_at_order = self.__get_comp_patterns_at_order()
 
         # Get polarization "average vector" bank and interaction sequences indexed by order, compounding pattern and
         # polarization averaging category
-        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.get_pol_avg_bank_and_int_seq_ocp()
+        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.__get_pol_avg_bank_and_int_seq_ocp()
 
         # Making an "all valid pulses" bank that is a union of res_and_time_ and time_not_res_ pulse tuples
         all_valid_pulses = copy.deepcopy(self.res_and_time_comp_pulses)
@@ -1091,10 +1131,10 @@ class FieldAnalysis:
 
         # Get "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
         # polarization averaging category, and magnitude condition category
-        self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.get_magn_cond_bank_and_int_seq_icpm()
+        self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.__get_magn_cond_bank_and_int_seq_icpm()
 
 
-    def get_interaction_patterns(self) -> list[tuple]:
+    def __get_interaction_patterns(self) -> list[tuple]:
         """
         Helper method: Get valid interaction patterns
         """
@@ -1153,7 +1193,7 @@ class FieldAnalysis:
         return valid_int_patterns
 
 
-    def get_time_freq_valid_pulses_and_tuples(self) -> tuple:
+    def __get_time_freq_valid_pulses_and_tuples(self) -> tuple:
         """
         Helper method: Get (compound) pulses and tuples that are both "time overlap" and "vib. resonance" valid,
         and ditto for "time overlap" tuples and "time overlap" but not "vib. resonance" pulses
@@ -1183,7 +1223,7 @@ class FieldAnalysis:
         return time_ovl_tuples, res_and_time_ovl_tuples, res_and_time_compound_pulses, time_not_res_compound_pulses
 
 
-    def get_comp_patterns_at_order(self) -> dict:
+    def __get_comp_patterns_at_order(self) -> dict:
         """
         Helper method: Get compounding patterns at valid orders
         """
@@ -1233,7 +1273,7 @@ class FieldAnalysis:
 
         return comp_patterns_at_order
 
-    def get_pol_avg_bank_and_int_seq_ocp(self) -> tuple:
+    def __get_pol_avg_bank_and_int_seq_ocp(self) -> tuple:
         """
         Helper method: Get macroscopic orientational avg. polarization vector "bank" and valid interaction
         sequences indexed by order, compounding pattern and polarization motif
@@ -1450,7 +1490,7 @@ class FieldAnalysis:
 
         return pol_avg_vector_bank, int_sequences_by_order_comp_pol
 
-    def get_magn_cond_bank_and_int_seq_icpm(self) -> tuple:
+    def __get_magn_cond_bank_and_int_seq_icpm(self) -> tuple:
 
         # Making a bank for conformity with the pol avg vector indexing even though the magnitude
         # condition tuples are hashable by themselves
@@ -1528,6 +1568,15 @@ class VibExperiment:
     thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
     distant to produce an appreciable signal. Default: 1500.0 (units: fs).
 
+    Attributes created at post-init:
+
+    dims: An integer representing the dimensionality of the experiment. Each scan adds a dimension and the 'base
+    dimension' is either zero (integrated intensity detection) or one (time-series or frequency-series (i.e.
+    spectrometer) detection)
+
+    field_analyses: An array of shape equal to the Cartesian product of the experiment scans. For each scan point,
+    an updated field at that scan point is instantiated and analyzed for attributes relevant to later evaluation
+    (mainly intended for use in integrator). See FieldAnalysis class for further description of the created attributes.
     """
 
     field: ElectricField
@@ -1555,7 +1604,7 @@ class VibExperiment:
                 if not isinstance(i, SpecScan):
                     raise TypeError('The scans attribute, if specified, must be a tuple of SpecScan instances')
 
-        self.dim = self.findDimensionality()
+        self.dim = self.__findDimensionality()
 
         # TODO: Inspection of requested scans against field
         #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
@@ -1626,7 +1675,7 @@ class VibExperiment:
         if not any_field_analysis_nonempty:
             raise AssertionError('This experiment will give a zero signal as set up and/or with the present tolerances/thresholds ')
 
-    def findDimensionality(self) -> int:
+    def __findDimensionality(self) -> int:
         """
         Using detector and scans information, determine the dimensionality of the spectral data
         that carrying out this experiment would produce
