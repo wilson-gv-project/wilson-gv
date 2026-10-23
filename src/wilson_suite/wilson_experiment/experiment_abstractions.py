@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional, Iterable
-from operator import itemgetter
 import copy
 from math import inf as infinity
-
-# TODO: Expand functionality according to below TODOs
+from math import exp as exp
+from math import acos as acos
+from math import pi as pi
+import numpy as np
 
 @dataclass
 class SpecDetector:
@@ -15,53 +16,130 @@ class SpecDetector:
     detection_method: String: A detection method: "integrated", "time", "freq"
     If detection_method is "time" or "freq", then the detection data is one spectral dimension
     If detection_method is "integrated", then the detection data is a scalar
-    Currently, only "freq" (frequency-range) detection is supported.
 
-    detector_location: List of floats: Unit vector describing the direction in which the detector is facing.
-    Default: [0.0, 0.0, 1.0]. Currently only used for defining polarization filtering.
+    detection_polarization: 3-tuple of floats: Detect only light with this specific polarization vector.
 
-    detection_polarization: List of floats: Detect only light with this specific polarization vector. Default:
-    [1.0, 0.0, 0.0].
+    detection_interval: 2-tuple of floats: For "time"/"integrated" or "freq" detection, tell the min/max points that the
+    detector will detect in either t/w space, respectively. If None, no truncation of the detection interval will stem
+    from the detector itself (but truncation may still be decided elsewhere (e.g. detecting at "reasonable" times)
+    FIXME: For now, only the interval of detection is taken as an attribute of the detector (leaving its
+     granularity to be decided later). This leaves room to choose this parameter in a way that may avoid misalignment
+     of response function arguments during scans. Return to this question after some use to consider this again.
 
-    detection_range: List of floats: For "time" or "freq" detection, tell over which points (the range)
-    in either t/E space as relevant the data is collected
+    detection_limited_to: A string specifying the detection limitation regime along the direction specified
+    by interaction_filter or detector_faces. Must be one of:
+        - 'same_order': Limit detection to other signals at the same order as detector_max_order
+        - 'up_to_order': Limit detection to other signals up to the same order as detector_max_order
+        - 'only_specified: Limit detection to only those signals specified in interaction_filter. Cannot be
+          combined with the detector_faces keyword.
 
-    wv_filter: List of dictionaries {pulse label: sign, ...}:  Detect only light along this/these particular
-    phase-matching direction(s)
+    ONE of the following must be specified:
 
-    ignore_collinear: If using a wavevector filter, ignore other effects collinear with this/these direction(s)?
-    Currently not used.
+    EITHER:
+
+    interaction_filter: List of interaction patterns as lists of signed integers: Filter signal to this/these
+    (signed) interaction pattern(s). Requirements:
+        - If detection_limited_to is 'same_order' or 'up_to_order', only one interaction pattern may be given.
+        - If detection_limited_to is 'only_specified', any number of interaction patterns may be given.
+        - When this detector is used in an experiment, all given interaction patterns must correspond to the same
+          wavevector. (This is not checked here)
+
+    OR:
+
+    detector_faces: 3-tuple of floats: The detector faces this direction and will detect signals with wavevectors
+    in this direction. Requirements:
+        - detection_limited_to must be 'same_order' or 'up_to_order'.
+
+    AND
+
+    detector_max_order: Maximum order of perturbation at which signals will be detected. Must be specified directly
+    if detector_faces is given, or will be derived from the maximum encountered order in interaction_filter if it is
+    that which instead is given
     """
-    detection_method: str
-    
-    detector_location: Optional[tuple[float]] = None
-    
-    detection_polarization: Optional[tuple[float]] = None
-    
-    # Comment: detection_range as None and detection_method as 'freq' is valid but results in no dimensionality
-    detection_range: Optional[list[float]] = None
-    wv_filter: Optional[list[dict]] = None
-    ignore_collinear: bool = True
 
-    overall_phase: complex = 1.0 + 0.0j
+    detection_method: str
+    detection_polarization: tuple[float]
+    detection_limited_to: str
+
+    detection_interval: tuple[float] | None = None
+    interaction_filter: list[list[int]] | None = None
+    detector_faces: tuple[float] | None = None
+    detector_max_order: int | None = None
 
     def __post_init__(self):
-        if self.detection_method not in {'time', 'freq', 'int'}:
+        if self.detection_method not in ('time', 'freq', 'int'):
             raise ValueError("The detection type must be either 'time', 'freq'(uency), or 'int'(egrated)")
 
-        if not self.overall_phase == 1.0 + 0.0j:
-            raise ValueError('Detector overall phase currently restricted to zero shift')
+        if not isinstance(self.detection_polarization, tuple):
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
 
-        # Will currently not be reach because of restriction to zero shift, but will be relevant when that is lifted
-        if not(abs(self.overall_phase) - 1.0 < 1e-10):
-            raise ValueError('Detector overall phase must be of unit length')
+        if not len(self.detection_polarization) == 3:
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
+
+        if not all([isinstance(i, float) for i in self.detection_polarization]):
+            raise ValueError('The detection polarization must be given as a tuple of 3 floats')
+
+        if self.detection_interval is not None:
+
+            if not len(self.detection_interval) == 2:
+                raise ValueError('The detection interval must be given as a tuple of 2 floats')
+
+            if not all([isinstance(i, float) for i in self.detection_interval]):
+                raise ValueError('The detection interval must be given as a tuple of 2 floats')
+
+        if self.detection_limited_to not in ('same_order', 'up_to_order', 'only_specified'):
+            raise ValueError("The detection limitation must be either 'same_order', 'up_to_order', or 'only_specified'")
+
+        if self.interaction_filter is not None and self.detector_faces is not None:
+
+            raise ValueError('Only one of detector_faces and interaction_filter can be specified')
+
+        elif self.interaction_filter is not None:
+
+            if self.detection_limited_to in ['same_order', 'up_to_order']:
+                if not len(self.interaction_filter) == 1:
+                    raise ValueError('Wavevector filter incompatible with > 1 interactions in filter')
+
+            if not isinstance(self.interaction_filter, list):
+                raise ValueError('The interaction filter must be given as a list of lists')
+
+            if not all([isinstance(i, list) for i in self.interaction_filter]):
+                raise ValueError('The interaction filter must be given as a list of lists')
+
+            for i in self.interaction_filter:
+                for j in i:
+                    if not isinstance(j, int):
+                        raise ValueError('The interaction filter IDs must be integers')
+
+            if self.detector_max_order is not None:
+                raise ValueError('The detector_max_order parameter will be automatically filled when specifying an interaction filter')
+
+            self.detector_max_order = max([len(i) for i in self.interaction_filter])
+
+        elif self.detector_faces is not None:
+
+            if self.detection_limited_to == 'only_specified':
+                raise ValueError("The 'only_specified' detection limitation cannot be used with detector_faces")
+
+            if self.detector_max_order is None:
+                raise ValueError("The detector_max keyword must be given when specifying detector_faces")
+
+            if not isinstance(self.detector_faces, tuple):
+                raise ValueError('The detector_faces keyword must be given as a tuple of 3 floats')
+
+            if not len(self.detector_faces) == 3:
+                raise ValueError('The detector_faces keyword must be given as a tuple of 3 floats')
+
+        else:
+
+            raise ValueError('One of detector_faces and interaction_filter must be specified')
 
 @dataclass
 class ScanObject:
     """
     Class to represent some attribute of the experiment which could be scanned. Currently not in use.
 
-    category: String: The (main) category of the object to be scanned, e.g. "pulse" or "detector"
+    category: String: The (main) category of the object to be scanned, e.g. "pulse"
     subcategory: String: The subcategory of the object to be scanned, e.g. "cf" (carrier frequency)
     id: Integer: An integer identifier for the specific instance of the main category, e.g. if 'category' is "pulse"
         (of which there are typically several, labelled by integer indices), then the present 'id' attribute
@@ -78,20 +156,35 @@ class ScanObject:
     id: int = 0
     coeff: float = 1.0
 
-
     def __post_init__(self):
 
-        # Testing against currently recognized scan categories/subcategories.
-        # Presence in these lists is required but not sufficient to
-        # indicate actual support for a specific scan.
+        # TODO: Consider reintroducing detector range as allowed scanning attribute
+        #  The intent is to allow shifting the detector range in lockstep with scanning freq/time maxima if that
+        #  facilitates data organization
 
-        valid_scan_objs = ['pulse', 'detector']
-        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev'], 'detector': ['detection_range']}
+        # Checking against currently recognized scan categories/subcategories.
+        # Presence in these lists is not sufficient to
+        # indicate actual support for a specific scan.
+        valid_scan_objs = ['pulse']
+        valid_scan_attributes = {'pulse': ['cf', 'tc', 'dev']}
 
         if not self.category in valid_scan_objs:
             raise ValueError('Scan category not supported')
         if not self.subcategory in valid_scan_attributes[self.category]:
             raise ValueError('Scan subcategory not supported')
+
+        # Classify if the scan affects only the pulse integration (convolution)
+        # (e.g. is invariant over the response function), affects only the response function (is invariant over
+        # the pulse integration), or affects both
+
+        self.scan_affects = None
+
+        if self.category == 'pulse':
+            if self.subcategory in ['cf', 'tc', 'dev']:
+                self.scan_affects = 'integration'
+
+        if self.scan_affects == None:
+            raise ValueError('Scan subcategory domain of effect is indeterminate')
 
 
 @dataclass
@@ -99,10 +192,19 @@ class SpecScan:
     """
     Class to represent a spectral scan (adding to the dimensionality of a spectrum)
 
-    scan_objs: Tuple of ScanObject instances: Tells what this scan will vary
+    scan_objs: Tuple of ScanObject instances: Tells what this scan will vary. Their IDs must be different
 
     range: Iterable over which scan objects are varied (scaled by their multipliers as represented by
     their 'coeff' attributes)
+
+    TODO: Support scanning concurrently over several attributes: Either extend this in ScanObject or
+     here in SpecScan specify dependencies between singleton scan objects
+
+    TODO: Support several ranges and link each to a scan object for situations where attributes to be scanned
+     simultaneously don't live in the same space (e.g. polarization (vector) and carrier frequency (scalar))
+
+    TODO: Consider allowing detector range as a scan object when combined with a relevant attribute (for
+     having detector results "lockstep" with such scan if that facilitates data organization)
     """
 
     scan_objs: tuple[ScanObject]
@@ -125,63 +227,96 @@ class SpecScan:
 @dataclass
 class EmPulse:
     """
-    Class to represent an electromagnetic pulse
+    Class to represent an electromagnetic pulse.
+
+    Conventions: In other functions using this class with Gaussian envelopes, parameters with dimensions of time are
+    assumed to be given in units of fs, and parameters with dimensions of frequency (energy) are asseumed
+    to be given in units of cm^-1.
     
     ----
     env: String: Pulse time-domain envelope type: The only current valid choice is "gaussian".
     maxstr: Float: Pulse amplitude at maximum of envelope. Default: Zero strength
     tc: Float: Point in time at which pulse envelope is at maximum
-    cf: float: (Infrared-range) carrier frequency
-    cf_uv: float: Designated "UV/VIS range" part of carrier frequency (for e.g. CARS-style cancellation).
-        - cf_uv should be specified as a nonnegative value: Any cancellation should follow from the phase-matching
-        wavevector--frequency combination in the experiment
-        - For pulses where cf_uv != 0.0, then cf must be 0.0
-    dev: float: Deviation parameter (e.g. broadness of Gaussian pulse). An impulsive-like pulse can be considered as the
-    dev -> 0.0 limit of a Gaussian pulse. A "continuous-wave"-like pulse can be considered as the dev -> infty limit of
-    a Gaussian pulse.
+    cf: float: Carrier (angular) frequency
+    dev: float: Time deviation parameter (e.g. time-domain sqrt(variance) of Gaussian pulse: In other functions using
+    this class with Gaussian envelopes, dev = sigma in A * e^( -(t- tc)**2 / (2 sigma^2)).
+    An impulsive-like pulse can be considered as the dev -> 0.0 limit of a Gaussian pulse.
+    A "continuous-wave"-like pulse can be considered as the dev -> infty limit of a Gaussian pulse.
     wv: floats: Unit wavevector propagation direction with respect to laboratory axes
     pol: floats: Polarization: Unit vector describing polarization direction with respect to laboratory axes
         - Must be orthogonal to wavevector
         - Only linear polarization currently supported (no phase difference between orthogonal components of
         polarization vector in plane of polarization)
         - Default: (1.0, 0.0, 0.0)
-    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse. Currently enforced as (1.0, 0.0)
+
+    pol_comp: Tuple of tuples of floats: Polarizations under pulse compounding. Assumed ordering is same ordering
+    as id_comp
+
+    tol_pol_wv_nonort: Tolerate nonorthogonality between polarization vector and wavevector
+    if deviation from orthogonality is less than tol_pol_wv_nonort degrees. (Intended use is to be able to use
+    simple polarization while still being able to distinguish slightly non-collinear wavevectors). Default: 0.0 (no
+    tolerance)
+
+    overall_phase: complex number defining a unit vector in the complex plane: Overall phase of pulse, expressed as a
+    float and understood as the exponent theta of e^(i theta)
 
     id: integer: Pulse ID label
-    """
-    env: str
-    
-    tc: float = None
-    cf: float = None
-    dev: float = None
 
-    cf_uv: float = 0.0
+    id_comp: Tuple: Pulse ID label(s) (used for pulse compounding)
+
+    is_compound: Boolean: Is this pulse regarded as a compound pulse?
+    """
+
+    env: str
+
+    wv: tuple[float]
+
+    tc: float | None = None
+    cf: float | None = None
+    dev: float | None = None
+
     maxstr: float = 0.0
 
-    wv: tuple[float] = (0.0, 0.0, 1.0)
-    pol: tuple[float] = (1.0, 0.0, 0.0)
-    overall_phase: complex = 1.0 + 0.0j
+    pol: tuple[float] | None = None
+    pol_comp:  tuple[tuple[float]] | None = None
 
-    id: int = None
+    tol_wv_pol_nonort: float | int = 0.0
+
+    overall_phase: float | int = 0.0
+
+    id: int | None = None
+    id_comp: tuple | None = None
+    is_compound: bool = False
 
     def __post_init__(self):
-        
-        # TODO: Generalize to arbitrary pulses and chirped pulses
+
+        if self.pol is not None and self.pol_comp is not None:
+                raise ValueError('Only one of pol or pol_comp may be specified')
+
+        if self.id is not None and self.id_comp is not None:
+                raise ValueError('Only one of id or id_comp may be specified')
+
+        if self.pol is None and self.pol_comp is None:
+                raise ValueError('One of pol or pol_comp must be specified')
+
+        if self.id is None and self.id_comp is None:
+                raise ValueError('One of id or id_comp must be specified')
+
+        if self.pol_comp is not None:
+            if self.id_comp is None:
+                raise ValueError('Both ID and polarization must be specified')
+            else:
+                self.is_compound = True
+
+        if self.pol is not None:
+            if self.id is None:
+                raise ValueError('Both ID and polarization must be specified')
+
+        # Currently only Gaussian envelopes allowed
         allowed_envelopes = ['gaussian']
 
         if self.env not in allowed_envelopes:
-            raise ValueError('The only current recognized pulse envelope choices is "gaussian"')
-
-        if not (self.cf_uv == 0.0):
-            if not (self.cf == 0.0 or self.cf == None):
-                raise ValueError('Pulses with non-zero UV/VIS carrier freqs. must have IR carrier freq part set to zero or None')
-
-        if not (self.cf_uv >= 0.0):
-            raise ValueError('A carrier frequency must be nonnegative')
-
-        if self.cf is not None:
-            if not (self.cf >= 0.0):
-                raise ValueError('A carrier frequency must be nonnegative')
+            raise ValueError('The only current recognized pulse envelope choice is "gaussian"')
 
         if self.env == 'gaussian':
             if self.cf is None:
@@ -197,11 +332,7 @@ class EmPulse:
         if isinstance(self.wv, tuple):
             if len(self.wv) == 3:
                 if all([isinstance(i, float) for i in self.wv]):
-                    wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
-                    if not wv_len == 1.0:
-                        print('Wavevector was normalized')
-                    self.wv = tuple([i/wv_len for i in self.wv])
-
+                    self.wv = tuple(self.wv)
                 else:
                     raise AssertionError('The pulse wavevector must be a len 3 tuple of floats')
             else:
@@ -211,33 +342,33 @@ class EmPulse:
 
         # Polarization: Specify the polarization of the pulse
         # Currently supports unit linear polarization
-        if isinstance(self.pol, tuple):
-            if len(self.pol) == 3:
-                if all([isinstance(i, float) for i in self.pol]):
-                    pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
-                    if not pol_len == 1.0:
-                        print('Wavevector was normalized')
-                    self.pol = tuple([i/pol_len for i in self.pol])
+        # Checks disregarded for compound polarization
+        if self.pol_comp is None:
+            if isinstance(self.pol, tuple):
+                if len(self.pol) == 3:
+                    if all([isinstance(i, float) for i in self.pol]):
+                        pol_len = (self.pol[0]**2.0 + self.pol[1]**2.0 + self.pol[2]**2.0)**0.5
+                        if not pol_len == 1.0:
+                            print('Polarization vector was normalized')
 
-                    wv_pol_dot = self.pol[0] * self.wv[0] + self.pol[1] * self.wv[1] + self.pol[2] * self.wv[2]
+                        self.pol = tuple([i/pol_len for i in self.pol])
 
-                    if not(wv_pol_dot == 0.0):
-                        raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
+                        # Make wv, pol dot product w.r.t. normalized both vectors
+                        wv_len = (self.wv[0]**2.0 + self.wv[1]**2.0 + self.wv[2]**2.0)**0.5
+                        wv_norm = tuple([i/wv_len for i in self.wv])
+                        wv_pol_dot = self.pol[0] * wv_norm[0] + self.pol[1] * wv_norm[1] + self.pol[2] * wv_norm[2]
 
+                        if not(abs(acos(wv_pol_dot) - pi/2.0) <= self.tol_wv_pol_nonort*pi/180.0):
+                            raise AssertionError('Error: Wavevector of pulse not orthogonal to polarization vector')
+
+                    else:
+                        raise AssertionError('The polarization vector must be a len 3 tuple of floats')
                 else:
                     raise AssertionError('The polarization vector must be a len 3 tuple of floats')
             else:
-                raise AssertionError('The polarization vector must be a len 3 tuple of floats')
-        else:
-            raise AssertionError('The polarization must be a len 3 tuple of floats')
+                raise AssertionError('The polarization must be a len 3 tuple of floats')
 
-        if not self.overall_phase == 1.0 + 0.0j:
-            raise AssertionError('Overall phase currently restricted to zero shift')
-
-        if not((abs(self.overall_phase) - 1.0) < 1e-10):
-            raise AssertionError('The overall phase must be of unit length')
-
-    def tendsImpulsive(self):
+    def tendsImpulsive(self) -> bool:
         """
         Does this pulse tend to impulsive?
         """
@@ -249,7 +380,7 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
-    def tendsContinuous(self):
+    def tendsContinuous(self) -> bool:
         """
         Does this pulse tend to being continuous-wave-like?
         """
@@ -261,11 +392,9 @@ class EmPulse:
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
 
-
-# FIXME: Here and next two fns: Change to be in terms of f(*, kw1=kw1, ...) style
-def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, maxstr: float=0.0,
-                        wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                        overall_phase: complex = 1.0 + 0.0j, id: int = None):
+def make_gaussian_pulse(tc: float | int, cf: float | int, dev: float | int, maxstr: float | int,
+                        wv: tuple[float| int], pol: tuple[float| int],
+                        overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort = 0.0) -> EmPulse:
     """
     Helper function: Makes a Gaussian EmPulse instance with the selected parameters.
     See EmPulse for a definition of these parameters.
@@ -273,13 +402,13 @@ def make_gaussian_pulse(tc: float, cf: float, dev: float, cf_uv: float = 0.0, ma
     Required arguments: tc, cf, dev.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = dev, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort= tol_wv_pol_nonort)
 
 
-def make_impulsive_gaussian_pulse(tc: float, cf: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
-                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
+def make_impulsive_gaussian_pulse(tc: float | int, cf: float | int = None, maxstr: float | int=0.0,
+                         wv: tuple[float | int] = (0.0, 0.0, 1.0), pol: tuple[float | int] = (1.0, 0.0, 0.0),
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort: float | int =0.0)-> EmPulse:
     """
     Helper function: Makes an impulsive-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -289,12 +418,12 @@ def make_impulsive_gaussian_pulse(tc: float, cf: float = None, cf_uv: float = 0.
     Required arguments: tc. All other arguments optional.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = 0.0, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort = tol_wv_pol_nonort)
 
-def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxstr: float=0.0,
-                         wv: tuple[float] = (0.0, 0.0, 1.0), pol: tuple[float] = (1.0, 0.0, 0.0),
-                         overall_phase: complex = 1.0 + 0.0j, id: int = None):
+def make_cw_gaussian_pulse(cf: float | int, tc: float | int = None, maxstr: float | int=0.0,
+                         wv: tuple[float | int] = (0.0, 0.0, 1.0), pol: tuple[float | int] = (1.0, 0.0, 0.0),
+                         overall_phase: float | int = 0.0, id: int = None, tol_wv_pol_nonort: float | int = 0.0)-> EmPulse:
     """
     Helper function: Makes a continuous-wave-tending Gaussian EmPulse instance with the selected parameters.
     See EmPulse for definitions of these parameters. The present function does not accept a dev parameter
@@ -305,8 +434,109 @@ def make_cw_gaussian_pulse(cf: float, tc: float = None, cf_uv: float = 0.0, maxs
     other make_..._pulse functions because of this optionality.
     """
 
-    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, cf_uv = cf_uv, maxstr = maxstr, wv = wv,
-                   pol = pol, overall_phase = overall_phase, id = id)
+    return EmPulse(env = 'gaussian', tc = tc, cf = cf, dev = infinity, maxstr = maxstr, wv = wv,
+                   pol = pol, overall_phase = overall_phase, id = id, tol_wv_pol_nonort = tol_wv_pol_nonort)
+
+def make_compound_gaussian_pulse(p1: EmPulse, p2: EmPulse = None) -> EmPulse:
+    """
+    Make a compound Gaussian pulse from two EmPulse instances.
+
+    p1, p2: The EmPulse instances to be compounded (p2 is optional)
+
+    Returns: An EmPulse instance representing the compounded pulse
+    """
+
+    # TODO: When fully incorporating limiting pulse-shapes (fully impulsive or fully adiabatic), extend this routine
+    #  accordingly
+
+    if not p1.env == 'gaussian':
+        raise ValueError('Pulses to be compounded must be Gaussian')
+
+    if p2 is None:
+
+        comp_pulse = copy.deepcopy(p1)
+
+        comp_pulse.pol_comp = (copy.deepcopy(p1.pol),)
+        comp_pulse.pol = None
+
+        comp_pulse.id_comp = (copy.deepcopy(p1.id),)
+        comp_pulse.id = None
+
+        comp_pulse.is_compound = True
+
+        return comp_pulse
+
+    else:
+
+        if not p2.env == 'gaussian':
+            raise ValueError('Pulses to be compounded must be Gaussian')
+
+        # Combining attributes of p1 and p2
+        # Here using the fact that the product of Gaussians is another Gaussian with specific expressions for
+        # the new means and variances
+        p1dsq = (p1.dev) ** 2
+        p2dsq = (p2.dev) ** 2
+        p12dsq = p1dsq + p2dsq
+
+        # New time maximum, carrier frequency, deviation, overall coefficient
+        new_tc = (p1.tc * p2dsq + p2.tc * p1dsq) / p12dsq
+        new_cf = p1.cf + p2.cf
+        new_dev = (p1dsq * p2dsq / p12dsq) ** 0.5
+        new_maxstr = p1.maxstr * p2.maxstr * exp(-1 * ((p1.tc - p2.tc) ** 2) / (2 * p12dsq))
+
+        # New wavevector as sum
+        new_wv = tuple([p1.wv[j] + p2.wv[j] for j in range(3)])
+
+        # Update polarization
+        if p1.is_compound:
+            lcppc = list(p1.pol_comp)
+        else:
+            lcppc = [p1.pol]
+
+        if p2.is_compound:
+            lcppc.extend(p2.pol_comp)
+        else:
+            lcppc.append(p2.pol)
+
+        new_pol_comp = tuple(lcppc)
+
+        # New phase is sum
+        new_overall_phase = p1.overall_phase + p2.overall_phase
+
+        # Update ID
+        if p1.is_compound:
+            nic = list(p1.id_comp)
+        else:
+            nic = [p1.id]
+
+        if p2.is_compound:
+            nic.extend(p2.id_comp)
+        else:
+            nic.append(p2.id)
+
+        new_id_comp = tuple(nic)
+
+        # Nonorthogonality tolerance not currently used but carried through as max for completeness
+        new_tol_nonort = max(p1.tol_wv_pol_nonort, p2.tol_wv_pol_nonort)
+
+        # Make compound pulse
+        return EmPulse(env='gaussian', tc=new_tc, cf=new_cf, dev=new_dev, maxstr=new_maxstr,
+                       wv=new_wv, pol=None, pol_comp=new_pol_comp, overall_phase=new_overall_phase,
+                       id=None, id_comp=new_id_comp, is_compound=True,
+                       tol_wv_pol_nonort=new_tol_nonort)
+
+
+def compound_pulses_in_list(pulses: list[EmPulse]) -> EmPulse:
+
+    if not all([i.env == 'gaussian' for i in pulses]):
+        raise ValueError('Pulses to be compounded must be Gaussian')
+
+    comp_acc = make_compound_gaussian_pulse(p1 = pulses[0])
+
+    for i in pulses[1:]:
+        comp_acc = make_compound_gaussian_pulse(p1 = comp_acc, p2 = i)
+
+    return comp_acc
 
 # The field consists of a collection of pulses
 @dataclass
@@ -317,12 +547,16 @@ class ElectricField:
     ----
     pulses: List of EmPulse instances: The pulses making up the field. While EmPulse itself does not require an ID to
     be specified, the use of pulses in ElectricField must have each pulse be assigned an ordinal integer ID starting from 1
+    These pulses are understood as "hosting" a cos(w_c t + k*r) oscillatory factor; post-init
+    will further divide them into individual positive/negative e^(i (-w_c t + k*r) + c.c. components
     """
 
     pulses: tuple[EmPulse]
 
     def __post_init__(self):
 
+        # NOTE: This restriction can be softened somewhat to pulse IDs needing to be a positive integer
+        # (but not necessarily together correspond exactly to the ordinal list)
         pulse_id_target = [i + 1 for i in range(len(self.pulses))]
         for i in self.pulses:
             if not i.id in pulse_id_target:
@@ -333,6 +567,978 @@ class ElectricField:
         # This condition should never be met but just to be safe
         if not pulse_id_target == []:
             raise AssertionError('Collection of pulse IDs do not correspond to ordinal list')
+
+        if all([i.tendsContinuous() for i in self.pulses]):
+            self.cw_field = True
+        else:
+            self.cw_field = False
+
+        if all([i.tendsImpulsive() for i in self.pulses]):
+            self.impulsive_field = True
+        else:
+            self.impulsive_field = False
+
+        # Making signed field: A dictionary corresponding to pulse IDs, divided into positive/negative
+        # freq/wavevector components. Negative components will have IDs = -1 * original ID.
+        # The pulses created here will be understood to have an oscillatory factor e^(i (-w_c t + k*r) or c.c.
+        # Organizing in dictionary when the pulse ID is also in the instance is redundant but kept for convenience
+
+        signed_pulses = {}
+
+        for i in self.pulses:
+
+            # Positive component
+            signed_pulses[i.id] = copy.deepcopy(i)
+
+            # Negative component
+            # NOTE: The polarization and overall phase should be complex conjugated here as I understand it, return to
+            # if there are problems
+            signed_pulses[-1 * i.id] = EmPulse(env = i.env, tc = i.tc, cf = -1 * i.cf, dev = i.dev, maxstr = i.maxstr,
+                                               wv = tuple([-1.0*j for j in i.wv]),
+                                               pol = tuple([j.real - j.imag for j in i.pol]),
+                                               overall_phase = -1 * i.overall_phase, id = -1 * i.id,
+                                               tol_wv_pol_nonort=i.tol_wv_pol_nonort)
+
+            self.signed_pulses = signed_pulses
+
+
+    # Take a reference to an interaction pattern and return all interaction patterns whose vector sum
+    # corresponds to the same direction
+    def wavevectors_matching_direction(self, direction: tuple[float | int], max_order: int, filter: str='same_order') -> list[tuple]:
+        """
+        direction: The 3D direction along for which matching wavevectors will be searched
+
+        max_order: Maximum order of interaction to be considered
+
+        filter: A flag to constrain the search (default and currently only supported: 'same_order', which will
+        make this function return only those patterns which both correspond to the same direction and contain the
+        same number of interactions as ids, and 'up_to_order', which will additionally return all lower-order
+        combinations summing to this pattern.
+
+        Returns: A list of tuples: Each tuple is a (sorted and filtered to unique after sorting) interaction pattern
+        whose wavevector will be oriented in the same direction as that corresponding to ids
+        """
+        from itertools import combinations_with_replacement as combs
+
+        # Normalize
+        t_len = (sum([k ** 2 for k in direction])) ** 0.5
+        if not t_len == 0.0:
+            target_wv = [j/t_len for j in direction]
+        else:
+            raise ValueError('The target wavevector is zero length')
+
+        # The input interaction pattern trivially matches
+        matching_wv = []
+
+        if filter == 'same_order':
+            ord_start = max_order
+            ord_end = max_order + 1
+
+        elif filter == 'up_to_order':
+            ord_start = 1
+            ord_end = max_order + 1
+
+        else:
+            raise NotImplementedError('Unrecognized filter in wavevectors_matching_ids')
+
+        all_ids = self.signed_pulses.keys()
+
+        parallel_tol = 1.e-10
+
+        for ord in range(ord_start, ord_end):
+
+            # Make all unique combinations of signed pulses keys of len ord
+            for c in combs(all_ids, ord):
+
+                # Make candidate wavevector
+                cand_wv = [0.0, 0.0, 0.0]
+                for i in c:
+                    cand_wv = [cand_wv[j] + self.signed_pulses[i].wv[j] for j in range(3)]
+
+                c_len = (sum([k ** 2 for k in cand_wv])) ** 0.5
+                if not c_len == 0.0:
+                    cand_wv = [j / c_len for j in cand_wv]
+
+                if abs(sum([cand_wv[i] * target_wv[i] for i in range(3)]) - 1) < parallel_tol:
+
+                    tc = tuple(sorted(c))
+                    if not tc in matching_wv:
+                        matching_wv.append(tc)
+
+        return matching_wv
+
+    def overlapping_pulses_for_interaction_pattern(self, pattern: list | tuple, tol_n_dev: float | int = 5.0) -> tuple[tuple]:
+        """
+        Calculate and tell which pulses of this field have overlapping temporal envelopes
+        under a tolerance parameter for the given interaction pattern.
+        This routine currently only supports this calculation for Gaussian-envelope pulses.
+
+        pattern: List or tuple describing interactions with field. Ordering is arbitrary and
+        duplicates are fine.
+
+        tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses): Each pulse's
+        "region of influence" is taken as its arg(time envelope max) +/- tol_n_dev * the pulse's
+        time-domain deviation parameter. A tuple of pulses is ruled to have overlapping temporal
+        envelope if the intersection of all relevant pulse regions is nonempty.
+
+        Returns: A tuple of tuples. Each "inner" tuple is a tuple of pulse IDs ruled to be
+        overlapping in time. Any tuple not in the return data was ruled to not overlap in time.
+        """
+
+        #TODO: Make this w.r.t. a phase-matching condition and signed fields
+
+        from itertools import combinations, chain
+        from math import inf as infinity
+
+        pattern_sorted = sorted(list(pattern))
+
+        # Make interval around each pulse as dictionary
+        pulse_intervals = {}
+
+        for i in pattern_sorted:
+
+            if not self.signed_pulses[i].env == 'gaussian':
+                raise ValueError('overlapping_pulses currently only supports Gaussian-envelope pulses')
+
+            if self.signed_pulses[i].tendsImpulsive():
+                pulse_intervals[i] = [self.signed_pulses[i].tc, self.signed_pulses[i].tc]
+            elif self.signed_pulses[i].tendsContinuous():
+                pulse_intervals[i] = [-infinity, infinity]
+            else:
+                pulse_intervals[i] = [self.signed_pulses[i].tc - tol_n_dev * self.signed_pulses[i].dev,
+                                      self.signed_pulses[i].tc + tol_n_dev * self.signed_pulses[i].dev]
+
+        # Make powerset of pulse IDs
+        pulse_powerset = list(chain.from_iterable(combinations(pattern_sorted, i) for i in range(len(pattern_sorted) + 1) ))
+
+        # For each element in powerset (smaller to larger sets): Determine intersection
+        # If intersection is nonempty, add to return data
+
+        valid_intersections = []
+
+        for i in pulse_powerset:
+
+            # The empty tuple is not relevant
+            if len(i) == 0:
+                continue
+
+            # Single pulses are trivially overlapping
+            elif len(i) == 1:
+                if not i in valid_intersections:
+                    valid_intersections.append(tuple(i))
+
+            # General case
+            else:
+
+                curr_interval = copy.deepcopy(pulse_intervals[i[0]])
+
+                for j in i[1:]:
+
+                    # If no overlap, break iterations
+                    if (pulse_intervals[j][0] > curr_interval[1]) or (pulse_intervals[j][1] < curr_interval[0]):
+                        break
+
+                    # Otherwise narrow current interval of overlap
+                    curr_interval[0] = max(curr_interval[0], pulse_intervals[j][0])
+                    curr_interval[1] = min(curr_interval[1], pulse_intervals[j][1])
+
+                # If loop was not broken, consider this a valid intersection
+                else:
+                    if not i in valid_intersections:
+                        valid_intersections.append(tuple(i))
+
+        return valid_intersections
+
+
+    def all_resonance_screened_compound_pulses(self, cand_pulse_tuples: list[tuple[int]], thres_freq:float | int=8000.,
+                                               tol_n_dev: float | int = 5.0) -> dict[tuple, EmPulse]:
+        """
+        Take a list of candidate pulse tuples and decide if a compound pulse created from them
+        can produce resonance in the vibrational as judged by whether the compound's frequency components
+        (with a cutoff) has a bandwidth that to a non-zero extent intersects with frequency components
+        falling beneath a threshold, returning all such valid candidates as a {pulse ID tuple:EmPulse instance} dictionary
+        This routine currently only supports Gaussian-envelope pulses.
+
+        cand_pulse_tuples: A list of pulse tuples specified by (signed) pulse IDs. The main intended origin of this list
+        is to have it be those tuples that were found to have sufficiently large time-domain intersections
+        as judged by overlapping_pulses_for_interaction_pattern().
+
+        thres_freq: A threshold (default: +/-8000 cm^-1) outside which no resonance in
+        the vibrational manifold is considered. To be given in units of cm^-1.
+
+        tol_n_dev: Tolerance parameter (for Gaussian-envelope pulses) (default: 5 units): Each pulse's frequency-domain
+        bandwidth is taken as arg(freq domain max) +/- tol_n_dev * the pulse's frequency-domain deviation parameter.
+
+        Returns: screened_compound_pulses: A dictionary of those {pulse tuple:EmPulse instance} pairs describing the
+        cand_pulse_tuples candidates that satisfy the requirement
+        """
+        from wilson_suite.wilson_utils.unit_convertor import per_cm_x_fs
+
+        screened_compound_pulses = {}
+
+        # Loop over candidate tuples
+        for c in cand_pulse_tuples:
+
+            # Create compounded pulse instance
+            comp_pulse = compound_pulses_in_list([self.signed_pulses[i] for i in c])
+
+            # Determine bandwidth and check if any of it falls inside the threshold range
+            w_range = [comp_pulse.cf - tol_n_dev * (per_cm_x_fs/comp_pulse.dev),
+                       comp_pulse.cf + tol_n_dev * (per_cm_x_fs/comp_pulse.dev)]
+
+            # If upper limit of bandwidth is >= lower threshold and lower limit of bandwith is <= upper threshold
+            # then this compound pulse is deemed in range
+            if not(w_range[1] < -1*thres_freq) and not(w_range[0] > thres_freq):
+                screened_compound_pulses[c] = copy.deepcopy(comp_pulse)
+
+        return screened_compound_pulses
+
+    def new_field_with_changes(self, scans: tuple[SpecScan], index: tuple[int]):
+        """
+        Take a list of changes and return a new ElectricField instance corresponding to these changes
+        applied to self.
+
+        scans: The scans under which changes are to be made
+
+        index: A tuple of integers specifying the index of each scan's range to be applied
+
+        returns: A new ElectricField instance with the requested changes
+        """
+
+        pulse_dict = {i.id: copy.deepcopy(i) for i in self.pulses}
+
+        for i in range(len(scans)):
+            scan_base_val = scans[i].range[index[i]]
+
+            for j in scans[i].scan_objs:
+
+                if not (j.category == 'pulse'):
+                    raise ValueError('Only pulse attributes may be changed')
+
+                if not j.id in pulse_dict:
+                    raise ValueError('Pulse ID not found in field')
+
+                if j.subcategory == 'cf':
+                    pulse_dict[j.id].cf += j.coeff * scan_base_val
+
+                elif j.subcategory == 'tc':
+                    pulse_dict[j.id].tc += j.coeff * scan_base_val
+
+                elif j.subcategory == 'dev':
+                    pulse_dict[j.id].dev += j.coeff * scan_base_val
+
+                else:
+                    raise ValueError('Invalid scan subcategory')
+
+        return ElectricField(copy.deepcopy(tuple(pulse_dict.values())))
+
+def compounding_patterns_at_order(n) -> list[tuple]:
+    """
+    Generate all compounding patterns at a given order
+
+    n: The order to be considered
+
+    Returns: A list of tuples: Each tuple is a compounding pattern at this order
+    """
+
+    def compounding_patterns_recurse(n: int, curr: list, acc: list[tuple]):
+        """
+        Tail-recursive routine to accumulate compounding patterns
+        """
+
+        # Termination condition
+        if n == 0:
+            if not tuple(curr) in acc:
+                acc.append(tuple(curr))
+
+        else:
+
+            # Add 1 to all in curr and recurse
+            for i in range(len(curr)):
+
+                new_curr = copy.deepcopy(curr)
+                new_curr[i] += 1
+                compounding_patterns_recurse(n-1, new_curr, acc)
+
+            # Extend curr by 1 and recurse
+            new_curr = copy.deepcopy(curr)
+            new_curr.append(1)
+            compounding_patterns_recurse(n - 1, new_curr, acc)
+
+        return
+
+    # Initialize results, seed holder
+    comp_patterns = []
+    seed = []
+
+    compounding_patterns_recurse(n, seed, comp_patterns)
+
+    return comp_patterns
+
+def pulse_time_ordering_valid(pulses: list[EmPulse] | tuple[EmPulse], thres_waiting_time: float|int  = 1000.,
+                              tol_n_dev: float | int = 5.0) -> bool:
+    """
+    Take an ordered sequence of (compounded) pulses and determine whether the time ordering is
+    (according to thresholds) is causally possible (note: Not "determine if definitely causally valid")
+
+    pulses: List of EmPulse instances in order of proposed interaction
+
+    thres_waiting_time: How long to allow wait (allowing for decay of response) after each pulse
+
+    tol_n_dev: Cutoff parameter: For how much time around each pulse to count it as "on"
+
+    FIXME: The current test is not very strict and will likely allow in some orderings that are
+        quite unlikely. Can revisit if this becomes a problem in practice or if (unlikely) known causal
+        orderings are ruled out.
+    """
+
+    # Singleton sequences are trivially valid
+    if len(pulses) == 1:
+        return True
+
+    # Initializing current window to any time
+    curr_window = [-infinity, infinity]
+
+    for i in range(len(pulses)):
+
+        # The current pulse is considered "on" during a tol_n_dev*pulse[i].dev window around its time maximum
+        curr_pulse_on = [pulses[i].tc - tol_n_dev * pulses[i].dev,
+                          pulses[i].tc + tol_n_dev * pulses[i].dev]
+
+        # The current pulse must be on during some part of the allowed window, otherwise the interaction
+        # is not considered causally valid
+
+        # Its end time must happen after the window start and its start time must happen before the window end
+        if (curr_pulse_on[1] < curr_window[0]) or (curr_pulse_on[0] > curr_window[1]):
+            return False
+
+        # The interaction window for next pulse is here considered as
+        # between whichever came last of the current pulse or the current window's start
+        # and whichever came first of the current pulse's latest "on" time plus a waiting tolerance
+        curr_window = [max(curr_window[0], curr_pulse_on[0]), min(curr_pulse_on[1], curr_window[1]) + thres_waiting_time]
+
+    return True
+
+def magnitude_conditions_for_ind_var_tuple(ind_var_tuple: tuple[tuple], pulses: dict[tuple, EmPulse],
+                                           thres_magn: float | int, tol_n_dev: float | int = 5.0) -> tuple[tuple[tuple], tuple[tuple]]:
+    """
+    Take a tuple of independent variables, consider its powerset sans {} and for each such element,
+    evaluate if the frequency-domain range of the corresponding tuple of (possibly compound) pulses is
+    (by a margin exceeding a specified threshold)
+    a) always positive, b) always negative, or c) indeterminate. If a) or b) register it in the appropriate
+    return tuple.
+
+    ind_var_tuple: A tuple of independent variables (a pulse interaction ordering at a compounding pattern)
+
+    pulses: A bank of pulse data (indexed by (compound) pulse indices)
+
+    thres_magn: A threshold defining a margin which the frequency-domain ranges must surpass in order to be deemed
+    eligible for the output plus/minus bins ("must be >/< 0 by at least this margin")
+
+    tol_n_dev: A frequency-domain tolerance parameter (number of standard deviations for a Gaussian pulse) for
+    constructing a bounded bandwidth interval for a (compound) pulse
+
+    Returns: Two tuples of tuples t_plus and t_minus. Both are given in terms of interaction number indices (NOT pulse
+     references).
+    """
+    from itertools import combinations, chain
+    from wilson_suite.wilson_utils.unit_convertor import per_cm_x_fs
+
+    # Get freq ranges for the involved (compound) pulses and index it by interaction number
+    freq_ranges = {}
+    fr_ctr = 0
+
+    for i in ind_var_tuple:
+
+        curr_pulse = pulses[i]
+
+        freq_ranges[fr_ctr] = [curr_pulse.cf - tol_n_dev * (per_cm_x_fs / curr_pulse.dev),
+                   curr_pulse.cf + tol_n_dev * (per_cm_x_fs / curr_pulse.dev)]
+
+        fr_ctr += 1
+
+    # Make all nonempty subsets of interaction combinations
+    int_combs = list(chain.from_iterable(combinations(range(len(ind_var_tuple)), i) for i in range(1, len(ind_var_tuple) + 1)))
+
+    t_plus = []
+    t_minus = []
+
+    # Loop over powerset and construct combined intervals, check for sign and put in plus/minus bins (or nowhere) as appropriate
+    for i in int_combs:
+
+        # Adding together lower/upper bounds to produce combined bounds
+        curr_interval = [0.0, 0.0]
+        for j in i:
+            curr_interval[0] += freq_ranges[j][0]
+            curr_interval[1] += freq_ranges[j][1]
+
+        # Always positive in excess of thres_magn
+        if (curr_interval[0] > thres_magn) and (curr_interval[1] > thres_magn):
+            t_plus.append(copy.deepcopy(i))
+
+        # Always negative in excess of -thres_magn
+        elif (curr_interval[0] < -1.0 * thres_magn) and (curr_interval[1] < -1.0 * thres_magn):
+            t_minus.append(copy.deepcopy(i))
+
+    return tuple(t_plus), tuple(t_minus)
+
+@dataclass
+class FieldAnalysis:
+    """
+    Class to carry out and hold results from analysis done on a field.
+
+    Required arguments:
+
+    field: Electric field instance on which the analysis is to be made
+
+    polarization_filter: A tuple specifying the polarization filter of the detector
+
+    detection_limited_to: String: Speficies regime under which matching wavevectors to that/those of the interaction
+    will be searched for/included
+
+    max_ord: Maximum order of perturbation to be considered
+
+    MUST provide one of the following arguments (and the other one must be None):
+
+    detector_faces: 3-tuple of floats: The detector faces this direction and will detect signals with wavevectors
+    in this direction. Requirements:
+        - detection_limited_to must be 'same_order' or 'up_to_order'.
+
+    OR
+
+    interaction_filter: A list of interaction pattern(s) (each a list of signed integers referring to pulse IDs with
+    the sign specifying the freq/wavevector parity) to be considered
+
+    Optional arguments:
+
+    tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse time overlap. Default: 5.
+
+    tol_n_dev_w: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse ability to create vibrational resonance. Default: 5.
+
+    thres_freq: A threshold: (compound) pulses whose no frequency components fall within the range
+     [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
+
+    thres_magn: A threshold used to define what "significant" means in determining whether a pulse combination's
+    frequency components are "significantly greater/smaller than 0". Default: 200 (units: cm^-1)
+
+    thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
+    distant to produce an appreciable signal. Default: 1500.0 (units: fs).
+
+    Attributes created at post-init:
+
+    valid_int_patterns: A list of tuples where each tuple refers to an (unordered) combination of interactions with the
+    pulses of the field, where positive/negative indices denote resp. positive and negative wavevector components. Each
+    interaction pattern listed here was found to be valid under the setup parameters (i.e. they would give signals along
+    the same wavevector and otherwise fulfill the requested detection limitation regime).
+
+    int_pattern_orders: A list telling which unique orders of interactions are represented in valid_int_patterns
+
+    int_patterns_by_order: An {order: [patterns]} dictionary organizing the above information combined
+
+    time_ovl_tuples: List of tuples: From unique subsets of pulse references in valid_int_pattern, tells which out of
+    these subsets were found to overlap sufficiently in time.
+
+    res_and_time_ovl_tuples: Same as time_ovl_tuples but the criterion is now extended to require that subsets also have
+    frequency components able to create vibrational resonance
+
+    res_and_time_comp_pulses: A {tuple: EmPulse} dictionary relating pulse reference tuples in res_and_time_ovl_tuples
+    to actual combined pulse instances formed to represent them
+
+    time_not_res_comp_pulses: Same structure as res_and_time_comp_pulses but instead involves pulse reference tuples
+    that were time-overlapping but NOT able to create vibrational resonance
+
+    all_valid_pulses: Union of res_and_time_comp_pulses and time_not_res_comp_pulses
+
+    comp_patterns_at_order: {order: list[tuples]} dictionary telling the valid compounding patterns at each relevant order
+
+    pol_avg_vector_bank: An {index: vector} dictionary collecting different unique "macroscopic polarization vector" setups
+
+    int_sequences_by_order_comp_pol: Valid interaction sequences indexed as a three-fold dictionary structure as
+    (outer to inner) order, comounding pattern, macroscopic polarization regime: list of interaction sequences (each
+    entry a tuple of tuples)
+
+    magnitude_condition_bank: An {index: (tuple_plus, tuple_minus)} dictionary collecting different unique magnitude
+    condition cases, where tuple_plus contains (in order of interaction index) all tuples whose freq. sum was
+    significantly > 0, and vice versa (significantly < 0) for tuple_minus.
+
+    int_sequences_by_order_comp_pol_magn: As int_sequences_by_order_comp_pol but further subindexed at the innermost
+    level by magnitude condition regime
+    """
+
+    field: ElectricField
+    polarization_filter: tuple[float | int]
+    detection_limited_to: str
+    max_ord: int
+
+    detector_faces: tuple[float] | None = None
+    interaction_filter: list[list[int]] | None = None
+
+    tol_n_dev_t: float | int = 5.0
+    tol_n_dev_w: float | int = 5.0
+    thres_freq: float | int = 8000.0
+    thres_magn:  float | int = 200.0
+    thres_waiting_time: float | int = 1500.0
+
+    def __post_init__(self):
+
+        # TODO: Make simplified handling for ideal frequency-domain (and later also possibly ideal time-domain) experiments
+
+        # Get valid interaction patterns
+        self.valid_int_patterns = self.__get_interaction_patterns()
+
+        # Compile information about which orders of interaction are represented in the interaction patterns
+        int_pattern_orders = []
+
+        for i in self.valid_int_patterns:
+            if not len(i) in int_pattern_orders:
+                int_pattern_orders.append(len(i))
+
+        self.int_pattern_orders = sorted(int_pattern_orders)
+
+        # Group interaction patterns according to order
+        int_patterns_by_order = {}
+
+        for i in self.valid_int_patterns:
+            if len(i) in int_patterns_by_order:
+                int_patterns_by_order[len(i)].append(i)
+            else:
+                int_patterns_by_order[len(i)] = [i]
+
+        self.int_patterns_by_order = int_patterns_by_order
+
+        # Generate time-overlapping tuples, time-overlapping and "vib. resonance possible" tuples,
+        # time-overlapping and "vib. resonance possible" pulses, and time-overlapping but not "vib. resonance possible"
+        # pulses
+        self.time_ovl_tuples, self.res_and_time_ovl_tuples, self.res_and_time_comp_pulses, self.time_not_res_comp_pulses = self.__get_time_freq_valid_pulses_and_tuples()
+
+        # Generate valid compounding patterns at all relevant orders
+        self.comp_patterns_at_order = self.__get_comp_patterns_at_order()
+
+        # Get polarization "average vector" bank and interaction sequences indexed by order, compounding pattern and
+        # polarization averaging category
+        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.__get_pol_avg_bank_and_int_seq_ocp()
+
+        # Making an "all valid pulses" bank that is a union of res_and_time_ and time_not_res_ pulse tuples
+        all_valid_pulses = copy.deepcopy(self.res_and_time_comp_pulses)
+
+        for i in self.time_not_res_comp_pulses:
+            if not i in all_valid_pulses:
+                all_valid_pulses[i] = self.time_not_res_comp_pulses[i]
+
+        self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
+
+        # Get "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
+        # polarization averaging category, and magnitude condition category
+        self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.__get_magn_cond_bank_and_int_seq_icpm()
+
+
+    def __get_interaction_patterns(self) -> list[tuple]:
+        """
+        Helper method: Get valid interaction patterns
+        """
+
+        if self.interaction_filter is not None:
+
+            # Make target wavevector from interaction filter entry
+            cand_wv = [0.0, 0.0, 0.0]
+            for i in self.interaction_filter[0]:
+                cand_wv = [cand_wv[j] + self.field.signed_pulses[i].wv[j] for j in range(3)]
+
+            c_len = (sum([k ** 2 for k in cand_wv])) ** 0.5
+            if not c_len == 0.0:
+                cand_wv = [j / c_len for j in cand_wv]
+
+            target_wv = cand_wv
+
+        elif self.detector_faces is not None:
+
+            # In this case, the target wavevector is the direction the detector faces
+            target_wv = self.detector_faces
+
+        else:
+
+            raise ValueError('Only one of detector_faces and interaction_filter can (and must) be specified')
+
+        # Find wavevector-matching interaction patterns
+        if self.detection_limited_to in ['same_order', 'up_to_order']:
+
+            valid_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord,
+                                                                            filter=self.detection_limited_to)
+
+        elif self.detection_limited_to == 'only_specified':
+
+            valid_int_patterns = [tuple(sorted(list(i))) for i in self.interaction_filter]
+
+            # Check if all wavevectors in interaction filter point in the same direction; if not, raise error
+
+            # Get all wavevectors matching the direction of a max order interaction in the filter with the
+            # 'up_to_order' flag; the returned set must contain all requested interaction patterns
+            maxlen = 0
+            for i in range(len(self.interaction_filter)):
+                if len(self.interaction_filter[i]) > maxlen:
+                    maxlen = len(self.interaction_filter[i])
+                    arg_max = i
+
+            test_int_patterns = self.field.wavevectors_matching_direction(target_wv, self.max_ord, filter='up_to_order')
+
+            for i in valid_int_patterns:
+                if not i in test_int_patterns:
+                    raise ValueError('Not all requested interaction patterns correspond to the same wavevector')
+
+        else:
+            raise ValueError('Unrecognized detection regime')
+
+        return valid_int_patterns
+
+
+    def __get_time_freq_valid_pulses_and_tuples(self) -> tuple:
+        """
+        Helper method: Get (compound) pulses and tuples that are both "time overlap" and "vib. resonance" valid,
+        and ditto for "time overlap" tuples and "time overlap" but not "vib. resonance" pulses
+        """
+
+        # Initialize result holders
+        time_ovl_tuples = []
+        time_not_res_compound_pulses = {}
+
+        # For all valid interaction patterns:
+        for i in self.valid_int_patterns:
+
+            # Accumulate all valid and relevant time-overlapping tuples (compounding and non-compounding)
+            time_ovl_tuples = list(set(time_ovl_tuples).union(self.field.overlapping_pulses_for_interaction_pattern(i, self.tol_n_dev_t)))
+
+        # Screen these according to resonance possibility (obtaining compound pulse instances)
+        res_and_time_compound_pulses = self.field.all_resonance_screened_compound_pulses(time_ovl_tuples, self.thres_freq, self.tol_n_dev_w)
+
+        # Take keys of prev results as overview of both resonance and time-overlap screened tuples
+        res_and_time_ovl_tuples = copy.deepcopy(tuple(res_and_time_compound_pulses.keys()))
+
+        # Obtain remaining compound pulses (time-overlapping but not resonance-possible) (they apply for the last interaction)
+        for i in time_ovl_tuples:
+            if not(i in res_and_time_ovl_tuples):
+                time_not_res_compound_pulses[i] = compound_pulses_in_list([self.field.signed_pulses[j] for j in i])
+
+        return time_ovl_tuples, res_and_time_ovl_tuples, res_and_time_compound_pulses, time_not_res_compound_pulses
+
+
+    def __get_comp_patterns_at_order(self) -> dict:
+        """
+        Helper method: Get compounding patterns at valid orders
+        """
+
+        # Compile info about time overlap compounding levels
+        # NOTE: Includes 0 for validity when the last (emission) compounding coefficient is 1
+        time_ovl_comp_lvls = [0]
+        for i in self.time_ovl_tuples:
+            if not len(i) in time_ovl_comp_lvls:
+                time_ovl_comp_lvls.append(len(i))
+
+        comp_patterns_at_order = {}
+
+        for i in self.int_pattern_orders:
+
+            # Generate candidate patterns (all patterns but will be screened)
+            candidate_compounding_patterns_at_order = compounding_patterns_at_order(i + 1)
+
+            # Screen based on occurrence of valid orders in time_ovl_tuples
+            # (if no pulse tuple of a compounding level required in a compounding pattern can exist,
+            # then that compounding pattern can already here be disregarded)
+            screened_patterns = []
+
+            for j in range(len(candidate_compounding_patterns_at_order)):
+
+                pattern_supported_by_tuples = True
+
+                for k in range(len(candidate_compounding_patterns_at_order[j])):
+
+                    # Not last interaction
+                    if k + 1 < len(candidate_compounding_patterns_at_order[j]):
+
+                        if not candidate_compounding_patterns_at_order[j][k] in time_ovl_comp_lvls:
+                            pattern_supported_by_tuples = False
+
+                    # Last interaction: Disregard the emission
+                    else:
+
+
+                        if not candidate_compounding_patterns_at_order[j][k] - 1 in time_ovl_comp_lvls:
+                            pattern_supported_by_tuples = False
+
+                if pattern_supported_by_tuples:
+                    screened_patterns.append(candidate_compounding_patterns_at_order[j])
+
+            comp_patterns_at_order[i] = copy.deepcopy(screened_patterns)
+
+        return comp_patterns_at_order
+
+    def __get_pol_avg_bank_and_int_seq_ocp(self) -> tuple:
+        """
+        Helper method: Get macroscopic orientational avg. polarization vector "bank" and valid interaction
+        sequences indexed by order, compounding pattern and polarization motif
+        """
+
+        from itertools import permutations as permutations
+        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+
+        # Initializing macroscopic orientational average polarization vector "bank", counter and
+        # "actually used" register
+        pol_avg_vector_bank = {}
+        pol_avg_vector_bank_ctr = 0
+        pol_actually_used = []
+
+        # The "master" loop: Evaluate all available interaction sequences,
+        # group by order, pulse compounding and polarization
+        int_sequences_by_order_comp_pol = {}
+
+        # For each valid order of interaction pattern
+        for ord in self.int_patterns_by_order:
+
+            int_sequences_by_order_comp_pol[ord] = {}
+
+            for c in self.comp_patterns_at_order[ord]:
+                int_sequences_by_order_comp_pol[ord][c] = {}
+
+            # For each permutation of indices at this order
+            for p in permutations(range(ord)):
+
+                # For each interaction pattern at this order
+                for i in self.int_patterns_by_order[ord]:
+
+                    p_pattern = []
+
+                    # Permute the pulses to that ordering
+                    for j in range(len(i)):
+                        p_pattern.append(i[p[j]])
+
+                    # For each compounding pattern at this interaction pattern's order:
+                    for c in self.comp_patterns_at_order[ord]:
+
+                        # FIXME: There should be several optimization opportunities here if needed:
+                        #  - Precalculate motifs of compounding patterns for time-overlap/resonance criteria
+                        #  - Precalculate motifs of time-enforcement patterns
+                        #  - Preassemble some compound pulse index motifs?
+                        #  - Also pre-solve for some permutation subsets in an outer loop?
+
+                        # First test if this permutation contains all valid (compound) pulses
+                        comp_valid = True
+                        c_ctr = 0
+
+                        c_pulse_inds = []
+                        c_pulses = []
+
+                        # For each compounding pattern element
+                        for c_elem in range(len(c)):
+
+                            # Generate the candidate (compound) pulse tuple
+
+                            # If this is the last compounding pattern element, disregard the emission
+                            if c_elem + 1 == len(c):
+
+                                c_elem_len = c[c_elem] - 1
+
+                                # If the length is zero, then this was a "lone emission" and no pulse structure needs
+                                # to be checked (this cycling will end the loop so break would also have worked)
+                                if c_elem_len == 0:
+                                    continue
+
+                            # Otherwise, do not disregard anything
+                            else:
+                                c_elem_len = c[c_elem]
+
+                            c_pulse_ind = tuple(sorted(p_pattern[c_ctr: c_ctr + c_elem_len]))
+
+                            # If this is not the last interaction, the candidate pulse tuple must
+                            # be both time-overlapping and potentially able to make vibrational resonance
+                            if c_elem + 1 < len(c):
+
+                                if not c_pulse_ind in self.res_and_time_ovl_tuples:
+                                    comp_valid = False
+                                    break
+
+                                c_pulses.append(self.res_and_time_comp_pulses[c_pulse_ind])
+                                c_pulse_inds.append(c_pulse_ind)
+
+                            # If this is the last interaction, only the time-overlapping criterion applies
+                            else:
+
+                                if not c_pulse_ind in self.time_ovl_tuples:
+                                    comp_valid = False
+                                    break
+
+                                c_pulses.append(self.time_not_res_comp_pulses[c_pulse_ind])
+                                c_pulse_inds.append(c_pulse_ind)
+
+                            c_ctr += c_elem_len
+
+                        # Determine orientational avg polarization vector
+                        all_polarizations = [copy.deepcopy(self.polarization_filter)]
+
+                        # Could probably be done more elegantly but works
+                        for j in c_pulse_inds:
+                            for k in j:
+                                all_polarizations.append(copy.deepcopy(self.field.signed_pulses[k].pol))
+
+                        # Cycle if any (compound) pulse was invalid
+                        if not comp_valid:
+                            continue
+
+                        pol_avg_vector = get_pol_laser(all_polarizations)
+
+                        # FIXME: May want to introduce tolerances here (see after some usage)
+                        # Check if pol avg vector is nonzero
+                        if not sum([abs(j) for j in pol_avg_vector]) == 0.0:
+
+                            # Check against bank; determine bank index or make new bank entry
+                            found_in_bank = False
+
+                            for j in pol_avg_vector_bank:
+                                pol_diff = sum([abs(pol_avg_vector[k] - pol_avg_vector_bank[j][k]) for k in
+                                                range(len(pol_avg_vector_bank[j]))])
+
+                                if pol_diff == 0.0:
+                                    found_in_bank = True
+                                    pol_bank_ind = j
+                                    break
+
+                            if not found_in_bank:
+                                pol_avg_vector_bank[pol_avg_vector_bank_ctr] = pol_avg_vector
+                                pol_bank_ind = pol_avg_vector_bank_ctr
+                                pol_avg_vector_bank_ctr += 1
+
+                        #  Otherwise cycle
+                        else:
+                            continue
+
+                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
+                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
+
+
+                        # Time-ordering enforcement screening: If also passing this criterion, register this
+                        # interaction sequence as valid
+                        if pulse_time_ordering_valid(c_pulses, thres_waiting_time=self.thres_waiting_time,
+                                                     tol_n_dev=self.tol_n_dev_t):
+
+                            # FIXME: With any compounding, some permutations will be revisited here
+                            #  Checking for uniqueness here and will account for this as part of the overall
+                            #  permutations--coefficient question for these cases
+                            #  Permutation should here be OK under the dipole approximation (symmetry of alpha, beta...)?
+                            #  In general case may need to register separate or two different polarization situations
+                            #  This can be revisited when the first version of the integrator is ready
+                            if not tuple(c_pulse_inds) in int_sequences_by_order_comp_pol[ord][c][pol_bank_ind]:
+                                if not pol_bank_ind in pol_actually_used:
+                                    pol_actually_used.append(pol_bank_ind)
+                                int_sequences_by_order_comp_pol[ord][c][pol_bank_ind].append(tuple(c_pulse_inds))
+
+        # Prune int_sequences_by_order_comp_pol over empty pol bank ind entries, empty compounding
+        # patterns, empty orders, then assign as attribute
+        del_o = []
+        del_oc = []
+        del_ocp = []
+
+        for ord in int_sequences_by_order_comp_pol:
+
+            new_oc = []
+
+            for comp in int_sequences_by_order_comp_pol[ord]:
+
+                new_ocp = []
+
+                for pol in int_sequences_by_order_comp_pol[ord][comp]:
+
+                    # If this polarization setup gave nothing, delete the reference to it
+                    if len(int_sequences_by_order_comp_pol[ord][comp][pol]) == 0:
+                        new_ocp.append((ord, comp, pol))
+
+                # If no polarization setups remain for this compounding pattern, delete the reference to it
+                if len(new_ocp) == len(int_sequences_by_order_comp_pol[ord][comp]):
+                    new_oc.append((ord, comp))
+
+                # Otherwise extend the ocp delete list if delete candidates were found
+                else:
+                    if len(new_ocp) > 0:
+                        del_ocp.extend(copy.deepcopy(new_ocp))
+
+            # If no compounding patterns remain for this order, delete the reference to it
+            if len(new_oc) == len(int_sequences_by_order_comp_pol[ord]):
+                del_o.append(ord)
+
+            # Otherwise extend the oc delete list if delete candidates were found
+            else:
+                if len(new_oc) > 0:
+                    del_oc.extend(copy.deepcopy(new_oc))
+
+        # Deletions
+        for o in del_o:
+            del int_sequences_by_order_comp_pol[o]
+
+        for oc in del_oc:
+            del int_sequences_by_order_comp_pol[oc[0]][oc[1]]
+
+        for ocp in del_ocp:
+            del int_sequences_by_order_comp_pol[ocp[0]][ocp[1]][ocp[2]]
+
+        del_p = []
+
+        for p in pol_avg_vector_bank:
+            if not p in pol_actually_used:
+                del_p.append(p)
+
+        for p in del_p:
+            del pol_avg_vector_bank[p]
+
+        return pol_avg_vector_bank, int_sequences_by_order_comp_pol
+
+    def __get_magn_cond_bank_and_int_seq_icpm(self) -> tuple:
+
+        # Making a bank for conformity with the pol avg vector indexing even though the magnitude
+        # condition tuples are hashable by themselves
+        magnitude_condition_bank = {}
+
+        # A bit inelegant but workable: Going to do "surgery" on the ord, pol, comp dictionary copy to replace
+        # the innermost structure by a dict indexing by magnitude condition.
+        int_sequences_by_order_comp_pol_magn = copy.deepcopy(self.int_sequences_by_order_comp_pol)
+
+        # Walking through int_sequences_by_order_comp_pol and determine magnitude regime for each entry
+        for ord in self.int_sequences_by_order_comp_pol:
+            for comp in self.int_sequences_by_order_comp_pol[ord]:
+                for pol in self.int_sequences_by_order_comp_pol[ord][comp]:
+
+                    new_magn_dict = {}
+
+                    for m in self.int_sequences_by_order_comp_pol[ord][comp][pol]:
+
+                        # Get magnitude conditions (template interaction indices) for this interaction sequence
+                        p_plus, p_minus = magnitude_conditions_for_ind_var_tuple(m, self.all_valid_pulses, self.thres_magn, self.tol_n_dev_w)
+
+                        # Look in bank to see if this magnitude regime was encountered before; if so note where,
+                        # otherwise amend bank
+                        found_in_bank = False
+
+                        for i in magnitude_condition_bank:
+                            if magnitude_condition_bank[i] == (p_plus, p_minus):
+                                found_where = i
+                                found_in_bank = True
+                                break
+
+                        if not found_in_bank:
+                            bank_len = len(magnitude_condition_bank.keys())
+                            magnitude_condition_bank[bank_len] = (p_plus, p_minus)
+                            found_where = bank_len
+
+                        # Update magnitude conditions dictionary for this ord, comp, pol set
+                        if found_where in new_magn_dict:
+                            new_magn_dict[found_where].append(copy.deepcopy(m))
+
+                        else:
+                            new_magn_dict[found_where] = [copy.deepcopy(m)]
+
+                    # Affix the new structure that groups by magnitude regime
+                    int_sequences_by_order_comp_pol_magn[ord][comp][pol] = copy.deepcopy(new_magn_dict)
+
+        return magnitude_condition_bank, int_sequences_by_order_comp_pol_magn
+
 
 @dataclass
 class VibExperiment:
@@ -345,20 +1551,43 @@ class VibExperiment:
 
     scans: List of SpecScan instances: Tells which parameters will be scanned over (and how) in this experiment
 
-    magn_conditions: Tuple of tuples: Magnitude conditions for use in identifying terms that will not become
-    fully resononant in this experiment. Format: Outer tuple collects magnitude conditions. Each inner tuple is
-    a magnitude condition and consists of signed pulse references (NOTE: Currently not using the SignedPulseTuple class)
-    where the sum of the associated frequencies are understood to be significantly > 0, where "significantly > 0" means
-    "never close to zero".
-    Example: ( (-1, 2), (2, 3, -4) ) denotes two magnitude conditions:
-        a) -w1 + w2 is always significantly > 0,
-        b) w2 + w3 - w4 is always significantly > 0
+    Optional parameters
+
+    tol_n_dev_t: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse time overlap. Default: 5.
+
+    tol_n_dev_w: Float: Tolerance as number of standard deviations of Gaussian pulse's time broadness for
+    deciding (compound) pulse ability to create vibrational resonance. Default: 5.
+
+    thres_freq: A threshold: (compound) pulses whose no frequency components fall within the range
+     [-thres_freq, thres_freq] are deemed unable to produced vibrational resonance. Default: 8000.0 (units: cm^-1).
+
+    thres_magn: A threshold used to define what "significant" means in determining whether a pulse combination's
+    frequency components are "significantly greater/smaller than 0". Default: 200 (units: cm^-1)
+
+    thres_waiting_time: A threshold above which (compound) pulses whose time maxima intervals are larger are deemed too
+    distant to produce an appreciable signal. Default: 1500.0 (units: fs).
+
+    Attributes created at post-init:
+
+    dims: An integer representing the dimensionality of the experiment. Each scan adds a dimension and the 'base
+    dimension' is either zero (integrated intensity detection) or one (time-series or frequency-series (i.e.
+    spectrometer) detection)
+
+    field_analyses: An array of shape equal to the Cartesian product of the experiment scans. For each scan point,
+    an updated field at that scan point is instantiated and analyzed for attributes relevant to later evaluation
+    (mainly intended for use in integrator). See FieldAnalysis class for further description of the created attributes.
     """
 
     field: ElectricField
     detector: SpecDetector
-    scans: tuple[SpecScan] = None
-    magn_conditions: tuple[tuple] = None
+    scans: tuple[SpecScan] = ()
+
+    tol_n_dev_t: float | int = 5.0
+    tol_n_dev_w: float | int = 5.0
+    thres_freq: float | int = 8000.0
+    thres_magn:  float | int = 200.0
+    thres_waiting_time: float | int = 1500.0
 
     def __post_init__(self):
 
@@ -375,132 +1604,78 @@ class VibExperiment:
                 if not isinstance(i, SpecScan):
                     raise TypeError('The scans attribute, if specified, must be a tuple of SpecScan instances')
 
-        if self.magn_conditions is not None:
-            if not isinstance(self.magn_conditions, tuple):
-                raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
-            for i in self.magn_conditions:
-                if not isinstance(i, tuple):
-                    raise TypeError('The magn_conditions attribute, if specified, must be a tuple of tuples')
+        self.dim = self.__findDimensionality()
+
+        # TODO: Inspection of requested scans against field
+        #  - If the experiment is an ideal frequency-domain experiment, then limit which pulse scanning
+        #  attributes are valid (scanning time centerpoint is then less meaningful)
+        #  - If the experiment is an ideal time-domain experiment, then also limit scan attribute validity
+        #  (scanning carrier frequency is then less meaningful)
+        #  - Maybe take tc resp. cf (for freq.-ideal resp. time-ideal) as "sleeping" parameters but need specification
+        #  if scanning time spread? Then may need some inverse stuff for one case (touch/depart from infinity)
+        #  (could also handle this more practically but less elegantly with large number instead of infty throughout)
+
+        # Make scan grid with field analyses under scanning
+        # (NOTE: Currently, field attributes are the only attributes whose scanning is supported and so,
+        # a grid of (scanned) fields manifests all the scans' changes to the experiment)
+        grid_dims = tuple([len(i.range) for i in self.scans])
+
+        # To hold instances of FieldAnalysis
+        self.field_analyses = np.empty(grid_dims, dtype=object)
+
+        any_field_analysis_nonempty = False
+
+        if len(self.scans) > 0:
+
+            for scan_elem in np.ndindex(self.field_analyses.shape):
+
+                curr_analysis = FieldAnalysis(
+                    field = self.field.new_field_with_changes(self.scans, scan_elem),
+                    polarization_filter = self.detector.detection_polarization,
+                    detection_limited_to = self.detector.detection_limited_to,
+                    max_ord = self.detector.detector_max_order,
+                    detector_faces = self.detector.detector_faces,
+                    interaction_filter = self.detector.interaction_filter,
+                    tol_n_dev_t = self.tol_n_dev_t,
+                    tol_n_dev_w = self.tol_n_dev_w,
+                    thres_freq = self.thres_freq,
+                    thres_magn = self.thres_magn,
+                    thres_waiting_time = self.thres_waiting_time
+                )
+
+                if not(curr_analysis.int_sequences_by_order_comp_pol == {}):
+                    any_field_analysis_nonempty = True
+
+                self.field_analyses[scan_elem] = copy.deepcopy(curr_analysis)
 
 
-        from wilson_suite.wilson_experiment.indep_vars_and_axes import (PhaseMatchingCondition, SignedPulseTuple,
-                                                                        find_indep_exp_variables, find_valid_axes,
-                                                                        find_canonical_axes)
 
-        # Establishes an assumption: The order is the same as the number of pulses in the field
-        # It is furthermore (but not strictly from this) assumed that in the experiment, the system will interact
-        # once with each pulse
-        self.order = len(self.field.pulses)
-
-        # Determine which phase-matching condition(s) will come under consideration in this experiment
-        relevant_phasematch = []
-
-        # If no specified phase-matching (wavevector) filter, all are (potentially) relevant
-        if self.detector.wv_filter is None:
-
-            from itertools import product as iter_prod
-            k = 0
-
-            for i in iter_prod([1, -1], repeat=len(self.field.pulses)):
-
-                new_phasematch = []
-
-                for j in range(len(self.field.pulses)):
-                    new_phasematch.append(self.field.pulses[j].id * i[j])
-
-                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
-                k += 1
-
-        # Otherwise, registered only that/those specified for the detector
+        # With no scans, the analysis is only done with respect to the base field
         else:
 
-            k = 0
+            curr_analysis = FieldAnalysis(
+                field=self.field,
+                polarization_filter=self.detector.detection_polarization,
+                detection_limited_to=self.detector.detection_limited_to,
+                max_ord=self.detector.detector_max_order,
+                detector_faces=self.detector.detector_faces,
+                interaction_filter=self.detector.interaction_filter,
+                tol_n_dev_t=self.tol_n_dev_t,
+                tol_n_dev_w=self.tol_n_dev_w,
+                thres_freq=self.thres_freq,
+                thres_magn=self.thres_magn,
+                thres_waiting_time=self.thres_waiting_time
+            )
 
-            for i in range(len(self.detector.wv_filter)):
+            if not (curr_analysis.int_sequences_by_order_comp_pol == {}):
+                any_field_analysis_nonempty = True
 
-                new_phasematch = []
+            self.field_analyses[()] = copy.deepcopy(curr_analysis)
 
-                for j in self.detector.wv_filter[i]:
-                    new_phasematch.append(j * self.detector.wv_filter[i][j])
+        if not any_field_analysis_nonempty:
+            raise AssertionError('This experiment will give a zero signal as set up and/or with the present tolerances/thresholds ')
 
-                relevant_phasematch.append(PhaseMatchingCondition(SignedPulseTuple(tuple(new_phasematch)), k))
-                k += 1
-
-        self.relevant_phasematch = relevant_phasematch
-
-        # FIXME: Replace with try...except in case not sufficient data specified
-        try:
-            self.dim = self.findDimensionality()
-        except AssertionError:
-            self.dim = None
-
-        # Determine pulse "epochs" - i.e. disjoint (or taken to be disjoint) time partitions of the pulses
-        self.epochs = find_epochs(self.field)
-
-        # Determine which interaction orderings are causally possible
-        self.int_sequences = self.findInteractionSequences()
-
-        # Register UV/VIS range carrier frequencies of field for convenience
-        self.cfuv = get_carrier_freqs_uv(self.field.pulses)
-
-        # Find valid choices of independent variables
-        self.indep_vars = find_indep_exp_variables(self.field.pulses, self.epochs, self.relevant_phasematch)
-
-        # Find valid choices of spectral axes given the choices of independent variables determined above
-        self.valid_axis_combs = find_valid_axes(self.indep_vars)
-
-        # If no canonical axes can be determined, set to None
-        try:
-            self.canonical_axes = find_canonical_axes(self.indep_vars)
-        except ValueError:
-            self.canonical_axes = None
-
-        # Register all polarization vectors (associated with the detector and pulses) for convenience
-        # Here I establish a convention: Macroscopic ranks are with respect to pulse IDs but first rank refers to the
-        # detected signal (so detected, pulse ID 1, pulse ID 2, ...)
-        all_polarizations = [copy.deepcopy(self.detector.detection_polarization)]
-
-        # Could probably be done more elegantly but works
-        for i in range(len(self.field.pulses)):
-            for j in self.field.pulses:
-                if j.id == i + 1:
-                    all_polarizations.append(copy.deepcopy(j.pol))
-
-        self.all_polarizations = all_polarizations
-
-        # Determine the macroscopic orientational average polarization vector
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
-        self.polarization_avg_vector = get_pol_laser(self.all_polarizations)
-
-    def tell_axis_options(self):
-
-        for i in range(len(self.valid_axis_combs)):
-            self.valid_axis_combs[i].present_spectral_axis_choices(from_exp_index = i)
-
-    def is_axis_set_by_ref_valid(self, ref: dict):
-        """
-        TODO: Take a reference describing an axis set choice in terms of
-        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
-        and return True if it's a valid choice for this experiment (TODO: ...phase-matching combination, indep var choice?)
-        or False if it's not
-
-        Sketch: Similar to choose_axis_set_by_ref
-
-        """
-        pass
-
-    def choose_axis_set_by_ref(self, ref: dict):
-        """
-        TODO: Take a reference describing an axis set choice in terms of
-        the dict {label 1: ((indep var 1_1), (indep var 1_2 ) ...), label 2: ((indep var 2_1), ...) , ...}
-        and return the corresponding SpectralAxisSet instance
-
-        Sketch: Look through self.valid_axis_choices and find out if any of the registered valid choices
-        match: If yes, return that SpectralAxisSet instance - otherwise raise an error
-        """
-        pass
-
-    def findDimensionality(self) -> int:
+    def __findDimensionality(self) -> int:
         """
         Using detector and scans information, determine the dimensionality of the spectral data
         that carrying out this experiment would produce
@@ -513,12 +1688,10 @@ class VibExperiment:
 
         # Time or frequency series adds a dimension
         if self.detector.detection_method == 'time':
-            if self.detector.detection_range is not None:
-                return d + 1
+            return d + 1
 
         elif self.detector.detection_method == 'freq':
-            if self.detector.detection_range is not None:
-                return d + 1
+            return d + 1
 
         # Integrated intensity does not add a dimension
         elif self.detector.detection_method == 'int':
@@ -526,147 +1699,3 @@ class VibExperiment:
 
         else:
             raise AssertionError('Cannot determine dimensionality: Unrecognized detection method')
-
-        return d
-    
-    def findInteractionSequences(self) -> list:
-        """
-        Based on the experiment information, find out if there must be a specific sequence/sequences of interactions with pulses
-
-        Returns a list [[{sequence 1 interaction 1: pulse i}, {seq. 1 int. 2: pulse j}, ...],
-                        [{seq. 2 int. 1: pulse k}, ... ], ...]
-        """
-
-        def interactionRecurse(res: list, curr_int: list, rem_wv: dict, curr_epoch: int, epochs: list):
-            """
-            Tail-recursive routine for finding interaction sequences
-
-            res: List of lists: Results accumulator
-            curr_int: List of dictionaries: Result currently being assembled
-            rem_wv: Dictionary: One wavevector filter dictionary
-            curr_epoch: Epoch counter
-            epochs: List of epochs as determined by ElectricField.findEpochs
-            """
-
-
-            # Termination condition
-            # If this interaction sequence satisfied the wavevector filter, append it
-            if rem_wv == {}:
-                res.append(tuple(curr_int))
-
-            # Recursion
-            else:
-                # Can one or more pulses in requested wv be found at the current or later epoch?
-                # If so, make all combinations, update rem wv and recurse further at same epoch
-
-                for t in range(curr_epoch, len(epochs)):
-                    for i in rem_wv:
-
-                        if i in epochs[t]:
-
-                            new_rem_wv = copy.deepcopy(rem_wv)
-                            new_int = copy.deepcopy(curr_int)
-                            new_int.append({i: new_rem_wv[i]})
-
-                            del new_rem_wv[i]
-
-                            interactionRecurse(res, new_int, new_rem_wv, t, epochs)
-
-
-
-        if self.detector.wv_filter is None:
-            raise AssertionError('Interaction sequence determination currently only implemented for wavevector filter detector')
-
-        if len(self.detector.wv_filter) > 1:
-            raise AssertionError('Interaction sequence determination currently not supported for more than one phase-matching direction')
-
-        int_sequences = []
-        int_seed = []
-
-        for i in self.detector.wv_filter:
-
-            interactionRecurse(int_sequences, int_seed, i, 0, find_epochs(self.field))
-
-        return int_sequences
-
-
-def get_carrier_freqs_uv(pulses) -> dict:
-    """
-    Get dictionary of UV/VIS-range part of carrier frequencies
-
-    Returns: Dictionary {pulse 1: UV/VIS carrier freq., ...}
-    """
-    cfuv_dict = {}
-    for i in pulses:
-        cfuv_dict[i.id] = i.cf_uv
-
-    return cfuv_dict
-
-def find_epochs(field, tol: float=0.0) -> list:
-    """
-    Divide field into epochs with either zero or finite tolerance
-    Currently only supported for a field consisting of ideal or impulsive pulses
-
-    tol: Float: Tolerance for non-temporal coincidence (currently not supported)
-    # TODO: Add support for tolerance
-
-    Returns: List of lists: [[epoch 1 pulse 1, epoch 1 pulse 2, ...], [epoch 2 pulse 1, ...], ...]
-    """
-
-    if not(tol == 0.0):
-        raise ValueError('Non-zero tolerance not yet supported in find_epochs')
-
-    for i in field.pulses:
-        if not i.tendsImpulsive():
-            raise AssertionError('Can currently only determine epochs for fields with impulsive-tending pulses')
-        if i.id is None:
-            raise AssertionError('All pulses must have IDs for valid epoch determination')
-
-    times_ids = sorted([(i.tc, i.id) for i in field.pulses], key=itemgetter(0))
-    epochs = [[]]
-    epoch = 0
-    curr_time = times_ids[0][0]
-
-    for i in times_ids:
-        if not(i[0] == curr_time):
-            epochs.append([])
-            epoch += 1
-            curr_time = i[0]
-        epochs[epoch].append(i[1])
-
-    sorted_epochs = []
-
-    for i in epochs:
-        sorted_epochs.append(sorted(i))
-
-    return sorted_epochs
-
-def uv_cancels(coll: tuple, cfs_uv: dict, tol: float=1e-10) -> bool:
-    """
-    Do the UV/VIS frequency components of this collection of pulses cancel?
-
-    coll: tuple: (Signed) pulse ID references
-    cfs_uv: dictionary {non-signed pulse ID: non-signed UV/VIS frequency component, ...}
-    tol: Tolerance: If the magnitude of the requested combination of freq components is beneath tol,
-    then accept as cancelling
-
-    return: True if cancellation was determined, False otherwise
-
-    # FIXME: This routine is a bit confusingly made but should
-    """
-
-
-    if tol < 0.0:
-        raise ValueError('The tolerance must be a nonnegative number')
-
-    acc = 0.0
-
-    for i in coll:
-
-        sgn = (i > 0) - (i < 0)
-
-        acc += sgn * cfs_uv[sgn * i]
-
-    sgnacc = (acc > 0) - (acc < 0)
-
-    return ((sgnacc * acc) <= tol)
