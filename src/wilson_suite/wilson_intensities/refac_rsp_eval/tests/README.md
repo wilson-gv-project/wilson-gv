@@ -6,8 +6,7 @@ with their helpers and reference data. Run them with pytest:
     python -m pytest src/wilson_suite/wilson_intensities/refac_rsp_eval/tests
 
 Scripts that are run by hand are in [scripts/](scripts/): speed, box sizes, and two examples of
-use. pytest collects none of them. The refactor's notes are
-there too: todo.txt and todo_oldcode_rm.txt. [scripts/README.md](scripts/README.md) lists them all.
+use. pytest collects none of them. [scripts/README.md](scripts/README.md) lists them.
 
 ## Test files
 

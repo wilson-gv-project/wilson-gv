@@ -20,14 +20,14 @@ Words used below:
                     e.g. A = w1, B = -w1 + w2.
     translate       rewrite each pf from pulse ids to axis labels. With A = w1 and B = -w1 + w2:
                     pf [-1] becomes ['-A'], and pf [-1, 2] becomes ['B']. The new evaluator takes only translated terms.
-    E13, G7         items in wilson_intensities/refac_rsp_eval/tests/scripts/todo.txt
+    G7 setup        one of G7_SETUPS: an experiment other than EVV that the tests use
 
 What the script does for each G7 setup (make_g7_file):
     1. Build the experiment with wilson_experiment.
     2. Run derive on the experiment. derive gives the terms, with pf in pulse ids.
     3. Pick the axes: the experiment's canonical_axes. If the experiment has none: the first of its valid axis
        choices (valid_axis_combs).
-    4. Translate the terms with derive's term_var_translate. It raises for 4 or more axes (E13).
+    4. Translate the terms with derive's term_var_translate. It raises for 4 or more axes.
     5. Check the polarizations (see the keys below), then write the file.
 
 Files:
@@ -147,7 +147,7 @@ def derive_translate(terms, axis_set) -> list[VibPerturbedTerm]:
     """
     Translates a list of terms with derive's term_var_translate. Returns the translated copies.
     derive's function takes and returns groups {i: {j: [terms]}}. The list goes in as the one group {0: {0: terms}}.
-    Raises ValueError for 4 or more axes (E13).
+    Raises ValueError for 4 or more axes.
     """
     return term_var_translate.translate_terms_to_axis_variables({0: {0: list(terms)}}, axis_set)[0][0]
 

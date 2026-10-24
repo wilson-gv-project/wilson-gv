@@ -351,8 +351,8 @@ class WilsonSimulation:
 
 	def evaluate(self, save_evalinputs_pkl: str = None):
 		"""
-		Not available until the new evaluator is connected here (refac_rsp_eval todo.txt, E6b). It ran the old
-		EvaluationWorkflow, which goes with the old code (E9). Until then, use the library calls (pipeline.py).
+		Not available until the new evaluator is connected here. It ran the old EvaluationWorkflow, which
+		goes with the old code. Until then, use the library calls (pipeline.py).
 		"""
 		raise NotImplementedError(
 			'WilsonSimulation.evaluate ran the old evaluator, which goes with the old code. '

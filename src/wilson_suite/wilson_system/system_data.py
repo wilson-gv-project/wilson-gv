@@ -324,7 +324,7 @@ class MolSystemData:
             e.g. MolSystemData.load(origin, ['polgrad', 'dipgrad', 'cff'])
                  -> request {'polgrad', 'dipgrad', 'cff', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'}
         Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry, and the reader
-        fails on normal_modes for some files (ACDM, todo.txt F2).
+        fails on normal_modes for some files.
 
         prop_names  trivial names, e.g. pipeline.prop_names(terms)
         obtainer    request {name: DataOriginInfo} -> data dict; default wilson_data_obtainer.
@@ -364,8 +364,7 @@ class MolSystemData:
 
 def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
     """
-    raises ValueError if data_dict does not fit what the evaluator reads (wilson_system/todo.txt D5), with every
-    problem found:
+    raises ValueError if data_dict does not fit what the evaluator reads, with every problem found:
         names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
                       'anharmonic_states' may be missing: MolSystemData.check_states_choice raises if it is asked for.
         modes         nc_sqrt_eigval has the keys 0 .. n-1, e.g. {0: 2878.7, 1: 1820.4}: n modes
@@ -378,7 +377,7 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
     prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
                 (MolSystemData.check_props); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no shape check.
     warns (UserWarning), no error: an excited state at or below 0 cm-1, the ground state, in any state list,
-        e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1 (todo.txt D5).
+        e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1.
     Not checked (no check is possible from the values): units, coordinates.
     """
     problems = []

@@ -224,7 +224,7 @@ def test_vibdiff_counts_a_zero_labelled_state_as_energy_zero():
     ('', '', 0.),         # ground -> ground
 ])
 def test_vibdiff_from_symbolic_and_from_quanta_agree_on_the_ground_state(left, right, expected, states):
-    """from_symbolic builds its own ground state, from_quanta looks it up in VibStatesData (todo A11)."""
+    """from_symbolic builds its own ground state, from_quanta looks it up in VibStatesData."""
     index_dict = {'a': 0, 'b': 1}
 
     symb = VibDiff.from_symbolic(vibdiff(sl=left, sr=right), index_dict, states)
@@ -379,7 +379,7 @@ def test_load_raises_for_data_that_does_not_fit_and_names_the_source():
         MolSystemData.load(ORIGIN, ['cff'], obtainer=fake_obtainer(data, []))
 
 
-## check_data_dict: the data dict fits what the evaluator reads (wilson_system/todo.txt D5) -----------------
+## check_data_dict: the data dict fits what the evaluator reads ---------------------------------
 # TOY_DATA fits: 2 modes. Each test breaks one rule; from_datadict runs the same check.
 
 def test_prop_index_counts_every_order_has_its_own_name():
