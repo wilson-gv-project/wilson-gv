@@ -339,6 +339,9 @@ class VibPerturbedTerm:
         B - A > 0
         """
 
+        if not self.was_sorted:
+            raise ValueError('Term must be sorted before full enhancement possibility can be evaluated')
+
         if magn_conditions is not None:
 
             prev_res = None

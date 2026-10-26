@@ -697,11 +697,13 @@ class ResonanceCondition:
         If the contents of given_prev_res for each attribute are a subset of the present instance,
         then these respective parts can be trimmed from the present instance and the resonance possibility determined
         (in the same way) with respect to the trimmed condition.
+
         """
 
         # Sketch:
 
         # Need reference to which freq vars are the independent vars (from compounding pattern)
+        # TODO: Make this outside and take it as given in here
 
         # Trim last resonance if present and maybe even add non-"all in" parts "on credit"
         # Or do it as one of two options? I wonder if there are situations where resonance miss can be
@@ -726,128 +728,64 @@ class ResonanceCondition:
         # For now simply trim last resonance from present
         if given_prev_res is not None:
 
-            all_in = True
+            # All previous perturbing freq args should be in so remove directly
+            for i in given_prev_res.pf:
+                pf_test.remove(i)
+
+            in_sl = []
+            not_in_sl = []
 
             for i in given_prev_res.diff.sl.q:
                 if not(i in diff_test.sl.q):
-                    all_in = False
+                    not_in_sl.append(i)
+                else:
+                    in_sl.append(i)
+
+            in_sr = []
+            not_in_sr = []
 
             for i in given_prev_res.diff.sr.q:
                 if not(i in diff_test.sr.q):
-                    all_in = False
+                    not_in_sr.append(i)
+                else:
+                    in_sr.append(i)
 
-            for i in given_prev_res.pf:
-                if not(i in pf_test):
-                    all_in = False
 
-            if all_in:
+            for i in in_sl:
+                diff_test.sl.q.remove(i)
 
-                for i in given_prev_res.diff.sl.q:
-                    diff_test.sl.q.remove(i)
+            for i in in_sr:
+                diff_test.sr.q.remove(i)
 
-                for i in given_prev_res.diff.sr.q:
-                    diff_test.sr.q.remove(i)
+            # Add not_in "on credit" to other side
+            for i in not_in_sl:
+                diff_test.sr.q.append(i)
 
-                for i in given_prev_res.pf:
-                    pf_test.remove(i)
+            for i in not_in_sr:
+                diff_test.sl.q.append(i)
 
         # Start off sign as unset
         pf_overall_sign = None
 
-        for i in magn_conditions:
+        # TODO: Here replace old code which was removed; new code may be substantially easier since more information
+        #  is now prepared in advance
 
-            if len(i) > 0:
+        # As far as I can tell, there will always be just one indep var left in pf after trimming (and only one if this
+        # is the first resonance condition)
 
-                rmd = False
+        # Case A: Found in mc_minus so pf sign is negative
+        if tuple(sorted(list(pf_test))) in mc_minus:
+            pf_overall_sign = -1
 
-                # Try one way (pulse signs as given), if match then rm and store sign, if no match then try other way
-                match = True
-                for j in i:
-                    if match:
-                        if j not in pf_test:
-                            match = False
+        # Case B: Found in mc_plus so pf sign is positive
+        elif tuple(sorted(list(pf_test))) in mc_plus:
+            pf_overall_sign = -1
 
-                if match:
-                    for j in i:
-                        pf_test.remove(j)
-                    rmd = True
-
-                    # Setting for first time. Note that this overall sign includes the convention
-                    # that perturbing frequencies in a resonance condition are subtracted from the state energy
-                    # level differences. Example:
-                    # magn_conditions is [[-1, 2]] (i.e. -w1 + w2 > 0)
-                    # pf is [-1, 2]
-                    # Therefore, pf_overall_sign is -1 (subtracting something known to be positive)
-                    if pf_overall_sign is None:
-                        pf_overall_sign = -1
-
-                    # Conflicting with earlier condition so return True (cannot rule out resonance)
-                    elif pf_overall_sign == 1:
-                        return True
-
-                # If condition not recognized first way, try the other way
-                # (opposite pulse signs, condition is now < 0 instead of > 0).
-                if not rmd:
-
-                    match = True
-                    for j in i:
-                        if match:
-                            if -1 * j not in pf_test:
-                                match = False
-                    if match:
-                        for j in i:
-                            pf_test.remove(-1 * j)
-
-                        # Setting for first time (opposite sign since other way)
-                        if pf_overall_sign is None:
-                            pf_overall_sign = 1
-
-                        # Conflicting with earlier condition so return True
-                        elif pf_overall_sign == -1:
-                            return True
-
-        # Reaching this point of the routine means that all (if any) magnitude conditions that were met
-        # were found to point to the same sign (and we have removed the corresponding pulse references from pf_test
-        # Therefore, pf_test contains all "residual" pulse references (if any) for which the magnitude conditions could
-        # not be used to determine a sign. Under the assumption that unsigned frequency ranges are always positive
-        # (i.e. a reference to w_i is always positive, while a reference to -w_i is always negative), then,
-        # if these remaining pulse references all have the same sign, and if either a) no magnitude conditions were
-        # applied or b) the overall sign as determined by the magnitude conditions corresponds to the sign of these
-        # remaining pulses, then we can determine an overall sign for the full collection of perturbing frequencies.
-
-        # Initialize "sign of residual pulse references" as unset
-        res_sgn = None
-
-        # Find out if all residual pulse references have the same sign and if so, which
-        if (len(pf_test) > 0):
-            for i in pf_test:
-                res_sgn_i = (i < 0) - (i > 0)
-
-                # Setting for the first time
-                if res_sgn is None:
-                    res_sgn = res_sgn_i
-
-                # If the current sign does not match previous signs, return True (cannot rule out resonance)
-                elif not(res_sgn_i == res_sgn):
-                    return True
-
-        # This means no perturbing frequencies: Should not be encountered in practice but included for completeness
-        # Returning True (cannot rule out resonance) to be on the safe side even though resonance could
-        # in fact then frequently be ruled out
-        if res_sgn is None and pf_overall_sign is None:
+        # Otherwise indeterminate so return True (resonance cannot be ruled out)
+        else:
             return True
 
-        else:
-            # If no magnitude conditions applied, set sign to residual sign
-            if pf_overall_sign is None:
-                pf_overall_sign = res_sgn
 
-            else:
-                # If magnitude conditions applied and a residual sign was determined, they need to match in order
-                # for resonance to be possible to rule out
-                if res_sgn is not None:
-                    if not res_sgn == pf_overall_sign:
-                        return True
 
         # Get sign of state energy level difference
         sd_overall_sign = self.netStateSign(instead_trimmed=diff_test)
