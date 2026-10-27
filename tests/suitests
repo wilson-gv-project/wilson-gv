@@ -1,9 +1,0 @@
-#!/bin/bash
-
-# restruct2 PR
-git -C ../wilson_intensities/ checkout restruct2
-git -C ../CQCParse/ checkout tests
-
-# seting up pytests run
-pyt="pytest -vvs --color=yes" # -s option makes internal prints be printed in terminal
-$pyt ./ ../wilson_intensities/tests/ ../wilson_utils/tests/
