@@ -139,7 +139,7 @@ def test_eval_molsys_data():
 
     import numpy as np
     assert np.all(molsys.eigenvecs[0] == np.array([ 0.04294, -0.,  0., -0.17408,  0., -0.,  0.69565, -0., -0., 0.69565,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
-    assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
+    assert molsys.eigenvals == {0: 1203.179, 1: 1268.91, 2: 1534.549, 3: 1820.416, 4: 2878.687, 5: 2933.526}
 
     # with empty datadict: no frequencies and no states, so it does not fit (check_data_dict)
     with pytest.raises(ValueError, match=r"no 'nc_sqrt_eigval'.*\n.*no 'harmonic_states'"):
@@ -160,7 +160,7 @@ def test_evaluate_term():
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))
     avrg_tensor = calculate_avrg_tensor_einsum(term.avrg_props, molsys.mol_props, polarization_linear_comb)
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 1}, 
+    value, contribs = evaluate_full_index_dict(term, {'a': 4, 'b': 3, 'c': 3}, 
                                                  molsys_data=molsys,
                                                  avrg_tensor=avrg_tensor,
                                                  zero_tol=1e-18, states_choice='harmonic')
@@ -173,16 +173,16 @@ def test_evaluate_term():
     
     w = {m: convNu2Ene(e) for m, e in molsys.eigenvals.items()}  # harmonic omega, Eh
 
-    assert contribs['NON_AVRG'] == molsys.mol_props['cff'].vals[0, 1, 1]        # cff[a, c, c]
-    assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[0])                  # E_a - E_0
-    assert contribs['VIBENE_DENOM'] == pytest.approx(1 / (w[0] * w[1] * w[1]))   # 1/(w_a w_b w_c)
+    assert contribs['NON_AVRG'] == molsys.mol_props['cff'].vals[4, 3, 3]        # cff[a, c, c]
+    assert contribs['VIBDIFF_TERMS'] == pytest.approx(1 / w[4])                  # E_a - E_0
+    assert contribs['VIBENE_DENOM'] == pytest.approx(1 / (w[4] * w[3] * w[3]))   # 1/(w_a w_b w_c)
     assert value == pytest.approx(-0.0625 * np.prod(list(contribs.values())))
 
     with pytest.raises(ValueError, match='term has indices that do not have values'):
-        evaluate_full_index_dict(term, {'a': 0, 'b': 1}, molsys_data=molsys, avrg_tensor=avrg_tensor,
+        evaluate_full_index_dict(term, {'a': 4, 'b': 3}, molsys_data=molsys, avrg_tensor=avrg_tensor,
                                  states_choice='harmonic')
 
-    value, contribs = evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': 2}, 
+    value, contribs = evaluate_full_index_dict(term, {'a': 4, 'b': 3, 'c': 2}, 
                                                  molsys_data=molsys,
                                                  avrg_tensor=avrg_tensor,
                                                  zero_tol=1e-18, states_choice='harmonic')
@@ -190,11 +190,11 @@ def test_evaluate_term():
     print(contribs)
 
     # term 2: resonance labels a, b are fixed; summation label c runs over every mode
-    total, factors = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1},
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 4, 'b': 3},
                                                  molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                                  states_choice='harmonic')
     n_modes = len(molsys.eigenvals)
-    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, molsys_data=molsys, avrg_tensor=avrg_tensor,
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 4, 'b': 3, 'c': c}, molsys_data=molsys, avrg_tensor=avrg_tensor,
                                            states_choice='harmonic')[0]
                   for c in range(n_modes))
     assert by_hand != 0.
@@ -203,7 +203,7 @@ def test_evaluate_term():
 
     # b is a resonance label: summing over b would add peaks at different positions
     with pytest.raises(ValueError, match=r"resonance labels \['b'\] must be fixed"):
-        evaluate_term_coeff_sumover(term, {'a': 0},
+        evaluate_term_coeff_sumover(term, {'a': 4},
                                     molsys_data=molsys, polarization_linear_comb=polarization_linear_comb,
                                     states_choice='harmonic')
 
