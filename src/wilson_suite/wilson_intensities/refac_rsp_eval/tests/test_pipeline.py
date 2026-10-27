@@ -553,7 +553,7 @@ def test_real_data_504_pairs_340_rows_164_zero(evv_formaldehyde):
 
 
 def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
-    """Motif of terms 1, 8-13 has no feature at (3, 4), (3, 5), (4, 3), (5, 3): all its 7 terms give coeff 0 there."""
+    """Motif of terms 1, 8-13 has no feature at (0, 1), (0, 5), (1, 0), (5, 0): all its 7 terms give coeff 0 there."""
     features = evv_formaldehyde.result.features
 
     ab_per_motif = defaultdict(set)
@@ -562,7 +562,7 @@ def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
 
     assert len(features) == 68
     assert ab_per_motif[EVV_MOTIF_TERMS[0]] == ALL_AB
-    assert ALL_AB - ab_per_motif[EVV_MOTIF_TERMS[1]] == {(3, 4), (3, 5), (4, 3), (5, 3)}
+    assert ALL_AB - ab_per_motif[EVV_MOTIF_TERMS[1]] == {(0, 1), (0, 5), (1, 0), (5, 0)}
 
 
 def test_real_data_each_feature_holds_the_stored_rows_of_its_motif_and_index_set(evv_formaldehyde):
@@ -593,15 +593,15 @@ STRONGEST = {'anharmonic': ({'A': 2682.765, 'B': 0.}, -5.0513e-4),
 
 def test_real_data_strongest_feature(evv_formaldehyde):
     """
-    a = b = 4, motif of terms 0, 2-7; terms 3 and 6 add to term 0, the other 4 terms give coeff 0.
-    A = E(1_4) - E(0): Gaussian mode 5 in the .out file, 2682.765 (anharmonic fundamental) or
+    a = b = 5, motif of terms 0, 2-7; terms 3 and 6 add to term 0, the other 4 terms give coeff 0.
+    A = E(1_5) - E(0): Gaussian's mode 5 in the .out file (A order), 2682.765 (anharmonic fundamental) or
     2933.526 (harmonic) cm-1. B = E(1_b) - E(1_a) = 0, since a = b.
     """
     location, amplitude = STRONGEST[evv_formaldehyde.states]
 
     strongest = max(evv_formaldehyde.result.features, key=lambda f: abs(f.amplitude_coeff))
 
-    assert _ab(strongest) == (4, 4)
+    assert _ab(strongest) == (5, 5)
     assert strongest.term_ids == (0, 3, 6)
     assert strongest.location.as_dict() == pytest.approx(location)
     assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
