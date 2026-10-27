@@ -138,7 +138,7 @@ def test_eval_molsys_data():
     print(molsys)
 
     import numpy as np
-    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04, -0.,  0., -0.17,  0., -0.,  0.7, -0., -0., 0.7,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
+    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04294, -0.,  0., -0.17408,  0., -0.,  0.69565, -0., -0., 0.69565,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
     assert molsys.eigenvals == {0: 2878.687, 1: 1820.416, 2: 1534.549, 3: 1203.179, 4: 2933.526, 5: 1268.91}
 
     # with empty datadict: no frequencies and no states, so it does not fit (check_data_dict)
