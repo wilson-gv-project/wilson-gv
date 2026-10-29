@@ -11,8 +11,9 @@ A caller needs only these two calls. The inputs are plain values, the terms and 
 evaluate_response_terms: compile_terms -> make_polarization_linear_comb -> compute_features.
 The evaluator neither derives nor translates terms: no file of it imports wilson_experiment, derive.derive or
 term_var_translate.
-One call is for one set of resonance axes, e.g. {A, B} (check_one_axis_set). Terms on more than one set, e.g. the
-3 IR setup ({A, B} and {A, B, C}): terms_by_axis_set splits them, and each set gets its own call.
+One call is for one set of term axes, e.g. ('A', 'B') (check_same_axis_set). Term axes: the axes in the pf of a
+term's resonance conditions, without sign. Terms with more than one set, e.g. the 3 IR setup (('A', 'B') and
+('A', 'B', 'C')): terms_by_axis_set splits them, and each set gets its own call.
 
 The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
 MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
@@ -35,7 +36,7 @@ Inputs
     exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): left out of the evaluation (the data keeps
                       them). Default: none.
     window_box        grid.Box, the range of each axis, cm-1, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)}).
-                      Its axes are the axes the terms resonate on.
+                      Its axes are the term axes.
     n_points_per_axis grid points on each axis of window_box, both edges included, e.g. {'A': 501, 'B': 201}
     box_rule          features.BoxRule: (window_box, features) -> the half-width of each feat_box, cm-1. Knobs by
                       functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
@@ -86,7 +87,8 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
   v
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
   │    evaluate_response_terms ends here (FeatureResult.features); spectrum_on_grid goes on:
-  │ 5. checks: the terms' axes and the axes of n_points_per_axis are those of window_box
+  │ 5. checks (check_grid_axes): term axes = window_box.axes; n_points_per_axis has one whole number >= 1
+  │    per axis of window_box
   │ 6. half-widths: box_rule(window_box, features), one per feature, cm-1   ← window_box, box_rule
   │    e.g. amplitude_half_widths: from each feature's amplitude; strong features get big feat_boxes
   │ 7. feat_boxes: SpectralWindow.from_features, a feat_box of location ± half-width per feature.
@@ -102,8 +104,9 @@ EvalRspResult(axis_points, amplitude, spectral_window)    the spectrum on the gr
   v
 the plot
 """
+import numbers
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -248,9 +251,9 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
     The result keeps the inputs, for FeatureResult.factors_by_index_set and for the states (FeatureResult.states) on the grid.
-    raises ValueError if the terms resonate on more than one set of axes (check_one_axis_set).
+    raises ValueError if the terms have more than one set of term axes (check_same_axis_set).
     """
-    check_one_axis_set(compiled)
+    check_same_axis_set(compiled)
     table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice,
                                       exclude_modes=exclude_modes)
     return FeatureResult(table, zero, propagator_param,
@@ -260,35 +263,66 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
 
 
 def _term_ids_by_axis_set(motifs: Iterable[ResonanceMotif]) -> dict[tuple[str, ...], list[int]]:
-    """term ids grouped by the axes of their conditions, sets in first-seen order, e.g. {('A', 'B'): [0, 2], ('A',): [1]}"""
+    """term ids grouped by their term axes, sets in first-seen order, e.g. {('A', 'B'): [0, 2], ('A',): [1]}"""
     term_ids = defaultdict(list)
     for term_id, motif in enumerate(motifs):
         term_ids[tuple(sorted(motif.get_max_different_freq_axes()))].append(term_id)
     return dict(term_ids)
 
 
-def check_one_axis_set(compiled: Sequence['CompiledTerm']) -> None:
+def check_same_axis_set(compiled: Sequence['CompiledTerm']) -> None:
     """
-    raises ValueError if the terms resonate on more than one set of axes. One evaluation, and its
-    grid, is for one set, e.g. {A, B}. The message lists the term ids per set, e.g. the 3 IR setup:
-        {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}
-    {A} and {B} are different sets: a term on A only is a stripe along B in an (A, B) plane.
-    Terms without conditions (key ()) do not count here.
-    Without this check such a mix passes compiling (compile_terms checks each term on its own axes) and fails only
-    on the grid.
+    Checks that all terms have the same term axes: the axes in the pf of a term's resonance
+    conditions, without sign, e.g. ('A', 'B') for the conditions pf ('-A',) and pf ('B',).
+    One evaluation and its grid take one set of term axes.
+    Raises ValueError otherwise; the message lists the term ids per set of term axes, e.g. the
+    3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}.
+    terms_by_axis_set splits such terms into one group per set.
+    Two sets differ whenever their axes differ, also when one holds the other: ('A',) and ('A', 'B').
+    A term without conditions (a flat term) has the term axes (): it fits any set and does not
+    count here.
+    compile_terms checks each term on its own, so this check is what catches a mix of sets.
     """
     term_ids = {axis_set: ids for axis_set, ids in _term_ids_by_axis_set(t.cmp_resmotf for t in compiled).items()
                 if axis_set}
     if len(term_ids) > 1:
-        raise ValueError(f'the terms resonate on {len(term_ids)} sets of axes, one evaluation takes one set '
-                         f'(terms_by_axis_set splits them); term ids by set: {term_ids}')
+        raise ValueError(f'{len(term_ids)} different sets of term axes, and one evaluation takes one set; '
+                         f'term ids by set: {term_ids}. Split them with terms_by_axis_set: '
+                         f'one evaluate_response_terms call per set')
+
+
+def check_grid_axes(features: Sequence[SpectralFeature], window_box: Box,
+                    n_points_per_axis: Mapping[str, int]) -> None:
+    """
+    Checks that the grid fits the features. Raises ValueError unless:
+        1. the term axes of the features (their location axes) are window_box.axes, e.g.
+           ('A', 'B') on Box({'A': ..., 'B': ...}). A flat feature (from terms without
+           conditions) has the term axes (): it fits any window_box.
+        2. n_points_per_axis has one entry per axis of window_box
+        3. each entry is a whole number, at least 1 (Box.grid_points checks the rest: 2 or more
+           points, or 1 with min = max)
+    """
+    term_axes = {f.location.axes for f in features if not f.is_flat}
+    if len(term_axes) > 1:
+        raise ValueError(f'{len(term_axes)} different sets of term axes, and one grid takes one set: '
+                         f'{sorted(term_axes)}')
+    if term_axes and term_axes != {window_box.axes}:
+        (axes,) = term_axes
+        raise ValueError(f'term axes {axes} != window_box.axes {window_box.axes}')
+    if set(n_points_per_axis) != set(window_box.axes):
+        raise ValueError(f'n_points_per_axis axes {tuple(sorted(n_points_per_axis))} != '
+                         f'window_box.axes {window_box.axes}')
+    not_counts = {ax: n for ax, n in n_points_per_axis.items()
+                  if isinstance(n, bool) or not isinstance(n, numbers.Integral) or n < 1}
+    if not_counts:
+        raise ValueError(f'n_points_per_axis needs a whole number >= 1 per axis, got {not_counts}')
 
 
 def terms_by_axis_set(terms: Sequence['VibPerturbedTerm']) -> dict[tuple[str, ...], list[int]]:
     """
-    The term ids (index in `terms`) grouped by the axes their resonance conditions use, e.g.
-    the 3 IR setup: {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: key ().
-    They are a flat background, the same on any grid, and check_one_axis_set does not count them, so they
+    The term ids (index in `terms`) grouped by their term axes, e.g. the 3 IR setup:
+    {('A', 'B'): [0, ..., 13], ('A', 'B', 'C'): [14, 15]}. Terms without conditions: term axes ().
+    They are a flat background, the same on any grid, and check_same_axis_set does not count them, so they
     can join the call of any set, e.g. IR absorption: {(): [0, 1, 2], ('A',): [3, 4]}, all 5 terms in one call.
     terms: translated to axes, as for evaluate_response_terms.
     For the caller: one evaluate_response_terms call per set, e.g.
@@ -378,8 +412,9 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                                                             plan.ResCondKey)
         2. orientation-average recipe, rank from the terms  make_polarization_linear_comb (made once per
                                                             rank and laser_pol)
-        3. rows, zero pairs, features                       compute_features (raises first if the terms resonate
-                                                            on more than one set of axes: terms_by_axis_set)
+        3. rows, zero pairs, features                       compute_features (raises first if the terms have
+                                                            more than one set of term axes: check_same_axis_set;
+                                                            terms_by_axis_set splits them)
     Next step: spectrum_on_grid puts the features of the result on a grid. One result serves any number
     of grids, e.g. other window_box values: the rows are computed here once, not again for each grid.
 
@@ -435,8 +470,8 @@ def spectrum_on_grid(feature_result: FeatureResult, *,
                      cut_tails: bool = False) -> EvalRspResult:
     """
     The features of feature_result on a grid over window_box, in five steps:
-        1. check the axes: the terms resonate on the axes of window_box, and n_points_per_axis has
-           one entry per axis of window_box
+        1. check_grid_axes: term axes = window_box.axes, and n_points_per_axis has one whole number
+           >= 1 per axis of window_box
         2. box_rule(window_box, features): the half-width of each feature's feat_box, cm-1
         3. SpectralWindow.from_features: each feature gets its feat_box, location +- half-width;
            keeps the features whose feat_box overlaps window_box (touching counts)
@@ -457,7 +492,7 @@ def spectrum_on_grid(feature_result: FeatureResult, *,
     new propagator_param, on first use (features_from_rows).
 
     window_box         the range of each axis, cm-1, a Box, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)}).
-                       Its axes are the axes the terms resonate on. If no term has conditions: any axes.
+                       Its axes are the term axes. If no term has conditions: any axes.
     n_points_per_axis  grid points on each axis of window_box, both edges included, e.g. {'A': 201, 'B': 201}
     box_rule           the half-width of each feat_box: a function (window_box, features) -> cm-1, one per
                        feature (features.BoxRule). Two exist in features.py; functools.partial gives them
@@ -472,19 +507,11 @@ def spectrum_on_grid(feature_result: FeatureResult, *,
                        missing; the run time grows with (kept features) x (grid points). True: each feature
                        only on its feat_box, its tail beyond cut off; the run time grows with the number of
                        grid points in all feat_boxes.
-    raises ValueError if the terms' axes or the axes of n_points_per_axis differ from the axes of window_box.
+    raises ValueError if the grid does not fit the terms (check_grid_axes).
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
     features = feature_result.features
-
-    # the axes of the terms and of n_points_per_axis must be those of window_box
-    term_axes = {f.location.axes for f in features if not f.is_flat}
-    if term_axes and term_axes != {window_box.axes}:
-        raise ValueError(f'the terms resonate on the axes {sorted(term_axes)}, '
-                         f'window_box has the axes {window_box.axes}')
-    if set(n_points_per_axis) != set(window_box.axes):
-        raise ValueError(f'n_points_per_axis has the axes {tuple(sorted(n_points_per_axis))}, '
-                         f'window_box has the axes {window_box.axes}')
+    check_grid_axes(features, window_box, n_points_per_axis)
 
     # the half-width of each feature's feat_box; from_features makes the feat_boxes from them
     half_widths = box_rule(window_box, features)

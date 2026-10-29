@@ -331,13 +331,16 @@ def three_ir() -> tuple[StoredSetup, list, dict[tuple[str, ...], list[int]]]:
     return setup, setup.terms, terms_by_axis_set(setup.terms)
 
 
-def test_three_ir_terms_resonate_on_two_axis_sets(three_ir):
-    """16 terms: 14 on {A, B}, 2 on {A, B, C}. One evaluation of all 16 raises before any row is computed."""
+def test_three_ir_terms_have_two_sets_of_term_axes(three_ir):
+    """
+    16 terms: 14 with the term axes ('A', 'B'), 2 with ('A', 'B', 'C'). One evaluation of all 16 raises before
+    any row is computed.
+    """
     setup, terms, groups = three_ir
 
     assert setup.axes == {'A': [(-1,)], 'B': [(2,)], 'C': [(3,)]}
     assert {axis_set: len(ids) for axis_set, ids in groups.items()} == {('A', 'B'): 14, ('A', 'B', 'C'): 2}
-    with pytest.raises(ValueError, match='2 sets of axes'):
+    with pytest.raises(ValueError, match='2 different sets of term axes'):
         evaluate_on_formaldehyde(setup, terms)
 
 

@@ -43,7 +43,8 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
 from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     FeatureResult,
     averaging_rank,
-    check_one_axis_set,
+    check_grid_axes,
+    check_same_axis_set,
     compute_features,
     evaluate_response_terms,
     make_polarization_linear_comb,
@@ -72,6 +73,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     PS_11,
     TOY_RECIPE,
     ab_term,
+    feat,
     flat_term,
     get_box_extent,
     polprop,
@@ -147,16 +149,16 @@ def test_compute_features_gives_a_propagator_param_function_the_conditions(molsy
     assert [f.peak_widths() for f in result.features] == [pytest.approx((15., 14.5)), pytest.approx((15., 19.))]
 
 
-## one set of resonance axes per evaluation ----------------------
-# MOTIF_AB resonates on {A, B}, MOTIF_A on {A}, MOTIF_B on {B}.
+## one set of term axes per evaluation ----------------------
+# Term axes: MOTIF_AB ('A', 'B'), MOTIF_A ('A',), MOTIF_B ('B',).
 
 MOTIF_B = (((('a',), ()), ('B',)),)           # B = E_a - E_0
 
 
 def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
     """
-    {A, B} and {A}: compiling takes both (each fixes one point on its own axes); the grid would not
-    ("Expected SpectralFeature with axes ('A', 'B'), got ('A',)"). The message lists the term ids per set.
+    Term axes ('A', 'B') and ('A',): compiling takes both (each fixes one point on its own term axes); one
+    grid would not. The message lists the term ids per set.
     """
     terms = [ab_term(MOTIF_AB), ab_term(MOTIF_A), ab_term(MOTIF_AB)]
 
@@ -165,14 +167,14 @@ def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
 
 
 def test_compute_features_raises_for_terms_on_A_only_and_on_B_only(molsys_a1_zero):
-    """{A} and {B} are different sets: in an (A, B) plane the first is a stripe along B, the second along A."""
-    with pytest.raises(ValueError, match='2 sets of axes'):
+    """Term axes ('A',) and ('B',) are different sets."""
+    with pytest.raises(ValueError, match='2 different sets of term axes'):
         compute_features([ab_term(MOTIF_A), ab_term(MOTIF_B)], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
-def test_check_one_axis_set_does_not_count_a_term_without_conditions():
-    """A term without conditions has no axes: it is not a set of its own."""
-    check_one_axis_set([ab_term(MOTIF_AB), flat_term()])
+def test_check_same_axis_set_does_not_count_a_term_without_conditions():
+    """A term without conditions has the term axes (): it is not a set of its own."""
+    check_same_axis_set([ab_term(MOTIF_AB), flat_term()])
 
 
 def test_compute_features_term_without_conditions_is_one_flat_feature(molsys_a1_zero):
@@ -725,7 +727,7 @@ def test_evaluate_response_terms_raises_for_two_axis_sets_and_runs_per_set(forma
     terms 1-13 in top_run, with ids[row.term_id] the index in the full list.
     """
     terms = evv_terms_with_term_0_on_A_only()
-    with pytest.raises(ValueError, match='2 sets of axes'):
+    with pytest.raises(ValueError, match='2 different sets of term axes'):
         evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms)
 
     ids = terms_by_axis_set(terms)[('A', 'B')]
@@ -996,3 +998,36 @@ def test_spectrum_on_grid_needs_a_box_rule(top_run):
     with pytest.raises(TypeError, match='box_rule'):
         spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST,  # type: ignore
                          n_points_per_axis=STEPS_1_CM)
+
+
+## check_grid_axes: the grid fits the features --------------------------------
+
+AB = [feat(A=100., B=50.)]          # one feature with the term axes ('A', 'B')
+
+
+@pytest.mark.parametrize('window_box, n_points_per_axis, message', [
+    (Box({'A': (0., 200.)}), {'A': 11}, 'term axes'),
+    (Box({'B': (0., 200.), 'C': (0., 100.)}), {'B': 11, 'C': 11}, 'term axes'),
+    (Box({'A': (0., 200.), 'B': (0., 100.), 'C': (0., 1.)}), {'A': 11, 'B': 11, 'C': 2}, 'term axes'),
+    (Box({'A': (0., 200.), 'B': (0., 100.)}), {'A': 11}, 'n_points_per_axis axes'),
+    (Box({'A': (0., 200.), 'B': (0., 100.)}), {'A': 11, 'C': 11}, 'n_points_per_axis axes'),
+    (Box({'A': (0., 200.), 'B': (0., 100.)}), {'A': 11, 'B': 10.5}, 'whole number'),
+], ids=['window_box misses B', 'window_box on other axes', 'window_box has an extra axis',
+        'n_points_per_axis misses B', 'n_points_per_axis on other axes', 'not a whole number'])
+def test_check_grid_axes_raises_when_the_grid_does_not_fit_the_features(window_box, n_points_per_axis, message):
+    with pytest.raises(ValueError, match=message):
+        check_grid_axes(AB, window_box, n_points_per_axis)
+
+
+def test_check_grid_axes_lets_flat_features_alone_take_any_window_box():
+    check_grid_axes([feat()], Box({'C': (0., 1.)}), {'C': 2})
+
+
+def test_spectrum_on_grid_checks_the_axes_before_the_box_rule(top_run):
+    calls = []
+    rule = lambda window_box, features: calls.append(window_box) or [7.] * len(features)
+
+    with pytest.raises(ValueError, match='term axes'):
+        spectrum_on_grid(top_run.result, window_box=Box({'A': (2600., 2800.)}),
+                         n_points_per_axis={'A': 201}, box_rule=rule)
+    assert calls == []
