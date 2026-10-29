@@ -1,0 +1,30 @@
+[
+  {
+    "name": "evv",
+    "group": "evv",
+    "file": "evv.json",
+    "n_terms": 14,
+    "error": null
+  },
+  {
+    "name": "try: CARS",
+    "group": "g7",
+    "file": "g7/01_try_cars.json.gz",
+    "n_terms": 4,
+    "error": null
+  },
+  {
+    "name": "nb: 3 IR (3D)",
+    "group": "g7",
+    "file": "g7/02_nb_3_ir_3d.json.gz",
+    "n_terms": 16,
+    "error": null
+  },
+  {
+    "name": "1D: IR absorption",
+    "group": "g7",
+    "file": "g7/03_1d_ir_absorption.json.gz",
+    "n_terms": 5,
+    "error": null
+  }
+]
