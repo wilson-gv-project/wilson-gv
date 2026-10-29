@@ -54,7 +54,7 @@ LABELS = {'A': r'A = $\omega_1/2\pi c$, cm$^{-1}$', 'B': r'B = $(-\omega_1+\omeg
 
 
 def evaluate(terms, molsys: MolSystemData, states: str) -> FeatureResult:
-    return evaluate_response_terms(terms, molsys_data=molsys, states_choice=states, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
+    return evaluate_response_terms(terms, molsys_data=molsys, states_choice=states, laser_pol=ref.LASER_POL, lineshape_param=GAMMA_CM)
 
 
 def save(fig, path: Path, dpi: int = 210):

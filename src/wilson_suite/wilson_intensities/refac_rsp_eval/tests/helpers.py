@@ -180,10 +180,11 @@ def cumulative_motif(axes: tuple[str, ...]) -> ResonanceMotif:
 def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0, amp: float | None = 1.0,
          rows: tuple | None = None, box_extent: float | None = None, **coords: float) -> SpectralFeature:
     """
-    A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}). gamma in cm-1.
+    A feature at the given coordinates, e.g. feat(A=100.) or feat({'A': 100.}).
+    gamma: the lineshape_param, cm-1 (the Lorentzian's half width).
     The dict form is for N-dimensional tests: feat(coords(3, 100.)).
     Without `rows`, the feature gets one row with coeff=amp, a=0 and the motif
-    cumulative_motif(axes), so one width per axis (amp=None -> no rows, so no amplitude).
+    cumulative_motif(axes), so one lineshape_param per axis (amp=None -> no rows, so no amplitude).
     No box, as before SpectralWindow.from_features gives one. box_extent gives it the box location +- box_extent on
     every axis (box_extent: the half-width in from_features, from the location to each box face), e.g.
     feat(A=0., box_extent=1.) has the box (-1, 1).
@@ -192,7 +193,7 @@ def feat(location: dict[str, float] | None = None, /, gamma: float | None = 1.0,
     if rows is None:
         rows = () if amp is None else (row(amp, location=loc, motif=cumulative_motif(loc.axes), a=0),)
     box = None if box_extent is None else Box({ax: (v - box_extent, v + box_extent) for ax, v in loc.coordinates})
-    return SpectralFeature(location=loc, rows=rows, propagator_param=gamma, feat_box=box)
+    return SpectralFeature(location=loc, rows=rows, lineshape_param=gamma, feat_box=box)
 
 
 def get_box_extent(f: SpectralFeature, axis: str = 'A') -> float:

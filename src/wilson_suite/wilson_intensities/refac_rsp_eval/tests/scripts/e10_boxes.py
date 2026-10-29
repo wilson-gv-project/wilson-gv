@@ -63,7 +63,7 @@ ZOOM_HALF_CM, ZOOM_N = 150., 301
 SETTINGS = [
     dict(dynrange=dynrange, eps=eps) for dynrange in (100., 500., 1000.) for eps in (0.1, 0.3)
 ] + [
-    dict(dynrange=500., eps=0.1, min_gammas=3.),
+    dict(dynrange=500., eps=0.1, min_lineshape_params=3.),
 ]
 RULES = [
     setting for dynrange in (100., 500., 1000.) for setting in (
@@ -132,7 +132,7 @@ def main(settings: list[dict]):
     terms = ref.evv_terms()
     for mol, load in (('formaldehyde', lambda: MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))),
                       ('ACDM', lambda: load_acdm(terms))):
-        result = evaluate_response_terms(terms, molsys_data=load(), states_choice=STATES, laser_pol=ref.LASER_POL, propagator_param=GAMMA_CM)
+        result = evaluate_response_terms(terms, molsys_data=load(), states_choice=STATES, laser_pol=ref.LASER_POL, lineshape_param=GAMMA_CM)
         run_case(f'{mol}, quick_start window_box', result, *QUICK_START, settings)
         zoom, zoom_grid = zoom_around_strongest(result, QUICK_START[0])
         run_case(f'{mol}, zoom {zoom.bounds}', result, zoom, zoom_grid, settings)

@@ -5,9 +5,9 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
     1. the inputs: terms already translated to axes, data file, laser polarization, states choice
     2. load the data, once
     3. features (evaluate_response_terms): how many, and where they are
-    4. the spectrum on a grid (spectrum_on_grid), with a width per condition
+    4. the spectrum on a grid (spectrum_on_grid), with a lineshape_param per condition
     5. what came out: the grid, the brightest point, spectral_window as used (its features and their feat_boxes)
-    6. another width, same rows: spectrum_on_grid runs again without computing the rows again
+    6. another lineshape_param, same rows: spectrum_on_grid runs again without computing the rows again
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.example_evaluate_response_terms
 """
@@ -44,12 +44,13 @@ def main():
     #    prop_names(terms): which properties the terms use, so which ones to load.
     molsys = MolSystemData.load(data_origin, prop_names(terms))
 
-    # 3. features. Width per condition: 3 cm-1 plus 0.2 % of the condition's |E| (energy_difference is signed).
-    width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
+    # 3. features. lineshape_param per condition: 3 cm-1 plus 0.2 % of the condition's |E|
+    # (energy_difference is signed).
+    lineshape_param = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
     t0 = time.perf_counter()
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states_choice,
-                                     laser_pol=laser_pol, propagator_param=width)
+                                     laser_pol=laser_pol, lineshape_param=lineshape_param)
     t_rows = time.perf_counter() - t0
 
     print(f'{len(terms)} terms -> {len(result.table)} rows, {len(result.zero)} zero pairs, '
@@ -89,12 +90,12 @@ def main():
 
     inside = spectral_window.full_features
     print(f'\n{len(inside)} features inside window_box, strongest first:')
-    print(f'  {"A":>8} {"B":>8}  {"(a, b)":>7}  {"terms":<22} {"widths at peak":<16} {"peak intensity":>14}')
+    print(f'  {"A":>8} {"B":>8}  {"(a, b)":>7}  {"terms":<22} {"params at peak":<16} {"peak intensity":>14}')
     for f in sorted(inside, key=lambda f: f.get_intensity(), reverse=True):
         (ps,) = f.param_sets
-        widths = ', '.join(f'{w:.2f}' for w in f.peak_widths())
+        params = ', '.join(f'{p:.2f}' for p in f.lineshape_params_at_peak())
         print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '  # noqa: RUF010
-              f'{str(f.term_ids):<22} {widths:<16} {f.get_intensity():14.3e}')  # noqa: RUF010
+              f'{str(f.term_ids):<22} {params:<16} {f.get_intensity():14.3e}')  # noqa: RUF010
 
     print('-----------------------------')
     for i in inside:
@@ -106,9 +107,10 @@ def main():
 
 
     # ---------------------------------------------------
-    # 6. another width, same rows: replace gives a new FeatureResult with the same table, spectrum_on_grid uses it
+    # 6. another lineshape_param, same rows: replace gives a new FeatureResult with the same table,
+    # spectrum_on_grid uses it
     t0 = time.perf_counter()
-    wider = spectrum_on_grid(replace(result, propagator_param=8.), window_box=window_box,
+    wider = spectrum_on_grid(replace(result, lineshape_param=8.), window_box=window_box,
                              n_points_per_axis=n_points_per_axis, box_rule=rule)
     t_again = time.perf_counter() - t0
 

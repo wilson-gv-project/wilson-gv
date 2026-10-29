@@ -108,10 +108,10 @@ def test_feature_has_no_box_until_its_window_gives_one():
 
 
 def test_replace_keeps_the_box():
-    """dataclasses.replace runs __post_init__ again; it must not reset a dressed box to location +- gamma."""
+    """dataclasses.replace runs __post_init__ again; it must not reset a dressed box to location +- lineshape_param."""
     dressed = feat(A=100., box_extent=50.)
 
-    assert replace(dressed, propagator_param=6.).feat_box == Box({'A': (50., 150.)})
+    assert replace(dressed, lineshape_param=6.).feat_box == Box({'A': (50., 150.)})
 
 
 def test_feature_amplitude_is_the_sum_of_row_coeffs():
@@ -162,7 +162,7 @@ def test_feature_motif_rejects_rows_of_two_motifs():
         _ = f.motif
 
 
-def test_feature_equality_uses_location_gamma_and_rows():
+def test_feature_equality_uses_location_lineshape_param_and_rows():
     assert feat(A=1.) == feat(A=1.)
     assert feat(A=1.) != feat(A=2.)
     assert feat(A=1., gamma=1.) != feat(A=1., gamma=2.)
@@ -227,21 +227,24 @@ def test_features_from_rows_does_not_round_locations():
     assert len(features_from_rows(ContributionTable(rows))) == 2
 
 
-def test_features_from_rows_gives_every_feature_the_propagator_param():
-    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), propagator_param=5.)
+def test_features_from_rows_gives_every_feature_the_lineshape_param():
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_param=5.)
 
-    assert f.propagator_param == 5.
+    assert f.lineshape_param == 5.
     assert f.feat_box is None   # boxes come later, from SpectralWindow.from_features
     assert f.conditions is None # a number needs no conditions
 
 
-def test_features_from_rows_without_states_gives_a_propagator_param_function_no_conditions():
-    """The conditions come from the states (test_pipeline.py checks them); without states, peak_widths raises."""
-    width = lambda vd, freqs: 5.
+def test_features_from_rows_without_states_gives_a_lineshape_param_function_no_conditions():
+    """
+    The conditions come from the states (test_pipeline.py checks them); without states,
+    lineshape_params_at_peak raises.
+    """
+    lineshape_param = lambda vd, freqs: 5.
 
-    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), propagator_param=width)
+    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_param=lineshape_param)
 
-    assert f.propagator_param is width
+    assert f.lineshape_param is lineshape_param
     assert f.conditions is None
 
 
@@ -298,12 +301,12 @@ def test_intensity_is_abs_squared_of_amplitude_over_gamma_power(location, gamma,
 
 
 @pytest.mark.parametrize('amp, gamma', [(None, 1.), (1., None)])
-def test_intensity_needs_amplitude_and_gamma(amp, gamma):
+def test_intensity_needs_amplitude_and_lineshape_param(amp, gamma):
     with pytest.raises(ValueError):
         feat(A=0., amp=amp, gamma=gamma).get_intensity()
 
 
-def test_intensity_needs_positive_gamma():
+def test_intensity_needs_a_positive_lineshape_param():
     with pytest.raises(ValueError, match='must be > 0'):
         feat(A=0., gamma=0.).get_intensity()
 
@@ -312,58 +315,63 @@ def test_intensity_of_zero_amplitude_is_zero():
     assert feat(A=0., amp=0.).get_intensity() == 0.
 
 
-## SpectralFeature: propagator_param function, peak widths --------------------------
-# A propagator_param function gets each condition's pair of states; here stand-ins that only have an energy difference.
+## SpectralFeature: lineshape_param function, lineshape_params_at_peak ---------------
+# A lineshape_param function gets each condition's pair of states; here stand-ins that only have an energy difference.
 
 TWO_CONDITIONS = (SimpleNamespace(E=1600.), SimpleNamespace(E=500.))
-WIDTH_1_PERCENT = lambda vd, freqs: vd.E / 100    # 16 and 5 cm-1
+LINESHAPE_PARAM_1_PERCENT = lambda vd, freqs: vd.E / 100    # 16 and 5 cm-1
 
 
-def with_width_per_condition(f: SpectralFeature) -> SpectralFeature:
-    return replace(f, propagator_param=WIDTH_1_PERCENT, conditions=TWO_CONDITIONS)
+def with_lineshape_param_per_condition(f: SpectralFeature) -> SpectralFeature:
+    return replace(f, lineshape_param=LINESHAPE_PARAM_1_PERCENT, conditions=TWO_CONDITIONS)
 
 
-def test_peak_widths_of_a_number_is_one_per_condition():
-    """One width per condition, whichever axes it uses: 3 conditions on 2 axes give 3 widths."""
+def test_lineshape_params_at_peak_of_a_number_is_one_per_condition():
+    """One value per condition, whichever axes it uses: 3 conditions on 2 axes give 3 values."""
     extra = row(motif=ResonanceMotif.from_tuples(MOTIF_AB_EXTRA), a=0, b=1)
 
-    assert feat(A=100., B=200., gamma=5.).peak_widths() == (5., 5.)
-    assert feat(A=100., B=200., gamma=5., rows=(extra,)).peak_widths() == (5., 5., 5.)
+    assert feat(A=100., B=200., gamma=5.).lineshape_params_at_peak() == (5., 5.)
+    assert feat(A=100., B=200., gamma=5., rows=(extra,)).lineshape_params_at_peak() == (5., 5., 5.)
 
 
-def test_peak_widths_of_a_function_is_one_per_condition():
-    assert with_width_per_condition(feat(A=1600., B=500.)).peak_widths() == pytest.approx((16., 5.))
+def test_lineshape_params_at_peak_of_a_function_is_one_per_condition():
+    f = with_lineshape_param_per_condition(feat(A=1600., B=500.))
+
+    assert f.lineshape_params_at_peak() == pytest.approx((16., 5.))
 
 
-def test_peak_widths_of_a_function_takes_the_location_as_freqs():
-    """width = A / 100 at A = 300 -> 3 cm-1"""
-    f = replace(feat(A=300.), propagator_param=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
+def test_lineshape_params_at_peak_of_a_function_takes_the_location_as_freqs():
+    """lineshape_param = A / 100 at A = 300 -> 3 cm-1"""
+    f = replace(feat(A=300.), lineshape_param=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
 
-    assert f.peak_widths() == pytest.approx((3.,))
+    assert f.lineshape_params_at_peak() == pytest.approx((3.,))
 
 
-def test_peak_widths_of_a_function_needs_the_conditions():
+def test_lineshape_params_at_peak_of_a_function_needs_the_conditions():
     with pytest.raises(ValueError, match='no conditions'):
-        replace(feat(A=100.), propagator_param=WIDTH_1_PERCENT).peak_widths()
+        replace(feat(A=100.), lineshape_param=LINESHAPE_PARAM_1_PERCENT).lineshape_params_at_peak()
 
 
-def test_intensity_with_a_width_per_condition():
-    """|2 / ((-16i) * (-5i))|^2, widths in au: 4 / (16 * 5 * CM_TO_AU**2)**2"""
-    f = with_width_per_condition(feat(A=1600., B=500., amp=2.))
+def test_intensity_with_a_lineshape_param_per_condition():
+    """|2 / ((-16i) * (-5i))|^2, lineshape_params in au: 4 / (16 * 5 * CM_TO_AU**2)**2"""
+    f = with_lineshape_param_per_condition(feat(A=1600., B=500., amp=2.))
 
     assert f.get_intensity() == pytest.approx(4. / (16. * 5. * CM_TO_AU ** 2) ** 2, rel=1e-6)
 
 
-def test_intensity_needs_positive_widths_from_a_function():
-    f = replace(feat(A=0.), propagator_param=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
+def test_intensity_needs_positive_lineshape_params_from_a_function():
+    f = replace(feat(A=0.), lineshape_param=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
 
     with pytest.raises(ValueError, match='must be > 0'):
         f.get_intensity()
 
 
-def test_intensity_half_widths_take_the_largest_peak_width():
-    """widths 16 and 5 cm-1, dynrange 101, no margin: 16 * sqrt(100) = 160 cm-1, scaled or not (the only feature)"""
-    f = with_width_per_condition(feat(A=5., B=5.))
+def test_intensity_half_widths_take_the_largest_lineshape_param():
+    """
+    lineshape_params 16 and 5 cm-1, dynrange 101, no margin: 16 * sqrt(100) = 160 cm-1, scaled or not
+    (the only feature)
+    """
+    f = with_lineshape_param_per_condition(feat(A=5., B=5.))
     window = Box({'A': (0., 10.), 'B': (0., 10.)})
 
     for scaled in (False, True):
@@ -371,12 +379,12 @@ def test_intensity_half_widths_take_the_largest_peak_width():
                                      scale_wrt_max_intensity=scaled) == pytest.approx([160.])
 
 
-def test_amplitude_half_widths_take_the_largest_peak_width():
+def test_amplitude_half_widths_take_the_largest_lineshape_param():
     """
-    widths 16 and 5 cm-1. Alone, the feature is the max: k = 2 * 101 / 0.1 = 2020 -> 16 * sqrt(2020**2 - 1).
+    lineshape_params 16 and 5 cm-1. Alone, the feature is the max: k = 2 * 101 / 0.1 = 2020 -> 16 * sqrt(2020**2 - 1).
     With an a_max far above it: k < 1 -> the smallest box, 1 gamma = 16 cm-1.
     """
-    f = with_width_per_condition(feat(A=5., B=5.))
+    f = with_lineshape_param_per_condition(feat(A=5., B=5.))
     window = Box({'A': (0., 10.), 'B': (0., 10.)})
 
     assert amplitude_half_widths(window, [f], dynrange=101.) == pytest.approx([16. * (2020. ** 2 - 1) ** 0.5])
@@ -452,8 +460,8 @@ def test_window_from_features_needs_half_widths_of_zero_or_more(half_width):
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5.)], [half_width])
 
 
-def test_window_from_features_needs_propagator_param():
-    with pytest.raises(ValueError, match='propagator_param'):
+def test_window_from_features_needs_lineshape_param():
+    with pytest.raises(ValueError, match='lineshape_param'):
         SpectralWindow.from_features(WINDOW_0_10, [feat(A=5., gamma=None)], [55.])
 
 
@@ -463,7 +471,7 @@ def test_window_from_features_needs_rows():
 
 
 ## amplitude_half_widths: box size by amplitude ----------------------------------
-# k = 2 * dynrange * a / (eps * a_max), half-width = gamma * sqrt(k**2 - 1), at least min_gammas * gamma.
+# k = 2 * dynrange * a / (eps * a_max), half-width = gamma * sqrt(k**2 - 1), at least min_lineshape_params * gamma.
 # dynrange 100, eps 0.1 (default): k = 2000 * a / a_max. One gamma (5 cm-1) for all: a / a_max = amp / max amp.
 
 def three_strengths() -> list[SpectralFeature]:
@@ -485,10 +493,11 @@ def test_amplitude_half_widths_smaller_eps_gives_bigger_boxes():
     assert half_widths == pytest.approx([5. * (20000. ** 2 - 1) ** 0.5, 5. * (200. ** 2 - 1) ** 0.5, 5. * 3 ** 0.5])
 
 
-@pytest.mark.parametrize('min_gammas, weakest', [(3., 15.), (0., 0.)])
-def test_amplitude_half_widths_min_gammas_sets_the_smallest_box(min_gammas, weakest):
+@pytest.mark.parametrize('min_lineshape_params, weakest', [(3., 15.), (0., 0.)])
+def test_amplitude_half_widths_min_lineshape_params_sets_the_smallest_box(min_lineshape_params, weakest):
     """only the weakest one (k = 0.2) is below the smallest box; the other two keep theirs"""
-    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100., min_gammas=min_gammas)
+    half_widths = amplitude_half_widths(WINDOW_0_10, three_strengths(), dynrange=100.,
+                                        min_lineshape_params=min_lineshape_params)
 
     assert half_widths == pytest.approx([5. * (2000. ** 2 - 1) ** 0.5, 5. * (20. ** 2 - 1) ** 0.5, weakest])
 
@@ -537,7 +546,7 @@ def test_amplitude_half_widths_compare_peak_heights_not_coefficients():
 
 
 def test_amplitude_half_widths_with_every_amplitude_zero_are_the_smallest_boxes():
-    """rows that cancel everywhere: nothing on the grid, no a_max to scale by -> min_gammas * gamma"""
+    """rows that cancel everywhere: nothing on the grid, no a_max to scale by -> min_lineshape_params * gamma"""
     assert amplitude_half_widths(WINDOW_0_10, [feat(A=5., amp=0., gamma=5.), feat(A=6., amp=0., gamma=2.)],
                                  dynrange=100.) == [5., 2.]
 
@@ -563,7 +572,7 @@ def test_window_from_amplitude_boxes_keeps_weak_features():
 
 
 @pytest.mark.parametrize('setting, value', [('dynrange', 1.), ('dynrange', 0.5), ('eps', 0.), ('eps', -0.1),
-                                            ('min_gammas', -1.), ('a_max', 0.)])
+                                            ('min_lineshape_params', -1.), ('a_max', 0.)])
 def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
     settings = {'dynrange': 100., setting: value}
 
@@ -571,8 +580,8 @@ def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
         amplitude_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
 
 
-@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
-def test_amplitude_half_widths_need_a_feature_with_rows_and_width(f, message):
+@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'lineshape_param'), (feat(A=5., amp=None), 'no rows')])
+def test_amplitude_half_widths_need_a_feature_with_rows_and_lineshape_param(f, message):
     with pytest.raises(ValueError, match=message):
         amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
@@ -685,15 +694,15 @@ def test_intensity_half_widths_reject_settings_out_of_range(setting, value):
         intensity_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
 
 
-@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'propagator_param'), (feat(A=5., amp=None), 'no rows')])
-def test_intensity_half_widths_need_a_feature_with_rows_and_width(f, message):
+@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'lineshape_param'), (feat(A=5., amp=None), 'no rows')])
+def test_intensity_half_widths_need_a_feature_with_rows_and_lineshape_param(f, message):
     with pytest.raises(ValueError, match=message):
         intensity_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
 ## A flat background: rows without resonance conditions ----------------------------------------
 # The rows of a term without conditions sit at the location without axes. The feature has the same amplitude on
-# every grid point: no peak, no width, no box of its own.
+# every grid point: no peak, no lineshape_params_at_peak, no box of its own.
 
 def flat(amp: float = 2.) -> SpectralFeature:
     return feat({}, amp=amp, gamma=5.)
@@ -704,10 +713,10 @@ def test_flat_feature_has_no_axes():
     assert not feat(A=0.).is_flat
 
 
-@pytest.mark.parametrize('propagator_param', [5., WIDTH_1_PERCENT])
-def test_flat_feature_has_no_peak_widths(propagator_param):
-    """No conditions, so no width; a function needs no conditions here."""
-    assert replace(flat(), propagator_param=propagator_param).peak_widths() == ()
+@pytest.mark.parametrize('lineshape_param', [5., LINESHAPE_PARAM_1_PERCENT])
+def test_flat_feature_has_no_lineshape_params_at_peak(lineshape_param):
+    """No conditions, so no lineshape_params_at_peak; a function needs no conditions here."""
+    assert replace(flat(), lineshape_param=lineshape_param).lineshape_params_at_peak() == ()
 
 
 def test_flat_feature_intensity_is_its_amplitude_squared():

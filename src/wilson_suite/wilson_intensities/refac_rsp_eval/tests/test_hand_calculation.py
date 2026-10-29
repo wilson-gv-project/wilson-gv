@@ -184,7 +184,7 @@ def evaluator_rows(setup, terms: list, states: str) -> dict[tuple[int, ...], lis
     molsys = MolSystemData.load(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
                                 prop_names(terms))
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states,
-                                     laser_pol=setup.laser_pol, propagator_param=10.)
+                                     laser_pol=setup.laser_pol, lineshape_param=10.)
     assert result.zero == []
     rows = defaultdict(list)
     for r in result.table:

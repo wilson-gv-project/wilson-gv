@@ -540,13 +540,13 @@ def boxed_result(axes: dict[str, np.ndarray]) -> EvalRspResult:
         flat     no axes; its box is the window                       gets no outline
     """
     def feature(peak: dict, box: dict) -> SpectralFeature:
-        return SpectralFeature(ResLocPoint({ax: peak[ax] for ax in axes}), propagator_param=3.,
+        return SpectralFeature(ResLocPoint({ax: peak[ax] for ax in axes}), lineshape_param=3.,
                                feat_box=Box({ax: box[ax] for ax in axes}))
 
     window = Box({ax: (float(points[0]), float(points[-1])) for ax, points in axes.items()})
     inside = feature({'A': 0., 'B': 0.}, {'A': (-5., 5.), 'B': (-3., 3.)})
     outside = feature({'A': 30., 'B': 0.}, {'A': (15., 45.), 'B': (-10., 10.)})
-    flat = SpectralFeature(ResLocPoint({}), propagator_param=3., feat_box=window)
+    flat = SpectralFeature(ResLocPoint({}), lineshape_param=3., feat_box=window)
     return replace(toy_result(axes), spectral_window=SpectralWindow(window, [inside, flat], [outside]))
 
 

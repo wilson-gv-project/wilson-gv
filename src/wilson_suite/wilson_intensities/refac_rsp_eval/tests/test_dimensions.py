@@ -49,7 +49,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import St
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
-G_CM = 20.          # peak width, cm-1
+G_CM = 20.          # lineshape_param (the Lorentzian half width), cm-1
 
 
 ## mock data: 2 modes, states up to 4 quanta -----------------------------------
@@ -187,7 +187,7 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
 def evaluate_on_formaldehyde(setup: StoredSetup, terms: list) -> FeatureResult:
     molsys = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
     return evaluate_response_terms(terms, molsys_data=molsys, states_choice='anharmonic',
-                                   laser_pol=setup.laser_pol, propagator_param=10.)
+                                   laser_pol=setup.laser_pol, lineshape_param=10.)
 
 
 ## 1D, real data: CARS on formaldehyde -------------------------------------------

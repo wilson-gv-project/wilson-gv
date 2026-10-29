@@ -5,7 +5,7 @@ Each case runs the two public calls on real data, and compares the result, grid 
 point, with the numbers saved in grid_reference.npz:
     terms + data -> rows -> features              evaluate_response_terms
     features -> boxes -> the amplitude on a grid  spectrum_on_grid
-So every step counts: the coefficients, the locations, the widths, the boxes, the line shape and
+So every step counts: the coefficients, the locations, the lineshape_params, the boxes, the line shape and
 the sum on the grid. test_evv_reference.py checks the rows alone.
 
 The test shows that the numbers did not change, not that they are right. Other tests check that:
@@ -16,11 +16,11 @@ The cases: formaldehyde, amplitude feat_boxes with dynrange 500. Each window_box
 so their peaks interfere, and features outside window_box reach in with their tails.
     evv        14 EVV terms, anharmonic states, gamma 4.7 cm-1, cut_tails=False.
                4 features inside, among them the strongest EVV feature.
-    evv_width  14 EVV terms, harmonic states, a width function (width_cm), cut_tails=False.
+    evv_width  14 EVV terms, harmonic states, a lineshape_param function (lineshape_param_cm), cut_tails=False.
                6 features inside.
     three_ir   3 IR, its terms on {A, B, C}, anharmonic states, gamma 10 cm-1, cut_tails=True.
                8 features inside. Its conditions use 1, 2 and 3 axes: A, A + B, A + B + C.
-Together they cover both state sets, a number and a function as the width, both cut_tails
+Together they cover both state sets, a number and a function as the lineshape_param, both cut_tails
 settings, and 2 and 3 axes.
 
 grid_reference.npz holds, per case, e.g. for evv:
@@ -50,7 +50,7 @@ import numpy as np
 import pytest
 
 from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
-    PropagatorParam,
+    LineshapeParam,
     amplitude_half_widths,
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
@@ -75,13 +75,13 @@ BOXES = partial(amplitude_half_widths, dynrange=500.)
 REL = 1e-11
 
 
-def width_cm(vd, freqs):
+def lineshape_param_cm(vd, freqs):
     """
-    The width function of the evv_width case, cm-1: a width per condition, from its energy
+    The lineshape_param function of the evv_width case, cm-1: one value per condition, from its energy
     difference E, that also grows along A:
         3 + 0.002 |E| + 0.001 |A|
     For the box and the peak height, A is the feature's location; on the grid, A is an array of
-    every grid point's A, so the width changes from point to point.
+    every grid point's A, so the value changes from point to point.
         e.g. the condition with E = 1534.5 at A = 1534.5: 3 + 3.07 + 1.53 = 7.6
     """
     return 3. + 0.002 * abs(vd.energy_difference()) + 0.001 * np.abs(freqs['A'])
@@ -95,7 +95,7 @@ class Case:
         axis_set   the setup's terms on these resonance axes (terms_by_axis_set): one
                    evaluation takes one set
         states     the state set, 'anharmonic' or 'harmonic'
-        width      propagator_param, cm-1: a number or a function (features.PropagatorParam)
+        lineshape_param    cm-1: a number or a function (features.LineshapeParam)
         window_box         the range of the spectrum, cm-1, one range per axis
         n_points_per_axis  grid points on each axis, both edges of window_box included
         cut_tails          False: each feature of spectral_window on the whole grid; True: on its own feat_box only
@@ -104,7 +104,7 @@ class Case:
     setup: str
     axis_set: tuple[str, ...]
     states: str
-    width: PropagatorParam
+    lineshape_param: LineshapeParam
     window_box: Box
     n_points_per_axis: dict[str, int]
     cut_tails: bool
@@ -121,7 +121,7 @@ CASES = {
                 cut_tails=False, n_inside=4),
     # harmonic locations, 5 cm-1 steps. Inside: A 1534.5 with B 1268.9, 1344.1, 1399.0, 1534.5;
     # A 1820.4 with B 1268.9 and 1534.5
-    'evv_width': Case('evv', ('A', 'B'), 'harmonic', width_cm,
+    'evv_width': Case('evv', ('A', 'B'), 'harmonic', lineshape_param_cm,
                       Box({'A': (1500., 1850.), 'B': (1250., 1560.)}), {'A': 71, 'B': 63},
                       cut_tails=False, n_inside=6),
     # 5 cm-1 steps on A and B, 10 on C. Inside: A -2726.8 and -2682.8, each with B 2682.8 and
@@ -157,7 +157,7 @@ def spectrum(case: Case, molsys: MolSystemData) -> EvalRspResult:
     """
     terms, laser_pol = case_terms(case)
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=case.states,
-                                     laser_pol=laser_pol, propagator_param=case.width)
+                                     laser_pol=laser_pol, lineshape_param=case.lineshape_param)
     return spectrum_on_grid(result, window_box=case.window_box, n_points_per_axis=case.n_points_per_axis,
                             box_rule=BOXES, cut_tails=case.cut_tails)
 

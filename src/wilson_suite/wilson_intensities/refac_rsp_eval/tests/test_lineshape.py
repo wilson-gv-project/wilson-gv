@@ -40,7 +40,7 @@ def test_distance_is_0_at_or_above_the_peak(drop):
 
 def test_peak_and_tail_follow_factor(monkeypatch):
     """Another factor changes peak and tail with it: only factor and distance are per line shape."""
-    monkeypatch.setattr(lineshape, 'factor', lambda resloc, gamma: np.exp(-(resloc / gamma) ** 2))
+    monkeypatch.setattr(lineshape, 'factor', lambda resloc, param: np.exp(-(resloc / param) ** 2))
 
     assert lineshape.peak(2.) == 1.
     assert lineshape.tail(2., 2.) == pytest.approx(np.exp(-1.))

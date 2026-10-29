@@ -123,30 +123,31 @@ def test_compute_features_reports_zero_pairs(molsys_a1_zero):
     assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
 
 
-def test_compute_features_gives_every_feature_the_propagator_param(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, propagator_param=5.,
+def test_compute_features_gives_every_feature_the_lineshape_param(molsys_a1_zero):
+    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, lineshape_param=5.,
                               states_choice='anharmonic')
 
     assert len(result.features) == 2
-    assert all(f.propagator_param == 5. for f in result.features)
+    assert all(f.lineshape_param == 5. for f in result.features)
     # no boxes yet: they come later, from SpectralWindow.from_features
     assert all(f.feat_box is None for f in result.features)
 
 
-def test_compute_features_gives_a_propagator_param_function_the_conditions(molsys_a1_zero):
+def test_compute_features_gives_a_lineshape_param_function_the_conditions(molsys_a1_zero):
     """
     The function gets the pair of states of each condition, from the result's states. ab_term (MOTIF_AB), a=0:
-    conditions <0 - a> and <ab - a>, so with width 5 + 1 % of |E|:
+    conditions <0 - a> and <ab - a>, so with lineshape_param 5 + 1 % of |E|:
         b=0:  0 - E0 = -1000,  E00 - E0 = 950   ->  15, 14.5 cm-1
         b=1:  0 - E0 = -1000,  E01 - E0 = 1400  ->  15, 19 cm-1
     """
-    width = lambda vd, freqs: 5. + 0.01 * abs(vd.energy_difference())
+    lineshape_param = lambda vd, freqs: 5. + 0.01 * abs(vd.energy_difference())
 
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, propagator_param=width,
+    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, lineshape_param=lineshape_param,
                               states_choice='anharmonic')
 
-    assert all(f.propagator_param is width for f in result.features)
-    assert [f.peak_widths() for f in result.features] == [pytest.approx((15., 14.5)), pytest.approx((15., 19.))]
+    assert all(f.lineshape_param is lineshape_param for f in result.features)
+    assert [f.lineshape_params_at_peak() for f in result.features] == [pytest.approx((15., 14.5)),
+                                                                       pytest.approx((15., 19.))]
 
 
 ## one set of term axes per evaluation ----------------------
@@ -205,9 +206,9 @@ def test_spectrum_on_grid_adds_a_term_without_conditions_on_every_grid_point(mol
     np.testing.assert_allclose(spec.amplitude, alone_on_grid + flat.amplitude_coeff)
 
 
-def test_feature_result_made_by_hand_gives_a_propagator_param_function_no_conditions():
+def test_feature_result_made_by_hand_gives_a_lineshape_param_function_no_conditions():
     """No states to take them from: the feature has no conditions, and its box and peak height raise."""
-    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], propagator_param=lambda vd, freqs: 5.)
+    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], lineshape_param=lambda vd, freqs: 5.)
 
     [f] = result.features
 
@@ -638,12 +639,12 @@ def formaldehyde_molsys() -> MolSystemData:
     return MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(ref.evv_terms()))
 
 
-def evaluate_formaldehyde(molsys, propagator_param, terms=None, **kwargs) -> FeatureResult:
+def evaluate_formaldehyde(molsys, lineshape_param, terms=None, **kwargs) -> FeatureResult:
     return evaluate_response_terms(ref.evv_terms() if terms is None else terms,
                                    molsys_data=molsys,
                                    states_choice='anharmonic',
                                    laser_pol=ref.LASER_POL,
-                                   propagator_param=propagator_param, **kwargs)
+                                   lineshape_param=lineshape_param, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -682,8 +683,8 @@ def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
     assert [term_to_str(t) for t in top_run.terms] == top_run.terms_before
 
 
-def test_evaluate_response_terms_gives_every_feature_the_propagator_param(top_run):
-    assert all(f.propagator_param == 4.7 for f in top_run.result.features)
+def test_evaluate_response_terms_gives_every_feature_the_lineshape_param(top_run):
+    assert all(f.lineshape_param == 4.7 for f in top_run.result.features)
 
 
 def test_evaluate_response_terms_keeps_what_the_grid_and_factors_by_index_set_need(top_run, formaldehyde_molsys):
@@ -793,26 +794,26 @@ STEPS_1_CM = {'A': 101, 'B': 101}                                               
 AMPLITUDE_BOXES = partial(amplitude_half_widths, dynrange=1001.)                # the box rule, unless a test says
 
 
-def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
+def test_spectrum_on_grid_with_a_lineshape_param_function(formaldehyde_molsys, top_run):
     """
-    The whole use: terms + data + width -> features (evaluate_response_terms) -> the spectrum on a grid.
-    Width: 3 cm-1 plus 0.2 % of the condition's |E|. The strongest feature's conditions have E = 2682.765 (on A)
-    and E = 0 (on B, since a = b), so its widths are 3 + 5.366 = 8.366 and 3 cm-1.
+    The whole use: terms + data + lineshape_param -> features (evaluate_response_terms) -> the spectrum on a grid.
+    lineshape_param: 3 cm-1 plus 0.2 % of the condition's |E|. The strongest feature's conditions have
+    E = 2682.765 (on A) and E = 0 (on B, since a = b), so its lineshape_params are 3 + 5.366 = 8.366 and 3 cm-1.
     """
-    width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
+    lineshape_param = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
-    result = evaluate_formaldehyde(formaldehyde_molsys, width)
+    result = evaluate_formaldehyde(formaldehyde_molsys, lineshape_param)
     spec = spectrum_on_grid(result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
                             box_rule=AMPLITUDE_BOXES)
 
-    # features: the same rows as top_run; every feature has the width function
+    # features: the same rows as top_run; every feature has the lineshape_param function
     assert spec.feature_result is result
     assert list(result.table) == list(top_run.result.table)
     assert len(result.features) == 68
-    assert all(f.propagator_param is width for f in result.features)
+    assert all(f.lineshape_param is lineshape_param for f in result.features)
     strongest = max(result.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     assert strongest.location.as_dict() == pytest.approx({'A': 2682.765, 'B': 0.})
-    assert strongest.peak_widths() == pytest.approx((3. + 0.002 * 2682.765, 3.))
+    assert strongest.lineshape_params_at_peak() == pytest.approx((3. + 0.002 * 2682.765, 3.))
 
     # the grid: 101 points per axis, from edge to edge of the window
     assert list(spec.axis_points) == ['A', 'B']
@@ -833,8 +834,8 @@ def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
     assert np.max(np.abs(intensity - reference)) < 0.1 * reference.max() / 1001.
 
 
-def test_spectrum_on_grid_width_function_of_a_constant_gives_the_same_as_the_number(formaldehyde_molsys):
-    """propagator_param 5. and lambda vd, freqs: 5. give the same spectrum"""
+def test_spectrum_on_grid_lineshape_param_function_of_a_constant_gives_the_same_as_the_number(formaldehyde_molsys):
+    """lineshape_param 5. and lambda vd, freqs: 5. give the same spectrum"""
     number = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), window_box=WINDOW_AROUND_STRONGEST,
                               n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
     function = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
@@ -901,10 +902,11 @@ def test_spectrum_on_grid_uses_the_boxes_of_its_box_rule(top_run):
 def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
     """
     partial(amplitude_half_widths, **knobs): the boxes on the grid are its half-widths with the same settings.
-    min_gammas 2 (gamma 4.7): the smallest box is 9.4 cm-1.
+    min_lineshape_params 2 (gamma 4.7): the smallest box is 9.4 cm-1.
     """
     features = top_run.result.features
-    knobs = dict(dynrange=1001., eps=0.3, min_gammas=2., a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
+    knobs = dict(dynrange=1001., eps=0.3, min_lineshape_params=2.,
+                 a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
 
     spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
                             box_rule=partial(amplitude_half_widths, **knobs))
@@ -960,15 +962,15 @@ def test_spectrum_on_grid_without_cut_keeping_every_feature_is_the_uncut_spectru
                                all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points))
 
 
-def test_spectrum_on_grid_with_a_new_width_reuses_the_rows(formaldehyde_molsys):
-    """replace(..., propagator_param=8.) keeps the table (no new rows) and gives what a new run with 8 cm-1 gives"""
+def test_spectrum_on_grid_with_a_new_lineshape_param_reuses_the_rows(formaldehyde_molsys):
+    """replace(..., lineshape_param=8.) keeps the table (no new rows) and gives what a new run with 8 cm-1 gives"""
     first = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
-    wider = spectrum_on_grid(replace(first, propagator_param=8.), window_box=WINDOW_AROUND_STRONGEST,
+    wider = spectrum_on_grid(replace(first, lineshape_param=8.), window_box=WINDOW_AROUND_STRONGEST,
                              n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
 
     assert wider.feature_result.table is first.table
-    assert all(f.propagator_param == 8. for f in wider.feature_result.features)
+    assert all(f.lineshape_param == 8. for f in wider.feature_result.features)
     new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 8.), window_box=WINDOW_AROUND_STRONGEST,
                                n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
     np.testing.assert_allclose(wider.amplitude, new_run.amplitude)

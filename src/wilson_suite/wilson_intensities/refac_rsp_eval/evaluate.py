@@ -621,15 +621,15 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
                           parameters: ParameterSet,
                           vibstates_data: 'VibStatesData',
                           mesh_au: Mesh,
-                          propagator_param: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray:
+                          lineshape_param_au: Callable[[VibDiff], float|np.ndarray]) -> complex | np.ndarray:
     """
     One motif consists of resonance conditions from a single term. Each condition's factor is
     lineshape.factor(resloc, parameter), e.g. the Lorentzian's 1 / (resloc - i*gamma).
 
     mesh_au - the grid points in Eh (grid.Mesh), as for eval_rescond_resloc
-    propagator_param - vd -> the line shape's parameter in Eh, one call per condition. The Eh form of
-                       feature.propagator_param (cm-1, a number or a (vd, freqs) function), which
-                       eval_feature_on_grid converts to this.
+    lineshape_param_au - vd -> the line shape's parameter in Eh, one call per condition. The Eh form
+                         of feature.lineshape_param (cm-1, a number or a (vd, freqs) function), which
+                         eval_feature_on_grid converts to this.
     """
     result = 1.
 
@@ -639,7 +639,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 
         resloc = eval_rescond_resloc(res_cond_key, vd, mesh_au)
 
-        result *= lineshape.factor(resloc, propagator_param(vd))
+        result *= lineshape.factor(resloc, lineshape_param_au(vd))
 
     return result
 
@@ -653,22 +653,23 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     Result in au, of the mesh's shape. The line shape comes from lineshape.py, as for get_intensity
     and the box rules (features.py).
 
-    The line shape's parameter is feature.propagator_param, cm-1 (converted to Eh here):
+    The line shape's parameter is feature.lineshape_param, cm-1 (converted to Eh here):
         a number   -> the same on every condition
-        a function -> propagator_param(vd, mesh_cm) for each condition (features.PropagatorParam):
+        a function -> lineshape_param(vd, mesh_cm) for each condition (features.LineshapeParam):
                       a number per condition, or an array of the grid's shape for one that changes with
                       the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
-    The box and get_intensity take the same propagator_param, at the peak (SpectralFeature.peak_widths).
+    The box and get_intensity take the same lineshape_param, at the peak
+    (SpectralFeature.lineshape_params_at_peak).
     A flat feature (no conditions): amplitude_coeff on every grid point, an array of the grid's shape.
     """
-    param = feature.propagator_param
+    param = feature.lineshape_param
     if param is None:
-        raise ValueError(f'feature {feature} has no propagator_param')
+        raise ValueError(f'feature {feature} has no lineshape_param')
     if callable(param):
         param_au = lambda vd: convNu2Ene(param(vd, mesh_cm)) # type: ignore
     else:
-        gamma_au = convNu2Ene(param)
-        param_au = lambda _vd: gamma_au
+        value_au = convNu2Ene(param)
+        param_au = lambda _vd: value_au
 
     if feature.motif is None:
         raise ValueError(f'feature {feature} has no motif')
@@ -683,7 +684,7 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
     mesh_au = {ax: convNu2Ene(v) for ax, v in mesh_cm.items()}
 
     resonance_factor = eval_resonance_factor(feature.motif, feature.rows[0].params, vibstates_data,
-                                             mesh_au, propagator_param=param_au)
+                                             mesh_au, lineshape_param_au=param_au)
 
     return feature.amplitude_coeff * resonance_factor
 

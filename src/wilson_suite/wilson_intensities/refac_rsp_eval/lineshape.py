@@ -12,7 +12,8 @@ The evaluation takes the line shape only from here, through factor, distance, pe
                   into window_box (amplitude_in_window_box) and the feat_box sizes (the box rules)
 So these always agree. Another line shape, e.g. a Gaussian, adds its own factor and distance
 functions and sets factor and distance to them.
-gamma: the line shape's parameter, in the same unit as resloc and d (cm-1 or Eh).
+param: the line shape's parameter (lineshape_param), in the same unit as resloc and d (cm-1 or Eh),
+e.g. the Lorentzian's half width gamma.
 
 Imports nothing from the rest of the package.
 """
@@ -44,15 +45,15 @@ distance = lorentzian_distance
 
 # for any line shape, from factor
 
-def peak(gamma) -> complex:
-    """The factor at resonance, factor(0, gamma); for the Lorentzian 1 / (-i*gamma) = i / gamma."""
-    return factor(0., gamma)
+def peak(param) -> complex:
+    """The factor at resonance, factor(0, param); for the Lorentzian 1 / (-i*gamma) = i / gamma."""
+    return factor(0., param)
 
 
-def tail(d, gamma) -> float:
+def tail(d, param) -> float:
     """
     |factor| at distance d from resonance, as a fraction of |peak|: 1 at d = 0.
     For the Lorentzian gamma / sqrt(d**2 + gamma**2), about gamma / d far away.
-        e.g. gamma 5: tail(5) = 0.71, tail(100) = 0.05
+        e.g. gamma 5: tail(5, 5) = 0.71, tail(100, 5) = 0.05
     """
-    return abs(factor(d, gamma) / factor(0., gamma))
+    return abs(factor(d, param) / factor(0., param))

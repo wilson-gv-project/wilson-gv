@@ -14,7 +14,7 @@ use. pytest collects none of them. [scripts/README.md](scripts/README.md) lists 
 |---|---|---|
 | test_plan.py | plan.py, the compile stage: property and denominator collections, resonance motifs, ParameterSet, ResLocPoint, CompiledTerm, compile_terms | none |
 | test_evaluate.py | evaluate.py, the numeric stage: the resonance location, each factor (non-averaged, averaged, 1/omega and energy-difference denominators), the einsum average, the sums over labels, build_contributions, excluded modes, the line shape on the grid, boxed_features_on_grid against all_features_on_grid | toy molecule |
-| test_features.py | features.py: tables of rows, SpectralFeature (amplitude, intensity, widths), features_from_rows, SpectralWindow, both box rules, flat features, 1 to 4 axes | none |
+| test_features.py | features.py: tables of rows, SpectralFeature (amplitude, intensity, lineshape_params_at_peak), features_from_rows, SpectralWindow, both box rules, flat features, 1 to 4 axes | none |
 | test_grid.py | grid.py: Box, grid_points, make_mesh, box_slices (also against a point-by-point search on random boxes), 1 to 4 axes | none |
 | test_lineshape.py | lineshape.py: the Lorentzian factor; peak, tail and distance agree with it | none |
 | test_pipeline.py | pipeline.py: compute_features and FeatureResult on the toy molecule; prop_names, averaging_rank, make_polarization_linear_comb; evaluate_response_terms and spectrum_on_grid on the 14 EVV terms (box rules, cut_tails, reuse of the rows) | toy molecule, formaldehyde |

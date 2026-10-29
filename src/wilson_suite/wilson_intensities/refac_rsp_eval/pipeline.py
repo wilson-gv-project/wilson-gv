@@ -3,7 +3,7 @@ Entry point: terms + molecular data -> spectral features -> the spectrum on a gr
 
 Two calls, from terms already translated to axes and the data:
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=..., laser_pol=...,
-                                     propagator_param=..., exclude_modes=...)
+                                     lineshape_param=..., exclude_modes=...)
                                                                       rows and features: FeatureResult
     spec   = spectrum_on_grid(result, window_box=..., n_points_per_axis=..., box_rule=...)
                                                                       the spectrum on a grid: EvalRspResult
@@ -30,9 +30,9 @@ Inputs
                       harmonic -> 'harmonic'. No default: the data cannot know the regime.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
-    propagator_param  the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
+    lineshape_param   the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
                       Lorentzian's half width gamma: a number, or a function (vd, freqs) -> cm-1
-                      (features.PropagatorParam). It sizes both the resonance on the grid and its box.
+                      (features.LineshapeParam). It sizes both the resonance on the grid and its box.
     exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): left out of the evaluation (the data keeps
                       them). Default: none.
     window_box        grid.Box, the range of each axis, cm-1, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)}).
@@ -50,7 +50,7 @@ Outputs
                                         location (cm-1), coeff (au)
                         zero            the (term_id, params) pairs with coeff 0: no row
                         features        one SpectralFeature per (motif, location), made from the table
-                        states_choice, exclude_modes, propagator_param: as passed
+                        states_choice, exclude_modes, lineshape_param: as passed
                         factors_by_index_set(row)   the summed index sets behind one row, each with its
                                         factors, computed again on demand
                         cancelling(rel_tol)   the features whose rows (nearly) cancel
@@ -128,7 +128,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     BoxRule,
     ContributionRow,
     ContributionTable,
-    PropagatorParam,
+    LineshapeParam,
     SpectralFeature,
     SpectralWindow,
     features_from_rows,
@@ -162,7 +162,7 @@ class FeatureResult:
     The evaluation of a term list before any grid: its rows and features (made by compute_features).
         table             one ContributionRow per (term, index set) with coeff != 0
         zero              the (term_id, params) pairs with coeff 0: no row
-        propagator_param  cm-1, a number or a function (features.PropagatorParam)
+        lineshape_param   cm-1, a number or a function (features.LineshapeParam)
     What the rows were computed from, kept by reference, not copied:
         compiled                  the compiled terms; row.term_id is the index in them
         molsys                    the data
@@ -177,7 +177,7 @@ class FeatureResult:
     """
     table: ContributionTable
     zero: list[tuple[int, ParameterSet]]
-    propagator_param: PropagatorParam | None = None
+    lineshape_param: LineshapeParam | None = None
     compiled: tuple['CompiledTerm', ...] | None = field(default=None, compare=False, repr=False)
     molsys: MolSystemData | None = field(default=None, compare=False, repr=False)
     polarization_linear_comb: dict | None = field(default=None, compare=False, repr=False)
@@ -188,11 +188,11 @@ class FeatureResult:
     def features(self) -> list[SpectralFeature]:
         """
         One feature per (motif, location), built from the table on first use.
-        A propagator_param function also needs the states (compute_features keeps them): each feature gets
+        A lineshape_param function also needs the states (compute_features keeps them): each feature gets
         its conditions from them. A result made by hand has no states, so its features get no conditions.
         """
         states = None if self.molsys is None or self.states_choice is None else self.states
-        return features_from_rows(self.table, self.propagator_param, states)
+        return features_from_rows(self.table, self.lineshape_param, states)
 
     @property
     def states(self) -> 'VibStatesData':
@@ -236,15 +236,15 @@ class FeatureResult:
 
 def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemData,
                      polarization_linear_comb: dict,
-                     propagator_param: PropagatorParam | None = None,
+                     lineshape_param: LineshapeParam | None = None,
                      *,
                      states_choice: str,
                      exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
     One SpectralFeature per (motif, location).
     polarization_linear_comb: the orientation-average recipe (make_polarization_linear_comb).
-    propagator_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a width
-        per condition and/or per frequency (features.PropagatorParam).
+    lineshape_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a value
+        per condition and/or per frequency (features.LineshapeParam).
     states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
         GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
     exclude_modes: modes left out of the evaluation, e.g. (5,): no peak and no summed value uses them
@@ -256,7 +256,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     check_same_axis_set(compiled)
     table, zero = build_contributions(compiled, molsys_data, polarization_linear_comb, states_choice=states_choice,
                                       exclude_modes=exclude_modes)
-    return FeatureResult(table, zero, propagator_param,
+    return FeatureResult(table, zero, lineshape_param,
                          compiled=tuple(compiled), molsys=molsys_data,
                          polarization_linear_comb=polarization_linear_comb, states_choice=states_choice,
                          exclude_modes=tuple(sorted(set(exclude_modes))))
@@ -404,7 +404,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                             molsys_data: MolSystemData,
                             states_choice: str,
                             laser_pol: Sequence[float],
-                            propagator_param: PropagatorParam,
+                            lineshape_param: LineshapeParam,
                             exclude_modes: Collection[int] = ()) -> FeatureResult:
     """
     Terms translated to axes + data loaded before + experiment settings -> rows and features.
@@ -423,7 +423,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                       loaded once, for any number of runs
     states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
-    propagator_param  cm-1: a number, or a function (vd, freqs) -> cm-1 (features.PropagatorParam), e.g.
+    lineshape_param   cm-1: a number, or a function (vd, freqs) -> cm-1 (features.LineshapeParam), e.g.
                       lambda vd, freqs: 0.01 * abs(vd.energy_difference())
     exclude_modes     modes left out of the evaluation, counted from 0 as in the data, e.g. (5,)
                       (VibAnaSetup.exclude_modes): no peak and no summed value uses them; the data keeps them. The
@@ -434,7 +434,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     """
     compiled = compile_terms(terms)
     recipe = make_polarization_linear_comb(terms, laser_pol)
-    return compute_features(compiled, molsys_data, recipe, propagator_param=propagator_param,
+    return compute_features(compiled, molsys_data, recipe, lineshape_param=lineshape_param,
                             states_choice=states_choice, exclude_modes=exclude_modes)
 
 
@@ -482,14 +482,14 @@ def spectrum_on_grid(feature_result: FeatureResult, *,
                cut_tails=True             boxed_features_on_grid: each feature only on the grid
                                           points inside its feat_box (the steps and an example are there)
     The rows are not computed again (the slow part: build_contributions), so a new window_box,
-    grid, propagator_param or box rule runs only the grid part:
+    grid, lineshape_param or box rule runs only the grid part:
         rule = partial(amplitude_half_widths, dynrange=500.)
         again = spectrum_on_grid(result, window_box=other_window_box, n_points_per_axis={'A': 401, 'B': 401},
                                  box_rule=rule)
-        wider = spectrum_on_grid(replace(result, propagator_param=8.), window_box=window_box,
+        wider = spectrum_on_grid(replace(result, lineshape_param=8.), window_box=window_box,
                                  n_points_per_axis=n_points_per_axis, box_rule=rule)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
-    new propagator_param, on first use (features_from_rows).
+    new lineshape_param, on first use (features_from_rows).
 
     window_box         the range of each axis, cm-1, a Box, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)}).
                        Its axes are the term axes. If no term has conditions: any axes.
