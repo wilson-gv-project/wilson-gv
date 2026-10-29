@@ -625,20 +625,6 @@ def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys)
     assert value == pytest.approx(0.25 * np.prod(list(expected.values())))
 
 
-def test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes(molsys):
-    term = evv_shaped_term()
-    otf_molsys = with_evv_props(molsys)
-    tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
-
-    total, factors = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
-                                                 states_choice='anharmonic')
-
-    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, tensor,
-                                           states_choice='anharmonic')[0] for c in (0, 1))
-    assert set(factors) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
-    assert total == pytest.approx(by_hand) != 0.
-
-
 def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_states(molsys):
     """dipgrad[a=1] = 0 makes the average 0: the state '1,1' (missing from the toy states) is never looked up."""
     dipgrad = DIPGRAD_3.copy()
@@ -651,16 +637,6 @@ def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_state
                                                states_choice='anharmonic')
 
     assert (value, contribs) == (0., {'AVRG': 0.})
-
-
-def test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given(molsys):
-    """No polarization: the average must come from the given tensor, not from a new einsum."""
-    given = AvrgTensor(('a', 'b', 'c'), np.full((2, 2, 2), 7.))
-
-    _, factors = evaluate_term_coeff_sumover(evv_shaped_term(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
-                                             states_choice='anharmonic')
-
-    assert [contribs['AVRG'] for contribs in factors.values()] == [7., 7.]
 
 
 def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeypatch):
@@ -759,31 +735,53 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_avrg, 
     assert contribs['NON_AVRG'] == 0.
 
 
-## evaluate_term_coeffs: sum over whichever of a, b, c the caller left unfixed ---------------
+## evaluate_term_coeff_sumover: the sum over the summed labels -----------------------
+# The tests of evaluate_term_coeff_sumover, grouped by what they check. Toy molecule with 2 modes unless noted.
+#
+# Which index sets the sum visits
+#   test_evaluate_term_coeff_sumover_enumerates_missing_index_combinations      0, 1, 2 labels summed; stubbed values
+#   test_evaluate_term_coeff_sumover_mode_count_comes_from_eigenvals            3 modes; stubbed values
+#   test_evaluate_term_coeff_sumover_sums_only_over_the_given_modes             modes=(0,)
+#   test_evaluate_term_coeff_sumover_summed_labels_in_any_alphabetical_place    summed before or between fixed ones
+# The total
+#   test_evaluate_term_coeff_sumover_hand_computed_total                        2 labels summed, by hand
+#   test_evaluate_term_coeff_sumover_total_is_sum_of_full_index_dict_values     2 labels summed
+#   test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes          1 label summed, rank-4 average
+# Where the averaged part comes from
+#   test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given
+#   test_evaluate_term_coeff_sumover_avrg_from_the_recipe_is_the_given_tensor
+# The factors per index set
+#   test_evaluate_term_coeff_sumover_zero_avrg_index_sets_are_kept
+#   test_evaluate_term_coeff_sumover_without_factors_gives_the_same_total
+#   test_evaluate_term_coeff_sumover_result_shape
+# Errors
+#   test_evaluate_term_coeff_sumover_resonance_labels_must_be_fixed
+#   test_evaluate_term_coeff_sumover_needs_polarization_without_an_avrg_tensor
+#
+# Through other functions
+#   test_build_contributions_keeps_no_factors_by_index_set (above)              keep_factors=False
+#   test_build_contributions_coeff_is_evaluate_term_coeff_sumover (below)       row coefficient = the sum
+#   test_pipeline.py     test_compute_features_amplitude_adds_both_terms
+#                        test_feature_result_factors_by_index_set_of_a_row_are_its_summed_index_sets
+#   test_integration.py  test_evaluate_term                                     formaldehyde (6 modes), 1 label summed
+#   test_dimensions.py   test_ir_absorption_polhess_term_by_hand                formaldehyde (6 modes), 1 label summed
+#                        test_ir_absorption_cff_terms_are_one_sum_twice         formaldehyde (6 modes), 2 labels summed
 
 @pytest.mark.parametrize('fixed, expected_index_sets, expected_total', [
     ({'a': 1, 'b': 0, 'c': 1}, {(1, 0, 1)},                                 101),  # nothing missing
     ({'a': 1, 'b': 0},         {(1, 0, 0), (1, 0, 1)},                       201),  # sum over c
     ({'a': 1},                 {(1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)}, 422),  # sum over b and c
 ])
-def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
+def test_evaluate_term_coeff_sumover_enumerates_missing_index_combinations(fixed,
                                                                     expected_index_sets, expected_total,
                                                                     molsys, monkeypatch):
     """
-    evaluate_term_coeffs takes a term with mode labels (a, b, c) and a list of caller-supplied
-    PARTIAL assignments ("relevant indices", e.g. {'a': 1}). For each partial assignment it fills
-    every label the caller did not fix with each mode 0..n_modes-1, calls
-    evaluate_single_index_dict once per complete assignment (a full index set), and returns
+    Which full index sets the sum visits. Every label of the term left out of `fixed` runs over
+    the modes 0 .. n_modes-1, and each full index set gets one evaluate_full_index_dict call.
+    The term fixes a and sums b and c; fixing b or c as well leaves fewer labels to sum.
 
-        results[ParameterSet(partial)] = (sum of the values, {ParameterSet(full index set): contribs})
-
-    Which labels get summed is decided by what is missing from the partial dict. The term's
-    idx_nonsumm labels must all be fixed (see test_evaluate_term_coeffs_resonance_labels_must_be_fixed);
-    here idx_nonsumm is just ('a',), so b and c may be left out.
-
-    This test checks the enumeration alone: evaluate_full_index_dict is stubbed to return
-    100a + 10b + c, so each index set's value spells out its own assignment and the expected totals
-    can be added by hand, e.g. {'a': 1} -> 100 + 101 + 110 + 111 = 422.
+    evaluate_full_index_dict is stubbed to return 100a + 10b + c, so the value of each index set
+    spells out its modes and the totals add up by hand, e.g. {'a': 1} -> 100 + 101 + 110 + 111 = 422.
     """
     # Stand-in for the per-index-set evaluation: value = 100a + 10b + c, so the sums above are checkable by eye.
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict',
@@ -805,36 +803,98 @@ def test_evaluate_term_coeffs_enumerates_missing_index_combinations(fixed,
     assert {tuple(index_set[k] for k in 'abc') for index_set in factors} == expected_index_sets
 
 
-@pytest.mark.parametrize('fixed, not_fixed', [
-    ({'a': 0},  ['b']),
-    ({'b': 0},  ['a']),
-    ({},        ['a', 'b']),
+def test_evaluate_term_coeff_sumover_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
+    """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 index sets."""
+    monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
+    term, avrg = term_and_avrg
+    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
+
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
+                                                 states_choice='anharmonic')
+
+    assert total == 9.
+    assert {(index_set['b'], index_set['c']) for index_set in factors} == {(b, c) for b in range(3) for c in range(3)}
+
+
+def test_evaluate_term_coeff_sumover_sums_only_over_the_given_modes(term_and_avrg, molsys):
+    """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one index set instead of four"""
+    term, avrg = term_and_avrg
+
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='anharmonic',
+                                                 modes=(0,))
+
+    only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='anharmonic')
+    assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
+    assert total == only
+
+
+def renamed_ab_term(motif, names: str) -> CompiledTerm:
+    """
+    ab_term(motif) with the labels a, b, c renamed to names[0], names[1], names[2], e.g. MOTIF_A and 'bac':
+    0.5 * cff[b,a,c] * <polgrad>[b] * 1/(E_ba - E_b) * 1/omega_b with A = E_b - E_0, b fixed, a and c summed.
+    """
+    new = dict(zip('abc', names))
+
+    def rename(labels):
+        return tuple(new[label] for label in labels)
+
+    renamed_motif = tuple(((rename(left), rename(right)), pf) for (left, right), pf in motif)
+    return replace(ab_term(renamed_motif),
+                   avrg_props=PropsCollection([polprop(ops=(0, 1), inds=new['a'])]),
+                   non_avrg_props=PropsCollection([polprop(inds=names)]),
+                   cmp_freqdenom=FreqTermsCollection([vibdiff(sl=new['a']),
+                                                      vibdiff(sl=new['a'] + new['b'], sr=new['a'], pert=True)]))
+
+
+@pytest.mark.parametrize('motif, fixed, names', [
+    (MOTIF_A,  {'a': 0},         'bac'),    # b fixed; a, c summed: a summed label before the fixed one
+    (MOTIF_A,  {'a': 0},         'cab'),    # c fixed; a, b summed: both summed labels before it
+    (MOTIF_AB, {'a': 0, 'b': 1}, 'acb'),    # a, c fixed; b summed: a summed label between the fixed ones
 ])
-def test_evaluate_term_coeffs_resonance_labels_must_be_fixed(fixed, not_fixed, molsys):
+def test_evaluate_term_coeff_sumover_summed_labels_in_any_alphabetical_place(motif, fixed, names, molsys_a1_zero):
     """
-    a and b are resonance labels: they decide where the peak sits. Summing over b would add
-    peaks at different positions into one number, so the call raises instead.
+    The summed labels may come before or between the fixed ones in the alphabet. Renaming the labels
+    changes nothing else: the renamed term gives the total of ab_term(motif), and the same factors on the
+    same index sets under the new names.
     """
-    term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
-                        idx_summ=('c',), idx_nonsumm=('a', 'b'))
+    new = dict(zip('abc', names))
 
-    with pytest.raises(ValueError) as err:
-        evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, states_choice='anharmonic')
-    assert str(err.value) == f'resonance labels {not_fixed} must be fixed, not summed'
+    def renamed(index_set):
+        return ParameterSet({new[label]: mode for label, mode in index_set.items()})
+
+    total, factors = evaluate_term_coeff_sumover(ab_term(motif), fixed, molsys_a1_zero, TOY_RECIPE,
+                                                 states_choice='anharmonic')
+    renamed_total, renamed_factors = evaluate_term_coeff_sumover(renamed_ab_term(motif, names),
+                                                                 renamed(fixed).to_dict(), molsys_a1_zero,
+                                                                 TOY_RECIPE, states_choice='anharmonic')
+
+    assert renamed_total == pytest.approx(total) != 0.
+    assert set(renamed_factors) == {renamed(index_set) for index_set in factors}
+    assert all(renamed_factors[renamed(index_set)] == pytest.approx(contribs)
+               for index_set, contribs in factors.items())
 
 
-def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_avrg, molsys):
+def test_evaluate_term_coeff_sumover_hand_computed_total(term_and_avrg, molsys):
     """
-    Same summation, now with the real evaluate_single_index_dict and the fixture's toy term
-    (0.5 * cff[a,b,c] * <polgrad>[a] * 1/(E_ab - E_a) * 1/omega_a). Fix a=0 and let b, c run
-    over the two modes -> four index sets.
+    a=0, sum over b, c of  0.5 * cff[0,b,c] * <polgrad>[0] * 1/(E_0b - E_0) * 1/omega_0 .
+    c enters only cff, so the two c values are added first; b picks state '0,0' or '0,1'.
+    """
+    term, avrg = term_and_avrg
 
-    The value of a single index set is already covered by test_evaluate_single_index_dict_*; here the
-    check is that evaluate_term_coeffs passes the factors per index set through faithfully: the total equals the sum
-    of evaluating each index set independently (nothing dropped, double-counted or
-    rescaled), and the contribs stored per index set are exactly what that call returns.
+    total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
+                                           states_choice='anharmonic')
 
-    The index sets are ParameterSets; index_set.to_dict() is the plain (a, b, c) dict needed to evaluate one again.
+    by_b = ((CFF[0, 0, 0] + CFF[0, 0, 1]) / convNu2Ene(E00 - E0)
+            + (CFF[0, 1, 0] + CFF[0, 1, 1]) / convNu2Ene(E01 - E0))
+    assert total == pytest.approx(0.5 * POLGRAD_AVRG[0] / convNu2Ene(E0_eigval) * by_b)
+
+
+def test_evaluate_term_coeff_sumover_total_is_sum_of_full_index_dict_values(term_and_avrg, molsys):
+    """
+    The total is the sum of evaluate_full_index_dict over the index sets, and the factors kept per
+    index set are what that call returns: nothing dropped, counted twice or rescaled.
+    toy_term() at a = 0 sums b and c over 2 modes: 4 index sets.
+    index_set.to_dict() gives the plain dict that evaluate_full_index_dict takes.
     """
     term, avrg = term_and_avrg
 
@@ -850,22 +910,31 @@ def test_evaluate_term_coeffs_total_is_sum_of_single_index_dict_values(term_and_
     assert factors == {index_set: contribs for index_set, (_, contribs) in per_index_set.items()}
 
 
-def test_evaluate_term_coeffs_hand_computed_total(term_and_avrg, molsys):
-    """
-    a=0, sum over b, c of  0.5 * cff[0,b,c] * <polgrad>[0] * 1/(E_0b - E_0) * 1/omega_0 .
-    c enters only cff, so the two c values are added first; b picks state '0,0' or '0,1'.
-    """
-    term, avrg = term_and_avrg
+def test_evaluate_term_coeff_sumover_on_the_fly_sums_c_over_both_modes(molsys):
+    term = evv_shaped_term()
+    otf_molsys = with_evv_props(molsys)
+    tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_props(), ISO4)
 
-    total, _ = evaluate_term_coeff_sumover(term, {'a': 0}, avrg_tensor=avrg, molsys_data=molsys,
-                                           states_choice='anharmonic')
+    total, factors = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 1}, otf_molsys, polarization_linear_comb=ISO4,
+                                                 states_choice='anharmonic')
 
-    by_b = ((CFF[0, 0, 0] + CFF[0, 0, 1]) / convNu2Ene(E00 - E0)
-            + (CFF[0, 1, 0] + CFF[0, 1, 1]) / convNu2Ene(E01 - E0))
-    assert total == pytest.approx(0.5 * POLGRAD_AVRG[0] / convNu2Ene(E0_eigval) * by_b)
+    by_hand = sum(evaluate_full_index_dict(term, {'a': 0, 'b': 1, 'c': c}, otf_molsys, tensor,
+                                           states_choice='anharmonic')[0] for c in (0, 1))
+    assert set(factors) == {ParameterSet({'a': 0, 'b': 1, 'c': c}) for c in (0, 1)}
+    assert total == pytest.approx(by_hand) != 0.
 
 
-def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_avrg, molsys_a1_zero):
+def test_evaluate_term_coeff_sumover_reads_the_avrg_tensor_it_is_given(molsys):
+    """No polarization: the average must come from the given tensor, not from a new einsum."""
+    given = AvrgTensor(('a', 'b', 'c'), np.full((2, 2, 2), 7.))
+
+    _, factors = evaluate_term_coeff_sumover(evv_shaped_term(), {'a': 0, 'b': 1}, with_evv_props(molsys), avrg_tensor=given,
+                                             states_choice='anharmonic')
+
+    assert [contribs['AVRG'] for contribs in factors.values()] == [7., 7.]
+
+
+def test_evaluate_term_coeff_sumover_avrg_from_the_recipe_is_the_given_tensor(term_and_avrg, molsys_a1_zero):
     """
     No tensor given -> <polgrad>[a] is built from polarization_linear_comb and the raw 'polgrad' data:
     <polgrad>[a] = sum over (i, j) of coeff_ij * polgrad[a, i, j], with TOY_RECIPE the trace / 3 of
@@ -884,25 +953,7 @@ def test_evaluate_term_coeffs_avrg_from_the_recipe_is_the_given_tensor(term_and_
     assert all(recipe_factors[index_set]['AVRG'] == pytest.approx(POLGRAD_AVRG[0]) for index_set in recipe_factors)
 
 
-def test_evaluate_term_coeffs_needs_polarization_without_an_avrg_tensor(molsys):
-    with pytest.raises(ValueError, match='polarization_linear_comb is required when no avrg_tensor is given'):
-        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='anharmonic')
-
-
-def test_evaluate_term_coeffs_mode_count_comes_from_eigenvals(term_and_avrg, molsys, monkeypatch):
-    """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 index sets."""
-    monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
-    term, avrg = term_and_avrg
-    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
-
-    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
-                                                 states_choice='anharmonic')
-
-    assert total == 9.
-    assert {(index_set['b'], index_set['c']) for index_set in factors} == {(b, c) for b in range(3) for c in range(3)}
-
-
-def test_evaluate_term_coeffs_zero_avrg_index_sets_are_kept(molsys):
+def test_evaluate_term_coeff_sumover_zero_avrg_index_sets_are_kept(molsys):
     """
     <polgrad>[1] = 0 -> every index set with a=1 stops right after AVRG. The index sets are still recorded,
     with only the AVRG entry. The states a=1 would need ('1,1' is missing) are never looked up.
@@ -916,7 +967,7 @@ def test_evaluate_term_coeffs_zero_avrg_index_sets_are_kept(molsys):
     assert all(contribs == {'AVRG': 0.} for contribs in factors.values())
 
 
-def test_evaluate_term_coeffs_without_factors_gives_the_same_total(term_and_avrg, molsys):
+def test_evaluate_term_coeff_sumover_without_factors_gives_the_same_total(term_and_avrg, molsys):
     """keep_factors=False (build_contributions): no factors per index set, the same total to the last bit"""
     term, avrg = term_and_avrg
 
@@ -930,7 +981,7 @@ def test_evaluate_term_coeffs_without_factors_gives_the_same_total(term_and_avrg
     assert total_only == total != 0.
 
 
-def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
+def test_evaluate_term_coeff_sumover_result_shape(term_and_avrg, molsys):
     """
     Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print):
     (total, {ParameterSet(full index set): factors}). cff[0, 0, 1] = 0 by symmetry, so c = 1 stops after
@@ -949,6 +1000,29 @@ def test_evaluate_term_coeffs_result_shape(term_and_avrg, molsys):
     assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
     assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 0})]) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'}
     assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 1})]) == {'NON_AVRG', 'AVRG'}
+
+
+@pytest.mark.parametrize('fixed, not_fixed', [
+    ({'a': 0},  ['b']),
+    ({'b': 0},  ['a']),
+    ({},        ['a', 'b']),
+])
+def test_evaluate_term_coeff_sumover_resonance_labels_must_be_fixed(fixed, not_fixed, molsys):
+    """
+    a and b are resonance labels: they decide where the peak sits. Summing over b would add
+    peaks at different positions into one number, so the call raises instead.
+    """
+    term = CompiledTerm(PropsCollection([]), PropsCollection([]), ResonanceMotif(()), FreqTermsCollection([]), 1.,
+                        idx_summ=('c',), idx_nonsumm=('a', 'b'))
+
+    with pytest.raises(ValueError) as err:
+        evaluate_term_coeff_sumover(term, fixed, molsys_data=molsys, states_choice='anharmonic')
+    assert str(err.value) == f'resonance labels {not_fixed} must be fixed, not summed'
+
+
+def test_evaluate_term_coeff_sumover_needs_polarization_without_an_avrg_tensor(molsys):
+    with pytest.raises(ValueError, match='polarization_linear_comb is required when no avrg_tensor is given'):
+        evaluate_term_coeff_sumover(toy_term(), {'a': 0}, molsys, states_choice='anharmonic')
 
 
 ## build_contributions --------------------------------------------------------
@@ -1101,18 +1175,6 @@ def test_included_modes_raises_for_a_mode_that_does_not_exist(exclude, molsys):
 def test_included_modes_raises_if_no_mode_is_left(molsys):
     with pytest.raises(ValueError, match='removes all 2 modes'):
         included_modes(molsys, (0, 1))
-
-
-def test_evaluate_term_coeffs_sums_only_over_the_given_modes(term_and_avrg, molsys):
-    """toy_term at a = 0 sums over b and c; with modes (0,) only b = c = 0 is left: one index set instead of four"""
-    term, avrg = term_and_avrg
-
-    total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, molsys, avrg_tensor=avrg, states_choice='anharmonic',
-                                                 modes=(0,))
-
-    only, _ = evaluate_full_index_dict(term, {'a': 0, 'b': 0, 'c': 0}, molsys, avrg, states_choice='anharmonic')
-    assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': 0})}
-    assert total == only
 
 
 def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a1_zero):
