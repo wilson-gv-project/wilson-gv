@@ -12,8 +12,8 @@ The test shows that the numbers did not change, not that they are right. Other t
 the rows against a hand calculation, the grid formulas against hand-written Lorentzians, and the
 boxed grid against all_features_on_grid.
 
-The cases: formaldehyde, amplitude boxes with dynrange 500. Each window holds several features,
-so their peaks interfere, and features outside the window reach in with their tails.
+The cases: formaldehyde, amplitude feat_boxes with dynrange 500. Each window_box holds several features,
+so their peaks interfere, and features outside window_box reach in with their tails.
     evv        14 EVV terms, anharmonic states, gamma 4.7 cm-1, cut_tails=False.
                4 features inside, among them the strongest EVV feature.
     evv_width  14 EVV terms, harmonic states, a width function (width_cm), cut_tails=False.
@@ -96,22 +96,22 @@ class Case:
                    evaluation takes one set
         states     the state set, 'anharmonic' or 'harmonic'
         width      propagator_param, cm-1: a number or a function (features.PropagatorParam)
-        window     the range of the spectrum, cm-1, one range per axis
-        dim_sizes  grid points per axis, both window edges included
-        cut_tails  False: each kept feature on the whole grid; True: on its own box only
-        n_inside   the number of features with their location in the window
+        window_box         the range of the spectrum, cm-1, one range per axis
+        n_points_per_axis  grid points on each axis, both edges of window_box included
+        cut_tails          False: each feature of spectral_window on the whole grid; True: on its own feat_box only
+        n_inside           the number of features with their location in window_box
     """
     setup: str
     axis_set: tuple[str, ...]
     states: str
     width: PropagatorParam
-    window: Box
-    dim_sizes: dict[str, int]
+    window_box: Box
+    n_points_per_axis: dict[str, int]
     cut_tails: bool
     n_inside: int
 
 
-# Each window sits on a group of features; their locations below in cm-1, rounded.
+# Each window_box sits on a group of features; their locations below in cm-1, rounded.
 # The 2D cases have different point counts on A and B, so swapped axes also change the shape.
 CASES = {
     # 2 cm-1 steps. Inside: A 2682.8 with B 0 (the strongest EVV feature) and 44;
@@ -158,7 +158,8 @@ def spectrum(case: Case, molsys: MolSystemData) -> EvalRspResult:
     terms, laser_pol = case_terms(case)
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=case.states,
                                      laser_pol=laser_pol, propagator_param=case.width)
-    return spectrum_on_grid(result, case.window, case.dim_sizes, box_rule=BOXES, cut_tails=case.cut_tails)
+    return spectrum_on_grid(result, window_box=case.window_box, n_points_per_axis=case.n_points_per_axis,
+                            box_rule=BOXES, cut_tails=case.cut_tails)
 
 
 def stored_arrays(name: str, spec: EvalRspResult) -> dict[str, np.ndarray]:
@@ -196,22 +197,22 @@ def test_reference_file_has_every_case(reference):
     grid_reference.npz holds exactly the arrays of CASES. Fails after a case is added, renamed or
     given other axes: then write the file again (see the top).
     """
-    expected = {f'{name}__{key}' for name, case in CASES.items() for key in ('amplitude', *case.window.axes)}
+    expected = {f'{name}__{key}' for name, case in CASES.items() for key in ('amplitude', *case.window_box.axes)}
 
     assert set(reference) == expected
 
 
 @pytest.mark.parametrize('name', CASES)
-def test_window_holds_several_features_and_features_outside_reach_in(spectra, name):
+def test_window_box_holds_several_features_and_features_outside_reach_in(spectra, name):
     """
-    Each window holds n_inside features, and the box of at least one feature outside reaches in:
+    Each window_box holds n_inside features, and the feat_box of at least one feature outside reaches in:
     the setting each case is chosen for. Fails if the features moved, or if the box rule keeps
     other features; the spectrum then changes too.
     """
-    window = spectra[name].spectral_window
+    spectral_window = spectra[name].spectral_window
 
-    assert len(window.full_features) == CASES[name].n_inside
-    assert window.contrib_features
+    assert len(spectral_window.full_features) == CASES[name].n_inside
+    assert spectral_window.contrib_features
 
 
 @pytest.mark.parametrize('name', CASES)
@@ -237,7 +238,7 @@ def test_spectrum_matches_the_reference(spectra, reference, name):
 def main():
     """
     Writes grid_reference.npz from CASES. Before it overwrites the old file, it prints per case:
-    the grid's shape, the number of features inside the window and reaching in, and how much the
+    the grid's shape, the number of features inside window_box and reaching in, and how much the
     amplitude changed against the old file ('new' if the old file lacks the case or has another
     grid shape).
     """

@@ -3,7 +3,7 @@ Pure geometry: bounds, boxes and grids. No physics, no SpectralFeature logic.
 
   in:  (min, max) bounds per named axis
   out: Box, the points of a regular grid over a Box (AxisPoints), every grid point (Mesh),
-       the cut of a Box in a grid (slices)
+       where a Box sits in a grid, as index ranges (box_slices)
 
   holds: Box, make_mesh, box_slices
 
@@ -119,22 +119,22 @@ class Box:
             for ax in self.axes
         )
 
-    def grid_points(self, dim_sizes: dict[str, int]) -> AxisPoints:
+    def grid_points(self, n_points_per_axis: dict[str, int]) -> AxisPoints:
         """
         The points of a regular grid over the box, along each axis (AxisPoints).
-        Each axis gets n = dim_sizes[ax] points from min to max, both edges included:
+        Each axis gets n = n_points_per_axis[ax] points from min to max, both edges included:
         step = (max - min) / (n - 1). So n >= 2, except on a zero-width axis
         (min = max): n = 1.
         e.g. A (0, 10) with 3 points, B (5, 5) with 1: {'A': [0., 5., 10.], 'B': [5.]}
         """
-        if set(dim_sizes) != set(self.axes):
-            raise ValueError(f"Expected one grid size per box axis {self.axes}, "
-                             f"got sizes for {tuple(sorted(dim_sizes))}")
+        if set(n_points_per_axis) != set(self.axes):
+            raise ValueError(f"n_points_per_axis needs one entry per box axis {self.axes}, "
+                             f"got entries for {tuple(sorted(n_points_per_axis))}")
         axis_points = {}
         for ax, (mn, mx) in self.bounds.items():
-            n = dim_sizes[ax]
+            n = n_points_per_axis[ax]
             if n < 1 or (n == 1 and mn < mx):
-                raise ValueError(f"Grid size {n} for {ax} on ({mn}, {mx}): "
+                raise ValueError(f"{n} points for {ax} on ({mn}, {mx}): "
                                  f"needs 2 or more points, or 1 with min = max")
             axis_points[ax] = np.linspace(mn, mx, n)
         return axis_points
@@ -153,26 +153,27 @@ def make_mesh(axis_points: AxisPoints) -> Mesh:
 
 def box_slices(box: Box, axis_points: AxisPoints) -> tuple[slice, ...] | None:
     """
-    Where a box sits in the grid (its cut), as index ranges: one slice per grid axis.
-    It only marks the cut: no array is made or cut out here. The caller cuts with the slices,
-    e.g. boxed_features_on_grid (evaluate.py): amplitude[cut] += the feature on its cut.
+    Where a box sits in the grid, as index ranges: one slice per grid axis.
+    It only finds the grid points: no array is made or copied here. The caller indexes with
+    the slices, e.g. boxed_features_on_grid (evaluate.py): amplitude[slices] += the feature
+    on those points.
 
     The slices come in the order of axis_points, the order of the grid array's dimensions (not
     the box's sorted axes), so they index the grid directly:
-        array[cut]                  the values on the cut, e.g. amplitude[cut] += ...
-        axis_points['A'][cut[0]]    the cut's points along the grid's first axis, here A
+        array[slices]                  the values at those grid points, e.g. amplitude[slices] += ...
+        axis_points['A'][slices[0]]    those points along the grid's first axis, here A
 
     The rule, on each axis on its own: from the last grid point at or below the box's min to
     the first at or above its max.
-      - A box edge between two grid points: the range takes the point beyond it, so the cut
-        holds the whole box.
+      - A box edge between two grid points: the range takes the point beyond it, so the
+        points cover the whole box.
       - A box edge on a grid point: nothing more.
       - A box that sticks out of the grid: the range stops at the grid's end. A box that only
         touches the grid's end still gets that one point.
     None if the box misses the grid on any one axis.
 
-    axis_points - the grid (AxisPoints), e.g. Box.grid_points of the window: one ascending,
-                  non-empty 1D array per axis; the same axes as the box.
+    axis_points - the grid (AxisPoints), e.g. window_box.grid_points(n_points_per_axis): one
+                  ascending, non-empty 1D array per axis; the same axes as the box.
 
     e.g. one axis, grid points A = 0, 1, ..., 9:
         box (2.5, 4.5)  ->  slice(2, 6)   points 2, 3, 4, 5: one more on each side
@@ -190,12 +191,12 @@ def box_slices(box: Box, axis_points: AxisPoints) -> tuple[slice, ...] | None:
     if empty:
         raise ValueError(f'grid axes {empty} have no points')
 
-    cut = []
+    slices = []
     for ax, points in axis_points.items():
         mn, mx = box.bounds[ax]
         if mx < points[0] or mn > points[-1]:
             return None
         i_min = max(int(np.searchsorted(points, mn, side='right')) - 1, 0)
         i_max = min(int(np.searchsorted(points, mx, side='left')), len(points) - 1)
-        cut.append(slice(i_min, i_max + 1))
-    return tuple(cut)
+        slices.append(slice(i_min, i_max + 1))
+    return tuple(slices)

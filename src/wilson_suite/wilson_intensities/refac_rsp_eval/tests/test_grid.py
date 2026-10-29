@@ -135,13 +135,13 @@ def test_grid_points_runs_from_min_to_max_with_both_edges():
     np.testing.assert_allclose(axis_points['B'], [100., 125., 150., 175., 200.])
 
 
-@pytest.mark.parametrize('dim_sizes', [
+@pytest.mark.parametrize('n_points_per_axis', [
     {'A': 5, 'B': 5},  # one axis too many
     {'B': 5},          # same number of axes, other name
 ])
-def test_grid_points_needs_one_size_per_box_axis(dim_sizes):
-    with pytest.raises(ValueError, match='one grid size per box axis'):
-        Box({'A': (0., 10.)}).grid_points(dim_sizes)
+def test_grid_points_needs_one_entry_per_box_axis(n_points_per_axis):
+    with pytest.raises(ValueError, match='one entry per box axis'):
+        Box({'A': (0., 10.)}).grid_points(n_points_per_axis)
 
 
 def test_grid_points_gives_one_point_on_a_zero_width_axis():
@@ -151,13 +151,13 @@ def test_grid_points_gives_one_point_on_a_zero_width_axis():
     assert make_mesh(axis_points)['A'].shape == (3, 1)
 
 
-@pytest.mark.parametrize('dim_sizes', [
+@pytest.mark.parametrize('n_points_per_axis', [
     {'A': 1, 'B': 1},  # 1 point on an axis with min < max: only min
     {'A': 3, 'B': 0},  # no points
 ])
-def test_grid_points_rejects_too_few_points(dim_sizes):
+def test_grid_points_rejects_too_few_points(n_points_per_axis):
     with pytest.raises(ValueError, match='needs 2 or more points'):
-        Box({'A': (0., 10.), 'B': (5., 5.)}).grid_points(dim_sizes)
+        Box({'A': (0., 10.), 'B': (5., 5.)}).grid_points(n_points_per_axis)
 
 
 def test_make_mesh_shapes_and_ij_indexing():

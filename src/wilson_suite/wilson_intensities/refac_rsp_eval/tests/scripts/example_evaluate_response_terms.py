@@ -6,7 +6,7 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
     2. load the data, once
     3. features (evaluate_response_terms): how many, and where they are
     4. the spectrum on a grid (spectrum_on_grid), with a width per condition
-    5. what came out: the grid, the brightest point, the window as used (its features and their boxes)
+    5. what came out: the grid, the brightest point, spectral_window as used (its features and their feat_boxes)
     6. another width, same rows: spectrum_on_grid runs again without computing the rows again
 
     python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.example_evaluate_response_terms
@@ -60,14 +60,14 @@ def main():
 
     # 4. the spectrum around the strongest peak (A = 2682.8, B = 0): A in 1 cm-1 steps, B over the whole
     #    range of the features in 16.65 cm-1 steps (201 points from -230 to 3100)
-    window = Box({'A': (600., 2800.), 'B': (5., 3100.)})
-    dim_sizes = {'A': 501, 'B': 201}
+    window_box = Box({'A': (600., 2800.), 'B': (5., 3100.)})
+    n_points_per_axis = {'A': 501, 'B': 201}
 
-    # Boxes: the box rule, with its knobs given by partial. dynrange is the plot's dynamic range (max / floor).
-    boxes = partial(amplitude_half_widths, dynrange=1001.)
+    # The box rule, with its knobs given by partial. dynrange is the plot's dynamic range (max / floor).
+    rule = partial(amplitude_half_widths, dynrange=1001.)
 
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(result, window, dim_sizes, box_rule=boxes)
+    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis=n_points_per_axis, box_rule=rule)
     t_on_grid = time.perf_counter() - t0
 
     # 5. what came out
@@ -81,13 +81,14 @@ def main():
     print(f'brightest grid point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
           f'intensity {intensity[i, j]:.3e} au (the grid misses the peak centre on B)')
 
-    used = spec.spectral_window                   # the window as used: features with their boxes (by amplitude)
-    whole = sum(f.feat_box.contains_box(window) for f in used.full_features + used.contrib_features)  # type: ignore
-    print(f'window: {len(used.full_features)} features inside, {len(used.contrib_features)} outside with a box '
-          f'that reaches in; {whole} boxes cover the whole window')
+    spectral_window = spec.spectral_window        # as used: features with their feat_boxes (by amplitude)
+    whole = sum(f.feat_box.contains_box(window_box) for f in spectral_window.features)  # type: ignore
+    print(f'spectral_window: {len(spectral_window.full_features)} features inside, '
+          f'{len(spectral_window.contrib_features)} outside with a feat_box that reaches in; '
+          f'{whole} feat_boxes cover all of window_box')
 
-    inside = used.full_features
-    print(f'\n{len(inside)} features inside the window, strongest first:')
+    inside = spectral_window.full_features
+    print(f'\n{len(inside)} features inside window_box, strongest first:')
     print(f'  {"A":>8} {"B":>8}  {"(a, b)":>7}  {"terms":<22} {"widths at peak":<16} {"peak intensity":>14}')
     for f in sorted(inside, key=lambda f: f.get_intensity(), reverse=True):
         (ps,) = f.param_sets
@@ -107,7 +108,8 @@ def main():
     # ---------------------------------------------------
     # 6. another width, same rows: replace gives a new FeatureResult with the same table, spectrum_on_grid uses it
     t0 = time.perf_counter()
-    wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
+    wider = spectrum_on_grid(replace(result, propagator_param=8.), window_box=window_box,
+                             n_points_per_axis=n_points_per_axis, box_rule=rule)
     t_again = time.perf_counter() - t0
 
     print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.amplitude) ** 2):.3e} au; '

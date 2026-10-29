@@ -13,7 +13,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralFeature,
     SpectralWindow,
     amplitude_half_widths,
-    amplitude_in_window,
+    amplitude_in_window_box,
     features_from_rows,
     intensity_half_widths,
 )
@@ -503,13 +503,13 @@ def test_amplitude_half_widths_a_max_given_replaces_the_estimate():
     assert half_widths == pytest.approx([5. * (1000. ** 2 - 1) ** 0.5, 5. * (10. ** 2 - 1) ** 0.5, 5.])
 
 
-def test_amplitude_in_window_is_the_peak_inside_and_the_tail_at_the_nearest_point_outside():
+def test_amplitude_in_window_box_is_the_peak_inside_and_the_tail_at_the_nearest_point_outside():
     """gamma 5: at A = 5, the peak; at A = 110, 100 cm-1 outside the window: peak * 5 / hypot(100, 5)"""
     inside, outside = feat(A=5., gamma=5.), feat(A=110., gamma=5.)
     peak = inside.get_intensity() ** 0.5
 
-    assert amplitude_in_window(inside, WINDOW_0_10) == pytest.approx(peak)
-    assert amplitude_in_window(outside, WINDOW_0_10) == pytest.approx(peak * 5. / np.hypot(100., 5.))
+    assert amplitude_in_window_box(inside, WINDOW_0_10) == pytest.approx(peak)
+    assert amplitude_in_window_box(outside, WINDOW_0_10) == pytest.approx(peak * 5. / np.hypot(100., 5.))
 
 
 def test_amplitude_half_widths_a_max_comes_from_inside_the_window():
@@ -716,8 +716,8 @@ def test_flat_feature_intensity_is_its_amplitude_squared():
 
 
 @pytest.mark.parametrize('window', [WINDOW_0_10, Box({'A': (500., 600.), 'B': (0., 1.)})])
-def test_amplitude_in_window_of_a_flat_feature_is_its_amplitude_anywhere(window):
-    assert amplitude_in_window(flat(2.), window) == 2.
+def test_amplitude_in_window_box_of_a_flat_feature_is_its_amplitude_anywhere(window):
+    assert amplitude_in_window_box(flat(2.), window) == 2.
 
 
 def test_amplitude_half_widths_give_a_flat_feature_0_and_count_it_for_a_max():
@@ -838,10 +838,10 @@ def test_nd_window_from_features_keeps_features_whose_box_touches_the_window(ndi
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_amplitude_in_window_multiplies_the_tail_of_each_axis_outside(ndim):
+def test_nd_amplitude_in_window_box_multiplies_the_tail_of_each_axis_outside(ndim):
     """100 cm-1 outside on every axis, gamma 5: peak * (5 / hypot(100, 5)) ** ndim"""
     inside, outside = feat(coords(ndim, 5.), gamma=5.), feat(coords(ndim, 110.), gamma=5.)
 
-    assert amplitude_in_window(outside, cube(ndim, 0., 10.)) == pytest.approx(
+    assert amplitude_in_window_box(outside, cube(ndim, 0., 10.)) == pytest.approx(
         inside.get_intensity() ** 0.5 * (5. / np.hypot(100., 5.)) ** ndim)
 

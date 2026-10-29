@@ -5,7 +5,8 @@ Two calls, from terms already translated to axes and the data:
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=..., laser_pol=...,
                                      propagator_param=..., exclude_modes=...)
                                                                       rows and features: FeatureResult
-    spec   = spectrum_on_grid(result, window, dim_sizes, box_rule=...)   the spectrum on a grid: EvalRspResult
+    spec   = spectrum_on_grid(result, window_box=..., n_points_per_axis=..., box_rule=...)
+                                                                      the spectrum on a grid: EvalRspResult
 A caller needs only these two calls. The inputs are plain values, the terms and a few small types (below).
 evaluate_response_terms: compile_terms -> make_polarization_linear_comb -> compute_features.
 The evaluator neither derives nor translates terms: no file of it imports wilson_experiment, derive.derive or
@@ -33,13 +34,14 @@ Inputs
                       (features.PropagatorParam). It sizes both the resonance on the grid and its box.
     exclude_modes     mode numbers, from 0 as in the data, e.g. (5,): left out of the evaluation (the data keeps
                       them). Default: none.
-    window            grid.Box, cm-1, one range per axis, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)})
-    dim_sizes         grid points per axis, both window edges included, e.g. {'A': 501, 'B': 201}
-    box_rule          features.BoxRule: (window, features) -> one box half-width per feature, cm-1. Knobs by
+    window_box        grid.Box, the range of each axis, cm-1, e.g. Box({'A': (600., 2800.), 'B': (5., 3100.)}).
+                      Its axes are the axes the terms resonate on.
+    n_points_per_axis grid points on each axis of window_box, both edges included, e.g. {'A': 501, 'B': 201}
+    box_rule          features.BoxRule: (window_box, features) -> the half-width of each feat_box, cm-1. Knobs by
                       functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
-                      dynamic range (max / floor), required. intensity_half_widths: by intensity, cuts more.
-    cut_tails         False (default): the boxes choose the features, each kept one on the whole grid.
-                      True: each feature on its own box only, faster, its tail beyond cut off.
+                      dynamic range (max / floor), required. intensity_half_widths: by intensity, leaves out more.
+    cut_tails         False (default): the feat_boxes choose the features, each chosen one on the whole grid.
+                      True: each feature on its own feat_box only, faster, its tail beyond cut off.
 
 Outputs
     FeatureResult     the evaluation, before any grid:
@@ -59,8 +61,9 @@ Outputs
                         feature_result  the FeatureResult it was made from
 
 Names in the grid part, one per kind of data (the types are in grid.py), e.g. A from 2600 to 2800 with 5 points:
-    window, feat_box  a Box: the range of each axis        {'A': (2600., 2800.)}
-    dim_sizes         the number of points per axis        {'A': 5}
+    window_box        a Box: the range of each axis        {'A': (2600., 2800.)}
+    feat_box          a Box: the range of one feature on each axis
+    n_points_per_axis the number of points on each axis    {'A': 5}
     axis_points       the points along each axis           {'A': [2600., 2650., 2700., 2750., 2800.]}
                       (grid.AxisPoints, made by Box.grid_points); the grid is every combination of them
     mesh              every grid point, one full array per axis (grid.Mesh, made by grid.make_mesh):
@@ -83,18 +86,19 @@ ContributionRow(term_id, motif, params, location, coeff)   "why" layer    evalua
   v
 SpectralFeature(location, rows)                            "what" layer   features.features_from_rows
   │    evaluate_response_terms ends here (FeatureResult.features); spectrum_on_grid goes on:
-  │ 5. half-widths: box_rule(window, features), one per feature, cm-1   ← window, box_rule
-  │    e.g. amplitude_half_widths: from each feature's amplitude; strong features get big boxes
-  │ 6. boxes: SpectralWindow.from_features, a box of location ± half-width per feature.
-  │    Keeps a feature if its box meets the window (touching counts): full_features
-  │    (location inside), contrib_features (outside). A flat feature's box is the window
-  │ 7. grid: axis_points = window.grid_points(dim_sizes), both edges included   ← dim_sizes
-  │ 8. values: the kept features added into one complex array, amplitudes before squaring:
+  │ 5. checks: the terms' axes and the axes of n_points_per_axis are those of window_box
+  │ 6. half-widths: box_rule(window_box, features), one per feature, cm-1   ← window_box, box_rule
+  │    e.g. amplitude_half_widths: from each feature's amplitude; strong features get big feat_boxes
+  │ 7. feat_boxes: SpectralWindow.from_features, a feat_box of location ± half-width per feature.
+  │    Keeps a feature if its feat_box overlaps window_box (touching counts): full_features
+  │    (location inside), contrib_features (outside). A flat feature's feat_box is window_box
+  │ 8. grid: axis_points = window_box.grid_points(n_points_per_axis), both edges included   ← n_points_per_axis
+  │ 9. values: the features of spectral_window added into one complex array, amplitudes before squaring:
   │    each on the whole grid (all_features_on_grid; default), or with cut_tails=True each on
-  │    its own cut of the grid (boxed_features_on_grid, box_slices)
+  │    the grid points inside its feat_box (boxed_features_on_grid, box_slices)
   v
 EvalRspResult(axis_points, amplitude, spectral_window)    the spectrum on the grid
-  │ 9. intensity = abs(amplitude)**2, e.g. plot_rsp_func (wilson_analysis/render)
+  │ 10. intensity = abs(amplitude)**2, e.g. plot_rsp_func (wilson_analysis/render)
   v
 the plot
 """
@@ -376,8 +380,8 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
                                                             rank and laser_pol)
         3. rows, zero pairs, features                       compute_features (raises first if the terms resonate
                                                             on more than one set of axes: terms_by_axis_set)
-    The spectrum on a grid: spectrum_on_grid(result, window, dim_sizes, box_rule=...), as often as needed; the rows
-    stay.
+    Next step: spectrum_on_grid puts the features of the result on a grid. One result serves any number
+    of grids, e.g. other window_box values: the rows are computed here once, not again for each grid.
 
     terms             translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
     molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
@@ -424,59 +428,74 @@ class EvalRspResult:
         return make_mesh(self.axis_points)
 
 
-def spectrum_on_grid(feature_result: FeatureResult,
-                  window: 'Box',
-                  dim_sizes: dict[str, int],
-                  *,
-                  box_rule: BoxRule,
-                  cut_tails: bool = False) -> EvalRspResult:
+def spectrum_on_grid(feature_result: FeatureResult, *,
+                     window_box: Box,
+                     n_points_per_axis: dict[str, int],
+                     box_rule: BoxRule,
+                     cut_tails: bool = False) -> EvalRspResult:
     """
-    The features of feature_result on a grid over `window`, in four steps:
-        1. box_rule(window, features): one box half-width per feature, cm-1
-        2. SpectralWindow.from_features: a box around each feature; keeps the features
-           whose box meets the window (touching counts)
-        3. window.grid_points: the grid, dim_sizes[ax] points per axis, both edges included
-        4. the kept features on the grid, all added into one array:
+    The features of feature_result on a grid over window_box, in five steps:
+        1. check the axes: the terms resonate on the axes of window_box, and n_points_per_axis has
+           one entry per axis of window_box
+        2. box_rule(window_box, features): the half-width of each feature's feat_box, cm-1
+        3. SpectralWindow.from_features: each feature gets its feat_box, location +- half-width;
+           keeps the features whose feat_box overlaps window_box (touching counts)
+        4. window_box.grid_points: the grid, n_points_per_axis[ax] points on axis ax, both edges included
+        5. the features of spectral_window (spectral_window.features) on the grid, all added into one array:
                cut_tails=False (default)  all_features_on_grid: each feature on the whole grid.
-                                          The boxes only choose the features; nothing is cut.
-               cut_tails=True             boxed_features_on_grid: each feature on its own cut
-                                          of the grid (the steps and an example are there)
-    The rows are not computed again (the slow part: build_contributions), so a new window,
-    grid, width or box rule runs only the grid part:
-        boxes = partial(amplitude_half_widths, dynrange=500.)
-        again = spectrum_on_grid(result, other_window, {'A': 401, 'B': 401}, box_rule=boxes)
-        wider = spectrum_on_grid(replace(result, propagator_param=8.), window, dim_sizes, box_rule=boxes)
+                                          The feat_boxes only choose the features.
+               cut_tails=True             boxed_features_on_grid: each feature only on the grid
+                                          points inside its feat_box (the steps and an example are there)
+    The rows are not computed again (the slow part: build_contributions), so a new window_box,
+    grid, propagator_param or box rule runs only the grid part:
+        rule = partial(amplitude_half_widths, dynrange=500.)
+        again = spectrum_on_grid(result, window_box=other_window_box, n_points_per_axis={'A': 401, 'B': 401},
+                                 box_rule=rule)
+        wider = spectrum_on_grid(replace(result, propagator_param=8.), window_box=window_box,
+                                 n_points_per_axis=n_points_per_axis, box_rule=rule)
     replace (dataclasses): a new FeatureResult with the same table; its features are made again, with the
-    new width, on first use (features_from_rows).
+    new propagator_param, on first use (features_from_rows).
 
-    window     the spectral window, cm-1, one range per axis, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)})
-    dim_sizes  grid points per axis, both edges included, e.g. {'A': 201, 'B': 201}
-    box_rule   the box half-width of each feature: a function (window, features) -> cm-1, one per feature
-               (features.BoxRule). Two exist in features.py; functools.partial gives them their knobs:
-                   partial(amplitude_half_widths, dynrange=500.)   by amplitude: the cut stays below eps * the
-                                                                   plot's floor
-                   partial(intensity_half_widths, dynrange=500.)   by intensity: cuts more
-               dynrange: the plot's dynamic range (max / floor). Required by both: the plot decides it.
-               Any other function works too, e.g. lambda window, features: [20.] * len(features).
-    cut_tails  False (default): each kept feature on the whole grid, so only the dropped features are
-               missing; the run time grows with (kept features) x (grid points). True: each feature only
-               on its box, its tail beyond cut off; the run time grows with the number of grid points in all
-               boxes.
+    window_box         the range of each axis, cm-1, a Box, e.g. Box({'A': (2600., 2800.), 'B': (-100., 100.)}).
+                       Its axes are the axes the terms resonate on. If no term has conditions: any axes.
+    n_points_per_axis  grid points on each axis of window_box, both edges included, e.g. {'A': 201, 'B': 201}
+    box_rule           the half-width of each feat_box: a function (window_box, features) -> cm-1, one per
+                       feature (features.BoxRule). Two exist in features.py; functools.partial gives them
+                       their knobs:
+                           partial(amplitude_half_widths, dynrange=500.)   by amplitude: what the feat_boxes
+                                                                           leave out changes the intensity by
+                                                                           less than eps * the plot's floor
+                           partial(intensity_half_widths, dynrange=500.)   by intensity: leaves out more
+                       dynrange: the plot's dynamic range (max / floor). Required by both: the plot decides it.
+                       Any other function works too, e.g. lambda window_box, features: [20.] * len(features).
+    cut_tails          False (default): each kept feature on the whole grid, so only the dropped features are
+                       missing; the run time grows with (kept features) x (grid points). True: each feature
+                       only on its feat_box, its tail beyond cut off; the run time grows with the number of
+                       grid points in all feat_boxes.
+    raises ValueError if the terms' axes or the axes of n_points_per_axis differ from the axes of window_box.
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
     features = feature_result.features
-    
-    # boxes: width at the peak
-    half_widths = box_rule(window, features)
 
-    spectral_window = SpectralWindow.from_features(window, features, half_widths)
-    axis_points = window.grid_points(dim_sizes)
+    # the axes of the terms and of n_points_per_axis must be those of window_box
+    term_axes = {f.location.axes for f in features if not f.is_flat}
+    if term_axes and term_axes != {window_box.axes}:
+        raise ValueError(f'the terms resonate on the axes {sorted(term_axes)}, '
+                         f'window_box has the axes {window_box.axes}')
+    if set(n_points_per_axis) != set(window_box.axes):
+        raise ValueError(f'n_points_per_axis has the axes {tuple(sorted(n_points_per_axis))}, '
+                         f'window_box has the axes {window_box.axes}')
 
-    # width on the grid
+    # the half-width of each feature's feat_box; from_features makes the feat_boxes from them
+    half_widths = box_rule(window_box, features)
+    spectral_window = SpectralWindow.from_features(window_box, features, half_widths)
+
+    axis_points = window_box.grid_points(n_points_per_axis)
+
+    # the features of spectral_window on the grid, amplitudes added
     if cut_tails:
         amplitude = boxed_features_on_grid(spectral_window, feature_result.states, axis_points)
     else:
-        kept = spectral_window.full_features + spectral_window.contrib_features
-        amplitude = all_features_on_grid(kept, feature_result.states, axis_points)
+        amplitude = all_features_on_grid(spectral_window.features, feature_result.states, axis_points)
 
     return EvalRspResult(feature_result, axis_points, amplitude, spectral_window)

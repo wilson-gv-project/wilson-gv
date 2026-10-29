@@ -1705,7 +1705,7 @@ def test_boxed_features_on_grid_skips_a_feature_whose_box_is_outside_the_grid(st
 def test_boxed_features_on_grid_needs_feature_boxes(states):
     window = SpectralWindow(Box({'A': (1000., 1700.)}), full_features=[feature_at_solved_location(MOTIF_A, PS_01, states)])
 
-    with pytest.raises(ValueError, match='no box'):
+    with pytest.raises(ValueError, match='no feat_box'):
         boxed_features_on_grid(window, states, {'A': np.linspace(1000., 1700., 11)})
 
 

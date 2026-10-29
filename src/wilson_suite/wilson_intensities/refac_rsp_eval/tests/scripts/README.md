@@ -16,13 +16,13 @@ The open items of the refactor are in [issue #71](https://github.com/wilson-gv-p
 
 | script | what it does | options | output | run time |
 |---|---|---|---|---|
-| example_evaluate_response_terms.py | Example of use, step by step: the 14 EVV terms on formaldehyde through evaluate_response_terms (a width per condition) and spectrum_on_grid; then a new width on the same rows | none | text: counts, the grid, the brightest point, the features in the window | 1 s |
-| example_plot_spectrum.py | Example of plots with plot_rsp_func and plot_spectrum (wilson_analysis/render/plot_spectrum.py): formaldehyde in the whole window, a zoom, a 1D cut through the strongest peak, harmonic and anharmonic states on one scale; ACDM | out_dir (default: plot_spectrum_figures) | 5 png files in out_dir | 20 s |
+| example_evaluate_response_terms.py | Example of use, step by step: the 14 EVV terms on formaldehyde through evaluate_response_terms (a width per condition) and spectrum_on_grid; then a new width on the same rows | none | text: counts, the grid, the brightest point, the features in window_box | 1 s |
+| example_plot_spectrum.py | Example of plots with plot_rsp_func and plot_spectrum (wilson_analysis/render/plot_spectrum.py): formaldehyde, every feature in window_box, a zoom, a 1D cut through the strongest peak, harmonic and anharmonic states on one scale; ACDM | out_dir (default: plot_spectrum_figures) | 5 png files in out_dir | 20 s |
 | f2_speed.py | Run time of each step on ACDM (14 EVV terms, anharmonic states, a 700 x 700 grid): load, build_contributions (also under cProfile), features, boxes, window, grid | none | text: the time of each step, the 15 slowest functions of build_contributions | 20 s |
-| e10_boxes.py | Box sizes (a box is the part of the grid where one feature is evaluated): spectrum_on_grid with the tails cut, for each setting of a box rule, against all_features_on_grid with nothing cut. Formaldehyde and ACDM, each on a big window and on a zoom | `rules`: compare the amplitude and intensity rules; default: settings of amplitude_half_widths | text, one line per setting: the largest error, the worst visible point, the grid time, the features kept | 1 min (default) |
+| e10_boxes.py | Box sizes (a feat_box is the part of the grid where one feature is evaluated): spectrum_on_grid with the tails cut, for each setting of a box rule, against all_features_on_grid with nothing cut. Formaldehyde and ACDM, each on a big window_box and on a zoom | `rules`: compare the amplitude and intensity rules; default: settings of amplitude_half_widths | text, one line per setting: the largest error, the worst visible point, the grid time, the features kept | 1 min (default) |
 
 Parts used elsewhere: f2_speed.load_acdm loads ACDM for e10_boxes.py and example_plot_spectrum.py.
-e10_boxes.reference and e10_boxes.score also run from a notebook, on any result and window.
+e10_boxes.reference and e10_boxes.score also run from a notebook, on any result and window_box.
 
 ## Code from outside the refactor
 

@@ -693,14 +693,14 @@ def all_features_on_grid(features: Iterable['SpectralFeature'],
              vibstates_data: 'VibStatesData',
              axis_points_cm: AxisPoints) -> np.ndarray:
     """
-    Sum of eval_feature_on_grid over `features`, each on every point of the grid:
-    the whole grid, or one cut of it (box_slices).
+    Sum of eval_feature_on_grid over `features`, each on every point of axis_points_cm:
+    the whole grid, or the grid points around one feat_box (boxed_features_on_grid).
     The grid points are every combination of the points along each axis (grid.make_mesh,
     ij indexing), e.g. A with 5 points, B with 3 -> 15 points, shape (5, 3).
-    On the whole grid nothing is cut off, so this is the reference for the evaluation
-    box by box (boxed_features_on_grid). Slow for many features on big grids.
+    On the whole grid nothing is left out, so this is the reference for boxed_features_on_grid,
+    which leaves out each feature's tail beyond its feat_box. Slow for many features on big grids.
 
-    axis_points_cm - the grid (grid.AxisPoints), cm-1, e.g. Box.grid_points of the window
+    axis_points_cm - the grid (grid.AxisPoints), cm-1, e.g. window_box.grid_points(n_points_per_axis)
     Returns the complex amplitude in au; array dimension k is the k-th axis of axis_points_cm.
     intensity = abs(amplitude)**2
     """
@@ -711,54 +711,59 @@ def all_features_on_grid(features: Iterable['SpectralFeature'],
     return amplitude
 
 
-# the window's features, each on its own cut of the grid
-def boxed_features_on_grid(window: 'SpectralWindow',
-                vibstates_data: 'VibStatesData',
-                axis_points_cm: AxisPoints) -> np.ndarray:
+# the features of spectral_window, each only on the grid points around its feat_box
+def boxed_features_on_grid(spectral_window: 'SpectralWindow',
+                           vibstates_data: 'VibStatesData',
+                           axis_points_cm: AxisPoints) -> np.ndarray:
     """
-    The spectrum on the grid: every feature of the window on its own cut of the grid.
+    The spectrum on the grid, with each feature of spectral_window evaluated only on the grid
+    points that cover its feat_box. The feature's tail beyond those points is left out
+    (cut_tails=True in spectrum_on_grid).
 
-    How the result comes together:
+    Steps:
       1. amplitude: one complex 0 per grid point, e.g. shape (501, 201)
-      2. for each feature (full_features, then contrib_features):
-         a. cut = box_slices(its box): the index range per axis that covers the box, cut
-            at the grid edges; None for a box outside the grid: that feature adds nothing
-         b. cut_points: the points of axis_points_cm in those ranges. The cut is a part of
-            the same grid, not a new grid
-         c. the feature on cut_points (all_features_on_grid), added into amplitude[cut]
+      2. for each feature of spectral_window (spectral_window.features):
+         a. slices = box_slices(feat_box, axis_points_cm): one index range per axis that
+            covers the feat_box, clipped at the ends of the grid. None if the feat_box misses
+            the grid: then the feature adds nothing
+         b. box_points: the points of axis_points_cm in those ranges. They are points of the
+            same grid, not a new grid
+         c. the feature on box_points (all_features_on_grid), added into amplitude[slices]
       3. amplitude, not squared: intensity = abs(amplitude)**2
 
-    e.g. grid points A = 0, 1, ..., 10; box of f1 (1.5, 4.5), box of f2 (3., 7.):
+    e.g. grid points A = 0, 1, ..., 10; feat_box of f1 (1.5, 4.5), feat_box of f2 (3., 7.):
         f1 -> slice(1, 6), points 1 to 5;  f2 -> slice(3, 8), points 3 to 7
         amplitude: points 3 to 5 get f1 + f2, points 1 and 2 f1, points 6 and 7 f2, the rest 0
+    A feat_box edge between two grid points takes the grid point beyond it (f1: points 1 and 5),
+    so the points cover the whole feat_box.
 
-    Where cuts overlap, the amplitudes add before squaring, as in all_features_on_grid,
-    so overlapping peaks interfere. Left out: each feature's tail beyond its cut.
-    A flat feature's box is the window, so its cut is the whole grid; the same holds for
-    a box that covers the window. The run time grows with the number of points in all
-    cuts.
+    Where the points of two features overlap, their amplitudes add before squaring, as in
+    all_features_on_grid, so overlapping peaks interfere.
+    A flat feature's feat_box is spectral_window.box (the window_box), so it is on every grid
+    point; so is any feature whose feat_box covers spectral_window.box. The run time grows with
+    the number of points around all feat_boxes.
 
-    The box sizes set what is left out. With amplitude_half_widths (features.py) the
-    intensity error stays near eps * the plot's floor. To check a case, compare with
-    all_features_on_grid.
+    The feat_box sizes (the box rule) set what is left out. With amplitude_half_widths
+    (features.py) the intensity error stays near eps * the plot's floor. To check a case,
+    compare with all_features_on_grid.
 
-    window         - e.g. from SpectralWindow.from_features, so every feature has its box
-                     (a flat feature: the window)
-    axis_points_cm - the grid (grid.AxisPoints), cm-1, one axis per window axis, e.g.
-                     window.box.grid_points(dim_sizes)
+    spectral_window - e.g. from SpectralWindow.from_features, so every feature has its feat_box
+    axis_points_cm  - the grid (grid.AxisPoints), cm-1, the axes of spectral_window.box, e.g.
+                      spectral_window.box.grid_points(n_points_per_axis)
     Returns the complex amplitude in au, laid out as in all_features_on_grid.
+    raises ValueError if a feature has no feat_box.
     """
     amplitude = np.zeros(tuple(len(points) for points in axis_points_cm.values()), dtype=complex)
-    for feature in window.full_features + window.contrib_features:
+    for feature in spectral_window.features:
         if feature.feat_box is None:
-            raise ValueError(f'feature {feature} has no box: SpectralWindow.from_features gives one')
-        # a. the index range per axis that covers the box
-        cut = box_slices(feature.feat_box, axis_points_cm)
-        if cut is None:
+            raise ValueError(f'feature {feature} has no feat_box: SpectralWindow.from_features gives one')
+        # a. one index range per axis that covers the feat_box
+        slices = box_slices(feature.feat_box, axis_points_cm)
+        if slices is None:
             continue
-        # b. the grid's points in those ranges
-        cut_points = {ax: points[s] for (ax, points), s in zip(axis_points_cm.items(), cut)}
-        # c. the feature on the cut, added into amplitude at the same points
-        amplitude[cut] += all_features_on_grid([feature], vibstates_data, cut_points)
+        # b. the grid points in those ranges
+        box_points = {ax: points[s] for (ax, points), s in zip(axis_points_cm.items(), slices)}
+        # c. the feature on those points, added into amplitude at the same points
+        amplitude[slices] += all_features_on_grid([feature], vibstates_data, box_points)
     return amplitude
 

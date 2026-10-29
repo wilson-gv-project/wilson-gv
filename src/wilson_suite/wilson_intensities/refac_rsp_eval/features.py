@@ -1,5 +1,5 @@
 """
-Spectral features, and the windows that hold them.
+Spectral features, and the spectral windows that hold them.
 
   in:  ContributionRow tables (evaluate.build_contributions), line-shape parameters
        (PropagatorParam)
@@ -8,20 +8,20 @@ Spectral features, and the windows that hold them.
   holds:
     ContributionRow, ContributionTable   one row per (term, index set); filter, group rows
     SpectralFeature, features_from_rows  one resonance per (motif, location), from the rows
-    amplitude_half_widths,               box rules (BoxRule): the size of each feature's box
+    amplitude_half_widths,               box rules (BoxRule): the size of each feature's feat_box
       intensity_half_widths
-    SpectralWindow                       the spectrum range with the features reaching in
+    SpectralWindow                       a window_box and the features whose feat_box overlaps it
 
-What a box decides depends on cut_tails in pipeline.spectrum_on_grid:
-    cut_tails=False (default)  whether the feature is kept: its box must reach the window.
-                               A kept feature is evaluated on the whole grid.
-    cut_tails=True             also where it is evaluated: only inside its box, so its tail
-                               beyond the box is cut off.
-Either way a box leaves out the feature's amplitude beyond its edge where that amplitude
-lies in the window: all of it for a dropped feature, the tail for a cut one.
+What a feat_box decides depends on cut_tails in pipeline.spectrum_on_grid:
+    cut_tails=False (default)  whether the feature is kept: its feat_box must overlap
+                               window_box. A kept feature is evaluated on the whole grid.
+    cut_tails=True             also where it is evaluated: only on the grid points around
+                               its feat_box, so its tail beyond the feat_box is cut off.
+Either way a feat_box leaves out the feature's amplitude beyond its edge where that amplitude
+lies in window_box: all of it for a dropped feature, the tail for a cut one.
 
-The peak heights (get_intensity), the amplitude reaching into a window (amplitude_in_window)
-and the box sizes take the line shape from lineshape.py, as the grid does.
+The peak heights (get_intensity), the amplitude reaching into window_box (amplitude_in_window_box)
+and the feat_box sizes take the line shape from lineshape.py, as the grid does.
 
 The whole flow, from terms to the plot, is drawn in the pipeline.py docstring.
 Takes Box from grid.py and the line shape from lineshape.py; neither imports from here.
@@ -143,10 +143,11 @@ class SpectralFeature:
         propagator_param  the parameter of each condition's line shape (lineshape.py),
                           cm-1, e.g. the Lorentzian's half width gamma: a number or a
                           function (PropagatorParam)
-        feat_box         the feature's box: it keeps the feature if it reaches the window,
-                          and with cut_tails=True it is where the feature is evaluated (see
-                          the module docstring). None until SpectralWindow.from_features
-                          gives the feature its box.
+        feat_box          the feature's own Box, location +- half-width: the feature is kept
+                          if its feat_box overlaps window_box, and with cut_tails=True it is
+                          evaluated only on the grid points around its feat_box (see the
+                          module docstring). None until SpectralWindow.from_features gives
+                          the feature its feat_box.
         conditions        the pair of states of each resonance condition, in motif order,
                           at rows[0].params (condition_states). features_from_rows sets
                           them when propagator_param is a function, which needs them for
@@ -157,7 +158,7 @@ class SpectralFeature:
                           width, e.g. its Gamma_mn.
 
     == compares location, rows and propagator_param. It leaves out conditions (the rows fix
-    them) and feat_box (the same feature gets another box in another window).
+    them) and feat_box (the same feature gets another feat_box for another window_box).
 
     Rows without resonance conditions make a flat background (is_flat): no peak, the same
     amplitude on every grid point.
@@ -217,8 +218,8 @@ class SpectralFeature:
         True for a feature that is its coefficient only: the rows come from terms
         without resonance conditions, so there is no resonance factor, and the location
         has no axes. On the grid it is a flat background, amplitude_coeff on every grid
-        point: no peak, no width, no box of its own (SpectralWindow.from_features gives
-        it the whole window).
+        point: no peak, no width, no feat_box of its own (SpectralWindow.from_features
+        gives it window_box as its feat_box).
             e.g. an IR absorption term such as 1/4 * polhess_(a,a) / <a>
         """
         return not self.location.axes
@@ -347,21 +348,21 @@ def _check_has_rows_and_width(f: SpectralFeature):
         raise ValueError(f'feature {f} has no rows, so no amplitude')
 
 
-def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
+def amplitude_in_window_box(f: SpectralFeature, window_box: Box) -> float:
     """
-    How strong the feature is inside `window`: its largest amplitude there, au, estimated
-    without a grid. The largest of these over all features estimates the window's strongest
-    amplitude, a_max. a_max sets the plot's floor, the faintest intensity the plot shows,
+    How strong the feature is inside window_box: its largest amplitude there, au, estimated
+    without a grid. The largest of these over all features estimates the strongest amplitude
+    in window_box, a_max. a_max sets the plot's floor, the faintest intensity the plot shows,
     a_max**2 / dynrange (amplitude_half_widths).
         peak inside   its peak amplitude, sqrt(get_intensity())
-        peak outside  its amplitude at the nearest point of the window: the peak
+        peak outside  its amplitude at the nearest point of window_box: the peak
                       amplitude times the line shape's tail, lineshape.tail(d, gamma), for
-                      each axis it lies outside on (d: the distance to the window on that
+                      each axis it lies outside on (d: the distance to window_box on that
                       axis). For the Lorentzian the tail is gamma / sqrt(d**2 + gamma**2),
                       e.g. 100 cm-1 outside on A, gamma 5:
                       peak * 5 / hypot(100, 5) = peak * 0.05
         flat          |amplitude_coeff|, the same on every grid point (is_flat)
-    gamma: the largest of its peak_widths, as for its box.
+    gamma: the largest of its peak_widths, as for its feat_box.
     The estimate takes each feature alone; on the grid, features add up or cancel.
     """
     amplitude = np.sqrt(f.get_intensity())
@@ -369,33 +370,33 @@ def amplitude_in_window(f: SpectralFeature, window: Box) -> float:
         return float(amplitude)
     gamma = max(f.peak_widths())
     # on each axis of the location: the peak amplitude times the line shape's tail
-    # for the distance from the peak to the window on that axis
+    # for the distance from the peak to window_box on that axis
     for ax, x in f.location.as_dict().items():
-        mn, mx = window.bounds[ax]
-        # d: mn - x below the window, x - mx above it, 0 inside its range
+        mn, mx = window_box.bounds[ax]
+        # d: mn - x below window_box, x - mx above it, 0 inside its range
         d = max(mn - x, 0., x - mx)
         # 1 at d = 0; for the Lorentzian gamma / sqrt(d**2 + gamma**2), about gamma / d far away
         amplitude *= lineshape.tail(d, gamma)
     return float(amplitude)
 
 
-# A box rule: (window, features) -> the box half-width of each feature, cm-1, in the order
-# of `features`. The half-widths are the input of SpectralWindow.from_features.
+# A box rule: (window_box, features) -> the feat_box half-width of each feature, cm-1, in the
+# order of `features`. The half-widths are the input of SpectralWindow.from_features.
 # Two rules: amplitude_half_widths and intensity_half_widths.
 # functools.partial sets a rule's knobs, e.g. partial(amplitude_half_widths, dynrange=500.)
 BoxRule = Callable[[Box, Sequence[SpectralFeature]], Sequence[float]]
 
 
-def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
+def amplitude_half_widths(window_box: Box, features: Sequence[SpectralFeature], *,
                           dynrange: float,
                           eps: float = 0.1,
                           min_gammas: float = 1.,
                           a_max: float | None = None) -> list[float]:
     """
-    The box half-width of each feature, cm-1, in the order of `features`, chosen from its
-    amplitude: strong features get big boxes, weak ones small. A box rule (BoxRule).
+    The feat_box half-width of each feature, cm-1, in the order of `features`, chosen from its
+    amplitude: strong features get big feat_boxes, weak ones small. A box rule (BoxRule).
 
-    Why amplitude: the plot shows intensities down to its floor, a_max**2 / dynrange. A box
+    Why amplitude: the plot shows intensities down to its floor, a_max**2 / dynrange. A feat_box
     leaves out the feature's amplitude beyond its edge: all of it if the feature is dropped,
     its tail if it is cut (cut_tails=True). The grid first adds the amplitudes of all
     features, then squares the sum. So a left-out amplitude a_out, at a point where the
@@ -418,23 +419,24 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     which leaves nothing out):
         dynrange    the plot's dynamic range, max / floor, e.g. 500. Required: it says what
                     the plot shows.
-        eps         the allowed error, as a fraction of the floor. Smaller: bigger boxes,
+        eps         the allowed error, as a fraction of the floor. Smaller: bigger feat_boxes,
                     more accurate, slower (more features kept; with cut_tails=True also
-                    more grid points per box).
+                    more grid points per feat_box).
         min_gammas  the smallest half-width, in gammas. Default 1. The tail of a weak
                     feature beyond it is below the allowed error anyway, so a larger value
                     only changes, with cut_tails=False, whether a weak feature just outside
-                    the window is kept, and with cut_tails=True, how a weak feature looks.
-        a_max      the strongest amplitude in the window, au. None (default): estimated
-                    without the grid, as the largest amplitude_in_window of `features`. This
-                    estimate ignores how features add up on the grid, so it can differ from
-                    the true maximum. Pass a_max e.g. to give two windows the same boxes, or
-                    to use the true maximum of a grid result.
+                    window_box is kept, and with cut_tails=True, how a weak feature looks.
+        a_max       the strongest amplitude in window_box, au. None (default): estimated
+                    without the grid, as the largest amplitude_in_window_box of `features`.
+                    This estimate ignores how features add up on the grid, so it can differ
+                    from the true maximum. Pass a_max e.g. to give the features the same
+                    feat_boxes for two different window_box values, or to use the true
+                    maximum of a grid result.
     Every feature needs rows and a propagator_param > 0. If every feature has amplitude 0,
-    each gets the smallest box: they add nothing to the grid.
+    each gets the smallest feat_box: they add nothing to the grid.
     A flat feature (is_flat) gets 0: it has no peak, and SpectralWindow.from_features gives
-    it the whole window. Its amplitude does count for a_max, since it is on every grid
-    point.
+    it window_box as its feat_box. Its amplitude does count for a_max, since it is on every
+    grid point.
     """
     if not dynrange > 1.:
         raise ValueError(f'dynrange must be > 1, got {dynrange}')
@@ -450,7 +452,7 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     for f in features:
         _check_has_rows_and_width(f)
     if a_max is None:
-        a_max = max(amplitude_in_window(f, window) for f in features)
+        a_max = max(amplitude_in_window_box(f, window_box) for f in features)
 
     half_widths = []
     for f in features:
@@ -465,14 +467,14 @@ def amplitude_half_widths(window: Box, features: Sequence[SpectralFeature], *,
     return half_widths
 
 
-def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
+def intensity_half_widths(window_box: Box, features: Sequence[SpectralFeature], *,
                           dynrange: float,
                           box_range_safety_margin: float = 0.1,
                           scale_wrt_max_intensity: bool = False,
                           minimum_box_padding: float = 10.,
                           max_intensity: float | None = None) -> list[float]:
     """
-    The box half-width of each feature, cm-1, in the order of `features`, chosen from its
+    The feat_box half-width of each feature, cm-1, in the order of `features`, chosen from its
     intensity. A box rule (BoxRule).
 
     Per feature (gamma: the largest of its peak_widths, used on every axis;
@@ -490,30 +492,30 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
 
     The knobs:
         dynrange                 the plot's dynamic range, max / floor, e.g. 100. Required.
-        box_range_safety_margin  makes the boxes this much larger, e.g. 0.1 (default): 10 %.
-        scale_wrt_max_intensity  False (default): each box ends at 1/dynrange of the
+        box_range_safety_margin  makes each feat_box this much larger, e.g. 0.1 (default): 10 %.
+        scale_wrt_max_intensity  False (default): each feat_box ends at 1/dynrange of the
                                  feature's own peak.
-                                 True: each box ends at the plot's floor.
+                                 True: each feat_box ends at the plot's floor.
         minimum_box_padding      the smallest half-width, cm-1. Default 10.
         max_intensity            used only when scaled. None (default): the strongest peak
-                                 intensity of the features inside `window`.
+                                 intensity of the features inside window_box.
 
-    The rule drops no feature for its strength: a feature below the floor still gets a box
+    The rule drops no feature for its strength: a feature below the floor still gets a feat_box
     (scaled: half-width minimum_box_padding). With 0, the feature is kept only if its peak
-    lies in the window, and with cut_tails=True evaluated only on the grid points around
+    lies in window_box, and with cut_tails=True evaluated only on the grid points around
     its peak.
-    A feature stronger than max_intensity is allowed, e.g. a strong feature outside the
-    window. Scaled, it gets a box larger than the unscaled one.
+    A feature stronger than max_intensity is allowed, e.g. a strong feature outside
+    window_box. Scaled, it gets a feat_box larger than the unscaled one.
 
-    This rule leaves out more than amplitude_half_widths: each box ends by the feature's own
-    intensity, but on the grid a left-out amplitude (a dropped feature, or with
+    This rule leaves out more than amplitude_half_widths: each feat_box ends by the feature's
+    own intensity, but on the grid a left-out amplitude (a dropped feature, or with
     cut_tails=True a cut tail) also changes the intensity of its neighbours, because
     amplitudes add before squaring (see amplitude_half_widths). To see the error for a case,
     compare with evaluate.all_features_on_grid.
     Every feature needs rows and a propagator_param > 0. Scaled, without max_intensity, at
-    least one feature must lie inside `window`.
+    least one feature must lie inside window_box.
     A flat feature (is_flat) gets 0, as in amplitude_half_widths. Scaled, it counts as
-    inside the window: its intensity is on every grid point.
+    inside window_box: its intensity is on every grid point.
     """
     if not dynrange > 1.:
         raise ValueError(f'dynrange must be > 1, got {dynrange}')
@@ -533,10 +535,10 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
         if max_intensity is not None:
             i_max = max_intensity
         else:
-            inside = [f.get_intensity() for f in features if f.is_flat or f.is_inside(window)]
+            inside = [f.get_intensity() for f in features if f.is_flat or f.is_inside(window_box)]
             if not inside:
-                raise ValueError('scaled boxes need the strongest peak inside the window, and no feature is inside: '
-                                 'pass max_intensity')
+                raise ValueError('scaled feat_boxes need the strongest peak inside window_box, and no feature is '
+                                 'inside: pass max_intensity')
             i_max = max(inside)
 
     half_widths = []
@@ -553,67 +555,77 @@ def intensity_half_widths(window: Box, features: Sequence[SpectralFeature], *,
             k = dynrange
         # where the intensity is down to 1/k of its peak, the amplitude to 1/sqrt(k); 0 for k <= 1
         reach = lineshape.distance(1. / np.sqrt(k), gamma) if k > 1. else 0.
-        box_extent = reach * (1. + box_range_safety_margin)
-        half_widths.append(max(box_extent, minimum_box_padding))
+        half_width = reach * (1. + box_range_safety_margin)
+        half_widths.append(max(half_width, minimum_box_padding))
     return half_widths
 
 
 @dataclass
 class SpectralWindow:
     """
-    The full spectrum range (a Box) with the features evaluated in it
-    (made by from_features).
-        full_features     the feature's location is inside the box (flat features too)
-        contrib_features  the feature's location is outside the box, but its own box
-                          overlaps the box, so its tail still adds to the spectrum
+    A window_box and the features whose feat_box overlaps it (made by from_features).
+        box               the window_box: the range of each axis, cm-1
+        full_features     the features with their location inside window_box. Flat features too:
+                          they have no location, and are the same on every grid point
+        contrib_features  the features with their location outside window_box, whose feat_box
+                          overlaps it: their tails still add to the spectrum in window_box
+        features          (property) full_features, then contrib_features
     """
     box: 'Box'
     full_features: list['SpectralFeature'] = field(default_factory=list)
     contrib_features: list['SpectralFeature'] = field(default_factory=list)
 
+    @property
+    def features(self) -> list['SpectralFeature']:
+        """Every feature of this spectral window: full_features, then contrib_features."""
+        return self.full_features + self.contrib_features
+
     @classmethod
-    def from_features(cls, box: Box, features: Sequence['SpectralFeature'],
+    def from_features(cls, window_box: Box, features: Sequence['SpectralFeature'],
                       half_widths: Sequence[float]) -> 'SpectralWindow':
         """
-        The window over `box` with the features that add amplitude inside it, each with its
-        own box. In this order:
-          1. a box around every feature: its location +- its half-width, the same on every
+        The spectral window over window_box: the features whose feat_box overlaps window_box,
+        each with its feat_box. In this order:
+          1. a feat_box for every feature: its location +- its half-width, the same on every
              axis. half_widths: cm-1, one per feature, in the order of `features`, e.g. from
-             a box rule (BoxRule). The window does not depend on how they were chosen.
-          2. keep the features whose box overlaps `box` (touching edges included, so a
-             feature with half-width 0 on the edge of `box` stays):
-             location inside `box` -> full_features, outside -> contrib_features
+             a box rule (BoxRule). from_features does not depend on how they were chosen.
+          2. keep the features whose feat_box overlaps window_box (touching edges count, so a
+             feature with half-width 0 on an edge of window_box stays):
+             location inside window_box -> full_features, outside -> contrib_features
           No feature is dropped for its amplitude:
             - a weak feature stays, however weak
             - a feature whose rows cancel (amplitude 0) stays, as a record of the
               cancellation; it adds nothing to the grid
             - a term with coefficient 0 never becomes a row (build_contributions puts it
-              in `zero`), so it never reaches the window
+              in `zero`), so it never becomes a feature
 
-        e.g. half-width 55 cm-1, `box` A (0, 10): a feature at A = 60 is kept (its box
-        starts at 5), a feature at A = 70 is not (its box starts at 15).
-        A flat feature (is_flat) has no location to put a box around: its box is `box`
-        itself, and it goes into full_features. Its half-width is not used.
+        e.g. half-width 55 cm-1, window_box A (0, 10): a feature at A = 60 is kept (its feat_box
+        starts at 5), a feature at A = 70 is not (its feat_box starts at 15).
+        A flat feature (is_flat) has no location to put a feat_box around: its feat_box is
+        window_box itself, and it goes into full_features. Its half-width is not used.
 
-        Returns copies with boxes; the input features stay as they are. Every feature needs
-        rows and a propagator_param: the evaluation on the grid needs both.
+        Returns copies of the features, each with its feat_box; the input features stay as
+        they are. Every feature needs rows and a propagator_param: the evaluation on the grid
+        needs both.
+        raises ValueError if half_widths and features differ in length, if a half-width is
+        below 0, or if a feature has no rows or no propagator_param.
         """
         if len(half_widths) != len(features):
             raise ValueError(f'one half-width per feature: {len(half_widths)} half-widths, {len(features)} features')
 
-        dressed = []
+        with_feat_box = []
         for f, half_width in zip(features, half_widths):
             _check_has_rows_and_width(f)
             if not half_width >= 0.:
                 raise ValueError(f'half-width must be >= 0, got {half_width} for {f}')
             if f.is_flat:
-                dressed.append(replace(f, feat_box=box))
+                with_feat_box.append(replace(f, feat_box=window_box))
                 continue
             feat_box = Box({k: (v - half_width, v + half_width) for k, v in f.location.as_dict().items()})
-            dressed.append(replace(f, feat_box=feat_box))
+            with_feat_box.append(replace(f, feat_box=feat_box))
 
-        kept = [f for f in dressed if f.is_flat or f.feat_box_overlaps(box)]
+        kept = [f for f in with_feat_box if f.is_flat or f.feat_box_overlaps(window_box)]
 
-        return cls(box,
-                   full_features=[f for f in kept if f.is_flat or f.is_inside(box)],
-                   contrib_features=[f for f in kept if not (f.is_flat or f.is_inside(box))])
+        return cls(window_box,
+                   full_features=[f for f in kept if f.is_flat or f.is_inside(window_box)],
+                   contrib_features=[f for f in kept if not (f.is_flat or f.is_inside(window_box))])

@@ -2,11 +2,11 @@
 Figures with plot_rsp_func and plot_spectrum (wilson_analysis/render/plot_spectrum.py). An example of use, not a
 test. The 14 EVV terms, axes A = w1, B = -w1 + w2, gamma 4.7 cm-1, boxes and plot with dynrange 500.
 
-    1. formaldehyde, anharmonic states: the whole window
+    1. formaldehyde, anharmonic states: every feature in window_box
     2. formaldehyde: +-150 cm-1 around the strongest peak, 1 cm-1 steps
     2b. 1D: the row of 2 through the strongest peak, with plot_spectrum on plain arrays
     3. formaldehyde, harmonic vs anharmonic states side by side, on one shared scale (reference_max)
-    4. ACDM (42 modes), anharmonic states: the window of examples/quick_start.ipynb, 700 x 700 points
+    4. ACDM (42 modes), anharmonic states: the window_box of examples/quick_start.ipynb, 700 x 700 points
        (about 20 s: loading the data about 4 s, the rows and the grid about 14 s; the loading warns about
        anharmonic states below 0)
 
@@ -69,9 +69,9 @@ def main(out: Path):
     formaldehyde = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
     anharmonic, harmonic = evaluate(terms, formaldehyde, 'anharmonic'), evaluate(terms, formaldehyde, 'harmonic')
 
-    # 1. the whole window
-    spec = spectrum_on_grid(anharmonic, Box({'A': (600., 3100.), 'B': (5., 3100.)}), {'A': 501, 'B': 501},
-                            box_rule=BOXES)
+    # 1. every feature in window_box
+    spec = spectrum_on_grid(anharmonic, window_box=Box({'A': (600., 3100.), 'B': (5., 3100.)}),
+                            n_points_per_axis={'A': 501, 'B': 501}, box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title('formaldehyde, 14 EVV terms, anharmonic states, dynrange 500')
     save(fig, out / '1_formaldehyde.png')
@@ -80,7 +80,7 @@ def main(out: Path):
     strongest = max(anharmonic.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     a0, b0 = strongest.location['A'], strongest.location['B']
     zoom = Box({'A': (a0 - 150., a0 + 150.), 'B': (b0, b0 + 300.)})
-    spec = spectrum_on_grid(anharmonic, zoom, {'A': 301, 'B': 301}, box_rule=BOXES)
+    spec = spectrum_on_grid(anharmonic, window_box=zoom, n_points_per_axis={'A': 301, 'B': 301}, box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title(f'zoom: strongest peak at A = {a0:.1f}, B = {b0:.1f} cm$^{{-1}}$')
     save(fig, out / '2_formaldehyde_zoom.png')
@@ -93,8 +93,9 @@ def main(out: Path):
     save(fig, out / '2b_formaldehyde_zoom_1d.png')
 
     # 3. harmonic vs anharmonic: reference_max = the larger of the two maxima, so both share one scale
-    window, sizes = Box({'A': (1100., 3000.), 'B': (5., 3000.)}), {'A': 401, 'B': 401}
-    specs = {name: spectrum_on_grid(result, window, sizes, box_rule=BOXES)
+    window_box, n_points_per_axis = Box({'A': (1100., 3000.), 'B': (5., 3000.)}), {'A': 401, 'B': 401}
+    specs = {name: spectrum_on_grid(result, window_box=window_box, n_points_per_axis=n_points_per_axis,
+                                    box_rule=BOXES)
              for name, result in (('anharmonic', anharmonic), ('harmonic', harmonic))}
     reference_max = max(np.max(np.abs(s.amplitude)) ** 2 for s in specs.values())
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
@@ -103,13 +104,14 @@ def main(out: Path):
         ax.set_title(f'formaldehyde, {name} states')
     save(fig, out / '3_formaldehyde_harmonic_vs_anharmonic.png', dpi=310)
 
-    # 4. ACDM, the quick_start window
+    # 4. ACDM, the quick_start window_box
     t0 = time.perf_counter()
     acdm = load_acdm(terms)
     t_load = time.perf_counter() - t0
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(evaluate(terms, acdm, 'anharmonic'), Box({'A': (700., 3400.), 'B': (10., 3500.)}),
-                         {'A': 700, 'B': 700}, box_rule=BOXES)
+    spec = spectrum_on_grid(evaluate(terms, acdm, 'anharmonic'),
+                            window_box=Box({'A': (700., 3400.), 'B': (10., 3500.)}),
+                            n_points_per_axis={'A': 700, 'B': 700}, box_rule=BOXES)
     t_eval = time.perf_counter() - t0
     t0 = time.perf_counter()
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)

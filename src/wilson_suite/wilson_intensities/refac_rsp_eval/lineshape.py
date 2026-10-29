@@ -9,7 +9,7 @@ at resonance, and how fast it falls off from there.
 The evaluation takes the line shape only from here, through factor, distance, peak and tail:
     evaluate.py   the factor on the grid (eval_resonance_factor)
     features.py   the peak height (SpectralFeature.get_intensity), the amplitude reaching
-                  into a window (amplitude_in_window) and the box sizes (the box rules)
+                  into window_box (amplitude_in_window_box) and the feat_box sizes (the box rules)
 So these always agree. Another line shape, e.g. a Gaussian, adds its own factor and distance
 functions and sets factor and distance to them.
 gamma: the line shape's parameter, in the same unit as resloc and d (cm-1 or Eh).

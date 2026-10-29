@@ -189,16 +189,17 @@ def test_spectrum_on_grid_adds_a_term_without_conditions_on_every_grid_point(mol
     ab_term alone, then with flat_term in the same call: the two grid results differ by the flat feature's
     coefficient on every grid point. Boxes of 20 cm-1 for both, so the peaks are cut alike.
     """
-    window, dim_sizes = Box({'A': (1500., 1700.), 'B': (300., 700.)}), {'A': 101, 'B': 101}
-    boxes = lambda window, features: [20.] * len(features)
+    window_box, n_points_per_axis = Box({'A': (1500., 1700.), 'B': (300., 700.)}), {'A': 101, 'B': 101}
+    rule = lambda window_box, features: [20.] * len(features)
     alone = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='anharmonic')
     with_flat = compute_features([ab_term(), flat_term()], molsys_a1_zero, TOY_RECIPE, 5., states_choice='anharmonic')
     [flat] = [f for f in with_flat.features if f.is_flat]
 
-    spec = spectrum_on_grid(with_flat, window, dim_sizes, box_rule=boxes)
+    spec = spectrum_on_grid(with_flat, window_box=window_box, n_points_per_axis=n_points_per_axis, box_rule=rule)
 
     assert flat.amplitude_coeff != 0.
-    alone_on_grid = spectrum_on_grid(alone, window, dim_sizes, box_rule=boxes).amplitude
+    alone_on_grid = spectrum_on_grid(alone, window_box=window_box, n_points_per_axis=n_points_per_axis,
+                                     box_rule=rule).amplitude
     np.testing.assert_allclose(spec.amplitude, alone_on_grid + flat.amplitude_coeff)
 
 
@@ -799,7 +800,8 @@ def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
     width = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
     result = evaluate_formaldehyde(formaldehyde_molsys, width)
-    spec = spectrum_on_grid(result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+    spec = spectrum_on_grid(result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=AMPLITUDE_BOXES)
 
     # features: the same rows as top_run; every feature has the width function
     assert spec.feature_result is result
@@ -831,17 +833,19 @@ def test_spectrum_on_grid_with_a_width_function(formaldehyde_molsys, top_run):
 
 def test_spectrum_on_grid_width_function_of_a_constant_gives_the_same_as_the_number(formaldehyde_molsys):
     """propagator_param 5. and lambda vd, freqs: 5. give the same spectrum"""
-    number = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                           box_rule=AMPLITUDE_BOXES)
+    number = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), window_box=WINDOW_AROUND_STRONGEST,
+                              n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
     function = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
-                             WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+                                window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                                box_rule=AMPLITUDE_BOXES)
 
     np.testing.assert_allclose(function.amplitude, number.amplitude)
 
 
 def test_spectrum_on_grid_mesh_holds_every_grid_point(top_run):
     """mesh['A'][i, j] = axis_points['A'][i], mesh['B'][i, j] = axis_points['B'][j]: the form the renderer reads"""
-    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=AMPLITUDE_BOXES)
     mesh, points = spec.mesh, spec.axis_points
 
     assert list(mesh) == ['A', 'B']
@@ -851,43 +855,44 @@ def test_spectrum_on_grid_mesh_holds_every_grid_point(top_run):
         np.testing.assert_array_equal(mesh['B'][k, :], points['B'])
 
 
-def test_spectrum_on_grid_keeps_the_window_it_used(formaldehyde_molsys):
+def test_spectrum_on_grid_keeps_the_spectral_window_it_used(formaldehyde_molsys):
     """
-    The window as used: each feature with its amplitude box (amplitude_half_widths, dynrange 1001). The 4 features
-    inside are strong enough for boxes far wider than the window (29000 to 100000 cm-1); 32 of the 64 outside
-    reach in, as contrib_features.
+    spectral_window as used: each feature with its amplitude feat_box (amplitude_half_widths, dynrange 1001).
+    The 4 features inside are strong enough for feat_boxes far wider than window_box (29000 to 100000 cm-1);
+    32 of the 64 outside reach in, as contrib_features.
     """
     result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
-    spec = spectrum_on_grid(result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+    spec = spectrum_on_grid(result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=AMPLITUDE_BOXES)
 
-    window = spec.spectral_window
+    spectral_window = spec.spectral_window
     expected = SpectralWindow.from_features(WINDOW_AROUND_STRONGEST, result.features,
                                             amplitude_half_widths(WINDOW_AROUND_STRONGEST, result.features, dynrange=1001.))
-    assert window.box is WINDOW_AROUND_STRONGEST
-    assert (len(window.full_features), len(window.contrib_features)) == (4, 32)
-    for used, made in zip(window.full_features + window.contrib_features,
-                           expected.full_features + expected.contrib_features, strict=True):
+    assert spectral_window.box is WINDOW_AROUND_STRONGEST
+    assert (len(spectral_window.full_features), len(spectral_window.contrib_features)) == (4, 32)
+    for used, made in zip(spectral_window.features, expected.features, strict=True):
         assert used == made and used.feat_box == made.feat_box
     assert all(WINDOW_AROUND_STRONGEST.bounds['A'][1] - WINDOW_AROUND_STRONGEST.bounds['A'][0]
-               < get_box_extent(f) for f in window.full_features)
+               < get_box_extent(f) for f in spectral_window.full_features)
 
 
 def test_spectrum_on_grid_uses_the_boxes_of_its_box_rule(top_run):
     """
-    The rule gets the window and every feature; the boxes on the grid are its half-widths.
+    The rule gets window_box and every feature; the feat_boxes on the grid are its half-widths.
     A function of our own: 7 cm-1 for every feature.
     """
     calls = []
 
-    def seven_cm(window, features):
-        calls.append((window, list(features)))
+    def seven_cm(window_box, features):
+        calls.append((window_box, list(features)))
         return [7.] * len(features)
 
-    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=seven_cm)
+    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=seven_cm)
 
     assert calls == [(WINDOW_AROUND_STRONGEST, top_run.result.features)]
-    kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
+    kept = spec.spectral_window.features
     assert kept and all(get_box_extent(f) == pytest.approx(7.) for f in kept)
 
 
@@ -899,10 +904,10 @@ def test_spectrum_on_grid_takes_the_knobs_through_the_box_rule(top_run):
     features = top_run.result.features
     knobs = dict(dynrange=1001., eps=0.3, min_gammas=2., a_max=10. * max(f.get_intensity() for f in features) ** 0.5)
 
-    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                         box_rule=partial(amplitude_half_widths, **knobs))
+    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=partial(amplitude_half_widths, **knobs))
 
-    kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
+    kept = spec.spectral_window.features
     expected = amplitude_half_widths(WINDOW_AROUND_STRONGEST, features, **knobs)
     assert kept and all(get_box_extent(f) == pytest.approx(expected[features.index(f)]) for f in kept)
     assert min(expected) == pytest.approx(9.4)
@@ -914,10 +919,10 @@ def test_spectrum_on_grid_with_the_intensity_rule(top_run):
     it cuts more than the amplitude rule: against all_features_on_grid, 2.6 floors off (floor: max / 101);
     amplitude boxes with the same dynrange: 0.03 floors.
     """
-    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                         box_rule=partial(intensity_half_widths, dynrange=101.), cut_tails=True)
+    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=partial(intensity_half_widths, dynrange=101.), cut_tails=True)
 
-    kept = spec.spectral_window.full_features + spec.spectral_window.contrib_features
+    kept = spec.spectral_window.features
     assert kept and all(get_box_extent(f) == pytest.approx(51.7) for f in kept)
     intensity = np.abs(spec.amplitude) ** 2
     reference = np.abs(all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points)) ** 2
@@ -930,22 +935,24 @@ def test_spectrum_on_grid_without_cut_puts_each_kept_feature_on_the_whole_grid(t
     kept feature is on the whole grid: all_features_on_grid of the kept features. With cut_tails=True the
     contrib features' tails end at their boxes, so the two spectra differ.
     """
-    cut = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES,
-                           cut_tails=True)
+    cut = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                           box_rule=AMPLITUDE_BOXES, cut_tails=True)
 
-    uncut = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
+    uncut = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                             box_rule=AMPLITUDE_BOXES)
 
-    kept = uncut.spectral_window.full_features + uncut.spectral_window.contrib_features
-    assert kept == cut.spectral_window.full_features + cut.spectral_window.contrib_features
+    kept = uncut.spectral_window.features
+    assert kept == cut.spectral_window.features
     np.testing.assert_allclose(uncut.amplitude, all_features_on_grid(kept, top_run.result.states, uncut.axis_points))
     assert not np.allclose(uncut.amplitude, cut.amplitude)
 
 
 def test_spectrum_on_grid_without_cut_keeping_every_feature_is_the_uncut_spectrum(top_run):
     """A box rule that keeps every feature (half-width 1e6 cm-1), no cut: every feature on every grid point."""
-    keep_all = lambda window, features: [1e6] * len(features)
+    keep_all = lambda window_box, features: [1e6] * len(features)
 
-    spec = spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, box_rule=keep_all, cut_tails=False)
+    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
+                            box_rule=keep_all, cut_tails=False)
 
     np.testing.assert_allclose(spec.amplitude,
                                all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points))
@@ -955,29 +962,31 @@ def test_spectrum_on_grid_with_a_new_width_reuses_the_rows(formaldehyde_molsys):
     """replace(..., propagator_param=8.) keeps the table (no new rows) and gives what a new run with 8 cm-1 gives"""
     first = evaluate_formaldehyde(formaldehyde_molsys, 5.)
 
-    wider = spectrum_on_grid(replace(first, propagator_param=8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                          box_rule=AMPLITUDE_BOXES)
+    wider = spectrum_on_grid(replace(first, propagator_param=8.), window_box=WINDOW_AROUND_STRONGEST,
+                             n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
 
     assert wider.feature_result.table is first.table
     assert all(f.propagator_param == 8. for f in wider.feature_result.features)
-    new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 8.), WINDOW_AROUND_STRONGEST, STEPS_1_CM,
-                            box_rule=AMPLITUDE_BOXES)
+    new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 8.), window_box=WINDOW_AROUND_STRONGEST,
+                               n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
     np.testing.assert_allclose(wider.amplitude, new_run.amplitude)
 
 
 def test_spectrum_on_grid_on_another_window_reuses_the_features(formaldehyde_molsys):
-    """Same features, another window and grid: what a new run on that window gives"""
+    """Same features, another window_box and grid: what a new run on that window_box gives"""
     result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
-    other, sizes = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
+    other_window_box, n_points_per_axis = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
 
-    again = spectrum_on_grid(result, other, sizes, box_rule=AMPLITUDE_BOXES)
+    again = spectrum_on_grid(result, window_box=other_window_box, n_points_per_axis=n_points_per_axis,
+                             box_rule=AMPLITUDE_BOXES)
 
     assert again.feature_result is result
-    new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), other, sizes, box_rule=AMPLITUDE_BOXES)
+    new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), window_box=other_window_box,
+                               n_points_per_axis=n_points_per_axis, box_rule=AMPLITUDE_BOXES)
     np.testing.assert_allclose(again.amplitude, new_run.amplitude)
 
 
-def test_spectrum_on_grid_takes_the_box_rule_by_keyword(top_run):
+def test_spectrum_on_grid_takes_every_argument_after_the_result_by_keyword(top_run):
     with pytest.raises(TypeError, match='positional'):
         spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, AMPLITUDE_BOXES)  # type: ignore
 
@@ -985,4 +994,5 @@ def test_spectrum_on_grid_takes_the_box_rule_by_keyword(top_run):
 def test_spectrum_on_grid_needs_a_box_rule(top_run):
     """no default: both rules need the plot's dynrange, and the plot decides what it shows, so the caller passes it"""
     with pytest.raises(TypeError, match='box_rule'):
-        spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM)  # type: ignore
+        spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST,  # type: ignore
+                         n_points_per_axis=STEPS_1_CM)

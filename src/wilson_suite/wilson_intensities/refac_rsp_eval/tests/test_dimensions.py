@@ -157,20 +157,21 @@ POINTS = {1: 2001, 2: 101, 3: 31, 4: 13}     # grid points per axis
 
 def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_result):
     """
-    Boxes of 3 gamma (60 cm-1) with cut_tails=True cut every feature: the spectrum is each feature's
-    all_features_on_grid value inside its own box, 0 outside, added up, in every dimensionality. Window: the
-    features +- 100 cm-1 on every axis.
-    (amplitude_half_widths would give these features the whole window: they are of similar strength.)
+    feat_boxes of 3 gamma (60 cm-1) with cut_tails=True cut every feature: the spectrum is each feature's
+    all_features_on_grid value inside its own feat_box, 0 outside, added up, in every dimensionality.
+    window_box: the features +- 100 cm-1 on every axis.
+    (amplitude_half_widths would give these features feat_boxes over all of window_box: they are of similar strength.)
     """
     locations = np.array([f.location.values for f in chain_result.features])
     ndim = locations.shape[1]
-    window = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip(AXES, locations.min(0), locations.max(0))})
+    window_box = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip(AXES, locations.min(0), locations.max(0))})
 
-    spec = spectrum_on_grid(chain_result, window, {ax: POINTS[ndim] for ax in AXES[:ndim]},
-                         box_rule=lambda window, features: [3 * G_CM] * len(features), cut_tails=True)
+    spec = spectrum_on_grid(chain_result, window_box=window_box,
+                            n_points_per_axis={ax: POINTS[ndim] for ax in AXES[:ndim]},
+                            box_rule=lambda window_box, features: [3 * G_CM] * len(features), cut_tails=True)
 
     expected = np.zeros((POINTS[ndim],) * ndim, dtype=complex)
-    for f in [*spec.spectral_window.full_features, *spec.spectral_window.contrib_features]:
+    for f in spec.spectral_window.features:
         inside = box_slices(f.feat_box, spec.axis_points)  # type: ignore
         expected[inside] += all_features_on_grid([f], chain_result.states, spec.axis_points)[inside]
     assert spec.amplitude.shape == expected.shape
@@ -229,10 +230,10 @@ def test_cars_on_grid_within_eps_floor_of_all_features_on_grid(cars):
     """
     _, _, result = cars
     locations = [f.location['A'] for f in result.features]
-    window = Box({'A': (min(locations) - 200., max(locations) + 200.)})
+    window_box = Box({'A': (min(locations) - 200., max(locations) + 200.)})
 
-    spec = spectrum_on_grid(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.),
-                            cut_tails=True)
+    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis={'A': 2001},
+                            box_rule=partial(amplitude_half_widths, dynrange=500.), cut_tails=True)
 
     reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
     assert 0. < np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.
@@ -309,12 +310,13 @@ def test_ir_absorption_on_grid_with_the_background_within_eps_floor_of_all_featu
     """1D, the peaks +- 200 cm-1, 2001 points, amplitude boxes: the flat feature's box is the window."""
     _, _, result = ir_absorption
     locations = [f.location['A'] for f in result.features if not f.is_flat]
-    window = Box({'A': (min(locations) - 200., max(locations) + 200.)})
+    window_box = Box({'A': (min(locations) - 200., max(locations) + 200.)})
 
-    spec = spectrum_on_grid(result, window, {'A': 2001}, box_rule=partial(amplitude_half_widths, dynrange=500.))
+    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis={'A': 2001},
+                            box_rule=partial(amplitude_half_widths, dynrange=500.))
 
     [flat] = [f for f in spec.spectral_window.full_features if f.is_flat]
-    assert flat.feat_box == window
+    assert flat.feat_box == window_box
     reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
     assert np.abs(abs(spec.amplitude) ** 2 - reference).max() < 0.1 * reference.max() / 500.
 
@@ -359,9 +361,9 @@ def test_three_ir_abc_set_on_a_3d_grid_within_eps_floor_of_all_features_on_grid(
     setup, terms, groups = three_ir
     result = evaluate_on_formaldehyde(setup, [terms[i] for i in groups[('A', 'B', 'C')]])
     locations = np.array([f.location.values for f in result.features])
-    window = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip('ABC', locations.min(0), locations.max(0))})
+    window_box = Box({ax: (lo - 100., hi + 100.) for ax, lo, hi in zip('ABC', locations.min(0), locations.max(0))})
 
-    spec = spectrum_on_grid(result, window, {ax: 41 for ax in 'ABC'},
+    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis={ax: 41 for ax in 'ABC'},
                             box_rule=partial(amplitude_half_widths, dynrange=500.), cut_tails=True)
 
     reference = abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
