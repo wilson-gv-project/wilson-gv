@@ -303,14 +303,14 @@ def test_harmonic_denom_needs_one_mode_per_denominator(molsys):
 # pair (i, l), the first dipgrad j, the second dipgrad k. The data has no symmetry, so reading a
 # wrong slot or a wrong mode changes the result.
 
-N_MODES = 3
+N_MODES = 4     # not 3, the number of cartesian axes: a mode index used as a cartesian index gives a shape error
 _rng = np.random.default_rng(7)
-POLGRAD_3 = _rng.normal(size=(N_MODES, 3, 3))      # polgrad[mode, i, j]
-DIPGRAD_3 = _rng.normal(size=(N_MODES, 3))         # dipgrad[mode, i]
+POLGRAD = _rng.normal(size=(N_MODES, 3, 3))      # polgrad[mode, i, j]
+DIPGRAD = _rng.normal(size=(N_MODES, 3))         # dipgrad[mode, i]
 ISO4 = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=(1., 1., 1.))
 
 
-def evv_props(polgrad=POLGRAD_3, dipgrad=DIPGRAD_3) -> MolPropsCollection:
+def evv_props(polgrad=POLGRAD, dipgrad=DIPGRAD) -> MolPropsCollection:
     return MolPropsCollection([MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={}),
                                MolecularProperty(trivial_name='dipgrad', vals=dipgrad, extra_data={})])
 
@@ -348,7 +348,7 @@ def test_avrg_func_reads_the_cartesian_slot_of_each_operator():
 
     value = func({'a': 0, 'b': 1, 'c': 2}, evv_props())
 
-    assert value == pytest.approx(3. * POLGRAD_3[1, 2, 1] * DIPGRAD_3[0, 0] * DIPGRAD_3[2, 1])
+    assert value == pytest.approx(3. * POLGRAD[1, 2, 1] * DIPGRAD[0, 0] * DIPGRAD[2, 1])
 
 
 def test_avrg_func_is_the_full_contraction_with_the_averaging_coefficients():
@@ -356,7 +356,7 @@ def test_avrg_func_is_the_full_contraction_with_the_averaging_coefficients():
     func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
 
     for idx in ALL_ABC:
-        expected = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD_3[idx['b']], DIPGRAD_3[idx['a']], DIPGRAD_3[idx['c']])
+        expected = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD[idx['b']], DIPGRAD[idx['a']], DIPGRAD[idx['c']])
         assert func(idx, evv_props()) == pytest.approx(expected)
 
 
@@ -364,11 +364,12 @@ def test_avrg_func_is_the_full_contraction_with_the_averaging_coefficients():
 def test_avrg_func_does_not_change_when_the_molecule_is_rotated(laser_pol):
     """
     The orientational average cannot depend on how the molecule sits in its own axes: rotating every
-    cartesian index of every property by the same R leaves the value unchanged. A single, non-averaged
-    element does change, which shows the rotation is not trivial.
+    cartesian index of every property by the same R leaves the value unchanged. The mode index is not
+    rotated: rotating the molecule never changes which mode is which. A single, non-averaged element
+    does change, which shows the rotation is not trivial.
     """
     R = rotation(0.7, 1.9)
-    rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, POLGRAD_3), np.einsum('ip,np->ni', R, DIPGRAD_3))
+    rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, POLGRAD), np.einsum('ip,np->ni', R, DIPGRAD))
     average = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(),
                                          polarization_linear_comb=getGeneralPolarizationAveragingExpression(4, laser_pol))
     one_element = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(0, 0, 0, 0): 1.})
@@ -383,7 +384,7 @@ def test_avrg_func_with_a_repeated_mode_label():
     expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
     func = make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb={(0, 0): 1., (1, 2): 3.})
 
-    assert func({'a': 2}, evv_props()) == pytest.approx(DIPGRAD_3[2, 0] ** 2 + 3. * DIPGRAD_3[2, 1] * DIPGRAD_3[2, 2])
+    assert func({'a': 2}, evv_props()) == pytest.approx(DIPGRAD[2, 0] ** 2 + 3. * DIPGRAD[2, 1] * DIPGRAD[2, 2])
 
 
 def test_avrg_func_without_polarization_entries_is_zero():
@@ -403,12 +404,12 @@ def test_avrg_func_needs_a_mol_props_collection():
     func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
 
     with pytest.raises(TypeError, match='MolPropsCollection'):
-        func({'a': 0, 'b': 1, 'c': 2}, {'polgrad': POLGRAD_3, 'dipgrad': DIPGRAD_3})  # type: ignore
+        func({'a': 0, 'b': 1, 'c': 2}, {'polgrad': POLGRAD, 'dipgrad': DIPGRAD})  # type: ignore
 
 
 def test_avrg_func_needs_every_property_in_the_data():
     func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-    no_polgrad = MolPropsCollection([MolecularProperty(trivial_name='dipgrad', vals=DIPGRAD_3, extra_data={})])
+    no_polgrad = MolPropsCollection([MolecularProperty(trivial_name='dipgrad', vals=DIPGRAD, extra_data={})])
 
     with pytest.raises(KeyError):
         func({'a': 0, 'b': 1, 'c': 2}, no_polgrad)
@@ -493,8 +494,8 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 # -- calculate_avrg_tensor_einsum: every index set at once = the on-the-fly loop -------------
 
 # 5 expressions (labels) x 3 recipes (laser_pol) = 15 cases.
-# Expected in each case: the einsum tensor equals the on-the-fly loop at all 27 index sets (a, b, c each over
-# modes 0, 1, 2), to rel 1e-12, abs 0. The data is random (POLGRAD_3, DIPGRAD_3): no symmetry, no zeros. So
+# Expected in each case: the einsum tensor equals the on-the-fly loop at all 64 index sets (a, b, c each over
+# modes 0 to 3), to rel 1e-12, abs 0. The data is random (POLGRAD, DIPGRAD): no symmetry, no zeros. So
 # reading a wrong mode, a wrong slot or the polgrad axes in the wrong order gives another number.
 #
 # labels -> evv_avrg_expr(labels) = polgrad[labels[0]] (slots 0, 3) * dipgrad[labels[1]] (slot 1) * dipgrad[labels[2]] (slot 2)
@@ -538,7 +539,7 @@ def test_avrg_tensor_einsum_term8_axes_are_a_b_c_not_the_expression_order():
     tensor = calculate_avrg_tensor_einsum(evv_avrg_expr('bac'), evv_props(), ISO4)
 
     W = dense(ISO4)
-    by_hand = sum(W[i, j, k, l] * POLGRAD_3[1, i, l] * DIPGRAD_3[0, j] * DIPGRAD_3[2, k]
+    by_hand = sum(W[i, j, k, l] * POLGRAD[1, i, l] * DIPGRAD[0, j] * DIPGRAD[2, k]
                   for i, j, k, l in itertools.product(range(3), repeat=4))
     assert tensor.labels == ('a', 'b', 'c')
     assert tensor.values.shape == (N_MODES,) * 3
@@ -616,7 +617,7 @@ def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys)
                                                states_choice='anharmonic')
 
     # a=0, b=1, c=1: states ab = '0,1' and c = '1'; omegas from eigenvals
-    avrg = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD_3[1], DIPGRAD_3[0], DIPGRAD_3[1])
+    avrg = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD[1], DIPGRAD[0], DIPGRAD[1])
     expected = {'NON_AVRG': CFF[0, 1, 1],
                 'AVRG': avrg,
                 'VIBDIFF_TERMS': 1. / convNu2Ene(E01 - E1),
@@ -627,7 +628,7 @@ def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys)
 
 def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_states(molsys):
     """dipgrad[a=1] = 0 makes the average 0: the state '1,1' (missing from the toy states) is never looked up."""
-    dipgrad = DIPGRAD_3.copy()
+    dipgrad = DIPGRAD.copy()
     dipgrad[1] = 0.
     otf_molsys = replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props(dipgrad=dipgrad)]))
     term = evv_shaped_term()

@@ -252,6 +252,7 @@ def test_term8_on_the_fly_average_is_the_einsum_contraction(term8):
 def test_term8_on_the_fly_average_does_not_change_when_the_molecule_is_rotated(term8):
     """
     Rotating every cartesian index of the real polgrad and dipgrad by the same R leaves the average unchanged.
+    The mode index is not rotated: rotating the molecule never changes which mode is which.
     Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0). The values below it
     are rounding noise and change with the rotation by a large part of their size.
     """
