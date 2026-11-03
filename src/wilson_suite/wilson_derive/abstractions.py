@@ -391,6 +391,8 @@ class ResonanceCondition:
         pf_test = copy.deepcopy(self.pf)
         diff_test  = copy.deepcopy(self.diff)
 
+        #print('pf', pf_test)
+
         # Trim last resonance from present: For there to be a chance of maximal enhancement, all preceding res.
         # conds would need to be met
         if given_prev_res is not None:
@@ -450,12 +452,16 @@ class ResonanceCondition:
 
         # Therefore a straightforward lookup should be sufficient here:
 
+        #print('pf test after trimming', pf_test)
+        #print('mcp', mc_plus)
+        #print('mcm', mc_minus)
+
         # Case A: Found in mc_minus so pf sign is negative
-        if tuple(sorted(list(pf_test))) in mc_minus:
+        if sorted(list(pf_test)) in mc_minus:
             pf_overall_sign = -1
 
         # Case B: Found in mc_plus so pf sign is positive
-        elif tuple(sorted(list(pf_test))) in mc_plus:
+        elif sorted(list(pf_test)) in mc_plus:
             pf_overall_sign = 1
 
         # Otherwise not found, therefore indeterminate so return True (resonance cannot be ruled out)
@@ -464,6 +470,9 @@ class ResonanceCondition:
 
         # If this line is reached, there is a definite state difference sign (or zero) and a definite perturbing freq.
         # combination sign, so analyze them w.r.t. each other
+
+        #print('sd sign', sd_overall_sign)
+        #print('pf sign', pf_overall_sign)
 
         # State energy level difference sign and perturbing frequencies must be opposite in order for
         # resonance to be possible

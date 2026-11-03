@@ -1260,12 +1260,12 @@ def test_get_fully_enhanced_terms():
 '''
 def test_get_terms_by_comp_patterns():
 
-    mc1_p = ( (0,), )
-    mc1_m = ( (1,) , )
+    mc1_p = ( (0,),  )
+    mc1_m = ( (1,), (0,1,) , )
     mc1 = (mc1_p, mc1_m)
 
-    comp_patt_magn_cond = {(2, 1, 1): (mc1, ),
-                           (2, 2): ( mc1, )}
+    comp_patt_magn_cond = {(1, 1, 2): (mc1, ),
+                           }
 
     get_terms_by_comp_patterns(3,
                       1, 1,1,

@@ -6,7 +6,6 @@ from fractions import Fraction
 from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, ResonanceCondition, QOperator, \
     HarmOscStateSymbolic, TransitionIntegral
 
-
 class VibPerturbedTerm:
     """
     Class to represent post-Hermite treatment term: Instances of this class are the main end result of a typical
@@ -54,7 +53,10 @@ class VibPerturbedTerm:
 
         self.order_mech = order_mech
 
+        nonsumm_ind, summ_ind = self.tellNonSummSummIndices()
+
         self.summ_ind = summ_ind
+        self.nonsumm_ind = nonsumm_ind
 
         # Hash (currently indeterminate)
         self.hsh = None
@@ -295,8 +297,11 @@ class VibPerturbedTerm:
 
             prev_res = None
             for i in self.res:
-                if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=prev_res)):
-                    return False
+
+                if prev_res is not None:
+
+                    if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=prev_res)):
+                        return False
 
                 if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=None)):
                     return False
@@ -325,6 +330,11 @@ class VibPerturbedTerm:
         print('Resonances:')
         for i in self.res:
             i.present()
+
+        print('Electrical anharm. order:', self.order_el)
+        print('Mechanical anharm. order:', self.order_mech)
+        print('Indices part of resonance conditions:', self.nonsumm_ind)
+        print('Further (summation) indices:', self.summ_ind)
 
         print('\nHas attributes: coeff, freqterms, res, was_sorted, props, hsh'
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'

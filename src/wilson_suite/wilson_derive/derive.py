@@ -9,14 +9,18 @@ import copy
 from ..wilson_utils import common_labels as wu_common
 
 @dataclass
-class ResponseTerms:
+class ResponseTermsCollection:
     """
-    Data holder class to collect terms under a common setup
+    Data holder class to collect terms under a common setup:
+
+    order: The order of perturbation considered
+    total_anharm_limit: Upper limit to total order of anharmonicity (electrical + mechanical)
+    el_anharm_limit: Upper limit to electrical order of anharmonicity
+    mech_anharm_limit: Upper limit to mechanical order of anharmonicity
 
     """
 
     order: int
-    # TODO: Anharmonicity regime
     total_anharm_limit: int
     el_anharm_limit: int
     mech_anharm_limit: int
@@ -28,17 +32,9 @@ class ResponseTerms:
         # Derived properties from original arguments if any
 
         # Get terms
-        self.terms = self.get_terms()
-
-    def get_terms(self):
-
-        # Get terms grouped by comp_patterns_with_magn_conditions entries
-
-        terms = get_terms_by_comp_patterns(self.order,
+        self.terms = get_terms_by_comp_patterns(self.order,
                                            self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
                                            self.comp_patterns_with_magn_conditions)
-
-        return terms
 
     def determine_needed_props(self):
 
@@ -101,8 +97,6 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
         if i.comp_pattern in sos_terms_at_comp_pattern:
             sos_terms_at_comp_pattern[i.comp_pattern].append(copy.deepcopy(i))
 
-    print(sos_terms_at_comp_pattern)
-
     # Then get anharm orders
     anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
 
@@ -145,7 +139,6 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
 
         for m in final_terms_at_comp_patt_and_magn[p]:
 
-            print('my magn', m)
             # Translate magn cond to interaction indices
 
             mcp_int = []
@@ -162,13 +155,9 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
                     new_mcm.extend(comp_patt_to_int[k])
                 mcm_int.append(copy.deepcopy(new_mcm))
 
-            print('my mcp', mcp_int)
-            print('my mcm', mcm_int)
-
             for t in ph_terms_at_comp_pattern[p]:
+
                 if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
                     final_terms_at_comp_patt_and_magn[p][m].append(copy.deepcopy(t))
-
-    print('final terms', final_terms_at_comp_patt_and_magn)
 
     return final_terms_at_comp_patt_and_magn
