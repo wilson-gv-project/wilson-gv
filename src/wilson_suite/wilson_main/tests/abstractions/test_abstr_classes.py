@@ -27,6 +27,13 @@ def test_DataOriginInfo():
     """To be implemented"""
     pass
 
+
+def test_wilson_main_and_system_data_share_one_data_origin_class():
+    from wilson_suite.wilson_main import abstractions
+    from wilson_suite.wilson_system.system_data import DataOriginInfo
+    assert abstractions.DataOriginInfo is DataOriginInfo        # the system_data one
+
+
 def test_MolecularProperty():
 
     from ....wilson_utils.prop_trivname import prop_trivname

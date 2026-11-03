@@ -96,7 +96,7 @@ translate them to your chosen spectral axis variables.
 
 ```python
 import wilson_suite as ws
-from wilson_suite.wilson_utils.some_reprs import make_SpectralAxisSet
+from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 
 # Derive the relevant contributing terms, here return in default structure (ordered by anharmonicity)
 terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment)
