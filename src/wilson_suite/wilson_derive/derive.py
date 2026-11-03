@@ -2,41 +2,64 @@ from ..wilson_experiment.experiment_abstractions import VibExperiment
 from . import dbl_pert_expansion
 from . import hermaut
 from . import vib_rsp_sos
-from . import response_terms
+from dataclasses import dataclass
+from .response_terms import VibPerturbedTerm, VibContribTerm
 from . import simplify
 import copy
 from ..wilson_utils import common_labels as wu_common
 
-def get_dressed_vib_sos_with_exp_filtering(order: int, int_sequences: list, epochs: list,
-                                           cfuv: dict) -> list[response_terms.VibContribTerm]:
+@dataclass
+class ResponseTerms:
     """
-    Take an order parameter and an experiment's a) interaction sequences, b) epochs, and c) UV carrier frequency info
-    and 1) Get the sum-over-states expression for the vibrational contribution to this order's response function with
-    dummy interaction indices, 2) dress the terms with the pulse references for each valid interaction sequence, and
-    3) filter the resulting terms by i) discarding terms where any pulses involved in an electronic response are not
-    confined to the same epoch, ii) discarding terms where carrier frequencies of pulses in an electronic response
-    do not have UV frequency components that together sum to zero
+    Data holder class to collect terms under a common setup
 
-    Returns: A list of VibContribTerm instances constituting the filtered SOS expression
     """
 
-    R_sos = vib_rsp_sos.get_vib_sos(order)
+    order: int
+    # TODO: Anharmonicity regime
+    total_anharm_limit: int
+    el_anharm_limit: int
+    mech_anharm_limit: int
+    # Keys are compounding patterns, values are magnitude conditions under each comp. pattern
+    comp_patterns_with_magn_conditions: dict[tuple, tuple]
 
-    R_sos_filtered = []
+    def __post_init__(self):
 
-    for i in int_sequences:
-        for j in R_sos:
-            new_R_sos = copy.deepcopy(j)
-            new_R_sos.dressWithPulseInteractions(i)
-            if new_R_sos.allElRspEpochContained(epochs, 0):
-                if new_R_sos.allUVCancels(cfuv):
-                    R_sos_filtered.append(new_R_sos)
+        # Derived properties from original arguments if any
 
-    return R_sos_filtered
+        # Get terms
+        self.terms = self.get_terms()
+
+    def get_terms(self):
+
+        # Get terms grouped by comp_patterns_with_magn_conditions entries
+
+        terms = get_terms_by_comp_patterns(self.order,
+                                           self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
+                                           self.comp_patterns_with_magn_conditions)
+
+        return terms
+
+    def determine_needed_props(self):
+
+        # Walk through all terms and determine which properties are needed
+        props = []
+
+        # Notes:
+        # - Connect to other definition of properties?
+        # - For non-derivatives properties (energy levels, relaxation parameters):
+        #       - Register the information as state-centered (or numbers of quanta needed?)
+        #       - This should be sufficient for both energy levels and relaxation
+        #           - More refined relaxation models would need to supply further details
+        #               - And would anyway need more detailed derivation
+        #       - Not sure yet how to adapt this for Fermi resolved states but that's for later
+        # - Also register as a derived property the max number of quanta needed?
+
+        return props
 
 
-def do_dbl_pert_expand_and_hermaut(sos_terms: list[response_terms.VibContribTerm],
-                                   order_el: int, order_mech: int) -> list[response_terms.VibPerturbedTerm]:
+def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
+                                   order_el: int, order_mech: int) -> list[VibPerturbedTerm]:
     """
     Take a list of SOS vibrational contribution response terms, perform a double perturbation expansion according to the
     requested orders of electrical and mechanical anharmonicity, carry out Hermite walk expansions for the resulting
@@ -56,31 +79,8 @@ def do_dbl_pert_expand_and_hermaut(sos_terms: list[response_terms.VibContribTerm
     # Simplify
     return list(simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds).values())
 
-def do_dbl_pert_expand_and_hermaut_with_enh_filtering(sos_terms:
-                                                      list[response_terms.VibContribTerm],
-                                                      order_el: int, order_mech: int,
-                                                      magn_conditions: tuple) -> list[response_terms.VibPerturbedTerm]:
-    """
-    Take a list of SOS vibrational contribution response terms, perform a double perturbation expansion according to the
-    requested orders of electrical and mechanical anharmonicity, carry out Hermite walk expansions for the resulting
-    terms, simplify these results by coefficient factoring, and filter those results according to whether full
-    enhancement is possible with the imposed magnitude conditions of the experiment.
-     
-    """
-
-    # Get simplified dbl. pert. expanded and Hermite expanded terms
-    simplified_hermaut_terms = do_dbl_pert_expand_and_hermaut(sos_terms, order_el, order_mech)
-
-    # Filter by possibility of full enhancement
-    filtered_terms = []
-    for k in simplified_hermaut_terms:
-        if k.full_enhancement_possible(magn_conditions=magn_conditions):
-            filtered_terms.append(copy.deepcopy(k))
-
-    return filtered_terms
-
 def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
-                              comp_patterns_with_magn_conditions: dict[tuple, tuple]) -> dict[tuple, list[response_terms.VibPerturbedTerm]]:
+                              comp_patterns_with_magn_conditions: dict[tuple, tuple]) -> dict[tuple, list[VibPerturbedTerm]]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
     and magnitude conditions and return fully enhanceable terms
@@ -117,8 +117,6 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
                 ph_terms_at_comp_pattern[i].extend(do_dbl_pert_expand_and_hermaut(sos_terms_at_comp_pattern[i],
                                                    ind_ord[0], ind_ord[1]))
 
-    print(ph_terms_at_comp_pattern)
-
     # Filter by magnitude conditions
 
     # Initialize result holder
@@ -128,46 +126,49 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
 
     # Walk through post-Hermite term and screen/group by magnitude conditions
     for p in final_terms_at_comp_patt_and_magn:
+
+        # Build dict to tell which interaction indices each compounding pattern refers to
+        comp_patt_to_int = {}
+        int_ctr = 1
+        comp_ctr = 0
+
+        for c in p:
+            new_ints = []
+
+            for j in range(c):
+                new_ints.append(int_ctr)
+                int_ctr += 1
+
+            comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
+
+            comp_ctr += 1
+
         for m in final_terms_at_comp_patt_and_magn[p]:
+
+            print('my magn', m)
+            # Translate magn cond to interaction indices
+
+            mcp_int = []
+            for j in m[0]:
+                new_mcp = []
+                for k in j:
+                    new_mcp.extend(comp_patt_to_int[k])
+                mcp_int.append(copy.deepcopy(new_mcp))
+
+            mcm_int = []
+            for j in m[1]:
+                new_mcm = []
+                for k in j:
+                    new_mcm.extend(comp_patt_to_int[k])
+                mcm_int.append(copy.deepcopy(new_mcm))
+
+            print('my mcp', mcp_int)
+            print('my mcm', mcm_int)
+
             for t in ph_terms_at_comp_pattern[p]:
-                if t.full_enhancement_possible(magn_conditions=m):
+                if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
                     final_terms_at_comp_patt_and_magn[p][m].append(copy.deepcopy(t))
 
+    print('final terms', final_terms_at_comp_patt_and_magn)
+
     return final_terms_at_comp_patt_and_magn
-
-
-
-def get_fully_enhanced_terms(experiment: VibExperiment, total_anharm_limit: int=1, el_anharm_limit: int=1,
-                             mech_anharm_limit: int=1) -> dict:
-    """
-    Take an experiment instance and requested maximal order(s) of anharmonicity and return
-    all terms that may be fully enhanced under this experiment at the requested orders of anharmonicity
-    or lower. Returns a dictionary {0: {[0,0]: [...], ...}, 1: {[1,0]: [...], ...}, ...} where [...]
-    is a list of VibPerturedTerm instances
-
-    experiment: VibExperiment instance from wilson-experiment
-
-    total: integer: Limitation on total order of anharmonicity (default = 1)
-    el_anharm_limit: integer: Limitation on electrical order of anharmonicity (default = 1)
-    mech_anharm_limit: integer: Limitation on mechanical order of anharmonicity (default = 1)
-    """
-
-    # Get interaction-dressed and epoch-/UV carrier freq.-filtered SOS vibrational response function expression
-    R_sos = get_dressed_vib_sos_with_exp_filtering(experiment.order, experiment.int_sequences, experiment.epochs,
-                                                   experiment.cfuv)
-
-
-    # Get representation of relevant anharmonicity orders
-    anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
-
-    # For each such anharmonicity order, do double pert. expansion, Hermite walk expansion and filtering
-    final_terms = {}
-    for i in anharm_orders:
-        final_terms[i] = {}
-        for j in anharm_orders[i]:
-            final_terms[i][j] = do_dbl_pert_expand_and_hermaut_with_enh_filtering(R_sos, j[0], j[1], experiment.magn_conditions)
-
-    return final_terms
-
-# TODO: For future work, add function to dress generated VibPerturbedTerm instances with specific operator types
-# according to choice of electromagnetic multipole expansion regime

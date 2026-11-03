@@ -7,57 +7,6 @@ from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, Resona
     HarmOscStateSymbolic, TransitionIntegral
 
 
-@dataclass
-class ResponseTerms:
-    """
-    Data holder class to collect terms under a common setup
-
-    """
-
-    order: int
-    # TODO: Anharmonicity regime
-    total_anharm_limit: int
-    el_anharm_limit: int
-    mech_anharm_limit: int
-    # Keys are compounding patterns, values are magnitude conditions under each comp. pattern
-    comp_patterns_with_magn_conditions: dict[tuple, tuple]
-
-    def __post_init__(self):
-
-        # Derived properties from original arguments if any
-
-        # Get terms
-        self.terms = self.get_terms()
-
-    def get_terms(self):
-
-        # Get terms grouped by comp_patterns_with_magn_conditions entries
-
-        #terms = get_terms_by_comp_patterns(self.order,
-        #                                   self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
-        #                                   self.comp_patterns_with_magn_conditions)
-
-        return terms
-
-    def determine_needed_props(self, re):
-
-        # Walk through all terms and determine which properties are needed
-        props = []
-
-        # Notes:
-        # - Connect to other definition of properties?
-        # - For non-derivatives properties (energy levels, relaxation parameters):
-        #       - Register the information as state-centered (or numbers of quanta needed?)
-        #       - This should be sufficient for both energy levels and relaxation
-        #           - More refined relaxation models would need to supply further details
-        #               - And would anyway need more detailed derivation
-        #       - Not sure yet how to adapt this for Fermi resolved states but that's for later
-        # - Also register as a derived property the max number of quanta needed?
-
-        return props
-
-
-
 class VibPerturbedTerm:
     """
     Class to represent post-Hermite treatment term: Instances of this class are the main end result of a typical
@@ -328,7 +277,7 @@ class VibPerturbedTerm:
 
         return self.hsh
 
-    def full_enhancement_possible(self, magn_conditions=None) -> bool:
+    def full_enhancement_possible(self, mcp, mcm) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
         ranges with respect to all of its resonance conditions?
@@ -342,14 +291,14 @@ class VibPerturbedTerm:
         if not self.was_sorted:
             raise ValueError('Term must be sorted before full enhancement possibility can be evaluated')
 
-        if magn_conditions is not None:
+        if mcp is not None or mcm is not None:
 
             prev_res = None
             for i in self.res:
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=prev_res)):
+                if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=prev_res)):
                     return False
 
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=None)):
+                if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=None)):
                     return False
 
                 prev_res = copy.deepcopy(i)
