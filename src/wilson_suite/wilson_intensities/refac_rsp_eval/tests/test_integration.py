@@ -138,7 +138,11 @@ def test_eval_molsys_data():
     print(molsys)
 
     import numpy as np
-    assert np.all(molsys.eigenvecs[0] == np.array([ 0.04294, -0.,  0., -0.17408,  0., -0.,  0.69565, -0., -0., 0.69565,  0.,  0.])) # pyright: ignore[reportOptionalSubscript]
+    # mode 0, one row per atom (O, C, H, H): dx/dQ in atomic units (m_e^(-1/2)), the printed mode (0.04294, -0.17408,
+    # 0.69565, 0.69565 along x) scaled to sum_a m_a |d_a|^2 = 1 with m_a in electron masses
+    np.testing.assert_allclose(molsys.eigenvecs[0], [[0.0008597016824121677, 0, 0], [-0.0034852554465372655, 0, 0],  # pyright: ignore[reportOptionalSubscript]
+                                                     [0.013927607717047614, 0, 0], [0.013927607717047614, 0, 0]],
+                               rtol=1e-12, atol=0)
     assert molsys.eigenvals == {0: 1203.179, 1: 1268.91, 2: 1534.549, 3: 1820.416, 4: 2878.687, 5: 2933.526}
 
     # with empty datadict: no frequencies and no states, so it does not fit (check_data_dict)
