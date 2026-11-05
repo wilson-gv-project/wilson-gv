@@ -351,34 +351,12 @@ class WilsonSimulation:
 
 	def evaluate(self, save_evalinputs_pkl: str = None):
 		"""
-		Evaluating method, using EvaluationWorkflow
+		Not available until the new evaluator is connected here. It ran the old EvaluationWorkflow, which
+		goes with the old code. Until then, use the library calls (pipeline.py).
 		"""
-		from wilson_suite.wilson_intensities.amplitudes.evaluation_wf import EvaluationWorkflow, make_evaluation_inputs
-		if self.axis_choice is None:
-			self.setAxisChoiceAndTranslateTerms(self.exp.canonical_axes)
-
-		# prepare data for input to EvaluationWorkflow
-		eval_inputs = make_evaluation_inputs(simulation=self)
-		
-		# save EvaluationInputs data optionally to a pickle file
-		if save_evalinputs_pkl is not None:
-			if not hasattr(self, '_run_dir'):
-				raise ValueError("Project directory for saving files was not initialized")
-			
-			from wilson_suite.wilson_utils.serialization import pickle_this_to
-			pickle_this_to(eval_inputs, filenamepkl='EvaluationInputs.pkl', save_to=self._run_dir)
-
-		workflow = EvaluationWorkflow(inputs=eval_inputs)
-		self._workflow = workflow
-		wf_result = workflow.run()
-
-		if self.diagn is None:
-			self.diagn = {}
-		self.diagn.update({'artifacts': workflow.artifacts})
-
-		# TODO: this is a temporary fix? can be organized better?
-		self.spec_eval_setup.grid = {'A': wf_result['A'], 'B': wf_result['B']}
-		self.spec = wf_result['result']
+		raise NotImplementedError(
+			'WilsonSimulation.evaluate ran the old evaluator, which goes with the old code. '
+			'Until the new evaluator is connected here.')
 
 	def evaluate_with_default_setup_fill(self):
 		"""

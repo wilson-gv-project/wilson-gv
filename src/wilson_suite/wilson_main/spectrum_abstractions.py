@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
 from ..wilson_analysis.render.render_utils import PlotConfig, NormalizationType
-from ..wilson_intensities.amplitudes.spectrum_composition import SpectralWindow
 from ..wilson_experiment.indep_vars_and_axes import SpectralAxisSet
 
 import logging
@@ -267,7 +266,8 @@ class EvaluationInfo:
 	Gamma_unit: str = None
 	# 'diag_margin'- this parameter is specific to the condition ow w2>w1
 	margins: dict = None
-	spectral_window: SpectralWindow = None
+	# was the old evaluator's SpectralWindow, which goes with the old code; the new caller (E6b) sets the type
+	spectral_window: Any = None
 	grid_resolution: dict = field(default_factory=lambda: {'A': 10, 'B': 10})
 	dynamic_range: float = 100
 	spectral_axes: SpectralAxisSet = None
