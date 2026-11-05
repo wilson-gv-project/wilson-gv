@@ -215,8 +215,6 @@ class VibDiffTerm:
         """
         return hash( ( self.sl.h(), self.sr.h() ) )
 
-
-
 class ResonanceCondition:
     """
     Resonance condition class
@@ -370,37 +368,37 @@ class ResonanceCondition:
             else:
                 return 1
 
-    # FIXME: Functionality not general yet
-    # FIXME: This is workspace for the new routine for ResponseTerms creation
     def could_be_resonant_by_conditions(self, mc_plus: tuple, mc_minus: tuple, given_prev_res = None):
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
         Return False only if this is definitely not possible.
 
-        given_prev_res (default: None): ResonanceCondition instance telling (if any) the preceding
-        resonance condition that was satisfied. Optional argument which will then adapt the functionining of this
-        method as described at the beginning of this documentation string.:
-        If the contents of given_prev_res for each attribute are a subset of the present instance,
-        then these respective parts can be trimmed from the present instance and the resonance possibility determined
-        (in the same way) with respect to the trimmed condition.
+        mc_plus: A tuple of tuples of interaction indices whose frequency components sum is to be taken as positive
+        by a margin deemed significant
 
+        mc_minus: The analagous data as for mc_plus but referring to interaction indices whose freq sum is to be taken
+        as negative
+
+        given_prev_res (default: None): ResonanceCondition instance telling (if any) the preceding
+        resonance condition that was satisfied. Optional argument which will then adapt the functioning of this method.
         """
 
         # Initialize test blocks to possibly trim if previous resonance condition is given (otherwise use directly)
         pf_test = copy.deepcopy(self.pf)
         diff_test  = copy.deepcopy(self.diff)
 
-        #print('pf', pf_test)
-
-        # Trim last resonance from present: For there to be a chance of maximal enhancement, all preceding res.
-        # conds would need to be met
+        # Trim last resonance from present
         if given_prev_res is not None:
 
-            # All previous perturbing freq args should be in so remove directly
+            # All previous perturbing freq args should be in when this fn is used as intended, so remove them directly
             for i in given_prev_res.pf:
                 pf_test.remove(i)
 
+            # Determine which of the previous res. cond.'s freq. diff. quanta are also in the current
+            # NOTE: Ignores anharmonicity effects
+            # NOTE: Assumes each index is given max one time per side; may need revisit if this turns out not to hold
+            # for the general term (currently not encountered)
             in_sl = []
             not_in_sl = []
 
@@ -419,7 +417,7 @@ class ResonanceCondition:
                 else:
                     in_sr.append(i)
 
-
+            # Remove those quanta that were in
             for i in in_sl:
                 diff_test.sl.q.remove(i)
 
@@ -440,21 +438,17 @@ class ResonanceCondition:
         if sd_overall_sign == -3:
             return True
 
+        # Attempt to find sign for perturbing freq. components combination
+
         # Start off sign as unset
         pf_overall_sign = None
 
         # As far as I can tell, there will always be just one indep var left in pf after trimming (and only one if this
-        # is the first resonance condition)
-
-        # Furthermore, a complete set of magnitude conditions created from the powerset
+        # is the first resonance condition). Moreover, a complete set of magnitude conditions created from the powerset
         # (as in FieldAnalysis construction) will also consider the powerset of interactions, so that any
         # valid combinations would be accessible here
 
-        # Therefore a straightforward lookup should be sufficient here:
-
-        #print('pf test after trimming', pf_test)
-        #print('mcp', mc_plus)
-        #print('mcm', mc_minus)
+        # Therefore a straightforward lookup should be sufficient
 
         # Case A: Found in mc_minus so pf sign is negative
         if sorted(list(pf_test)) in mc_minus:
@@ -468,11 +462,8 @@ class ResonanceCondition:
         else:
             return True
 
-        # If this line is reached, there is a definite state difference sign (or zero) and a definite perturbing freq.
+        # If this stage is reached, there is a definite state difference sign (or zero) and a definite perturbing freq.
         # combination sign, so analyze them w.r.t. each other
-
-        #print('sd sign', sd_overall_sign)
-        #print('pf sign', pf_overall_sign)
 
         # State energy level difference sign and perturbing frequencies must be opposite in order for
         # resonance to be possible
@@ -493,27 +484,8 @@ class ResonanceCondition:
             elif pf_overall_sign == -1:
                 return False
 
-        # This line should ordinarily not be reached (no ruling could be made with the above analysis) so raise
+        # This line should ordinarily not be reached (no ruling could be made with the above analysis), so raise
         raise ValueError('A ruling could not be made on term resonance possibility')
-
-class LineShape:
-    """
-    Lineshape class
-    For now just outline, not presently used
-    """
-
-    def __init__(self, rcs: tuple[ResonanceCondition], evaluator=None):
-        """
-        rcs: Resonance conditions associated with this lineshape
-
-        evaluator: Possible associated evaluator function
-        """
-
-        # Must be tuple of resonanceCondition instances
-        self.rcs = rcs
-
-        # Possible evaluator function?
-        self.evaluator = evaluator
 
 class PolProp:
     """

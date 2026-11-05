@@ -33,7 +33,7 @@ class ResponseTermsCollection:
     def __post_init__(self):
 
         # Get terms
-        self.terms = get_terms_by_comp_patterns(self.order,
+        self.terms = get_terms_by_comp_pattern_and_magn_conds(self.order,
                                            self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
                                            self.comp_pattern, self.magn_conds)
 
@@ -114,7 +114,7 @@ def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
     # Simplify
     return list(simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds).values())
 
-def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
+def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
                               comp_pattern: tuple, magn_conds: tuple[tuple]) -> list[VibPerturbedTerm]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
@@ -153,7 +153,7 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
     # Initialize result holder
     final_terms = []
 
-    # Walk through post-Hermite term and screen/group by magnitude conditions
+    # Walk through post-Hermite terms and screen by magnitude conditions
 
     # Build dict to tell which interaction indices the compounding pattern refers to
     comp_patt_to_int = {}
@@ -168,12 +168,11 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
             int_ctr += 1
 
         comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
-
         comp_ctr += 1
 
     for m in magn_conds:
 
-        # Translate magn cond to interaction indices
+        # Translate magnitude condition to interaction indices
 
         mcp_int = []
         for j in m[0]:

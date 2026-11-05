@@ -548,61 +548,6 @@ class VibContribTerm:
 
         self.freqdiff.append(new_term)
 
-    def dressWithPulseInteractions(self, int_seq: tuple[dict]):
-        """
-        Substitute interaction dummy indices in my resonance conditions
-        and in my polarization property axes with those of a specific pulse interaction sequence
-
-        int_seq: tuple of dictionaries ({interaction #1 pulse label: sign}, {int. #2 pulse label: sign}, ...)
-        """
-        # FIXME: Must get tests as part of averaging work
-
-        int_ids = [list(i.keys())[0] for i in int_seq]
-
-        # Dress perturbing frequencies of resonance conditions
-        for i in self.res:
-            for j in range(len(i.pf)):
-                i.pf[j] = int_ids[i.pf[j] - 1] * int_seq[j][int_ids[i.pf[j]  - 1]]
-
-        # Dress operators of polarization properties
-        for i in self.ints:
-            for j in i.prop.ops:
-                if not j.o == 0:
-                    j.o = int_ids[j.o - 1]
-
-
-    def allUVCancels(self, cfs_uv: dict, tol: float=0.0) -> bool:
-        """
-        Boolean function: Do all UV/VIS carrier frequency components sum to zero
-        (leaving only potentially vibrationally resonant values) for my resonance conditions?
-
-        cfs_uv: Dictionary {pulse label: UV/VIS freq. component, ...}
-        tol: Tolerance (allow a verdict of "cancels" if sum is within tolerance)
-        """
-
-        all_cancel = True
-
-        for i in self.res:
-            all_cancel = all_cancel and i.uvCancels(cfs_uv, tol)
-
-        return all_cancel
-
-
-    def allElRspEpochContained(self, epochs, op_ind_omega) -> bool:
-        """
-        Boolean function: Do all the individual operator tuples of my (electronic) response functions
-        belong to pulses corresponding to the same epoch?
-
-        epochs: List of epochs and which pulses (pulse IDs) are in each
-        op_ind_omega: Which operator is the "omega" (interaction w/detected field) operator?
-        """
-
-        epoch_contained = True
-
-        for i in self.ints:
-            epoch_contained = epoch_contained and i.prop.epochContained(epochs, op_ind_omega)
-
-        return epoch_contained
 
     def present(self):
         """
