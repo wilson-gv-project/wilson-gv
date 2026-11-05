@@ -395,6 +395,14 @@ def test_resonance_condition():
 
     # Not yet testing method couldBeResonantWithFieldByRanges (not finished and not currently used)
 
+    # LaTeX testing: Update and use
+    #res_conds = generate_res_cond_objs()
+    #latex_resconds = [rc.to_latex() for rc in res_conds]
+    #assert latex_resconds == ['(\\omega_{a+b,a} -A)',
+    #                          '(\\omega_{b,a} -B)',
+    #                          '(\\omega_{,a} -B)',
+    #                          '(\\omega_{,a} -A+B)']
+
 def test_pol_prop():
 
     operator_a = QOperator(2)

@@ -290,6 +290,25 @@ def test_vib_perturbed_term():
     # Cannot fulfill second resonance condition (finding must follow from both magnitude condition and previous resonance)
     assert not (t.full_enhancement_possible(magn_conditions=((-2,),)))
 
+    # From different test, to be updated: Latex representation
+
+    #latex_strs = [t.to_latex() for t in terms]
+
+    #assert latex_strs == ['\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}',
+    #                      '\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)}',
+    #                      '\\frac{1}{4}\\frac{1}{(\\omega_{a+b,a} -A)(\\omega_{b,a} -B)}',
+    #                      '\\frac{1}{4}\\frac{1}{(\\omega_{,a} -B)(\\omega_{b,a} -B)}',
+    #                      '\\frac{1}{4}\\frac{1}{(\\omega_{,a} -B)(\\omega_{,a} -A+B)}']
+
+    #from wilson_suite.fixtures import get_terms_from_json
+    #terms_fuller_list = get_terms_from_json()
+    #
+    #latex_strs = [t.to_latex() for t in terms_fuller_list]
+    #assert latex_strs[
+    #           0] == '\\frac{-1}{4}\\frac{1}{\\omega_{a,}\\omega_{b,}}\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{b}}\\frac{\\partial^{2}\\alpha_{\\alpha\\delta}}{\\partial Q_{a}\\partial Q_{b}}\\frac{1}{(\\omega_{,a} +A-B)(\\omega_{b,a} -B)}'
+    #assert latex_strs[
+    #           -1] == '\\frac{1}{8}\\frac{1}{\\omega_{a,}\\omega_{a+b+c,}\\omega_{b,}\\omega_{c,}}\\frac{\\partial\\alpha_{\\alpha\\delta}}{\\partial Q_{b}}\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{c}}\\frac{\\partial^{3}E_{}}{\\partial Q_{a}\\partial Q_{b}\\partial Q_{c}}\\frac{1}{(\\omega_{,a} +A-B)(\\omega_{a+b,a} -B)}'
+
 
 def test_vib_contrib_term():
 
