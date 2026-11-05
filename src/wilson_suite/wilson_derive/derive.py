@@ -8,6 +8,7 @@ from . import simplify
 import copy
 from ..wilson_utils import common_labels as wu_common
 from ..wilson_utils import prop_trivname as pt
+from ..wilson_system.system_data import MolecularProperty, MolPropsCollection
 
 @dataclass
 class ResponseTermsCollection:
@@ -49,7 +50,7 @@ class ResponseTermsCollection:
     def __determine_needed_props(self):
 
         # Walk through all terms and determine which (derivative) properties would be needed to evaluate them
-        # Make a MolPropsCollection instance with all the derivatives needed
+        # Make a MolPropsCollection instance with all the needed derivatives
         # Determine the maximum number of quanta used in state energy levels
         # Determine the different (sorted) pair number of quanta used in relaxation parameters
 
@@ -63,8 +64,7 @@ class ResponseTermsCollection:
                         if not trivname in props:
                             props.append(trivname)
 
-
-        return props
+        return MolPropsCollection([MolecularProperty(i) for i in props])
 
     def __find_max_state_lvl_and_pair_quanta(self):
 
