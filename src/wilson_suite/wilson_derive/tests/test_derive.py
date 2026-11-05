@@ -1,6 +1,6 @@
 import pytest
 
-from wilson_suite.wilson_derive.derive import (get_terms_by_comp_patterns)
+from wilson_suite.wilson_derive.derive import (get_terms_by_comp_patterns, ResponseTermsCollection)
 from wilson_suite.fixtures import evv_experiment
 
 '''
@@ -1258,6 +1258,21 @@ def test_get_fully_enhanced_terms():
 
     
 '''
+
+def test_response_terms_collection():
+
+    mc1_p = ( (0,),  )
+    mc1_m = ( (1,), (0,1,) , )
+    mc1 = (mc1_p, mc1_m)
+
+    comp_patt_magn_cond = {(1, 1, 2): (mc1, ),
+                           }
+
+    rsp_coll = ResponseTermsCollection(order = 3, total_anharm_limit=1, el_anharm_limit=1,
+                                       mech_anharm_limit=1, comp_patterns_with_magn_conditions=comp_patt_magn_cond)
+
+    pass
+
 def test_get_terms_by_comp_patterns():
 
     mc1_p = ( (0,),  )

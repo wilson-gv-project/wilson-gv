@@ -38,18 +38,12 @@ class ResponseTermsCollection:
 
     def determine_needed_props(self):
 
-        # Walk through all terms and determine which properties are needed
-        props = []
+        # Walk through all terms and determine what would be needed to evaluate them
+        # Make a MolPropsCollection instance with all the derivatives needed
+        # Determine the maximum number of quanta used in state energy levels
+        # Determine the maximum pair number of quanta used in relaxation parameters
 
-        # Notes:
-        # - Connect to other definition of properties?
-        # - For non-derivatives properties (energy levels, relaxation parameters):
-        #       - Register the information as state-centered (or numbers of quanta needed?)
-        #       - This should be sufficient for both energy levels and relaxation
-        #           - More refined relaxation models would need to supply further details
-        #               - And would anyway need more detailed derivation
-        #       - Not sure yet how to adapt this for Fermi resolved states but that's for later
-        # - Also register as a derived property the max number of quanta needed?
+        props = []
 
         return props
 
