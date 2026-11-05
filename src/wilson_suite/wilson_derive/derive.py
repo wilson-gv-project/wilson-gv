@@ -66,7 +66,7 @@ class ResponseTermsCollection:
     def __find_max_state_lvl_and_pair_quanta(self):
 
         max_state_lvl = 0
-        pair_quanta = []
+        pair_quanta = set()
 
         for t in self.terms:
 
@@ -89,9 +89,9 @@ class ResponseTermsCollection:
                     max_state_lvl = len_r
 
                 if not (len_l, len_r) in pair_quanta:
-                    pair_quanta.append((len_l, len_r))
+                    pair_quanta.add((len_l, len_r))
 
-        return max_state_lvl, sorted(pair_quanta)
+        return max_state_lvl, pair_quanta
 
 def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
                                    order_el: int, order_mech: int) -> list[VibPerturbedTerm]:
