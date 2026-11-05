@@ -7,6 +7,7 @@ from .response_terms import VibPerturbedTerm, VibContribTerm
 from . import simplify
 import copy
 from ..wilson_utils import common_labels as wu_common
+from ..wilson_utils import prop_trivname as pt
 
 @dataclass
 class ResponseTermsCollection:
@@ -36,17 +37,66 @@ class ResponseTermsCollection:
                                            self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
                                            self.comp_patterns_with_magn_conditions)
 
-    def determine_needed_props(self):
+        props = self.__determine_needed_props()
 
-        # Walk through all terms and determine what would be needed to evaluate them
+        self.props = props
+
+        max_state_lvl, pair_quanta = self.__find_max_state_lvl_and_pair_quanta()
+
+        self.max_state_lvl = max_state_lvl
+        self.pair_quanta = pair_quanta
+
+    def __determine_needed_props(self):
+
+        # Walk through all terms and determine which (derivative) properties would be needed to evaluate them
         # Make a MolPropsCollection instance with all the derivatives needed
         # Determine the maximum number of quanta used in state energy levels
-        # Determine the maximum pair number of quanta used in relaxation parameters
+        # Determine the different (sorted) pair number of quanta used in relaxation parameters
 
         props = []
 
+        for p in self.terms:
+            for m in self.terms[p]:
+                for t in self.terms[p][m]:
+                    for pp in t.props:
+                        trivname = pt.prop_trivname(ord_geo=pp.dord, ord_el=len(pp.ops), ord_rot=0)
+                        if not trivname in props:
+                            props.append(trivname)
+
+
         return props
 
+    def __find_max_state_lvl_and_pair_quanta(self):
+
+        max_state_lvl = 0
+        pair_quanta = []
+
+        for p in self.terms:
+            for m in self.terms[p]:
+                for t in self.terms[p][m]:
+
+                    for j in t.freqterms:
+
+                        if len(j.sl.q) > max_state_lvl:
+                            max_state_lvl = len(j.sl.q)
+                        if len(j.sr.q) > max_state_lvl:
+                            max_state_lvl = len(j.sr.q)
+
+                    for j in t.res:
+
+                        len_l = len(j.diff.sl.q)
+                        len_r = len(j.diff.sr.q)
+
+                        if len_l > max_state_lvl:
+                            max_state_lvl = len_l
+
+                        if len_r > max_state_lvl:
+                            max_state_lvl = len_r
+
+                        if not (len_l, len_r) in pair_quanta:
+                            pair_quanta.append((len_l, len_r))
+
+        return max_state_lvl, sorted(pair_quanta)
 
 def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
                                    order_el: int, order_mech: int) -> list[VibPerturbedTerm]:

@@ -1271,6 +1271,11 @@ def test_response_terms_collection():
     rsp_coll = ResponseTermsCollection(order = 3, total_anharm_limit=1, el_anharm_limit=1,
                                        mech_anharm_limit=1, comp_patterns_with_magn_conditions=comp_patt_magn_cond)
 
+    print('props', rsp_coll.props)
+
+    print('max state lvl', rsp_coll.max_state_lvl)
+    print('pair quanta', rsp_coll.pair_quanta)
+
     pass
 
 def test_get_terms_by_comp_patterns():
