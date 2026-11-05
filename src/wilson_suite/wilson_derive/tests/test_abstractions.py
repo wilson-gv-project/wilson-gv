@@ -10,12 +10,12 @@ def test_q_operator():
     operator_c = QOperator(3, op_type='el_quadrupole', ax = (3, 3))
 
     assert operator_a.o == 1
-    assert operator_a.op_type == None
-    assert operator_a.ax == None
+    assert operator_a.op_type is None
+    assert operator_a.ax is None
 
     assert operator_b.o == 2
     assert operator_b.op_type == 'el_dipole'
-    assert operator_b.ax == None
+    assert operator_b.ax is None
 
     assert operator_c.o == 3
     assert operator_c.op_type == 'el_quadrupole'
@@ -394,12 +394,6 @@ def test_resonance_condition():
         res_cond_a_0_bogus = ResonanceCondition(vd_harm_a_bc, pert_freq_1m23, id='2')
 
     # Not yet testing method couldBeResonantWithFieldByRanges (not finished and not currently used)
-
-def test_line_shape():
-
-    # Functionality not currently used, deferring tests
-
-    pass
 
 def test_pol_prop():
 
