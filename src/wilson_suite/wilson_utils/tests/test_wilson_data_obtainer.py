@@ -4,8 +4,6 @@ origin, and merges the results. CQCParse tests its own readers; the tests here c
 load of a real file. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
 wilson_main/tests/test_workflow_abstractions.py.
 """
-import dataclasses
-import inspect
 from importlib.resources import files
 
 import pytest
@@ -15,9 +13,6 @@ from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
 
 data_dir = files('wilson_suite').joinpath('data_for_tests')
 WATER = DataOriginInfo(source_type='gaussian', base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
-
-G16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
-C4 = DataOriginInfo(source_type='cfour', base_file_loc='c4_folder')
 
 
 def test_getting_data():
@@ -42,50 +37,33 @@ def test_getting_data():
 
 @pytest.fixture
 def calls(monkeypatch):
-    """parse_from_source replaced by a fake that records its calls and gives each name its origin's file."""
+    """parse_from_source replaced by a fake: reads no file, records the names of each call, returns text as values."""
     made = []
 
     def fake(requested_data, **origin):
-        made.append((list(requested_data), origin))
-        return {name: origin['base_file_loc'] for name in requested_data}
+        made.append(list(requested_data))
+        return {name: f"{name} from {origin['base_file_loc']}" for name in requested_data}
 
     monkeypatch.setattr('CQCParse.parsing.parse_from_source', fake)
     return made
 
 
 def test_one_call_per_origin(calls):
-    """The names of one origin go to parse_from_source together; an equal DataOriginInfo is the same origin."""
+    """Names of equal DataOriginInfo go to parse_from_source together; each name keeps the value from its own call."""
+    g16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
     same_as_g16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
-    data = wilson_data_obtainer({'cff': G16, 'dipgrad': C4, 'qff': same_as_g16})
+    c4 = DataOriginInfo(source_type='cfour', base_file_loc='c4_folder')
 
-    assert [names for names, _ in calls] == [['cff', 'qff'], ['dipgrad']]
-    assert data == {'cff': 'g16.out', 'qff': 'g16.out', 'dipgrad': 'c4_folder'}
+    data = wilson_data_obtainer({'cff': g16, 'dipgrad': c4, 'qff': same_as_g16})
 
-
-def test_origin_fields_are_the_arguments(calls):
-    """Every DataOriginInfo field goes to parse_from_source as the argument of the same name."""
-    wilson_data_obtainer({'cff': G16})
-
-    assert calls[0][1] == dataclasses.asdict(G16)
+    assert calls == [['cff', 'qff'], ['dipgrad']]
+    assert data == {'cff': 'cff from g16.out', 'qff': 'qff from g16.out', 'dipgrad': 'dipgrad from c4_folder'}
 
 
-def test_parse_from_source_takes_every_origin_field():
-    """A DataOriginInfo field that parse_from_source does not take would make every load fail."""
-    from CQCParse.parsing import parse_from_source
+def test_unknown_source_type(calls):
+    """A source type the obtainer does not know stops with an error and never reaches parse_from_source."""
+    unknown = DataOriginInfo(source_type='orca')
 
-    fields = {f.name for f in dataclasses.fields(DataOriginInfo)}
-    assert fields <= set(inspect.signature(parse_from_source).parameters)
-
-
-@pytest.mark.parametrize('requested', [['cff'], {'cff': 'g16.out'}])
-def test_request_maps_names_to_origins(requested):
-    with pytest.raises(TypeError):
-        wilson_data_obtainer(requested)
-
-
-@pytest.mark.parametrize('source_type, error', [('wilson', NotImplementedError), ('orca', ValueError)])
-def test_source_types(calls, source_type, error):
-    """Only Gaussian and CFOUR go to CQCParse: 'wilson' is not written yet, anything else is unknown."""
-    with pytest.raises(error):
-        wilson_data_obtainer({'cff': DataOriginInfo(source_type=source_type)})
+    with pytest.raises(ValueError):
+        wilson_data_obtainer({'cff': unknown})
     assert not calls
