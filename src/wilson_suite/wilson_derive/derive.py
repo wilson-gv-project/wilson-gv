@@ -1,4 +1,3 @@
-from ..wilson_experiment.experiment_abstractions import VibExperiment
 from . import dbl_pert_expansion
 from . import hermaut
 from . import vib_rsp_sos
@@ -19,6 +18,8 @@ class ResponseTermsCollection:
     total_anharm_limit: Upper limit to total order of anharmonicity (electrical + mechanical)
     el_anharm_limit: Upper limit to electrical order of anharmonicity
     mech_anharm_limit: Upper limit to mechanical order of anharmonicity
+    comp_pattern: The compounding pattern to consider
+    magn_conds: The magnitude conditions set to consider
 
     """
 
@@ -26,17 +27,15 @@ class ResponseTermsCollection:
     total_anharm_limit: int
     el_anharm_limit: int
     mech_anharm_limit: int
-    # Keys are compounding patterns, values are magnitude conditions under each comp. pattern
-    comp_patterns_with_magn_conditions: dict[tuple, tuple]
+    comp_pattern: tuple
+    magn_conds: tuple[tuple]
 
     def __post_init__(self):
-
-        # Derived properties from original arguments if any
 
         # Get terms
         self.terms = get_terms_by_comp_patterns(self.order,
                                            self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
-                                           self.comp_patterns_with_magn_conditions)
+                                           self.comp_pattern, self.magn_conds)
 
         props = self.__determine_needed_props()
 
@@ -56,13 +55,11 @@ class ResponseTermsCollection:
 
         props = []
 
-        for p in self.terms:
-            for m in self.terms[p]:
-                for t in self.terms[p][m]:
-                    for pp in t.props:
-                        trivname = pt.prop_trivname(ord_geo=pp.dord, ord_el=len(pp.ops), ord_rot=0)
-                        if not trivname in props:
-                            props.append(trivname)
+        for t in self.terms:
+            for pp in t.props:
+                trivname = pt.prop_trivname(ord_geo=pp.dord, ord_el=len(pp.ops), ord_rot=0)
+                if not trivname in props:
+                    props.append(trivname)
 
         return MolPropsCollection([MolecularProperty(i) for i in props])
 
@@ -71,30 +68,28 @@ class ResponseTermsCollection:
         max_state_lvl = 0
         pair_quanta = []
 
-        for p in self.terms:
-            for m in self.terms[p]:
-                for t in self.terms[p][m]:
+        for t in self.terms:
 
-                    for j in t.freqterms:
+            for j in t.freqterms:
 
-                        if len(j.sl.q) > max_state_lvl:
-                            max_state_lvl = len(j.sl.q)
-                        if len(j.sr.q) > max_state_lvl:
-                            max_state_lvl = len(j.sr.q)
+                if len(j.sl.q) > max_state_lvl:
+                    max_state_lvl = len(j.sl.q)
+                if len(j.sr.q) > max_state_lvl:
+                    max_state_lvl = len(j.sr.q)
 
-                    for j in t.res:
+            for j in t.res:
 
-                        len_l = len(j.diff.sl.q)
-                        len_r = len(j.diff.sr.q)
+                len_l = len(j.diff.sl.q)
+                len_r = len(j.diff.sr.q)
 
-                        if len_l > max_state_lvl:
-                            max_state_lvl = len_l
+                if len_l > max_state_lvl:
+                    max_state_lvl = len_l
 
-                        if len_r > max_state_lvl:
-                            max_state_lvl = len_r
+                if len_r > max_state_lvl:
+                    max_state_lvl = len_r
 
-                        if not (len_l, len_r) in pair_quanta:
-                            pair_quanta.append((len_l, len_r))
+                if not (len_l, len_r) in pair_quanta:
+                    pair_quanta.append((len_l, len_r))
 
         return max_state_lvl, sorted(pair_quanta)
 
@@ -120,7 +115,7 @@ def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
     return list(simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds).values())
 
 def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
-                              comp_patterns_with_magn_conditions: dict[tuple, tuple]) -> dict[tuple, list[VibPerturbedTerm]]:
+                              comp_pattern: tuple, magn_conds: tuple[tuple]) -> list[VibPerturbedTerm]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
     and magnitude conditions and return fully enhanceable terms
@@ -128,80 +123,75 @@ def get_terms_by_comp_patterns(order: int, total_anharm_limit: int, el_anharm_li
     May return some terms that are not fully enhanceable depending on completeness of magnitude condition handling
     """
 
-    # Get all SOS terms that match requested compounding patterns
+    # Get all SOS terms that match requested compounding pattern
     # NOTE: Can if needed at very high orders replace get_vib_sos by something that prunes
     # compounding patterns during the derivation
     sos_terms = vib_rsp_sos.get_vib_sos(order)
 
-    # For all requested compounding patterns, group SOS terms under each pattern
-    sos_terms_at_comp_pattern = {i: [] for i in list(comp_patterns_with_magn_conditions.keys())}
+    # For requested compounding pattern, group SOS terms under each pattern
+    sos_terms_at_comp_pattern = []
 
     for i in sos_terms:
-
-        if i.comp_pattern in sos_terms_at_comp_pattern:
-            sos_terms_at_comp_pattern[i.comp_pattern].append(copy.deepcopy(i))
+        if i.comp_pattern == comp_pattern:
+            sos_terms_at_comp_pattern.append(copy.deepcopy(i))
 
     # Then get anharm orders
     anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
 
     # Do double perturbation expansion, Hermite expansion and simplification
 
-    # Group post-Hermite terms under each requested compounding pattern
-    ph_terms_at_comp_pattern = {i: [] for i in list(sos_terms_at_comp_pattern.keys())}
+    # Get post-Hermite terms
+    ph_terms = []
 
     for tot_ord in anharm_orders:
         for ind_ord in anharm_orders[tot_ord]:
-            for i in sos_terms_at_comp_pattern:
-                ph_terms_at_comp_pattern[i].extend(do_dbl_pert_expand_and_hermaut(sos_terms_at_comp_pattern[i],
-                                                   ind_ord[0], ind_ord[1]))
+            ph_terms.extend(do_dbl_pert_expand_and_hermaut(sos_terms_at_comp_pattern,
+                                               ind_ord[0], ind_ord[1]))
 
     # Filter by magnitude conditions
 
     # Initialize result holder
-    final_terms_at_comp_patt_and_magn = {i:
-                                         {j: [] for j in comp_patterns_with_magn_conditions[i]}
-                                         for i in list(comp_patterns_with_magn_conditions.keys())}
+    final_terms = []
 
     # Walk through post-Hermite term and screen/group by magnitude conditions
-    for p in final_terms_at_comp_patt_and_magn:
 
-        # Build dict to tell which interaction indices each compounding pattern refers to
-        comp_patt_to_int = {}
-        int_ctr = 1
-        comp_ctr = 0
+    # Build dict to tell which interaction indices the compounding pattern refers to
+    comp_patt_to_int = {}
+    int_ctr = 1
+    comp_ctr = 0
 
-        for c in p:
-            new_ints = []
+    for c in comp_pattern:
+        new_ints = []
 
-            for j in range(c):
-                new_ints.append(int_ctr)
-                int_ctr += 1
+        for j in range(c):
+            new_ints.append(int_ctr)
+            int_ctr += 1
 
-            comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
+        comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
 
-            comp_ctr += 1
+        comp_ctr += 1
 
-        for m in final_terms_at_comp_patt_and_magn[p]:
+    for m in magn_conds:
 
-            # Translate magn cond to interaction indices
+        # Translate magn cond to interaction indices
 
-            mcp_int = []
-            for j in m[0]:
-                new_mcp = []
-                for k in j:
-                    new_mcp.extend(comp_patt_to_int[k])
-                mcp_int.append(copy.deepcopy(new_mcp))
+        mcp_int = []
+        for j in m[0]:
+            new_mcp = []
+            for k in j:
+                new_mcp.extend(comp_patt_to_int[k])
+            mcp_int.append(copy.deepcopy(new_mcp))
 
-            mcm_int = []
-            for j in m[1]:
-                new_mcm = []
-                for k in j:
-                    new_mcm.extend(comp_patt_to_int[k])
-                mcm_int.append(copy.deepcopy(new_mcm))
+        mcm_int = []
+        for j in m[1]:
+            new_mcm = []
+            for k in j:
+                new_mcm.extend(comp_patt_to_int[k])
+            mcm_int.append(copy.deepcopy(new_mcm))
 
-            for t in ph_terms_at_comp_pattern[p]:
+        for t in ph_terms:
 
-                if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
-                    final_terms_at_comp_patt_and_magn[p][m].append(copy.deepcopy(t))
+            if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
+                final_terms.append(copy.deepcopy(t))
 
-    return final_terms_at_comp_patt_and_magn
+    return final_terms
