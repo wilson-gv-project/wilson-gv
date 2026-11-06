@@ -177,6 +177,9 @@ def test_resonance_condition():
     assert res_cond_a_bc.diff.sr.q == ['b', 'c']
     assert res_cond_a_bc.id == 2
 
+    latex_rescond = res_cond_a_bc.to_latex()
+    assert latex_rescond == '(\\omega_{a,b+c} -1-2-3)'
+
     # Overall state energy lvl difference sign is here indeterminate without further information
     assert res_cond_a_bc.netStateSign() == -3
 
@@ -293,13 +296,6 @@ def test_resonance_condition():
 
     # Not yet testing method couldBeResonantWithFieldByRanges (not finished and not currently used)
 
-    # LaTeX testing: Update and use
-    #res_conds = generate_res_cond_objs()
-    #latex_resconds = [rc.to_latex() for rc in res_conds]
-    #assert latex_resconds == ['(\\omega_{a+b,a} -A)',
-    #                          '(\\omega_{b,a} -B)',
-    #                          '(\\omega_{,a} -B)',
-    #                          '(\\omega_{,a} -A+B)']
 
 def test_pol_prop():
 
