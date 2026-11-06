@@ -131,6 +131,12 @@ class VibPerturbedTerm:
                 self.res[i].diff.sr.q[j] = mask[self.res[i].diff.sr.q[j]]
             self.res[i].diff.sr.q = sorted(self.res[i].diff.sr.q)
 
+        for i in range(len(self.nonsumm_ind)):
+            self.nonsumm_ind[i] = mask[self.nonsumm_ind[i]]
+
+        for i in range(len(self.summ_ind)):
+            self.summ_ind[i] = mask[self.summ_ind[i]]
+
     def sort(self, nm_inds):
         """
         Sort and possibly rename indices in term:

@@ -8,15 +8,28 @@ def test_terms_simplify():
 
     import copy
     from fractions import Fraction
-    from wilson_suite.fixtures import evv_experiment
-    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
+    from wilson_suite.wilson_derive.derive import get_terms_by_comp_pattern_and_magn_conds
     from wilson_suite.wilson_utils import common_labels as wu_common
 
-    evv_exp = evv_experiment()
-    terms = get_fully_enhanced_terms(experiment=evv_exp)
+    order = 3
+    tot_anharm_limit = 1
+    el_anharm_limit = 1
+    mech_anharm_limit = 1
+    comp_patt = (1, 1, 2)
 
-    el_terms = list(terms[1][(1, 0)])
-    assert len(el_terms) == 2
+    # At -k1 + k2 (+ k3): w1 is negative, w2 is positive, here constricting to w1 + w2 signif. > 0
+    mc_plus = ((1,), (0, 1,),)
+    mc_minus = ((0,),)
+
+    # Getting terms
+    # The assertions in this test depend on wilson-derive retaining ordering of terms
+    terms = get_terms_by_comp_pattern_and_magn_conds(order=order, total_anharm_limit=tot_anharm_limit,
+                                                     el_anharm_limit=el_anharm_limit,
+                                                     mech_anharm_limit=mech_anharm_limit,
+                                                     comp_pattern=comp_patt,
+                                                     magn_conds=(mc_plus, mc_minus))
+
+    el_terms = [terms[0], terms[1]]
 
     # Two identical terms should combine: coefficient doubles
     t0 = copy.deepcopy(el_terms[0])
