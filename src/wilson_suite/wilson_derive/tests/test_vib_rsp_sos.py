@@ -51,6 +51,8 @@ def test_get_vib_sos():
     # Corresponds to derivation p.22 res. term 1
     t = R_sos_selected[0]
 
+    assert t.comp_pattern == (1, 1, 2)
+
     assert t.coeff == Fraction(1)
     assert len(t.ints) == 3
 
@@ -84,6 +86,8 @@ def test_get_vib_sos():
 
     # Corresponds to derivation p.21 res. term 2
     t = R_sos_selected[1]
+
+    assert t.comp_pattern == (1, 1, 2)
 
     assert t.coeff == Fraction(-1)
     assert len(t.ints) == 3
@@ -120,6 +124,8 @@ def test_get_vib_sos():
     # Corresponds to derivation p.21 res. term 1
     t = R_sos_selected[2]
 
+    assert t.comp_pattern == (1, 1, 2)
+
     assert t.coeff == Fraction(-1)
     assert len(t.ints) == 3
 
@@ -153,6 +159,8 @@ def test_get_vib_sos():
 
     # Corresponds to derivation p.22 res. term 2
     t = R_sos_selected[3]
+
+    assert t.comp_pattern == (1, 1, 2)
 
     assert t.coeff == Fraction(1)
     assert len(t.ints) == 3

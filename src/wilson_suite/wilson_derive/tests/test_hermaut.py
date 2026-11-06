@@ -16,9 +16,6 @@ def test_all_uneq_walks():
 
         all_uneq_walks(first_walk, n_pairs, inds[:n_pairs], closed, walks)
 
-        print('Walks for n_pairs = ', n_pairs)
-        print(walks)
-
         if n_pairs == 1:
             # Trivial (reading right to left): Up one and down one
             assert walks == [[['a', -1], ['a', 1]]]
@@ -127,31 +124,22 @@ def test_all_uneq_walks():
                              [['a', -1], ['b', -1], ['c', -1], ['c', 1], ['b', 1], ['a', 1]]] # O: 1
 
 
-# Claude generated, fixture to get selected terms for testing of hermaut functionality.
-# The exact form of these terms is less important for their use in testing but here nevertheless are EVV relevant.
-def _get_evv_filtered_sos():
-    import copy
-    from wilson_suite.fixtures import evv_experiment
-    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
-    evv_exp = evv_experiment()
-    R_sos = get_vib_sos(evv_exp.order)
-    R_sos_evv = []
-    for int_seq in evv_exp.int_sequences:
-        for term in R_sos:
-            t = copy.deepcopy(term)
-            t.dressWithPulseInteractions(int_seq)
-            if t.allElRspEpochContained(evv_exp.epochs, 0) and t.allUVCancels(evv_exp.cfuv):
-                R_sos_evv.append(t)
-    return R_sos_evv
-
 # Claude generated, has been reviewed and amended
 def test_go_for_a_walk():
 
     from fractions import Fraction
     from wilson_suite.wilson_derive.dbl_pert_expansion import expand_term
     from wilson_suite.wilson_derive.abstractions import HarmOscStateSymbolic
+    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
 
-    R_sos_evv = _get_evv_filtered_sos()
+    R_sos = get_vib_sos(3)
+
+
+    R_sos_evv = []
+
+    for t in R_sos:
+        if t.comp_pattern == (1, 1, 2):
+            R_sos_evv.append(t)
 
     # El. anharm case: dord=4 (2+1+1), n_pairs=2, using D1D1E term
     # expand_term[0] has dord=2 on the first integral, dord=1 on the others
@@ -230,8 +218,15 @@ def test_do_hermaut():
     from wilson_suite.wilson_derive.dbl_pert_expansion import expand_term
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
     from wilson_suite.wilson_utils import common_labels as wu_common
+    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
 
-    R_sos_evv = _get_evv_filtered_sos()
+    R_sos = get_vib_sos(3)
+
+    R_sos_evv = []
+
+    for t in R_sos:
+        if t.comp_pattern == (1, 1, 2):
+            R_sos_evv.append(t)
 
     # Harmonic term: total dord=3 (odd) → must return empty list
     harm_term = expand_term(R_sos_evv[0], 0, 0)[0]
@@ -289,17 +284,17 @@ def test_do_hermaut():
 
     assert len(t.res) == 2
 
-    # 1/w_(a,0)^[-1]
+    # 1/w_(a,0)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == ['a']
     assert t.res[0].diff.sr.q == []
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(a + b,0)^[-1, 2]
+    # 1/w_(a + b,0)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == []
-    assert t.res[1].pf == [-1, 2]
+    assert t.res[1].pf == [1, 2]
 
 
     # Mech. anharm term: total dord=6, n_pairs=3 → 15 walks → 15 results
@@ -371,17 +366,17 @@ def test_do_hermaut():
 
     assert len(t.res) == 2
 
-    # 1/w_(a,0)^[-1]
+    # 1/w_(a,0)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == ['a']
     assert t.res[0].diff.sr.q == []
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(a+c,0)^[-1, 2]
+    # 1/w_(a+c,0)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'c']
     assert t.res[1].diff.sr.q == []
-    assert t.res[1].pf == [-1, 2]
+    assert t.res[1].pf == [1, 2]
 
     # First bra not ground state
     with pytest.raises(NotImplementedError):

@@ -332,7 +332,7 @@ def test_vib_contrib_term():
         VibContribTerm(t_choice.coeff, t_choice.ints, [object()])  # bad res type
 
     # Taking the EVV term and re-initializing a VibContribTerm
-    t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res)
+    t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res, comp_pattern=(1, 2, 1))
 
     assert t.coeff == Fraction(-1)
 
@@ -365,6 +365,8 @@ def test_vib_contrib_term():
     assert t.res[1].diff.sr.s == 'm'
     assert t.res[1].pf == [1, 2]
     assert len(t.freqdiff) == 0
+
+    assert t.comp_pattern == (1, 2, 1)
 
     # Testing addFreqTerm
     td = copy.deepcopy(t)
