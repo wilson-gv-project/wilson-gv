@@ -334,7 +334,7 @@ class MolSystemData:
         """
         if obtainer is None:
             # imported here, not at the top: wilson_data_obtainer imports DataOriginInfo from this module
-            from wilson_suite.wilson_utils.wilson_data_obtainer import (
+            from wilson_suite.wilson_system.data_obtainer import (
                 wilson_data_obtainer,
             )
             obtainer = wilson_data_obtainer

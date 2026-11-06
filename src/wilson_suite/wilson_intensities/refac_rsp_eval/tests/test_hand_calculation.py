@@ -40,7 +40,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
 )
 from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 WATER_FILE = Path(__file__).parents[3] / 'data_for_tests' / 'g16_h2o_HF_STO3G.out'
