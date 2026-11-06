@@ -258,8 +258,6 @@ def test_resonance_condition():
     assert not(res_cond_ab_c.could_be_resonant_by_conditions(mc_plus=(), mc_minus=magn_conditions_34,
                                                              given_prev_res=given_res_cond_a_c))
 
-
-
     # Non-covered previous resonance should give net effective bc, b resonance with given_res_cond_a_c
     harm_osc_b = HarmOscStateSymbolic(['b'])
     vd_harm_ab_b = VibDiffTerm(harm_osc_ab, harm_osc_b)
@@ -389,18 +387,6 @@ def test_pol_prop():
         pol_prop_a = PolProp(operators)
         epochs_bogus = [[1, 2, 3, 4, 5], [6]]
         bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega='bogus')
-
-def test_pol_prop_sos_recursion():
-
-    operator_a = QOperator(2)
-    operator_b = QOperator(3)
-
-    state_a = VibStateSymbolic('A')
-    state_b = VibStateSymbolic('B', mbu=['A'])
-
-    # FIXME: Return to this test once relevant attributes/methods settled during code pass/unit test work on
-    # vib_rsp_sos
-    pass
 
 def test_transition_integral():
 
