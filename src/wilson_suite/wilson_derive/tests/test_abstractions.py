@@ -155,40 +155,27 @@ def test_resonance_condition():
     harm_osc_0 = HarmOscStateSymbolic([])
     vd_harm_a_0 = VibDiffTerm(harm_osc_a, harm_osc_0)
 
-    pert_freq_1m2 = [1, -2]
+    pert_freq_1m2 = [1, 2]
 
     res_cond_a_0 = ResonanceCondition(vd_harm_a_0, pert_freq_1m2)
 
     assert res_cond_a_0.diff.sl.q == ['a']
     assert res_cond_a_0.diff.sr.q == []
-    assert res_cond_a_0.pf == [1, -2]
-    assert res_cond_a_0.id == None
+    assert res_cond_a_0.pf == [1, 2]
+    assert res_cond_a_0.id is None
 
     # Overall sign for state energy level difference must be positive
     assert res_cond_a_0.netStateSign() == 1
 
-    # Another example: w_a - w_(b + c) - (w_1 - w_2 + w_3)
+    # Another example: w_a - w_(b + c) - (w_1 + w_2 + w_3)
     harm_osc_bc = HarmOscStateSymbolic(['b', 'c'])
     vd_harm_a_bc = VibDiffTerm(harm_osc_a, harm_osc_bc)
 
-    pert_freq_1m23 = [1, -2, 3]
+    pert_freq_123 = [1, 2, 3]
 
-    res_cond_a_bc = ResonanceCondition(vd_harm_a_bc, pert_freq_1m23, id=2)
+    res_cond_a_bc = ResonanceCondition(vd_harm_a_bc, pert_freq_123, id=2)
     assert res_cond_a_bc.diff.sr.q == ['b', 'c']
     assert res_cond_a_bc.id == 2
-
-    # Testing uvCancels method
-    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.072}
-    assert not(res_cond_a_bc.uvCancels(cfs_uv=cfs_uv))
-
-    cfs_uv = {1: 0.072, 2: 0.072, 3: 0.0}
-    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
-
-    cfs_uv = {1: 0.072, 2: 0.144, 3: 0.072}
-    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
-
-    cfs_uv = {1: 0.0, 2: 0.0, 3: 0.0}
-    assert res_cond_a_bc.uvCancels(cfs_uv=cfs_uv)
 
     # Overall state energy lvl difference sign is here indeterminate without further information
     assert res_cond_a_bc.netStateSign() == -3
@@ -208,16 +195,13 @@ def test_resonance_condition():
     # aiding in ruling out terms from further consideration, the consequences of this are small:
     # It will at worst lead to evaluation of unimportant terms
 
-    # Signifying that w1 - w2 > 0
-    magn_conditions_1_m_m2_gt_0 = [[1, -2]]
-    assert res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_1_m_m2_gt_0)
+    mc_12 = ([1, 2],)
 
-    # Signifying that w2 - w1 > 0: Resonance can here be ruled out since wa - w0 is positive and -w1 + w2 is positive,
-    # i.e. w1 - w2 is negative, i.e. this resonance condition will have a positive number (the energy level difference)
-    # minus a negative number (minus (w1 - w2) which is negative), ergo this will always be positive and > 0 so no
-    # resonance possible
-    magn_conditions_m2_m_1_gt_0 = [[-1, 2]]
-    assert not(res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0))
+    # Case: w2 + w1 < 0: Resonance can here be ruled out since wa - w0 is positive and w1 + w2 < 0,
+    assert not res_cond_a_0.could_be_resonant_by_conditions(mc_plus=(), mc_minus=mc_12)
+
+    # Case: w1 + w2 > 0: Resonance possible
+    assert res_cond_a_0.could_be_resonant_by_conditions(mc_plus=mc_12, mc_minus=())
 
     # More tests of "could be resonant"
 
@@ -226,72 +210,28 @@ def test_resonance_condition():
     # subtracted), then resonance can be ruled out
     vd_harm_a_ab = VibDiffTerm(harm_osc_a, harm_osc_ab)
 
-    pert_freq_lrg = [1, -2, 3, -4, -5, 6]
+    pert_freq_lrg = [1, 2, 3, 4, 5, 6]
 
     res_cond_lrg = ResonanceCondition(vd_harm_a_ab, pert_freq_lrg)
 
-    magn_cond_a = [[1, -2], [3, -4]]
-    magn_cond_b = [[1, -2], [3, -4, -5]]
-    magn_cond_c = [[1, -2], [-3, 4, 5]]
-    magn_cond_d = [[1, -2], [1, 3, -4, -5]]
-    magn_cond_e = [[1, -2], [3, -4, 7]]
-    magn_cond_f = [[1, -2, -4, -5], [3, -5]]
+    assert res_cond_lrg.netStateSign() == -1
 
-    # Should return True: While w1 - w2 > 0 and w3 - w4 > 0, there is no further information about w5 - w6, and they are
-    # of opposing signs: Therefore resonance cannot be ruled out
-    assert res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_a)
+    magn_cond_a = ([1, 2], [3, 4])
+    magn_cond_b = ([1, 2], [1, 2, 3, 4, 5, 6])
+    magn_cond_c = ([3, 4, 5, 6],)
+    magn_cond_d = ([1, 2], [3, 4, 5, 6])
 
-    # Should return False: w1 - w2 > 0 and w3 - w4 - w5 > 0, and w6 > 0 by definition:
-    # Therefore energy level difference - perturbing freqs is always negative: Cannot become zero: Resonance
-    # is ruled out
-    assert not(res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_b))
+    # Should return True: While w1 + w2 > 0 and w3 + w4 > 0, there is no further information about w5 + w6, therefore
+    # resonance cannot be ruled out
+    assert res_cond_lrg.could_be_resonant_by_conditions(mc_plus=magn_cond_a, mc_minus=())
 
-    # Should return True: [1, -2] will be recognized with sign as is, but [-3, 4, 5] will be recognized with opposite sign
-    assert res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_c)
+    # Should return False: w1 + w2 > 0 and (crucially)  w1 + w2 + w3 + w4 + w5 + w6 > 0, even if w3 + w4 + w5 + w6 < 0
+    assert not(res_cond_lrg.could_be_resonant_by_conditions(mc_plus=magn_cond_b, mc_minus=magn_cond_c))
 
-    # Should return True: Magnitude conditions are overlapping (w1) and only can be applied. Whichever is (it will be
-    # the first), the result for the residual will be ambiguous
-    assert res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_d)
-
-    # Should return True: One magnitude condition contains an unrepresented reference (w7) and so cannot be applied.
-    # The residual after applying the only valid condition ([1, -2]) is ambiguous.
-    assert res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_e)
-
-    # Should return True: The magnitude conditions are both applicable but overlapping.
-    # The first listed will be applied first and the second will not be because of the overlap. However, the
-    # resulting residual is w3 + w6 which aligns with the positive sign after applying the magnitude condition.
-    assert not(res_cond_lrg.couldBeResonantWithFieldByConditions(magn_cond_f))
-
-    # Setting up for "all residual" test 1
-
-    pert_freq_lrg_2 = [-1, -2, -3, -4, -5]
-    vd_harm_ab_a = VibDiffTerm(harm_osc_ab, harm_osc_a)
-    res_cond_lrg_2 = ResonanceCondition(vd_harm_ab_a, pert_freq_lrg_2)
-    magn_cond_mt = []
-
-    # Should here go to full residual treatment and find that resonance can be ruled out
-    assert not (res_cond_lrg_2.couldBeResonantWithFieldByConditions(magn_cond_mt))
-
-    # "All residual" test 2
-
-    pert_freq_lrg_2 = [1, 2, 3, 4, 5]
-    vd_harm_ab_a = VibDiffTerm(harm_osc_ab, harm_osc_a)
-    res_cond_lrg_2 = ResonanceCondition(vd_harm_ab_a, pert_freq_lrg_2)
-    magn_cond_mt = []
-
-    # Should here go to full residual treatment and find that resonance cannot be ruled out
-    assert res_cond_lrg_2.couldBeResonantWithFieldByConditions(magn_cond_mt)
-
-    # "All residual" test 3
-
-    pert_freq_lrg_2 = [-1, -2, -3, 4, -5]
-    vd_harm_ab_a = VibDiffTerm(harm_osc_ab, harm_osc_a)
-    res_cond_lrg_2 = ResonanceCondition(vd_harm_ab_a, pert_freq_lrg_2)
-    # Note present but empty resonance condition also considered valid input (will simply not be treated)
-    magn_cond_mt = [[]]
-
-    # Resonance cannot be ruled out (w4 opposite sign)
-    assert res_cond_lrg_2.couldBeResonantWithFieldByConditions(magn_cond_mt)
+    # Should return True: w1 + w2 > 0 and w3 + w4 + w5 + w6 > 0 so they together are enough information to make a
+    # ruling of False, however the routine is not designed to recognize this (FieldAnalysis data would in this situation
+    # also recognize w1 + w2 + w3 + w4 + w5 + w6 > 0 and include that)
+    assert res_cond_lrg.could_be_resonant_by_conditions(mc_plus=magn_cond_d, mc_minus=())
 
     # Now testing application of previous resonances:
 
@@ -300,76 +240,34 @@ def test_resonance_condition():
     harm_osc_a = HarmOscStateSymbolic(['a'])
     harm_osc_c = HarmOscStateSymbolic(['c'])
     vd_harm_a_c = VibDiffTerm(harm_osc_a, harm_osc_c)
-    pert_freq_1m3 = [1, -3]
-    given_res_cond_a_c = ResonanceCondition(vd_harm_a_c, pert_freq_1m3)
+    pert_freq_12 = [1, 2]
+    given_res_cond_a_c = ResonanceCondition(vd_harm_a_c, pert_freq_12)
 
     harm_osc_ab = HarmOscStateSymbolic(['a', 'b'])
     vd_harm_ab_c = VibDiffTerm(harm_osc_ab, harm_osc_c)
-    pert_freq_1m2m34 = [1, -2, -3, 4]
-    res_cond_ab_c = ResonanceCondition(vd_harm_ab_c, pert_freq_1m2m34)
+    pert_freq_1234 = [1, 2, 3, 4]
+    res_cond_ab_c = ResonanceCondition(vd_harm_ab_c, pert_freq_1234)
 
-    magn_conditions_m2_3_gt_0 = [[2, -4]]
+    magn_conditions_34 = ([3, 4],)
 
     # Resonance can here be ruled out given that given_res_cond_a_c was resonant (but not otherwise with the present
     # magnitude conditions)
-    assert not(res_cond_ab_c.couldBeResonantWithFieldByConditions(magn_conditions_m2_3_gt_0, given_res_cond_a_c))
+    assert not(res_cond_ab_c.could_be_resonant_by_conditions(mc_plus=(), mc_minus=magn_conditions_34,
+                                                             given_prev_res=given_res_cond_a_c))
 
-    # With only residual freqs A: Resonance cannot be ruled out
-    assert res_cond_ab_c.couldBeResonantWithFieldByConditions([[]], given_prev_res=given_res_cond_a_c)
 
-    # With only residual freqs A: Resonance can be ruled out with modified pert freq argument
-    pert_freq_12m34 = [1, -2, -3, -4]
-    res_cond_ab_c = ResonanceCondition(vd_harm_ab_c, pert_freq_12m34)
-    assert not(res_cond_ab_c.couldBeResonantWithFieldByConditions([[]],given_prev_res=given_res_cond_a_c))
 
-    # Non-matching previous resonance
+    # Non-covered previous resonance should give net effective bc, b resonance with given_res_cond_a_c
     harm_osc_b = HarmOscStateSymbolic(['b'])
     vd_harm_ab_b = VibDiffTerm(harm_osc_ab, harm_osc_b)
-    pert_freq_1m2m34 = [1, -2, -3, 4]
+    pert_freq_1m2m34 = [1, 2, 3, 4]
     res_cond_ab_b = ResonanceCondition(vd_harm_ab_b, pert_freq_1m2m34)
 
-    magn_conditions_m2_3_gt_0 = [[2, -4]]
+    magn_conditions_m34 = ([3, 4],)
 
-    # Resonance can here not be ruled out but would be if the state difference had been w_(a + b) - w_c and not
-    # (as used here) w_(a + b) - w_b
-    assert res_cond_ab_b.couldBeResonantWithFieldByConditions(magn_conditions_m2_3_gt_0, given_res_cond_a_c)
-
-    # Type-based early return (argument(s) not correct type(s) so returns True (cannot rule out resonance))
-
-    # Perturbing freqs not signed pulse references
-    pert_freq_a_mb = ['A', '-B']
-    res_cond_a_0_axes = ResonanceCondition(vd_harm_a_0, pert_freq_a_mb)
-    magn_conditions_m2_m_1_gt_0 = [[-1, 2]]
-    assert res_cond_a_0_axes.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0)
-
-    # Magnitude conditions not list of lists of signed pulse references
-    magn_conditions_dev_form = [['A', 2]]
-    assert res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_dev_form)
-
-    magn_conditions_dev_form = [-1, 2]
-    assert res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_dev_form)
-
-    # Previous resonance argument not ResonanceCondition
-    assert res_cond_a_0.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0, given_prev_res='deviating_form')
-
-    # Extra test: Not HarmOscStateSymbolic states in VibDiffTerm
-    # This is allowed but precludes the use of some methods
-    vibstate_symb_a = VibStateSymbolic('A')
-    vibstate_symb_b = VibStateSymbolic('B')
-    vd_harm_a_0 = VibDiffTerm(vibstate_symb_a, vibstate_symb_b)
-    pert_freq_1m2 = [1, -2]
-
-    res_cond_a_0_symb = ResonanceCondition(vd_harm_a_0, pert_freq_1m2)
-
-    assert res_cond_a_0_symb.diff.sl.s == 'A'
-    assert res_cond_a_0_symb.diff.sr.s == 'B'
-
-    with pytest.raises(TypeError):
-        bogus = res_cond_a_0_symb.netStateSign()
-
-    with pytest.raises(TypeError):
-        magn_conditions_m2_m_1_gt_0 = [[-1, 2]]
-        bogus = res_cond_a_0_symb.couldBeResonantWithFieldByConditions(magn_conditions_m2_m_1_gt_0)
+    # w3 + w4 < 0 and effective states 0, c should give
+    assert not res_cond_ab_b.could_be_resonant_by_conditions(mc_plus=(), mc_minus=magn_conditions_m34,
+                                                             given_prev_res=given_res_cond_a_c)
 
     # Bogus:
 

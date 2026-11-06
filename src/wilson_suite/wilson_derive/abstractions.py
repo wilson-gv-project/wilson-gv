@@ -297,24 +297,6 @@ class ResonanceCondition:
         """
         return hash(( self.diff.h(), tuple(self.pf), self.id ))
 
-    def uvCancels(self, cfs_uv: dict, tol: float=0.0) -> bool:
-        """
-        Do the UV/VIS parts of my perturbing frequencies cancel?
-
-        cfs_uv: UV/VIS part of my perturbing frequencies
-        tol: tolerance (default: 0.0)
-        NOTE: Consequences if tolerance != 0.0 used are not yet supported/investigated
-        """
-
-        acc = 0.0
-
-        for i in self.pf:
-            sgn = (i > 0) - (i < 0)
-            acc += sgn * cfs_uv[sgn*i]
-
-        sgnacc = (acc > 0) - (acc < 0)
-
-        return ((sgnacc * acc) <= tol)
 
     def netStateSign(self, instead_trimmed: VibDiffTerm=None) -> int:
         """
@@ -465,15 +447,15 @@ class ResonanceCondition:
         # If this stage is reached, there is a definite state difference sign (or zero) and a definite perturbing freq.
         # combination sign, so analyze them w.r.t. each other
 
-        # State energy level difference sign and perturbing frequencies must be opposite in order for
+        # State energy level difference sign and perturbing frequencies must be same in order for
         # resonance to be possible
         if sd_overall_sign == -1:
-            if pf_overall_sign == 1:
+            if pf_overall_sign == -1:
                 return True
             return False
 
         elif sd_overall_sign == 1:
-            if pf_overall_sign == -1:
+            if pf_overall_sign == 1:
                 return True
             return False
 
