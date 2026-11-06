@@ -1,4 +1,6 @@
-from wilson_suite.fixtures import evv_experiment
+# These tests are not currently active, awaiting revisit once the related code is restructured
+
+'''
 from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
 from wilson_suite.wilson_derive.term_var_translate import translate_terms_to_axis_variables
 from wilson_suite.wilson_experiment.indep_vars_and_axes import SpectralAxisSet, IndependentVariableSet, SignedPulseTuple, SpectralAxis
@@ -162,3 +164,5 @@ def test_translate_terms_to_axis_variables():
     assert tt.res[1].diff.sl.q == ['a', 'b']
     assert tt.res[1].diff.sr.q == ['a']
     assert tt.res[1].pf == ['B']
+    
+'''

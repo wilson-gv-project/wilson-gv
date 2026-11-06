@@ -120,6 +120,9 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
     and magnitude conditions and return fully enhanceable terms
 
+    magn_conds: Len 2 tuple (positive and negative combinations): Each entry another tuple: Each such entry a tuple of
+     interaction indices each corresponding to an interaction index combination found to be either positive or negative
+
     May return some terms that are not fully enhanceable depending on completeness of magnitude condition handling
     """
 
@@ -170,27 +173,29 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
         comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
         comp_ctr += 1
 
-    for m in magn_conds:
+    # Translate magnitude condition to interaction indices
+    mcp_int = []
 
-        # Translate magnitude condition to interaction indices
+    for m in magn_conds[0]:
+        new_mcp = []
+        for j in m:
+            new_mcp.extend(comp_patt_to_int[j])
 
-        mcp_int = []
-        for j in m[0]:
-            new_mcp = []
-            for k in j:
-                new_mcp.extend(comp_patt_to_int[k])
-            mcp_int.append(copy.deepcopy(new_mcp))
+        mcp_int.append(copy.deepcopy(new_mcp))
 
-        mcm_int = []
-        for j in m[1]:
-            new_mcm = []
-            for k in j:
-                new_mcm.extend(comp_patt_to_int[k])
-            mcm_int.append(copy.deepcopy(new_mcm))
+    mcm_int = []
 
-        for t in ph_terms:
+    for m in magn_conds[1]:
+        new_mcm = []
+        for j in m:
+            new_mcm.extend(comp_patt_to_int[j])
 
-            if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
-                final_terms.append(copy.deepcopy(t))
+        mcm_int.append(copy.deepcopy(new_mcm))
+
+    # Keep terms that are not clearly impossible to fully enhance
+    for t in ph_terms:
+
+        if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
+            final_terms.append(copy.deepcopy(t))
 
     return final_terms

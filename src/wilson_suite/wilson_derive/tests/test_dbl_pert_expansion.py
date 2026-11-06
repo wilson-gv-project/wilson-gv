@@ -88,7 +88,6 @@ def test_expand_term():
 
 def test_make_anharm_orders():
 
-
     # Case: (as for "regular EVV"): Up to 1st order el, mech, and up to 1st order total
 
     limit_total = 1
