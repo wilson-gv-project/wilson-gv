@@ -11,8 +11,8 @@ import json
 
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests import make_evv_reference as ref
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 
 REFERENCE = json.loads(ref.REFERENCE_FILE.read_text())
 CASES = [(b['molecule'], b['states']) for b in REFERENCE['results']]

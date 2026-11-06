@@ -12,7 +12,7 @@ Steps:
      Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1.
 
 A script, not a test: it runs for minutes.
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed
+    python -m wilson_suite.wilson_response_evaluate.tests.scripts.f2_speed
 """
 import cProfile
 import pstats
@@ -20,22 +20,22 @@ import time
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+from wilson_suite.wilson_response_evaluate.evaluate import (
     boxed_features_on_grid,
     build_contributions,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     SpectralWindow,
     amplitude_half_widths,
     features_from_rows,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import (
     make_polarization_linear_comb,
     prop_names,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import FreqTermsCollection
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
+from wilson_suite.wilson_response_evaluate.plan import FreqTermsCollection
+from wilson_suite.wilson_response_evaluate.tests import (
     make_evv_reference as ref,
 )
 from wilson_suite.wilson_system.system_data import (

@@ -33,11 +33,11 @@ from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval import lineshape
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+from wilson_suite.wilson_response_evaluate import lineshape
+from wilson_suite.wilson_response_evaluate.grid import (
     Box,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     ParameterSet,
     ResonanceMotif,
 )
@@ -45,7 +45,7 @@ from wilson_suite.wilson_system.system_data import VibDiff
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    from wilson_suite.wilson_response_evaluate.plan import (
         ResLocPoint,
     )
     from wilson_suite.wilson_system.system_data import VibStatesData

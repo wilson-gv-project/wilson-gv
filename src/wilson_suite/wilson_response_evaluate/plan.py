@@ -26,7 +26,7 @@ from wilson_suite.wilson_derive.abstractions import (
     ResonanceCondition,
     VibDiffTerm,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str
+from wilson_suite.wilson_response_evaluate.compat import term_to_str
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 
 if TYPE_CHECKING:

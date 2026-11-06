@@ -1,9 +1,9 @@
-# refac_rsp_eval tests
+# wilson_response_evaluate tests
 
 Tests of the evaluator (plan.py, evaluate.py, features.py, grid.py, lineshape.py, pipeline.py),
 with their helpers and reference data. Run them with pytest:
 
-    python -m pytest src/wilson_suite/wilson_intensities/refac_rsp_eval/tests
+    python -m pytest src/wilson_suite/wilson_response_evaluate/tests
 
 Scripts that are run by hand are in [scripts/](scripts/): speed, box sizes, and two examples of
 use. pytest collects none of them. [scripts/README.md](scripts/README.md) lists them.
@@ -22,7 +22,7 @@ use. pytest collects none of them. [scripts/README.md](scripts/README.md) lists 
 | test_evv_reference.py | the rows of the 14 EVV terms (coefficients, locations, zero pairs) have not changed, against evv_reference.json | formaldehyde, water, CO |
 | test_grid_reference.py | the whole spectrum has not changed, grid point by grid point, against grid_reference.npz. Run as a script, it writes that file again | formaldehyde |
 | test_hand_calculation.py | the numbers are right: rows of EVV, CARS and 3 IR terms by hand, with numpy and textbook formulas; control cases with the wrong denominator | water |
-| test_imports.py | no file of refac_rsp_eval or wilson_system imports the experiment or derive | the source files |
+| test_imports.py | no file of wilson_response_evaluate or wilson_system imports the experiment or derive | the source files |
 | test_integration.py | the 14 EVV terms compiled; the data reader; the factors of one term; the einsum average against the plain loop on real data, also with the molecule rotated | formaldehyde |
 
 ## Support files
