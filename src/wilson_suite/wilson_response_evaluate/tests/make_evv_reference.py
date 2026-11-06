@@ -7,24 +7,24 @@ Settings: axes A = [1], B = [-1, 2]; laser polarization (1, 1, 1), rank 4. The d
 their regime takes anharmonic states; harmonic is stored too.
 
 Run it again only on purpose (a deliberate change of numbers), then check the diff:
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.make_evv_reference
+    python -m wilson_suite.wilson_response_evaluate.tests.make_evv_reference
 """
 
 import json
 from pathlib import Path
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import build_contributions
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.evaluate import build_contributions
+from wilson_suite.wilson_response_evaluate.pipeline import (
     make_polarization_linear_comb,
     prop_names,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     ParameterSet,
     compile_terms,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 

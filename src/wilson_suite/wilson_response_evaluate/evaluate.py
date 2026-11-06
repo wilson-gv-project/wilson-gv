@@ -17,18 +17,18 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval import lineshape
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate import lineshape
+from wilson_suite.wilson_response_evaluate.features import (
     ContributionRow,
     ContributionTable,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+from wilson_suite.wilson_response_evaluate.grid import (
     AxisPoints,
     Mesh,
     box_slices,
     make_mesh,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     ParameterSet,
     ResLocPoint,
     generate_LHS_motif,
@@ -41,11 +41,11 @@ from wilson_suite.wilson_system.system_data import (
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 if TYPE_CHECKING:
-    from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+    from wilson_suite.wilson_response_evaluate.features import (
         SpectralFeature,
         SpectralWindow,
     )
-    from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+    from wilson_suite.wilson_response_evaluate.plan import (
         CompiledTerm,
         FreqTermsCollection,
         PropsCollection,

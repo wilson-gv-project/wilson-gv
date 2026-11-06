@@ -15,12 +15,12 @@ from wilson_suite.wilson_derive.abstractions import (
     QOperator,
     VibDiffTerm,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     ContributionRow,
     SpectralFeature,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ParameterSet,

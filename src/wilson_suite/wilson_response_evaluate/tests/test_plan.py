@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ParameterSet,
@@ -22,7 +22,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     compile_terms,
     generate_LHS_motif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     AXES,
     MOTIF_A,
     MOTIF_AB,

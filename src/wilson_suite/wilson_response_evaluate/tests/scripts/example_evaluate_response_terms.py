@@ -9,7 +9,7 @@ The 14 EVV terms, formaldehyde (GVPT2 run, so anharmonic states), axes A = w1, B
     5. what came out: the grid, the brightest point, spectral_window as used (its features and their feat_boxes)
     6. another lineshape_param, same rows: spectrum_on_grid runs again without computing the rows again
 
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.example_evaluate_response_terms
+    python -m wilson_suite.wilson_response_evaluate.tests.scripts.example_evaluate_response_terms
 """
 import time
 from dataclasses import replace
@@ -17,16 +17,16 @@ from functools import partial
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     amplitude_half_widths,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import (
     evaluate_response_terms,
     prop_names,
     spectrum_on_grid,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 

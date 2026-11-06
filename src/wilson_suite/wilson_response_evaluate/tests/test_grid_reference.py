@@ -37,7 +37,7 @@ feature, a cut tail or a slightly different constant.
 A deliberate change of numbers:
     1. Run this file as a script. It prints, per case, how much the amplitude changed against
        the old file, then overwrites the file:
-           python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.test_grid_reference
+           python -m wilson_suite.wilson_response_evaluate.tests.test_grid_reference
     2. Check that only the expected cases changed, by about the expected amount.
     3. Commit the new grid_reference.npz together with the change.
 """
@@ -49,22 +49,22 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     LineshapeParam,
     amplitude_half_widths,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import (
     EvalRspResult,
     evaluate_response_terms,
     prop_names,
     spectrum_on_grid,
     terms_by_axis_set,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
+from wilson_suite.wilson_response_evaluate.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import MolSystemData
 
 REFERENCE_FILE = Path(__file__).parent / 'grid_reference.npz'

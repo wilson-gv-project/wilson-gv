@@ -117,14 +117,14 @@ from wilson_suite.wilson_intensities.amplitudes.averaging import (
     get_iso_f,
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+from wilson_suite.wilson_response_evaluate.evaluate import (
     all_features_on_grid,
     boxed_features_on_grid,
     build_contributions,
     evaluate_term_coeff_sumover,
     included_modes,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     BoxRule,
     ContributionRow,
     ContributionTable,
@@ -133,13 +133,13 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     SpectralWindow,
     features_from_rows,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+from wilson_suite.wilson_response_evaluate.grid import (
     AxisPoints,
     Box,
     Mesh,
     make_mesh,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     ParameterSet,
     ResonanceMotif,
     compile_terms,
@@ -149,7 +149,7 @@ from wilson_suite.wilson_system.system_data import MolSystemData
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-    from wilson_suite.wilson_intensities.refac_rsp_eval.plan import CompiledTerm
+    from wilson_suite.wilson_response_evaluate.plan import CompiledTerm
     from wilson_suite.wilson_system.system_data import VibStatesData
 
 

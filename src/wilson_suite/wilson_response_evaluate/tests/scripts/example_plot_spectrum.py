@@ -10,7 +10,7 @@ test. The 14 EVV terms, axes A = w1, B = -w1 + w2, gamma 4.7 cm-1, boxes and plo
        (about 20 s: loading the data about 4 s, the rows and the grid about 14 s; the loading warns about
        anharmonic states below 0)
 
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.example_plot_spectrum [out_dir]
+    python -m wilson_suite.wilson_response_evaluate.tests.scripts.example_plot_spectrum [out_dir]
 out_dir: where the png files go; default plot_spectrum_figures (made if missing).
 """
 import sys
@@ -29,20 +29,20 @@ from wilson_suite.wilson_analysis.render.plot_spectrum import (
     plot_rsp_func,
     plot_spectrum,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     amplitude_half_widths,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import (
     FeatureResult,
     evaluate_response_terms,
     prop_names,
     spectrum_on_grid,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
+from wilson_suite.wilson_response_evaluate.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.f2_speed import (
+from wilson_suite.wilson_response_evaluate.tests.scripts.f2_speed import (
     load_acdm,
 )
 from wilson_suite.wilson_system.system_data import MolSystemData

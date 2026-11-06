@@ -20,27 +20,27 @@ from functools import partial
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_intensities.refac_rsp_eval.pipeline as pipeline_mod
+import wilson_suite.wilson_response_evaluate.pipeline as pipeline_mod
 from wilson_suite.wilson_derive.abstractions import PolProp
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.compat import term_to_str
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+from wilson_suite.wilson_response_evaluate.compat import term_to_str
+from wilson_suite.wilson_response_evaluate.evaluate import (
     all_features_on_grid,
     build_contributions,
     evaluate_term_coeff_sumover,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     ContributionTable,
     SpectralFeature,
     SpectralWindow,
     amplitude_half_widths,
     intensity_half_widths,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import (
     FeatureResult,
     averaging_rank,
     check_grid_axes,
@@ -52,16 +52,16 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     spectrum_on_grid,
     terms_by_axis_set,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     ParameterSet,
     ResLocPoint,
     ResonanceMotif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import (
+from wilson_suite.wilson_response_evaluate.tests import (
     make_evv_reference as ref,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     E0,
     E00,
     E01,
@@ -80,7 +80,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
     row,
     toy_term,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import TERMS_DIR
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import TERMS_DIR
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
 
 

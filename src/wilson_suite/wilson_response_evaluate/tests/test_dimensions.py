@@ -20,10 +20,10 @@ from functools import partial
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import all_features_on_grid, eval_feature_on_grid
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.evaluate import all_features_on_grid, eval_feature_on_grid
+from wilson_suite.wilson_response_evaluate.features import amplitude_half_widths
+from wilson_suite.wilson_response_evaluate.grid import Box, box_slices
+from wilson_suite.wilson_response_evaluate.pipeline import (
     FeatureResult,
     compute_features,
     evaluate_response_terms,
@@ -31,21 +31,21 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
     spectrum_on_grid,
     terms_by_axis_set,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ResonanceMotif,
     generate_LHS_motif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests import make_evv_reference as ref
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests import make_evv_reference as ref
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     AXES,
     NDIMS,
     TOY_RECIPE,
     toy_term,
     vibdiff,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import StoredSetup, load_setup
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import StoredSetup, load_setup
 from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 

@@ -1,6 +1,6 @@
 """
 The evaluator takes terms already translated to axes; the tests and scripts load theirs from files (stored_terms.py).
-No file of refac_rsp_eval or wilson_system (tests and scripts too) imports a module of FORBIDDEN, not even for
+No file of wilson_response_evaluate or wilson_system (tests and scripts too) imports a module of FORBIDDEN, not even for
 type hints or inside a function. make_translated_terms.py (data_for_tests/translated_terms) does, outside the
 evaluator: it writes the term files.
 Used from wilson_derive: the classes a term is made of (response_terms.VibPerturbedTerm, abstractions); the test
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-NEW_CODE = ('wilson_intensities/refac_rsp_eval', 'wilson_system')     # relative to SUITE_ROOT
+NEW_CODE = ('wilson_response_evaluate', 'wilson_system')     # relative to SUITE_ROOT
 FORBIDDEN = (
     'wilson_suite.wilson_experiment',                   # the experiment, every module
     'wilson_suite.wilson_derive.derive',                # get_fully_enhanced_terms

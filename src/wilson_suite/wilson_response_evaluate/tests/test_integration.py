@@ -9,19 +9,19 @@ from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+from wilson_suite.wilson_response_evaluate.evaluate import (
     calculate_avrg_tensor_einsum,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     make_avrg_einsum_subscripts,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import prop_names
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.pipeline import prop_names
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     compile_terms,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import make_func_to_compute_avrg
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests.helpers import make_func_to_compute_avrg
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import (
     DataOriginInfo,
     MolecularProperty,

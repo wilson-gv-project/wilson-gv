@@ -1,9 +1,9 @@
-# refac_rsp_eval scripts
+# wilson_response_evaluate scripts
 
 Scripts that are run by hand. pytest collects none of these files.
 Run a script by its module name:
 
-    python -m wilson_suite.wilson_intensities.refac_rsp_eval.tests.scripts.<name> [options]
+    python -m wilson_suite.wilson_response_evaluate.tests.scripts.<name> [options]
 
 Each script's docstring says what it prints and which settings it uses. The scripts load the
 stored terms with ../stored_terms.py and the settings of the 14 EVV terms from
@@ -26,7 +26,7 @@ e10_boxes.reference and e10_boxes.score also run from a notebook, on any result 
 
 ## Code from outside the refactor
 
-The refactor's code is refac_rsp_eval and wilson_system. The scripts also use:
+The refactor's code is wilson_response_evaluate and wilson_system. The scripts also use:
 
 | module | what it gives | used by |
 |---|---|---|

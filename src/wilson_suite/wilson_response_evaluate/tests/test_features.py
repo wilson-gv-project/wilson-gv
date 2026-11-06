@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     ContributionTable,
     SpectralFeature,
     SpectralWindow,
@@ -17,15 +17,15 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
     features_from_rows,
     intensity_half_widths,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+from wilson_suite.wilson_response_evaluate.grid import (
     Box,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     ParameterSet,
     ResLocPoint,
     ResonanceMotif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     AXES,
     MOTIF_AB_EXTRA,
     NDIMS,

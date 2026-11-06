@@ -33,17 +33,17 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import (
+from wilson_suite.wilson_response_evaluate.pipeline import (
     evaluate_response_terms,
     prop_names,
     terms_by_axis_set,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.stored_terms import load_setup
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
-WATER_FILE = Path(__file__).parents[3] / 'data_for_tests' / 'g16_h2o_HF_STO3G.out'
+WATER_FILE = Path(__file__).parents[2] / 'data_for_tests' / 'g16_h2o_HF_STO3G.out'
 CM1_PER_EH = 219474.6313632     # CODATA 2018 (CODATA 2014's 219474.6313702 would miss by 6e-11)
 STATES = ('harmonic', 'anharmonic')
 REL = 5e-12                     # wilson's cm-1 per Eh and CODATA 2018's differ by 2.7e-13, once per energy factor;

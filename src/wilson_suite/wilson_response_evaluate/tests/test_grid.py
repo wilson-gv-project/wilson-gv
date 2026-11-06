@@ -5,12 +5,12 @@ grid.py — bounds, boxes, grids and box slices. Runs with zero molecular data.
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import (
+from wilson_suite.wilson_response_evaluate.grid import (
     Box,
     box_slices,
     make_mesh,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     AXES,
     NDIMS,
     cube,

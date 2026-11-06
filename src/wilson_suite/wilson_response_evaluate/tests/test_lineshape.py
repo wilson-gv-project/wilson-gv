@@ -5,7 +5,7 @@ peak, tail and distance are each checked against factor, so they stay one shape.
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval import lineshape
+from wilson_suite.wilson_response_evaluate import lineshape
 
 
 def test_lorentzian_factor_real_and_imaginary_parts():

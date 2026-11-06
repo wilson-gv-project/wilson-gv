@@ -10,12 +10,12 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_intensities.refac_rsp_eval.evaluate as evaluate_mod
-import wilson_suite.wilson_intensities.refac_rsp_eval.lineshape as lineshape_mod
+import wilson_suite.wilson_response_evaluate.evaluate as evaluate_mod
+import wilson_suite.wilson_response_evaluate.lineshape as lineshape_mod
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
+from wilson_suite.wilson_response_evaluate.evaluate import (
     AvrgTensor,
     all_features_on_grid,
     boxed_features_on_grid,
@@ -35,15 +35,15 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.evaluate import (
     otf_vibdiffdenom,
     solve_LSE_motif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import (
+from wilson_suite.wilson_response_evaluate.features import (
     ContributionRow,
     SpectralFeature,
     SpectralWindow,
     amplitude_half_widths,
     condition_states,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box, box_slices, make_mesh
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.grid import Box, box_slices, make_mesh
+from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ParameterSet,
@@ -52,7 +52,7 @@ from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
     ResLocPoint,
     ResonanceMotif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     CFF,
     E0,
     E00,

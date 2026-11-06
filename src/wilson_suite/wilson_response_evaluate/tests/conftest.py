@@ -1,12 +1,12 @@
 """
-Fixtures shared by the refac_rsp_eval tests: the toy molecule built from helpers.py.
+Fixtures shared by the wilson_response_evaluate tests: the toy molecule built from helpers.py.
 """
 
 from dataclasses import replace
 
 import pytest
 
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     CFF,
     TOY_POLGRAD,
     E0_eigval,
