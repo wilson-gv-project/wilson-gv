@@ -1,5 +1,5 @@
 """
-wilson_data_obtainer groups the requested names by their DataOriginInfo, calls CQCParse's parse_from_source once per
+data_obtainer groups the requested names by their DataOriginInfo, calls CQCParse's parse_from_source once per
 origin, and merges the results. CQCParse tests its own readers; the tests here cover what the obtainer adds, and one
 load of a real file. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
 wilson_main/tests/test_workflow_abstractions.py.
@@ -9,7 +9,7 @@ from importlib.resources import files
 import pytest
 
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 data_dir = files('wilson_suite').joinpath('data_for_tests')
 WATER = DataOriginInfo(source_type='gaussian', base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')

@@ -30,7 +30,7 @@ from wilson_suite.wilson_system.system_data import (
 )
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.prop_trivname import prop_trivname
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_derive.abstractions import ResonanceCondition

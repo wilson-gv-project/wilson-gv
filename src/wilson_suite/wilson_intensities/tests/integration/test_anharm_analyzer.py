@@ -44,7 +44,7 @@ def test_anharm_analyzer_wilsonsim():
 
     sim.setAxisChoiceAndTranslateTerms(axes_choice)
     
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
     sim.getResults(obtainer=wilson_data_obtainer)
         
     print('\n')
@@ -100,7 +100,7 @@ def test_anharm_analyzer_vibana():
                                                      base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
 
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    
+    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer    
     calc_data = wilson_data_obtainer(reqst_data_all)
 
     # ---- get props for vibana
@@ -162,7 +162,7 @@ def test_anharm_analyzer_vibana_excludemodes():
                                                      base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     reqst_data_all = dict.fromkeys(list(reqst_data_all.keys()), calc_setup)
 
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer    
+    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer    
     calc_data = wilson_data_obtainer(reqst_data_all)
 
     # ---- get props for vibana
