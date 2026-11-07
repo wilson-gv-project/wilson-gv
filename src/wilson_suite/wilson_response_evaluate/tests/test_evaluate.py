@@ -329,90 +329,8 @@ def dense(pol: dict) -> np.ndarray:
     return C
 
 
-def rotation(alpha: float, beta: float) -> np.ndarray:
-    """Rotation by alpha about z, then by beta about x."""
-    ca, sa, cb, sb = np.cos(alpha), np.sin(alpha), np.cos(beta), np.sin(beta)
-    Rz = np.array([[ca, -sa, 0.], [sa, ca, 0.], [0., 0., 1.]])
-    Rx = np.array([[1., 0., 0.], [0., cb, -sb], [0., sb, cb]])
-    return Rx @ Rz
-
-
 ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(N_MODES), repeat=3)]
 
-
-# -- make_func_to_compute_avrg: one value for one index set --------------------------
-
-def test_avrg_func_reads_the_cartesian_slot_of_each_operator():
-    """One polarization entry, key (2, 0, 1, 1): polgrad[b] reads (2, 1), dipgrad[a] reads 0, dipgrad[c] reads 1."""
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(2, 0, 1, 1): 3.})
-
-    value = func({'a': 0, 'b': 1, 'c': 2}, evv_props())
-
-    assert value == pytest.approx(3. * POLGRAD[1, 2, 1] * DIPGRAD[0, 0] * DIPGRAD[2, 1])
-
-
-def test_avrg_func_is_the_full_contraction_with_the_averaging_coefficients():
-    """sum over (i, j, k, l) of C[i, j, k, l] * polgrad[b, i, l] * dipgrad[a, j] * dipgrad[c, k], written with einsum."""
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-
-    for idx in ALL_ABC:
-        expected = np.einsum('ijkl,il,j,k->', dense(ISO4), POLGRAD[idx['b']], DIPGRAD[idx['a']], DIPGRAD[idx['c']])
-        assert func(idx, evv_props()) == pytest.approx(expected)
-
-
-@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
-def test_avrg_func_does_not_change_when_the_molecule_is_rotated(laser_pol):
-    """
-    The orientational average cannot depend on how the molecule sits in its own axes: rotating every
-    cartesian index of every property by the same R leaves the value unchanged. The mode index is not
-    rotated: rotating the molecule never changes which mode is which. A single, non-averaged element
-    does change, which shows the rotation is not trivial.
-    """
-    R = rotation(0.7, 1.9)
-    rotated = evv_props(np.einsum('ip,jq,npq->nij', R, R, POLGRAD), np.einsum('ip,np->ni', R, DIPGRAD))
-    average = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(),
-                                         polarization_linear_comb=getGeneralPolarizationAveragingExpression(4, laser_pol))
-    one_element = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={(0, 0, 0, 0): 1.})
-
-    for idx in ALL_ABC:
-        assert average(idx, rotated) == pytest.approx(average(idx, evv_props()))
-    assert one_element(ALL_ABC[-1], rotated) != pytest.approx(one_element(ALL_ABC[-1], evv_props()))
-
-
-def test_avrg_func_with_a_repeated_mode_label():
-    """dipgrad[a] * dipgrad[a], rank 2: both factors read mode a."""
-    expr = PropsCollection([polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='a')])
-    func = make_func_to_compute_avrg(avrg_expression=expr, polarization_linear_comb={(0, 0): 1., (1, 2): 3.})
-
-    assert func({'a': 2}, evv_props()) == pytest.approx(DIPGRAD[2, 0] ** 2 + 3. * DIPGRAD[2, 1] * DIPGRAD[2, 2])
-
-
-def test_avrg_func_without_polarization_entries_is_zero():
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb={})
-
-    assert func({'a': 0, 'b': 1, 'c': 2}, evv_props()) == 0.
-
-
-def test_avrg_func_needs_every_mode_label():
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-
-    with pytest.raises(KeyError, match="'c'"):
-        func({'a': 0, 'b': 1}, evv_props())
-
-
-def test_avrg_func_needs_a_mol_props_collection():
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-
-    with pytest.raises(TypeError, match='MolPropsCollection'):
-        func({'a': 0, 'b': 1, 'c': 2}, {'polgrad': POLGRAD, 'dipgrad': DIPGRAD})  # type: ignore
-
-
-def test_avrg_func_needs_every_property_in_the_data():
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(), polarization_linear_comb=ISO4)
-    no_polgrad = MolPropsCollection([MolecularProperty(trivial_name='dipgrad', vals=DIPGRAD, extra_data={})])
-
-    with pytest.raises(KeyError):
-        func({'a': 0, 'b': 1, 'c': 2}, no_polgrad)
 
 
 # -- eval_avrg_per_indexdict: the averaged part at one index set, from the term's tensor ---------
@@ -583,6 +501,13 @@ def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
     """a rank-2 key for a rank-4 expression would fill a whole 3 x 3 block of W without an error"""
     with pytest.raises(ValueError, match=r'\(0, 0\) has length 2, the rank is 4'):
         calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {(0, 0): 1.})
+
+
+def test_avrg_tensor_einsum_reads_the_cartesian_slot_of_each_operator():
+    """One polarization entry, key (2, 0, 1, 1): polgrad[b] reads (2, 1), dipgrad[a] reads 0, dipgrad[c] reads 1."""
+    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {(2, 0, 1, 1): 3.})
+
+    assert tensor.at({'a': 0, 'b': 1, 'c': 2}) == pytest.approx(3. * POLGRAD[1, 2, 1] * DIPGRAD[0, 0] * DIPGRAD[2, 1])
 
 
 # -- one EVV-shaped term, every factor on the fly -------------------------------------

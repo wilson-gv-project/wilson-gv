@@ -1,3 +1,6 @@
+import numpy as np
+import pytest
+
 import wilson_suite.wilson_intensities.amplitudes.averaging as averaging
 
 
@@ -110,3 +113,39 @@ def test_getGeneralPolarizationAveragingExpression():
                 assert ((lin_comb_vvvv[(i, i, j, j)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
                 assert ((lin_comb_vvvv[(i, j, i, j)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
                 assert ((lin_comb_vvvv[(i, j, j, i)] - 1.0 / 15.0) ** 2) ** 0.5 < tol
+
+
+def dense_recipe(recipe: dict) -> np.ndarray:
+    """The recipe as a dense 3x3x3x3 coefficient tensor C[i, j, k, l]."""
+    C = np.zeros((3,) * 4)
+    for key, coeff in recipe.items():
+        C[key] = coeff
+    return C
+
+
+def rotation(alpha: float, beta: float) -> np.ndarray:
+    """Rotation by alpha about z, then by beta about x."""
+    ca, sa, cb, sb = np.cos(alpha), np.sin(alpha), np.cos(beta), np.sin(beta)
+    Rz = np.array([[ca, -sa, 0.], [sa, ca, 0.], [0., 0., 1.]])
+    Rx = np.array([[1., 0., 0.], [0., cb, -sb], [0., sb, cb]])
+    return Rx @ Rz
+
+
+def rotate_every_axis(R: np.ndarray, C: np.ndarray) -> np.ndarray:
+    """C with each of its four axes rotated by R."""
+    return np.einsum('ip,jq,kr,ls,pqrs->ijkl', R, R, R, R, C)
+
+
+@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
+def test_rank4_recipe_does_not_change_when_the_molecule_is_rotated(laser_pol):
+    """
+    The orientational average cannot depend on how the molecule sits in its own axes. So the recipe, as a
+    tensor over the molecular axes, stays the same when all four axes are rotated by the same R. A tensor
+    with a single entry does change, which shows the rotation is not trivial.
+    """
+    R = rotation(0.7, 1.9)
+    C = dense_recipe(averaging.getGeneralPolarizationAveragingExpression(4, laser_pol))
+    one_entry = dense_recipe({(0, 0, 0, 0): 1.})
+
+    assert np.allclose(rotate_every_axis(R, C), C)
+    assert not np.allclose(rotate_every_axis(R, one_entry), one_entry)
