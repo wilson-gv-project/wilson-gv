@@ -44,7 +44,7 @@ from wilson_suite.wilson_system.system_data import (
 )
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-DATA_FILE = 'wilson_intensities/tests/test_database/dftGaussian/ACDM/B3LYPcc_pVQZ/g16_b3lyp_corr_inputFull_3q.out'
+DATA_FILE = 'data_for_tests/g16_acetic_acid_dimer_B3LYPcc_pVQZ.out'
 STATES = 'anharmonic'
 # the grid, as in examples/quick_start.ipynb
 GAMMA_CM = 4.7
