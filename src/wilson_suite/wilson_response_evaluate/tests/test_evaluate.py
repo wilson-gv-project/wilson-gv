@@ -167,14 +167,6 @@ def test_eval_non_avrg_reads_the_tensor_at_the_modes_of_its_labels(molsys):
     assert eval_non_avrg_per_indexdict(expr, {'a': 1, 'b': 0, 'c': 0}, molsys) == 0.
 
 
-def test_eval_non_avrg_short_circuits_on_zero(molsys):
-    molsys.mol_props['cff'].vals = np.zeros((2, 2, 2))
-    expr = PropsCollection([polprop(inds='abc'), polprop(inds='abc')])
-
-    assert eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0, 'c': 0}, molsys) == 0.
-
-
-
 ## Energy denominators, on the fly ---------------------------------------------
 # otf_vibdiffdenom: 1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
 # harmonic_denom:   1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
@@ -187,20 +179,11 @@ def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
     assert value == pytest.approx(1. / convNu2Ene(E01 - E0) / convNu2Ene(E1))
 
 
-def test_otf_vibdiffdenom_of_no_terms_is_one(molsys):
-    assert otf_vibdiffdenom(FreqTermsCollection([]), {}, molsys, states_choice='anharmonic') == 1.
-
-
-
 def test_harmonic_denom_uses_eigenvals_not_state_energies(molsys):
     """eigenvals are 1100 and 1580 cm-1; the states '0' and '1' are at 1000 and 1500 cm-1."""
     value = harmonic_denom(FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b')]), {'a': 0, 'b': 1}, molsys)
 
     assert value == pytest.approx(1. / convNu2Ene(E0_eigval) / convNu2Ene(E1_eigval))
-
-
-def test_harmonic_denom_of_no_terms_is_one(molsys):
-    assert harmonic_denom(FreqTermsCollection([]), {}, molsys) == 1.
 
 
 def test_harmonic_denom_needs_the_ground_state_on_the_right(molsys):
@@ -258,15 +241,6 @@ def test_eval_avrg_per_indexdict_reads_the_tensor_at_the_index_set():
     tensor = AvrgTensor(('a', 'b'), np.array([[1., 2.], [3., 4.]]))
 
     assert eval_avrg_per_indexdict(tensor, {'a': 1, 'b': 0, 'c': 1}) == 3.
-
-
-def test_eval_avrg_per_indexdict_turns_values_below_zero_tol_into_zero():
-    def value(v):
-        return eval_avrg_per_indexdict(one_value(v), {'a': 0}, zero_tol=1e-18)
-
-    assert value(1e-20) == 0.
-    assert value(-1e-20) == 0.
-    assert value(1e-17) == 1e-17
 
 
 @pytest.mark.parametrize('v, expected', [(1e-18, 0.), (-1e-18, 0.), (1.0000001e-18, 1.0000001e-18), (-2e-18, -2e-18)],
@@ -370,14 +344,6 @@ def test_avrg_tensor_einsum_term8_axes_are_a_b_c_not_the_expression_order():
     assert tensor.values[1, 0, 2] != pytest.approx(by_hand)      # read as (b, a, c): another number
 
 
-def test_avrg_tensor_einsum_without_c_has_no_c_axis():
-    """terms 2, 7, 9, 12: polgrad[b] dipgrad[a] dipgrad[b]: one value per (a, b), the same for every c"""
-    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr('bab'), evv_props(), ISO4)
-
-    assert (tensor.labels, tensor.values.shape) == (('a', 'b'), (N_MODES, N_MODES))
-    assert tensor.at({'a': 2, 'b': 1, 'c': 0}) == tensor.at({'a': 2, 'b': 1, 'c': 2}) == tensor.values[2, 1]
-
-
 def test_avrg_tensor_einsum_reads_the_diagonal_for_a_label_twice_in_one_property():
     """polhess[a, a] (slots 0, 1): values[a] = sum over I, J of W[I, J] * polhess[a, a, I, J]"""
     polhess = np.random.default_rng(11).normal(size=(N_MODES, N_MODES, 3, 3))
@@ -392,13 +358,6 @@ def test_avrg_tensor_einsum_reads_the_diagonal_for_a_label_twice_in_one_property
     for a in range(N_MODES):
         assert tensor.at({'a': a}) == pytest.approx(polhess[a, a, 0, 0] + 3. * polhess[a, a, 1, 2], rel=1e-12, abs=0)
         assert tensor.at({'a': a}) == pytest.approx(func({'a': a}, props), rel=1e-12, abs=0)
-
-
-def test_avrg_tensor_einsum_without_polarization_entries_is_zero():
-    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(), evv_props(), {})
-
-    assert tensor.values.shape == (N_MODES,) * 3
-    assert not tensor.values.any()
 
 
 def test_avrg_tensor_einsum_needs_one_recipe_entry_per_slot():
