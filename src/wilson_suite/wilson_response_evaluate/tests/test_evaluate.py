@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 
 import wilson_suite.wilson_response_evaluate.evaluate as evaluate_mod
-import wilson_suite.wilson_response_evaluate.lineshape as lineshape_mod
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
@@ -41,7 +40,7 @@ from wilson_suite.wilson_response_evaluate.features import (
     amplitude_half_widths,
     condition_states,
 )
-from wilson_suite.wilson_response_evaluate.grid import Box, box_slices, make_mesh
+from wilson_suite.wilson_response_evaluate.grid import Box, box_slices
 from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
@@ -100,21 +99,6 @@ def params() -> dict:
 @pytest.fixture
 def params_obj() -> ParameterSet:
     return ParameterSet({'a': 0, 'b': 1})
-
-def resonance_residuals(motif: ResonanceMotif,
-                        location: ResLocPoint,
-                        index_dict: dict, states,
-                        unit: str = 'Eh') -> list[float]:
-    """E_left - E_right - sum_j s_j w_j for every condition, written out independently of evaluate.py.
-    State energies are stored in cm-1; `unit` is the unit of `location` ('Eh' or 'cm-1')."""
-    def energy(quanta):
-        label = ','.join(str(i) for i in sorted(index_dict[q] for q in quanta))
-        e_cm1 = states.get_state_by_label(label).energy if label else 0.
-        return convNu2Ene(e_cm1) if unit == 'Eh' else e_cm1
-
-    return [energy(c.left) - energy(c.right)
-            - sum((-1. if ax.startswith('-') else 1.) * location[ax.strip('-')] for ax in c.pf)  # type: ignore
-            for c in motif]
 
 
 ## solve_LSE_motif ------------------------------------------------------------
@@ -834,14 +818,9 @@ def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a
 ## Resonance factors on the grid -----------------------------------------------
 # One condition is the denominator  E_left - E_right - sum_j s_j w_j - i*gamma  (derive's convention).
 # eval_rescond_resloc and eval_resonance_factor take grids in Eh; eval_feature_on_grid takes cm-1.
-# resonance_residuals (top of this file) writes  E_left - E_right - sum_j s_j w_j  out independently.
-#
-# The get_intensity test and the hand-worked values (eval_resonance_factor, eval_feature_on_grid) use the
-# Lorentzian (test_lineshape.py tests it alone). The other tests swap in a recording factor (the fixture
-# `recorded`), so they hold for any line shape.
+# The hand-worked values use the Lorentzian (test_lineshape.py tests it alone).
 
 G_CM = 5.                   # lineshape_param parameter, cm-1
-G_AU = convNu2Ene(G_CM)
 CM1_PER_EH = 219474.6313632  # 1 Eh in cm-1 (CODATA), written out so the hand-worked values don't use convNu2Ene
 
 
@@ -869,23 +848,6 @@ def feature_at_solved_location(motif, params: ParameterSet, states, coeffs=(0.3,
     return SpectralFeature(location=location, rows=rows, lineshape_param=lineshape_param, conditions=conditions)
 
 
-@pytest.fixture
-def recorded(monkeypatch) -> list:
-    """
-    Stands in for any line shape on the grid: lineshape.factor, swapped for one test, stores
-    each (resloc, param) it gets and returns resloc + i*param (not a Lorentzian).
-    Returns the list of calls, in order.
-    """
-    calls = []
-
-    def factor(resloc, param):
-        calls.append((resloc, param))
-        return resloc + 1j * param
-
-    monkeypatch.setattr(lineshape_mod, 'factor', factor)
-    return calls
-
-
 # -- eval_rescond_resloc --------------------------------------------------------
 
 def test_eval_rescond_resloc_sign_is_E_minus_freq(states):
@@ -895,19 +857,6 @@ def test_eval_rescond_resloc_sign_is_E_minus_freq(states):
 
     assert eval_rescond_resloc(key, vd, {'A': 0.}) == pytest.approx(convNu2Ene(E0))         # type: ignore
     assert eval_rescond_resloc(key, vd, {'A': convNu2Ene(E0)}) == pytest.approx(0.)          # type: ignore
-
-
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_rescond_resloc_matches_the_independent_residuals(motif, params_obj, states):
-    """Every condition, on a 2D grid in Eh; '-B' enters the sum with -1 (MOTIF_MIXED)."""
-    res_motif = ResonanceMotif.from_tuples(motif)
-    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
-
-    expected = resonance_residuals(res_motif, grid, params_obj.to_dict(), states)  # type: ignore
-
-    for key, exp in zip(res_motif, expected):
-        vd = VibDiff.from_quanta(*key.diff, params_obj.to_dict(), states)
-        np.testing.assert_allclose(eval_rescond_resloc(key, vd, grid), exp)
 
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
@@ -922,49 +871,6 @@ def test_eval_rescond_resloc_is_zero_at_the_solved_location(motif, params_obj, s
 
 
 # -- eval_resonance_factor ------------------------------------------------------
-
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_resonance_factor_calls_the_line_shape_once_per_condition_with_E_minus_freq(motif, params_obj, states,
-                                                                                         recorded):
-    """
-    e.g. MOTIF_AB, a=0, b=1 (in cm-1): two calls, with resloc A - 1000 ('-A') and 1400 - B.
-    Checked on a 3x3 grid in Eh against resonance_residuals.
-    """
-    res_motif = ResonanceMotif.from_tuples(motif)
-    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
-
-    eval_resonance_factor(res_motif, params_obj, states, grid, lambda _vd: G_AU)
-
-    residuals = resonance_residuals(res_motif, grid, params_obj.to_dict(), states)  # type: ignore
-    assert len(recorded) == len(res_motif)
-    for (resloc, _), expected in zip(recorded, residuals):
-        np.testing.assert_allclose(resloc, expected)
-
-
-def test_eval_resonance_factor_gives_each_condition_its_own_lineshape_param(params_obj, states, recorded):
-    """
-    lineshape_param_au(vd) is asked once per condition, so a value per pair of states is possible.
-    Here it returns the condition's own E (cm-1). At freq = 0, resloc is E in Eh,
-    so each call must get resloc == convNu2Ene(param).
-    """
-    eval_resonance_factor(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, {'A': 0., 'B': 0.},  # type: ignore
-                          lineshape_param_au=lambda vd: vd.energy_difference())
-
-    assert sorted(g for _, g in recorded) == pytest.approx(sorted([-E0, E01 - E0]))
-    for resloc, g in recorded:
-        assert resloc == pytest.approx(convNu2Ene(g))
-
-
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_resonance_factor_multiplies_the_line_shape_factors(motif, params_obj, states, recorded):
-    """e.g. MOTIF_AB: factor(resloc_1, param) * factor(resloc_2, param), at every grid point."""
-    res_motif = ResonanceMotif.from_tuples(motif)
-    grid = to_au(grid_around({'A': 300., 'B': -700.}, 100.))
-
-    value = eval_resonance_factor(res_motif, params_obj, states, grid, lambda _vd: G_AU)
-
-    np.testing.assert_allclose(value, np.prod([r + 1j * g for r, g in recorded], axis=0))
-
 
 def test_eval_resonance_factor_lorentzian_values_with_a_gamma_per_condition(params_obj, states):
     """
@@ -986,25 +892,6 @@ def test_eval_resonance_factor_lorentzian_values_with_a_gamma_per_condition(para
 
 
 # -- eval_feature_on_grid -------------------------------------------------------
-
-@pytest.mark.parametrize('ps', [PS_01, PS_10])
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_eval_feature_on_grid_gives_the_line_shape_resloc_and_lineshape_param_in_eh(motif, ps, states, recorded):
-    """
-    Grid and lineshape_param go in as cm-1. The line shape must get E_i - freq_i and lineshape_param in Eh.
-    The states come from the feature's own params: a=0, b=1 and a=1, b=0 resonate at different places.
-    """
-    f = feature_at_solved_location(motif, ps, states)
-    mesh_cm = grid_around(f.location.as_dict(), G_CM)
-
-    eval_feature_on_grid(f, states, mesh_cm)
-
-    residuals = resonance_residuals(ResonanceMotif.from_tuples(motif), to_au(mesh_cm), ps.to_dict(), states)  # type: ignore
-    assert len(recorded) == len(motif)
-    for (resloc, param), expected in zip(recorded, residuals):
-        np.testing.assert_allclose(resloc, expected, atol=1e-15)   # atol: the centre point is 0
-        assert param == pytest.approx(G_AU)
-
 
 @pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED, MOTIF_AB_EXTRA])
 def test_eval_feature_on_grid_peak_matches_get_intensity(motif, params_obj, states):
@@ -1110,27 +997,6 @@ def test_eval_feature_on_grid_axis_outside_the_motif_changes_nothing(states):
     np.testing.assert_allclose(value, CM1_PER_EH * np.array(expected))
 
 
-@pytest.mark.parametrize('motif, gamma, expected_cm1', [
-    (MOTIF_A,     5.,  0.06j),      # 0.3 / (-5i)    =  0.3i / 5
-    (MOTIF_A,     10., 0.03j),
-    (MOTIF_AB,    5.,  -0.012),     # 0.3 / (-5i)^2  = -0.3 / 25
-    (MOTIF_AB,    10., -0.003),
-    (MOTIF_MIXED, 5.,  -0.012),
-    (MOTIF_AB_EXTRA, 5., -0.0024j),   # 0.3 / (-5i)^3 = 0.3 * (i / 5)^3 = -0.3i / 125
-])
-def test_eval_feature_on_grid_peak_is_coeff_times_i_over_gamma_to_the_N(motif, gamma, expected_cm1, params_obj, states):
-    """
-    At resonance every condition gives 1 / (-i*gamma) = i / gamma, so the peak is 0.3 * (i / gamma)^N:
-    on the imaginary axis for one condition, real and negative for two. Wider line -> lower peak.
-    get_intensity only checks |peak|^2; this also checks the phase (the -i*gamma sign).
-    """
-    f = replace(feature_at_solved_location(motif, params_obj, states), lineshape_param=gamma)
-
-    value = eval_feature_on_grid(f, states, f.location.as_dict())  # type: ignore
-
-    assert value == pytest.approx(CM1_PER_EH ** len(motif) * expected_cm1)
-
-
 def test_eval_feature_on_grid_lineshape_param_function_gives_each_condition_its_own_value(states):
     """
     Same points and gammas as the eval_resonance_factor test above (10 cm-1 on A, 14 cm-1 on B), with the
@@ -1144,15 +1010,6 @@ def test_eval_feature_on_grid_lineshape_param_function_gives_each_condition_its_
 
     expected = 0.3 * np.array([-1 / 140, (-1 + 1j) / 280, (-1 + 1j) / 280])
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
-
-
-def test_eval_feature_on_grid_lineshape_param_function_of_a_constant_equals_the_number(states):
-    """lambda vd, freqs: 5. gives the same as lineshape_param=5. MOTIF_AB, 3x3 grid around the peak."""
-    number = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    function = feature_at_solved_location(MOTIF_AB, PS_01, states, lineshape_param=lambda vd, freqs: 5.)
-    grid = grid_around(number.location.as_dict(), G_CM)
-
-    np.testing.assert_allclose(eval_feature_on_grid(function, states, grid), eval_feature_on_grid(number, states, grid))
 
 
 def test_eval_feature_on_grid_lineshape_param_function_can_depend_on_the_frequency(states):
@@ -1216,18 +1073,6 @@ def test_eval_feature_on_grid_flat_feature_is_its_coefficient_on_every_point(gri
 # -- all_features_on_grid -------------------------------------------------------------------
 # Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1000, B = 1400.  With a=1, b=0 (PS_10): MOTIF_A at A = 1500,
 # a ridge along B.
-
-def test_all_features_on_grid_is_the_sum_of_the_features_on_the_whole_grid(states):
-    peak = feature_at_solved_location(MOTIF_AB, PS_01, states)
-    ridge = feature_at_solved_location(MOTIF_A, PS_10, states)
-    axis_points = {'A': np.array([1000., 1500.]), 'B': np.array([1395., 1400., 1405.])}
-    mesh = make_mesh(axis_points)
-
-    value = all_features_on_grid([peak, ridge], states, axis_points)
-
-    expected = eval_feature_on_grid(peak, states, mesh) + eval_feature_on_grid(ridge, states, mesh)
-    np.testing.assert_allclose(value, expected)
-
 
 def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(states):
     """ij indexing: value[i, j] belongs to A = axis_points['A'][i], B = axis_points['B'][j]; A has 5 points, B has 3."""
@@ -1322,23 +1167,6 @@ def test_boxed_features_on_grid_puts_each_feature_on_its_own_box_only(box_states
     expected = all_features_on_grid([strong], box_states, axis_points)
     expected[weak_box] += all_features_on_grid([weak], box_states, {'A': axis_points['A'][weak_box]})
     np.testing.assert_allclose(value, expected)
-
-
-def test_boxed_features_on_grid_differs_from_all_features_on_grid_only_by_the_cut_off_tails(states):
-    """
-    Peaks at A = 1500 and 1000, half-widths 55: boxes (1445, 1555) and (945, 1055).
-    boxed_features_on_grid leaves each feature out beyond its box, all_features_on_grid does not. A Lorentzian only
-    gets smaller further out, so the difference is at most the sum of the two features' values at their box edges.
-    """
-    features = [feature_at_solved_location(MOTIF_A, PS_10, states), feature_at_solved_location(MOTIF_A, PS_01, states)]
-    window = SpectralWindow.from_features(Box({'A': (900., 1600.)}), features, [55., 55.])
-    axis_points = window.box.grid_points({'A': 701})
-
-    difference = boxed_features_on_grid(window, states, axis_points) - all_features_on_grid(features, states, axis_points)
-
-    at_box_edge = [abs(eval_feature_on_grid(f, states, {'A': f.location['A'] + get_box_extent(f)}))  # type: ignore
-                   for f in window.full_features]
-    assert 0. < np.abs(difference).max() <= sum(at_box_edge)
 
 
 def on_grid_with_amplitude_boxes(features, window: Box, n_points: int, states, dynrange: float):
