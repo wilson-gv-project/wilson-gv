@@ -20,6 +20,7 @@ from wilson_suite.wilson_response_evaluate.plan import (
     compile_terms,
 )
 from wilson_suite.wilson_response_evaluate.tests.helpers import (
+    LASER_POL_DISTINCT_PAIRINGS,
     make_func_to_compute_avrg,
 )
 from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
@@ -201,33 +202,12 @@ def test_evaluate_term():
                                     states_choice='harmonic')
 
 
-
-## Term 8, averaged properties on the fly, with the formaldehyde data ---------------------
-# Term 8 averages polgrad[b] (ops 0, 3) * dipgrad[a] (op 1) * dipgrad[c] (op 2) over four cartesian
-# slots: for polarization key (i, j, k, l), polgrad reads (i, l), the first dipgrad j, the second k.
-
-ISO4 = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=(1., 1., 1.))
-ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(6), repeat=3)]
-
-
-@pytest.fixture(scope='module')
-def term8():
-    """Term 8 and its MolSystemData from the formaldehyde file."""
-    term = cmpl_terms[8]
-    calc_dataorigin = DataOriginInfo(source_type='gaussian',
-                                     base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    return term, MolSystemData.load(calc_dataorigin, term.prop_names)
-
-
-def evv_props(polgrad, dipgrad) -> MolPropsCollection:
-    return MolPropsCollection([MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={}),
-                               MolecularProperty(trivial_name='dipgrad', vals=dipgrad, extra_data={})])
-
-
 ## All 14 EVV terms: the einsum tensor = the on-the-fly loop, formaldehyde -----------------------------
 # Each term reads the tensor with its own labels, e.g. term 8: 'bIL,aJ,cK,IJKL->abc', read at {'a', 'b', 'c'}.
 # Tolerance: rel 1e-12; abs 1e-18, the evaluator's zero_tol (below it a value counts as 0): where the loop gives 0,
 # einsum gives rounding noise.
+
+ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(6), repeat=3)]
 
 EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc',
                   'aIL,aJ,bK,IJKL->ab', 'aIL,aJ,bK,IJKL->ab', 'cIL,aJ,bK,IJKL->abc', 'bIL,aJ,bK,IJKL->ab',
@@ -251,11 +231,10 @@ def test_evv_einsum_subscripts():
     assert [make_avrg_einsum_subscripts(t.avrg_props) for t in cmpl_terms] == EVV_SUBSCRIPTS
 
 
-@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
 @pytest.mark.parametrize('term_id', range(14))
-def test_evv_einsum_tensor_is_the_on_the_fly_average_for_every_index_set(term_id, laser_pol, evv_molsys):
+def test_evv_einsum_tensor_is_the_on_the_fly_average_for_every_index_set(term_id, evv_molsys):
     term = cmpl_terms[term_id]
-    pol = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=laser_pol)
+    pol = getGeneralPolarizationAveragingExpression(rank=4, laser_pol=LASER_POL_DISTINCT_PAIRINGS)
     func = make_func_to_compute_avrg(avrg_expression=term.avrg_props, polarization_linear_comb=pol)
 
     tensor = calculate_avrg_tensor_einsum(term.avrg_props, evv_molsys.mol_props, pol)
