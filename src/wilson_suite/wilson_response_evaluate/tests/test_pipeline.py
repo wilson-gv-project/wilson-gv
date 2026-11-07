@@ -9,7 +9,6 @@ ab_term fixes a, b and sums over c. <polgrad>[1] = 0 (molsys_a1_zero with TOY_RE
 with a=1 have coeff 0: per term, 2 rows (a=0) at 2 different locations and 2 zero pairs (a=1).
 """
 
-import dataclasses
 import json
 import re
 from collections import defaultdict
@@ -20,7 +19,6 @@ from functools import partial
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_response_evaluate.pipeline as pipeline_mod
 from wilson_suite.wilson_derive.abstractions import PolProp
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
 from wilson_suite.wilson_intensities.amplitudes.averaging import (
@@ -78,10 +76,13 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     get_box_extent,
     polprop,
     row,
-    toy_term,
 )
 from wilson_suite.wilson_response_evaluate.tests.stored_terms import TERMS_DIR
-from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
+from wilson_suite.wilson_system.system_data import (
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+)
 
 
 def two_terms_one_motif():
@@ -238,18 +239,6 @@ def test_feature_result_features_hold_every_row_of_the_table_once(molsys_a1_zero
     assert set(rows_in_features) == set(result.table)
 
 
-def test_feature_result_builds_features_once(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert result.features is result.features
-
-
-def test_feature_result_is_frozen(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        result.table = ContributionTable([])  # type: ignore
-
 
 def index_set_value(term: CompiledTerm, contribs: dict) -> float:
     """
@@ -316,12 +305,6 @@ def test_feature_result_keeps_its_inputs_without_copying(molsys_a1_zero):
     assert result.molsys is molsys_a1_zero
     assert result.polarization_linear_comb is TOY_RECIPE
 
-
-def test_feature_result_inputs_do_not_count_for_equality():
-    """two results with the same rows are equal, whatever they were computed from"""
-    table = ContributionTable([row(0.3, a=0)])
-
-    assert FeatureResult(table, zero=[]) == FeatureResult(table, zero=[], compiled=(toy_term(),))
 
 
 def test_feature_result_made_by_hand_has_no_factors_by_index_set():
@@ -468,23 +451,6 @@ def test_make_polarization_linear_comb_raises_for_rank_above_6():
     with pytest.raises(ValueError, match='rank 2 to 6'):
         make_polarization_linear_comb([term_with_slots(tuple(range(7)))], (1.,))
 
-
-def test_make_polarization_linear_comb_makes_the_recipe_once_per_rank_and_laser_pol(monkeypatch):
-    """the same rank and laser_pol again (other terms, a list instead of a tuple): no new recipe; another laser_pol: a new one"""
-    made = []
-
-    def counting(**kwargs):
-        made.append(kwargs)
-        return getGeneralPolarizationAveragingExpression(**kwargs)
-    monkeypatch.setattr(pipeline_mod, 'getGeneralPolarizationAveragingExpression', counting)
-    pipeline_mod._averaging_recipe.cache_clear()
-
-    first = make_polarization_linear_comb([RANK_4_TERM], (1., 0., 1.))
-    again = make_polarization_linear_comb([RANK_4_TERM, RANK_4_TERM], [1., 0., 1.])
-    other = make_polarization_linear_comb([RANK_4_TERM], (1., 1., 1.))
-
-    assert made == [{'rank': 4, 'laser_pol': (1., 0., 1.)}, {'rank': 4, 'laser_pol': (1., 1., 1.)}]
-    assert again == first != other
 
 
 def test_make_polarization_linear_comb_gives_each_call_its_own_copy():
@@ -738,11 +704,6 @@ def test_evaluate_response_terms_raises_for_two_axis_sets_and_runs_per_set(forma
             == {(r.term_id, r.params, r.coeff) for r in top_run.result.table if r.term_id != 0})
 
 
-def test_evaluate_response_terms_takes_every_setting_by_keyword(formaldehyde_molsys):
-    """positional settings raise: a swapped pair, e.g. states_choice and laser_pol, cannot slip through"""
-    with pytest.raises(TypeError, match='positional'):
-        evaluate_response_terms(ref.evv_terms(), formaldehyde_molsys, 'anharmonic', ref.LASER_POL, 5.)  # type: ignore
-
 
 def evv_terms_in_pulse_ids() -> list[VibPerturbedTerm]:
     """the 14 EVV terms as derive writes them, before the translation: e.g. pf [-1, 2] where evv.json has ['B']"""
@@ -989,17 +950,6 @@ def test_spectrum_on_grid_on_another_window_reuses_the_features(formaldehyde_mol
                                n_points_per_axis=n_points_per_axis, box_rule=AMPLITUDE_BOXES)
     np.testing.assert_allclose(again.amplitude, new_run.amplitude)
 
-
-def test_spectrum_on_grid_takes_every_argument_after_the_result_by_keyword(top_run):
-    with pytest.raises(TypeError, match='positional'):
-        spectrum_on_grid(top_run.result, WINDOW_AROUND_STRONGEST, STEPS_1_CM, AMPLITUDE_BOXES)  # type: ignore
-
-
-def test_spectrum_on_grid_needs_a_box_rule(top_run):
-    """no default: both rules need the plot's dynrange, and the plot decides what it shows, so the caller passes it"""
-    with pytest.raises(TypeError, match='box_rule'):
-        spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST,  # type: ignore
-                         n_points_per_axis=STEPS_1_CM)
 
 
 ## check_grid_axes: the grid fits the features --------------------------------

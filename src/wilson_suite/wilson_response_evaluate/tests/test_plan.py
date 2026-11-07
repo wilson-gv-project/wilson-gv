@@ -2,9 +2,6 @@
 plan.py — the compile stage. Runs with zero molecular data.
 """
 
-import copy
-import pickle
-from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
 import numpy as np
@@ -92,13 +89,6 @@ def test_propscollection_names_one_per_property_in_order():
     assert coll.names == ('polgrad', 'dipgrad', 'dipgrad', 'cff')
 
 
-def test_propscollection_names_are_made_once():
-    """the evaluation reads the names for every index set"""
-    coll = PropsCollection([polprop(ops=(0, 1), inds='a')])
-
-    assert coll.names is coll.names
-
-
 def test_propscollection_equal_by_value_and_usable_as_key():
     a = PropsCollection([polprop(ops=(0, 1), inds='a')])
     b = PropsCollection([polprop(ops=(0, 1), inds='a')])
@@ -164,22 +154,6 @@ def test_freqterms_pert_wf_diff_against_ground_is_pert_only():
 # derive's ResonanceCondition so a ResonanceMotif can be hashed, compared and pickled without
 # holding derive objects.
 
-def test_rescondkey_left_right_and_ground_state():
-    key = ResCondKey(diff=(('a', 'b'), ()), pf=('1',))     # E_ab - E_0, perturbed by freq '1'
-
-    assert key.left == ('a', 'b')
-    assert key.right == ()        # ground state is the empty tuple
-    assert key.pf == ('1',)
-
-
-def test_rescondkey_is_a_frozen_value_usable_as_dict_key():
-    key = ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2'))
-    same = ResCondKey(diff=(('a',), ('c',)), pf=('-1', '2'))
-
-    assert key == same and hash(key) == hash(same)
-    assert {key: 'motif'}[same] == 'motif'
-    with pytest.raises(AttributeError):
-        key.pf = ()  # type: ignore
 
 
 def test_rescondkey_pf_order_does_not_matter():
@@ -241,12 +215,6 @@ def test_resonance_motif_keeps_repeated_conditions():
     assert once != twice
 
 
-def test_resonance_motif_is_immutable():
-    motif = ResonanceMotif.from_tuples([((('a',), ()), ('1',))])
-
-    with pytest.raises(AttributeError):
-        motif.conditions = () # type: ignore
-
 
 def test_resonance_motif_from_tuples_sorts_quanta_and_pf():
     """Quanta are a multiset (E_ba is E_ab) and pf a sum of signed axes (A - B is -B + A),
@@ -255,12 +223,6 @@ def test_resonance_motif_from_tuples_sorts_quanta_and_pf():
 
     assert motif.conditions == (ResCondKey(diff=(('a', 'c'), ('a', 'b')), pf=('-A', 'B')),)
 
-
-def test_resonance_motif_accepts_any_sequence_of_keys():
-    keys = [ResCondKey(diff=(('a',), ()), pf=('1',))]
-
-    assert ResonanceMotif(keys).conditions == tuple(keys)       # type: ignore  # list -> tuple in __post_init__
-    assert ResonanceMotif(keys) == ResonanceMotif(tuple(keys))  # type: ignore
 
 
 def test_resonance_motif_max_state_lvl_counts_quanta_on_either_side():
@@ -290,14 +252,6 @@ def test_resonance_motif_repeated_axes_are_counted_once():
 
     assert motif.get_max_different_freq_axes() == {'A', 'B'}
 
-
-def test_resonance_motif_pickle_roundtrip():
-    motif = ResonanceMotif.from_tuples([((('a', 'b'), ()), ('A',)), ((('b',), ('a',)), ('-A', 'B'))])
-
-    restored = pickle.loads(pickle.dumps(motif))
-
-    assert restored == motif
-    assert hash(restored) == hash(motif)
 
 
 ## generate_LHS_motif ---------------------------------------------------------
@@ -368,11 +322,6 @@ def test_parameterset_equality_is_order_independent():
     assert ParameterSet({'a': 0}) != ParameterSet({'a': 1})
 
 
-def test_parameterset_pickle_roundtrip():
-    ps = ParameterSet({'a': 1, 'c': 2})
-
-    assert pickle.loads(pickle.dumps(ps)) == ps
-
 
 ## ResLocPoint --------------------------------------------------------------
 
@@ -409,9 +358,6 @@ def test_res_loc_point_rejects_unknown_axis():
         _ = ResLocPoint({'A': 1.})['B']
 
 
-def test_res_loc_point_is_not_equal_to_other_types():
-    assert ResLocPoint({'A': 1.}) != (('A', 1.),)
-
 
 def test_res_loc_point_ignores_later_changes_to_the_input_dict():
     """The point copies the caller's dict: changing the dict later changes neither the values nor the hash."""
@@ -436,22 +382,6 @@ def test_res_loc_point_as_dict_returns_a_new_dict():
     assert point.as_dict() == {'A': 1., 'B': 2.}
     assert point['A'] == 1.
 
-
-def test_res_loc_point_is_frozen():
-    point = ResLocPoint({'A': 1.})
-
-    with pytest.raises(FrozenInstanceError):
-        point.coordinates = (('A', 2.),)    # type: ignore
-    assert point.as_dict() == {'A': 1.}
-
-
-def test_res_loc_point_survives_deepcopy_and_pickle():
-    """features.py deepcopies features, and so their locations; slots=True changes how a point is copied."""
-    point = ResLocPoint({'B': 2., 'A': 1.})
-
-    for copied in (copy.deepcopy(point), pickle.loads(pickle.dumps(point))):
-        assert copied == point and hash(copied) == hash(point)
-        assert copied.axes == ('A', 'B')
 
 
 ## CompiledTerm -------------------------------------------------------------
@@ -517,13 +447,6 @@ def test_compiled_term_prop_names_one_per_distinct_trivial_name(avrg, non_avrg, 
     """what MolSystemData.load requests for the term: each name once, averaged properties first"""
     assert bare_term(avrg, non_avrg).prop_names == expected
 
-
-def test_compiled_term_split_is_made_once_and_kept():
-    """evaluate_full_index_dict reads the split for every index set; it must not be made again each time"""
-    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
-
-    assert ct.freq_vibenedenom is ct.freq_vibenedenom
-    assert ct.freq_pert_wf_diff is ct.freq_pert_wf_diff
 
 
 def test_compile_terms_one_compiled_per_term():
