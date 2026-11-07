@@ -26,5 +26,3 @@ Write tests before writing code in order to help determine exactly what that cod
 
 https://swcarpentry.github.io/python-novice-inflammation/10-defensive.html
 """
-
-from . import testing_utils
