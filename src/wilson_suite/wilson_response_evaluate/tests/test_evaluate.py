@@ -58,6 +58,7 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     E00,
     E01,
     E1,
+    LASER_POL_DISTINCT_PAIRINGS,
     MOTIF_A,
     MOTIF_AB,
     MOTIF_AB_EXTRA,
@@ -395,9 +396,8 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 
 # -- calculate_avrg_tensor_einsum: every index set at once = the on-the-fly loop -------------
 
-# 5 expressions (labels) x 3 recipes (laser_pol) = 15 cases.
-# Expected in each case: the einsum tensor equals the on-the-fly loop at all 64 index sets (a, b, c each over
-# modes 0 to 3), to rel 1e-12, abs 0. The data is random (POLGRAD, DIPGRAD): no symmetry, no zeros. So
+# Expected for each expression: the einsum tensor equals the on-the-fly loop at all 64 index sets (a, b, c each
+# over modes 0 to 3), to rel 1e-12, abs 0. The data is random (POLGRAD, DIPGRAD): no symmetry, no zeros. So
 # reading a wrong mode, a wrong slot or the polgrad axes in the wrong order gives another number.
 #
 # labels -> evv_avrg_expr(labels) = polgrad[labels[0]] (slots 0, 3) * dipgrad[labels[1]] (slot 1) * dipgrad[labels[2]] (slot 2)
@@ -413,18 +413,10 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
 #   'baa'  terms 10, 11       both dipgrads read at mode a: one mode, two slot letters (J, K).
 #   Not here: 'aab' (terms 4, 5); terms 0 and 1 (polhess, diphess). test_integration.py checks all 14 terms.
 #
-# laser_pol -> the rank-4 recipe (getGeneralPolarizationAveragingExpression). With e_k the polarization of slot k,
-# the 3 numbers are ((e_0.e_1)(e_2.e_3), (e_0.e_2)(e_1.e_3), (e_0.e_3)(e_1.e_2)).
-#   (1, 1, 1)         all four fields along x. This recipe treats every slot alike, so wrong slots give the same
-#                     numbers: this case alone cannot catch a slot mix-up.
-#   (1, 0, 0)         slots 0, 1 along one axis, slots 2, 3 along another, e.g. (x, x, y, y). Catches a swap of
-#                     slots 1 and 2, or of the two polgrad axes; not a swap of slots 0 and 1 (the same pair).
-#   (0.3, -1.2, 2.0)  no setup of unit vectors gives these numbers. Each pairing has its own weight, so every
-#                     slot mix-up changes the value.
-@pytest.mark.parametrize('laser_pol', [(1., 1., 1.), (1., 0., 0.), (0.3, -1.2, 2.)])
+# The recipe: LASER_POL_DISTINCT_PAIRINGS, with which every slot mix-up changes the value.
 @pytest.mark.parametrize('labels', ['bac', 'abc', 'cab', 'bab', 'baa'])
-def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels, laser_pol):
-    pol = getGeneralPolarizationAveragingExpression(4, laser_pol)
+def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels):
+    pol = getGeneralPolarizationAveragingExpression(4, LASER_POL_DISTINCT_PAIRINGS)
     func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(labels), polarization_linear_comb=pol)
 
     tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(labels), evv_props(), pol)

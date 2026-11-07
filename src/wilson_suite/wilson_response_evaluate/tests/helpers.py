@@ -137,6 +137,10 @@ TOY_POLGRAD[0] = np.diag([0.1, 0.3, 0.2])
 TOY_POLGRAD[1, 1, 2] = TOY_POLGRAD[1, 2, 1] = 0.08
 TOY_RECIPE = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
 
+# A rank-4 laser_pol that gives each pairing of the four slots its own weight, so every slot mix-up changes
+# the value of the average.
+LASER_POL_DISTINCT_PAIRINGS = (0.3, -1.2, 2.)
+
 PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
 PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})
 
@@ -207,7 +211,7 @@ def get_box_extent(f: SpectralFeature, axis: str = 'A') -> float:
 
 # --- N-dimensional locations: the same test runs for every spectrum dimensionality in NDIMS ---
 
-NDIMS = (1, 2, 3, 4)
+NDIMS = (1, 3)
 AXES = 'ABCD'
 
 

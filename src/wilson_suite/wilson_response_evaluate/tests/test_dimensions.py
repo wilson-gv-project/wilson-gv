@@ -20,7 +20,10 @@ from functools import partial
 import numpy as np
 import pytest
 
-from wilson_suite.wilson_response_evaluate.evaluate import all_features_on_grid, eval_feature_on_grid
+from wilson_suite.wilson_response_evaluate.evaluate import (
+    all_features_on_grid,
+    eval_feature_on_grid,
+)
 from wilson_suite.wilson_response_evaluate.features import amplitude_half_widths
 from wilson_suite.wilson_response_evaluate.grid import Box, box_slices
 from wilson_suite.wilson_response_evaluate.pipeline import (
@@ -39,13 +42,19 @@ from wilson_suite.wilson_response_evaluate.plan import (
 from wilson_suite.wilson_response_evaluate.tests import make_evv_reference as ref
 from wilson_suite.wilson_response_evaluate.tests.helpers import (
     AXES,
-    NDIMS,
     TOY_RECIPE,
     toy_term,
     vibdiff,
 )
-from wilson_suite.wilson_response_evaluate.tests.stored_terms import StoredSetup, load_setup
-from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection, MolSystemData
+from wilson_suite.wilson_response_evaluate.tests.stored_terms import (
+    StoredSetup,
+    load_setup,
+)
+from wilson_suite.wilson_system.system_data import (
+    MolecularProperty,
+    MolPropsCollection,
+    MolSystemData,
+)
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 G_CM = 20.          # lineshape_param (the Lorentzian half width), cm-1
@@ -87,6 +96,7 @@ def mock_molsys() -> MolSystemData:
 ## the chain term, 1D-4D --------------------------------------------------------
 
 LABELS = 'abcd'
+CHAIN_NDIMS = (1, 2, 3, 4)      # every number of axes, end to end; the unit tests take fewer (helpers.NDIMS)
 
 
 def chain_motif(ndim: int) -> ResonanceMotif:
@@ -114,7 +124,7 @@ def chain_location(params: dict[str, int]) -> dict[str, float]:
     return {ax: e - before for ax, e, before in zip(AXES, energies, [0., *energies])}
 
 
-@pytest.fixture(scope='module', params=NDIMS, ids=[f'{n}D' for n in NDIMS])
+@pytest.fixture(scope='module', params=CHAIN_NDIMS, ids=[f'{n}D' for n in CHAIN_NDIMS])
 def chain_result(request, mock_molsys) -> FeatureResult:
     return compute_features([chain_term(request.param)], mock_molsys, TOY_RECIPE, G_CM, states_choice='anharmonic')
 
