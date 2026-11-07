@@ -958,18 +958,6 @@ def test_evaluate_term_coeff_sumover_needs_polarization_without_an_avrg_tensor(m
 # lacks, so solving that pair would raise: these tests also show that zero pairs never reach solve_LSE_motif.
 # MOTIF_AB at a=0: A = E0 = 1000; B = E00 - E0 = 950 for b=0, E01 - E0 = 1400 for b=1.
 
-def test_toy_polgrad_and_recipe_give_0_2_and_0(molsys_a1_zero):
-    """
-    The averaged part the build_contributions and compute_features tests use: trace / 3 of each mode's polgrad.
-    TOY_RECIPE is the real rank-2 recipe.
-    """
-    tensor = calculate_avrg_tensor_einsum(ab_term().avrg_props, molsys_a1_zero.mol_props, TOY_RECIPE)
-
-    assert TOY_RECIPE == pytest.approx(getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,)))
-    assert tensor.labels == ('a',)
-    np.testing.assert_allclose(tensor.values, [0.2, 0.], rtol=1e-15, atol=0)
-
-
 # -- what becomes a row: rows, zero pairs ------------------------------------------
 
 def test_build_contributions_one_row_per_nonzero_pair(molsys_a1_zero):

@@ -15,6 +15,9 @@ from wilson_suite.wilson_derive.abstractions import (
     QOperator,
     VibDiffTerm,
 )
+from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    getGeneralPolarizationAveragingExpression,
+)
 from wilson_suite.wilson_response_evaluate.features import (
     ContributionRow,
     SpectralFeature,
@@ -132,7 +135,7 @@ CFF[0, 1, 1] = CFF[1, 0, 1] = CFF[1, 1, 0] = 2.
 TOY_POLGRAD = np.zeros((2, 3, 3))
 TOY_POLGRAD[0] = np.diag([0.1, 0.3, 0.2])
 TOY_POLGRAD[1, 1, 2] = TOY_POLGRAD[1, 2, 1] = 0.08
-TOY_RECIPE = {(0, 0): 1 / 3, (1, 1): 1 / 3, (2, 2): 1 / 3}
+TOY_RECIPE = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
 
 PS_00, PS_01 = ParameterSet({'a': 0, 'b': 0}), ParameterSet({'a': 0, 'b': 1})
 PS_10, PS_11 = ParameterSet({'a': 1, 'b': 0}), ParameterSet({'a': 1, 'b': 1})

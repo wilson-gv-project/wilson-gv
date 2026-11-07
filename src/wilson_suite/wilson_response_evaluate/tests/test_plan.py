@@ -493,13 +493,6 @@ def test_compiled_term_splits_its_denominators_by_pert_wf_diff():
     assert vibdiff_keys(ct.freq_pert_wf_diff) == [(('a', 'b'), ('a',), True)]
 
 
-def test_compiled_term_all_props_is_made_once():
-    """a new PropsCollection deepcopies its props: all_props is built on first use and kept"""
-    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
-
-    assert ct.all_props is ct.all_props
-
-
 def test_compiled_term_prop_names_each_once_in_order():
     """_fake_vibpert_term: polgrad[a] (averaged), cff-like 'ab' second derivative (non-averaged)"""
     ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore

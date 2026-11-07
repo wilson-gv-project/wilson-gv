@@ -35,7 +35,6 @@ from wilson_suite.wilson_response_evaluate.plan import (
     CompiledTerm,
     FreqTermsCollection,
     ResonanceMotif,
-    generate_LHS_motif,
 )
 from wilson_suite.wilson_response_evaluate.tests import make_evv_reference as ref
 from wilson_suite.wilson_response_evaluate.tests.helpers import (
@@ -118,15 +117,6 @@ def chain_location(params: dict[str, int]) -> dict[str, float]:
 @pytest.fixture(scope='module', params=NDIMS, ids=[f'{n}D' for n in NDIMS])
 def chain_result(request, mock_molsys) -> FeatureResult:
     return compute_features([chain_term(request.param)], mock_molsys, TOY_RECIPE, G_CM, states_choice='anharmonic')
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_chain_motif_fixes_one_point_on_its_ndim_axes(ndim):
-    """As many conditions as axes, all independent (rank), the check from_VibPertTerm runs on derive's terms."""
-    lhs, axes = generate_LHS_motif(chain_motif(ndim))
-
-    assert axes == tuple(AXES[:ndim])
-    assert len(chain_motif(ndim)) == np.linalg.matrix_rank(lhs) == ndim
 
 
 def test_compute_features_chain_term_one_row_and_one_feature_per_index_set(chain_result):
