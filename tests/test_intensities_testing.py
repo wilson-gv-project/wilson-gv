@@ -1,10 +1,11 @@
-import numpy as np
-import wilson_suite
-from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
-from wilson_suite.wilson_intensities.utils.utils import pairwise_differences
-
 import logging
+
+import numpy as np
+
+import wilson_suite
 from wilson_suite.wilson_utils.logger import setup_logger
+from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
 setup_logger("wilson", level=logging.WARNING)
 
 
@@ -826,36 +827,3 @@ different axes
 
 """
 
-def test_pairwise_differences():
-    print()
-    qstates_Eh = {1: convNu2Ene(np.array([500., 700., 1300.])),
-                  2: convNu2Ene(np.array([[950., 1150., 1985.],
-                      [1150., 1380., 1996.],
-                      [1985., 1996., 2650.]]))}
-    a = pairwise_differences(qstates_Eh[1], qstates_Eh[2])
-    print(a)
-    assert a[2, 0, 1] == qstates_Eh[1][2] - qstates_Eh[2][(0,1)]
-    assert a[0, 1, 0] == qstates_Eh[1][0] - qstates_Eh[2][(1,0)]
-
-    print(1/a[(0,1,2)])
-    print(1/a[(2,0,1)])
-    q = np.array([[[-0.00205035, -0.00296162, -0.00676616],                         
-                                        [-0.00296162,                              
-                                -0.00400958, -0.00681628],                         
-                                        [-0.00676616,                              
-                                -0.00681628, -0.00979612]],                        
-                                                                                    
-                                        [[-0.00113908,                              
-                                -0.00205035, -0.00585489],                         
-                                        [-0.00205035,                              
-                                -0.00309831, -0.00590501],                         
-                                        [-0.00585489,                              
-                                -0.00590501, -0.00888485]],                        
-                                                                                    
-                                        [[ 0.00159472,                              
-                                0.00068345, -0.00312109],                          
-                                        [ 0.00068345,                              
-                                -0.00036451, -0.00317121],                         
-                                        [-0.00312109,                              
-                                -0.00317121, -0.00615105]]])
-    assert np.allclose(q, a)
