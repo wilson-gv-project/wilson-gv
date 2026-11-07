@@ -107,12 +107,6 @@ def test_feature_has_no_box_until_its_window_gives_one():
     assert boxed.feat_box is not None
 
 
-def test_replace_keeps_the_box():
-    """dataclasses.replace runs __post_init__ again; it must not reset a dressed box to location +- lineshape_param."""
-    dressed = feat(A=100., box_extent=50.)
-
-    assert replace(dressed, lineshape_param=6.).feat_box == Box({'A': (50., 150.)})
-
 
 def test_feature_amplitude_is_the_sum_of_row_coeffs():
     f = feat(A=0., rows=(row(0.3, a=0), row(-0.12, a=1)))

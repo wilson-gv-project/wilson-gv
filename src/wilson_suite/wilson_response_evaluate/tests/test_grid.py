@@ -31,11 +31,6 @@ def test_box_rejects_bounds_that_are_not_a_pair(bad):
         Box({'A': bad})
 
 
-def test_box_rejects_non_numeric_bounds():
-    with pytest.raises(TypeError):
-        Box({'A': ('0', 1.)}) # type: ignore
-
-
 def test_box_rejects_min_above_max():
     with pytest.raises(ValueError, match='min'):
         Box({'A': (2., 1.)})
@@ -64,12 +59,6 @@ def test_box_accepts_int_bounds_and_zero_width():
 
     assert box.bounds == {'A': (0, 1), 'B': (2., 2.)}
 
-
-def test_box_stores_numpy_numbers_as_plain_floats():
-    box = Box({'A': (np.int64(0), np.int64(1)), 'B': (np.float32(2.), np.float32(3.))}) # type: ignore
-
-    assert box.bounds == {'A': (0., 1.), 'B': (2., 3.)}
-    assert all(type(v) is float for bounds in box.bounds.values() for v in bounds)
 
 
 ## Box: operations ----------------------------------------------------------

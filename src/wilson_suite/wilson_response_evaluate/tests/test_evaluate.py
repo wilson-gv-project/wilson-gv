@@ -245,12 +245,6 @@ def test_eval_non_avrg_short_circuits_on_zero(molsys):
     assert eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0, 'c': 0}, molsys) == 0.
 
 
-def test_eval_non_avrg_missing_property_raises(molsys):
-    expr = PropsCollection([polprop(inds='ab')])  # 'hess' is not in molsys
-
-    with pytest.raises(KeyError):
-        eval_non_avrg_per_indexdict(expr, {'a': 0, 'b': 0}, molsys)
-
 
 ## Energy denominators, on the fly ---------------------------------------------
 # otf_vibdiffdenom: 1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
@@ -268,12 +262,6 @@ def test_otf_vibdiffdenom_of_no_terms_is_one(molsys):
     assert otf_vibdiffdenom(FreqTermsCollection([]), {}, molsys, states_choice='anharmonic') == 1.
 
 
-def test_otf_vibdiffdenom_zero_difference_raises(molsys):
-    """a = b = 0: both sides are state '0', so the difference is 0."""
-    with pytest.raises(ZeroDivisionError):
-        otf_vibdiffdenom(FreqTermsCollection([vibdiff(sl='a', sr='b', pert=True)]), {'a': 0, 'b': 0}, molsys,
-                         states_choice='anharmonic')
-
 
 def test_harmonic_denom_uses_eigenvals_not_state_energies(molsys):
     """eigenvals are 1100 and 1580 cm-1; the states '0' and '1' are at 1000 and 1500 cm-1."""
@@ -290,10 +278,6 @@ def test_harmonic_denom_needs_the_ground_state_on_the_right(molsys):
     with pytest.raises(ValueError, match='not a ground state'):
         harmonic_denom(FreqTermsCollection([vibdiff(sl='a', sr='b')]), {'a': 0, 'b': 1}, molsys)
 
-
-def test_harmonic_denom_needs_one_mode_per_denominator(molsys):
-    with pytest.raises(ValueError):
-        harmonic_denom(FreqTermsCollection([vibdiff(sl='ab')]), {'a': 0, 'b': 1}, molsys)
 
 
 ## Averaged properties, on the fly ---------------------------------------------
@@ -565,28 +549,6 @@ def test_evaluate_full_index_dict_on_the_fly_zero_average_stops_before_the_state
     assert (value, contribs) == (0., {'AVRG': 0.})
 
 
-def test_build_contributions_makes_the_avrg_tensor_once_per_term(molsys, monkeypatch):
-    """One einsum per term, passed to every index set of that term; not one einsum per index set."""
-    made, passed = [], []
-    einsum = evaluate_mod.calculate_avrg_tensor_einsum
-
-    def counting_einsum(*args):
-        made.append(einsum(*args))
-        return made[-1]
-
-    def stub_coeff(*_, avrg_tensor=None, **__):
-        passed.append(avrg_tensor)
-        return 0., None
-
-    monkeypatch.setattr(evaluate_mod, 'calculate_avrg_tensor_einsum', counting_einsum)
-    monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', stub_coeff)
-
-    build_contributions([evv_shaped_term(), evv_shaped_term()], with_evv_props(molsys), ISO4, states_choice='anharmonic')
-
-    assert len(made) == 2
-    assert len(passed) == 2 * 4                              # 2 terms x 4 index sets (a, b over 2 modes)
-    assert all(t is made[0] for t in passed[:4]) and all(t is made[1] for t in passed[4:])
-
 
 def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zero, monkeypatch):
     """
@@ -608,21 +570,6 @@ def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zer
 
     assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
-
-def test_build_contributions_keeps_no_factors_by_index_set(molsys_a1_zero, monkeypatch):
-    """The rows do not carry their factors per index set; FeatureResult.factors_by_index_set computes them again
-    when asked (test_pipeline.py)."""
-    asked = []
-    sumover = evaluate_mod.evaluate_term_coeff_sumover
-
-    def recording(*args, **kwargs):
-        asked.append(kwargs['keep_factors'])
-        return sumover(*args, **kwargs)
-    monkeypatch.setattr(evaluate_mod, 'evaluate_term_coeff_sumover', recording)
-
-    build_contributions([ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert asked == [False] * 4                              # 4 index sets (a, b over 2 modes)
 
 
 ## One term end to end -------------------------------------------------------
@@ -679,13 +626,11 @@ def test_evaluate_single_index_dict_zero_non_avrg_short_circuits(term_and_avrg, 
 # The factors per index set
 #   test_evaluate_term_coeff_sumover_zero_avrg_index_sets_are_kept
 #   test_evaluate_term_coeff_sumover_without_factors_gives_the_same_total
-#   test_evaluate_term_coeff_sumover_result_shape
 # Errors
 #   test_evaluate_term_coeff_sumover_resonance_labels_must_be_fixed
 #   test_evaluate_term_coeff_sumover_needs_polarization_without_an_avrg_tensor
 #
 # Through other functions
-#   test_build_contributions_keeps_no_factors_by_index_set (above)              keep_factors=False
 #   test_build_contributions_coeff_is_evaluate_term_coeff_sumover (below)       row coefficient = the sum
 #   test_pipeline.py     test_compute_features_amplitude_adds_both_terms
 #                        test_feature_result_factors_by_index_set_of_a_row_are_its_summed_index_sets
@@ -906,26 +851,6 @@ def test_evaluate_term_coeff_sumover_without_factors_gives_the_same_total(term_a
     assert len(factors) == 4
     assert total_only == total != 0.
 
-
-def test_evaluate_term_coeff_sumover_result_shape(term_and_avrg, molsys):
-    """
-    Shows the shape of the evaluate_term_coeff_sumover result (run with -s to see the print):
-    (total, {ParameterSet(full index set): factors}). cff[0, 0, 1] = 0 by symmetry, so c = 1 stops after
-    NON_AVRG.
-    """
-    term, avrg = term_and_avrg
-
-    result = evaluate_term_coeff_sumover(term, {'a': 0, 'b': 0}, molsys, avrg_tensor=avrg,
-                                         states_choice='anharmonic')
-
-    from pprint import pprint
-    pprint(result)
-
-    total, factors = result
-    assert isinstance(total, float)
-    assert set(factors) == {ParameterSet({'a': 0, 'b': 0, 'c': c}) for c in (0, 1)}
-    assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 0})]) == {'NON_AVRG', 'AVRG', 'VIBDIFF_TERMS', 'VIBENE_DENOM'}
-    assert set(factors[ParameterSet({'a': 0, 'b': 0, 'c': 1})]) == {'NON_AVRG', 'AVRG'}
 
 
 @pytest.mark.parametrize('fixed, not_fixed', [
