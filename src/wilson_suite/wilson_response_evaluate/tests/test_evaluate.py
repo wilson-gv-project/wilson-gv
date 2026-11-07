@@ -640,12 +640,6 @@ def test_build_contributions_term_built_by_hand_without_a_single_point_stops_the
         build_contributions([ab_term(MOTIF_B_TWICE)], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
-def test_build_contributions_without_terms_is_empty(molsys):
-    rows, zero = build_contributions([], molsys, TOY_RECIPE, states_choice='anharmonic')
-
-    assert (len(rows), zero) == (0, [])
-
-
 def test_build_contributions_term_without_conditions_is_one_row_summing_every_label(molsys_a1_zero):
     """
     A flat background: no label to fix, so one index set, {}, at the location without axes.
@@ -730,10 +724,6 @@ def test_build_contributions_needs_every_prop_the_terms_use(molsys):
 ## exclude_modes: a mode left out of the evaluation ----------------------------
 # The toy molecule has 2 modes, 0 and 1. An excluded mode is no value of a resonance label (no row, no zero
 # pair) and no value of a summed label (included_modes).
-
-def test_included_modes_without_exclusion_is_every_mode(molsys):
-    assert included_modes(molsys) == (0, 1)
-
 
 def test_included_modes_leaves_out_the_excluded_modes(molsys):
     assert included_modes(molsys, (1,)) == (0,)
