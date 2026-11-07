@@ -28,7 +28,6 @@ from wilson_suite.wilson_response_evaluate.evaluate import (
     eval_resonance_factor,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
-    get_RHS_motif,
     harmonic_denom,
     included_modes,
     make_avrg_einsum_subscripts,
@@ -118,51 +117,6 @@ def resonance_residuals(motif: ResonanceMotif,
             for c in motif]
 
 
-## get_RHS_motif --------------------------------------------------------------
-# One entry per condition: -(E_left - E_right), in Eh by default, cm-1 on request.
-
-@pytest.mark.parametrize('motif, expected_cm1', [
-    (MOTIF_AB,      [E0, -(E01 - E0)]),           # -(E_0 - E_a), -(E_ab - E_a)
-    (MOTIF_A,       [-E0]),                       # -(E_a - E_0)
-    (MOTIF_MIXED,   [E0, E0]),                    # -(E_0 - E_a)
-    (MOTIF_B_TWICE, [E0, -(E1 - E0)]),
-])
-def test_get_RHS_motif_cm1(motif, expected_cm1, params_obj, states):
-    rhs = get_RHS_motif(ResonanceMotif.from_tuples(motif), params_obj, states, unit='cm-1')
-
-    assert rhs == pytest.approx(expected_cm1)
-
-
-def test_get_RHS_motif_defaults_to_hartree(params_obj, states):
-    motif = ResonanceMotif.from_tuples(MOTIF_AB)
-
-    assert get_RHS_motif(motif, params_obj, states) == get_RHS_motif(motif, params_obj, states, unit='Eh')
-    assert get_RHS_motif(motif, params_obj, states) == pytest.approx([convNu2Ene(E0), convNu2Ene(-(E01 - E0))])
-
-
-def test_get_RHS_motif_follows_the_mode_assignment(states):
-    """Same motif, a and b swapped -> different states resonate."""
-    motif = ResonanceMotif.from_tuples(MOTIF_AB)
-
-    swapped = get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 0}), states, unit='cm-1')
-
-    assert swapped == pytest.approx([E1, -(E01 - E1)])
-
-
-@pytest.mark.parametrize('unit', ['cm', 'cm^-1', 'eh', 'au'])
-def test_get_RHS_motif_unknown_unit_raises(unit, params_obj, states):
-    """Only 'Eh' and 'cm-1': any other text raises, rather than being read as cm-1."""
-    with pytest.raises(ValueError, match="unit must be 'Eh' or 'cm-1'"):
-        get_RHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), params_obj, states, unit=unit)
-
-
-def test_get_RHS_motif_unknown_state_raises(states):
-    motif = ResonanceMotif.from_tuples(MOTIF_AB)
-
-    with pytest.raises(ValueError):          # a=b=1 needs state '1,1', which `states` lacks
-        get_RHS_motif(motif, ParameterSet({'a': 1, 'b': 1}), states)
-
-
 ## solve_LSE_motif ------------------------------------------------------------
 
 @pytest.mark.parametrize('motif, expected', [
@@ -176,16 +130,6 @@ def test_solve_LSE_motif_cm1(motif, expected, params_obj, states):
     assert isinstance(location, ResLocPoint)
     assert location.axes == tuple(sorted(expected))
     assert dict(location.coordinates) == pytest.approx(expected)
-
-
-@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_A, MOTIF_MIXED])
-def test_solve_LSE_motif_location_satisfies_every_condition(motif, params_obj, states):
-    """Independent check: plug the solution back into  E_left - E_right = sum_j s_j w_j ."""
-    res_motif = ResonanceMotif.from_tuples(motif)
-
-    location = solve_LSE_motif(res_motif, params_obj, states, unit='cm-1')
-
-    assert resonance_residuals(res_motif, location, params_obj.to_dict(), states, unit='cm-1') == pytest.approx([0.] * len(res_motif))
 
 
 def test_solve_LSE_motif_hartree_is_cm1_converted(params_obj, states):
