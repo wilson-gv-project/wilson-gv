@@ -51,7 +51,7 @@ def test_get_data_for_vibanalysers():
                                                      basis_set='STO-3G', 
                                                      base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
     vib_ana, props = ws.main.main_functions.get_data_for_vibanalysers(vib_ana=vib_ana, 
                                                      calc_setup=calc_setup, 
                                                      obtainer=wilson_data_obtainer)

@@ -141,7 +141,7 @@ sim.setPropsAndMaxStateLvl()  # setting up self.props/sim.props
 sim.dressPropsWithSetup()
 
 
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 sim.getResults(obtainer=wilson_data_obtainer)
 
 
