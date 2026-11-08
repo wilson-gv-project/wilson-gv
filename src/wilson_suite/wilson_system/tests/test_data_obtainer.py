@@ -84,9 +84,10 @@ def test_one_call_per_origin(calls):
 
 
 def test_unknown_source_type(calls):
-    """A source type the obtainer does not know stops with an error and never reaches parse_from_source."""
+    """A source type the obtainer does not know stops with an error that names it, before any file is read."""
+    known = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
     unknown = DataOriginInfo(source_type='orca')
 
-    with pytest.raises(ValueError):
-        wilson_data_obtainer({'cff': unknown})
+    with pytest.raises(ValueError, match="'orca'"):
+        wilson_data_obtainer({'cff': known, 'dipgrad': unknown})
     assert not calls

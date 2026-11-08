@@ -1,4 +1,5 @@
 from collections import Counter
+from dataclasses import asdict
 
 from wilson_suite.wilson_system.system_data import DataOriginInfo
 
@@ -18,57 +19,41 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     Mixing origins assumes mode k is the same vibration in each; nothing checks this.
 
     raises TypeError if requested_data_dict is not {name: DataOriginInfo},
-        ValueError for an unknown source_type, NotImplementedError for 'wilson'
+        ValueError for an unknown source_type, NotImplementedError for 'wilson';
+        all before any file is read
     """
-    
-    if isinstance(requested_data_dict, dict):
-        for k, v in requested_data_dict.items():
-            if isinstance(v, DataOriginInfo):
-                continue
-            else:
-                raise TypeError("requested_data_dict should be dict[str,DataOriginInfo]")
-    else:
-        raise TypeError("requested_data_dict should be dict[str,DataOriginInfo]")
-    dict_with_data = {}
-    extras = []     # per call, the names it returned without being asked
+    if not isinstance(requested_data_dict, dict):
+        raise TypeError(f'requested_data_dict should be dict[str, DataOriginInfo], '
+                        f'not {type(requested_data_dict).__name__}')
+    wrong = {k: type(v).__name__ for k, v in requested_data_dict.items() if not isinstance(v, DataOriginInfo)}
+    if wrong:
+        raise TypeError(f'requested_data_dict should be dict[str, DataOriginInfo]; not a DataOriginInfo: {wrong}')
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
-
-
     for k, v in requested_data_dict.items():
-
-        if v not in origin_to_req_data:
-            origin_to_req_data[v] = [k]
-
-        else:
-            origin_to_req_data[v].append(k)
-
+        origin_to_req_data.setdefault(v, []).append(k)
 
     for o, datakeys in origin_to_req_data.items():
-
-        if o.source_type in ['cfour', 'gaussian']:
-
-            from dataclasses import asdict
-
-            from CQCParse.parsing import parse_from_source
-
-            these_results_dict = parse_from_source(requested_data=datakeys, **asdict(o))
-
-            dict_with_data.update({k: these_results_dict[k] for k in datakeys if k in these_results_dict})
-            extras.append({k: v for k, v in these_results_dict.items() if k not in datakeys})
-
-        elif o.source_type in ['wilson']:
-
-            raise NotImplementedError('In-house retrieval not yet implemented')
+        if o.source_type == 'wilson':
+            raise NotImplementedError(f"source_type 'wilson' for {datakeys}: in-house retrieval not yet implemented")
             # FIXME: MR to implement:
             #   - use base_file_loc as a parsing starting point. Support one or
             #     more of:
             #     a) Formatted or unformatted numpy arrays delimited by header info
             #     b) Other systematic (e.g. OpenRSP format) tensors
             #     c) Header info plus locator for values in formats a) or b)
+        if o.source_type not in ('cfour', 'gaussian'):
+            raise ValueError(f"unknown source_type {o.source_type!r} for {datakeys}; expected 'gaussian' or 'cfour'")
 
-        else:
-            raise ValueError('Unsupported source type for data obtainer')
+    # imported here, not at the top: wilson imports without CQCParse
+    from CQCParse.parsing import parse_from_source
+
+    dict_with_data = {}
+    extras = []     # per call, the names it returned without being asked
+    for o, datakeys in origin_to_req_data.items():
+        these_results_dict = parse_from_source(requested_data=datakeys, **asdict(o))
+        dict_with_data.update({k: these_results_dict[k] for k in datakeys if k in these_results_dict})
+        extras.append({k: v for k, v in these_results_dict.items() if k not in datakeys})
 
     # an extra name is kept if no origin was asked for it and only one origin returns it
     counts = Counter(k for e in extras for k in e)
