@@ -1,13 +1,26 @@
+from collections import Counter
+
 from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 
-def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
-                         get_geometry=False, get_displacements=False):
+def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     """
-    1. group by origin
+    Read data from its sources: one parse_from_source call per origin.
 
+    requested_data_dict  {name: DataOriginInfo}, the names to read and where each comes from
+    returns              {name: value}, the requested names, plus extra names a call returns
 
+    Names with equal origins go to one call together, e.g.
+        {'cff': g16, 'qff': g16, 'dipgrad': c4} -> ['cff', 'qff'] from g16, ['dipgrad'] from c4
+    A call can return names that were not requested, e.g. cff_rc with cff. Merging the calls:
+        a requested name   always from its own origin
+        an extra name      kept if no origin was asked for it and only one origin returns it
+    Mixing origins assumes mode k is the same vibration in each; nothing checks this.
+
+    raises TypeError if requested_data_dict is not {name: DataOriginInfo},
+        ValueError for an unknown source_type, NotImplementedError for 'wilson'
     """
+    
     if isinstance(requested_data_dict, dict):
         for k, v in requested_data_dict.items():
             if isinstance(v, DataOriginInfo):
@@ -17,13 +30,10 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
     else:
         raise TypeError("requested_data_dict should be dict[str,DataOriginInfo]")
     dict_with_data = {}
+    extras = []     # per call, the names it returned without being asked
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
 
-    if get_geometry:
-        requested_data_dict.update({'atoms': requested_data_dict['nc_sqrt_eigval']})
-    if get_displacements:
-        requested_data_dict.update({'normal_modes': requested_data_dict['nc_sqrt_eigval']})
 
     for k, v in requested_data_dict.items():
 
@@ -34,16 +44,18 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
             origin_to_req_data[v].append(k)
 
 
-    for o in origin_to_req_data:
+    for o, datakeys in origin_to_req_data.items():
 
         if o.source_type in ['cfour', 'gaussian']:
 
-            from CQCParse.parsing import parse_from_source
             from dataclasses import asdict
 
-            these_results_dict = parse_from_source(requested_data=origin_to_req_data[o], **asdict(o))
+            from CQCParse.parsing import parse_from_source
 
-            dict_with_data.update(these_results_dict)
+            these_results_dict = parse_from_source(requested_data=datakeys, **asdict(o))
+
+            dict_with_data.update({k: these_results_dict[k] for k in datakeys if k in these_results_dict})
+            extras.append({k: v for k, v in these_results_dict.items() if k not in datakeys})
 
         elif o.source_type in ['wilson']:
 
@@ -57,6 +69,11 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo],
 
         else:
             raise ValueError('Unsupported source type for data obtainer')
+
+    # an extra name is kept if no origin was asked for it and only one origin returns it
+    counts = Counter(k for e in extras for k in e)
+    for e in extras:
+        dict_with_data.update({k: v for k, v in e.items() if k not in requested_data_dict and counts[k] == 1})
 
     return dict_with_data
 

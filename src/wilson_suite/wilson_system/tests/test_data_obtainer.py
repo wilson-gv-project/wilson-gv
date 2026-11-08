@@ -13,6 +13,8 @@ from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 data_dir = files('wilson_suite').joinpath('data_for_tests')
 WATER = DataOriginInfo(source_type='gaussian', base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
+FORMALDEHYDE = DataOriginInfo(source_type='gaussian',
+                              base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out')
 
 
 def test_getting_data():
@@ -33,6 +35,27 @@ def test_getting_data():
               'cff': (n, n, n), 'cff_rc': (n, n, n), 'qff': (n, n, n, n), 'qff_rc': (n, n, n, n),
               'coriolis': (3, n, n)}
     assert {k: data[k].shape for k in shapes} == shapes
+
+
+@pytest.mark.parametrize('water_first', [True, False])
+def test_merge_of_two_origins(water_first):
+    """
+    Water (3 modes) and formaldehyde (6 modes). A call for cff also returns cff_rc, and the
+    reverse; every call returns reindex_modes. The merge, in either order of the request:
+        cff, cff_rc   requested: each from its own origin, not from the other's extra
+        qff_rc        an extra of water only: kept
+        reindex_modes an extra of both: dropped
+    """
+    from_water = {'cff': WATER, 'qff': WATER}
+    from_formaldehyde = {'cff_rc': FORMALDEHYDE}
+    request = {**from_water, **from_formaldehyde} if water_first else {**from_formaldehyde, **from_water}
+
+    data = wilson_data_obtainer(request)
+
+    assert set(data) == {'cff', 'qff', 'cff_rc', 'qff_rc'}
+    assert data['cff'].shape == (3, 3, 3)
+    assert data['qff_rc'].shape == (3, 3, 3, 3)
+    assert data['cff_rc'].shape == (6, 6, 6)
 
 
 @pytest.fixture
