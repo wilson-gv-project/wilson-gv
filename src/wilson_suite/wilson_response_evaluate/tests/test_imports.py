@@ -12,7 +12,7 @@ from pathlib import Path
 
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 
-NEW_CODE = ('wilson_response_evaluate', 'wilson_system')     # relative to SUITE_ROOT
+NEW_CODE = ('wilson_response_evaluate', 'wilson_system', 'wilson_orientational_averaging')     # relative to SUITE_ROOT
 FORBIDDEN = (
     'wilson_suite.wilson_experiment',                   # the experiment, every module
     'wilson_suite.wilson_derive.derive',                # get_fully_enhanced_terms
