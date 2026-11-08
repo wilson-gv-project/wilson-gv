@@ -1,10 +1,23 @@
 """
 """
+import wilson_suite as ws
+from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCollection
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.serialization import unpickle_smth_from
-import wilson_suite as ws
 
 pickles_dir = SUITE_ROOT+'/wilson_intensities/tests/datafiles'
+
+
+def vpt2_inputs(props) -> MolPropsCollection:
+    """
+    The VPT2 inputs from the pickled properties of the old workflow. The pickles keep the force
+    constants in cm-1 in extra_data of cff and qff; the collection names them cff_rc and qff_rc.
+    """
+    by_name = {p.trivial_name: p for p in props}
+    return MolPropsCollection([MolecularProperty(trivial_name='cff_rc', vals=by_name['cff'].extra_data),
+                               MolecularProperty(trivial_name='qff_rc', vals=by_name['qff'].extra_data),
+                               MolecularProperty(trivial_name='B', vals=by_name['B'].vals),
+                               MolecularProperty(trivial_name='coriolis', vals=by_name['coriolis'].vals)])
 
 def test_form_vpt2():
     file = 'HF_STO_3G_VPT2.pkl'
@@ -15,7 +28,7 @@ def test_form_vpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                             regime="VPT2", #vib_ana.regime
                                                                             exclude_modes=None)        
@@ -43,7 +56,7 @@ def test_form_gvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                             regime="GVPT2", #vib_ana.regime
                                                                             exclude_modes=None)        
@@ -75,7 +88,7 @@ def test_form_gvpt2_nocoriolis():
             assert (p.vals == 0).all()
 
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                             regime="GVPT2", #vib_ana.regime
                                                                             exclude_modes=None)        
@@ -103,7 +116,7 @@ def test_form_dvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
+    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                             regime="DVPT2", #vib_ana.regime
                                                                             exclude_modes=None)        

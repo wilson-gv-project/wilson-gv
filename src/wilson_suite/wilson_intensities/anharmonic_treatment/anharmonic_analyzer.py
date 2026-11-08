@@ -1,24 +1,29 @@
 """
-Anharmonic analyzer for wilson_main.VibAnaSetup.doAnharmonicAnalysis()
+Anharmonic analyzer
 
 """
-from ...wilson_main import abstractions as wm_abst
+import logging
+
+from ...wilson_system.system_data import MolPropsCollection, VibState
 from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
-import logging
 logger = logging.getLogger("wilson_suite."+__name__)
 
-def anharm_analyzer_data(props: list[wm_abst.MolecularProperty] = None, 
-                         nc_sqrt_eigval: dict = None, 
-                         regime: str = None,
-                         exclude_modes: list = None) -> tuple[list[wm_abst.VibState], dict]:
+def anharm_analyzer_data(props: MolPropsCollection, 
+                         nc_sqrt_eigval: dict, 
+                         regime: str,
+                         exclude_modes: list) -> tuple[list[VibState], dict]:
     """
     Basically a wrapper for analyser; passes data to anharm_corr_energies where analysis happens...
         then puts into list[VibState] form.
     This way it is more clean
 
     returns self.states for VibAnaSetup, and states are list[VibState]
-    
+
+    exclude_modes: modes left out of VPT2, as if the molecule did not have them. The other states
+        change, and no state of an excluded mode is returned. An unknown mode raises ValueError.
+    diagnostics: {'fermi_resonances': [...], 'exclude_modes': the excluded modes, sorted, e.g. (1,)}
+
     NOTE: Pure function -  will assume that inputs are always valid
     """
     logger.info('Starting anharm_analyzer()')
@@ -28,12 +33,13 @@ def anharm_analyzer_data(props: list[wm_abst.MolecularProperty] = None,
     # modes exclusion list update
     if exclude_modes is None:
         exclude_modes = []
-    
-    # prop_dict = {i.trivial_name: i.serial_vals for i in props}
-    prop_dict = {i.trivial_name: i.vals for i in props}
-    for i in props: 
-        if i.trivial_name in ['cff', 'qff']:
-            prop_dict[i.trivial_name] = i.extra_data
+    unknown = sorted(set(exclude_modes) - set(nc_sqrt_eigval))
+    if unknown:
+        raise ValueError(f'exclude_modes {unknown}: no such mode, the modes are {sorted(nc_sqrt_eigval)}')
+
+    # force constants in cm-1 (cff_rc, qff_rc), as anharm_corr_energies takes them; cff and qff are in atomic units
+    prop_dict = {name: props[name].vals for name in ('cff_rc', 'qff_rc', 'B', 'coriolis')}
+
     logger.debug(f'prop_dict {prop_dict.keys()}')
     logger.debug(prop_dict)
 
@@ -42,8 +48,8 @@ def anharm_analyzer_data(props: list[wm_abst.MolecularProperty] = None,
 
     # corrected_levels : funds, over2q, combo2q, over3q, combo3q
     corrected_levels, fermi_resonances = anharm_corr_energies(harmonic_energies=nc_sqrt_eigval,
-                                                             cubic_forcefield=prop_dict['cff'], 
-                                                             quartic_forcefield=prop_dict['qff'], 
+                                                             cubic_forcefield=prop_dict['cff_rc'],
+                                                             quartic_forcefield=prop_dict['qff_rc'],
                                                              rotational_constant=prop_dict['B'], 
                                                              coriolis_constant=prop_dict['coriolis'],
                                                              anharmonic_type=regime, 
@@ -56,32 +62,39 @@ def anharm_analyzer_data(props: list[wm_abst.MolecularProperty] = None,
 
         for j in range(i + 1):
             if i == j:
-                all_states_corr[tuple([str(i), str(i)])] = corrected_levels[1][i]
+                all_states_corr[(str(i), str(i))] = corrected_levels[1][i]
             else:
-                all_states_corr[tuple([str(el) for el in sorted([i, j])])] = corrected_levels[2][i, j]
+                all_states_corr[(str(j), str(i))] = corrected_levels[2][i, j]     # j < i: numeric order
 
             for k in range(len(nc_sqrt_eigval)):
                 if i == j == k:
-                    all_states_corr[tuple([str(i), str(i), str(i)])] = corrected_levels[3][i]
+                    all_states_corr[(str(i), str(i), str(i))] = corrected_levels[3][i]
                 else:
                     key = tuple([str(el) for el in sorted([i, j, k])])
-                    if key not in all_states_corr:
-                        if corrected_levels[4][i, j, k] != 0.:
-                            all_states_corr[key] = corrected_levels[4][i, j, k]
+                    if key not in all_states_corr and corrected_levels[4][i, j, k] != 0.:
+                        all_states_corr[key] = corrected_levels[4][i, j, k]
 
     logger.debug(f'all_states_corr: {all_states_corr}')
 
+    # VPT2 keeps a slot for each excluded mode and leaves it at 0 cm-1, the ground-state energy;
+    # a state that contains an excluded mode is left out, so no such 0 is read as a real energy.
+    # whole mode labels are compared: excluding '1' keeps ('0', '10')
+    excluded = {str(m) for m in exclude_modes}
     vibstates = []
-    for st in all_states_corr:
+    for st, energy in all_states_corr.items():
+        if excluded.intersection(st):
+            continue
         # if len(st) <= max_state_lvl: # ?
-        # TODO: Exclusion based on mode index or freq cutoff
+        # TODO: Exclusion based on freq cutoff
         # FIXME: Change to integer indexing - in s dict?
-        vibstates.append(wm_abst.VibState(harm_quanta_coeffs={st: 1.0}, energy=all_states_corr[st]))
+        vibstates.append(VibState(harm_quanta_coeffs={st: 1.0}, energy=energy))
 
     logger.debug('GVPT2 anharm corrected:')
     logger.debug(f'vibstates: {vibstates}')
 
-    diagnostics = {'fermi_resonances': fermi_resonances}
+    # the energies of the kept states depend on which modes VPT2 left out, and the states alone
+    # do not show those modes, so the diagnostics name them. Sorted tuple: same modes in any order, same record
+    diagnostics = {'fermi_resonances': fermi_resonances, 'exclude_modes': tuple(sorted(exclude_modes))}
     
     return vibstates, diagnostics
 
