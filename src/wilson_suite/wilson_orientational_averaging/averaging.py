@@ -1,6 +1,8 @@
+import copy
+
+
 
 import numpy as np
-import copy
 
 
 def isotropic_average_for_props_and_field(term, experiment):
@@ -80,36 +82,6 @@ def isotropic_average_for_props_and_field(term, experiment):
 
     pass
 
-# FIXME: Type hints for all
-
-# FIXME: Verify this routine thoroughly with tests
-def get_pol_laser(pol):
-    """
-    Calculate transposed 'laser polarization term' (the term (A * f) in (A * f * M * g * P) in JCP 141, 204103)
-    pol: list of len 3 lists specifying polarization vectors
-    """
-
-    A = 1.0
-
-    A = get_pol_tensor(A, pol)
-    A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
-
-    f = get_iso_f(len(pol))
-
-    # NOTE: This is real-valued for now since it only currently deals with linear polarization and assumed overall
-    # phase of zero. If any of these conditions are relaxed this must be changed to be complex-valued
-    pl = np.zeros((len(f)))
-
-    for i in range(len(f)):
-
-        for j in range(len(f[i][0])):
-            pl[i] += A[tuple(f[i][0][j])]
-
-        for j in range(len(f[i][1])):
-            pl[i] -= A[tuple(f[i][1][j])]
-
-    return [float(i) for i in pl]
-
 
 def get_pol_tensor(pol_tensor, pol):
     """
@@ -127,127 +99,6 @@ def get_pol_tensor(pol_tensor, pol):
     else:
         return get_pol_tensor(np.kron(pol_tensor, np.array(copy.deepcopy(pol[len(pol) - 1]))), pol[0:len(pol) -1])
 
-def mdk(a: int, b: int):
-    """
-    Kronecker delta over three spatial dimensions
-
-    Takes integers a and b for ranks and returns list of dictionaries each of valid pairs of axes for these ranks
-    """
-
-    return [
-        {a: 0, b: 0},
-        {a: 1, b: 1},
-        {a: 2, b: 2}
-    ]
-
-def mdl(a: int, b: int, c: int):
-    """
-    Levi-Civita terms
-
-    Takes integers a, b, c for ranks and returns two lists, each consisting of dictionaries each of valid triples of
-    axes for these ranks:
-    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
-    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
-    """
-
-    return [
-        [{a: 0, b: 1, c: 2},
-         {a: 1, b: 2, c: 0},
-         {a: 2, b: 0, c: 1}],
-        [{a: 2, b: 1, c: 0},
-         {a: 1, b: 0, c: 2},
-         {a: 0, b: 2, c: 1}]
-    ]
-
-def make_iso_f_element(n, kron, lc):
-    """
-    Determine full set of valid axis values for each rank given a string of Kronecker deltas and Levi-Civita symbols
-    for individual doubles/triples of ranks. This is an element of the f (g) vector
-
-    n: Total order (strictly speaking redundant when all ranks are represented in the Kronecker/Levi-Civita collection)
-    kron: List of Kronecker delta valid axis values for given ranks (see mdk())
-    lc: List of two lists (coefficient +1 and -1): Levi-civita valid axis values for given ranks (see mdl())
-
-    Returns two lists of lists:
-    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
-    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
-    - Note that the second list may be empty if no elements are to be subtracted (i.e. no Levi-Civita)
-    """
-
-    # Make two lists of lists in iso_f: One for addition and another for subtraction
-    iso_f = []
-
-    # Call meso_iso_f: iso_f argument is a dummy recursion seed
-    iso_f.append(meso_iso_f_element(kron, [['dummy' for i in range(n)]]))
-
-    # Are there only Kronecker deltas to take care of? If so, then no subtraction: Make tuples of valid axis combs. and return
-    if len(lc) == 0:
-
-        # Check if all ranks were covered
-        for i in iso_f[0]:
-             if 'dummy' in i:
-                 raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
-
-        return [[tuple(i) for i in iso_f[0]], []]
-
-
-    # If not, proceed to do Levi-Civita handling
-    iso_f.append(copy.deepcopy(iso_f[0]))
-
-    # FIXME: Test this to end of fn specifically: No big reason to suspect problems but I don't recall how this worked
-    bperm = [[0], [1]]
-    for i in range(len(bperm)):
-
-        this_lc = []
-        for j in range(len(bperm[i])):
-            this_lc.append(lc[j][bperm[i][j]])
-
-        iso_f[sum(bperm[i]) % 2] = meso_iso_f_element(this_lc, iso_f[sum(bperm[i]) % 2])
-
-    # Check if all ranks were covered
-    for i in iso_f[0]:
-        if 'dummy' in i:
-            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
-
-    for i in iso_f[1]:
-        if 'dummy' in i:
-            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
-
-    # Make tuples of valid axis combs. and return
-    return [[tuple(i) for i in iso_f[0]], [tuple(i) for i in iso_f[1]]]
-
-def meso_iso_f_element(dicts, iso_f):
-    """
-    Helper function: Take list of Kronecker or Levi-Civita (resp. mdk() or mdl(), see
-    return structure there) dictionaries of rank : element pairs and return a set of valid collected axis combinations
-
-    Returns a list of lists: (Partially or fully covered (depending on completeness of dicts in covering ranks)) lists of
-    valid axis combinations
-    """
-
-    # FIXME: This appears to fill ranks according to the dictionaries
-    if len(dicts) > 0:
-
-        new_iso_f = []
-
-        for i in range(len(iso_f)):
-
-            this_iso_f = copy.deepcopy(iso_f[i])
-            for j in range(len(dicts[0])):
-                curr_iso_f = copy.deepcopy(this_iso_f)
-                for k in dicts[0][j].keys():
-
-                    curr_iso_f[k] = dicts[0][j][k]
-
-                new_iso_f.append(copy.deepcopy(curr_iso_f))
-
-        iso_f = copy.deepcopy(new_iso_f)
-        result = meso_iso_f_element(dicts[1:len(dicts)], iso_f)
-        return result
-
-    else:
-
-        return iso_f
 
 def get_iso_f(n):
     """
@@ -315,6 +166,163 @@ def get_iso_f(n):
         raise ValueError('Unsupported get_iso_f order:', n)
 
 
+# FIXME: Type hints for all
+
+# FIXME: Verify this routine thoroughly with tests
+def get_pol_laser(pol):
+    """
+    Calculate transposed 'laser polarization term' (the term (A * f) in (A * f * M * g * P) in JCP 141, 204103)
+    pol: list of len 3 lists specifying polarization vectors
+    """
+
+    A = 1.0
+
+    A = get_pol_tensor(A, pol)
+    A = np.reshape(A, tuple([len(pol[i]) for i in range(len(pol))]))
+
+    f = get_iso_f(len(pol))
+
+    # NOTE: This is real-valued for now since it only currently deals with linear polarization and assumed overall
+    # phase of zero. If any of these conditions are relaxed this must be changed to be complex-valued
+    pl = np.zeros((len(f)))
+
+    for i in range(len(f)):
+
+        for j in range(len(f[i][0])):
+            pl[i] += A[tuple(f[i][0][j])]
+
+        for j in range(len(f[i][1])):
+            pl[i] -= A[tuple(f[i][1][j])]
+
+    return [float(i) for i in pl]
+
+
+def mdk(a: int, b: int):
+    """
+    Kronecker delta over three spatial dimensions
+
+    Takes integers a and b for ranks and returns list of dictionaries each of valid pairs of axes for these ranks
+    """
+
+    return [
+        {a: 0, b: 0},
+        {a: 1, b: 1},
+        {a: 2, b: 2}
+    ]
+
+
+def mdl(a: int, b: int, c: int):
+    """
+    Levi-Civita terms
+
+    Takes integers a, b, c for ranks and returns two lists, each consisting of dictionaries each of valid triples of
+    axes for these ranks:
+    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
+    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
+    """
+
+    return [
+        [{a: 0, b: 1, c: 2},
+         {a: 1, b: 2, c: 0},
+         {a: 2, b: 0, c: 1}],
+        [{a: 2, b: 1, c: 0},
+         {a: 1, b: 0, c: 2},
+         {a: 0, b: 2, c: 1}]
+    ]
+
+
+def meso_iso_f_element(dicts, iso_f):
+    """
+    Helper function: Take list of Kronecker or Levi-Civita (resp. mdk() or mdl(), see
+    return structure there) dictionaries of rank : element pairs and return a set of valid collected axis combinations
+
+    Returns a list of lists: (Partially or fully covered (depending on completeness of dicts in covering ranks)) lists of
+    valid axis combinations
+    """
+
+    # FIXME: This appears to fill ranks according to the dictionaries
+    if len(dicts) > 0:
+
+        new_iso_f = []
+
+        for i in range(len(iso_f)):
+
+            this_iso_f = copy.deepcopy(iso_f[i])
+            for j in range(len(dicts[0])):
+                curr_iso_f = copy.deepcopy(this_iso_f)
+                for k in dicts[0][j].keys():
+
+                    curr_iso_f[k] = dicts[0][j][k]
+
+                new_iso_f.append(copy.deepcopy(curr_iso_f))
+
+        iso_f = copy.deepcopy(new_iso_f)
+        result = meso_iso_f_element(dicts[1:len(dicts)], iso_f)
+        return result
+
+    else:
+
+        return iso_f
+
+
+def make_iso_f_element(n, kron, lc):
+    """
+    Determine full set of valid axis values for each rank given a string of Kronecker deltas and Levi-Civita symbols
+    for individual doubles/triples of ranks. This is an element of the f (g) vector
+
+    n: Total order (strictly speaking redundant when all ranks are represented in the Kronecker/Levi-Civita collection)
+    kron: List of Kronecker delta valid axis values for given ranks (see mdk())
+    lc: List of two lists (coefficient +1 and -1): Levi-civita valid axis values for given ranks (see mdl())
+
+    Returns two lists of lists:
+    - The first list contains elements to be considered with a factor +1 ("forwards" permutations)
+    - The second list contains elements to be considered with a factor -1 ("backwards" permutations)
+    - Note that the second list may be empty if no elements are to be subtracted (i.e. no Levi-Civita)
+    """
+
+    # Make two lists of lists in iso_f: One for addition and another for subtraction
+    iso_f = []
+
+    # Call meso_iso_f: iso_f argument is a dummy recursion seed
+    iso_f.append(meso_iso_f_element(kron, [['dummy' for i in range(n)]]))
+
+    # Are there only Kronecker deltas to take care of? If so, then no subtraction: Make tuples of valid axis combs. and return
+    if len(lc) == 0:
+
+        # Check if all ranks were covered
+        for i in iso_f[0]:
+             if 'dummy' in i:
+                 raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
+
+        return [[tuple(i) for i in iso_f[0]], []]
+
+
+    # If not, proceed to do Levi-Civita handling
+    iso_f.append(copy.deepcopy(iso_f[0]))
+
+    # FIXME: Test this to end of fn specifically: No big reason to suspect problems but I don't recall how this worked
+    bperm = [[0], [1]]
+    for i in range(len(bperm)):
+
+        this_lc = []
+        for j in range(len(bperm[i])):
+            this_lc.append(lc[j][bperm[i][j]])
+
+        iso_f[sum(bperm[i]) % 2] = meso_iso_f_element(this_lc, iso_f[sum(bperm[i]) % 2])
+
+    # Check if all ranks were covered
+    for i in iso_f[0]:
+        if 'dummy' in i:
+            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
+
+    for i in iso_f[1]:
+        if 'dummy' in i:
+            raise AssertionError('Not all ranks were covered by Kronecker dictated combinations')
+
+    # Make tuples of valid axis combs. and return
+    return [[tuple(i) for i in iso_f[0]], [tuple(i) for i in iso_f[1]]]
+
+
 def get_iso_mat(n):
     """
     Get the matrix M used in orientational averaging between macroscopic and microscopic vectors (here tabulated)
@@ -375,6 +383,7 @@ def get_iso_mat(n):
 
         raise ValueError('Unsupported get_iso_mat order:', n)
 
+
 def get_AlphaBetaGammaDelta_indices(num_f: int) -> np.ndarray:
     """
     Now is set for the EVV experiment and for ZZZZ polarization.
@@ -401,6 +410,7 @@ def getPolarizationAveragingExpression(num_pulses: int, polarization: str):
     if num_pulses==4:
         if polarization=="ZZZZ":
             return get_AlphaBetaGammaDelta_indices(num_f=num_pulses), 1./15
+
 
 def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
     """
@@ -482,4 +492,3 @@ def getGeneralPolarizationAveragingExpression(rank: int, laser_pol: np.array):
         del linear_combination[i]
 
     return linear_combination
-

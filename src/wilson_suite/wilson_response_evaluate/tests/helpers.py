@@ -15,7 +15,7 @@ from wilson_suite.wilson_derive.abstractions import (
     QOperator,
     VibDiffTerm,
 )
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
+from wilson_suite.wilson_orientational_averaging.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_response_evaluate.features import (

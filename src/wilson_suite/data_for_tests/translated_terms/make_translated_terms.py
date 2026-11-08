@@ -85,7 +85,7 @@ import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+from wilson_suite.wilson_orientational_averaging.averaging import get_pol_laser
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
 

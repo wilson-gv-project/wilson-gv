@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
+from wilson_suite.wilson_orientational_averaging.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_response_evaluate.evaluate import (
@@ -148,7 +148,7 @@ def test_evaluate_term():
                                      base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
     molsys = MolSystemData.load(calc_dataorigin, term.prop_names)
     
-    from wilson_suite.wilson_intensities.amplitudes.averaging import (
+    from wilson_suite.wilson_orientational_averaging.averaging import (
         getGeneralPolarizationAveragingExpression,
     )
     polarization_linear_comb = getGeneralPolarizationAveragingExpression(rank=4,laser_pol=(1.,1.,1.))

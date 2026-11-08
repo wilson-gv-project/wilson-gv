@@ -113,7 +113,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
+from wilson_suite.wilson_orientational_averaging.averaging import (
     get_iso_f,
     getGeneralPolarizationAveragingExpression,
 )

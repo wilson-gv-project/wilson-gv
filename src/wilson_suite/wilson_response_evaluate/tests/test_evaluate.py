@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 import wilson_suite.wilson_response_evaluate.evaluate as evaluate_mod
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
+from wilson_suite.wilson_orientational_averaging.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_response_evaluate.evaluate import (

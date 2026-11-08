@@ -21,7 +21,7 @@ import pytest
 
 from wilson_suite.wilson_derive.abstractions import PolProp
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.averaging import (
+from wilson_suite.wilson_orientational_averaging.averaging import (
     getGeneralPolarizationAveragingExpression,
 )
 from wilson_suite.wilson_response_evaluate.compat import term_to_str

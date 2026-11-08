@@ -31,7 +31,7 @@ The refactor's code is wilson_response_evaluate and wilson_system. The scripts a
 | module | what it gives | used by |
 |---|---|---|
 | wilson_analysis/render/plot_spectrum.py (written for the refactor) | plot_rsp_func, plot_spectrum | example_plot_spectrum.py |
-| wilson_intensities/amplitudes/averaging.py (old evaluator code), through pipeline.py | the averaging recipe | every script |
+| wilson_orientational_averaging/averaging.py, through pipeline.py | the averaging recipe | every script |
 | wilson_utils.wilson_data_obtainer (the reader), through MolSystemData.load | the data of a Gaussian output file | every script |
 
 No script imports the experiment or derive. The stored terms come from
@@ -44,4 +44,4 @@ data_for_tests/translated_terms/make_translated_terms.py, which runs main's code
 | wilson_derive.term_var_translate | the translation of the terms to axes |
 | wilson_utils.termdict_from_symb_term | derived_terms_flat: derive's terms as one list |
 | wilson_utils.builders | make_SpectralAxisSet: the EVV axes, A = w1, B = -w1 + w2 |
-| wilson_intensities/amplitudes/averaging.py (old evaluator code) | get_pol_laser: checks each setup's polarization vector |
+| wilson_orientational_averaging/averaging.py | get_pol_laser: checks each setup's polarization vector |

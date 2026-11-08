@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import wilson_suite.wilson_intensities.amplitudes.averaging as averaging
+from wilson_suite.wilson_orientational_averaging import averaging
 
 
 def test_pol_laser():
