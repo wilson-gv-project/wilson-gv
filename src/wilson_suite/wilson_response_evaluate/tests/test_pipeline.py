@@ -564,8 +564,8 @@ STRONGEST = {'anharmonic': ({'A': 2682.765, 'B': 0.}, -5.0513e-4),
 def test_real_data_strongest_feature(evv_formaldehyde):
     """
     a = b = 5, motif of terms 0, 2-7; terms 3 and 6 add to term 0, the other 4 terms give coeff 0.
-    A = E(1_5) - E(0): Gaussian's mode 5 in the .out file (A order), 2682.765 (anharmonic fundamental) or
-    2933.526 (harmonic) cm-1. B = E(1_b) - E(1_a) = 0, since a = b.
+    A = E(1_5) - E(0): mode 5, 2682.765 (anharmonic fundamental) or 2933.526 (harmonic) cm-1.
+    B = E(1_b) - E(1_a) = 0, since a = b.
     """
     location, amplitude = STRONGEST[evv_formaldehyde.states]
 
