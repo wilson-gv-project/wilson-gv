@@ -56,10 +56,10 @@ def test_get_data_for_vibanalysers():
                                                      calc_setup=calc_setup, 
                                                      obtainer=wilson_data_obtainer)
     
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
-                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                             regime=vib_ana.regime,
-                                                                             exclude_modes=None)
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                        regime=vib_ana.regime,
+                                                                        exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     for k,v in st_dict.items():
         print(k.ljust(10), v)

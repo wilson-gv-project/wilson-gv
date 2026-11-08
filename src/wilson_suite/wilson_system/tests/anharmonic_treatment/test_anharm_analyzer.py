@@ -1,7 +1,6 @@
 import pytest
 
 from ....wilson_utils.printing import printtest, separatorprint
-from ....fixtures import evv_experiment
 from ....wilson_system.system_data import DataOriginInfo, MolSystemData
 import wilson_suite as ws
 from importlib.resources import files
@@ -11,62 +10,6 @@ WATER = DataOriginInfo(source_type='gaussian', lvl_theory='HF', basis_set='STO-3
                        base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
 VPT2_INPUTS = ['cff_rc', 'qff_rc', 'B', 'coriolis']     # force constants in cm-1, rotational, Coriolis constants
 
-def test_anharm_analyzer_wilsonsim():
-    """
-    Anharmonic analyzer (using vpt2.py module) integration test
-
-    to put back in future:
-    import logging
-    from ....wilson_utils.logger import setup_logger
-    setup_logger("wilson_suite.", level=logging.DEBUG)
-    logging.getLogger('wilson_suite.').setLevel(logging.DEBUG)
-    """
-    separatorprint()
-
-    from .... import wilson_main as ws_main
-
-    mol_system = ws_main.abstractions.MolecularSystem(name='h2o', natoms=3)
-    vib_ana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='anharm')
-
-    printtest(f'vibana.vibana_own_analysis: {vib_ana.vibana_own_analysis}')
-    experiment_a = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=experiment_a)
-    axes_choice = experiment_a.valid_axis_combs[0].valid_axis_combs[3] # {'A': [(2,)], 'B': [(-1,), (2,)]}
-    calc_setup = ws_main.abstractions.DataOriginInfo(source_type='gaussian',
-                                                     lvl_theory='HF', 
-                                                     basis_set='STO-3G', 
-                                                     base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
-
-    sim = ws_main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(experiment_a)
-    sim.addTerms(terms=terms)
-    sim.addSystem(mol_system)
-    sim.addVibAnaSetup(vib_ana_setup=vib_ana)
-    sim.addPropEvalSetup(eval_uniform=calc_setup)
-
-    # should be careful with props, because props are needed for vib analyzer
-    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    printtest(f'[i.triv_name for i in sim.props] {[i.trivial_name for i in sim.props]}')    
-    sim.dressPropsWithSetup()
-
-    sim.setAxisChoiceAndTranslateTerms(axes_choice)
-    
-    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
-    sim.getResults(obtainer=wilson_data_obtainer)
-        
-    print('\n')
-    printtest(f'nc_sqrt_eigval: {sim.vib_ana_setup.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
-    print('\n')
-
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=sim.props,
-                                                                             nc_sqrt_eigval=sim.vib_ana_setup.nc_sqrt_eigval,
-                                                                             regime=sim.vib_ana_setup.regime,
-                                                                             exclude_modes=None)
-    st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
-    for k,v in st_dict.items():
-        print(k.ljust(10), v)
-    print(diagn)
-    
 '''
 anharm_analyzer_data() returns list[Vibstate] and diagn dict. Vibstates energies are with anharmonic corrections
 
@@ -88,10 +31,10 @@ def test_anharm_analyzer_vibana():
     printtest(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
-                                                                             nc_sqrt_eigval=molsys.eigenvals,
-                                                                             regime='GVPT2',
-                                                                             exclude_modes=None)
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+                                                                        nc_sqrt_eigval=molsys.eigenvals,
+                                                                        regime='GVPT2',
+                                                                        exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     assert molsys.eigenvals != states_1quantum_corrected
@@ -120,10 +63,10 @@ def test_anharm_analyzer_vibana_excludemodes():
     printtest(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
-                                                                             nc_sqrt_eigval=molsys.eigenvals,
-                                                                             regime='GVPT2',
-                                                                             exclude_modes=[1])
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+                                                                        nc_sqrt_eigval=molsys.eigenvals,
+                                                                        regime='GVPT2',
+                                                                        exclude_modes=[1])
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     assert set(states_1quantum_corrected) == {0, 2}
@@ -139,9 +82,9 @@ def test_anharm_analyzer_vibana_excludemodes():
         print(k, '--', v, '--', states_1quantum_corrected.get(k))
 
     with pytest.raises(ValueError, match=r'exclude_modes \[3\]'):
-        ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
-                                                                 nc_sqrt_eigval=molsys.eigenvals,
-                                                                 regime='GVPT2', exclude_modes=[3])
+        ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+                                                            nc_sqrt_eigval=molsys.eigenvals,
+                                                            regime='GVPT2', exclude_modes=[3])
 
 '''
 def test_anharm_analyzer_vibana():

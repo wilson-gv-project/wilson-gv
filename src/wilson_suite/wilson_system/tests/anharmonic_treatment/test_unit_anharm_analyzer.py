@@ -5,7 +5,7 @@ from wilson_suite.wilson_system.system_data import MolecularProperty, MolPropsCo
 from wilson_suite.wilson_utils.paths import SUITE_ROOT
 from wilson_suite.wilson_utils.serialization import unpickle_smth_from
 
-pickles_dir = SUITE_ROOT+'/wilson_intensities/tests/datafiles'
+pickles_dir = SUITE_ROOT+'/wilson_system/tests/anharmonic_treatment/datafiles'
 
 
 def vpt2_inputs(props) -> MolPropsCollection:
@@ -28,10 +28,10 @@ def test_form_vpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
-                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                            regime="VPT2", #vib_ana.regime
-                                                                            exclude_modes=None)        
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+                                                                       nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                       regime="VPT2", #vib_ana.regime
+                                                                       exclude_modes=None)        
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
@@ -56,10 +56,10 @@ def test_form_gvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
-                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                            regime="GVPT2", #vib_ana.regime
-                                                                            exclude_modes=None)        
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+                                                                       nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                       regime="GVPT2", #vib_ana.regime
+                                                                       exclude_modes=None)        
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
@@ -88,10 +88,10 @@ def test_form_gvpt2_nocoriolis():
             assert (p.vals == 0).all()
 
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
-                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                            regime="GVPT2", #vib_ana.regime
-                                                                            exclude_modes=None)        
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+                                                                       nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                       regime="GVPT2", #vib_ana.regime
+                                                                       exclude_modes=None)        
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
@@ -116,10 +116,10 @@ def test_form_dvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
-                                                                            nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                            regime="DVPT2", #vib_ana.regime
-                                                                            exclude_modes=None)        
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+                                                                       nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                       regime="DVPT2", #vib_ana.regime
+                                                                       exclude_modes=None)        
     # ---- check results
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     st_dict_g16 = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states_g16}
