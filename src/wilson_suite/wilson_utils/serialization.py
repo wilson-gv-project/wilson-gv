@@ -84,14 +84,13 @@ def ndarray_to_dict(arr: np.ndarray, serial=True):
         return {idx: arr[idx].item() for idx in np.ndindex(arr.shape)}
     
 
-def pickle_this_to(obj, filenamepkl=str, save_to: str = ''):
+def pickle_this_to(obj, filenamepkl: str, save_to: str = ''):
     import os
     filepath = os.path.abspath(os.path.join(save_to, filenamepkl))
 
     with open(filepath, "wb") as f:
         pickle.dump(obj, f)
 
-    return
 
 def unpickle_smth_from(filenamepkl: str, load_from: str = ''):
     import os
