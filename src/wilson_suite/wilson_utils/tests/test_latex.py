@@ -2,7 +2,7 @@
 latex_rendering.py: get_plt_latex draws a LaTeX formula with matplotlib's mathtext and saves it, e.g. as SVG.
 A formula that mathtext cannot read raises ValueError when the figure is saved.
 The formulas: VibPerturbedTerm.to_latex of five hand-built terms (resonance conditions only) and of the saved terms
-(terms_fuller_flat.json).
+(data_for_tests/translated_terms/evv.json).
 """
 import matplotlib.pyplot as plt
 import pytest
