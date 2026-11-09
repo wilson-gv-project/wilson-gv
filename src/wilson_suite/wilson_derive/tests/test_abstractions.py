@@ -325,17 +325,6 @@ def test_pol_prop():
     with pytest.raises(ValueError):
         pol_prop_a.setInds(['b', 'a', 'c'])
 
-    # Testing epochContained
-    epochs_a = [[1, 2, 3, 4, 5], [6]]
-    epochs_b = [[1, 2, 3, 4], [5]]
-    epochs_c = [[1], [4, 2, 3]]
-    epochs_d = [[1], [2, 3], [4]]
-
-    assert pol_prop_a.epochContained(epochs_a, op_ind_omega = 7)
-    assert not(pol_prop_a.epochContained(epochs_b, op_ind_omega=6))
-    assert pol_prop_a.epochContained(epochs_c, op_ind_omega = 5)
-    assert not(pol_prop_a.epochContained(epochs_d, op_ind_omega=5))
-
     # Type errors:
 
     # Non-list operators argument
@@ -365,28 +354,6 @@ def test_pol_prop():
         pol_prop_a = PolProp(operators)
         pol_prop_a.setDerivOrder(3)
         pol_prop_a.setInds(['a', 'bogus', 'c'])
-
-    # epochContained: malformed epochs
-    with pytest.raises(TypeError):
-        pol_prop_a = PolProp(operators)
-        epochs_bogus = ([1, 2, 3, 4, 5], [6])
-        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
-
-    with pytest.raises(TypeError):
-        pol_prop_a = PolProp(operators)
-        epochs_bogus = [(1, 2, 3, 4, 5), [6]]
-        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
-
-    with pytest.raises(TypeError):
-        pol_prop_a = PolProp(operators)
-        epochs_bogus = [[1, 2, 3, 'bogus', 5], [6]]
-        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega=7)
-
-    # epochContained: op_ind_omega wrong type
-    with pytest.raises(TypeError):
-        pol_prop_a = PolProp(operators)
-        epochs_bogus = [[1, 2, 3, 4, 5], [6]]
-        bogus = pol_prop_a.epochContained(epochs_bogus, op_ind_omega='bogus')
 
 def test_transition_integral():
 

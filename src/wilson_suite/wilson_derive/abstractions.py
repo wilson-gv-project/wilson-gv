@@ -222,7 +222,7 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list|tuple=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list|tuple=(), id=None):
         """
         diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
               - Several methods will only work with the states in HarmOscStateSymbolic form
@@ -326,31 +326,41 @@ class ResonanceCondition:
 
         term = False
 
+        # Removing matching quanta from bra and ket
         while not term:
             for i in q_bra_net:
                 if i in q_ket_net:
+
                     q_bra_net.remove(i)
                     q_ket_net.remove(i)
+
             new_len_bra = len(q_bra_net)
             new_len_ket = len(q_ket_net)
+
             if (len_bra == new_len_bra) and (len_ket == new_len_ket):
                 term = True
+
             len_bra = new_len_bra
             len_ket = new_len_ket
 
+        # Decide sign based on number of quanta left in bra and ket
         if len_bra == 0:
+
             if len_ket > 0:
                 return -1
+            # None left so zero sign
             else:
                 return 0
+
         else:
+
             # Special flag for indeterminate sign
             if len_ket > 0:
                 return -3
             else:
                 return 1
 
-    def could_be_resonant_by_conditions(self, mc_plus: tuple, mc_minus: tuple, given_prev_res = None):
+    def could_be_resonant_by_conditions(self, mc_plus: tuple, mc_minus: tuple, given_prev_res = None) -> bool:
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
@@ -473,7 +483,6 @@ class PolProp:
     """
     Polarization property differentiated zero or more times w.r.t. geometrical displacement
     Also used more generally as energy derivative
-    TODO: refactor names of attributes so they are understandable and clear
     """
 
     def __init__(self, ops: list[QOperator], dord: int = 0):
@@ -543,53 +552,6 @@ class PolProp:
         """
 
         return hash((tuple([i.h() for i in self.ops]), self.dord, tuple(self.inds)))
-
-    def epochContained(self, epochs: list[list[int]], op_ind_omega: int) -> bool:
-        """
-        Boolean: Do all electromagnetic operators in this property belong to the same pulse epoch?
-
-        epochs: List [[epoch 1 pulse index 1, epoch 1 pulse ind. 2], [epoch 2 pulse ind. 1, ...], ...]
-        op_ind_omega: Label of omega (detected field) operator
-        """
-
-        if not isinstance(epochs, list):
-            raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        if not (all([isinstance(i, list) for i in epochs])):
-            raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        for i in epochs:
-            if not (all([isinstance(j, int) for j in i])):
-                raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        if not isinstance(op_ind_omega, int):
-            raise TypeError('Index of omega operator must be given as integer')
-
-        my_op_ids = [i.o for i in self.ops]
-
-        # If omega is one of the operators, all of the others must belong to the last epoch:
-        # (Epochs are given according to incident pulses and do not contain any reference to the emitted wave)
-        if op_ind_omega in my_op_ids:
-            for i in my_op_ids:
-                if not (i == op_ind_omega):
-                    if not i in epochs[len(epochs) - 1]:
-                        return False
-
-        # Otherwise, all operators must belong to the same epoch but it need not be the last
-        else:
-
-            required_epoch = None
-
-            for i in range(len(epochs)):
-                if my_op_ids[0] in epochs[i]:
-                    required_epoch = i
-
-            for i in my_op_ids:
-                if not i in epochs[required_epoch]:
-                    return False
-
-        # If not ruled out by prev checks, then the ops. in this PolProp are indeed epoch contained
-        return True
 
     def present(self):
         """
