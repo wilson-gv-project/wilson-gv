@@ -14,12 +14,12 @@ class ResponseTermsCollection:
     """
     Data holder class to collect terms under a common setup:
 
-    order: The order of perturbation considered
-    total_anharm_limit: Upper limit to total order of anharmonicity (electrical + mechanical)
-    el_anharm_limit: Upper limit to electrical order of anharmonicity
-    mech_anharm_limit: Upper limit to mechanical order of anharmonicity
-    comp_pattern: The compounding pattern to consider
-    magn_conds: The magnitude conditions set to consider
+    order: Integer: The order of perturbation considered
+    total_anharm_limit: Integer: Upper limit to total order of anharmonicity (electrical + mechanical)
+    el_anharm_limit: Integer: Upper limit to electrical order of anharmonicity
+    mech_anharm_limit: Integer: Upper limit to mechanical order of anharmonicity
+    comp_pattern: Tuple of integers: The compounding pattern to consider
+    magn_conds: Tuple: The magnitude conditions set to consider, each a tuple of integers
 
     """
 
@@ -27,31 +27,33 @@ class ResponseTermsCollection:
     total_anharm_limit: int
     el_anharm_limit: int
     mech_anharm_limit: int
-    comp_pattern: tuple
-    magn_conds: tuple[tuple]
+    comp_pattern: tuple[int]
+    magn_conds: tuple[tuple[int]]
 
     def __post_init__(self):
 
-        # Get terms
+        # Obtain terms for the requested setup parameters
         self.terms = get_terms_by_comp_pattern_and_magn_conds(self.order,
                                            self.total_anharm_limit, self.el_anharm_limit, self.mech_anharm_limit,
                                            self.comp_pattern, self.magn_conds)
 
+        # Determine which (derivative) properties are needed to evaluate these terms
         props = self.__determine_needed_props()
 
         self.props = props
 
+        # Determine the maximum number of quanta in the states and pair quanta in energy level differences
+        # The latter is mainly relevant for determining the scope of relaxation parameters
         max_state_lvl, pair_quanta = self.__find_max_state_lvl_and_pair_quanta()
 
         self.max_state_lvl = max_state_lvl
         self.pair_quanta = pair_quanta
 
-    def __determine_needed_props(self):
-
-        # Walk through all terms and determine which (derivative) properties would be needed to evaluate them
-        # Make a MolPropsCollection instance with all the needed derivatives
-        # Determine the maximum number of quanta used in state energy levels
-        # Determine the different (sorted) pair number of quanta used in relaxation parameters
+    def __determine_needed_props(self) -> MolPropsCollection:
+        """
+        Walk through all terms and determine which (derivative) properties would be needed to evaluate them
+        Make a MolPropsCollection instance with all the needed derivatives
+        """
 
         props = []
 
@@ -63,7 +65,15 @@ class ResponseTermsCollection:
 
         return MolPropsCollection([MolecularProperty(i) for i in props])
 
-    def __find_max_state_lvl_and_pair_quanta(self):
+
+    def __find_max_state_lvl_and_pair_quanta(self) ->  tuple[int, tuple[tuple]] :
+        """
+        Determine the maximum number of quanta used in state energy levels
+
+        Determine the different (sorted) pair number of quanta in level diffs. (relevant for relaxation parameters)
+
+        Returns and integer (max state level) and a tuple of 2-tuples (each a pair quanta tuple)
+        """
 
         max_state_lvl = 0
         pair_quanta = set()
@@ -93,12 +103,21 @@ class ResponseTermsCollection:
 
         return max_state_lvl, pair_quanta
 
+
 def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
                                    order_el: int, order_mech: int) -> list[VibPerturbedTerm]:
     """
     Take a list of SOS vibrational contribution response terms, perform a double perturbation expansion according to the
     requested orders of electrical and mechanical anharmonicity, carry out Hermite walk expansions for the resulting
     terms and simplify these results by coefficient factoring
+
+    sos_terms: a list of VibContribTerm instances to be expanded
+
+    order_el: Integer: Order of electrical anharmonicity
+
+    order_mech: Integer: Order of mechanical anharmonicity
+
+    Returns: List of VibPerturbedTerm instances: The expanded terms
     """
 
     # Do double perturbation expansion
@@ -114,14 +133,28 @@ def do_dbl_pert_expand_and_hermaut(sos_terms: list[VibContribTerm],
     # Simplify
     return list(simplify.terms_simplify(full_hermaut_terms, wu_common.nm_inds).values())
 
-def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int, el_anharm_limit: int, mech_anharm_limit: int,
-                              comp_pattern: tuple, magn_conds: tuple[tuple]) -> list[VibPerturbedTerm]:
+def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int, el_anharm_limit: int,
+                                             mech_anharm_limit: int, comp_pattern: tuple,
+                                             magn_conds: tuple[tuple]) -> list[VibPerturbedTerm]:
     """
     Take a specification of the order of perturbation, degree of anharmonicity, requested compounding patterns,
-    and magnitude conditions and return fully enhanceable terms
+    and magnitude conditions and return fully enhanceable terms up to the requested anharmonicity setup
+
+    order: Integer: Order of perturbation
+
+    total_anharm_limit: Integer: Max. total (el. + mech.) order of anharmonicity to be considered
+
+    el_anharm_limit: Integer: Max. order of electrical anharmonicity
+
+    mech_anharm_limit: Integer: Max order of mechanical anharmonicity
+
+    comp_pattern: Time-ordered compounding pattern: Tuple of integers referring to the level of compounding
+    at each interaction index
 
     magn_conds: Len 2 tuple (positive and negative combinations): Each entry another tuple: Each such entry a tuple of
-     interaction indices each corresponding to an interaction index combination found to be either positive or negative
+    interaction indices each corresponding to an interaction index combination found to be either positive or negative
+
+    Returns: list of VibPerturbedTerm instances: Terms found to be possibly fully enhanceable at the requested setup
 
     May return some terms that are not fully enhanceable depending on completeness of magnitude condition handling
     """

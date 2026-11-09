@@ -15,6 +15,16 @@ def get_vib_sos(maxord: int) -> list[VibContribTerm]:
     """
 
     def which_int_has_omega(ints: list[TransitionIntegral], op_omega: QOperator) -> int:
+        """
+        Determine which transition integral has the "omega" (emission) operator
+
+        ints: list of TransitionIntegral instances to be searched
+
+        op_omega: QOperator: The "omega" operator to be matched
+
+        Returns: Integer: Position of integral containing the "omega" operator
+        """
+
 
         found = False
 
@@ -35,6 +45,15 @@ def get_vib_sos(maxord: int) -> list[VibContribTerm]:
         return omega_int_ind
 
     def which_op_is_omega(integral: TransitionIntegral, op_omega: QOperator) -> int:
+        """
+        Determine which operator is the "omega" operator in a transition integral presumed to contain it
+
+        integral: The transition integral
+
+        op_omega: The omega operator to be matched
+
+        Returns: Integer: The position (in the integral) of the omega operator
+        """
 
         found = False
 

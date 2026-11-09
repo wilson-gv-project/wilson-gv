@@ -13,7 +13,7 @@ class VibPerturbedTerm:
     """
 
     def __init__(self, coeff: Fraction, props: list[PolProp], freqterms: list[VibDiffTerm], res: list[ResonanceCondition],
-                 order_el: int=0, order_mech: int=0, summ_ind: list[str] = []):
+                 order_el: int=0, order_mech: int=0):
         """
         A term consists of the following attributes:
 
@@ -27,7 +27,7 @@ class VibPerturbedTerm:
 
         res: Resonance conditions as identified by the derivation (list of ResonanceCondition instances)
 
-        order_el, order_mech: Order of electrical resp. mechanical anharmonicity: Default 0 for both
+        order_el, order_mech: Integers: Order of electrical resp. mechanical anharmonicity: Default 0 for both
         """
 
         if not (isinstance(coeff, Fraction) ):
@@ -64,11 +64,18 @@ class VibPerturbedTerm:
     def __repr__(self):
         return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
-    def tellNonSummSummIndices(self):
+    def tellNonSummSummIndices(self) -> tuple[list[str], list[str]]:
+        """
+        Tell which normal modeindices in this term are "non-summation" (i.e. involved in a resonance condition) and
+        which are "summation" (i.e. not involved in a resonance condition)
+
+        Returns a 2-tuple: Each entry is a list of characters referring to resp. non-summation and summation indices
+        """
 
         summation_indices = []
         non_summation_indices = []
 
+        # Walk through resonance conditions: Every index encountered here is a non-summation index
         for i in self.res:
 
             for j in i.diff.sl.q:
@@ -81,6 +88,7 @@ class VibPerturbedTerm:
 
         candidate_summation_indices = []
 
+        # Walk through frequency terms: Every index here but not non-summmation is a summation inde
         for i in self.freqterms:
 
             for j in i.sl.q:
@@ -285,30 +293,39 @@ class VibPerturbedTerm:
 
         return self.hsh
 
-    def full_enhancement_possible(self, mcp, mcm) -> bool:
+    def full_enhancement_possible(self, mcp: list|tuple[list|tuple], mcm: list|tuple[list|tuple]) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
         ranges with respect to all of its resonance conditions?
 
-        FIXME: Currently only for sole harmonic oscillator state, may later need extension for variationally resolved states
+        TODO: Currently only for sole harmonic oscillator state, may later need extension for variationally resolved states
 
-        magn_conditions: List [[A = signed freq i, B = signed freq j], ...] signifying that
-        B - A > 0
+        mcp: List or tuple: Each entry another list or tuple: Each such a collection of interaction indices
+        whose frequency sum is imposed as positive (ordinarily from analyzing a specific interaction sequence of pulses
+        in an experiment) by a margin deemed "significant" according to a previously decided threshold
+
+        mcm: As mcp but referring to sums imposed as negative
+
+        Returns: bool: True if full enhancement is possible (or can't be ruled out), False if full enhancement
+        definitely not possible
         """
 
         if not self.was_sorted:
             raise ValueError('Term must be sorted before full enhancement possibility can be evaluated')
 
+        # There is only something to do here if there are actually conditions
         if mcp is not None or mcm is not None:
 
             prev_res = None
             for i in self.res:
 
+                # Try with a preceding resonance condition as given if one is available
                 if prev_res is not None:
 
                     if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=prev_res)):
                         return False
 
+                # Also try with no preceding resonance condition (regardless of whether one is available or not)
                 if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=None)):
                     return False
 
@@ -317,8 +334,7 @@ class VibPerturbedTerm:
             return True
 
         # If no information given, return True to keep term
-        else:
-            return True
+        return True
 
     def present(self):
         """
@@ -367,8 +383,9 @@ class VibPerturbedTerm:
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
               '\nPresenting also elements of: self.props, self.freqterms, self.res')
 
-    def to_latex(self, part=None):
+    def to_latex(self, part=None) -> str:
         """
+        Make LaTeX representation of own attributes
         """
         res_conditions_denom = ''.join([rc.to_latex() for rc in self.res])
         if res_conditions_denom == '':
