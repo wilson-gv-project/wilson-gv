@@ -31,6 +31,19 @@ class ResponseTermsCollection:
     magn_conds: tuple[tuple[int]]
 
     def __post_init__(self):
+        """
+        Determine the following derived attributes:
+
+        terms: Terms (as VibPerturbedTerms list) for the requested setup parameters
+
+        props: (Derivative) properties needed to evaluate these terms, as MolPropsCollection instance consisting of
+        Molecular property instances without values but with trivnames registered
+
+        max_state_lvl: Integer describing the maximum number of quanta in states encountered over all terms
+
+        pair_quanta: Tuple of 2-tuples describing pair quanta in resonance condition VibDiff instances over all terms:
+        For use if individual (state-pair specific) relaxation parameters will be used during evalutaion
+        """
 
         # Obtain terms for the requested setup parameters
         self.terms = get_terms_by_comp_pattern_and_magn_conds(self.order,
@@ -42,8 +55,8 @@ class ResponseTermsCollection:
 
         self.props = props
 
-        # Determine the maximum number of quanta in the states and pair quanta in energy level differences
-        # The latter is mainly relevant for determining the scope of relaxation parameters
+        # Determine the maximum number of quanta in the states and pair quanta in resonance condition energy level
+        # differences. The latter is mainly relevant for determining the scope of relaxation parameters
         max_state_lvl, pair_quanta = self.__find_max_state_lvl_and_pair_quanta()
 
         self.max_state_lvl = max_state_lvl

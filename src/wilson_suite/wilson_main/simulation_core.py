@@ -28,7 +28,24 @@ class SimulationCore():
 
     def __post_init__(self):
         """
+        Process terms and analyze collectively, determining the following derived attributes:
 
+        terms_by_order_comp_magn: Organized as nested dictionaries over perturbation order, compounding pattern
+        and collective magnitude condition references: Terms (as VibPerturbedTerms list) for
+        each such unique entry.
+
+        coll_magn_bank: "Collective magnitude conditions": Dictionary organized by unique magnitude condition setups
+        encountered over all scans. Values are the respective magnitude condition setups
+
+        props: (Derivative) properties needed to evaluate the whole collection of identified terms,
+        as MolPropsCollection instance consisting of Molecular property instances without values but with trivnames
+        registered
+
+        max_state_lvl: Integer describing the maximum number of quanta in states encountered over all (collective) terms
+
+        pair_quanta: Tuple of 2-tuples describing unique encountered pair quanta in
+        resonance condition VibDiff instances over all collected terms: For use
+        if individual (state-pair specific) relaxation parameters will be used during evalutaion
         """
 
         # To hold all unique sets of resulting terms
