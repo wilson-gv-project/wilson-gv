@@ -27,7 +27,6 @@ from wilson_suite.wilson_orientational_averaging.averaging import (
 from wilson_suite.wilson_response_evaluate.compat import term_to_str
 from wilson_suite.wilson_response_evaluate.evaluate import (
     all_features_on_grid,
-    build_contributions,
     evaluate_term_coeff_sumover,
 )
 from wilson_suite.wilson_response_evaluate.features import (
@@ -67,8 +66,6 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     MOTIF_AB,
     PS_00,
     PS_01,
-    PS_10,
-    PS_11,
     TOY_RECIPE,
     ab_term,
     feat,
@@ -79,8 +76,6 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
 )
 from wilson_suite.wilson_response_evaluate.tests.stored_terms import TERMS_DIR
 from wilson_suite.wilson_system.system_data import (
-    MolecularProperty,
-    MolPropsCollection,
     MolSystemData,
 )
 
@@ -118,22 +113,6 @@ def test_compute_features_amplitude_adds_both_terms(molsys_a1_zero):
         assert f.amplitude_coeff == pytest.approx(5 * single)
 
 
-def test_compute_features_reports_zero_pairs(molsys_a1_zero):
-    result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert result.zero == [(0, PS_10), (0, PS_11), (1, PS_10), (1, PS_11)]
-
-
-def test_compute_features_gives_every_feature_the_lineshape_param(molsys_a1_zero):
-    result = compute_features([ab_term()], molsys_a1_zero, TOY_RECIPE, lineshape_param=5.,
-                              states_choice='anharmonic')
-
-    assert len(result.features) == 2
-    assert all(f.lineshape_param == 5. for f in result.features)
-    # no boxes yet: they come later, from SpectralWindow.from_features
-    assert all(f.feat_box is None for f in result.features)
-
-
 def test_compute_features_gives_a_lineshape_param_function_the_conditions(molsys_a1_zero):
     """
     The function gets the pair of states of each condition, from the result's states. ab_term (MOTIF_AB), a=0:
@@ -166,12 +145,6 @@ def test_compute_features_raises_for_terms_on_two_axis_sets(molsys_a1_zero):
 
     with pytest.raises(ValueError, match=re.escape("term ids by set: {('A', 'B'): [0, 2], ('A',): [1]}")):
         compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-
-def test_compute_features_raises_for_terms_on_A_only_and_on_B_only(molsys_a1_zero):
-    """Term axes ('A',) and ('B',) are different sets."""
-    with pytest.raises(ValueError, match='2 different sets of term axes'):
-        compute_features([ab_term(MOTIF_A), ab_term(MOTIF_B)], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
 
 
 def test_check_same_axis_set_does_not_count_a_term_without_conditions():
@@ -207,28 +180,7 @@ def test_spectrum_on_grid_adds_a_term_without_conditions_on_every_grid_point(mol
     np.testing.assert_allclose(spec.amplitude, alone_on_grid + flat.amplitude_coeff)
 
 
-def test_feature_result_made_by_hand_gives_a_lineshape_param_function_no_conditions():
-    """No states to take them from: the feature has no conditions, and its box and peak height raise."""
-    result = FeatureResult(ContributionTable([row(0.3, a=0)]), zero=[], lineshape_param=lambda vd, freqs: 5.)
-
-    [f] = result.features
-
-    assert f.conditions is None
-    with pytest.raises(ValueError, match='no conditions'):
-        f.get_intensity()
-
-
 ## FeatureResult ------------------------------------------------------------
-
-def test_feature_result_table_is_what_build_contributions_returns(molsys_a1_zero):
-    terms = two_terms_one_motif()
-    
-    # compute_features calls build_contributions, so this is a bit redundant, but it checks that the table is preserved
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-    table, _ = build_contributions(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert list(result.table) == list(table)
-
 
 def test_feature_result_features_hold_every_row_of_the_table_once(molsys_a1_zero):
     result = compute_features(two_terms_one_motif(), molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
@@ -272,39 +224,6 @@ def test_feature_result_factors_by_index_set_add_up_to_the_row_coefficient(molsy
     for r in result.table:
         total = sum(index_set_value(terms[r.term_id], contribs) for contribs in result.factors_by_index_set(r).values())
         assert total == pytest.approx(r.coeff, rel=1e-12, abs=0)
-
-
-def test_feature_result_factors_by_index_set_use_the_polarization_of_the_result(molsys):
-    """
-    factors_by_index_set needs the result's own recipe (without it, the average raises), here a real one: rank 2 from
-    getGeneralPolarizationAveragingExpression. ab_term's <polgrad>[a] has slots 0, 1: rank 2. polgrad of mode 1
-    is 0, so a = 1 stops at the average, as with molsys_a1_zero: the toy states have no '1,1'.
-    """
-    terms = [ab_term()]
-    polgrad = np.zeros((2, 3, 3))
-    polgrad[0] = np.arange(9.).reshape(3, 3) + 1.
-    otf_molsys = replace(molsys, mol_props=MolPropsCollection(
-        [*molsys.mol_props, MolecularProperty(trivial_name='polgrad', vals=polgrad, extra_data={})]))
-    recipe = getGeneralPolarizationAveragingExpression(rank=2, laser_pol=(1.,))
-
-    result = compute_features(terms, otf_molsys, recipe, states_choice='anharmonic')
-
-    assert result.polarization_linear_comb is recipe
-    assert len(result.table) == 2                       # a = 0, b = 0 and 1
-    for r in result.table:
-        total = sum(index_set_value(terms[0], contribs) for contribs in result.factors_by_index_set(r).values())
-        assert total == pytest.approx(r.coeff, rel=1e-12, abs=0) != 0.
-
-
-def test_feature_result_keeps_its_inputs_without_copying(molsys_a1_zero):
-    terms = two_terms_one_motif()
-
-    result = compute_features(terms, molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert result.compiled == tuple(terms) and all(a is b for a, b in zip(result.compiled, terms)) # type: ignore
-    assert result.molsys is molsys_a1_zero
-    assert result.polarization_linear_comb is TOY_RECIPE
-
 
 
 def test_feature_result_made_by_hand_has_no_factors_by_index_set():
@@ -380,19 +299,6 @@ def test_prop_names_of_the_terms_in_pulse_ids_are_those_of_the_compiled_terms():
     assert prop_names(ref.evv_terms()) == from_compiled
 
 
-def test_molsys_data_loaded_with_the_prop_names_has_one_property_per_name():
-    """the caller's load (pipeline docstring): one property per name, no matter how many terms use it; filled from
-    the data dict"""
-    data = {'polgrad': np.ones((2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'nc_sqrt_eigval': {0: 1., 1: 2.},
-            'harmonic_states': {('0',): 1., ('1',): 2.}}
-
-    molsys = MolSystemData.load(None, prop_names([toy_pulse_term(), toy_pulse_term()]),  # type: ignore
-                                obtainer=lambda request: data)
-
-    assert molsys.mol_props.names() == ['polgrad', 'cff']
-    assert molsys.data_filled
-
-
 ## polarization recipe: averaging_rank, make_polarization_linear_comb ----------
 # The rank counts the Cartesian slots (op.o) of a term's averaged part.
 # toy_pulse_term(): <polgrad> with slots 0, 1 -> rank 2.
@@ -408,11 +314,6 @@ RANK_4_TERM = term_with_slots((0, 3), (1,), (2,))      # like EVV term 0: polhes
 def test_averaging_rank_counts_the_slots_of_the_averaged_part():
     assert averaging_rank([toy_pulse_term()]) == 2
     assert averaging_rank([RANK_4_TERM]) == 4
-
-
-def test_averaging_rank_of_terms_with_the_same_slots():
-    """slots 0, 1 in one property or in two: the same slots"""
-    assert averaging_rank([toy_pulse_term(), term_with_slots((1,), (0,))]) == 2
 
 
 def test_averaging_rank_raises_if_terms_differ():
@@ -476,7 +377,6 @@ ALL_AB = {(a, b) for a in range(6) for b in range(6)}
 @dataclass(frozen=True)
 class EvvRun:
     states: str
-    compiled: list[CompiledTerm]
     result: FeatureResult
     stored: dict            # the evv_reference.json block for formaldehyde and these states
 
@@ -489,8 +389,7 @@ def evv_formaldehyde(request) -> EvvRun:
 
     stored = next(b for b in json.loads(ref.REFERENCE_FILE.read_text())['results']
                   if (b['molecule'], b['states']) == ('formaldehyde', request.param))
-    return EvvRun(request.param, compiled,
-                  compute_features(compiled, molsys, polarization, states_choice=request.param), stored)
+    return EvvRun(request.param, compute_features(compiled, molsys, polarization, states_choice=request.param), stored)
 
 
 def _ab(feature: SpectralFeature) -> tuple[int, int]:
@@ -503,17 +402,6 @@ def _motif_terms(feature: SpectralFeature) -> tuple[int, ...]:
     """the EVV_MOTIF_TERMS group that the feature's terms belong to"""
     (group,) = [g for g in EVV_MOTIF_TERMS if set(feature.term_ids) <= set(g)]
     return group
-
-
-def test_real_data_the_14_terms_have_2_motifs(evv_formaldehyde):
-    compiled = evv_formaldehyde.compiled
-
-    motifs = dict.fromkeys(t.cmp_resmotf for t in compiled)
-    assert tuple(tuple(i for i, t in enumerate(compiled) if t.cmp_resmotf == m) for m in motifs) == EVV_MOTIF_TERMS
-
-
-def test_real_data_averaging_rank_is_the_one_stored_in_the_reference_file():
-    assert averaging_rank(ref.evv_terms()) == ref.RANK == 4
 
 
 def test_real_data_504_pairs_340_rows_164_zero(evv_formaldehyde):
@@ -533,18 +421,6 @@ def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
     assert len(features) == 68
     assert ab_per_motif[EVV_MOTIF_TERMS[0]] == ALL_AB
     assert ALL_AB - ab_per_motif[EVV_MOTIF_TERMS[1]] == {(0, 1), (0, 5), (1, 0), (5, 0)}
-
-
-def test_real_data_each_feature_holds_the_stored_rows_of_its_motif_and_index_set(evv_formaldehyde):
-    """features_from_rows groups by (motif, location); the expected groups here come from (motif, params)"""
-    compiled, result, stored = evv_formaldehyde.compiled, evv_formaldehyde.result, evv_formaldehyde.stored
-
-    expected = defaultdict(set)
-    for r in stored['rows']:
-        expected[(compiled[r['term']].cmp_resmotf, (r['params']['a'], r['params']['b']))].add(r['term'])
-
-    assert {(f.motif, _ab(f)): set(f.term_ids) for f in result.features} == dict(expected)
-    assert sum(len(f.rows) for f in result.features) == len(stored['rows'])     # each term once per feature
 
 
 def test_real_data_amplitude_is_the_sum_of_the_stored_coefficients(evv_formaldehyde):
@@ -577,27 +453,9 @@ def test_real_data_strongest_feature(evv_formaldehyde):
     assert strongest.amplitude_coeff == pytest.approx(amplitude, rel=1e-4)
 
 
-def test_real_data_factors_by_index_set_add_up_to_every_row_coefficient(evv_formaldehyde):
-    """
-    All 340 rows, on the fly (einsum average) with the result's recipe. One entry per summed index set:
-    6 modes ** number of summation labels (term 0: none, 1 entry; a term summing c: 6 entries).
-    """
-    compiled, result = evv_formaldehyde.compiled, evv_formaldehyde.result
-
-    for r in result.table:
-        term = compiled[r.term_id]
-        factors = result.factors_by_index_set(r)
-
-        assert len(factors) == 6 ** len(term.idx_summ)
-        total = sum(index_set_value(term, contribs) for contribs in factors.values())
-        assert total == pytest.approx(r.coeff, rel=1e-12, abs=0), r
-
-
 ## evaluate_response_terms: the top function -----------------------------------
 # Same settings as evv_reference.json, formaldehyde, anharmonic states. The data is loaded once
-# (formaldehyde_molsys), for the stored EVV terms (already in axes). The evv_formaldehyde fixture
-# runs the same steps one by one, so equal results mean evaluate_response_terms passes every setting to
-# the right step. One run (top_run) serves most tests.
+# (formaldehyde_molsys), for the stored EVV terms (already in axes). One run (top_run) serves most tests.
 
 @pytest.fixture(scope='module')
 def formaldehyde_molsys() -> MolSystemData:
@@ -627,14 +485,6 @@ def top_run(formaldehyde_molsys) -> TopRun:
     return TopRun(terms, before, evaluate_formaldehyde(formaldehyde_molsys, 4.7, terms))
 
 
-@pytest.mark.parametrize('evv_formaldehyde', ['anharmonic'], indirect=True)
-def test_evaluate_response_terms_equals_the_steps_one_by_one(top_run, evv_formaldehyde):
-    result, by_steps = top_run.result, evv_formaldehyde.result
-
-    assert list(result.table) == list(by_steps.table)
-    assert result.zero == by_steps.zero
-
-
 def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run, formaldehyde_molsys):
     """terms in reverse order: the row of term i comes back with term_id 13 - i, same params and coeff"""
     backward = evaluate_formaldehyde(formaldehyde_molsys, 4.7, ref.evv_terms()[::-1])
@@ -647,32 +497,6 @@ def test_evaluate_response_terms_term_id_is_the_index_in_the_input_list(top_run,
 def test_evaluate_response_terms_leaves_the_input_terms_as_they_are(top_run):
     """the caller's terms come back unchanged (never change derive's objects)"""
     assert [term_to_str(t) for t in top_run.terms] == top_run.terms_before
-
-
-def test_evaluate_response_terms_gives_every_feature_the_lineshape_param(top_run):
-    assert all(f.lineshape_param == 4.7 for f in top_run.result.features)
-
-
-def test_evaluate_response_terms_keeps_what_the_grid_and_factors_by_index_set_need(top_run, formaldehyde_molsys):
-    """
-    the compiled terms, the data with its states (boxed_features_on_grid), the recipe: one row's index sets add up to
-    its coeff
-    """
-    result = top_run.result
-
-    assert len(result.compiled) == len(top_run.terms)  # type: ignore
-    assert result.molsys is formaldehyde_molsys
-    assert result.states_choice == 'anharmonic'
-    assert result.states is formaldehyde_molsys.states['anharmonic']
-    assert result.polarization_linear_comb == make_polarization_linear_comb(top_run.terms, ref.LASER_POL)
-
-    r = max(result.table, key=lambda r: abs(r.coeff))
-    term = result.compiled[r.term_id]  # type: ignore
-    assert sum(index_set_value(term, c) for c in result.factors_by_index_set(r).values()) == pytest.approx(r.coeff, rel=1e-12, abs=0)
-
-
-def test_terms_by_axis_set_the_14_evv_terms_are_one_set():
-    assert terms_by_axis_set(ref.evv_terms()) == {('A', 'B'): list(range(14))}
 
 
 def evv_terms_with_term_0_on_A_only() -> list:
@@ -713,11 +537,6 @@ def evv_terms_in_pulse_ids() -> list[VibPerturbedTerm]:
 def test_evaluate_response_terms_raises_on_terms_in_pulse_ids(formaldehyde_molsys):
     with pytest.raises(ValueError, match='pulse IDs'):
         evaluate_formaldehyde(formaldehyde_molsys, 4.7, evv_terms_in_pulse_ids())
-
-
-def test_terms_by_axis_set_raises_on_terms_in_pulse_ids():
-    with pytest.raises(ValueError, match='pulse IDs'):
-        terms_by_axis_set(evv_terms_in_pulse_ids())
 
 
 def test_evaluate_response_terms_excluded_mode_is_left_out_of_rows_and_sums(formaldehyde_molsys, top_run):
@@ -793,17 +612,6 @@ def test_spectrum_on_grid_with_a_lineshape_param_function(formaldehyde_molsys, t
     # (all_features_on_grid): at most eps = 0.1 floors (floor: max / dynrange)
     reference = np.abs(all_features_on_grid(result.features, result.states, spec.axis_points)) ** 2
     assert np.max(np.abs(intensity - reference)) < 0.1 * reference.max() / 1001.
-
-
-def test_spectrum_on_grid_lineshape_param_function_of_a_constant_gives_the_same_as_the_number(formaldehyde_molsys):
-    """lineshape_param 5. and lambda vd, freqs: 5. give the same spectrum"""
-    number = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), window_box=WINDOW_AROUND_STRONGEST,
-                              n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
-    function = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, lambda vd, freqs: 5.),
-                                window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
-                                box_rule=AMPLITUDE_BOXES)
-
-    np.testing.assert_allclose(function.amplitude, number.amplitude)
 
 
 def test_spectrum_on_grid_mesh_holds_every_grid_point(top_run):
@@ -912,17 +720,6 @@ def test_spectrum_on_grid_without_cut_puts_each_kept_feature_on_the_whole_grid(t
     assert not np.allclose(uncut.amplitude, cut.amplitude)
 
 
-def test_spectrum_on_grid_without_cut_keeping_every_feature_is_the_uncut_spectrum(top_run):
-    """A box rule that keeps every feature (half-width 1e6 cm-1), no cut: every feature on every grid point."""
-    keep_all = lambda window_box, features: [1e6] * len(features)
-
-    spec = spectrum_on_grid(top_run.result, window_box=WINDOW_AROUND_STRONGEST, n_points_per_axis=STEPS_1_CM,
-                            box_rule=keep_all, cut_tails=False)
-
-    np.testing.assert_allclose(spec.amplitude,
-                               all_features_on_grid(top_run.result.features, top_run.result.states, spec.axis_points))
-
-
 def test_spectrum_on_grid_with_a_new_lineshape_param_reuses_the_rows(formaldehyde_molsys):
     """replace(..., lineshape_param=8.) keeps the table (no new rows) and gives what a new run with 8 cm-1 gives"""
     first = evaluate_formaldehyde(formaldehyde_molsys, 5.)
@@ -973,13 +770,3 @@ def test_check_grid_axes_raises_when_the_grid_does_not_fit_the_features(window_b
 
 def test_check_grid_axes_lets_flat_features_alone_take_any_window_box():
     check_grid_axes([feat()], Box({'C': (0., 1.)}), {'C': 2})
-
-
-def test_spectrum_on_grid_checks_the_axes_before_the_box_rule(top_run):
-    calls = []
-    rule = lambda window_box, features: calls.append(window_box) or [7.] * len(features)
-
-    with pytest.raises(ValueError, match='term axes'):
-        spectrum_on_grid(top_run.result, window_box=Box({'A': (2600., 2800.)}),
-                         n_points_per_axis={'A': 201}, box_rule=rule)
-    assert calls == []

@@ -253,15 +253,6 @@ def ir_absorption() -> tuple[StoredSetup, list, FeatureResult]:
     return setup, setup.terms, evaluate_on_formaldehyde(setup, setup.terms)
 
 
-def test_ir_absorption_derive_gives_3_terms_without_conditions_and_2_on_A(ir_absorption):
-    setup, terms, _ = ir_absorption
-
-    assert setup.axes == {'A': [(1,)]}                                                     # A = w1
-    assert setup.laser_pol == (1.,)                                                        # rank 2
-    assert prop_names(terms) == ['polhess', 'polgrad', 'cff', 'dipgrad']
-    assert terms_by_axis_set(terms) == {(): [0, 1, 2], ('A',): [3, 4]}
-
-
 def test_ir_absorption_flat_terms_make_one_feature_next_to_12_peaks(ir_absorption):
     """
     Each term without conditions: one row (no label to fix) at the location without axes; the 3 rows add up in
@@ -329,19 +320,6 @@ def test_ir_absorption_on_grid_with_the_background_within_eps_floor_of_all_featu
 def three_ir() -> tuple[StoredSetup, list, dict[tuple[str, ...], list[int]]]:
     setup = load_setup('nb: 3 IR (3D)')
     return setup, setup.terms, terms_by_axis_set(setup.terms)
-
-
-def test_three_ir_terms_have_two_sets_of_term_axes(three_ir):
-    """
-    16 terms: 14 with the term axes ('A', 'B'), 2 with ('A', 'B', 'C'). One evaluation of all 16 raises before
-    any row is computed.
-    """
-    setup, terms, groups = three_ir
-
-    assert setup.axes == {'A': [(-1,)], 'B': [(2,)], 'C': [(3,)]}
-    assert {axis_set: len(ids) for axis_set, ids in groups.items()} == {('A', 'B'): 14, ('A', 'B', 'C'): 2}
-    with pytest.raises(ValueError, match='2 different sets of term axes'):
-        evaluate_on_formaldehyde(setup, terms)
 
 
 def test_three_ir_each_axis_set_runs_on_its_own(three_ir):

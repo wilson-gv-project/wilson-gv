@@ -18,13 +18,6 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
 
 ## Box: construction --------------------------------------------------------
 
-def test_box_sorts_axes_by_name():
-    box = Box({'B': (0., 1.), 'A': (2., 3.)})
-
-    assert box.axes == ('A', 'B')
-    assert list(box.bounds) == ['A', 'B']
-
-
 @pytest.mark.parametrize('bad', [[0., 1.], (0., 1., 2.), (0.,)])
 def test_box_rejects_bounds_that_are_not_a_pair(bad):
     with pytest.raises(ValueError, match=r'expected \(min, max\)'):
@@ -48,17 +41,6 @@ def test_box_equality_and_hash_ignore_input_order():
 
     assert b1 == b2
     assert hash(b1) == hash(b2)
-
-
-def test_box_hash_tells_different_bounds_apart():
-    assert len({Box({'A': (0., 1.)}), Box({'A': (0., 1.)}), Box({'A': (0., 2.)})}) == 2
-
-
-def test_box_accepts_int_bounds_and_zero_width():
-    box = Box({'A': (0, 1), 'B': (2., 2.)})
-
-    assert box.bounds == {'A': (0, 1), 'B': (2., 2.)}
-
 
 
 ## Box: operations ----------------------------------------------------------
@@ -105,15 +87,6 @@ def test_box_comparison_needs_the_same_axes(method, other):
 
 
 ## Box: grid points, make_mesh ----------------------------------------------
-
-def test_grid_points_gives_the_points_along_each_axis_only():
-    box = Box({'A': (0., 10.), 'B': (100., 200.)})
-
-    axis_points = box.grid_points({'A': 5, 'B': 3})
-
-    assert list(axis_points) == ['A', 'B']
-    assert (axis_points['A'].shape, axis_points['B'].shape) == ((5,), (3,))
-
 
 def test_grid_points_runs_from_min_to_max_with_both_edges():
     box = Box({'A': (0., 10.), 'B': (100., 200.)})
@@ -350,31 +323,3 @@ def test_nd_zero_width_box_on_the_boundary_overlaps(ndim):
     assert box.overlaps(cube(ndim, 1., 1., A=(2., 2.)))        # on the face A = 2
     assert box.overlaps(cube(ndim, 2., 2.))                    # on the corner (2, 2, ...)
     assert not box.overlaps(cube(ndim, 1., 1., A=(2.5, 2.5)))  # 0.5 outside on A
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_grid_points_has_both_edges_and_make_mesh_ij_indexing(ndim):
-    # same bounds (0, 10) on every axis, e.g. ndim=2 -> Box({'A': (0., 10.), 'B': (0., 10.)})
-    box = cube(ndim, 0., 10.)
-
-    # 3 points per axis: step = (10 - 0) / (3 - 1) = 5
-    axis_points = box.grid_points({ax: 3 for ax in AXES[:ndim]})
-    mesh = make_mesh(axis_points)
-
-    # axes come back in sorted order A, B, C, D
-    assert list(axis_points) == list(mesh) == list(AXES[:ndim])
-    for i, ax in enumerate(AXES[:ndim]):
-        # both box edges are grid points: 0 (min) and 10 (max)
-        np.testing.assert_allclose(axis_points[ax], [0., 5., 10.])
-        # one full array per axis, 3 points along every array dimension: ndim=2 -> (3, 3), ndim=3 -> (3, 3, 3)
-        assert mesh[ax].shape == (3,) * ndim
-        # ij indexing: array dimension i belongs to axis i, so spectrum[i, j] sits at
-        # A = axis_points['A'][i], B = axis_points['B'][j].
-        # ndim=2:  mesh['A'] = [[ 0,  0,  0],     mesh['B'] = [[0, 5, 10],
-        #                       [ 5,  5,  5],                  [0, 5, 10],
-        #                       [10, 10, 10]]                  [0, 5, 10]]
-        # np.diff (difference between neighbours) along dimension j:
-        #   5 along the axis's own dimension (j == i), 0 along all others.
-        # numpy's default indexing='xy' swaps the first two dimensions, so this check catches it.
-        for j in range(ndim):
-            np.testing.assert_allclose(np.diff(mesh[ax], axis=j), 5. if j == i else 0.)

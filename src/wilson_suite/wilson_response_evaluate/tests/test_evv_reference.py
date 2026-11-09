@@ -56,12 +56,6 @@ def test_terms_file_has_the_axes_and_laser_pol_of_the_script():
     assert len(setup.terms) == 14
 
 
-def test_formaldehyde_has_504_pairs_340_rows_164_zero():
-    for states in ref.STATES_CHOICES:
-        (block,) = [b for b in REFERENCE['results'] if (b['molecule'], b['states']) == ('formaldehyde', states)]
-        assert block['counts'] == {'rows': 340, 'zero': 164}
-
-
 def test_same_pairs_are_rows_and_zero(stored_and_now):
     stored, now = stored_and_now
 

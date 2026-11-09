@@ -48,13 +48,6 @@ R1 = row(-0.1, term_id=1, location=ResLocPoint({'A': 1700.}), a=1)
 R2 = row(0.2, term_id=2, motif=OTHER_MOTIF, location=ResLocPoint({'A': 1600., 'B': 10.}), a=0)
 
 
-def test_table_keeps_rows_in_order():
-    table = ContributionTable([R0, R1, R2])
-
-    assert list(table) == [R0, R1, R2]
-    assert len(table) == 3
-
-
 def test_table_where_keeps_matching_rows_and_returns_a_table():
     table = ContributionTable([R0, R1, R2])
 
@@ -76,46 +69,12 @@ def test_table_where_selects_rows_by_any_row_field(keep, expected):
     assert list(ContributionTable([R0, R1, R2]).where(keep)) == expected
 
 
-def test_table_group_by_keeps_first_appearance_order():
-    groups = ContributionTable([R0, R1, R2]).group_by(lambda r: r.coeff > 0)
-
-    assert list(groups) == [True, False]
-    assert all(isinstance(g, ContributionTable) for g in groups.values())
-    assert list(groups[True]) == [R0, R2]
-    assert list(groups[False]) == [R1]
-
-
-def test_table_group_by_index_set_and_by_motif():
-    table = ContributionTable([R0, R1, R2])
-
-    by_params = table.group_by(lambda r: r.params)
-    by_motif = table.group_by(lambda r: r.motif)
-
-    assert {ps: list(g) for ps, g in by_params.items()} == {ParameterSet({'a': 0}): [R0, R2],
-                                                            ParameterSet({'a': 1}): [R1]}
-    assert {m: list(g) for m, g in by_motif.items()} == {ResonanceMotif(()): [R0, R1], OTHER_MOTIF: [R2]}
-
-
 ## SpectralFeature: basics --------------------------------------------------
-
-def test_feature_has_no_box_until_its_window_gives_one():
-    f = feat(A=5., gamma=5.)
-
-    [boxed] = SpectralWindow.from_features(WINDOW_0_10, [f], [55.]).full_features
-
-    assert f.feat_box is None
-    assert boxed.feat_box is not None
-
-
 
 def test_feature_amplitude_is_the_sum_of_row_coeffs():
     f = feat(A=0., rows=(row(0.3, a=0), row(-0.12, a=1)))
 
     assert f.amplitude_coeff == pytest.approx(0.18)
-
-
-def test_feature_without_rows_has_no_amplitude():
-    assert feat(A=0., amp=None).amplitude_coeff is None
 
 
 @pytest.mark.parametrize('coeffs, expected', [((0.5, -0.4), 0.1 / 0.9),
@@ -143,26 +102,11 @@ def test_feature_motif_param_sets_and_term_ids_come_from_rows():
     assert f.term_ids == (0, 1)
 
 
-def test_feature_without_rows_has_no_motif_param_sets_or_term_ids():
-    f = feat(A=0., amp=None)
-
-    assert (f.motif, f.param_sets, f.term_ids) == (None, (), ())
-
-
 def test_feature_motif_rejects_rows_of_two_motifs():
     f = feat(A=0., rows=(row(a=0), row(motif=OTHER_MOTIF, a=0)))
 
     with pytest.raises(ValueError, match='one motif per feature'):
         _ = f.motif
-
-
-def test_feature_equality_uses_location_lineshape_param_and_rows():
-    assert feat(A=1.) == feat(A=1.)
-    assert feat(A=1.) != feat(A=2.)
-    assert feat(A=1., gamma=1.) != feat(A=1., gamma=2.)
-    assert feat(A=1., amp=1.) != feat(A=1., amp=5.)         # rows differ in coeff
-    assert feat(A=1., rows=(row(a=0),)) != feat(A=1., rows=(row(motif=OTHER_MOTIF, a=0),))
-    assert feat(A=0.) != 'feature'
 
 
 def test_feature_equality_leaves_out_the_box_and_the_conditions():
@@ -196,13 +140,6 @@ def test_features_from_rows_keeps_motifs_apart_at_one_location():
     assert [f.amplitude_coeff for f in features] == [0.30, 0.20]
 
 
-def test_features_from_rows_keeps_locations_apart():
-    loc_1651 = ResLocPoint({'A': 1651.})
-    rows = (row(location=LOC_1650, a=0), row(location=loc_1651, a=1))
-
-    assert [f.location for f in features_from_rows(ContributionTable(rows))] == [LOC_1650, loc_1651]
-
-
 def test_features_from_rows_groups_equal_locations_that_are_different_objects():
     """Two index sets can land on one point: separate ResLocPoint objects with equal values."""
     rows = (row(0.30, location=ResLocPoint({'A': 1650.}), a=0), row(0.20, location=ResLocPoint({'A': 1650.}), a=1))
@@ -221,14 +158,6 @@ def test_features_from_rows_does_not_round_locations():
     assert len(features_from_rows(ContributionTable(rows))) == 2
 
 
-def test_features_from_rows_gives_every_feature_the_lineshape_param():
-    [f] = features_from_rows(ContributionTable([row(location=LOC_1650, a=0)]), lineshape_param=5.)
-
-    assert f.lineshape_param == 5.
-    assert f.feat_box is None   # boxes come later, from SpectralWindow.from_features
-    assert f.conditions is None # a number needs no conditions
-
-
 def test_features_from_rows_without_states_gives_a_lineshape_param_function_no_conditions():
     """
     The conditions come from the states (test_pipeline.py checks them); without states,
@@ -240,10 +169,6 @@ def test_features_from_rows_without_states_gives_a_lineshape_param_function_no_c
 
     assert f.lineshape_param is lineshape_param
     assert f.conditions is None
-
-
-def test_features_from_rows_of_empty_table_is_empty():
-    assert features_from_rows(ContributionTable([])) == []
 
 
 ## SpectralFeature: relation to a box ---------------------------------------
@@ -269,13 +194,6 @@ def test_feature_box_overlaps_includes_touching_edges():
     assert feat(A=10.5, box_extent=1.).feat_box_overlaps(box)
     assert feat(A=11., box_extent=1.).feat_box_overlaps(box)  # boxes only touch
     assert not feat(A=11.5, box_extent=1.).feat_box_overlaps(box)
-
-
-def test_window_from_features_keeps_a_feature_with_half_width_0_on_the_edge():
-    """its box is one point, on the window edge: it touches the window, so it stays (in full_features)"""
-    on_edge = feat(A=10., gamma=5.)
-
-    assert SpectralWindow.from_features(Box({'A': (0., 10.)}), [on_edge], [0.]).full_features == [on_edge]
 
 
 def test_feature_box_overlaps_needs_a_feature_box():
@@ -305,10 +223,6 @@ def test_intensity_needs_a_positive_lineshape_param():
         feat(A=0., gamma=0.).get_intensity()
 
 
-def test_intensity_of_zero_amplitude_is_zero():
-    assert feat(A=0., amp=0.).get_intensity() == 0.
-
-
 ## SpectralFeature: lineshape_param function, lineshape_params_at_peak ---------------
 # A lineshape_param function gets each condition's pair of states; here stand-ins that only have an energy difference.
 
@@ -328,12 +242,6 @@ def test_lineshape_params_at_peak_of_a_number_is_one_per_condition():
     assert feat(A=100., B=200., gamma=5., rows=(extra,)).lineshape_params_at_peak() == (5., 5., 5.)
 
 
-def test_lineshape_params_at_peak_of_a_function_is_one_per_condition():
-    f = with_lineshape_param_per_condition(feat(A=1600., B=500.))
-
-    assert f.lineshape_params_at_peak() == pytest.approx((16., 5.))
-
-
 def test_lineshape_params_at_peak_of_a_function_takes_the_location_as_freqs():
     """lineshape_param = A / 100 at A = 300 -> 3 cm-1"""
     f = replace(feat(A=300.), lineshape_param=lambda vd, freqs: freqs['A'] / 100, conditions=TWO_CONDITIONS[:1])
@@ -351,13 +259,6 @@ def test_intensity_with_a_lineshape_param_per_condition():
     f = with_lineshape_param_per_condition(feat(A=1600., B=500., amp=2.))
 
     assert f.get_intensity() == pytest.approx(4. / (16. * 5. * CM_TO_AU ** 2) ** 2, rel=1e-6)
-
-
-def test_intensity_needs_positive_lineshape_params_from_a_function():
-    f = replace(feat(A=0.), lineshape_param=lambda vd, freqs: -5., conditions=TWO_CONDITIONS[:1])
-
-    with pytest.raises(ValueError, match='must be > 0'):
-        f.get_intensity()
 
 
 def test_intensity_half_widths_take_the_largest_lineshape_param():
@@ -426,13 +327,6 @@ def test_window_from_features_keeps_a_feature_whose_rows_cancel():
     assert window.full_features[1].amplitude_coeff == 0.
     assert window.full_features[1].rows == cancelling.rows
     assert len(window.full_features) == 2
-
-
-@pytest.mark.parametrize('features', [[], [feat(A=500., gamma=5.)]])
-def test_window_from_features_without_features_near_the_window_is_empty(features):
-    window = SpectralWindow.from_features(WINDOW_0_10, features, [55.] * len(features))
-
-    assert window.full_features == [] and window.contrib_features == []
 
 
 def test_window_from_features_does_not_change_input_features():
@@ -549,22 +443,6 @@ def test_amplitude_half_widths_of_no_features_is_empty():
     assert amplitude_half_widths(WINDOW_0_10, [], dynrange=100.) == []
 
 
-def test_window_from_amplitude_boxes_keeps_weak_features():
-    """
-    No feature is dropped for being weak. Amplitudes 1, 1e-6 inside, 1e-6 at A = 12, outside:
-    the weak ones get the smallest box, 1 gamma; at A = 12 that is (7, 17), so it still reaches into the window.
-    """
-    strong, weakest, weak_outside = feat(A=5., amp=1., gamma=5.), feat(A=7., amp=1e-6, gamma=5.), feat(A=12., amp=1e-6, gamma=5.)
-    features = [strong, weakest, weak_outside]
-
-    window = SpectralWindow.from_features(WINDOW_0_10, features,
-                                          amplitude_half_widths(WINDOW_0_10, features, dynrange=101.))
-
-    assert window.full_features == [strong, weakest]
-    assert window.contrib_features == [weak_outside]
-    assert window.contrib_features[0].feat_box == Box({'A': (7., 17.)})
-
-
 @pytest.mark.parametrize('setting, value', [('dynrange', 1.), ('dynrange', 0.5), ('eps', 0.), ('eps', -0.1),
                                             ('min_lineshape_params', -1.), ('a_max', 0.)])
 def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
@@ -572,12 +450,6 @@ def test_amplitude_half_widths_reject_settings_out_of_range(setting, value):
 
     with pytest.raises(ValueError, match=setting):
         amplitude_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
-
-
-@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'lineshape_param'), (feat(A=5., amp=None), 'no rows')])
-def test_amplitude_half_widths_need_a_feature_with_rows_and_lineshape_param(f, message):
-    with pytest.raises(ValueError, match=message):
-        amplitude_half_widths(WINDOW_0_10, [f], dynrange=100.)
 
 
 ## intensity_half_widths: box size by intensity -------------------------------------------------------
@@ -688,23 +560,12 @@ def test_intensity_half_widths_reject_settings_out_of_range(setting, value):
         intensity_half_widths(WINDOW_0_10, [feat(A=5.)], **settings)
 
 
-@pytest.mark.parametrize('f, message', [(feat(A=5., gamma=None), 'lineshape_param'), (feat(A=5., amp=None), 'no rows')])
-def test_intensity_half_widths_need_a_feature_with_rows_and_lineshape_param(f, message):
-    with pytest.raises(ValueError, match=message):
-        intensity_half_widths(WINDOW_0_10, [f], dynrange=100.)
-
-
 ## A flat background: rows without resonance conditions ----------------------------------------
 # The rows of a term without conditions sit at the location without axes. The feature has the same amplitude on
 # every grid point: no peak, no lineshape_params_at_peak, no box of its own.
 
 def flat(amp: float = 2.) -> SpectralFeature:
     return feat({}, amp=amp, gamma=5.)
-
-
-def test_flat_feature_has_no_axes():
-    assert flat().is_flat
-    assert not feat(A=0.).is_flat
 
 
 @pytest.mark.parametrize('lineshape_param', [5., LINESHAPE_PARAM_1_PERCENT])

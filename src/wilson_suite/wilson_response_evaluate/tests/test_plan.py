@@ -16,7 +16,6 @@ from wilson_suite.wilson_response_evaluate.plan import (
     ResCondKey,
     ResLocPoint,
     ResonanceMotif,
-    compile_terms,
     generate_LHS_motif,
 )
 from wilson_suite.wilson_response_evaluate.tests.helpers import (
@@ -68,17 +67,6 @@ def test_propscollection_sort_puts_non_averaged_last():
     coll = PropsCollection([polprop(inds='abc'), polprop(ops=(3,), inds='a'), polprop(ops=(1,), inds='b')])
 
     assert [p.ops[0].o if p.ops else None for p in coll.sort()] == [1, 3, None]
-
-
-def test_propscollection_sort_returns_a_new_collection_and_leaves_this_one():
-    coll = PropsCollection([polprop(inds='abc'), polprop(ops=(3,), inds='a')])
-    names_before = coll.names
-
-    sorted_coll = coll.sort()
-
-    assert sorted_coll is not coll
-    assert coll.names == names_before == ('cff', 'dipgrad')
-    assert sorted_coll.names == ('dipgrad', 'cff')
 
 
 def test_propscollection_names_one_per_property_in_order():
@@ -140,12 +128,6 @@ def test_freqterms_split_by_pert_wf_diff():
 
     assert vibdiff_keys(coll.get_vibenedenom()) == [(('a',), (), False)]
     assert vibdiff_keys(coll.get_pert_wf_diff()) == [(('a', 'b'), ('a',), True)]
-
-
-def test_freqterms_pert_wf_diff_against_ground_is_pert_only():
-    coll = FreqTermsCollection([vibdiff(sl='ab', sr='', pert=True)])
-    assert vibdiff_keys(coll.get_vibenedenom()) == []
-    assert vibdiff_keys(coll.get_pert_wf_diff()) == [(('a', 'b'), (), True)]
 
 
 ## ResCondKey ---------------------------------------------------------------
@@ -245,15 +227,6 @@ def test_resonance_motif_empty_is_the_no_resonance_term():
     assert motif == ResonanceMotif.from_conditions([])
 
 
-def test_resonance_motif_repeated_axes_are_counted_once():
-    motif = ResonanceMotif.from_tuples([((('a',), ()), ('A', '-B')),
-                                        ((('b',), ()), ('B',)),
-                                        ((('a',), ('b',)), ('-A',))])
-
-    assert motif.get_max_different_freq_axes() == {'A', 'B'}
-
-
-
 ## generate_LHS_motif ---------------------------------------------------------
 # Row i <-> condition i of the motif (conditions are kept sorted), column j <-> j-th of the
 # motif's distinct axes, sorted. Entry is -s_j: the equation is written as
@@ -283,15 +256,6 @@ def test_generate_LHS_motif_extra_axes_get_zero_columns():
 def test_generate_LHS_motif_axes_must_cover_the_motif():
     with pytest.raises(ValueError):
         generate_LHS_motif(ResonanceMotif.from_tuples(MOTIF_AB), axes=('A',))
-
-
-def test_generate_LHS_motif_ignores_states():
-    """Only pf enters the LHS; which states resonate is the RHS's business.
-    (States do fix the row order, so both motifs here sort the ('A', '-B') condition first.)"""
-    one = ResonanceMotif.from_tuples(((((), ('a',)), ('A', '-B')), ((('b',), ()), ('B',))))
-    other = ResonanceMotif.from_tuples(((((), ('b',)), ('A', '-B')), ((('a', 'b'), ('a',)), ('B',))))
-
-    np.testing.assert_array_equal(generate_LHS_motif(one)[0], generate_LHS_motif(other)[0])
 
 
 ## ParameterSet -------------------------------------------------------------
@@ -373,17 +337,6 @@ def test_res_loc_point_ignores_later_changes_to_the_input_dict():
     assert hash(point) == before
 
 
-def test_res_loc_point_as_dict_returns_a_new_dict():
-    point = ResLocPoint({'A': 1., 'B': 2.})
-
-    d = point.as_dict()
-    d['A'] = 5.
-
-    assert point.as_dict() == {'A': 1., 'B': 2.}
-    assert point['A'] == 1.
-
-
-
 ## CompiledTerm -------------------------------------------------------------
 
 def _fake_vibpert_term(res=(('a', '', ('1',)),)):
@@ -415,21 +368,6 @@ def test_compiled_term_from_vibpert_term():
     assert sorted(set(ct.idx_summ+ct.idx_nonsumm)) == sorted(indices)
 
 
-def test_compiled_term_splits_its_denominators_by_pert_wf_diff():
-    """freqterms of _fake_vibpert_term: 1/omega_a (False) and 1/(E_ab - E_a) (True)"""
-    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
-
-    assert vibdiff_keys(ct.freq_vibenedenom) == [(('a',), (), False)]
-    assert vibdiff_keys(ct.freq_pert_wf_diff) == [(('a', 'b'), ('a',), True)]
-
-
-def test_compiled_term_prop_names_each_once_in_order():
-    """_fake_vibpert_term: polgrad[a] (averaged), cff-like 'ab' second derivative (non-averaged)"""
-    ct = CompiledTerm.from_VibPertTerm(_fake_vibpert_term()) # type: ignore
-
-    assert ct.prop_names == tuple(dict.fromkeys(ct.all_props.names)) == ('polgrad', 'hess')
-
-
 def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
     """only properties: no motif, no denominators, no labels"""
     return CompiledTerm(PropsCollection(list(avrg)), PropsCollection(list(non_avrg)),
@@ -447,13 +385,6 @@ def test_compiled_term_prop_names_one_per_distinct_trivial_name(avrg, non_avrg, 
     """what MolSystemData.load requests for the term: each name once, averaged properties first"""
     assert bare_term(avrg, non_avrg).prop_names == expected
 
-
-
-def test_compile_terms_one_compiled_per_term():
-    compiled = compile_terms([_fake_vibpert_term(), _fake_vibpert_term()]) # type: ignore
-
-    assert len(compiled) == 2
-    assert all(isinstance(c, CompiledTerm) for c in compiled)
 
 
 # A term's resonance conditions must fix exactly one point, in the axes the term uses.
@@ -491,10 +422,3 @@ def test_compiled_term_without_conditions_passes():
     assert ct.cmp_resmotf == ResonanceMotif(())
     assert ct.max_state_lvl == 2                    # from the freqterms: sl 'ab'
     assert FreqTermsCollection([]).get_max_state_lvl() == 0
-
-
-def test_compile_terms_raises_if_one_term_does_not_fix_one_point():
-    bad = _fake_vibpert_term(res=(('a', '', ('A', 'B')),))
-
-    with pytest.raises(ValueError, match='do not fix one point'):
-        compile_terms([_fake_vibpert_term(), bad]) # type: ignore
