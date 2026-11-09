@@ -2,12 +2,13 @@ from wilson_suite.wilson_experiment.experiment_abstractions import (make_gaussia
                                                                     ScanObject, SpecScan, VibExperiment)
 
 # Canned experiment: An EVV experiment with two scans, one for each IR carrier frequency
+# It visits more than one magnitude regime
 def evv_2scan():
 
-    pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
+    pulse_ir_1 = make_gaussian_pulse(tc=100.0, cf=1000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=1)
 
-    pulse_ir_2 = make_gaussian_pulse(tc=600.0, cf=1000.0, dev=100.0, maxstr=1.0e-5,
+    pulse_ir_2 = make_gaussian_pulse(tc=600.0, cf=3000.0, dev=100.0, maxstr=1.0e-5,
                                      wv=(0.0, 0.0, 1.0), pol=(1.0, 0.0, 0.0), id=2)
 
     pulse_uvvis_1 = make_gaussian_pulse(tc=1100.0, cf=15000.0, dev=100.0, maxstr=1.0e-5,
@@ -24,7 +25,7 @@ def evv_2scan():
 
     # Push one carrier freq
     scan_obj_a = ScanObject('pulse', 'cf', id=1, coeff=1.0)
-    scan_range_a = [50.0 * i for i in range(10)]
+    scan_range_a = [300.0 * i for i in range(10)]
     scan_a = SpecScan(scan_objs=(scan_obj_a,), range=scan_range_a)
 
     # Push another carrier freq

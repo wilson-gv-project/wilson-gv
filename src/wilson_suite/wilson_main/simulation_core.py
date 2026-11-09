@@ -1,13 +1,25 @@
 import copy
 from dataclasses import dataclass
 
-from wilson_system.system_data import MolPropsCollection, MolecularProperty
+from ..wilson_system.system_data import MolPropsCollection, MolecularProperty
 from ..wilson_experiment.experiment_abstractions import VibExperiment
 from ..wilson_derive.derive import ResponseTermsCollection
 import numpy as np
 
 @dataclass
 class SimulationCore():
+    """
+    Class to collect experiment and terms information, and determine collected term-related information
+    over all scan points of experiment.
+
+    experiment: VibExperiment: The requested experiment.
+
+    total_anharm_limit: Maximum total (electrical + mechanical) order of anharmonicity to be considered
+
+    mech_anharm_limit: Maximum order of mechanical anharmonicity to be considered
+
+    el_anharm_limit: Maximum order of electrical anharmonicity to be considered
+    """
 
     experiment: VibExperiment
     total_anharm_limit: int
@@ -15,15 +27,30 @@ class SimulationCore():
     el_anharm_limit: int
 
     def __post_init__(self):
+        """
 
+        """
+
+        # To hold all unique sets of resulting terms
         terms_by_order_comp_magn = {}
 
+        # Collective magnitude condition bank and key counter
+        # Need collective bank because individual FieldAnalysis have their own banks and entries at one scan point
+        # may differ
+        coll_magn_bank = {}
+        coll_magn_bank_ctr = 0
+
+        # To hold all derivative properties needed to evaluate the collective terms in terms_by_order_comp_magn
         props_set = set()
 
+        # Maximum number of vibrational quanta encountered over all terms
         max_state_lvl = 0
+
+        # All pair quanta encountered over all terms
         pair_quanta = set()
 
         for scan_elem in np.ndindex(self.experiment.field_analyses.shape):
+
             int_seq = self.experiment.field_analyses[scan_elem].int_sequences_by_order_comp_pol_magn
 
             for order in int_seq:
@@ -36,16 +63,26 @@ class SimulationCore():
 
                     for pol in int_seq[order][comp]:
                         for magn in int_seq[order][comp][pol]:
-                            if not magn in terms_by_order_comp_magn[order][comp]:
+
+                            curr_magn = self.experiment.field_analyses[scan_elem].magnitude_condition_bank[magn]
+                            found_in_bank = False
+
+                            for i in coll_magn_bank:
+                                if coll_magn_bank[i] == curr_magn:
+                                    found_in_bank = True
+
+                            if not found_in_bank:
+
+                                coll_magn_bank[coll_magn_bank_ctr] = copy.deepcopy(curr_magn)
 
                                 new_collection = ResponseTermsCollection(order = order,
                                                             total_anharm_limit=self.total_anharm_limit,
                                                             el_anharm_limit=self.el_anharm_limit,
                                                             mech_anharm_limit=self.mech_anharm_limit,
                                                             comp_pattern=comp,
-                                                            magn_conds=magn)
+                                                            magn_conds=curr_magn)
 
-                                terms_by_order_comp_magn[order][comp][magn] = copy.deepcopy(new_collection)
+                                terms_by_order_comp_magn[order][comp][coll_magn_bank_ctr] = copy.deepcopy(new_collection)
 
                                 props_set = props_set.union(set(new_collection.props.names()))
 
@@ -54,6 +91,13 @@ class SimulationCore():
 
                                 pair_quanta = pair_quanta.union(new_collection.pair_quanta)
 
+                                coll_magn_bank_ctr += 1
+
+        # Setting collected attributes over all scan points
+        self.terms_by_order_comp_magn = terms_by_order_comp_magn
+        self.coll_magn_bank = coll_magn_bank
         self.props = MolPropsCollection(MolecularProperty(i) for i in props_set)
+        self.max_state_lvl = max_state_lvl
+        self.pair_quanta = pair_quanta
 
 pass
