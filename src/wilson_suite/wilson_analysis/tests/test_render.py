@@ -7,7 +7,10 @@ from wilson_suite.wilson_main.spectrum_abstractions import SpecEvalSetup, Render
 import numpy as np
 import pytest
 import copy
+from pathlib import Path
 np.set_printoptions(linewidth=280, precision=4)
+
+TEST_DIR = Path(__file__).parent
 
 
 def test_render_spectrum_simplecontour():
@@ -21,7 +24,7 @@ def test_render_spectrum_simplecontour():
 
     rndinfo = RenderingInfo(intensity_normalization_type=None, 
                             spec_data_operations='none', nlevels=6,
-                            filename='simple_contour.svg')
+                            filename=str(TEST_DIR / 'simple_contour.svg'))
     spec_eval_setup = SpecEvalSetup(rnd_info=rndinfo)
     assert not spec_eval_setup.is_ready_render
 
@@ -84,7 +87,7 @@ def test_render_spectrum_simplecontour_sq():
 
     rndinfo = RenderingInfo(intensity_normalization_type=None, 
                             spec_data_operations='abs()**2', nlevels=6,
-                            filename='simple_contour_sq.svg')
+                            filename=str(TEST_DIR / 'simple_contour_sq.svg'))
     spec_eval_setup = SpecEvalSetup(rnd_info=rndinfo)
     assert not spec_eval_setup.is_ready_render
 
