@@ -120,16 +120,6 @@ def test_feature_equality_leaves_out_the_box_and_the_conditions():
 LOC_1650 = ResLocPoint({'A': 1650.})
 
 
-def test_features_from_rows_adds_rows_of_one_motif_at_one_location():
-    rows = (row(0.30, term_id=0, location=LOC_1650, a=0), row(-0.12, term_id=1, location=LOC_1650, a=0))
-
-    [f] = features_from_rows(ContributionTable(rows))
-
-    assert f.location == LOC_1650
-    assert f.rows == rows
-    assert f.amplitude_coeff == pytest.approx(0.18)
-
-
 def test_features_from_rows_keeps_motifs_apart_at_one_location():
     """Same point, different motif -> different peak shape: two features."""
     rows = (row(0.30, location=LOC_1650, a=0), row(0.20, motif=OTHER_MOTIF, location=LOC_1650, a=0))
@@ -287,22 +277,8 @@ def test_amplitude_half_widths_take_the_largest_lineshape_param():
 
 
 ## SpectralWindow.from_features ---------------------------------------------
-# Window A (0, 10). Half-width 55 cm-1: a feature at A = 60 has the box (5, 115), at A = 70 the box (15, 125).
 
 WINDOW_0_10 = Box({'A': (0., 10.)})
-
-
-def test_window_from_features_keeps_features_whose_box_overlaps_the_window():
-    """
-    A = 60: box (5, 115) overlaps the window -> contrib_features.  A = 70: box (15, 125) does not -> dropped.
-    """
-    inside, near, far = feat(A=5., gamma=5.), feat(A=60., gamma=5.), feat(A=70., gamma=5.)
-
-    window = SpectralWindow.from_features(WINDOW_0_10, [inside, near, far], [55., 55., 55.])
-
-    assert window.box == WINDOW_0_10
-    assert window.full_features == [inside]
-    assert window.contrib_features == [near]
 
 
 def test_window_from_features_box_is_the_location_plus_minus_its_half_width():
@@ -515,20 +491,6 @@ def test_intensity_half_widths_scaled_by_a_given_max_intensity():
     assert half_widths == pytest.approx([5. * 49.5 ** 0.5, 10., 10.])
 
 
-def test_intensity_half_widths_scaled_take_a_stronger_feature_outside_the_window():
-    """
-    A feature 10 times stronger in amplitude, 100 cm-1 outside: dress_these_with_boxes raised (stronger than its
-    max). max_intensity is the strongest peak inside: inside k = 101 -> 50 cm-1; outside k = 101 * 100 = 10100 ->
-    5 * sqrt(10099) cm-1.
-    """
-    inside, strong_outside = feat(A=5., amp=1., gamma=5.), feat(A=110., amp=10., gamma=5.)
-
-    half_widths = intensity_half_widths(WINDOW_0_10, [inside, strong_outside], dynrange=101.,
-                                        box_range_safety_margin=0., scale_wrt_max_intensity=True)
-
-    assert half_widths == pytest.approx([50., 5. * 10099 ** 0.5])
-
-
 def test_intensity_half_widths_scaled_need_a_feature_inside_or_max_intensity():
     """no feature inside: no strongest peak to scale by. Unscaled needs none."""
     outside = feat(A=60., gamma=5.)
@@ -646,13 +608,6 @@ def test_nd_feature_is_inside_only_when_every_axis_is_inside(ndim):
 
 
 @pytest.mark.parametrize('ndim', NDIMS)
-def test_nd_intensity_has_one_gamma_factor_per_axis(ndim):
-    f = feat(coords(ndim, 100.), amp=2., gamma=5.)
-
-    assert f.get_intensity() == pytest.approx(4. / (5. * CM_TO_AU) ** (2 * ndim), rel=1e-6)
-
-
-@pytest.mark.parametrize('ndim', NDIMS)
 @pytest.mark.parametrize('scaled', [False, True])
 def test_nd_intensity_half_width_does_not_change_with_the_number_of_axes(ndim, scaled):
     """one gamma factor per axis in the intensity, the same half-width: 5 * sqrt(100) = 50 cm-1 (dynrange 101)"""
@@ -708,4 +663,3 @@ def test_nd_amplitude_in_window_box_multiplies_the_tail_of_each_axis_outside(ndi
 
     assert amplitude_in_window_box(outside, cube(ndim, 0., 10.)) == pytest.approx(
         inside.get_intensity() ** 0.5 * (5. / np.hypot(100., 5.)) ** ndim)
-

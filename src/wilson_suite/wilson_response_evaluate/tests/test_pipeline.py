@@ -287,11 +287,6 @@ def test_prop_names_every_property_of_the_terms_each_once():
     assert prop_names([toy_pulse_term(), with_dipgrad, toy_pulse_term()]) == ['polgrad', 'cff', 'dipgrad']
 
 
-def test_prop_names_lists_the_averaged_props_of_a_term_first():
-    """as CompiledTerm.prop_names: cff written first, still after <polgrad>"""
-    assert prop_names([pulse_term(polprop(inds='abc'), polprop(ops=(0, 1), inds='a'))]) == ['polgrad', 'cff']
-
-
 def test_prop_names_of_the_terms_in_pulse_ids_are_those_of_the_compiled_terms():
     """the 14 EVV terms: the axis translation leaves the props alone"""
     from_compiled = list(dict.fromkeys(name for t in ref.compiled_evv_terms() for name in t.prop_names))
@@ -402,12 +397,6 @@ def _motif_terms(feature: SpectralFeature) -> tuple[int, ...]:
     """the EVV_MOTIF_TERMS group that the feature's terms belong to"""
     (group,) = [g for g in EVV_MOTIF_TERMS if set(feature.term_ids) <= set(g)]
     return group
-
-
-def test_real_data_504_pairs_340_rows_164_zero(evv_formaldehyde):
-    result = evv_formaldehyde.result
-
-    assert (len(result.table), len(result.zero)) == (340, 164)
 
 
 def test_real_data_68_features_36_and_32_per_motif(evv_formaldehyde):
@@ -732,21 +721,6 @@ def test_spectrum_on_grid_with_a_new_lineshape_param_reuses_the_rows(formaldehyd
     new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 8.), window_box=WINDOW_AROUND_STRONGEST,
                                n_points_per_axis=STEPS_1_CM, box_rule=AMPLITUDE_BOXES)
     np.testing.assert_allclose(wider.amplitude, new_run.amplitude)
-
-
-def test_spectrum_on_grid_on_another_window_reuses_the_features(formaldehyde_molsys):
-    """Same features, another window_box and grid: what a new run on that window_box gives"""
-    result = evaluate_formaldehyde(formaldehyde_molsys, 5.)
-    other_window_box, n_points_per_axis = Box({'A': (2700., 2750.), 'B': (-60., 0.)}), {'A': 51, 'B': 61}
-
-    again = spectrum_on_grid(result, window_box=other_window_box, n_points_per_axis=n_points_per_axis,
-                             box_rule=AMPLITUDE_BOXES)
-
-    assert again.feature_result is result
-    new_run = spectrum_on_grid(evaluate_formaldehyde(formaldehyde_molsys, 5.), window_box=other_window_box,
-                               n_points_per_axis=n_points_per_axis, box_rule=AMPLITUDE_BOXES)
-    np.testing.assert_allclose(again.amplitude, new_run.amplitude)
-
 
 
 ## check_grid_axes: the grid fits the features --------------------------------

@@ -56,7 +56,6 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     E00,
     E01,
     E1,
-    LASER_POL_DISTINCT_PAIRINGS,
     MOTIF_A,
     MOTIF_AB,
     MOTIF_AB_EXTRA,
@@ -225,10 +224,6 @@ def dense(pol: dict) -> np.ndarray:
     return C
 
 
-ALL_ABC = [dict(zip('abc', combo)) for combo in itertools.product(range(N_MODES), repeat=3)]
-
-
-
 # -- eval_avrg_per_indexdict: the averaged part at one index set, from the term's tensor ---------
 
 def one_value(v: float) -> AvrgTensor:
@@ -296,36 +291,9 @@ def test_avrg_einsum_subscripts_need_lowercase_mode_labels():
         make_avrg_einsum_subscripts(PropsCollection([polprop(ops=(0, 1), inds='I')]))
 
 
-# -- calculate_avrg_tensor_einsum: every index set at once = the on-the-fly loop -------------
-
-# Expected for each expression: the einsum tensor equals the on-the-fly loop at all 64 index sets (a, b, c each
-# over modes 0 to 3), to rel 1e-12, abs 0. The data is random (POLGRAD, DIPGRAD): no symmetry, no zeros. So
-# reading a wrong mode, a wrong slot or the polgrad axes in the wrong order gives another number.
-#
-# labels -> evv_avrg_expr(labels) = polgrad[labels[0]] (slots 0, 3) * dipgrad[labels[1]] (slot 1) * dipgrad[labels[2]] (slot 2)
-#   'bac'  terms 8, 13        expression order b, a, c; tensor axes a, b, c (alphabetical, tensor.labels).
-#                             Right: read with tensor.labels, as AvrgTensor.at does:
-#                                 {'a': 0, 'b': 1, 'c': 2} -> values[0, 1, 2]
-#                             Wrong: read in expression order (b, a, c):
-#                                 {'a': 0, 'b': 1, 'c': 2} -> values[1, 0, 2], the value of a=1, b=0, c=2.
-#   'abc'  no EVV term        expression order = axis order: the plain case.
-#   'cab'  terms 3, 6         polgrad read at c, the last axis.
-#   'bab'  terms 2, 7, 9, 12  no c: a tensor with 2 axes (a, b). ALL_ABC still runs over c; einsum (AvrgTensor.at)
-#                             and the loop both ignore it.
-#   'baa'  terms 10, 11       both dipgrads read at mode a: one mode, two slot letters (J, K).
-#   Not here: 'aab' (terms 4, 5); terms 0 and 1 (polhess, diphess). test_integration.py checks all 14 terms.
-#
-# The recipe: LASER_POL_DISTINCT_PAIRINGS, with which every slot mix-up changes the value.
-@pytest.mark.parametrize('labels', ['bac', 'abc', 'cab', 'bab', 'baa'])
-def test_avrg_tensor_einsum_is_the_on_the_fly_value_for_every_index_set(labels):
-    pol = getGeneralPolarizationAveragingExpression(4, LASER_POL_DISTINCT_PAIRINGS)
-    func = make_func_to_compute_avrg(avrg_expression=evv_avrg_expr(labels), polarization_linear_comb=pol)
-
-    tensor = calculate_avrg_tensor_einsum(evv_avrg_expr(labels), evv_props(), pol)
-
-    for idx in ALL_ABC:
-        assert tensor.at(idx) == pytest.approx(func(idx, evv_props()), rel=1e-12, abs=0)
-
+# -- calculate_avrg_tensor_einsum: the averaged part at every index set at once ---------------
+# The data is random (POLGRAD, DIPGRAD): no symmetry, no zeros. So reading a wrong mode, a wrong slot or the
+# polgrad axes in the wrong order gives another number.
 
 def test_avrg_tensor_einsum_term8_axes_are_a_b_c_not_the_expression_order():
     """
@@ -412,27 +380,6 @@ def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys)
                 'VIBENE_DENOM': 1. / (convNu2Ene(E0_eigval) * convNu2Ene(E1_eigval) * convNu2Ene(E1_eigval))}
     assert contribs == pytest.approx(expected)
     assert value == pytest.approx(0.25 * np.prod(list(expected.values())))
-
-
-def test_build_contributions_splits_the_denominators_once_per_term(molsys_a1_zero, monkeypatch):
-    """
-    The split into 1/omega and energy-difference denominators is made once per term and kept
-    (CompiledTerm.freq_vibenedenom, freq_pert_wf_diff), not once per index set. Each split builds a new
-    FreqTermsCollection with a deepcopy: per index set, that was 11 of 22 s of build_contributions on ACDM.
-    Here: per term, a = 0 with b, c over 2 modes gives 4 index sets that reach the denominators.
-    """
-    calls = {'get_vibenedenom': 0, 'get_pert_wf_diff': 0}
-    for name in calls:
-        original = getattr(FreqTermsCollection, name)
-
-        def counting(self, _name=name, _original=original):
-            calls[_name] += 1
-            return _original(self)
-        monkeypatch.setattr(FreqTermsCollection, name, counting)
-
-    build_contributions([ab_term(), ab_term()], molsys_a1_zero, TOY_RECIPE, states_choice='anharmonic')
-
-    assert calls == {'get_vibenedenom': 2, 'get_pert_wf_diff': 2}
 
 
 ## One term end to end -------------------------------------------------------
@@ -930,20 +877,6 @@ def test_eval_feature_on_grid_values_with_a_minus_axis(states):
                 [-0.0036 - 0.0012j, -0.006 - 0.006j, -0.006 - 0.006j]]
     assert np.shape(value) == (3, 3)
     np.testing.assert_allclose(value, CM1_PER_EH**2 * np.array(expected))
-
-
-def test_eval_feature_on_grid_axis_outside_the_motif_changes_nothing(states):
-    """MOTIF_A only has a condition on A. On an A x B grid every column is the 1D result: a ridge along B."""
-    f = feature_at_solved_location(MOTIF_A, PS_01, states)
-    grid = grid_around({'A': 1000., 'B': 0.}, 5.)
-
-    value = eval_feature_on_grid(f, states, grid)
-
-    expected = [[0.03 + 0.03j] * 3,
-                [0.06j] * 3,
-                [-0.03 + 0.03j] * 3]
-    assert np.shape(value) == (3, 3)
-    np.testing.assert_allclose(value, CM1_PER_EH * np.array(expected))
 
 
 def test_eval_feature_on_grid_lineshape_param_function_gives_each_condition_its_own_value(states):

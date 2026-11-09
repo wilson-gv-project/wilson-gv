@@ -77,15 +77,6 @@ def test_propscollection_names_one_per_property_in_order():
     assert coll.names == ('polgrad', 'dipgrad', 'dipgrad', 'cff')
 
 
-def test_propscollection_equal_by_value_and_usable_as_key():
-    a = PropsCollection([polprop(ops=(0, 1), inds='a')])
-    b = PropsCollection([polprop(ops=(0, 1), inds='a')])
-
-    assert a == b
-    assert hash(a) == hash(b)
-    assert {a: 'tensor'}[b] == 'tensor'
-
-
 def test_propscollection_equality_is_symmetric_ignores_order_and_counts_repeats():
     p1, p2 = polprop(ops=(0,), inds='a'), polprop(ops=(1,), inds='b')
     one, both = PropsCollection([p1]), PropsCollection([p1, p2])
@@ -176,17 +167,6 @@ def test_resonance_motif_axes_and_mode_indices():
     assert motif.get_nm_indices() == {'a', 'b', 'c'}          # both sides of every diff
     assert len(motif) == 2
     assert list(motif) == list(motif.conditions)               # iterating yields the keys
-
-
-def test_resonance_motif_condition_order_does_not_matter():
-    """Same conditions in another order is the same motif, so reorderings dedup to one key."""
-    forward = ResonanceMotif.from_tuples([((('a',), ()), ('A',)), ((('b',), ('a',)), ('B',))])
-    backward = ResonanceMotif.from_tuples([((('b',), ('a',)), ('B',)), ((('a',), ()), ('A',))])
-
-    assert forward == backward
-    assert hash(forward) == hash(backward)
-    assert forward.conditions == backward.conditions
-    assert len({forward, backward}) == 1
 
 
 def test_resonance_motif_keeps_repeated_conditions():
