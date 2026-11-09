@@ -53,7 +53,7 @@ RES_COND_TERMS_LATEX = [
 SAVED_TERM_0_LATEX = (r'\frac{-1}{4}\frac{1}{\omega_{a,}\omega_{b,}}\frac{\partial\mu_{\beta}}{\partial Q_{a}}'
                       r'\frac{\partial\mu_{\gamma}}{\partial Q_{b}}'
                       r'\frac{\partial^{2}\alpha_{\alpha\delta}}{\partial Q_{a}\partial Q_{b}}'
-                      r'\frac{1}{(\omega_{,a} +A-B)(\omega_{b,a} -B)}')
+                      r'\frac{1}{(\omega_{,a} +A)(\omega_{b,a} -B)}')
 
 
 @pytest.fixture(autouse=True)

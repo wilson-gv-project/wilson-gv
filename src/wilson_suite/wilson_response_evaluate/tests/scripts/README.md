@@ -32,7 +32,7 @@ The refactor's code is wilson_response_evaluate and wilson_system. The scripts a
 |---|---|---|
 | wilson_analysis/render/plot_spectrum.py (written for the refactor) | plot_rsp_func, plot_spectrum | example_plot_spectrum.py |
 | wilson_orientational_averaging/averaging.py, through pipeline.py | the averaging recipe | every script |
-| wilson_utils.wilson_data_obtainer (the reader), through MolSystemData.load | the data of a Gaussian output file | every script |
+| wilson_system.data_obtainer (the reader), through MolSystemData.load | the data of a Gaussian output file | every script |
 
 No script imports the experiment or derive. The stored terms come from
 data_for_tests/translated_terms/make_translated_terms.py, which runs main's code outside the refactor:
