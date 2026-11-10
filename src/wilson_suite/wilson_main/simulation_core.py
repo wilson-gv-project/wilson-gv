@@ -7,7 +7,7 @@ from ..wilson_derive.derive import ResponseTermsCollection
 import numpy as np
 
 @dataclass
-class SimulationCore():
+class SimulationCore:
     """
     Class to collect experiment and terms information, and determine collected term-related information
     over all scan points of experiment.
