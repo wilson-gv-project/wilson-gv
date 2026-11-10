@@ -25,10 +25,10 @@ While some core functionality of Wilson is still under development, the list of 
 
 ### Workflow
 
-![alt text](wilson_workflow.png)
+![alt text](docs/images/wilson_workflow.png)
 
 ### Scopes - symbolic vs numerical
-![alt text](2scopes_wilson.png)
+![alt text](docs/images/2scopes_wilson.png)
 
 
 ## Installation

@@ -1,106 +1,69 @@
-import wilson_suite as ws
-from wilson_suite.wilson_main.abstractions import DataOriginInfo
+"""
+wilson_data_obtainer groups the requested names by their DataOriginInfo, calls CQCParse's parse_from_source once per
+origin, and merges the results. CQCParse tests its own readers; the tests here cover what the obtainer adds, and one
+load of a real file. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
+wilson_main/tests/test_workflow_abstractions.py.
+"""
 from importlib.resources import files
+
+import pytest
+
+from wilson_suite.wilson_main.abstractions import DataOriginInfo
+from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+
 data_dir = files('wilson_suite').joinpath('data_for_tests')
+WATER = DataOriginInfo(source_type='gaussian', base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
+
 
 def test_getting_data():
     """
-    complete_info_keys = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff', 'diphess']
-    compl_data = complete_info_keys + ['harmonic_states']
-
-    sim.getResults(obtainer=wilson_data_obtainer)    
-    anharm own analysis - ['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'qff', 'B', 'coriolis', 'nc_sqrt_eigval']
-    complete_info_keys = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff', 'diphess']
+    A real file, water HF/STO-3G from Gaussian. Checks what wilson relies on, not CQCParse's full list of keys: every
+    requested name comes back, cff_rc and qff_rc come with cff and qff (the VPT2 reads them), and each tensor has one
+    axis per mode index.
     """
-    from ...fixtures import evv_experiment
+    names = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff',
+             'diphess']
+    data = wilson_data_obtainer(dict.fromkeys(names, WATER))
 
-    evv_exp = evv_experiment()
-    terms = ws.derive.derive.get_fully_enhanced_terms(experiment=evv_exp)
-    mol_system = ws.main.abstractions.MolecularSystem(name='h2o', natoms=3)
-    calc_setup_blank = ws.main.abstractions.DataOriginInfo()
+    assert set(names) | {'cff_rc', 'qff_rc'} <= set(data)
+    assert all(data[k] is not None for k in names)
+    n = len(data['nc_sqrt_eigval'])
+    assert n == 3
+    shapes = {'dipgrad': (n, 3), 'diphess': (n, n, 3), 'polgrad': (n, 3, 3), 'polhess': (n, n, 3, 3),
+              'cff': (n, n, n), 'cff_rc': (n, n, n), 'qff': (n, n, n, n), 'qff_rc': (n, n, n, n),
+              'coriolis': (3, n, n)}
+    assert {k: data[k].shape for k in shapes} == shapes
 
-    # -------- vibana_own_analysis='none'
-    sim = ws.main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(evv_exp)
-    sim.addTerms(terms=terms) # terms
 
-    vib_ana = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='none')
-    # dict_keys(['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'nc_sqrt_eigval', 'anharmonic_states'])
-    
-    sim.addSystem(mol_system)
-    sim.addVibAnaSetup(vib_ana)
+@pytest.fixture
+def calls(monkeypatch):
+    """parse_from_source replaced by a fake: reads no file, records the names of each call, returns text as values."""
+    made = []
 
-    sim.addPropEvalSetup(eval_uniform=calc_setup_blank)
-    
-    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    sim.dressPropsWithSetup()
-    
-    rq_none_keys = list(sim.requestData().keys())
+    def fake(requested_data, **origin):
+        made.append(list(requested_data))
+        return {name: f"{name} from {origin['base_file_loc']}" for name in requested_data}
 
-    # -------- vibana_own_analysis='anharm'
-    sim = ws.main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(evv_exp)
-    sim.addTerms(terms=terms) # terms
+    monkeypatch.setattr('CQCParse.parsing.parse_from_source', fake)
+    return made
 
-    vib_ana1 = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='anharm')
-    # dict_keys(['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'qff', 'B', 'coriolis', 'nc_sqrt_eigval'])
-    
-    sim.addSystem(mol_system)
-    sim.addVibAnaSetup(vib_ana1)
 
-    sim.addPropEvalSetup(eval_uniform=calc_setup_blank)
-    
-    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    sim.dressPropsWithSetup()
+def test_one_call_per_origin(calls):
+    """Names of equal DataOriginInfo go to parse_from_source together; each name keeps the value from its own call."""
+    g16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
+    same_as_g16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
+    c4 = DataOriginInfo(source_type='cfour', base_file_loc='c4_folder')
 
-    rq_anh_keys = list(sim.requestData().keys())
+    data = wilson_data_obtainer({'cff': g16, 'dipgrad': c4, 'qff': same_as_g16})
 
-    # -------- vibana_own_analysis='full'
-    sim = ws.main.workflow_abstractions.WilsonSimulation()
-    sim.addExperiment(evv_exp)
-    sim.addTerms(terms=terms) # terms
+    assert calls == [['cff', 'qff'], ['dipgrad']]
+    assert data == {'cff': 'cff from g16.out', 'qff': 'qff from g16.out', 'dipgrad': 'dipgrad from c4_folder'}
 
-    vib_ana1 = ws.main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2', vibana_own_analysis='full')
-    # dict_keys(['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff', 'qff', 'B', 'coriolis', 'nc_sqrt_eigval'])
-    
-    sim.addSystem(mol_system)
-    sim.addVibAnaSetup(vib_ana1)
 
-    sim.addPropEvalSetup(eval_uniform=calc_setup_blank)
-    
-    sim.setPropsAndMaxStateLvl() # setting up self.props/sim.props
-    sim.dressPropsWithSetup()
+def test_unknown_source_type(calls):
+    """A source type the obtainer does not know stops with an error and never reaches parse_from_source."""
+    unknown = DataOriginInfo(source_type='orca')
 
-    rq_full_keys = list(sim.requestData().keys())
-
-    missing_from_A = set(rq_anh_keys) - set(rq_none_keys)
-    missing_from_B = set(rq_none_keys) - set(rq_anh_keys)
-    missing_from_C = set(rq_anh_keys) - set(rq_full_keys)
-    missing_from_D = set(rq_full_keys) - set(rq_anh_keys)
-
-    # missing_from rq_none but in rq_anharm
-    assert missing_from_A == {'coriolis', 'qff', 'B'}
-    # missing_from rq_anharm but in rq_none
-    assert missing_from_B == {'anharmonic_states'}
-    # missing_from rq_full but in rq_anharm
-    assert missing_from_C == {'nc_sqrt_eigval'}
-    # missing_from rq_anharm but in rq_full
-    assert missing_from_D == {'hess'}
-
-    union_none_anharm = list(set(rq_none_keys) | set(rq_anh_keys))
-    print(union_none_anharm, len(union_none_anharm))
-    print(len(rq_none_keys), len(rq_anh_keys), len(rq_full_keys))
-
-    
-    data_orig_g16 = DataOriginInfo(source_type='gaussian',
-                                base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
-    complete_info_keys = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff', 'diphess']
-    complete_rq = dict.fromkeys(complete_info_keys, data_orig_g16)
-    
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
-    compl_data = wilson_data_obtainer(complete_rq)
-
-    # reindex_modes: CQCParse's flag, True if it renumbered the modes (wilson_data_obtainer never asks it to)
-    assert sorted(list(compl_data.keys())) == sorted(complete_info_keys+['harmonic_states', 'cff_rc', 'qff_rc',
-                                                                         'reindex_modes'])
-    assert all(v is not None for v in compl_data.values())
+    with pytest.raises(ValueError):
+        wilson_data_obtainer({'cff': unknown})
+    assert not calls
