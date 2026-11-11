@@ -293,14 +293,14 @@ class VibPerturbedTerm:
 
         return self.hsh
 
-    def full_enhancement_possible(self, mcp: list|tuple[list|tuple], mcm: list|tuple[list|tuple]) -> bool:
+    def full_enhancement_possible(self, mcp: list[list]|tuple[list], mcm: list[list]|tuple[list]) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
         ranges with respect to all of its resonance conditions?
 
         TODO: Currently only for sole harmonic oscillator state, may later need extension for variationally resolved states
 
-        mcp: List or tuple: Each entry another list or tuple: Each such a collection of interaction indices
+        mcp: List or tuple: Each entry a list: Each such list a collection of interaction indices
         whose frequency sum is imposed as positive (ordinarily from analyzing a specific interaction sequence of pulses
         in an experiment) by a margin deemed "significant" according to a previously decided threshold
 
@@ -549,10 +549,6 @@ class VibContribTerm:
             raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
         self.comp_pattern = comp_pattern
 
-        # Always true for well-formed compounding patterns
-        # Could alternatively get as total number of operators in transition integrals
-        self.order = sum(comp_pattern) - 1
-
         self.order_el = order_el
 
         self.order_mech = order_mech
@@ -560,6 +556,12 @@ class VibContribTerm:
         # Initialize frequency difference terms in anticipation of possible addition
         # from mechanical anharmonicity handling
         self.freqdiff = []
+
+    @property
+    def order(self) -> int:
+        # Always true for well-formed compounding patterns
+        # Could alternatively get as total number of operators in transition integrals
+        return sum(self.comp_pattern) - 1
 
     def addFreqTerm(self, new_term: VibDiffTerm):
         """

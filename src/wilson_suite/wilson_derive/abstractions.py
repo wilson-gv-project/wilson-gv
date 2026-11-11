@@ -222,13 +222,13 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list|tuple=(), id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
         """
         diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
               - Several methods will only work with the states in HarmOscStateSymbolic form
               - However, having states as VibStateSymbolic instances is relevant in earlier stages of the overall term
               derivation process
-        pf: List or tuple: Perturbing field frequency labels (their sum to be subtracted when evaluating)
+        pf: List: Perturbing field frequency labels (their sum to be subtracted when evaluating)
         id: Optional integer id term for potential later handling of grouped
         resonance conditions in lineshape evaluation
         """
@@ -239,8 +239,8 @@ class ResonanceCondition:
 
         self.diff = diff
 
-        if not(isinstance(pf, list) or isinstance(pf, tuple)):
-            raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
+        if not(isinstance(pf, list)):
+            raise TypeError('Perturbing frequency labels must be a list of strings or integers')
         for i in pf:
             if not (isinstance(i, str) or isinstance(i, int)):
                 raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
@@ -360,13 +360,13 @@ class ResonanceCondition:
             else:
                 return 1
 
-    def could_be_resonant_by_conditions(self, mc_plus: tuple, mc_minus: tuple, given_prev_res = None) -> bool:
+    def could_be_resonant_by_conditions(self, mc_plus: list[list]|tuple[list], mc_minus: list[list]|tuple[list], given_prev_res = None) -> bool:
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
         Return False only if this is definitely not possible.
 
-        mc_plus: A tuple of tuples of interaction indices whose frequency components sum is to be taken as positive
+        mc_plus: A list or tuple, containing lists of interaction indices whose frequency components sum is to be taken as positive
         by a margin deemed significant
 
         mc_minus: The analagous data as for mc_plus but referring to interaction indices whose freq sum is to be taken
