@@ -262,7 +262,7 @@ class ResonanceCondition:
         right_state = HarmOscStateSymbolic(list(right_state))
         diff = VibDiffTerm(sl=left_state, sr=right_state)
 
-        return cls(diff=diff, pf=pert_freqs)
+        return cls(diff=diff, pf=list(pert_freqs))
 
     @property
     def pf_dict(self):
