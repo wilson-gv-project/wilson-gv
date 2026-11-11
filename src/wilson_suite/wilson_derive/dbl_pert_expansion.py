@@ -29,6 +29,8 @@ def expand_term(term: VibContribTerm, order_el: int=0, order_mech: int=0):
 
         new_term_harm = copy.deepcopy(term)
 
+        new_term_harm.order_el = 1
+
         for i in new_term_harm.ints:
             i.prop.setDerivOrder(1)
 
@@ -41,6 +43,8 @@ def expand_term(term: VibContribTerm, order_el: int=0, order_mech: int=0):
     elif (order_el == 2):
 
         new_term_harm = copy.deepcopy(term)
+
+        new_term_harm.order_el = 2
 
         for i in new_term_harm.ints:
             i.prop.setDerivOrder(1)
@@ -82,6 +86,8 @@ def expand_term(term: VibContribTerm, order_el: int=0, order_mech: int=0):
                     new_term = copy.deepcopy(i)
                     new_term.coeff *= Fraction(-1, 6)
                     vcubic = PolProp([], dord=3)
+
+                    new_term.order_mech = 1
 
                     if (bk == 'bra'):
 

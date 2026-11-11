@@ -1,264 +1,229 @@
 import pytest
 
-from wilson_suite.wilson_derive.derive import (get_dressed_vib_sos_with_exp_filtering,
-                                               do_dbl_pert_expand_and_hermaut_with_enh_filtering,
-                                               get_fully_enhanced_terms)
-from wilson_suite.fixtures import evv_experiment
+from wilson_suite.wilson_derive.derive import (get_terms_by_comp_pattern_and_magn_conds,
+                                               do_dbl_pert_expand_and_hermaut,
+                                               ResponseTermsCollection)
 
-def test_get_dressed_vib_sos_with_exp_filtering():
+from wilson_suite.wilson_system.system_data import MolPropsCollection
 
-    from fractions import Fraction
+def test_response_terms_collection():
 
-    # Test case: EVV terms
-    evv_exp = evv_experiment()
-    R_sos = get_dressed_vib_sos_with_exp_filtering(evv_exp.order, evv_exp.int_sequences, evv_exp.epochs,
-                                                   evv_exp.cfuv)
+    # Setting up with EVV data
+    order = 3
+    tot_anharm_limit = 1
+    el_anharm_limit = 1
+    mech_anharm_limit = 1
+    comp_patt = (1, 1, 2)
 
-    # Surviving terms here are actually the same terms which are currently tested in
-    # test_vib_sos (filtration there was done "manually"), except now dressed with
-    # interactions according to -k1 + k2 + k3 phase-matching condition
+    # At -k1 + k2 (+ k3): w1 is negative, w2 is positive, here constricting to w1 + w2 signif. > 0
+    mc_plus = ( (1,), (0,1,) , )
+    mc_minus = ((0,),)
 
-    # Should have four terms
-    assert (len(R_sos) == 4)
+    rsp_coll = ResponseTermsCollection(order = order, total_anharm_limit=tot_anharm_limit,
+                                       el_anharm_limit=el_anharm_limit, mech_anharm_limit=mech_anharm_limit,
+                                       comp_pattern=comp_patt, magn_conds=(mc_plus, mc_minus))
 
-    # Corresponds to derivation p.22 res. term 1
-    t = R_sos[0]
+    # There should be 14 terms
+    assert len(rsp_coll.terms) == 14
 
-    assert t.coeff == Fraction(1)
-    assert len(t.ints) == 3
+    # There should be these (derivative) properties identified and they should be a MolPropsCollection instance
+    assert isinstance(rsp_coll.props, MolPropsCollection)
+    assert sorted(rsp_coll.props.names()) == sorted(['dipgrad', 'polhess', 'polgrad', 'diphess', 'cff'])
 
-    assert t.ints[0].bra.s == '0'
-    assert len(t.ints[0].prop.ops) == 2
-    assert t.ints[0].prop.ops[0].o == 0
-    assert t.ints[0].prop.ops[1].o == 3
-    assert t.ints[0].prop.dord == 0
-    assert t.ints[0].ket.s == 'n'
+    # There should be up to 3 quanta in the state references
+    assert rsp_coll.max_state_lvl == 3
 
-    assert t.ints[1].bra.s == 'n'
-    assert len(t.ints[1].prop.ops) == 1
-    assert t.ints[1].prop.ops[0].o == 2
-    assert t.ints[1].prop.dord == 0
-    assert t.ints[1].ket.s == 'm'
-
-    assert t.ints[2].bra.s == 'm'
-    assert len(t.ints[2].prop.ops) == 1
-    assert t.ints[2].prop.ops[0].o == 1
-    assert t.ints[2].prop.dord == 0
-    assert t.ints[2].ket.s == '0'
-
-    assert len(t.res) == 2
-    assert t.res[0].diff.sl.s == 'm'
-    assert t.res[0].diff.sr.s == '0'
-    assert t.res[0].pf == [-1]
-
-    assert t.res[1].diff.sl.s == 'n'
-    assert t.res[1].diff.sr.s == '0'
-    assert t.res[1].pf == [-1, 2]
-
-    # Corresponds to derivation p.21 res. term 2
-    t = R_sos[1]
-
-    assert t.coeff == Fraction(-1)
-    assert len(t.ints) == 3
-
-    assert t.ints[0].bra.s == '0'
-    assert len(t.ints[0].prop.ops) == 1
-    assert t.ints[0].prop.ops[0].o == 2
-    assert t.ints[0].prop.dord == 0
-    assert t.ints[0].ket.s == 'n'
-
-    assert t.ints[1].bra.s == 'n'
-    assert len(t.ints[1].prop.ops) == 2
-    assert t.ints[1].prop.ops[0].o == 0
-    assert t.ints[1].prop.ops[1].o == 3
-    assert t.ints[1].prop.dord == 0
-    assert t.ints[1].ket.s == 'm'
-
-    assert t.ints[2].bra.s == 'm'
-    assert len(t.ints[2].prop.ops) == 1
-    assert t.ints[2].prop.ops[0].o == 1
-    assert t.ints[2].prop.dord == 0
-    assert t.ints[2].ket.s == '0'
-
-    assert len(t.res) == 2
-    assert t.res[0].diff.sl.s == 'm'
-    assert t.res[0].diff.sr.s == '0'
-    assert t.res[0].pf == [-1]
-
-    assert t.res[1].diff.sl.s == 'm'
-    assert t.res[1].diff.sr.s == 'n'
-    assert t.res[1].pf == [-1, 2]
-
-    # Corresponds to derivation p.21 res. term 1
-    t = R_sos[2]
-
-    assert t.coeff == Fraction(-1)
-    assert len(t.ints) == 3
-
-    assert t.ints[0].bra.s == '0'
-    assert len(t.ints[0].prop.ops) == 1
-    assert t.ints[0].prop.ops[0].o == 1
-    assert t.ints[0].prop.dord == 0
-    assert t.ints[0].ket.s == 'm'
-
-    assert t.ints[1].bra.s == 'm'
-    assert len(t.ints[1].prop.ops) == 2
-    assert t.ints[1].prop.ops[0].o == 0
-    assert t.ints[1].prop.ops[1].o == 3
-    assert t.ints[1].prop.dord == 0
-    assert t.ints[1].ket.s == 'n'
-
-    assert t.ints[2].bra.s == 'n'
-    assert len(t.ints[2].prop.ops) == 1
-    assert t.ints[2].prop.ops[0].o == 2
-    assert t.ints[2].prop.dord == 0
-    assert t.ints[2].ket.s == '0'
-
-    assert len(t.res) == 2
-    assert t.res[0].diff.sl.s == '0'
-    assert t.res[0].diff.sr.s == 'm'
-    assert t.res[0].pf == [-1]
-
-    assert t.res[1].diff.sl.s == 'n'
-    assert t.res[1].diff.sr.s == 'm'
-    assert t.res[1].pf == [-1, 2]
-
-    # Corresponds to derivation p.22 res. term 2
-    t = R_sos[3]
-
-    assert t.coeff == Fraction(1)
-    assert len(t.ints) == 3
-
-    assert t.ints[0].bra.s == '0'
-    assert len(t.ints[0].prop.ops) == 1
-    assert t.ints[0].prop.ops[0].o == 1
-    assert t.ints[0].prop.dord == 0
-    assert t.ints[0].ket.s == 'm'
-
-    assert t.ints[1].bra.s == 'm'
-    assert len(t.ints[1].prop.ops) == 1
-    assert t.ints[1].prop.ops[0].o == 2
-    assert t.ints[1].prop.dord == 0
-    assert t.ints[1].ket.s == 'n'
-
-    assert t.ints[2].bra.s == 'n'
-    assert len(t.ints[2].prop.ops) == 2
-    assert t.ints[2].prop.ops[0].o == 0
-    assert t.ints[2].prop.ops[1].o == 3
-    assert t.ints[2].prop.dord == 0
-    assert t.ints[2].ket.s == '0'
-
-    assert len(t.res) == 2
-    assert t.res[0].diff.sl.s == '0'
-    assert t.res[0].diff.sr.s == 'm'
-    assert t.res[0].pf == [-1]
-
-    assert t.res[1].diff.sl.s == '0'
-    assert t.res[1].diff.sr.s == 'n'
-    assert t.res[1].pf == [-1, 2]
+    # Pair quanta should be (0, 1) (e.g. 0, a), (1, 1) (e.g. (a, b)), and (2, 1) (e.g. ( (a, b), b ) )
+    assert rsp_coll.pair_quanta == {(0, 1), (1, 1), (2, 1)}
 
 
-def test_do_dbl_pert_expand_and_hermaut_with_enh_filtering():
+def test_do_dbl_pert_expand_and_hermaut():
 
-    # TODO for general verification: Make exp. situation where more than one term survives "enhancement" possible
-    #  filtering and consider each such term separately
+    from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
 
-    # Test case: EVV
-    evv_exp = evv_experiment()
-    R_sos = get_dressed_vib_sos_with_exp_filtering(evv_exp.order, evv_exp.int_sequences, evv_exp.epochs,
-                                                   evv_exp.cfuv)
-    print('\nAFTER FILTERING\n')
-    k = 0
+    R_sos = get_vib_sos(3)
 
-    for i in R_sos:
-        print('Term, ', k, '\n')
-        i.present()
-        print('\n\n')
-        k += 1
+    R_sos_evv = []
 
-    # This term (criteria "m, 0", "n, 0") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[0]], 1,
-                                                                 0, evv_exp.magn_conditions)
+    for t in R_sos:
+        if t.comp_pattern == (1, 1, 2):
+            R_sos_evv.append(t)
+
+    assert len(R_sos_evv) == 4
+
+    # Magnitude conditions for post-filtering
+    mc_plus = ( [2], [1,2] )
+    mc_minus = ([1],)
+
+    # First term
+
+    # No double harmonic terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[0]], 0, 0)
+
+    assert len(R_result_raw) == 0
+
+
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[0]], 1, 0)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[0]], 0,
-                                                                 1, evv_exp.magn_conditions)
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[0]], 0, 1)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
-    # This term (criteria "m, 0", "m, n") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[1]], 1,
-                                                                 0, evv_exp.magn_conditions)
+    # Second term:
+
+    # No double harmonic terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[1]], 0, 0)
+
+    assert len(R_result_raw) == 0
+
+
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[1]], 1, 0)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[1]], 0,
-                                                                 1, evv_exp.magn_conditions)
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[1]], 0, 1)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
-    # This term (criteria "n, m", "0, m") gets no result at the double harmonic level but will get results at the
-    # 1st order of anharmonicity
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 0,
-                                                                 0, evv_exp.magn_conditions)
+    # Third term
 
-    assert len(R_result) == 0
+    # No double harmonic terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[2]], 0, 0)
 
-    # Two el. anharm. terms: Contents already tested in test_get_fully_enhanced_terms
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 1,
-                                                                 0, evv_exp.magn_conditions)
+    assert len(R_result_raw) == 0
+
+    # Two el. anharm. terms make it: Contents already tested in test_get_fully_enhanced_terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[2]], 1, 0)
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 2
 
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[2]], 0,
-                                                                 1, evv_exp.magn_conditions)
-    # Twelve mech. anharm. terms: Contents already tested in test_get_fully_enhanced_terms
+
+    # Twelve mech. anharm. terms make it: Contents already tested in test_get_fully_enhanced_terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[2]], 0, 1)
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
+
     assert len(R_result) == 12
 
-    # This term (criteria "0, m", "0, n") would get anharmonic hermaut results but those terms should not pass
-    # "full enhancement possible?" filtering
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[3]], 1,
-                                                                 0, evv_exp.magn_conditions)
+    # Fourth term:
+
+    # No double harmonic terms
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[3]], 0, 0)
+
+    assert len(R_result_raw) == 0
+
+
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[3]], 1, 0)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
-    R_result = do_dbl_pert_expand_and_hermaut_with_enh_filtering([R_sos[3]], 0,
-                                                                 1, evv_exp.magn_conditions)
+    # Should be terms here but none satisfying the magnitude conditions
+    R_result_raw = do_dbl_pert_expand_and_hermaut([R_sos_evv[3]], 0, 1)
+
+    assert len(R_result_raw) > 0
+
+    R_result = []
+    for t in R_result_raw:
+        if t.full_enhancement_possible(mcp=mc_plus, mcm=mc_minus):
+            R_result.append(t)
 
     assert len(R_result) == 0
 
 
 
-    pass
+def test_get_terms_by_comp_pattern_and_magn_conds():
+    # Setting up with EVV data
+    order = 3
+    tot_anharm_limit = 1
+    el_anharm_limit = 1
+    mech_anharm_limit = 1
+    comp_patt = (1, 1, 2)
 
-def test_get_fully_enhanced_terms():
+    # At -k1 + k2 (+ k3): w1 is negative, w2 is positive, here constricting to w1 + w2 signif. > 0
+    mc_plus = ((1,), (0, 1,),)
+    mc_minus = ((0,),)
 
-    # Test case: EVV terms
-
+    # Getting terms
     # The assertions in this test depend on wilson-derive retaining ordering of terms
-    evv_exp = evv_experiment()
-    terms = get_fully_enhanced_terms(experiment=evv_exp)
+    terms = get_terms_by_comp_pattern_and_magn_conds(order=order, total_anharm_limit=tot_anharm_limit,
+                                                     el_anharm_limit=el_anharm_limit,
+                                                     mech_anharm_limit=mech_anharm_limit,
+                                                     comp_pattern=comp_patt,
+                                                     magn_conds=(mc_plus, mc_minus))
 
-    # Two total order of anharmonicity
-    assert len(terms) == 2
 
-    # Two categories at 1st order of anharmonicity ([1, 0] and [0, 1])
-    assert len(terms[1]) == 2
+    tot_mech = 0
+    tot_el = 0
 
-    # One category at 0th order ([0, 0])
-    assert len(terms[0]) == 1
+    # Terms should be anharm orders (1, 0) or (0, 1)
+    for t in terms:
+
+        assert t.order_mech == 1 or t.order_el == 1
+
+        if t.order_mech == 1:
+
+            assert t.order_el == 0
+            tot_mech += 1
+
+        elif t.order_el == 1:
+
+            tot_el += 1
 
     # Two terms from electrical anharmonicity
-    assert len(terms[1][(1, 0)]) == 2
+    assert tot_el == 2
 
     # Twelve terms from mechanical anharmonicity
-    assert len(terms[1][(0, 1)]) == 12
-
-    # No terms at zeroth order of anharmonicity
-    assert len(terms[0][(0, 0)]) == 0
+    assert tot_mech == 12
 
     # NOTE about coefficients: A factor -1 difference w.r.t. the form of the reference terms is to be expected
     # because they are expressed in terms of the polarizability, which is -1 times the electric dipole response
@@ -271,59 +236,59 @@ def test_get_fully_enhanced_terms():
 
     # Paper 1 terms     Here                        Coeff sign wrt. paper
     #
-    # Term 1            terms[1][(1,0)][1]          -1
-    # Term 2            terms[1][(1,0)][0]          -1
-    # Term 3a           terms[1][(0, 1)][11]        -1
-    # Term 3b           terms[1][(0, 1)][6]          1 (pert. WF diff. term opposite order)
-    # Term 4a           terms[1][(0, 1)][4]         -1
-    # Term 4b           terms[1][(0, 1)][1]         -1
-    # Term 5a           terms[1][(0, 1)][8]          1 (pert. WF diff. term opposite order)
-    # Term 5b           terms[1][(0, 1)][9]         -1
-    # Term 6a           terms[1][(0, 1)][7]          1 (pert. WF diff. term opposite order)
-    # Term 6b           terms[1][(0, 1)][10]        -1
-    # Term 7a           terms[1][(0, 1)][2]          1 (pert. WF diff. term opposite order)
-    # Term 7b           terms[1][(0, 1)][3]         -1
-    # Term 8a           terms[1][(0, 1)][5]          1 (pert. WF diff. term opposite order)
-    # Term 8b           terms[1][(0, 1)][0]         -1
+    # Term 1            terms[1]                     -1
+    # Term 2            terms[0]                     -1
+    # Term 3a           terms[13]                    -1
+    # Term 3b           terms[8]                      1 (pert. WF diff. term opposite order)
+    # Term 4a           terms[6]                     -1
+    # Term 4b           terms[3]                     -1
+    # Term 5a           terms[10]                     1 (pert. WF diff. term opposite order)
+    # Term 5b           terms[11]                    -1
+    # Term 6a           terms[9]                      1 (pert. WF diff. term opposite order)
+    # Term 6b           terms[12]                    -1
+    # Term 7a           terms[4]                      1 (pert. WF diff. term opposite order)
+    # Term 7b           terms[5]                     -1
+    # Term 8a           terms[7]                      1 (pert. WF diff. term opposite order)
+    # Term 8b           terms[2]                     -1
 
     # Cross-checks: Relative signs/magnitudes between term coefficients
     # Depends on both relative signs of terms as written and "coeff sign" column in above table
 
-    assert terms[1][(1, 0)][0].coeff ==      terms[1][(1, 0)][1].coeff
+    assert terms[0].coeff == terms[1].coeff
 
-    assert terms[1][(1, 0)][0].coeff == -2 * terms[1][(0, 1)][11].coeff
-    assert terms[1][(1, 0)][0].coeff ==  2 * terms[1][(0, 1)][6].coeff
-    assert terms[1][(1, 0)][0].coeff == -2 * terms[1][(0, 1)][4].coeff
-    assert terms[1][(1, 0)][0].coeff == -2 * terms[1][(0, 1)][1].coeff
-    assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][8].coeff
-    assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][9].coeff
+    assert terms[0].coeff == -2 * terms[13].coeff
+    assert terms[0].coeff ==  2 * terms[8].coeff
+    assert terms[0].coeff == -2 * terms[6].coeff
+    assert terms[0].coeff == -2 * terms[3].coeff
+    assert terms[0].coeff ==  4 * terms[10].coeff
+    assert terms[0].coeff == -4 * terms[11].coeff
 
     # Example: I am on the next code line comparing term 1 and 6a:
     # Term 1's coefficient should be -4 times term 5a's coefficient according to the derivation
     # However, wilson-derive outputs the term corresponding to 6a with the pert WF diff. term in
     # opposite order (it did not do so for the term corresponding to term 1)
     # Therefore, the relative coefficient when compared w.r.t. the wilson-derive terms should here be (plus) 4
-    assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][7].coeff
-    assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][10].coeff
-    assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][2].coeff
-    assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][3].coeff
-    assert terms[1][(1, 0)][0].coeff == -4 * terms[1][(0, 1)][5].coeff
-    assert terms[1][(1, 0)][0].coeff ==  4 * terms[1][(0, 1)][0].coeff
+    assert terms[0].coeff == 4 * terms[9].coeff
+    assert terms[0].coeff == -4 * terms[12].coeff
+    assert terms[0].coeff == -4 * terms[4].coeff
+    assert terms[0].coeff == 4 * terms[5].coeff
+    assert terms[0].coeff == -4 * terms[7].coeff
+    assert terms[0].coeff == 4 * terms[2].coeff
 
     # Term details
 
     # Electrical anharmonicity
 
     # Paper 1 term 2
-    t = terms[1][(1,0)][0]
+    t = terms[0]
 
     # -1/4
-    assert t.coeff == -1/4
+    assert t.coeff == -1 / 4
 
     assert len(t.freqterms) == 2
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -355,21 +320,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 1
-    t = terms[1][(1, 0)][1]
+    t = terms[1]
 
     # -1/4
     assert t.coeff == -1 / 4
@@ -409,23 +373,22 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(a + b,a)^[-1, 2]
+    # 1/w_(a + b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
+    assert t.res[1].pf == [1, 2]
 
     # Mechanical anharmonicity
 
-
     # Paper 1 term 8b
-    t = terms[1][(0, 1)][0]
+    t = terms[2]
 
     # -1/16
     assert t.coeff == -1 / 16
@@ -480,21 +443,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 4b
-    t = terms[1][(0, 1)][1]
+    t = terms[3]
 
     # 1/8
     assert t.coeff == 1 / 8
@@ -502,7 +464,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -549,21 +511,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 7a
-    t = terms[1][(0, 1)][2]
+    t = terms[4]
 
     # 1/16 (factor -1 on top of the "polarizability -1 sign"
     # because pert WF diff term is opposite order to paper)
@@ -572,7 +533,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -619,21 +580,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 7b
-    t = terms[1][(0, 1)][3]
+    t = terms[5]
 
     # -1/16
     assert t.coeff == -1 / 16
@@ -641,7 +601,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -688,21 +648,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 4a
-    t = terms[1][(0, 1)][4]
+    t = terms[6]
 
     # 1/8
     assert t.coeff == 1 / 8
@@ -710,7 +669,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -757,21 +716,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 8a
-    t = terms[1][(0, 1)][5]
+    t = terms[7]
 
     # 1/16 (factor -1 on top of the "polarizability -1 sign"
     # because pert WF diff term is opposite order to paper)
@@ -780,7 +738,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -827,21 +785,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 3b
-    t = terms[1][(0, 1)][6]
+    t = terms[8]
 
     # -1/8 (factor -1 on top of the "polarizability -1 sign"
     # because pert WF diff term is opposite order to paper)
@@ -850,7 +807,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -897,21 +854,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 6a
-    t = terms[1][(0, 1)][7]
+    t = terms[9]
 
     # -1/16 (factor -1 on top of the "polarizability -1 sign"
     # because pert WF diff term is opposite order to paper)
@@ -920,7 +876,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -967,21 +923,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 5a
-    t = terms[1][(0, 1)][8]
+    t = terms[10]
 
     # -1/16 (factor -1 on top of the "polarizability -1 sign"
     # because pert WF diff term is opposite order to paper)
@@ -990,7 +945,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -1037,21 +992,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 5b
-    t = terms[1][(0, 1)][9]
+    t = terms[11]
 
     # 1/16
     assert t.coeff == 1 / 16
@@ -1059,7 +1013,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -1074,7 +1028,7 @@ def test_get_fully_enhanced_terms():
     assert t.freqterms[2].sr.q == []
 
     # 1/w_c
-    assert not(t.freqterms[3].is_pert_wf_diff)
+    assert not (t.freqterms[3].is_pert_wf_diff)
     assert t.freqterms[3].sl.q == ['c']
     assert t.freqterms[3].sr.q == []
 
@@ -1106,21 +1060,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 6b
-    t = terms[1][(0, 1)][10]
+    t = terms[12]
 
     # 1/16
     assert t.coeff == 1 / 16
@@ -1133,7 +1086,7 @@ def test_get_fully_enhanced_terms():
     assert t.freqterms[0].sr.q == []
 
     # 1/w_a
-    assert not(t.freqterms[1].is_pert_wf_diff)
+    assert not (t.freqterms[1].is_pert_wf_diff)
     assert t.freqterms[1].sl.q == ['a']
     assert t.freqterms[1].sr.q == []
 
@@ -1143,7 +1096,7 @@ def test_get_fully_enhanced_terms():
     assert t.freqterms[2].sr.q == []
 
     # 1/w_c
-    assert not(t.freqterms[3].is_pert_wf_diff)
+    assert not (t.freqterms[3].is_pert_wf_diff)
     assert t.freqterms[3].sl.q == ['c']
     assert t.freqterms[3].sr.q == []
 
@@ -1175,21 +1128,20 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
-
+    assert t.res[1].pf == [1, 2]
 
     # Paper 1 term 3a
-    t = terms[1][(0, 1)][11]
+    t = terms[13]
 
     # 1/8
     assert t.coeff == 1 / 8
@@ -1197,7 +1149,7 @@ def test_get_fully_enhanced_terms():
     assert len(t.freqterms) == 4
 
     # 1/w_a
-    assert not(t.freqterms[0].is_pert_wf_diff)
+    assert not (t.freqterms[0].is_pert_wf_diff)
     assert t.freqterms[0].sl.q == ['a']
     assert t.freqterms[0].sr.q == []
 
@@ -1212,7 +1164,7 @@ def test_get_fully_enhanced_terms():
     assert t.freqterms[2].sr.q == []
 
     # 1/w_c
-    assert not(t.freqterms[3].is_pert_wf_diff)
+    assert not (t.freqterms[3].is_pert_wf_diff)
     assert t.freqterms[3].sl.q == ['c']
     assert t.freqterms[3].sr.q == []
 
@@ -1244,15 +1196,18 @@ def test_get_fully_enhanced_terms():
 
     assert len(t.res) == 2
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == ['a']
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == ['a', 'b']
     assert t.res[1].diff.sr.q == ['a']
-    assert t.res[1].pf == [-1, 2]
+    assert t.res[1].pf == [1, 2]
+
+
+
 

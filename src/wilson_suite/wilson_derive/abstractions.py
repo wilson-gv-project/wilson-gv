@@ -215,8 +215,6 @@ class VibDiffTerm:
         """
         return hash( ( self.sl.h(), self.sr.h() ) )
 
-
-
 class ResonanceCondition:
     """
     Resonance condition class
@@ -224,13 +222,13 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list|tuple=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list, id=None):
         """
         diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
               - Several methods will only work with the states in HarmOscStateSymbolic form
               - However, having states as VibStateSymbolic instances is relevant in earlier stages of the overall term
               derivation process
-        pf: List or tuple: Perturbing field frequency labels (their sum to be subtracted when evaluating)
+        pf: List: Perturbing field frequency labels (their sum to be subtracted when evaluating)
         id: Optional integer id term for potential later handling of grouped
         resonance conditions in lineshape evaluation
         """
@@ -241,8 +239,8 @@ class ResonanceCondition:
 
         self.diff = diff
 
-        if not(isinstance(pf, list) or isinstance(pf, tuple)):
-            raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
+        if not(isinstance(pf, list)):
+            raise TypeError('Perturbing frequency labels must be a list of strings or integers')
         for i in pf:
             if not (isinstance(i, str) or isinstance(i, int)):
                 raise TypeError('Perturbing frequency labels must be list or tuple of strings or integers')
@@ -264,7 +262,7 @@ class ResonanceCondition:
         right_state = HarmOscStateSymbolic(list(right_state))
         diff = VibDiffTerm(sl=left_state, sr=right_state)
 
-        return cls(diff=diff, pf=pert_freqs)
+        return cls(diff=diff, pf=list(pert_freqs))
 
     @property
     def pf_dict(self):
@@ -299,24 +297,6 @@ class ResonanceCondition:
         """
         return hash(( self.diff.h(), tuple(self.pf), self.id ))
 
-    def uvCancels(self, cfs_uv: dict, tol: float=0.0) -> bool:
-        """
-        Do the UV/VIS parts of my perturbing frequencies cancel?
-
-        cfs_uv: UV/VIS part of my perturbing frequencies
-        tol: tolerance (default: 0.0)
-        NOTE: Consequences if tolerance != 0.0 used are not yet supported/investigated
-        """
-
-        acc = 0.0
-
-        for i in self.pf:
-            sgn = (i > 0) - (i < 0)
-            acc += sgn * cfs_uv[sgn*i]
-
-        sgnacc = (acc > 0) - (acc < 0)
-
-        return ((sgnacc * acc) <= tol)
 
     def netStateSign(self, instead_trimmed: VibDiffTerm=None) -> int:
         """
@@ -346,314 +326,102 @@ class ResonanceCondition:
 
         term = False
 
+        # Removing matching quanta from bra and ket
         while not term:
             for i in q_bra_net:
                 if i in q_ket_net:
+
                     q_bra_net.remove(i)
                     q_ket_net.remove(i)
+
             new_len_bra = len(q_bra_net)
             new_len_ket = len(q_ket_net)
+
             if (len_bra == new_len_bra) and (len_ket == new_len_ket):
                 term = True
+
             len_bra = new_len_bra
             len_ket = new_len_ket
 
+        # Decide sign based on number of quanta left in bra and ket
         if len_bra == 0:
+
             if len_ket > 0:
                 return -1
+            # None left so zero sign
             else:
                 return 0
+
         else:
+
             # Special flag for indeterminate sign
             if len_ket > 0:
                 return -3
             else:
                 return 1
 
-    def couldBeResonantWithFieldByRanges(self, pulse_freq_spans: dict) -> bool:
-        """
-        Unfinished/untested:
-        Determine whether it's possible (return True) that this combination of field
-        (as specified by frequency ranges for each pulse) and states might be resonant.
-        Return False if this is definitely not possible.
-
-        pulse_freq_spans: Dictionary {pulse #i: [lower range, upper range], ...}
-        """
-
-        # VibDiffTerm has its own type check where sl and sr must be same class, therefore checking one is sufficient here
-        if not (isinstance(self.diff.sl, HarmOscStateSymbolic)):
-            raise TypeError(
-                'The netStateSign method works only with a VibDiffTerm composed of HarmOscStateSymbolic instances')
-
-        pfr_curr = {}
-
-        for i in self.pf:
-
-            sgn = (i > 0) - (i < 0)
-
-            if not(sgn*i in pulse_freq_spans):
-                pfr_curr[i] = [float('-inf'), float('inf')]
-
-            else:
-
-                if not(i == sgn*i):
-                    pfr_curr[i] = sorted([-1*pulse_freq_spans[sgn*i][0], -1*pulse_freq_spans[sgn*i][1]])
-
-                else:
-                    pfr_curr[i] = sorted([-1*j for j in pfr_curr[i]])
-
-        pf_total_range = [sum([pfr_curr[i][0] for i in self.pf]), sum([pfr_curr[i][1] for i in self.pf])]
-
-        if pf_total_range[0] < 0.0:
-
-            if pf_total_range[1] < 0.0:
-                pf_overall_sign = -1
-                pf_closed = False
-
-            elif pf_total_range[1] == 0.0:
-                pf_overall_sign = -1
-                pf_closed = True
-
-            elif pf_total_range[1] > 0.0:
-                return True
-
-        if pf_total_range[0] == 0.0:
-
-            if pf_total_range[1] == 0.0:
-                pf_closed = True
-
-            elif pf_total_range[1] > 0.0:
-                pf_overall_sign = 1
-                pf_closed = True
-
-        if pf_total_range[0] > 0.0:
-            pf_overall_sign = 1
-            pf_closed = False
-
-        sd_overall_sign = self.netStateSign()
-
-        # Special flag for indeterminate sign
-        if sd_overall_sign == -3:
-            return True
-
-        if sd_overall_sign == -1:
-
-            if pf_overall_sign == 1:
-                return True
-
-            return False
-
-        elif sd_overall_sign == 1:
-
-            if pf_overall_sign == -1:
-                return True
-
-            return False
-
-        elif sd_overall_sign == 0:
-
-            if pf_closed:
-                return True
-
-            return False
-
-    # FIXME: Functionality not general yet
-    def couldBeResonantWithFieldByConditions(self, magn_conditions: list|tuple, given_prev_res=None):
+    def could_be_resonant_by_conditions(self, mc_plus: list[list]|tuple[list], mc_minus: list[list]|tuple[list], given_prev_res = None) -> bool:
         """
         Determine whether it's possible (return True) that this combination of field
         (as specified by magnitude conditions) and states might be resonant.
         Return False only if this is definitely not possible.
 
-        Clarification: Returns True if answer is indeterminate or if arguments were not of the required form, or if
-        the present instance's "pf" argument is not given in terms of (signed integer) pulse references
-        (i.e. "If I can't find a definite 'no' I will return 'yes'" since it as far as I can tell resonance
-        is still possible)
+        mc_plus: A list or tuple, containing lists of interaction indices whose frequency components sum is to be taken as positive
+        by a margin deemed significant
 
-        Optionally, with the given_prev_res argument specified, determine the answer to the same question as above
-        given that the resonance condition given by given_prev_res was satisfied.
-
-        magn_conditions: List/tuple (here list) [[A = signed freq i, B = signed freq j, ...],
-                               [C = signed freq k, ...],
-                                ...], signifying that
-                         A + B + ... > 0 (by a significant margin)
-                         C + ... > 0 (ibid.)
-                         ...
-
-        A "significant margin" is here not unambiguous, but one useful definition can be "greater than the longest
-        distance where the lineshape is visible around a lineshape"
+        mc_minus: The analagous data as for mc_plus but referring to interaction indices whose freq sum is to be taken
+        as negative
 
         given_prev_res (default: None): ResonanceCondition instance telling (if any) the preceding
-        resonance condition that was satisfied. Optional argument which will then adapt the functionining of this
-        method as described at the beginning of this documentation string.:
-        If the contents of given_prev_res for each attribute are a subset of the present instance,
-        then these respective parts can be trimmed from the present instance and the resonance possibility determined
-        (in the same way) with respect to the trimmed condition.
-
-        This routine could be extended as follows:
-        TODO: Can also combine with freq ranges (first rm according to conditions and then actual ranges for remaining?)
-        TODO: For now just walking through conditions. Later, could apply all combinations of conditions
-        to exhaust opportunities for eliminating all
+        resonance condition that was satisfied. Optional argument which will then adapt the functioning of this method.
         """
 
-        # VibDiffTerm has its own type check where sl and sr must be same class, therefore checking one is sufficient here
-        if not(isinstance(self.diff.sl, HarmOscStateSymbolic)):
-            raise TypeError(
-                'The netStateSign method works only with a VibDiffTerm composed of HarmOscStateSymbolic instances')
-
-        # Catching if perturbing frequencies not specified as (signed integer) pulse references and returning True
-        # (cannot rule out resonance)
-        # This functionality currently not supported for other specifications of perturbing freqs. (e.g. axis labels)
-        # This is not currently a hindrance to the overall functioning because this method is currently invoked
-        # while perturbing freqs. are still specified in terms of pulse references
-        for i in self.pf:
-            if not isinstance(i, int):
-                return True
-
-        # Corresponding catch for magnitude conditions: A usable magnitude conditions set must be
-        # a list of lists of (signed integer) pulse references; otherwise, return True (cannot rule out resonance)
-        for i in magn_conditions:
-            if not (isinstance(i, list) or isinstance(i, tuple)):
-                return True
-            for j in i:
-                if not isinstance(j, int):
-                    return True
-
-        # If prev_res is not a ResonanceCondition instance, it cannot be used so return True (cannot rule out resonance)
-        if given_prev_res is not None:
-            if not isinstance(given_prev_res, ResonanceCondition):
-                return True
-
-        # Use conditions to trim blocks of definite sign
-        # If all blocks are rmvd, see if results point to definite overall sign
-        # If not all rmvd or not all definite sign, return as indeterminate
+        # Initialize test blocks to possibly trim if previous resonance condition is given (otherwise use directly)
         pf_test = copy.deepcopy(self.pf)
         diff_test  = copy.deepcopy(self.diff)
 
-        # For now simply trim last resonance from present
+        # Trim last resonance from present
         if given_prev_res is not None:
 
-            all_in = True
+            # All previous perturbing freq args should be in when this fn is used as intended, so remove them directly
+            for i in given_prev_res.pf:
+                pf_test.remove(i)
+
+            # Determine which of the previous res. cond.'s freq. diff. quanta are also in the current
+            # NOTE: Ignores anharmonicity effects
+            # NOTE: Assumes each index is given max one time per side; may need revisit if this turns out not to hold
+            # for the general term (currently not encountered)
+            in_sl = []
+            not_in_sl = []
 
             for i in given_prev_res.diff.sl.q:
                 if not(i in diff_test.sl.q):
-                    all_in = False
+                    not_in_sl.append(i)
+                else:
+                    in_sl.append(i)
+
+            in_sr = []
+            not_in_sr = []
 
             for i in given_prev_res.diff.sr.q:
                 if not(i in diff_test.sr.q):
-                    all_in = False
+                    not_in_sr.append(i)
+                else:
+                    in_sr.append(i)
 
-            for i in given_prev_res.pf:
-                if not(i in pf_test):
-                    all_in = False
+            # Remove those quanta that were in
+            for i in in_sl:
+                diff_test.sl.q.remove(i)
 
-            if all_in:
+            for i in in_sr:
+                diff_test.sr.q.remove(i)
 
-                for i in given_prev_res.diff.sl.q:
-                    diff_test.sl.q.remove(i)
+            # Add not_in "on credit" to other side
+            for i in not_in_sl:
+                diff_test.sr.q.append(i)
 
-                for i in given_prev_res.diff.sr.q:
-                    diff_test.sr.q.remove(i)
-
-                for i in given_prev_res.pf:
-                    pf_test.remove(i)
-
-        # Start off sign as unset
-        pf_overall_sign = None
-
-        for i in magn_conditions:
-
-            if len(i) > 0:
-
-                rmd = False
-
-                # Try one way (pulse signs as given), if match then rm and store sign, if no match then try other way
-                match = True
-                for j in i:
-                    if match:
-                        if j not in pf_test:
-                            match = False
-
-                if match:
-                    for j in i:
-                        pf_test.remove(j)
-                    rmd = True
-
-                    # Setting for first time. Note that this overall sign includes the convention
-                    # that perturbing frequencies in a resonance condition are subtracted from the state energy
-                    # level differences. Example:
-                    # magn_conditions is [[-1, 2]] (i.e. -w1 + w2 > 0)
-                    # pf is [-1, 2]
-                    # Therefore, pf_overall_sign is -1 (subtracting something known to be positive)
-                    if pf_overall_sign is None:
-                        pf_overall_sign = -1
-
-                    # Conflicting with earlier condition so return True (cannot rule out resonance)
-                    elif pf_overall_sign == 1:
-                        return True
-
-                # If condition not recognized first way, try the other way
-                # (opposite pulse signs, condition is now < 0 instead of > 0).
-                if not rmd:
-
-                    match = True
-                    for j in i:
-                        if match:
-                            if -1 * j not in pf_test:
-                                match = False
-                    if match:
-                        for j in i:
-                            pf_test.remove(-1 * j)
-
-                        # Setting for first time (opposite sign since other way)
-                        if pf_overall_sign is None:
-                            pf_overall_sign = 1
-
-                        # Conflicting with earlier condition so return True
-                        elif pf_overall_sign == -1:
-                            return True
-
-        # Reaching this point of the routine means that all (if any) magnitude conditions that were met
-        # were found to point to the same sign (and we have removed the corresponding pulse references from pf_test
-        # Therefore, pf_test contains all "residual" pulse references (if any) for which the magnitude conditions could
-        # not be used to determine a sign. Under the assumption that unsigned frequency ranges are always positive
-        # (i.e. a reference to w_i is always positive, while a reference to -w_i is always negative), then,
-        # if these remaining pulse references all have the same sign, and if either a) no magnitude conditions were
-        # applied or b) the overall sign as determined by the magnitude conditions corresponds to the sign of these
-        # remaining pulses, then we can determine an overall sign for the full collection of perturbing frequencies.
-
-        # Initialize "sign of residual pulse references" as unset
-        res_sgn = None
-
-        # Find out if all residual pulse references have the same sign and if so, which
-        if (len(pf_test) > 0):
-            for i in pf_test:
-                res_sgn_i = (i < 0) - (i > 0)
-
-                # Setting for the first time
-                if res_sgn is None:
-                    res_sgn = res_sgn_i
-
-                # If the current sign does not match previous signs, return True (cannot rule out resonance)
-                elif not(res_sgn_i == res_sgn):
-                    return True
-
-        # This means no perturbing frequencies: Should not be encountered in practice but included for completeness
-        # Returning True (cannot rule out resonance) to be on the safe side even though resonance could
-        # in fact then frequently be ruled out
-        if res_sgn is None and pf_overall_sign is None:
-            return True
-
-        else:
-            # If no magnitude conditions applied, set sign to residual sign
-            if pf_overall_sign is None:
-                pf_overall_sign = res_sgn
-
-            else:
-                # If magnitude conditions applied and a residual sign was determined, they need to match in order
-                # for resonance to be possible to rule out
-                if res_sgn is not None:
-                    if not res_sgn == pf_overall_sign:
-                        return True
+            for i in not_in_sr:
+                diff_test.sl.q.append(i)
 
         # Get sign of state energy level difference
         sd_overall_sign = self.netStateSign(instead_trimmed=diff_test)
@@ -662,15 +430,42 @@ class ResonanceCondition:
         if sd_overall_sign == -3:
             return True
 
-        # State energy level difference sign and perturbing frequencies must be opposite in order for
+        # Attempt to find sign for perturbing freq. components combination
+
+        # Start off sign as unset
+        pf_overall_sign = None
+
+        # As far as I can tell, there will always be just one indep var left in pf after trimming (and only one if this
+        # is the first resonance condition). Moreover, a complete set of magnitude conditions created from the powerset
+        # (as in FieldAnalysis construction) will also consider the powerset of interactions, so that any
+        # valid combinations would be accessible here
+
+        # Therefore a straightforward lookup should be sufficient
+
+        # Case A: Found in mc_minus so pf sign is negative
+        if sorted(list(pf_test)) in mc_minus:
+            pf_overall_sign = -1
+
+        # Case B: Found in mc_plus so pf sign is positive
+        elif sorted(list(pf_test)) in mc_plus:
+            pf_overall_sign = 1
+
+        # Otherwise not found, therefore indeterminate so return True (resonance cannot be ruled out)
+        else:
+            return True
+
+        # If this stage is reached, there is a definite state difference sign (or zero) and a definite perturbing freq.
+        # combination sign, so analyze them w.r.t. each other
+
+        # State energy level difference sign and perturbing frequencies must be same in order for
         # resonance to be possible
         if sd_overall_sign == -1:
-            if pf_overall_sign == 1:
+            if pf_overall_sign == -1:
                 return True
             return False
 
         elif sd_overall_sign == 1:
-            if pf_overall_sign == -1:
+            if pf_overall_sign == 1:
                 return True
             return False
 
@@ -681,33 +476,13 @@ class ResonanceCondition:
             elif pf_overall_sign == -1:
                 return False
 
-        return True
-
-
-class LineShape:
-    """
-    Lineshape class
-    For now just outline, not presently used
-    """
-
-    def __init__(self, rcs: tuple[ResonanceCondition], evaluator=None):
-        """
-        rcs: Resonance conditions associated with this lineshape
-
-        evaluator: Possible associated evaluator function
-        """
-
-        # Must be tuple of resonanceCondition instances
-        self.rcs = rcs
-
-        # Possible evaluator function?
-        self.evaluator = evaluator
+        # This line should ordinarily not be reached (no ruling could be made with the above analysis), so raise
+        raise ValueError('A ruling could not be made on term resonance possibility')
 
 class PolProp:
     """
     Polarization property differentiated zero or more times w.r.t. geometrical displacement
     Also used more generally as energy derivative
-    TODO: refactor names of attributes so they are understandable and clear
     """
 
     def __init__(self, ops: list[QOperator], dord: int = 0):
@@ -777,53 +552,6 @@ class PolProp:
         """
 
         return hash((tuple([i.h() for i in self.ops]), self.dord, tuple(self.inds)))
-
-    def epochContained(self, epochs: list[list[int]], op_ind_omega: int) -> bool:
-        """
-        Boolean: Do all electromagnetic operators in this property belong to the same pulse epoch?
-
-        epochs: List [[epoch 1 pulse index 1, epoch 1 pulse ind. 2], [epoch 2 pulse ind. 1, ...], ...]
-        op_ind_omega: Label of omega (detected field) operator
-        """
-
-        if not isinstance(epochs, list):
-            raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        if not (all([isinstance(i, list) for i in epochs])):
-            raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        for i in epochs:
-            if not (all([isinstance(j, int) for j in i])):
-                raise TypeError('Epochs must be given as list of lists of integer pulse references')
-
-        if not isinstance(op_ind_omega, int):
-            raise TypeError('Index of omega operator must be given as integer')
-
-        my_op_ids = [i.o for i in self.ops]
-
-        # If omega is one of the operators, all of the others must belong to the last epoch:
-        # (Epochs are given according to incident pulses and do not contain any reference to the emitted wave)
-        if op_ind_omega in my_op_ids:
-            for i in my_op_ids:
-                if not (i == op_ind_omega):
-                    if not i in epochs[len(epochs) - 1]:
-                        return False
-
-        # Otherwise, all operators must belong to the same epoch but it need not be the last
-        else:
-
-            required_epoch = None
-
-            for i in range(len(epochs)):
-                if my_op_ids[0] in epochs[i]:
-                    required_epoch = i
-
-            for i in my_op_ids:
-                if not i in epochs[required_epoch]:
-                    return False
-
-        # If not ruled out by prev checks, then the ops. in this PolProp are indeed epoch contained
-        return True
 
     def present(self):
         """

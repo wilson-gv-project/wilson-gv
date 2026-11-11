@@ -59,17 +59,17 @@ def _assert_term_is_template(t, nm_index_mask = {'a': 'a', 'b': 'b', 'c': 'c'}):
     assert t.props[3].dord == 3
     assert t.props[3].inds == sorted([nm_index_mask['b'], nm_index_mask['c'], nm_index_mask['c']])
 
-    # 1/w_(0,a)^[-1]
+    # 1/w_(0,a)^[1]
     assert not (t.res[0].diff.is_pert_wf_diff)
     assert t.res[0].diff.sl.q == []
     assert t.res[0].diff.sr.q == [nm_index_mask['a']]
-    assert t.res[0].pf == [-1]
+    assert t.res[0].pf == [1]
 
-    # 1/w_(b,a)^[-1, 2]
+    # 1/w_(b,a)^[1, 2]
     assert not (t.res[1].diff.is_pert_wf_diff)
     assert t.res[1].diff.sl.q == [nm_index_mask['b']]
     assert t.res[1].diff.sr.q == [nm_index_mask['a']]
-    assert t.res[1].pf == [-1, 2]
+    assert t.res[1].pf == [1, 2]
 
     return True
 
@@ -77,16 +77,31 @@ def test_vib_perturbed_term():
 
     import copy
     from fractions import Fraction
-    from wilson_suite.fixtures import evv_experiment
-    from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
     from wilson_suite.wilson_utils import common_labels as wu_common
+    from wilson_suite.wilson_derive.derive import get_terms_by_comp_pattern_and_magn_conds
 
-    evv_exp = evv_experiment()
-    terms = get_fully_enhanced_terms(experiment=evv_exp)
+    order = 3
+    tot_anharm_limit = 1
+    el_anharm_limit = 1
+    mech_anharm_limit = 1
+    comp_patt = (1, 1, 2)
+
+    # At -k1 + k2 (+ k3): w1 is negative, w2 is positive, here constricting to w1 + w2 signif. > 0
+    mc_plus = ((1,), (0, 1,),)
+    mc_minus = ((0,),)
+
+    # Getting terms
+    # The assertions in this test depend on wilson-derive retaining ordering of terms
+    terms = get_terms_by_comp_pattern_and_magn_conds(order=order, total_anharm_limit=tot_anharm_limit,
+                                                     el_anharm_limit=el_anharm_limit,
+                                                     mech_anharm_limit=mech_anharm_limit,
+                                                     comp_pattern=comp_patt,
+                                                     magn_conds=(mc_plus, mc_minus))
 
     # Constructor type checking
     # Known term from mech. anharm. part
-    td = terms[1][(0, 1)][2]
+    td = terms[4]
+
     with pytest.raises(TypeError):
         VibPerturbedTerm(1, td.props, td.freqterms, td.res)  # coeff not Fraction
     with pytest.raises(TypeError):
@@ -249,71 +264,75 @@ def test_vib_perturbed_term():
     # Is mostly a wrapper for couldBeResonantWithFieldByConditions (tested separately), so not much further testing
     # needed here
 
-    assert evv_exp.magn_conditions == ((-1, 2),)
-
     # Same test term as before
-    t = terms[1][(0, 1)][2]
+    t = terms[4]
+
+    mc_plus_int = ([2], [1, 2],)
+    mc_minus_int = ([1],)
 
     # No magnitude conditions, should here not lead to any restriction
-    assert t.full_enhancement_possible()
+    assert t.full_enhancement_possible(mcp = (), mcm = ())
 
     # EVV magnitude conditions, should here not lead to any restriction
-    assert t.full_enhancement_possible(magn_conditions=evv_exp.magn_conditions)
+    assert t.full_enhancement_possible(mcp = mc_plus_int, mcm = mc_minus_int)
 
     # Cannot fulfill first resonance condition
-    assert not(t.full_enhancement_possible(magn_conditions=((-1,),)))
+    assert not(t.full_enhancement_possible(mcp = mc_minus_int, mcm = ()))
 
     # Can fulfill second resonance condition (direct finding from magnitude condition alone)
-    assert t.full_enhancement_possible(magn_conditions=((1, -2),))
-
-    # Finding follows from both magnitude condition and previous resonance
-    assert t.full_enhancement_possible(magn_conditions=((2,),))
-
-    # Cannot fulfill second resonance condition (finding must follow from both magnitude condition and previous resonance)
-    assert not (t.full_enhancement_possible(magn_conditions=((-2,),)))
+    assert t.full_enhancement_possible(mcp = (), mcm = mc_minus_int)
 
     # New test term ("a+b, a" term from el. anharm.)
-    t = terms[1][(1, 0)][1]
+    t = terms[3]
 
     # EVV magnitude conditions, should here not lead to any restriction
-    assert t.full_enhancement_possible(magn_conditions=evv_exp.magn_conditions)
+    assert t.full_enhancement_possible(mcp = mc_plus_int, mcm = mc_minus_int)
 
     # Magnitude conditions not applicable to these resonance conditions
-    assert t.full_enhancement_possible(magn_conditions=((3, -4), (5, -7, 6)))
+    assert t.full_enhancement_possible(mcp=([3, 4],), mcm=([5, 7, 6],))
 
-    # Cannot fulfill second resonance condition (direct finding from magnitude condition alone)
-    assert not(t.full_enhancement_possible(magn_conditions=((1, -2),)))
 
-    # Finding follows from both magnitude condition and previous resonance
-    assert t.full_enhancement_possible(magn_conditions=((2,),))
+    # Anharm orders
+    assert t.order_mech == 1
+    assert t.order_el == 0
 
-    # Cannot fulfill second resonance condition (finding must follow from both magnitude condition and previous resonance)
-    assert not (t.full_enhancement_possible(magn_conditions=((-2,),)))
+    # Summation and non-summation indices
+    assert t.summ_ind == ['c']
+    assert t.nonsumm_ind == ['a', 'b']
 
+    # From different test, to be updated: Latex representation
+
+    latex_str = t.to_latex()
+
+    assert latex_str == ('\\frac{1}{8}' +
+                        '\\frac{1}{\\omega_{a,}\\omega_{b,}\\omega_{c,}\\omega_{b+c,a}}' +
+                        '\\frac{\\partial\\alpha_{\\alpha\\delta}}{\\partial Q_{c}}' +
+                        '\\frac{\\partial\\mu_{\\beta}}{\\partial Q_{a}}' +
+                        '\\frac{\\partial\\mu_{\\gamma}}{\\partial Q_{b}}' +
+                        '\\frac{\\partial^{3}E_{}}{\\partial Q_{a}\\partial Q_{b}\\partial Q_{c}}' +
+                        '\\frac{1}{(\\omega_{,a} -1)(\\omega_{b,a} -1-2)}')
 
 def test_vib_contrib_term():
 
     import copy
-    from wilson_suite.fixtures import evv_experiment
     from wilson_suite.wilson_derive.vib_rsp_sos import get_vib_sos
-    from wilson_suite.wilson_derive.abstractions import TransitionIntegral, PolProp, VibStateSymbolic, ResonanceCondition, QOperator, VibDiffTerm
+    from wilson_suite.wilson_derive.abstractions import VibStateSymbolic, VibDiffTerm
 
-    evv_exp = evv_experiment()
-    R_sos = get_vib_sos(evv_exp.order)
+    R_sos = get_vib_sos(3)
 
     # Taking an EVV relevant term
     t_choice = R_sos[21]
 
     # Constructor type checking
     with pytest.raises(TypeError):
-        VibContribTerm(1, t_choice.ints, t_choice.res)  # coeff not Fraction
+        VibContribTerm(1, t_choice.ints, t_choice.res, (1, 1, 2))  # coeff not Fraction
     with pytest.raises(TypeError):
-        VibContribTerm(t_choice.coeff, [object()], t_choice.res)  # bad ints type
+        VibContribTerm(t_choice.coeff, [object()], t_choice.res, (1, 1, 2))  # bad ints type
     with pytest.raises(TypeError):
-        VibContribTerm(t_choice.coeff, t_choice.ints, [object()])  # bad res type
+        VibContribTerm(t_choice.coeff, t_choice.ints, [object()], (1, 1, 2))  # bad res type
 
     # Taking the EVV term and re-initializing a VibContribTerm
-    t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res)
+    t = VibContribTerm(t_choice.coeff, t_choice.ints, t_choice.res, comp_pattern=(1, 1, 2))
 
     assert t.coeff == Fraction(-1)
 
@@ -347,6 +366,8 @@ def test_vib_contrib_term():
     assert t.res[1].pf == [1, 2]
     assert len(t.freqdiff) == 0
 
+    assert t.comp_pattern == (1, 1, 2)
+
     # Testing addFreqTerm
     td = copy.deepcopy(t)
     assert len(td.freqdiff) == 0
@@ -360,65 +381,4 @@ def test_vib_contrib_term():
     assert td.freqdiff[0].sr.s == 'p'
     assert td.freqdiff[0].is_pert_wf_diff == True
 
-    # Testing dressWithPulseInteractions
-    td = copy.deepcopy(t)
-
-    assert evv_exp.int_sequences == [({1: -1}, {2: 1}, {3: 1})]
-
-    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
-
-    assert [k.o for k in td.ints[0].prop.ops] == [1]
-    assert [k.o for k in td.ints[1].prop.ops] == [0, 3]
-    assert [k.o for k in td.ints[2].prop.ops] == [2]
-
-    assert td.res[0].pf == [-1]
-    assert td.res[1].pf == [-1, 2]
-
-    td = copy.deepcopy(t)
-    td.dressWithPulseInteractions(({3: 1}, {2: -1}, {1: 1}))
-
-    assert [k.o for k in td.ints[0].prop.ops] == [3]
-    assert [k.o for k in td.ints[1].prop.ops] == [0, 1]
-    assert [k.o for k in td.ints[2].prop.ops] == [2]
-
-    assert td.res[0].pf == [3]
-    assert td.res[1].pf == [3, -2]
-
-    # Now testing allUVCancels and allElRspEpochContained
-
-    # This is a CARS term, chosen for this testing since it has two extracted el. responses
-    td = R_sos[3]
-    # Dress according to -k1 + k2 + k3
-    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
-
-    assert evv_exp.epochs == [[1], [2], [3]]
-    assert evv_exp.cfuv == {1: 0.0, 2: 0.0, 3: 0.072}
-
-    assert not(td.allElRspEpochContained(evv_exp.epochs, op_ind_omega = 0))
-    assert not(td.allElRspEpochContained([[1], [2, 3]], op_ind_omega=0))
-    assert not(td.allElRspEpochContained([[1, 3], [2]], op_ind_omega=0))
-    assert td.allElRspEpochContained([[1, 2], [3]], op_ind_omega=0)
-    assert not(td.allElRspEpochContained([[1, 0], [3]], op_ind_omega=2))
-    assert td.allElRspEpochContained([[1, 2, 3]], op_ind_omega=0)
-
-    assert td.allUVCancels(evv_exp.cfuv)
-    assert td.allUVCancels({1: 0.0, 2: 0.0, 3: 0.0})
-    assert not(td.allUVCancels({1: 0.072, 2: 0.0, 3: 0.032}))
-    assert not (td.allUVCancels({1: 0.072, 2: 0.032, 3: 0.032}))
-    assert td.allUVCancels({1: 0.072, 2: 0.072, 3: 0.032})
-    assert td.allUVCancels({1: 0.072, 2: 0.072, 3: 0.072})
-
-    # Extra epoch containment and UV cancellation testing
-
-    td = R_sos[21]
-    td.dressWithPulseInteractions(evv_exp.int_sequences[0])
-
-    assert td.allElRspEpochContained(evv_exp.epochs, op_ind_omega=0)
-    assert td.allElRspEpochContained([[1], [2, 0]], op_ind_omega=3)
-    assert td.allElRspEpochContained([[1], [2], [0]], op_ind_omega=3)
-    assert td.allElRspEpochContained([[1, 2], [3]], op_ind_omega=0)
-    assert not(td.allElRspEpochContained([[1], [0], [2]], op_ind_omega=3))
-    assert not(td.allElRspEpochContained([[1, 3], [2]], op_ind_omega=0))
-
-    assert td.allUVCancels(evv_exp.cfuv)
 

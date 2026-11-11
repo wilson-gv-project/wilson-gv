@@ -1,10 +1,10 @@
 import copy
 import json
+from dataclasses import dataclass
 from fractions import Fraction
 
 from wilson_suite.wilson_derive.abstractions import PolProp, VibDiffTerm, ResonanceCondition, QOperator, \
     HarmOscStateSymbolic, TransitionIntegral
-
 
 class VibPerturbedTerm:
     """
@@ -12,7 +12,8 @@ class VibPerturbedTerm:
     wilson-derive run.
     """
 
-    def __init__(self, coeff: Fraction, props: list[PolProp], freqterms: list[VibDiffTerm], res: list[ResonanceCondition]):
+    def __init__(self, coeff: Fraction, props: list[PolProp], freqterms: list[VibDiffTerm], res: list[ResonanceCondition],
+                 order_el: int=0, order_mech: int=0):
         """
         A term consists of the following attributes:
 
@@ -25,6 +26,8 @@ class VibPerturbedTerm:
         by the derivation (list of VibDiffTerm instances)
 
         res: Resonance conditions as identified by the derivation (list of ResonanceCondition instances)
+
+        order_el, order_mech: Integers: Order of electrical resp. mechanical anharmonicity: Default 0 for both
         """
 
         if not (isinstance(coeff, Fraction) ):
@@ -46,17 +49,42 @@ class VibPerturbedTerm:
         # Boolean: Has this term been sorted according to the below sort method?
         self.was_sorted = False
 
+        self.order_el = order_el
+
+        self.order_mech = order_mech
+
+        # Indicate that this instance was initialized from a stored version that didn't include these attributes
+        # TODO: This information can probably be cleaned from a closer inspection of the terms - can if needed later
+        #  implement something for that
+        if self.order_el == -1 or self.order_mech == -1:
+            self.legacy = True
+
+        else:
+            self.legacy = False
+
+        nonsumm_ind, summ_ind = self.tellNonSummSummIndices()
+
+        self.summ_ind = summ_ind
+        self.nonsumm_ind = nonsumm_ind
+
         # Hash (currently indeterminate)
         self.hsh = None
 
     def __repr__(self):
         return f"VibPerturbedTerm(coeff = {self.coeff}, props = {self.props}, freqterms = {self.freqterms}, res = {self.res})"
 
-    def tellNonSummSummIndices(self):
+    def tellNonSummSummIndices(self) -> tuple[list[str], list[str]]:
+        """
+        Tell which normal modeindices in this term are "non-summation" (i.e. involved in a resonance condition) and
+        which are "summation" (i.e. not involved in a resonance condition)
+
+        Returns a 2-tuple: Each entry is a list of characters referring to resp. non-summation and summation indices
+        """
 
         summation_indices = []
         non_summation_indices = []
 
+        # Walk through resonance conditions: Every index encountered here is a non-summation index
         for i in self.res:
 
             for j in i.diff.sl.q:
@@ -69,6 +97,7 @@ class VibPerturbedTerm:
 
         candidate_summation_indices = []
 
+        # Walk through frequency terms: Every index here but not non-summmation is a summation inde
         for i in self.freqterms:
 
             for j in i.sl.q:
@@ -118,6 +147,12 @@ class VibPerturbedTerm:
             for j in range(len(self.res[i].diff.sr.q)):
                 self.res[i].diff.sr.q[j] = mask[self.res[i].diff.sr.q[j]]
             self.res[i].diff.sr.q = sorted(self.res[i].diff.sr.q)
+
+        for i in range(len(self.nonsumm_ind)):
+            self.nonsumm_ind[i] = mask[self.nonsumm_ind[i]]
+
+        for i in range(len(self.summ_ind)):
+            self.summ_ind[i] = mask[self.summ_ind[i]]
 
     def sort(self, nm_inds):
         """
@@ -267,35 +302,40 @@ class VibPerturbedTerm:
 
         return self.hsh
 
-    def full_enhancement_possible(self, magn_conditions=None) -> bool:
+    def full_enhancement_possible(self, mcp: list[list]|tuple[list], mcm: list[list]|tuple[list]) -> bool:
         """
         Determine: Given the setup/requested frequency ranges, is it possible for this term to become resonant within these
         ranges with respect to all of its resonance conditions?
 
-        FIXME: Currently only for sole harmonic oscillator state, may later need extension for variationally resolved states
+        TODO: Currently only for sole harmonic oscillator state, may later need extension for variationally resolved states
 
-        magn_conditions: List [[A = signed freq i, B = signed freq j], ...] signifying that
-        B - A > 0
+        mcp: List or tuple: Each entry a list: Each such list a collection of interaction indices
+        whose frequency sum is imposed as positive (ordinarily from analyzing a specific interaction sequence of pulses
+        in an experiment) by a margin deemed "significant" according to a previously decided threshold
+
+        mcm: As mcp but referring to sums imposed as negative
+
+        Returns: bool: True if full enhancement is possible (or can't be ruled out), False if full enhancement
+        definitely not possible
         """
 
-        # Discernment by frequency ranges implementation not ready
-        #
-        #if field_freq_ranges is not None:
-        #
-        #    for i in self.res:
-        #        if not(i.couldBeResonantWithFieldByRanges(field_freq_ranges)):
-        #            return False
-        #
-        #    return True
+        if not self.was_sorted:
+            raise ValueError('Term must be sorted before full enhancement possibility can be evaluated')
 
-        if magn_conditions is not None:
+        # There is only something to do here if there are actually conditions
+        if mcp is not None or mcm is not None:
 
             prev_res = None
             for i in self.res:
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=prev_res)):
-                    return False
 
-                if not (i.couldBeResonantWithFieldByConditions(magn_conditions, given_prev_res=None)):
+                # Try with a preceding resonance condition as given if one is available
+                if prev_res is not None:
+
+                    if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=prev_res)):
+                        return False
+
+                # Also try with no preceding resonance condition (regardless of whether one is available or not)
+                if not (i.could_be_resonant_by_conditions(mcp, mcm, given_prev_res=None)):
                     return False
 
                 prev_res = copy.deepcopy(i)
@@ -303,8 +343,7 @@ class VibPerturbedTerm:
             return True
 
         # If no information given, return True to keep term
-        else:
-            return True
+        return True
 
     def present(self):
         """
@@ -322,6 +361,11 @@ class VibPerturbedTerm:
         print('Resonances:')
         for i in self.res:
             i.present()
+
+        print('Electrical anharm. order:', self.order_el)
+        print('Mechanical anharm. order:', self.order_mech)
+        print('Indices part of resonance conditions:', self.nonsumm_ind)
+        print('Further (summation) indices:', self.summ_ind)
 
         print('\nHas attributes: coeff, freqterms, res, was_sorted, props, hsh'
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
@@ -348,8 +392,9 @@ class VibPerturbedTerm:
               '\nHas methods: nmRenameAndResort, sort, h, full_enhancement_possible, present'
               '\nPresenting also elements of: self.props, self.freqterms, self.res')
 
-    def to_latex(self, part=None):
+    def to_latex(self, part=None) -> str:
         """
+        Make LaTeX representation of own attributes
         """
         res_conditions_denom = ''.join([rc.to_latex() for rc in self.res])
         if res_conditions_denom == '':
@@ -382,6 +427,8 @@ class VibPerturbedTerm:
         """Convert VibPerturbedTerm to a dictionary for JSON serialization"""
         return {
             "coeff": [self.coeff.numerator, self.coeff.denominator],
+            "order_el": self.order_el,
+            "order_mech": self.order_mech,
             "props": [
                 {
                     "ops": [{"o": op.o, "op_type": op.op_type, "ax": op.ax} for op in p.ops],
@@ -415,6 +462,18 @@ class VibPerturbedTerm:
         # Reconstruct coefficient
         coeff = Fraction(data["coeff"][0], data["coeff"][1])
 
+        # Legacy use: If "order_el" or "order_mech" attributes were not set in stored version, set as order -1 which in
+        # class init triggers a "legacy version" flag
+        if "order_el" in data:
+            order_el = data["order_el"]
+        else:
+            order_el = -1
+
+        if "order_mech" in data:
+            order_mech = data["order_mech"]
+        else:
+            order_mech = -1
+
         # Reconstruct properties
         props = []
         for p in data["props"]:
@@ -439,7 +498,7 @@ class VibPerturbedTerm:
             res.append(ResonanceCondition(diff, r["pf"], r["id"]))
 
         # Create instance
-        instance = cls(coeff, props, freqterms, res)
+        instance = cls(coeff, props, freqterms, res, order_el, order_mech)
         instance.was_sorted = data["was_sorted"]
         return instance
 
@@ -481,7 +540,8 @@ class VibContribTerm:
     Class to represent a vibrational term in SOS expression up to but not including Hermite treatment
     """
 
-    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition]):
+    def __init__(self, coeff: Fraction, ints: list[TransitionIntegral], res: list[ResonanceCondition], comp_pattern: tuple[int],
+                 order_el: int = 0, order_mech: int = 0):
         """
         A term consists of the following attributes:
 
@@ -490,6 +550,8 @@ class VibContribTerm:
         ints: Transition integrals involving a bra state, one or more operators, and a ket state
 
         res: Resonance conditions as identified by the derivation (list of ResonanceCondition instances)
+
+        comp_pattern: Compounding pattern as a tuple of integers
         """
 
         if not (isinstance(coeff, Fraction) ):
@@ -504,9 +566,25 @@ class VibContribTerm:
             raise TypeError('All resonance condition arguments in VibContribTerm must be ResonanceCondition instances')
         self.res = res
 
+        if not (isinstance(comp_pattern, tuple)):
+            raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
+        if not (all([isinstance(i, int) for i in comp_pattern])):
+            raise TypeError('The compounding pattern argument in VibContribTerm must be a tuple of integers')
+        self.comp_pattern = comp_pattern
+
+        self.order_el = order_el
+
+        self.order_mech = order_mech
+
         # Initialize frequency difference terms in anticipation of possible addition
         # from mechanical anharmonicity handling
         self.freqdiff = []
+
+    @property
+    def order(self) -> int:
+        # Always true for well-formed compounding patterns
+        # Could alternatively get as total number of operators in transition integrals
+        return sum(self.comp_pattern) - 1
 
     def addFreqTerm(self, new_term: VibDiffTerm):
         """
@@ -518,61 +596,6 @@ class VibContribTerm:
 
         self.freqdiff.append(new_term)
 
-    def dressWithPulseInteractions(self, int_seq: tuple[dict]):
-        """
-        Substitute interaction dummy indices in my resonance conditions
-        and in my polarization property axes with those of a specific pulse interaction sequence
-
-        int_seq: tuple of dictionaries ({interaction #1 pulse label: sign}, {int. #2 pulse label: sign}, ...)
-        """
-        # FIXME: Must get tests as part of averaging work
-
-        int_ids = [list(i.keys())[0] for i in int_seq]
-
-        # Dress perturbing frequencies of resonance conditions
-        for i in self.res:
-            for j in range(len(i.pf)):
-                i.pf[j] = int_ids[i.pf[j] - 1] * int_seq[j][int_ids[i.pf[j]  - 1]]
-
-        # Dress operators of polarization properties
-        for i in self.ints:
-            for j in i.prop.ops:
-                if not j.o == 0:
-                    j.o = int_ids[j.o - 1]
-
-
-    def allUVCancels(self, cfs_uv: dict, tol: float=0.0) -> bool:
-        """
-        Boolean function: Do all UV/VIS carrier frequency components sum to zero
-        (leaving only potentially vibrationally resonant values) for my resonance conditions?
-
-        cfs_uv: Dictionary {pulse label: UV/VIS freq. component, ...}
-        tol: Tolerance (allow a verdict of "cancels" if sum is within tolerance)
-        """
-
-        all_cancel = True
-
-        for i in self.res:
-            all_cancel = all_cancel and i.uvCancels(cfs_uv, tol)
-
-        return all_cancel
-
-
-    def allElRspEpochContained(self, epochs, op_ind_omega) -> bool:
-        """
-        Boolean function: Do all the individual operator tuples of my (electronic) response functions
-        belong to pulses corresponding to the same epoch?
-
-        epochs: List of epochs and which pulses (pulse IDs) are in each
-        op_ind_omega: Which operator is the "omega" (interaction w/detected field) operator?
-        """
-
-        epoch_contained = True
-
-        for i in self.ints:
-            epoch_contained = epoch_contained and i.prop.epochContained(epochs, op_ind_omega)
-
-        return epoch_contained
 
     def present(self):
         """

@@ -13,15 +13,15 @@ def test_expand_term():
 
     # Note: This is likely an appropriate truncation but that's not so important since testing on just one of these
     # terms should be sufficient
-    evv_exp = evv_experiment()
-    R_sos = get_vib_sos(evv_exp.order)
+
+    R_sos = get_vib_sos(3)
+
     R_sos_evv = []
-    for int_seq in evv_exp.int_sequences:
-        for term in R_sos:
-            t = copy.deepcopy(term)
-            t.dressWithPulseInteractions(int_seq)
-            if t.allElRspEpochContained(evv_exp.epochs, 0) and t.allUVCancels(evv_exp.cfuv):
-                R_sos_evv.append(t)
+
+    for t in R_sos:
+        if t.comp_pattern == (1, 1, 2):
+            R_sos_evv.append(t)
+
     assert len(R_sos_evv) == 4
 
     term = R_sos_evv[0]
@@ -87,7 +87,6 @@ def test_expand_term():
     assert [(k.sl.s, k.sr.s, k.is_pert_wf_diff) for k in result_01[5].freqdiff] == [('A', '0', True)]
 
 def test_make_anharm_orders():
-
 
     # Case: (as for "regular EVV"): Up to 1st order el, mech, and up to 1st order total
 
