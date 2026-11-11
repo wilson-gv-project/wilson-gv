@@ -53,6 +53,15 @@ class VibPerturbedTerm:
 
         self.order_mech = order_mech
 
+        # Indicate that this instance was initialized from a stored version that didn't include these attributes
+        # TODO: This information can probably be cleaned from a closer inspection of the terms - can if needed later
+        #  implement something for that
+        if self.order_el == -1 or self.order_mech == -1:
+            self.legacy = True
+
+        else:
+            self.legacy = False
+
         nonsumm_ind, summ_ind = self.tellNonSummSummIndices()
 
         self.summ_ind = summ_ind
@@ -453,8 +462,17 @@ class VibPerturbedTerm:
         # Reconstruct coefficient
         coeff = Fraction(data["coeff"][0], data["coeff"][1])
 
-        order_el = data["order_el"]
-        order_mech = data["order_mech"]
+        # Legacy use: If "order_el" or "order_mech" attributes were not set in stored version, set as order -1 which in
+        # class init triggers a "legacy version" flag
+        if "order_el" in data:
+            order_el = data["order_el"]
+        else:
+            order_el = -1
+
+        if "order_mech" in data:
+            order_mech = data["order_mech"]
+        else:
+            order_mech = -1
 
         # Reconstruct properties
         props = []
