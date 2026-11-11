@@ -1,5 +1,5 @@
 
-packages_all = ['analysis', 'derive', 'experiment', 'intensities', 'main', 'utils']
+packages_all = ['analysis', 'derive', 'experiment', 'system', 'main', 'utils']
 
 def test_imports():
     print("\n\nTesting imports...\n")

@@ -51,15 +51,15 @@ def test_get_data_for_vibanalysers():
                                                      basis_set='STO-3G', 
                                                      base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
     
-    from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+    from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
     vib_ana, props = ws.main.main_functions.get_data_for_vibanalysers(vib_ana=vib_ana, 
                                                      calc_setup=calc_setup, 
                                                      obtainer=wilson_data_obtainer)
     
-    states, diagn = ws.intensities.anharmonic_treatment.anharm_analyzer_data(props=props,
-                                                                             nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
-                                                                             regime=vib_ana.regime,
-                                                                             exclude_modes=None)
+    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=props,
+                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
+                                                                        regime=vib_ana.regime,
+                                                                        exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     for k,v in st_dict.items():
         print(k.ljust(10), v)

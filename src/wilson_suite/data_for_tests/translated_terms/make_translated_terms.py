@@ -1,10 +1,10 @@
 """
 Makes the stored term files in this folder: the terms translated to axes, for the tests of the new evaluator.
 The tests and scripts of the new evaluator read these files through
-wilson_intensities/refac_rsp_eval/tests/stored_terms.py.
+wilson_response_evaluate/tests/stored_terms.py.
 
 Why the terms are stored: the new evaluator code must not import wilson_experiment, derive.derive or
-term_var_translate (refac_rsp_eval/tests/test_imports.py checks the imports). This script imports all three. The
+term_var_translate (wilson_response_evaluate/tests/test_imports.py checks the imports). This script imports all three. The
 script sits outside the new code and saves their output to files.
 Only the setups that the tests use are stored. Other experiments are explored with the library itself: build the
 experiment, run derive, translate the terms to axes, evaluate them.
@@ -34,7 +34,7 @@ Files:
     evv.json                the 14 EVV terms. Not derived here: read from evv_in_pulse_ids.json (derive's terms,
                             stored earlier, with pf in pulse ids). Translated to A = w1, B = -w1 + w2.
                             laser_pol (1, 1, 1). These are the settings of the old EVV integration tests
-                            (refac_rsp_eval/tests/make_evv_reference.py).
+                            (wilson_response_evaluate/tests/make_evv_reference.py).
     g7/NN_<name>.json.gz    one file per G7 setup. NN is the setup's number in G7_SETUPS. The G7 setups are the
                             experiments other than EVV that the tests use: CARS (1D), IR absorption (1D),
                             3 IR (3D).
@@ -85,7 +85,7 @@ import wilson_suite.wilson_experiment.experiment_abstractions as wexp
 from wilson_suite.wilson_derive import term_var_translate
 from wilson_suite.wilson_derive.derive import get_fully_enhanced_terms
 from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
-from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+from wilson_suite.wilson_orientational_averaging.averaging import get_pol_laser
 from wilson_suite.wilson_utils.builders import make_SpectralAxisSet
 from wilson_suite.wilson_utils.termdict_from_symb_term import derived_terms_flat
 
