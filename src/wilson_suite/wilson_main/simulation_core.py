@@ -31,7 +31,7 @@ class SimulationCore:
         Process terms and analyze collectively, determining the following derived attributes:
 
         terms_by_order_comp_magn: Organized as nested dictionaries over perturbation order, compounding pattern
-        and collective magnitude condition references: Terms (as VibPerturbedTerms list) for
+        and collective magnitude condition references: Terms (as ResponseTermCollection instances) for
         each such unique entry.
 
         coll_magn_bank: "Collective magnitude conditions": Dictionary organized by unique magnitude condition setups
@@ -43,7 +43,7 @@ class SimulationCore:
 
         max_state_lvl: Integer describing the maximum number of quanta in states encountered over all (collective) terms
 
-        pair_quanta: Tuple of 2-tuples describing unique encountered pair quanta in
+        pair_quanta: Set of 2-tuples describing unique encountered pair quanta in
         resonance condition VibDiff instances over all collected terms: For use
         if individual (state-pair specific) relaxation parameters will be used during evalutaion
         """
