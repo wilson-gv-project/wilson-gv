@@ -39,7 +39,7 @@ def test_simulation_core():
     # Magnitude condition key 1 has 47 terms (they are not inspected in detail - here testing the organizing)
     assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)][1].terms) == 47
 
-    # Magnitude condition key 1 has 47 terms (they are not inspected in detail - here testing the organizing)
+    # Magnitude condition key 2 has 34 terms (they are not inspected in detail - here testing the organizing)
     assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)][2].terms) == 34
 
     # The evaluation should need these five derivative properties and a maximum of three-quantum energy levels

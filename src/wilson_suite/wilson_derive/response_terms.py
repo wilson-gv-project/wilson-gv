@@ -418,6 +418,8 @@ class VibPerturbedTerm:
         """Convert VibPerturbedTerm to a dictionary for JSON serialization"""
         return {
             "coeff": [self.coeff.numerator, self.coeff.denominator],
+            "order_el": self.order_el,
+            "order_mech": self.order_mech,
             "props": [
                 {
                     "ops": [{"o": op.o, "op_type": op.op_type, "ax": op.ax} for op in p.ops],
@@ -451,6 +453,9 @@ class VibPerturbedTerm:
         # Reconstruct coefficient
         coeff = Fraction(data["coeff"][0], data["coeff"][1])
 
+        order_el = data["order_el"]
+        order_mech = data["order_mech"]
+
         # Reconstruct properties
         props = []
         for p in data["props"]:
@@ -475,7 +480,7 @@ class VibPerturbedTerm:
             res.append(ResonanceCondition(diff, r["pf"], r["id"]))
 
         # Create instance
-        instance = cls(coeff, props, freqterms, res)
+        instance = cls(coeff, props, freqterms, res, order_el, order_mech)
         instance.was_sorted = data["was_sorted"]
         return instance
 

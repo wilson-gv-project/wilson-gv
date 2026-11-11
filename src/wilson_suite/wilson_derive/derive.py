@@ -12,7 +12,7 @@ from ..wilson_system.system_data import MolecularProperty, MolPropsCollection
 @dataclass
 class ResponseTermsCollection:
     """
-    Data holder class to collect terms under a common setup:
+    Data holder class to collect terms under a common setup (and derive the terms during post-init):
 
     order: Integer: The order of perturbation considered
     total_anharm_limit: Integer: Upper limit to total order of anharmonicity (electrical + mechanical)
@@ -182,7 +182,7 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
 
     for i in sos_terms:
         if i.comp_pattern == comp_pattern:
-            sos_terms_at_comp_pattern.append(copy.deepcopy(i))
+            sos_terms_at_comp_pattern.append(i)
 
     # Then get anharm orders
     anharm_orders = dbl_pert_expansion.make_anharm_orders(total_anharm_limit, el_anharm_limit, mech_anharm_limit)
@@ -216,7 +216,7 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
             new_ints.append(int_ctr)
             int_ctr += 1
 
-        comp_patt_to_int[comp_ctr] = copy.deepcopy(new_ints)
+        comp_patt_to_int[comp_ctr] = new_ints
         comp_ctr += 1
 
     # Translate magnitude condition to interaction indices
@@ -227,7 +227,7 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
         for j in m:
             new_mcp.extend(comp_patt_to_int[j])
 
-        mcp_int.append(copy.deepcopy(new_mcp))
+        mcp_int.append(new_mcp)
 
     mcm_int = []
 
@@ -236,12 +236,12 @@ def get_terms_by_comp_pattern_and_magn_conds(order: int, total_anharm_limit: int
         for j in m:
             new_mcm.extend(comp_patt_to_int[j])
 
-        mcm_int.append(copy.deepcopy(new_mcm))
+        mcm_int.append(new_mcm)
 
     # Keep terms that are not clearly impossible to fully enhance
     for t in ph_terms:
 
         if t.full_enhancement_possible(mcp = mcp_int, mcm = mcm_int):
-            final_terms.append(copy.deepcopy(t))
+            final_terms.append(t)
 
     return final_terms
