@@ -101,7 +101,7 @@ class SimulationCore:
                                                             comp_pattern=comp,
                                                             magn_conds=curr_magn)
 
-                                terms_by_order_comp_magn[order][comp][coll_magn_bank_ctr] = copy.deepcopy(new_collection)
+                                terms_by_order_comp_magn[order][comp][coll_magn_bank_ctr] = new_collection
 
                                 props_set = props_set.union(set(new_collection.props.names()))
 
@@ -117,7 +117,7 @@ class SimulationCore:
                                         found_in_bank = True
 
                                 if not found_in_bank:
-                                    coll_magn_bank[coll_magn_bank_ctr] = copy.deepcopy(curr_magn)
+                                    coll_magn_bank[coll_magn_bank_ctr] = curr_magn
 
                                 coll_magn_bank_ctr += 1
 
