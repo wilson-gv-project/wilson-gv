@@ -222,7 +222,7 @@ class ResonanceCondition:
     Convention: Perturbing frequencies to be subtracted
     """
 
-    def __init__(self, diff: VibDiffTerm, pf: list=[], id=None):
+    def __init__(self, diff: VibDiffTerm, pf: list, id=None):
         """
         diff: VibDiffTerm instance: State energy level difference: States must here be HarmOscStateSymbolic or VibStateSymbolic
               - Several methods will only work with the states in HarmOscStateSymbolic form
