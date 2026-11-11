@@ -41,7 +41,7 @@ class ResponseTermsCollection:
 
         max_state_lvl: Integer describing the maximum number of quanta in states encountered over all terms
 
-        pair_quanta: Tuple of 2-tuples describing pair quanta in resonance condition VibDiff instances over all terms:
+        pair_quanta: Set of 2-tuples describing pair quanta in resonance condition VibDiff instances over all terms:
         For use if individual (state-pair specific) relaxation parameters will be used during evalutaion
         """
 
@@ -79,13 +79,13 @@ class ResponseTermsCollection:
         return MolPropsCollection([MolecularProperty(i) for i in props])
 
 
-    def __find_max_state_lvl_and_pair_quanta(self) ->  tuple[int, tuple[tuple]] :
+    def __find_max_state_lvl_and_pair_quanta(self) ->  tuple[int, set[tuple]] :
         """
         Determine the maximum number of quanta used in state energy levels
 
         Determine the different (sorted) pair number of quanta in level diffs. (relevant for relaxation parameters)
 
-        Returns and integer (max state level) and a tuple of 2-tuples (each a pair quanta tuple)
+        Returns and integer (max state level) and a tuple of 2-tuples (each a pair quanta set)
         """
 
         max_state_lvl = 0
