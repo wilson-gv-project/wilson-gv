@@ -43,10 +43,10 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import to_rgba
 
 from wilson_suite.wilson_analysis.render.plot_spectrum import plot_feature_boxes, plot_rsp_func, plot_spectrum
-from wilson_suite.wilson_intensities.refac_rsp_eval.features import SpectralFeature, SpectralWindow
-from wilson_suite.wilson_intensities.refac_rsp_eval.grid import Box
-from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import EvalRspResult
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import ResLocPoint
+from wilson_suite.wilson_response_evaluate.features import SpectralFeature, SpectralWindow
+from wilson_suite.wilson_response_evaluate.grid import Box
+from wilson_suite.wilson_response_evaluate.pipeline import EvalRspResult
+from wilson_suite.wilson_response_evaluate.plan import ResLocPoint
 
 
 def toy_axes(a_range=(-20., 20.), b_range=(-20., 20.)) -> dict[str, np.ndarray]:

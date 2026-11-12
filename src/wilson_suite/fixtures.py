@@ -136,10 +136,13 @@ def get_eval_ready_evv_terms():
     return ws.derive.term_var_translate.translate_terms_to_axis_variables(terms, experiment_a.valid_axis_combs[0].valid_axis_combs[3])
 
 def get_terms_from_json():
-    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    import json
     from importlib.resources import files
-    json_path = files('wilson_suite').joinpath('terms_fuller_flat.json')
-    return VibPerturbedTerm.load_many_from_json(str(json_path))
+
+    from wilson_suite.wilson_derive.response_terms import VibPerturbedTerm
+    path = files('wilson_suite').joinpath('data_for_tests', 'translated_terms', 'evv.json')
+    return [VibPerturbedTerm.from_dict(t) for t in json.loads(path.read_text())['terms']]
+
 
 # # QC calculations/vibana parameters
 # mol_system = abst_main.MolecularSystem(name='FORM', natoms=4)

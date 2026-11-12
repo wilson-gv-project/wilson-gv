@@ -1280,7 +1280,7 @@ class FieldAnalysis:
         """
 
         from itertools import permutations as permutations
-        from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+        from wilson_suite.wilson_orientational_averaging.averaging import get_pol_laser
 
         # Initializing macroscopic orientational average polarization vector "bank", counter and
         # "actually used" register
