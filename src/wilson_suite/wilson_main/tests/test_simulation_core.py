@@ -11,14 +11,12 @@ def test_simulation_core():
     sim_core = SimulationCore(experiment = evv_2scan(), total_anharm_limit = tot_anharm_limit,
                               mech_anharm_limit = mech_anharm_limit, el_anharm_limit = el_anharm_limit)
 
-    # One unique order of perturbation is common to this experiment
-    assert len(sim_core.terms_by_order_comp_magn.keys()) == 1
+    # This experiment results in terms with order 3 and one compounding pattern (1, 1, 2),
+    # which during the scan visits three different magnitude condition regimes
+    assert sorted(list(sim_core.terms_by_order_comp_magn.keys())) == sorted(
+        [(3, (1, 1, 2), 0), (3, (1, 1, 2), 1), (3, (1, 1, 2), 2)]
+    )
 
-
-    # That order is 3 and there is only one compounding pattern (1, 1, 2), which during the scan
-    # visits three different magnitude condition regimes
-    assert len(sim_core.terms_by_order_comp_magn[3]) == 1
-    assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)]) == 3
     assert len(sim_core.coll_magn_bank.keys()) == 3
 
     # The tuples containing (2) (here corresponds to the carrier freq of the third pulse) are
@@ -34,13 +32,13 @@ def test_simulation_core():
     assert sim_core.coll_magn_bank[2] == (((1,), (2,), (0, 2), (1, 2), (0, 1, 2)), ((0,), (0, 1)))
 
     # Magnitude condition key 0 has 14 terms (should correspond to the "typical" EVV terms)
-    assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)][0].terms) == 14
+    assert len(sim_core.terms_by_order_comp_magn[(3, (1, 1, 2), 0)].terms) == 14
 
     # Magnitude condition key 1 has 47 terms (they are not inspected in detail - here testing the organizing)
-    assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)][1].terms) == 47
+    assert len(sim_core.terms_by_order_comp_magn[(3, (1, 1, 2), 1)].terms) == 47
 
     # Magnitude condition key 2 has 34 terms (they are not inspected in detail - here testing the organizing)
-    assert len(sim_core.terms_by_order_comp_magn[3][(1, 1, 2)][2].terms) == 34
+    assert len(sim_core.terms_by_order_comp_magn[(3, (1, 1, 2), 2)].terms) == 34
 
     # The evaluation should need these five derivative properties and a maximum of three-quantum energy levels
     assert sorted(sim_core.props.names()) == sorted(['dipgrad', 'diphess', 'polgrad', 'cff', 'polhess'])
