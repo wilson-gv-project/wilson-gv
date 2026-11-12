@@ -591,10 +591,9 @@ def test_field_analysis():
     # (which refers to the number of incoming pulses) (i.e. "three pulses make a four-wave mixing process")
     assert fa.comp_patterns_at_order == {3: [(2, 2), (2, 1, 1), (1, 3), (1, 2, 1), (1, 1, 2), (1, 1, 1, 1)]}
     assert fa.pol_avg_vector_bank == {0: [1.0, 1.0, 1.0]}
-    assert fa.int_sequences_by_order_comp_pol == {3: {(1, 1, 2): {0: [((-1,), (2,), (3,))]}}}
     assert fa.magnitude_condition_bank == {0: (((1,), (2,), (0, 2), (1, 2), (0, 1, 2)), ((0,), (0, 1)))}
     # One valid compounding pattern at (the one valid) order 3, with one polarization and magnitude condition motif
-    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(1, 1, 2): {0: {0: [((-1,), (2,), (3,))]}}}}
+    assert fa.int_sequences_by_order_comp_magn_pol == {(3, (1, 1, 2), 0, 0): [((-1,), (2,), (3,))]}
 
 # Diagnostic function to print key FieldAnalysis attributes, kept for later use
 def present_field_analysis(e: FieldAnalysis):
@@ -607,10 +606,9 @@ def present_field_analysis(e: FieldAnalysis):
 
     print('Compounding patterns at order:', e.comp_patterns_at_order)
     print('Macroscopic polarization bank:', e.pol_avg_vector_bank)
-    print('Interaction sequences by order, compounding, polarization:', e.int_sequences_by_order_comp_pol)
 
     print('Magnitude condition bank', e.magnitude_condition_bank)
-    print('Interaction sequences by order, compounding, polarization, magn. conditions:', e.int_sequences_by_order_comp_pol_magn)
+    print('Interaction sequences by order, compounding, polarization, magn. conditions:', e.int_sequences_by_order_comp_magn_pol)
 
     return
 
@@ -684,7 +682,7 @@ def test_vib_experiment():
     # No pulses deemed overlapping in time
     assert sorted(fa.time_ovl_tuples) == sorted([(2,), (3,), (-1,)])
     # One interaction sequence remains
-    assert fa.int_sequences_by_order_comp_pol == {3: {(1, 1, 2): {0: [((-1,), (2,), (3,))]}}}
+    assert fa.int_sequences_by_order_comp_magn_pol == {(3, (1, 1, 2), 0, 0): [((-1,), (2,), (3,))]}
     assert len(exp_evv.field.pulses) == 3
     assert exp_evv.detector.detection_method == 'int'
     assert len(exp_evv.scans) == 2
@@ -725,7 +723,7 @@ def test_vib_experiment():
     # Only 1 and 2 deemed overlapping
     assert fa.res_and_time_ovl_tuples == ((-2, 1),)
     # Only the CARS contribution (2,2) - i.e. "alpha**2" - remains
-    assert fa.int_sequences_by_order_comp_pol_magn == {3: {(2, 2): {0: {0: [((-2, 1), (3,))]}}}}
+    assert fa.int_sequences_by_order_comp_magn_pol == {(3, (2, 2), 0, 0): [((-2, 1), (3,))]}
     # The second ind var (3,) is > 0 and so is the first, second combination (-2, 1) and (3,)
     assert fa.magnitude_condition_bank == {0: (((1,), (0, 1)), ())}
     # No scans and frequency (spectrometer) detection = one-dimensional result
@@ -762,7 +760,7 @@ def test_vib_experiment():
     fa = exp_sfg.field_analyses[20]
 
     # One sequence (1 then 2) at the (1, 2) ("mu alpha") compounding pattern
-    assert fa.int_sequences_by_order_comp_pol_magn == {2: {(1, 2): {0: {0: [((1,), (2,))]}}}}
+    assert fa.int_sequences_by_order_comp_magn_pol == {(2, (1, 2), 0, 0): [((1,), (2,))]}
     # One scan with 100 scan points
     assert exp_sfg.field_analyses.shape == (100,)
     # One scan and integrated detection = one-dimensional result
@@ -808,5 +806,5 @@ def test_vib_experiment():
     assert fa.magnitude_condition_bank ==  {0: (((0,),), ()), 1: (((1,), (0, 1)), ())}
     # Here, the (nonresonant) ZPVA third hyperpolarizability makes the cut (compounding pattern (5,)
     # Also two interaction sequences for the "intended" alpha-beta CARS contribution  (comp. pattern (2, 3)) remain
-    assert fa.int_sequences_by_order_comp_pol_magn == {4: {(5,): {0: {0: [((-2, 1, 3, 3),)]}},
-                                                        (2, 3): {0: {1: [((-2, 1), (3, 3)), ((-2, 3), (1, 3))]}}}}
+    assert fa.int_sequences_by_order_comp_magn_pol[4, (5,), 0, 0] == [((-2, 1, 3, 3),)]
+    assert fa.int_sequences_by_order_comp_magn_pol[4, (2, 3), 0, 1] == [((-2, 1), (3, 3)), ((-2, 3), (1, 3))]

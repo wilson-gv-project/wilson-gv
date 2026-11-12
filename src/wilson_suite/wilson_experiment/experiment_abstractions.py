@@ -1116,10 +1116,6 @@ class FieldAnalysis:
         # Generate valid compounding patterns at all relevant orders
         self.comp_patterns_at_order = self.__get_comp_patterns_at_order()
 
-        # Get polarization "average vector" bank and interaction sequences indexed by order, compounding pattern and
-        # polarization averaging category
-        self.pol_avg_vector_bank, self.int_sequences_by_order_comp_pol = self.__get_pol_avg_bank_and_int_seq_ocp()
-
         # Making an "all valid pulses" bank that is a union of res_and_time_ and time_not_res_ pulse tuples
         all_valid_pulses = copy.deepcopy(self.res_and_time_comp_pulses)
 
@@ -1129,9 +1125,9 @@ class FieldAnalysis:
 
         self.all_valid_pulses = copy.deepcopy(all_valid_pulses)
 
-        # Get "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
+        # Get polarization "average vector" bank, "magnitude condition" bank and interaction sequences indexed by order, compounding pattern,
         # polarization averaging category, and magnitude condition category
-        self.magnitude_condition_bank, self.int_sequences_by_order_comp_pol_magn = self.__get_magn_cond_bank_and_int_seq_icpm()
+        self.pol_avg_vector_bank, self.magnitude_condition_bank, self.int_sequences_by_order_comp_magn_pol = self.__get_pol_magn_banks_and_int_seq_ocmp()
 
 
     def __get_interaction_patterns(self) -> list[tuple]:
@@ -1273,14 +1269,18 @@ class FieldAnalysis:
 
         return comp_patterns_at_order
 
-    def __get_pol_avg_bank_and_int_seq_ocp(self) -> tuple:
+    def __get_pol_magn_banks_and_int_seq_ocmp(self) -> tuple:
         """
         Helper method: Get macroscopic orientational avg. polarization vector "bank" and valid interaction
-        sequences indexed by order, compounding pattern and polarization motif
+        sequences indexed by order, compounding pattern, magnitude condition and polarization motif
         """
 
         from itertools import permutations as permutations
         from wilson_suite.wilson_intensities.amplitudes.averaging import get_pol_laser
+
+        # Initializing magnitude condition bank and "actually used" register
+        magnitude_condition_bank = {}
+        magn_actually_used = []
 
         # Initializing macroscopic orientational average polarization vector "bank", counter and
         # "actually used" register
@@ -1289,16 +1289,11 @@ class FieldAnalysis:
         pol_actually_used = []
 
         # The "master" loop: Evaluate all available interaction sequences,
-        # group by order, pulse compounding and polarization
-        int_sequences_by_order_comp_pol = {}
+        # group by order, pulse compounding, magnitude conditions, and polarization
+        int_sequences_by_order_comp_magn_pol = {}
 
         # For each valid order of interaction pattern
         for ord in self.int_patterns_by_order:
-
-            int_sequences_by_order_comp_pol[ord] = {}
-
-            for c in self.comp_patterns_at_order[ord]:
-                int_sequences_by_order_comp_pol[ord][c] = {}
 
             # For each permutation of indices at this order
             for p in permutations(range(ord)):
@@ -1411,14 +1406,34 @@ class FieldAnalysis:
                         else:
                             continue
 
-                        if not pol_bank_ind in int_sequences_by_order_comp_pol[ord][c]:
-                            int_sequences_by_order_comp_pol[ord][c][pol_bank_ind] = []
-
-
                         # Time-ordering enforcement screening: If also passing this criterion, register this
                         # interaction sequence as valid
                         if pulse_time_ordering_valid(c_pulses, thres_waiting_time=self.thres_waiting_time,
                                                      tol_n_dev=self.tol_n_dev_t):
+
+                            # Get magnitude conditions (template interaction indices) for this interaction sequence
+                            p_plus, p_minus = magnitude_conditions_for_ind_var_tuple(tuple(c_pulse_inds), self.all_valid_pulses,
+                                                                                     self.thres_magn, self.tol_n_dev_w)
+
+                            # Look in bank to see if this magnitude regime was encountered before; if so note where,
+                            # otherwise amend bank
+                            found_in_bank = False
+
+                            for i in magnitude_condition_bank:
+                                if magnitude_condition_bank[i] == (p_plus, p_minus):
+                                    magn_bank_ind = i
+                                    found_in_bank = True
+                                    break
+
+                            if not found_in_bank:
+                                bank_len = len(magnitude_condition_bank.keys())
+                                magnitude_condition_bank[bank_len] = (p_plus, p_minus)
+                                magn_bank_ind = bank_len
+
+                            ocmp_bank_key = (ord, c, pol_bank_ind, magn_bank_ind)
+
+                            if not ocmp_bank_key in int_sequences_by_order_comp_magn_pol:
+                                int_sequences_by_order_comp_magn_pol[ocmp_bank_key] = []
 
                             # FIXME: With any compounding, some permutations will be revisited here
                             #  Checking for uniqueness here and will account for this as part of the overall
@@ -1426,59 +1441,27 @@ class FieldAnalysis:
                             #  Permutation should here be OK under the dipole approximation (symmetry of alpha, beta...)?
                             #  In general case may need to register separate or two different polarization situations
                             #  This can be revisited when the first version of the integrator is ready
-                            if not tuple(c_pulse_inds) in int_sequences_by_order_comp_pol[ord][c][pol_bank_ind]:
+                            if not tuple(c_pulse_inds) in int_sequences_by_order_comp_magn_pol[ocmp_bank_key]:
+
                                 if not pol_bank_ind in pol_actually_used:
                                     pol_actually_used.append(pol_bank_ind)
-                                int_sequences_by_order_comp_pol[ord][c][pol_bank_ind].append(tuple(c_pulse_inds))
 
-        # Prune int_sequences_by_order_comp_pol over empty pol bank ind entries, empty compounding
-        # patterns, empty orders, then assign as attribute
-        del_o = []
-        del_oc = []
-        del_ocp = []
+                                if not magn_bank_ind in magn_actually_used:
+                                    magn_actually_used.append(magn_bank_ind)
 
-        for ord in int_sequences_by_order_comp_pol:
+                                int_sequences_by_order_comp_magn_pol[ocmp_bank_key].append(tuple(c_pulse_inds))
 
-            new_oc = []
+        # If some magnitude condition set was not actually used, delete it
+        del_m = []
 
-            for comp in int_sequences_by_order_comp_pol[ord]:
+        for m in magnitude_condition_bank:
+            if not m in magn_actually_used:
+                del_m.append(m)
 
-                new_ocp = []
+        for m in del_m:
+            del magnitude_condition_bank[m]
 
-                for pol in int_sequences_by_order_comp_pol[ord][comp]:
-
-                    # If this polarization setup gave nothing, delete the reference to it
-                    if len(int_sequences_by_order_comp_pol[ord][comp][pol]) == 0:
-                        new_ocp.append((ord, comp, pol))
-
-                # If no polarization setups remain for this compounding pattern, delete the reference to it
-                if len(new_ocp) == len(int_sequences_by_order_comp_pol[ord][comp]):
-                    new_oc.append((ord, comp))
-
-                # Otherwise extend the ocp delete list if delete candidates were found
-                else:
-                    if len(new_ocp) > 0:
-                        del_ocp.extend(copy.deepcopy(new_ocp))
-
-            # If no compounding patterns remain for this order, delete the reference to it
-            if len(new_oc) == len(int_sequences_by_order_comp_pol[ord]):
-                del_o.append(ord)
-
-            # Otherwise extend the oc delete list if delete candidates were found
-            else:
-                if len(new_oc) > 0:
-                    del_oc.extend(copy.deepcopy(new_oc))
-
-        # Deletions
-        for o in del_o:
-            del int_sequences_by_order_comp_pol[o]
-
-        for oc in del_oc:
-            del int_sequences_by_order_comp_pol[oc[0]][oc[1]]
-
-        for ocp in del_ocp:
-            del int_sequences_by_order_comp_pol[ocp[0]][ocp[1]][ocp[2]]
-
+        # If some polarization setup was not actually used, delete it
         del_p = []
 
         for p in pol_avg_vector_bank:
@@ -1488,57 +1471,7 @@ class FieldAnalysis:
         for p in del_p:
             del pol_avg_vector_bank[p]
 
-        return pol_avg_vector_bank, int_sequences_by_order_comp_pol
-
-    def __get_magn_cond_bank_and_int_seq_icpm(self) -> tuple:
-
-        # Making a bank for conformity with the pol avg vector indexing even though the magnitude
-        # condition tuples are hashable by themselves
-        magnitude_condition_bank = {}
-
-        # A bit inelegant but workable: Going to do "surgery" on the ord, pol, comp dictionary copy to replace
-        # the innermost structure by a dict indexing by magnitude condition.
-        int_sequences_by_order_comp_pol_magn = copy.deepcopy(self.int_sequences_by_order_comp_pol)
-
-        # Walking through int_sequences_by_order_comp_pol and determine magnitude regime for each entry
-        for ord in self.int_sequences_by_order_comp_pol:
-            for comp in self.int_sequences_by_order_comp_pol[ord]:
-                for pol in self.int_sequences_by_order_comp_pol[ord][comp]:
-
-                    new_magn_dict = {}
-
-                    for m in self.int_sequences_by_order_comp_pol[ord][comp][pol]:
-
-                        # Get magnitude conditions (template interaction indices) for this interaction sequence
-                        p_plus, p_minus = magnitude_conditions_for_ind_var_tuple(m, self.all_valid_pulses, self.thres_magn, self.tol_n_dev_w)
-
-                        # Look in bank to see if this magnitude regime was encountered before; if so note where,
-                        # otherwise amend bank
-                        found_in_bank = False
-
-                        for i in magnitude_condition_bank:
-                            if magnitude_condition_bank[i] == (p_plus, p_minus):
-                                found_where = i
-                                found_in_bank = True
-                                break
-
-                        if not found_in_bank:
-                            bank_len = len(magnitude_condition_bank.keys())
-                            magnitude_condition_bank[bank_len] = (p_plus, p_minus)
-                            found_where = bank_len
-
-                        # Update magnitude conditions dictionary for this ord, comp, pol set
-                        if found_where in new_magn_dict:
-                            new_magn_dict[found_where].append(copy.deepcopy(m))
-
-                        else:
-                            new_magn_dict[found_where] = [copy.deepcopy(m)]
-
-                    # Affix the new structure that groups by magnitude regime
-                    int_sequences_by_order_comp_pol_magn[ord][comp][pol] = copy.deepcopy(new_magn_dict)
-
-        return magnitude_condition_bank, int_sequences_by_order_comp_pol_magn
-
+        return pol_avg_vector_bank, magnitude_condition_bank, int_sequences_by_order_comp_magn_pol
 
 @dataclass
 class VibExperiment:
@@ -1643,7 +1576,7 @@ class VibExperiment:
                     thres_waiting_time = self.thres_waiting_time
                 )
 
-                if not(curr_analysis.int_sequences_by_order_comp_pol == {}):
+                if not(curr_analysis.int_sequences_by_order_comp_magn_pol == {}):
                     any_field_analysis_nonempty = True
 
                 self.field_analyses[scan_elem] = copy.deepcopy(curr_analysis)
@@ -1667,7 +1600,7 @@ class VibExperiment:
                 thres_waiting_time=self.thres_waiting_time
             )
 
-            if not (curr_analysis.int_sequences_by_order_comp_pol == {}):
+            if not (curr_analysis.int_sequences_by_order_comp_magn_pol == {}):
                 any_field_analysis_nonempty = True
 
             self.field_analyses[()] = copy.deepcopy(curr_analysis)
