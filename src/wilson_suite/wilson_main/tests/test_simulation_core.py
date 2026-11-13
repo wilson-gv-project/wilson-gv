@@ -13,11 +13,14 @@ def test_simulation_core():
 
     # This experiment results in terms with order 3 and one compounding pattern (1, 1, 2),
     # which during the scan visits three different magnitude condition regimes
+    assert len(sim_core.coll_magn_bank.keys()) == 3
+
     assert sorted(list(sim_core.terms_by_order_comp_magn.keys())) == sorted(
         [(3, (1, 1, 2), 0), (3, (1, 1, 2), 1), (3, (1, 1, 2), 2)]
     )
 
-    assert len(sim_core.coll_magn_bank.keys()) == 3
+    # One polarization setup is common to all entries
+    assert sim_core.coll_pol_bank == {0: [1.0, 1.0, 1.0]}
 
     # The tuples containing (2) (here corresponds to the carrier freq of the third pulse) are
     # not relevant for understanding the below comments about magnitude conditions

@@ -57,6 +57,10 @@ class SimulationCore:
         coll_magn_bank = {}
         coll_magn_bank_ctr = 0
 
+        # Collective polarization bank
+        # Not used further in this post-init but establishes a common indexing that can be used later
+        coll_pol_bank = {}
+
         # For bookkeeping magnitude conditions encountered for each order and compounding pattern
         magn_enc_for_ord_comp = {}
 
@@ -78,6 +82,20 @@ class SimulationCore:
             # Iterating over compound (order, compounding pattern, magn. cond., polarization) indices
             for ocmp in int_seq:
 
+                curr_pol = self.experiment.field_analyses[scan_elem].pol_avg_vector_bank[ocmp[2]]
+
+                # Checking if this polarization setup was already in the collective bank; if not make a
+                # new entry for it
+                found_in_bank = False
+
+                for i in coll_pol_bank:
+                    if coll_pol_bank[i] == curr_pol:
+                        found_in_bank = True
+                        break
+
+                if not found_in_bank:
+                    coll_pol_bank[coll_magn_bank_ctr] = curr_pol
+
                 # Initializing magnitude condition list for order and compounding pattern if not done before
                 if not (ocmp[0], ocmp[1]) in magn_enc_for_ord_comp:
                     magn_enc_for_ord_comp[(ocmp[0], ocmp[1])] = []
@@ -92,16 +110,16 @@ class SimulationCore:
                     # new entry for it; in both cases mark the location
                     found_in_bank = False
 
-                    coll_bank_loc = 0
+                    coll_m_bank_loc = 0
                     for i in coll_magn_bank:
                         if coll_magn_bank[i] == curr_magn:
                             found_in_bank = True
                             break
-                        coll_bank_loc += 1
+                        coll_m_bank_loc += 1
 
                     if not found_in_bank:
                         coll_magn_bank[coll_magn_bank_ctr] = curr_magn
-                        coll_bank_loc = coll_magn_bank_ctr
+                        coll_m_bank_loc = coll_magn_bank_ctr
                         coll_magn_bank_ctr += 1
 
                     magn_enc_for_ord_comp[(ocmp[0], ocmp[1])].append(curr_magn)
@@ -114,7 +132,7 @@ class SimulationCore:
                                                 magn_conds=curr_magn)
 
                     # Register the obtained collection
-                    terms_by_order_comp_magn[(ocmp[0], ocmp[1], coll_bank_loc)] = new_collection
+                    terms_by_order_comp_magn[(ocmp[0], ocmp[1], coll_m_bank_loc)] = new_collection
 
                     # Amending (if new entries) the set of necessary derivative properties
                     props_set = props_set.union(set(new_collection.props.names()))
@@ -128,6 +146,7 @@ class SimulationCore:
         # Setting collected attributes over all scan points
         self.terms_by_order_comp_magn = terms_by_order_comp_magn
         self.coll_magn_bank = coll_magn_bank
+        self.coll_pol_bank = coll_pol_bank
         self.props = MolPropsCollection(properties=tuple(MolecularProperty(i) for i in props_set))
         self.max_state_lvl = max_state_lvl
         self.pair_quanta = pair_quanta
