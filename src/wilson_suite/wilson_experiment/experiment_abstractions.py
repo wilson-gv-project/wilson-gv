@@ -1430,7 +1430,7 @@ class FieldAnalysis:
                                 magnitude_condition_bank[bank_len] = (p_plus, p_minus)
                                 magn_bank_ind = bank_len
 
-                            ocmp_bank_key = (ord, c, pol_bank_ind, magn_bank_ind)
+                            ocmp_bank_key = (ord, c, magn_bank_ind, pol_bank_ind)
 
                             if not ocmp_bank_key in int_sequences_by_order_comp_magn_pol:
                                 int_sequences_by_order_comp_magn_pol[ocmp_bank_key] = []

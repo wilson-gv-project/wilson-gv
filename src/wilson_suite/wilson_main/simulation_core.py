@@ -82,7 +82,7 @@ class SimulationCore:
             # Iterating over compound (order, compounding pattern, magn. cond., polarization) indices
             for ocmp in int_seq:
 
-                curr_pol = self.experiment.field_analyses[scan_elem].pol_avg_vector_bank[ocmp[2]]
+                curr_pol = self.experiment.field_analyses[scan_elem].pol_avg_vector_bank[ocmp[3]]
 
                 # Checking if this polarization setup was already in the collective bank; if not make a
                 # new entry for it
@@ -100,7 +100,7 @@ class SimulationCore:
                 if not (ocmp[0], ocmp[1]) in magn_enc_for_ord_comp:
                     magn_enc_for_ord_comp[(ocmp[0], ocmp[1])] = []
 
-                curr_magn = self.experiment.field_analyses[scan_elem].magnitude_condition_bank[ocmp[3]]
+                curr_magn = self.experiment.field_analyses[scan_elem].magnitude_condition_bank[ocmp[2]]
 
                 # Has this magn. cond. has been treated before for this order and compounding pattern?
                 # If not then now treat it and register that
