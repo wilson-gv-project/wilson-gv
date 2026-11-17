@@ -1,7 +1,7 @@
 """
 data_obtainer groups the requested names by their DataOriginInfo, calls CQCParse's parse_from_source once per
-origin, and merges the results. CQCParse tests its own readers; the tests here cover what the obtainer adds, and one
-load of a real file. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
+origin, and merges the results. CQCParse tests its own readers; the tests here cover what the obtainer adds, some
+on real files. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
 wilson_main/tests/test_workflow_abstractions.py.
 """
 from importlib.resources import files
@@ -12,9 +12,10 @@ from wilson_suite.wilson_main.abstractions import DataOriginInfo
 from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 data_dir = files('wilson_suite').joinpath('data_for_tests')
-WATER = DataOriginInfo(source_type='gaussian', base_file_loc=data_dir / 'g16_h2o_HF_STO3G.out')
-FORMALDEHYDE = DataOriginInfo(source_type='gaussian',
-                              base_file_loc=data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out')
+WATER = DataOriginInfo(source_type='gaussian', base_file_loc=str(data_dir / 'g16_h2o_HF_STO3G.out'))
+FORMALDEHYDE_G16 = DataOriginInfo(source_type='gaussian',
+                                  base_file_loc=str(data_dir / 'g16_formaldehyde_B3LYPcc_pVQZ.out'))
+FORMALDEHYDE_C4 = DataOriginInfo(source_type='cfour', base_file_loc=str(data_dir / 'c4_formaldehyde_HFcc_pVQZ'))
 
 
 def test_getting_data():
@@ -37,25 +38,40 @@ def test_getting_data():
     assert {k: data[k].shape for k in shapes} == shapes
 
 
-@pytest.mark.parametrize('water_first', [True, False])
-def test_merge_of_two_origins(water_first):
+@pytest.mark.parametrize('g16_first', [True, False])
+def test_merge_of_two_origins(g16_first):
     """
-    Water (3 modes) and formaldehyde (6 modes). A call for cff also returns cff_rc, and the
-    reverse; every call returns reindex_modes. The merge, in either order of the request:
-        cff, cff_rc   requested: each from its own origin, not from the other's extra
-        qff_rc        an extra of water only: kept
-        reindex_modes an extra of both: dropped
+    The merge of the reads of two origins. One molecule, formaldehyde, from two programs:
+    Gaussian at B3LYP/cc-pVQZ and CFOUR at HF/cc-pVQZ. The two methods give different
+    values, so a value shows which read it comes from.
+
+    A read returns more names than requested:
+        nc_sqrt_eigval   also harmonic_states
+        cff              also cff_rc
+        any name         also reindex_modes
+    The request: nc_sqrt_eigval and cff from Gaussian, harmonic_states from CFOUR. So both
+    reads return harmonic_states: CFOUR as requested, Gaussian as an extra.
+    What the result holds:
+        harmonic_states  the CFOUR value: it was requested from CFOUR, so the Gaussian
+                         extra does not replace it
+        cff_rc           the Gaussian value: only the Gaussian read returns it, and no
+                         origin was asked for it
+        reindex_modes    left out: both reads return it. The result holds one value per
+                         name, and the reads give two: True from Gaussian (the read
+                         renumbers its modes by rising frequency), False from CFOUR (its
+                         modes are in that order already). So the value only repeats the
+                         source type of its read.
+    The reads run in the order of the request; both orders give the same result.
     """
-    from_water = {'cff': WATER, 'qff': WATER}
-    from_formaldehyde = {'cff_rc': FORMALDEHYDE}
-    request = {**from_water, **from_formaldehyde} if water_first else {**from_formaldehyde, **from_water}
+    from_g16 = {'nc_sqrt_eigval': FORMALDEHYDE_G16, 'cff': FORMALDEHYDE_G16}
+    from_c4 = {'harmonic_states': FORMALDEHYDE_C4}
+    request = {**from_g16, **from_c4} if g16_first else {**from_c4, **from_g16}
 
     data = wilson_data_obtainer(request)
+    g16, c4 = wilson_data_obtainer(from_g16), wilson_data_obtainer(from_c4)    # each origin alone
 
-    assert set(data) == {'cff', 'qff', 'cff_rc', 'qff_rc'}
-    assert data['cff'].shape == (3, 3, 3)
-    assert data['qff_rc'].shape == (3, 3, 3, 3)
-    assert data['cff_rc'].shape == (6, 6, 6)
+    assert set(data) == {'nc_sqrt_eigval', 'cff', 'cff_rc', 'harmonic_states'}
+    assert data['harmonic_states'] == c4['harmonic_states'] != g16['harmonic_states']
 
 
 @pytest.fixture
