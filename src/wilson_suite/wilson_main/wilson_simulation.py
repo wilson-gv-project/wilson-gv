@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import partial
+from collections.abc import Sequence
 from .simulation_core import SimulationCore
 from ..wilson_system.system_data import MolSystemData
 from math import floor, ceil
@@ -33,7 +34,8 @@ class WilsonSimulation:
     "sum_freq" (default), which integrates over sum-frequency components w1, w1 + w2, ..., and "direct", which
     integrates over (non-sum) frequency components w1, w2, ... directly. With the "sum_freq" style, the final w_sigma
     integration with e^i w_sigma t can be omitted to directly yield a w_sigma data series, useful for spectrometer
-    detection. It is likely that to begin with, "sum-freq" will be the only available choice for the integrator.
+    detection. It is likely that to begin with, "sum-freq" will be the only available choice for the integrator. I let
+    the default choice be "auto", which leaves it to the integrator to make the choice.
 
     integration_grid_origin: Float or integer (default 0.0): Grids in frequency space will be aligned so that a grid
     point coincides exactly with this origin.
@@ -54,10 +56,14 @@ class WilsonSimulation:
     states_choice: str
     dynrange: float | int
 
+    # FIXME: Consider wrapping these in an IntegrationSettings class or as an an instance of an Integrator
+    # class that yields the integration results in some form as a method
+
     integration_resolution: int | float
-    integration_style: str = 'sum_freq'
+    integration_style: str = 'auto'
     integration_grid_origin: float | int  = 0.0
     n_dev_w_int: float | int = 5.0
+
 
     def __post_init__(self):
 
@@ -67,7 +73,7 @@ class WilsonSimulation:
         # Grid origin mod resolution
         self.grid_origin_mod_res = self.integration_grid_origin % self.integration_resolution
 
-        # Get integration ranges for each integration task  tuple (indexed by order, compounding pattern,
+        # Get integration ranges for each integration task tuple (indexed by order, compounding pattern,
         # magnitude condition, macroscopic polarization and interaction sequence)
         self.int_ranges = self.__get_integration_ranges()
 
@@ -242,6 +248,8 @@ class WilsonSimulation:
         return rsp_results
 
     def __get_integrated_results(self):
+
+
 
         int_results = []
 
