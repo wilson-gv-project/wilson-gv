@@ -1,6 +1,6 @@
 """
 system_data.py — vibrational states, energy differences, molecular data and the data request (MolSystemData.load).
-Built by hand from tiny arrays, no VibPerturbedTerm. One test reads a data file: wilson's own anharmonic states.
+Built by hand from tiny arrays, no VibPerturbedTerm. The load tests read real files.
 """
 
 import re
@@ -26,6 +26,7 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     vibdiff,
 )
 from wilson_suite.wilson_system.system_data import (
+    ANHARMONIC_ANALYSIS_KEYS,
     EVALUATION_DATA_KEYS,
     PROP_INDEX_COUNTS,
     DataOriginInfo,
@@ -362,7 +363,7 @@ def test_load_raises_for_an_unknown_anharmonic_before_reading():
 def test_load_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
     """
     The Gaussian formaldehyde file holds GVPT2 states. wilson's GVPT2, from the same file's force constants,
-    gives the same 83 states, within 0.002 cm-1.
+    gives the same 83 states, within 0.01 cm-1.
     """
     from_file = MolSystemData.load(FORMALDEHYDE, [])
     from_wilson = MolSystemData.load(FORMALDEHYDE, [], anharmonic='GVPT2')
@@ -375,6 +376,18 @@ def test_load_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
     assert sorted(wilson_states.allstates_map) == labels
     np.testing.assert_allclose([wilson_states.get_state_by_label(label).energy for label in labels],
                                [file_states.get_state_by_label(label).energy for label in labels], rtol=0, atol=0.01)
+
+
+def test_with_wilson_states_after_load_gives_the_states_of_load_with_a_regime():
+    """the two-step way gives the same states as the one call, and the loaded data keeps the file's states"""
+    loaded = MolSystemData.load(FORMALDEHYDE, list(ANHARMONIC_ANALYSIS_KEYS))
+
+    in_two_steps = loaded.with_wilson_states('GVPT2')
+    in_one_call = MolSystemData.load(FORMALDEHYDE, [], anharmonic='GVPT2')
+
+    assert in_two_steps.states['anharmonic'].allstates == in_one_call.states['anharmonic'].allstates
+    assert in_two_steps.states['anharmonic'].regime == 'GVPT2'
+    assert loaded.states['anharmonic'].regime == 'unknown'
 
 
 ## check_data_dict: the data dict fits what the evaluator reads ---------------------------------

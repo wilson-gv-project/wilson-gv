@@ -1,7 +1,7 @@
 import copy
 import warnings
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 # When wilson computes the anharmonic states, load requests ANHARMONIC_ANALYSIS_KEYS instead of 'anharmonic_states'.
 EVALUATION_DATA_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states')
 
-# What wilson's own anharmonic analysis (anharm_analyzer_data) reads besides 'nc_sqrt_eigval':
+# What MolSystemData.with_wilson_states reads from mol_props, besides the harmonic frequencies:
 # cubic and quartic force constants in cm-1, rotational constants, Coriolis constants.
 ANHARMONIC_ANALYSIS_KEYS = ('cff_rc', 'qff_rc', 'B', 'coriolis')
 
@@ -132,7 +132,7 @@ class VibStatesData:
     regime: str - the vibrational analysis regime, e.g. 'harmonic', 'GVPT2', 'VPT2';
         'unknown' for anharmonic states read from a file: the file's regime is not read
     computed_by: str - 'file': read from the data (the program is in MolSystemData.data_origin);
-        'wilson': computed by wilson (anharm_analyzer_data)
+        'wilson': computed by wilson (MolSystemData.with_wilson_states)
     """
     allstates: Sequence[VibState]
     regime: str
@@ -282,20 +282,36 @@ class MolSystemData:
         if missing:
             raise ValueError(f'no values for {missing}: the data has values for {have}')
 
+    def with_wilson_states(self, regime: str) -> 'MolSystemData':
+        """
+        A copy whose states['anharmonic'] are wilson's own, from anharm_analyzer_data with no modes left out.
+        Reads ANHARMONIC_ANALYSIS_KEYS from mol_props, e.g.
+            MolSystemData.load(origin, ['polgrad', *ANHARMONIC_ANALYSIS_KEYS]).with_wilson_states('GVPT2')
+        regime: 'GVPT2', 'VPT2' or 'DVPT2'
+        raises KeyError if mol_props lacks one of ANHARMONIC_ANALYSIS_KEYS; NotImplementedError for another regime
+        """
+        from wilson_suite.wilson_system.anharmonic_treatment.anharmonic_analyzer import (
+            anharm_analyzer_data,
+        )
+
+        states, _ = anharm_analyzer_data(self.mol_props, self.eigenvals, regime, exclude_modes=[])
+        for s in states:                    # each state has one key, e.g. {('0', '1'): 1.0}
+            s.state_label = make_state_label(next(iter(s.harm_quanta_coeffs)))
+        anharmonic = VibStatesData(allstates=states, regime=regime, computed_by='wilson',
+                                   harmonic_osc_states_labels=self.states['harmonic'].harmonic_osc_states_labels)
+        return replace(self, states={**self.states, 'anharmonic': anharmonic})
+
 
     @classmethod
     def from_datadict(cls,
                       mol_props: 'MolPropsCollection',  # to be filled with data
                       data_dict: dict,                  # data obtained from obtainer
                       *,
-                      anharmonic: str = 'file',
                       name: str = 'from_data_dict'):
         """
         Build a MolSystemData from a data dict already read. Reads no file and computes nothing; load calls this.
 
         data_dict: dict - {data_name: values}
-        anharmonic: who made data_dict['anharmonic_states']: 'file' (read from the source), or the regime wilson
-            computed them with, e.g. 'GVPT2' (load does this). Sets regime and computed_by of states['anharmonic'].
         states: one VibStatesData per state list in data_dict, by states choice:
             'harmonic_states' -> states['harmonic'], 'anharmonic_states' -> states['anharmonic'].
             'anharmonic_states' may be missing: no entry (check_states_choice raises if the evaluation asks for it).
@@ -312,13 +328,12 @@ class MolSystemData:
         harm_states, anharm_states = _make_hq_states_from_datadict(data_dict)
         labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
 
-        anharm_regime, anharm_computed_by = ('unknown', 'file') if anharmonic == 'file' else (anharmonic, 'wilson')
         # check_data_dict raised if 'harmonic_states' is missing, so the harmonic set is never empty
         states = {'harmonic': VibStatesData(allstates=harm_states, regime='harmonic', computed_by='file',
                                             harmonic_osc_states_labels=labels)}
         if anharm_states:
-            states['anharmonic'] = VibStatesData(allstates=anharm_states, regime=anharm_regime,
-                                                 computed_by=anharm_computed_by, harmonic_osc_states_labels=labels)
+            states['anharmonic'] = VibStatesData(allstates=anharm_states, regime='unknown', computed_by='file',
+                                                 harmonic_osc_states_labels=labels)
 
         geo = data_dict.get('geo', None)
         natoms = len(geo) if geo is not None else 0
@@ -349,15 +364,15 @@ class MolSystemData:
         prop_names  trivial names, e.g. pipeline.prop_names(terms)
         anharmonic  where the anharmonic states come from:
                     'file'                    the source's 'anharmonic_states'
-                    'GVPT2', 'VPT2', 'DVPT2'  wilson computes them (anharm_analyzer_data), with no modes left out.
-                                              load requests ANHARMONIC_ANALYSIS_KEYS instead of 'anharmonic_states':
+                    'GVPT2', 'VPT2', 'DVPT2'  wilson's own (with_wilson_states). load reads ANHARMONIC_ANALYSIS_KEYS
+                                              as properties, instead of the source's 'anharmonic_states':
             e.g. MolSystemData.load(origin, ['polgrad'], anharmonic='GVPT2')
-                 -> request {'polgrad', 'nc_sqrt_eigval', 'harmonic_states', 'cff_rc', 'qff_rc', 'B', 'coriolis'}
+                 -> request {'polgrad', 'cff_rc', 'qff_rc', 'B', 'coriolis', 'nc_sqrt_eigval', 'harmonic_states'},
+                    then with_wilson_states('GVPT2')
         The result's data_origin is origin.
-        raises ValueError for an unknown anharmonic, before the source is read; if wilson computes the states and
-            the source lacks one of ANHARMONIC_ANALYSIS_KEYS; if the data does not fit what the evaluator reads
-            (check_data_dict) or the source has no values for a requested property. These last two messages name
-            the source; so do check_data_dict's warnings.
+        raises ValueError for an unknown anharmonic, before the source is read; if the data does not fit what the
+            evaluator reads (check_data_dict) or the source has no values for a requested property. These last two
+            messages name the source; so do check_data_dict's warnings.
         """
         # checked before the source is read; anharm_analyzer_data checks too, but only after the read
         if anharmonic not in ('file', 'GVPT2', 'VPT2', 'DVPT2'):
@@ -365,26 +380,22 @@ class MolSystemData:
         
         from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
-        # 1. what to read
+        # 1. what to read: with a regime, the analysis keys instead of the source's anharmonic states
         names = list(dict.fromkeys(prop_names))        # each name once, in the given order
-        if anharmonic == 'file':
-            data_keys = list(EVALUATION_DATA_KEYS)
-        else:
-            data_keys = [k for k in EVALUATION_DATA_KEYS if k != 'anharmonic_states'] + list(ANHARMONIC_ANALYSIS_KEYS)
+        data_keys = list(EVALUATION_DATA_KEYS)
+        if anharmonic != 'file':
+            names = list(dict.fromkeys([*names, *ANHARMONIC_ANALYSIS_KEYS]))
+            data_keys.remove('anharmonic_states')
 
         # 2. read
         data_dict = {**wilson_data_obtainer(dict.fromkeys([*names, *data_keys], origin)), 'data_origin': origin}
 
-        # 3. wilson's own anharmonic states, if asked
-        if anharmonic != 'file':
-            data_dict['anharmonic_states'] = _compute_anharmonic_states(data_dict, anharmonic)
-
-        # 4. build
+        # 3. build
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
             try:
                 molsys = cls.from_datadict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
-                                           data_dict, anharmonic=anharmonic, name=name)
+                                           data_dict, name=name)
             except ValueError as err:
                 raise ValueError(f'the data from {origin} does not fit: {err}') from err
         for w in caught:            # again, with the source, at the line that called load
@@ -396,7 +407,9 @@ class MolSystemData:
             molsys.check_props(names)
         except ValueError as err:
             raise ValueError(f'the source did not return every requested property, {origin}: {err}') from err
-        return molsys
+
+        # 4. wilson's own anharmonic states, if asked
+        return molsys if anharmonic == 'file' else molsys.with_wilson_states(anharmonic)
 
 
 def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
@@ -472,27 +485,6 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
 
     if problems:
         raise ValueError('the data dict does not fit what the evaluator reads:\n  - ' + '\n  - '.join(problems))
-
-
-def _compute_anharmonic_states(data_dict: dict[str, Any], regime: str) -> dict[tuple, float]:
-    """
-    wilson's own anharmonic states (anharm_analyzer_data, no modes left out), in the form of the data dict's
-    'anharmonic_states': {('0',): energy, ('0', '1'): energy, ...}, energies in cm-1.
-    raises ValueError if data_dict lacks one of ANHARMONIC_ANALYSIS_KEYS
-    """
-    missing = [k for k in ANHARMONIC_ANALYSIS_KEYS if data_dict.get(k) is None]
-    if missing:
-        raise ValueError(f'anharmonic={regime!r}: wilson computes the anharmonic states from '
-                         f'{list(ANHARMONIC_ANALYSIS_KEYS)}; the data dict has no {missing}')
-
-    # imported here, not at the top: anharmonic_analyzer imports VibState and MolPropsCollection from this module
-    from wilson_suite.wilson_system.anharmonic_treatment.anharmonic_analyzer import (
-        anharm_analyzer_data,
-    )
-    props = MolPropsCollection([MolecularProperty(trivial_name=k, vals=data_dict[k]) for k in ANHARMONIC_ANALYSIS_KEYS])
-    states, _ = anharm_analyzer_data(props, data_dict['nc_sqrt_eigval'], regime, exclude_modes=[])
-    # each state has one key, e.g. {('0', '1'): 1.0}
-    return {next(iter(s.harm_quanta_coeffs)): s.energy for s in states}
 
 
 def _make_hq_states_from_datadict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
