@@ -1,10 +1,11 @@
 """
 system_data.py — vibrational states, energy differences, molecular data and the data request (MolSystemData.load).
-Everything here is built by hand from tiny arrays; no VibPerturbedTerm, no data files.
+Built by hand from tiny arrays, no VibPerturbedTerm. One test reads a data file: wilson's own anharmonic states.
 """
 
 import re
 import warnings
+from importlib.resources import files
 
 import numpy as np
 import pytest
@@ -78,7 +79,7 @@ def test_vibstatesdata_unknown_label_raises(states):
 
 def test_vibstatesdata_harmonic_osc_states_filters_by_label_choice():
     data = VibStatesData(allstates=(state('1', E1), state('0', E0), state('0,1', E01)),
-                         harmonic_osc_states_labels=(0,1))
+                         regime='unknown', computed_by='file', harmonic_osc_states_labels=(0,1))
 
     assert data.get_harmonic_osc_states() == {0: E0, 1: E1}
 
@@ -178,7 +179,7 @@ def test_mode_0_is_not_the_ground_state(states):
 
 def test_vibstatesdata_ground_state_energy_is_zero_even_if_the_data_says_otherwise():
     """Energies are measured from the ground state: a 'zero' entry in the data is overridden with energy 0."""
-    data = VibStatesData(allstates=(state('zero', 5.), state('0', E0)))
+    data = VibStatesData(allstates=(state('zero', 5.), state('0', E0)), regime='unknown', computed_by='file')
 
     assert data.get_state_by_label('zero').energy == 0.
 
@@ -330,53 +331,50 @@ def test_check_props_names_what_is_missing_and_what_the_data_has():
         molsys.check_props(['cff', 'polgrad', 'polhess', 'polgrad'])
 
 
-## MolSystemData.load: one obtainer call, only what the evaluation reads ------------------------
+## MolSystemData.load: reads real files -------------------------------------------------------
 
-ORIGIN = DataOriginInfo(source_type='gaussian', base_file_loc='toy.out')
-
-
-def fake_obtainer(data: dict, asked: list):
-    """stands in for wilson_data_obtainer: records the request, returns `data` (what the source has)"""
-    def obtainer(request: dict) -> dict:
-        asked.append(request)
-        return data
-    return obtainer
-
-
-def test_load_requests_the_properties_frequencies_and_both_state_lists_only():
-    asked = []
-    data = {'cff': np.ones((2, 2, 2)), 'dipgrad': np.ones((2, 3)), **TOY_DATA}
-
-    MolSystemData.load(ORIGIN, ['cff', 'dipgrad', 'cff'], obtainer=fake_obtainer(data, asked))
-
-    (request,) = asked
-    assert list(request) == ['cff', 'dipgrad', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states']
-    assert all(origin is ORIGIN for origin in request.values())
+DATA_DIR = files('wilson_suite').joinpath('data_for_tests')
+FORMALDEHYDE = DataOriginInfo(source_type='gaussian', base_file_loc=str(DATA_DIR / 'g16_formaldehyde_B3LYPcc_pVQZ.out'))
+ACETIC_ACID_DIMER = DataOriginInfo(source_type='gaussian',
+                                   base_file_loc=str(DATA_DIR / 'g16_acetic_acid_dimer_B3LYPcc_pVQZ.out'))
 
 
 def test_load_fills_properties_frequencies_and_state_sets():
-    cff = np.full((2, 2, 2), 3.)
-    data = {'cff': cff, **TOY_DATA}
+    molsys = MolSystemData.load(FORMALDEHYDE, ['cff'])
 
-    molsys = MolSystemData.load(ORIGIN, ['cff'], obtainer=fake_obtainer(data, []))
-
-    assert molsys.mol_props['cff'].vals is cff
-    assert molsys.eigenvals == {0: E0_eigval, 1: E1_eigval}
+    assert molsys.mol_props['cff'].vals.shape == (6, 6, 6)
+    assert sorted(molsys.eigenvals) == [0, 1, 2, 3, 4, 5]
     assert set(molsys.states) == {'harmonic', 'anharmonic'}
+    assert molsys.data_origin is FORMALDEHYDE
 
 
-def test_load_raises_for_a_property_the_source_lacks():
-    data = {'cff': np.ones((2, 2, 2)), **TOY_DATA}
+def test_load_raises_for_an_unknown_anharmonic_before_reading():
+    """
+    'anharmonic' is a states choice, not a source of the anharmonic states.
+    The file does not exist: a read would raise another error.
+    """
+    origin = DataOriginInfo(source_type='gaussian', base_file_loc='no_such_file.out')
 
-    with pytest.raises(ValueError, match=r"the source did not return .*toy\.out.*no values for \['polgrad'\]"):
-        MolSystemData.load(ORIGIN, ['cff', 'polgrad'], obtainer=fake_obtainer(data, []))
+    with pytest.raises(ValueError, match=r"anharmonic 'anharmonic': expected 'file', 'GVPT2', 'VPT2' or 'DVPT2'"):
+        MolSystemData.load(origin, [], anharmonic='anharmonic')
 
 
-def test_load_raises_for_data_that_does_not_fit_and_names_the_source():
-    data = {'cff': np.ones((2, 2, 2)), **STATE_LISTS}             # no frequencies
+def test_load_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
+    """
+    The Gaussian formaldehyde file holds GVPT2 states. wilson's GVPT2, from the same file's force constants,
+    gives the same 83 states, within 0.002 cm-1.
+    """
+    from_file = MolSystemData.load(FORMALDEHYDE, [])
+    from_wilson = MolSystemData.load(FORMALDEHYDE, [], anharmonic='GVPT2')
 
-    with pytest.raises(ValueError, match=r"(?s)the data from .*toy\.out.* does not fit: .*no 'nc_sqrt_eigval'"):
-        MolSystemData.load(ORIGIN, ['cff'], obtainer=fake_obtainer(data, []))
+    file_states, wilson_states = from_file.states['anharmonic'], from_wilson.states['anharmonic']
+    assert (file_states.regime, file_states.computed_by) == ('unknown', 'file')
+    assert (wilson_states.regime, wilson_states.computed_by) == ('GVPT2', 'wilson')
+    labels = sorted(file_states.allstates_map)
+    assert len(labels) == 84                                    # 83 states and the ground state
+    assert sorted(wilson_states.allstates_map) == labels
+    np.testing.assert_allclose([wilson_states.get_state_by_label(label).energy for label in labels],
+                               [file_states.get_state_by_label(label).energy for label in labels], rtol=0, atol=0.01)
 
 
 ## check_data_dict: the data dict fits what the evaluator reads ---------------------------------
@@ -464,10 +462,10 @@ def test_check_data_dict_warns_for_a_state_at_or_below_the_ground_state(key, ene
 
 
 def test_load_warning_names_the_source():
-    data = {**TOY_DATA, 'anharmonic_states': {**TOY_DATA['anharmonic_states'], ('1',): -5.}}
-
-    with pytest.warns(UserWarning, match=r'the data from .*toy\.out.*: anharmonic_states: 1 of 3') as record:
-        MolSystemData.load(ORIGIN, [], obtainer=fake_obtainer(data, []))
+    """the acetic acid dimer file has anharmonic states below 0 cm-1, the lowest at -596.7 cm-1"""
+    with pytest.warns(UserWarning, match=r'the data from .*acetic_acid_dimer.*: anharmonic_states: \d+ of \d+ '
+                                         r'state energies are at or below 0 cm-1') as record:
+        MolSystemData.load(ACETIC_ACID_DIMER, [])
     assert len(record) == 1
     assert record[0].filename == __file__           # points at the line that called load
 

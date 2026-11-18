@@ -63,14 +63,14 @@ E0_eigval, E1_eigval = 1100., 1580.
 def toy_states() -> VibStatesData:
     """The anharmonic states, the ones the tests use: states_choice='anharmonic'."""
     return VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E01), state('0,0', E00)),
-                         harmonic_osc_states_labels=(0, 1))
+                         regime='unknown', computed_by='file', harmonic_osc_states_labels=(0, 1))
 
 
 def toy_harmonic_states() -> VibStatesData:
     """The harmonic states: fundamentals at the eigenvalues, 2-quanta states at the sums."""
     return VibStatesData(allstates=(state('0', E0_eigval), state('1', E1_eigval),
                                     state('0,1', E0_eigval + E1_eigval), state('0,0', 2 * E0_eigval)),
-                         harmonic_osc_states_labels=(0, 1))
+                         regime='harmonic', computed_by='file', harmonic_osc_states_labels=(0, 1))
 
 
 def toy_term() -> CompiledTerm:
