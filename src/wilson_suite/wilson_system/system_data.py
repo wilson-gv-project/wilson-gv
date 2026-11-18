@@ -323,8 +323,7 @@ class MolSystemData:
         Also reads what every evaluation needs: the harmonic frequencies (nc_sqrt_eigval) and both state lists.
             e.g. MolSystemData.load(origin, ['polgrad', 'dipgrad', 'cff'])
                  -> request {'polgrad', 'dipgrad', 'cff', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'}
-        Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry, and the reader
-        fails on normal_modes for some files.
+        Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry.
 
         prop_names  trivial names, e.g. pipeline.prop_names(terms)
         obtainer    request {name: DataOriginInfo} -> data dict; default wilson_data_obtainer.

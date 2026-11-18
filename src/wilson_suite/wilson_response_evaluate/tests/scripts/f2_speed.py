@@ -11,7 +11,7 @@ Steps:
      on one grid.
      Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1.
 
-A script, not a test: it runs for minutes.
+A script, not a test: it runs for 14 s.
     python -m wilson_suite.wilson_response_evaluate.tests.scripts.f2_speed
 """
 import cProfile
