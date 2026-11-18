@@ -241,9 +241,10 @@ class MolSystemData:
         states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
                     Gives the energy differences where a term needs them.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
-                    states[states_choice]. The choice must follow the vib analysis regime: GVPT2, VPT2 ->
-                    'anharmonic'; harmonic -> 'harmonic'. The two differ, e.g. in 272 of 340 formaldehyde
-                    coefficients of the 14 EVV terms.
+                    states[states_choice]. 'anharmonic' holds the file's states, or wilson's own after
+                    load(..., anharmonic=...) or with_wilson_states; VibStatesData.regime says which.
+                    'harmonic' and 'anharmonic' differ, e.g. in 272 of 340 formaldehyde coefficients of the
+                    14 EVV terms.
     The evaluator does not read the other fields: name (a label), eigenvecs (the normal modes; load does not read
     them), natoms, geo, geo_extra, linear, data_origin (where the data comes from).
     """

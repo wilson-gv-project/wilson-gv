@@ -26,8 +26,8 @@ Inputs
                       (derive writes pulse IDs, e.g. [-1, 2]: plan.ResCondKey raises on them). row.term_id is the
                       index in the list.
     molsys_data       MolSystemData: the properties, frequencies and state sets of one molecule (see above)
-    states_choice    'harmonic' or 'anharmonic'. Must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic';
-                      harmonic -> 'harmonic'. No default: the data cannot know the regime.
+    states_choice     'harmonic' or 'anharmonic': the state set of molsys_data for the energy differences. No default.
+                      molsys_data.states[states_choice].regime says how the set was made, e.g. 'GVPT2'.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
     lineshape_param   the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
@@ -245,8 +245,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     polarization_linear_comb: the orientation-average recipe (make_polarization_linear_comb).
     lineshape_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a value
         per condition and/or per frequency (features.LineshapeParam).
-    states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
-        GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
+    states_choice: the state set of molsys_data to use, 'harmonic' or 'anharmonic'. No default.
     exclude_modes: modes left out of the evaluation, e.g. (5,): no peak and no summed value uses them
     (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
@@ -421,7 +420,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     terms             translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
     molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
                       loaded once, for any number of runs
-    states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
+    states_choice     the state set of molsys_data to use, 'harmonic' or 'anharmonic'. No default.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     lineshape_param   cm-1: a number, or a function (vd, freqs) -> cm-1 (features.LineshapeParam), e.g.
                       lambda vd, freqs: 0.01 * abs(vd.energy_difference())

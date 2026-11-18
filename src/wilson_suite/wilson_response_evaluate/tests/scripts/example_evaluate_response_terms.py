@@ -38,7 +38,7 @@ def main():
     data_origin = DataOriginInfo(source_type='gaussian',
                                  base_file_loc=f'{SUITE_ROOT}/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
     laser_pol = setup.laser_pol     # (1, 1, 1): pulses and detector along x
-    states_choice = 'anharmonic'    # follows the vib analysis regime: GVPT2 -> anharmonic
+    states_choice = 'anharmonic'    # the file's states; for this file the same as wilson's GVPT2
 
     # 2. data, once, outside the evaluator: the evaluator takes a MolSystemData and reads no file.
     #    prop_names(terms): which properties the terms use, so which ones to load.
@@ -96,15 +96,6 @@ def main():
         params = ', '.join(f'{p:.2f}' for p in f.lineshape_params_at_peak())
         print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '  # noqa: RUF010
               f'{str(f.term_ids):<22} {params:<16} {f.get_intensity():14.3e}')  # noqa: RUF010
-
-    print('-----------------------------')
-    for i in inside:
-        for k in i.rows:
-            print(k.location, k.params, k.term_id)
-        print('\n')
-
-    print('-----------------------------')
-
 
     # ---------------------------------------------------
     # 6. another lineshape_param, same rows: replace gives a new FeatureResult with the same table,
