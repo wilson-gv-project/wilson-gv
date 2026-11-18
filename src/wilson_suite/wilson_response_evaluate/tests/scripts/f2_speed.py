@@ -3,8 +3,7 @@ Run time on a bigger molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes.
 The 14 EVV terms, axes A = w1, B = -w1 + w2, laser_pol (1, 1, 1), anharmonic states (the file is a GVPT2 run).
 
 Steps:
-  1. load: MolSystemData.load, only the terms' properties + frequencies + states. The reader fails on ACDM at
-     normal_modes; the evaluator does not use normal_modes.
+  1. load: MolSystemData.load, only the terms' properties + frequencies + states. The evaluator does not use normal_modes.
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
      (calculate_avrg_tensor_einsum + AvrgTensor.at) and of the deepcopy (FreqTermsCollection.__post_init__).
   3. the rest: features_from_rows, amplitude_half_widths, SpectralWindow.from_features, boxed_features_on_grid
@@ -55,7 +54,7 @@ GRID = {'A': 700, 'B': 700}
 
 
 def load_acdm(terms) -> MolSystemData:
-    """the terms' properties, frequencies, states; no normal_modes, atoms, geometry: the reader fails on ACDM there"""
+    """the terms' properties, frequencies, states; no normal_modes, atoms, geometry"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{DATA_FILE}')
     return MolSystemData.load(origin, prop_names(terms))
 
