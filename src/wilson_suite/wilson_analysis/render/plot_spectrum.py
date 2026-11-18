@@ -1,7 +1,7 @@
 """
 1D and 2D spectra:
     plot_spectrum(intensity, grid, ...)   any intensity array on a grid
-    plot_rsp_func(spec, ...)              the new evaluator's result (EvalRspResult, refac_rsp_eval):
+    plot_rsp_func(spec, ...)              the new evaluator's result (EvalRspResult, wilson_response_evaluate):
                                           plot_spectrum of |spec.amplitude|^2 on spec.mesh
     plot_feature_boxes(ax, spec)          the outline of each feature's box on a plot of spec
 Both show intensity / top, from 1 / dynrange to 1 on a log scale; top: the largest intensity, or reference_max
@@ -23,7 +23,7 @@ from matplotlib.patches import Rectangle
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
 
-    from wilson_suite.wilson_intensities.refac_rsp_eval.pipeline import EvalRspResult
+    from wilson_suite.wilson_response_evaluate.pipeline import EvalRspResult
 
 
 def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,

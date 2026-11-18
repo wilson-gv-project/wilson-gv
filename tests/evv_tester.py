@@ -185,7 +185,7 @@ def run():
         # csvfile = CQCPARSE_ROOT + '/CQCParse/files_examples/calculations.csv'
         # vault = DataVault(csvfile)
 
-        from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+        from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
         # sim.getResults(source_type='vault', datavault=vault, source_loc=SUITE_ROOT+'/wilson_intensities/tests')
         sim.getResults(obtainer=wilson_data_obtainer)
         print('\n ----', sim.vib_ana_setup)

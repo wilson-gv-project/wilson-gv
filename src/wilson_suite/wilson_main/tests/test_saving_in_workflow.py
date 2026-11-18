@@ -1,8 +1,10 @@
 import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 import numpy as np
-from wilson_suite.wilson_utils.wilson_data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 from importlib.resources import files
+
+import wilson_suite.wilson_system.data_obtainer
 data_dir = files('wilson_suite').joinpath('data_for_tests')
 
 def test_saving_obtained_data():
@@ -44,7 +46,7 @@ def test_saving_obtained_data():
     # pickling data dict - testing save_obtained_data
     filepath = SUITE_ROOT+'/wilson_main/tests/test_compl_data.pkl'
     print(filepath, type(filepath))
-    ws.utils.save_obtained_data(request_dict, format='pkl', filename=filepath)
+    wilson_suite.wilson_system.data_obtainer.save_obtained_data(request_dict, format='pkl', filename=filepath)
 
     unpkl_compl_data = ws.utils.serialization.unpickle_smth_from(filepath)
     assert_equal(unpkl_compl_data, request_dict)

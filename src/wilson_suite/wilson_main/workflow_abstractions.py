@@ -330,7 +330,7 @@ class WilsonSimulation:
 				raise ValueError("Provide save_to_filename with file extention specified")
 			format = save_to_filename.split('.')[1]
 
-			from wilson_suite.wilson_utils import save_obtained_data
+			from wilson_suite.wilson_system.data_obtainer import save_obtained_data
 			save_obtained_data(data_dict, format=format, filename=save_to_filename, save_to_dir=save_to_dir)
 
 		self.fillResults(data_dict=data_dict)

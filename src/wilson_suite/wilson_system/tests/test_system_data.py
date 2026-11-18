@@ -10,11 +10,11 @@ import numpy as np
 import pytest
 
 from wilson_suite.wilson_derive.abstractions import ResonanceCondition
-from wilson_suite.wilson_intensities.refac_rsp_eval.plan import (
+from wilson_suite.wilson_response_evaluate.plan import (
     ResCondKey,
     ResonanceMotif,
 )
-from wilson_suite.wilson_intensities.refac_rsp_eval.tests.helpers import (
+from wilson_suite.wilson_response_evaluate.tests.helpers import (
     E0,
     E01,
     E1,
