@@ -22,6 +22,7 @@ EVALUATION_DATA_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'
 # cubic and quartic force constants in cm-1, rotational constants, Coriolis constants.
 ANHARMONIC_ANALYSIS_KEYS = ('cff_rc', 'qff_rc', 'B', 'coriolis')
 
+# Array layout of each derivative by normal modes and electric field, e.g. 'dipgrad', 'cff' (not 'B', 'coriolis').
 # Property name -> (g, e): g = number of derivatives by normal modes, e = number of derivatives by the electric field.
 # The array has one index of length n (number of modes) per g, then one index of length 3 (x, y, z) per e.
 # Example: 'polhess' (polarizability, 2nd derivative by modes) -> (2, 2) -> shape (n, n, 3, 3).
@@ -235,9 +236,9 @@ class MolSystemData:
     The evaluator reads three fields:
         eigenvals   the harmonic frequency of each mode in cm-1 (data key 'nc_sqrt_eigval'), e.g. {0: 2878.7,
                     1: 1820.4}. Gives the number of modes, and the frequency where a term needs one.
-        mol_props   the property values, e.g. polgrad, dipgrad, cff. Each array has the mode indices first, then
-                    x, y, z (PROP_INDEX_COUNTS). A property with no values has vals None; check_props raises if a
-                    term needs it.
+        mol_props   the property values, e.g. polgrad, dipgrad, cff. Each derivative by modes and electric field
+                    (the names in PROP_INDEX_COUNTS) has its mode indices first, then x, y, z. A property with no
+                    values has vals None; check_props raises if a term needs it.
         states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
                     Gives the energy differences where a term needs them.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
@@ -419,9 +420,9 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
         names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
                       'anharmonic_states' may be missing: MolSystemData.check_states_choice raises if it is asked for.
         modes         nc_sqrt_eigval has the keys 0 .. n-1, e.g. {0: 2878.7, 1: 1820.4}: n modes
-        shapes        each property: mode indices first, then x, y, z (PROP_INDEX_COUNTS),
-                      e.g. n = 6: polhess (6, 6, 3, 3), cff (6, 6, 6), dipgrad (6, 3)
-        full tensors  each property is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
+        shapes        each derivative by modes and electric field (PROP_INDEX_COUNTS): mode indices first,
+                      then x, y, z, e.g. n = 6: polhess (6, 6, 3, 3), cff (6, 6, 6), dipgrad (6, 3)
+        full tensors  each such derivative is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
                       (SYMMETRY_RTOL, SYMMETRY_ATOL)
         fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
         ground state  a state list may hold the ground state, key (), but only at 0 cm-1: energies count from it
