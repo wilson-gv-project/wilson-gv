@@ -322,15 +322,14 @@ def test_check_states_choice_names_the_sets_the_data_has(choice):
         molsys.check_states_choice(choice)
 
 
-def test_check_props_names_what_is_missing_and_what_the_data_has():
-    """polgrad: in mol_props, vals None; polhess: not in mol_props. Both count as missing, each named once."""
-    molsys = MolSystemData.from_data_dict(MolPropsCollection([MolecularProperty(trivial_name='cff'),
-                                                             MolecularProperty(trivial_name='polgrad')]),
-                                         {**TOY_DATA, 'cff': np.ones((2, 2, 2))})
+def test_require_values_names_what_is_missing_and_what_the_collection_has():
+    """polgrad: in the collection, vals None; polhess: not in it. Both count as missing, each named once."""
+    props = MolPropsCollection([MolecularProperty(trivial_name='cff', vals=np.ones((2, 2, 2))),
+                                MolecularProperty(trivial_name='polgrad')])
 
-    molsys.check_props(['cff'])
+    props.require_values(['cff'])
     with pytest.raises(ValueError, match=r"no values for \['polgrad', 'polhess'\]: the data has values for \['cff'\]"):
-        molsys.check_props(['cff', 'polgrad', 'polhess', 'polgrad'])
+        props.require_values(['cff', 'polgrad', 'polhess', 'polgrad'])
 
 
 ## MolSystemData.from_output_file: reads real files -------------------------------------------
@@ -460,7 +459,7 @@ def test_check_data_dict_symmetry_allows_differences_below_the_zero_tol():
 
 
 def test_check_data_dict_does_not_check_properties_the_data_lacks_or_with_no_known_shape():
-    """a missing property is check_props' job; 'coriolis' (rotational) has no entry in PROP_INDEX_COUNTS"""
+    """a missing property is require_values' job; 'coriolis' (rotational) has no entry in PROP_INDEX_COUNTS"""
     check_data_dict({**TOY_DATA, 'coriolis': np.ones(7)}, ['polgrad', 'coriolis'])
 
 

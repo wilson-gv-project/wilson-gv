@@ -4,7 +4,7 @@ Anharmonic analyzer
 """
 import logging
 
-from ...wilson_system.system_data import MolPropsCollection, VibState
+from ...wilson_system.system_data import VPT2_INPUT_KEYS, MolPropsCollection, VibState, check_modes_exist
 from ..anharmonic_treatment.vpt2 import VPT2_REGIMES, anharm_corr_energies
 
 logger = logging.getLogger("wilson_suite."+__name__)
@@ -20,26 +20,24 @@ def compute_vpt2_states(props: MolPropsCollection,
 
     returns self.states for VibAnaSetup, and states are list[VibState]
 
+    props: needs values for VPT2_INPUT_KEYS; a missing one raises ValueError
     regime: a key of VPT2_REGIMES, e.g. 'GVPT2'; another raises ValueError
     exclude_modes: modes left out of VPT2, as if the molecule did not have them. The other states
         change, and no state of an excluded mode is returned. An unknown mode raises ValueError.
     diagnostics: {'fermi_resonances': [...], 'exclude_modes': the excluded modes, sorted, e.g. (1,)}
-
-    NOTE: Pure function -  will assume that inputs are always valid
     """
     logger.info('Starting anharm_analyzer()')
     if regime not in VPT2_REGIMES:
         raise ValueError(f"regime {regime!r}: expected one of {', '.join(VPT2_REGIMES)}")
-    
+
     # modes exclusion list update
     if exclude_modes is None:
         exclude_modes = []
-    unknown = sorted(set(exclude_modes) - set(nc_sqrt_eigval))
-    if unknown:
-        raise ValueError(f'exclude_modes {unknown}: no such mode, the modes are {sorted(nc_sqrt_eigval)}')
+    check_modes_exist(exclude_modes, len(nc_sqrt_eigval))
+    props.require_values(VPT2_INPUT_KEYS)
 
     # force constants in cm-1 (cff_rc, qff_rc), as anharm_corr_energies takes them; cff and qff are in atomic units
-    prop_dict = {name: props[name].vals for name in ('cff_rc', 'qff_rc', 'B', 'coriolis')}
+    prop_dict = {name: props[name].vals for name in VPT2_INPUT_KEYS}
 
     logger.debug(f'prop_dict {prop_dict.keys()}')
     logger.debug(prop_dict)

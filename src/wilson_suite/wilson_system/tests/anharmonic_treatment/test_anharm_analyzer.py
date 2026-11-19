@@ -81,10 +81,20 @@ def test_anharm_analyzer_vibana_excludemodes():
     for k,v in molsys.eigenvals.items():
         print(k, '--', v, '--', states_1quantum_corrected.get(k))
 
-    with pytest.raises(ValueError, match=r'exclude_modes \[3\]'):
+    with pytest.raises(ValueError, match=r'modes \[3\] do not exist'):
         ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
                                                             nc_sqrt_eigval=molsys.eigenvals,
                                                             regime='GVPT2', exclude_modes=[3])
+
+
+def test_compute_vpt2_states_names_the_inputs_without_values():
+    """Water read without B and coriolis: the error names both, before any VPT2 step."""
+    molsys = MolSystemData.from_output_file(WATER, ['cff_rc', 'qff_rc'])
+
+    with pytest.raises(ValueError, match=r"no values for \['B', 'coriolis'\]"):
+        ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
+                                                            nc_sqrt_eigval=molsys.eigenvals,
+                                                            regime='GVPT2', exclude_modes=[])
 
 '''
 def test_anharm_analyzer_vibana():

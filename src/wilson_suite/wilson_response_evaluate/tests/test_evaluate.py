@@ -680,7 +680,7 @@ def test_included_modes_leaves_out_the_excluded_modes(molsys):
 @pytest.mark.parametrize('exclude', [(2,), (-1,), ('1',)], ids=['beyond the last mode', 'negative', 'not a number'])
 def test_included_modes_raises_for_a_mode_that_does_not_exist(exclude, molsys):
     """modes count from 0, as in the data: a 1-based list would name a mode beyond the last one"""
-    with pytest.raises(ValueError, match=r'no such mode, the modes are 0 \.\. 1'):
+    with pytest.raises(ValueError, match=r'do not exist: the modes are 0 \.\. 1'):
         included_modes(molsys, exclude)
 
 

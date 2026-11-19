@@ -174,6 +174,13 @@ def make_state_label(modes: Sequence[int | str]) -> str:
     return ','.join(str(m) for m in sorted(int(m) for m in modes)) or ZERO_STATE_LABEL
 
 
+def check_modes_exist(modes: Iterable, n_modes: int) -> None:
+    """Raises ValueError for a mode not in 0 .. n_modes-1, e.g. 6, -1 or '1' when there are 6 modes."""
+    unknown = [m for m in dict.fromkeys(modes) if m not in range(n_modes)]
+    if unknown:
+        raise ValueError(f'modes {unknown} do not exist: the modes are 0 .. {n_modes - 1}')
+
+
 @dataclass
 class VibDiff:
     """
@@ -238,7 +245,7 @@ class MolSystemData:
                     1: 1820.4}. Gives the number of modes, and the frequency where a term needs one.
         mol_props   the property values, e.g. polgrad, dipgrad, cff. Each derivative by modes and electric field
                     (the names in PROP_INDEX_COUNTS) has its mode indices first, then x, y, z. A property with no
-                    values has vals None; check_props raises if a term needs it.
+                    values has vals None; MolPropsCollection.require_values raises if a term needs it.
         states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
                     Gives the energy differences where a term needs them.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
@@ -274,24 +281,13 @@ class MolSystemData:
         if states_choice not in self.states:
             raise ValueError(f'states_choice {states_choice!r}: the data has the state sets {sorted(self.states)}')
 
-    def check_props(self, prop_names: Iterable[str]) -> None:
-        """
-        raises ValueError if a named property has no values here: not in mol_props, or there with vals None,
-            e.g. 'polhess' for data loaded for ['polgrad', 'dipgrad', 'cff'] only.
-        prop_names: what the terms need, e.g. from CompiledTerm.prop_names
-        """
-        have = [p.trivial_name for p in self.mol_props if p.vals is not None]
-        missing = [name for name in dict.fromkeys(prop_names) if name not in have]
-        if missing:
-            raise ValueError(f'no values for {missing}: the data has values for {have}')
-
     def with_wilson_anharmonic_states(self, regime: str) -> 'MolSystemData':
         """
         A copy whose states['anharmonic'] are wilson's own, from compute_vpt2_states with no modes left out.
         Reads VPT2_INPUT_KEYS from mol_props, e.g.
             MolSystemData.from_output_file(origin, ['polgrad', *VPT2_INPUT_KEYS]).with_wilson_anharmonic_states('GVPT2')
         regime: a key of VPT2_REGIMES, e.g. 'GVPT2'
-        raises KeyError if mol_props lacks one of VPT2_INPUT_KEYS; ValueError for another regime
+        raises ValueError for another regime, or if one of VPT2_INPUT_KEYS has no values
         """
         from wilson_suite.wilson_system.anharmonic_treatment.anharmonic_analyzer import (
             compute_vpt2_states,
@@ -322,7 +318,7 @@ class MolSystemData:
             Both sets get the modes of the harmonic fundamentals as harmonic_osc_states_labels.
         raises ValueError if data_dict does not fit what the evaluator reads (check_data_dict), e.g. without
             'nc_sqrt_eigval'. A property of mol_props that data_dict lacks is no error here: its vals stay None
-            (check_props).
+            (MolPropsCollection.require_values).
         """
         check_data_dict(data_dict, mol_props.names())
 
@@ -374,10 +370,11 @@ class MolSystemData:
             e.g. MolSystemData.from_output_file(origin, ['polgrad'], wilson_regime='GVPT2')
                  -> request {'polgrad', 'cff_rc', 'qff_rc', 'B', 'coriolis', 'nc_sqrt_eigval', 'harmonic_states'},
                     then with_wilson_anharmonic_states('GVPT2')
-        The result's data_origin is origin.
+        The result's data_origin is origin. A requested property the source lacks is no error here: its vals stay
+        None (MolPropsCollection.require_values).
         raises ValueError for an unknown wilson_regime, before the source is read; if the data does not fit what
-            the evaluator reads (check_data_dict) or the source has no values for a requested property. These last
-            two messages name the source; so do check_data_dict's warnings.
+            the evaluator reads (check_data_dict); with a wilson_regime, if one of VPT2_INPUT_KEYS has no values.
+            The errors and warnings after the read name the source.
         """
         from wilson_suite.wilson_system.anharmonic_treatment.vpt2 import VPT2_REGIMES
         from wilson_suite.wilson_system.data_obtainer import read_from_sources
@@ -397,26 +394,19 @@ class MolSystemData:
         # 2. read
         data_dict = {**read_from_sources(dict.fromkeys([*names, *data_keys], origin)), 'data_origin': origin}
 
-        # 3. build
+        # 3. build, 4. with a regime, wilson's own anharmonic states; errors and warnings name the source
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
             try:
                 molsys = cls.from_data_dict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]),
                                             data_dict, name=name)
+                if wilson_regime is not None:
+                    molsys = molsys.with_wilson_anharmonic_states(wilson_regime)
             except ValueError as err:
                 raise ValueError(f'the data from {origin} does not fit: {err}') from err
         for w in caught:            # again, with the source, at the line that called from_output_file
             warnings.warn(f'the data from {origin}: {w.message}', w.category, stacklevel=2)
-
-        # fill_from leaves vals None for a name the source lacks. The same check as build_contributions makes,
-        # but here it means the source failed to return a property: it fails at the reading, naming the source
-        try:
-            molsys.check_props(names)
-        except ValueError as err:
-            raise ValueError(f'the source did not return every requested property, {origin}: {err}') from err
-
-        # 4. wilson's own anharmonic states, if asked
-        return molsys if wilson_regime is None else molsys.with_wilson_anharmonic_states(wilson_regime)
+        return molsys
 
 
 def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
@@ -432,7 +422,8 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
         fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
         ground state  a state list may hold the ground state, key (), but only at 0 cm-1: energies count from it
     prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
-                (MolSystemData.check_props); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no shape check.
+                (MolPropsCollection.require_values); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no
+                shape check.
     warns (UserWarning), no error: an excited state at or below 0 cm-1, the ground state, in any state list,
         e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1.
     Not checked (no check is possible from the values): units, coordinates.
@@ -584,6 +575,17 @@ class MolPropsCollection:
     def without_values(self) -> 'MolPropsCollection':
         """Properties still awaiting data — useful for finding what's missing."""
         return self.filter(lambda p: p.vals is None)
+
+    def require_values(self, names: Iterable[str]) -> None:
+        """
+        Raises ValueError if a named property has no values here: not in the collection, or there with vals None,
+            e.g. 'polhess' in a collection read for ['polgrad', 'dipgrad', 'cff'] only.
+        names: what a computation reads, e.g. the properties of the terms, or VPT2_INPUT_KEYS
+        """
+        have = [p.trivial_name for p in self.properties if p.vals is not None]
+        missing = [name for name in dict.fromkeys(names) if name not in have]
+        if missing:
+            raise ValueError(f'no values for {missing}: the data has values for {have}')
 
     def fill_from(self, data_dict: dict):
         """Load obtained data into each property's .vals."""

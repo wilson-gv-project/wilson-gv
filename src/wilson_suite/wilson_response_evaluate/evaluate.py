@@ -37,6 +37,7 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolSystemData,
     VibDiff,
+    check_modes_exist,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -508,9 +509,7 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
     """
     n_modes = len(molsys_data.eigenvals)
     excluded = set(exclude_modes)
-    unknown = [m for m in excluded if m not in range(n_modes)]
-    if unknown:
-        raise ValueError(f'exclude_modes {unknown}: no such mode, the modes are 0 .. {n_modes - 1}')
+    check_modes_exist(excluded, n_modes)
     modes = tuple(m for m in range(n_modes) if m not in excluded)
     if not modes:
         raise ValueError(f'exclude_modes removes all {n_modes} modes')
@@ -552,7 +551,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     """
     modes = included_modes(molsys_data, exclude_modes)
     molsys_data.check_states_choice(states_choice)
-    molsys_data.check_props(name for term in terms for name in term.prop_names)
+    molsys_data.mol_props.require_values(name for term in terms for name in term.prop_names)
     states = molsys_data.states[states_choice]
 
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}

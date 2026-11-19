@@ -20,7 +20,7 @@ MolSystemData (wilson_system) with the properties the terms use, prop_names(term
     molsys = MolSystemData.from_output_file(origin, prop_names(terms))   origin: DataOriginInfo
     molsys = MolSystemData.from_data_dict(...)                           from a data dict the caller already read
 One MolSystemData serves any number of runs. evaluate_response_terms checks that molsys has every property the
-terms use (MolSystemData.check_props).
+terms use (MolPropsCollection.require_values).
 
 Inputs
     terms             VibPerturbedTerm list, translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
