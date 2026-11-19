@@ -243,7 +243,7 @@ class MolSystemData:
                     Gives the energy differences where a term needs them.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
                     states[states_choice]. 'anharmonic' holds the file's states, or wilson's own after
-                    from_output_file(..., anharmonic=...) or with_wilson_anharmonic_states;
+                    from_output_file(..., wilson_regime=...) or with_wilson_anharmonic_states;
                     VibStatesData.regime says which.
                     'harmonic' and 'anharmonic' differ, e.g. in 272 of 340 formaldehyde coefficients of the
                     14 EVV terms.
@@ -290,8 +290,8 @@ class MolSystemData:
         A copy whose states['anharmonic'] are wilson's own, from compute_vpt2_states with no modes left out.
         Reads VPT2_INPUT_KEYS from mol_props, e.g.
             MolSystemData.from_output_file(origin, ['polgrad', *VPT2_INPUT_KEYS]).with_wilson_anharmonic_states('GVPT2')
-        regime: 'GVPT2', 'VPT2' or 'DVPT2'
-        raises KeyError if mol_props lacks one of VPT2_INPUT_KEYS; NotImplementedError for another regime
+        regime: a key of VPT2_REGIMES, e.g. 'GVPT2'
+        raises KeyError if mol_props lacks one of VPT2_INPUT_KEYS; ValueError for another regime
         """
         from wilson_suite.wilson_system.anharmonic_treatment.anharmonic_analyzer import (
             compute_vpt2_states,
@@ -355,7 +355,7 @@ class MolSystemData:
 
     @classmethod
     def from_output_file(cls, origin: DataOriginInfo, prop_names: Iterable[str], *,
-                         anharmonic: str='file',
+                         wilson_regime: str | None = None,
                          name: str = 'loaded') -> 'MolSystemData':
         """
         Read the data from one source and build a MolSystemData.
@@ -365,30 +365,32 @@ class MolSystemData:
                  -> request {'polgrad', 'dipgrad', 'cff', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states'}
         Nothing else is requested: the evaluator does not use normal_modes, atoms or the geometry.
 
-        prop_names  trivial names, e.g. pipeline.prop_names(terms)
-        anharmonic  where the anharmonic states come from:
-                    'file'                    the source's 'anharmonic_states'
-                    'GVPT2', 'VPT2', 'DVPT2'  wilson's own (with_wilson_anharmonic_states). Reads
-                                              VPT2_INPUT_KEYS as properties, instead of the source's
-                                              'anharmonic_states':
-            e.g. MolSystemData.from_output_file(origin, ['polgrad'], anharmonic='GVPT2')
+        prop_names     trivial names, e.g. pipeline.prop_names(terms)
+        wilson_regime  where the anharmonic states come from:
+                       None                      the source's 'anharmonic_states'
+                       a key of VPT2_REGIMES     wilson's own (with_wilson_anharmonic_states). Reads
+                       ('VPT2', 'DVPT2', 'GVPT2')  VPT2_INPUT_KEYS as properties, instead of the source's
+                                                 'anharmonic_states':
+            e.g. MolSystemData.from_output_file(origin, ['polgrad'], wilson_regime='GVPT2')
                  -> request {'polgrad', 'cff_rc', 'qff_rc', 'B', 'coriolis', 'nc_sqrt_eigval', 'harmonic_states'},
                     then with_wilson_anharmonic_states('GVPT2')
         The result's data_origin is origin.
-        raises ValueError for an unknown anharmonic, before the source is read; if the data does not fit what the
-            evaluator reads (check_data_dict) or the source has no values for a requested property. These last two
-            messages name the source; so do check_data_dict's warnings.
+        raises ValueError for an unknown wilson_regime, before the source is read; if the data does not fit what
+            the evaluator reads (check_data_dict) or the source has no values for a requested property. These last
+            two messages name the source; so do check_data_dict's warnings.
         """
-        # checked before the source is read; compute_vpt2_states checks too, but only after the read
-        if anharmonic not in ('file', 'GVPT2', 'VPT2', 'DVPT2'):
-            raise ValueError(f"anharmonic {anharmonic!r}: expected 'file', 'GVPT2', 'VPT2' or 'DVPT2'")
-        
+        from wilson_suite.wilson_system.anharmonic_treatment.vpt2 import VPT2_REGIMES
         from wilson_suite.wilson_system.data_obtainer import read_from_sources
+
+        # before the read: compute_vpt2_states checks the regime too, but only after the read
+        if wilson_regime is not None and wilson_regime not in VPT2_REGIMES:
+            raise ValueError(f"wilson_regime {wilson_regime!r}: expected None (the file's states) or one of "
+                             f"{', '.join(VPT2_REGIMES)}")
 
         # 1. what to read: with a regime, the analysis keys instead of the source's anharmonic states
         names = list(dict.fromkeys(prop_names))        # each name once, in the given order
         data_keys = list(FREQUENCY_AND_STATE_KEYS)
-        if anharmonic != 'file':
+        if wilson_regime is not None:
             names = list(dict.fromkeys([*names, *VPT2_INPUT_KEYS]))
             data_keys.remove('anharmonic_states')
 
@@ -414,7 +416,7 @@ class MolSystemData:
             raise ValueError(f'the source did not return every requested property, {origin}: {err}') from err
 
         # 4. wilson's own anharmonic states, if asked
-        return molsys if anharmonic == 'file' else molsys.with_wilson_anharmonic_states(anharmonic)
+        return molsys if wilson_regime is None else molsys.with_wilson_anharmonic_states(wilson_regime)
 
 
 def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:

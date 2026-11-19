@@ -350,15 +350,16 @@ def test_from_output_file_fills_properties_frequencies_and_state_sets():
     assert molsys.data_origin is FORMALDEHYDE
 
 
-def test_from_output_file_raises_for_an_unknown_anharmonic_before_reading():
+def test_from_output_file_raises_for_an_unknown_wilson_regime_before_reading():
     """
-    'anharmonic' is a states choice, not a source of the anharmonic states.
+    'anharmonic' is a states choice, not a regime.
     The file does not exist: a read would raise another error.
     """
     origin = DataOriginInfo(source_type='gaussian', base_file_loc='no_such_file.out')
 
-    with pytest.raises(ValueError, match=r"anharmonic 'anharmonic': expected 'file', 'GVPT2', 'VPT2' or 'DVPT2'"):
-        MolSystemData.from_output_file(origin, [], anharmonic='anharmonic')
+    with pytest.raises(ValueError, match=r"wilson_regime 'anharmonic': expected None \(the file's states\) "
+                                         r"or one of VPT2, DVPT2, GVPT2"):
+        MolSystemData.from_output_file(origin, [], wilson_regime='anharmonic')
 
 
 def test_from_output_file_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
@@ -367,7 +368,7 @@ def test_from_output_file_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
     gives the same 83 states, within 0.01 cm-1.
     """
     from_file = MolSystemData.from_output_file(FORMALDEHYDE, [])
-    from_wilson = MolSystemData.from_output_file(FORMALDEHYDE, [], anharmonic='GVPT2')
+    from_wilson = MolSystemData.from_output_file(FORMALDEHYDE, [], wilson_regime='GVPT2')
 
     file_states, wilson_states = from_file.states['anharmonic'], from_wilson.states['anharmonic']
     assert (file_states.regime, file_states.computed_by) == ('unknown', 'file')
@@ -384,7 +385,7 @@ def test_with_wilson_anharmonic_states_equals_from_output_file_with_a_regime():
     loaded = MolSystemData.from_output_file(FORMALDEHYDE, list(VPT2_INPUT_KEYS))
 
     in_two_steps = loaded.with_wilson_anharmonic_states('GVPT2')
-    in_one_call = MolSystemData.from_output_file(FORMALDEHYDE, [], anharmonic='GVPT2')
+    in_one_call = MolSystemData.from_output_file(FORMALDEHYDE, [], wilson_regime='GVPT2')
 
     assert in_two_steps.states['anharmonic'].allstates == in_one_call.states['anharmonic'].allstates
     assert in_two_steps.states['anharmonic'].regime == 'GVPT2'

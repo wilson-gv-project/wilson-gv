@@ -6,6 +6,9 @@ import copy
 import logging
 logger = logging.getLogger("wilson."+__name__)
 
+# Each VPT2 regime -> (resonance checks, variational correction)
+VPT2_REGIMES = {'VPT2': (False, False), 'DVPT2': (True, False), 'GVPT2': (True, True)}
+
 def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield,
                          rotational_constant, coriolis_constant, anharmonic_type,
                          list2exclude):
@@ -16,27 +19,12 @@ def anharm_corr_energies(harmonic_energies, cubic_forcefield, quartic_forcefield
         harmonic_energies, cubic_forcefield, quartic_forcefield, rotational_constant, coriolis_constant(unit?)
         (nmodes,);   (nmodes, nmodes, nmodes);   (nmodes, nmodes, nmodes, nmodes);   [x,y,z];   (nmodes, nmodes)
 
-    anharmonic_type options:
-            'VPT2'                        - don't do_res, don't do_var
-            'DVPT2'                       - do_res, don't do_var
-            'GVPT2'                       - do_res, do_var
+    anharmonic_type: a key of VPT2_REGIMES, e.g. 'GVPT2'
     returns:
         fundamental, overtones, combotones, over3q, combo3q
     """
-    if anharmonic_type == 'GVPT2':
-        do_variational_correction = True
-        do_resonance_checks = True
-    elif anharmonic_type == 'VPT2':
-        do_resonance_checks = False
-        do_variational_correction = False
-    elif anharmonic_type == 'DVPT2':
-        do_resonance_checks = True
-        do_variational_correction = False
-    else:
-        logger.info('Something strange has happened in anharm_corrected_vibrational_energies')
-        logger.info('Anharmonic is called, but which type isn/t specified')
-        exit()
-    
+    do_resonance_checks, do_variational_correction = VPT2_REGIMES[anharmonic_type]
+
     original_len_ene = len(harmonic_energies)
 
     fundamental = np.zeros((original_len_ene))

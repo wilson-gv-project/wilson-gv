@@ -5,7 +5,7 @@ Anharmonic analyzer
 import logging
 
 from ...wilson_system.system_data import MolPropsCollection, VibState
-from ..anharmonic_treatment.vpt2 import anharm_corr_energies
+from ..anharmonic_treatment.vpt2 import VPT2_REGIMES, anharm_corr_energies
 
 logger = logging.getLogger("wilson_suite."+__name__)
 
@@ -20,6 +20,7 @@ def compute_vpt2_states(props: MolPropsCollection,
 
     returns self.states for VibAnaSetup, and states are list[VibState]
 
+    regime: a key of VPT2_REGIMES, e.g. 'GVPT2'; another raises ValueError
     exclude_modes: modes left out of VPT2, as if the molecule did not have them. The other states
         change, and no state of an excluded mode is returned. An unknown mode raises ValueError.
     diagnostics: {'fermi_resonances': [...], 'exclude_modes': the excluded modes, sorted, e.g. (1,)}
@@ -27,8 +28,8 @@ def compute_vpt2_states(props: MolPropsCollection,
     NOTE: Pure function -  will assume that inputs are always valid
     """
     logger.info('Starting anharm_analyzer()')
-    if regime not in ['GVPT2', 'VPT2', 'DVPT2']:
-        raise NotImplementedError(f"Vibrational anharmonic analysis regime not supported: {regime}. Choose from: GVPT2, VPT2, DVPT2")
+    if regime not in VPT2_REGIMES:
+        raise ValueError(f"regime {regime!r}: expected one of {', '.join(VPT2_REGIMES)}")
     
     # modes exclusion list update
     if exclude_modes is None:
