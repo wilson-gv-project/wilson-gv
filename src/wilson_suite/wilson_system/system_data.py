@@ -2,6 +2,7 @@ import copy
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -22,11 +23,18 @@ FREQUENCY_AND_STATE_KEYS = ('nc_sqrt_eigval', 'harmonic_states', 'anharmonic_sta
 # cubic and quartic force constants in cm-1, rotational constants, Coriolis constants.
 VPT2_INPUT_KEYS = ('cff_rc', 'qff_rc', 'B', 'coriolis')
 
-# Array layout of each derivative by normal modes and electric field, e.g. 'dipgrad', 'cff' (not 'B', 'coriolis').
-# Property name -> (g, e): g = number of derivatives by normal modes, e = number of derivatives by the electric field.
-# The array has one index of length n (number of modes) per g, then one index of length 3 (x, y, z) per e.
-# Example: 'polhess' (polarizability, 2nd derivative by modes) -> (2, 2) -> shape (n, n, 3, 3).
-PROP_INDEX_COUNTS = {prop_trivname(ord_geo=g, ord_el=e): (g, e) for g in range(7) for e in range(7)}
+# Array layout of each property: one letter per index, in order. 'm': a normal mode (length n, the number of
+# modes); 'x': x, y or z (length 3). Every property name the data can have is here.
+#   derivatives by normal modes and electric field: mode indices first, e.g. 'polhess' -> 'mmxx', shape (n, n, 3, 3)
+#   force constants in cm-1, as VPT2 takes them: 'cff_rc' -> 'mmm', 'qff_rc' -> 'mmmm'
+#   rotational constants: 'B' -> 'x';  Coriolis constants: 'coriolis' -> 'xmm', shape (3, n, n)
+PROP_LAYOUT = {**{prop_trivname(ord_geo=g, ord_el=e): 'm' * g + 'x' * e for g in range(7) for e in range(7)},
+               'cff_rc': 'mmm', 'qff_rc': 'mmmm',
+               prop_trivname(ord_rot=1): 'x', prop_trivname(ord_rot=1, ord_geo=2): 'xmm'}
+
+# No symmetry check in the mode indices: the Coriolis constant changes sign when its two modes swap, but the reader
+# gives the same sign. VPT2 squares it, so the sign changes no state.
+NO_SYMMETRY_CHECK = {'coriolis'}
 
 # Symmetry in the mode indices: values that differ by less than this count as equal. 1e-18 is the evaluator's zero_tol (au).
 SYMMETRY_RTOL, SYMMETRY_ATOL = 1e-12, 1e-18
@@ -242,9 +250,9 @@ class MolSystemData:
     The evaluator reads three fields:
         eigenvals   the harmonic frequency of each mode in cm-1 (data key 'nc_sqrt_eigval'), e.g. {0: 2878.7,
                     1: 1820.4}. Gives the number of modes, and the frequency where a term needs one.
-        mol_props   the property values, e.g. polgrad, dipgrad, cff. Each derivative by modes and electric field
-                    (the names in PROP_INDEX_COUNTS) has its mode indices first, then x, y, z. A property with no
-                    values has vals None; MolPropsCollection.require_values raises if a term needs it.
+        mol_props   the property values, e.g. polgrad, dipgrad, cff. Each array has the index order PROP_LAYOUT
+                    gives, e.g. polhess (n, n, 3, 3), coriolis (3, n, n). A property with no values has vals None;
+                    MolPropsCollection.require_values raises if a term needs it.
         states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
                     Gives the energy differences where a term needs them.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
@@ -266,6 +274,33 @@ class MolSystemData:
     geo_extra: Any = None
     linear: bool = False
     data_origin: DataOriginInfo | None = None
+
+    def __post_init__(self):
+        """
+        Checks that the fields fit together, however the data is built, with every problem in one ValueError:
+            eigenvals  a dict with the modes 0 .. n-1 as keys: n modes
+            mol_props  each name has a layout in PROP_LAYOUT; each array with values has the shape that its layout
+                       and n give, and is symmetric in its mode indices (not the names in NO_SYMMETRY_CHECK)
+        The state sets check themselves (VibStatesData).
+        """
+        problems, n = [], None
+        freqs = self.eigenvals
+        if not isinstance(freqs, dict) or not freqs or set(freqs) != set(range(len(freqs))):
+            keys = list(freqs) if isinstance(freqs, dict) else type(freqs).__name__
+            problems.append(f"eigenvals (data key 'nc_sqrt_eigval'): needs a dict with the modes 0 .. n-1 as keys, "
+                            f"got {keys}")
+        else:
+            n = len(freqs)
+
+        for prop in self.mol_props:
+            name = prop.trivial_name
+            if name not in PROP_LAYOUT:
+                problems.append(f'{name}: no layout in PROP_LAYOUT, so its shape cannot be checked')
+            elif n is not None and prop.vals is not None:
+                problems += _layout_problems(name, np.asarray(prop.vals), PROP_LAYOUT[name], n)
+
+        if problems:
+            raise ValueError(f'MolSystemData {self.name!r} does not fit together:\n  - ' + '\n  - '.join(problems))
 
     @property
     def data_filled(self) -> bool:
@@ -315,23 +350,22 @@ class MolSystemData:
         data_dict: dict - {data_name: values}
         states: one VibStatesData per state list in data_dict, by states choice:
             'harmonic_states' -> states['harmonic'], 'anharmonic_states' -> states['anharmonic'].
-            'anharmonic_states' may be missing: no entry (state_set raises if the evaluation asks for it).
+            Either may be missing: no entry (state_set raises if the evaluation asks for it).
             Both sets get the modes of the harmonic fundamentals as harmonic_osc_states_labels.
-        raises ValueError if data_dict does not fit what the evaluator reads (check_data_dict), e.g. without
-            'nc_sqrt_eigval'. A property of mol_props that data_dict lacks is no error here: its vals stay None
-            (MolPropsCollection.require_values).
+        raises ValueError if the result does not fit together (MolSystemData, e.g. without 'nc_sqrt_eigval'), or a
+            state set breaks its rules (VibStatesData). A property of mol_props that data_dict lacks is no error
+            here: its vals stay None (MolPropsCollection.require_values).
         """
-        check_data_dict(data_dict, mol_props.names())
-
         mol_props = mol_props.empty_copy()
         mol_props.fill_from(data_dict)
 
         harm_states, anharm_states = _make_hq_states_from_data_dict(data_dict)
         labels = tuple(int(s.state_label) for s in VibState.get_1q_states(list(harm_states)))
 
-        # check_data_dict raised if 'harmonic_states' is missing, so the harmonic set is never empty
-        states = {'harmonic': VibStatesData(allstates=harm_states, regime='harmonic', computed_by='file',
-                                            harmonic_osc_states_labels=labels)}
+        states = {}
+        if harm_states:
+            states['harmonic'] = VibStatesData(allstates=harm_states, regime='harmonic', computed_by='file',
+                                               harmonic_osc_states_labels=labels)
         if anharm_states:
             states['anharmonic'] = VibStatesData(allstates=anharm_states, regime='unknown', computed_by='file',
                                                  harmonic_osc_states_labels=labels)
@@ -340,7 +374,7 @@ class MolSystemData:
         natoms = len(geo) if geo is not None else 0
 
         return cls(name=name,
-                   eigenvals=data_dict['nc_sqrt_eigval'],
+                   eigenvals=data_dict.get('nc_sqrt_eigval'),        # type: ignore  # None: __post_init__ raises
                    eigenvecs=data_dict.get('normal_modes', None),
                    mol_props=mol_props,
                    natoms=natoms,
@@ -373,8 +407,8 @@ class MolSystemData:
                     then with_wilson_anharmonic_states('GVPT2')
         The result's data_origin is origin. A requested property the source lacks is no error here: its vals stay
         None (MolPropsCollection.require_values).
-        raises ValueError for an unknown wilson_regime, before the source is read; if the data does not fit what
-            the evaluator reads (check_data_dict); with a wilson_regime, if one of VPT2_INPUT_KEYS has no values.
+        raises ValueError for an unknown wilson_regime, before the source is read; if the data does not fit
+            together (MolSystemData, VibStatesData); with a wilson_regime, if one of VPT2_INPUT_KEYS has no values.
             The errors and warnings after the read name the source.
         """
         from wilson_suite.wilson_system.anharmonic_treatment.vpt2 import VPT2_REGIMES
@@ -411,66 +445,27 @@ class MolSystemData:
         return molsys
 
 
-def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
+def _layout_problems(name: str, vals: np.ndarray, layout: str, n: int) -> list[str]:
     """
-    raises ValueError if data_dict does not fit what the evaluator reads, with every problem found:
-        names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
-                      'anharmonic_states' may be missing: MolSystemData.state_set raises if it is asked for.
-        modes         nc_sqrt_eigval has the keys 0 .. n-1, e.g. {0: 2878.7, 1: 1820.4}: n modes
-        shapes        each derivative by modes and electric field (PROP_INDEX_COUNTS): mode indices first,
-                      then x, y, z, e.g. n = 6: polhess (6, 6, 3, 3), cff (6, 6, 6), dipgrad (6, 3)
-        full tensors  each such derivative is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
-                      (SYMMETRY_RTOL, SYMMETRY_ATOL)
-        fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
-    prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
-                (MolPropsCollection.require_values); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no
-                shape check.
-    The state energies are checked where each state set is built (VibStatesData).
-    Not checked (no check is possible from the values): units, coordinates.
+    The problem of one property array, if any: its shape, then its symmetry in the mode indices.
+        e.g. n = 6: polhess 'mmxx' -> shape (6, 6, 3, 3), polhess[0, 2] == polhess[2, 0]
+    Values that differ by less than SYMMETRY_RTOL, SYMMETRY_ATOL count as equal.
     """
-    problems = []
-
-    freqs = data_dict.get('nc_sqrt_eigval')
-    n = None
-    if freqs is None:
-        problems.append("no 'nc_sqrt_eigval' (the harmonic frequencies)")
-    elif not isinstance(freqs, dict) or not freqs or set(freqs) != set(range(len(freqs))):
-        keys = list(freqs) if isinstance(freqs, dict) else type(freqs).__name__
-        problems.append(f"'nc_sqrt_eigval': needs a dict with the modes 0 .. n-1 as keys, got {keys}")
-    else:
-        n = len(freqs)
-
-    harmonic = data_dict.get('harmonic_states')
-    if harmonic is None:
-        problems.append("no 'harmonic_states'")
-    elif n is not None:
-        have = {int(key[0]) for key in harmonic if len(key) == 1}
-        missing = [m for m in range(n) if m not in have]
-        if missing:
-            problems.append(f"'harmonic_states' lacks the fundamentals of modes {missing}, e.g. the key "
-                            f"('{missing[0]}',)")
-
-    for name in dict.fromkeys(prop_names):
-        if n is None or data_dict.get(name) is None or name not in PROP_INDEX_COUNTS:
-            continue
-        n_modes, n_xyz = PROP_INDEX_COUNTS[name]
-        vals = np.asarray(data_dict[name])
-        expected = (n,) * n_modes + (3,) * n_xyz
-        if vals.shape != expected:
-            problems.append(f'{name}: shape {vals.shape}, expected {expected} (mode indices first, then x, y, z)')
-            continue
-        for i in range(n_modes - 1):             # symmetric under every swap of neighbours: under every order
-            swapped = np.swapaxes(vals, i, i + 1)
-            if not np.allclose(vals, swapped, rtol=SYMMETRY_RTOL, atol=SYMMETRY_ATOL):
-                idx = np.unravel_index(np.argmax(np.abs(vals - swapped)), vals.shape)
-                other = list(idx)
-                other[i], other[i + 1] = other[i + 1], other[i]
-                problems.append(f'{name}: not symmetric in its mode indices, {name}{list(map(int, idx))} = '
-                                f'{vals[idx]:.6g}, {name}{list(map(int, other))} = {vals[tuple(other)]:.6g}')
-                break
-
-    if problems:
-        raise ValueError('the data dict does not fit what the evaluator reads:\n  - ' + '\n  - '.join(problems))
+    expected = tuple(n if index == 'm' else 3 for index in layout)
+    if vals.shape != expected:
+        return [f'{name}: shape {vals.shape}, expected {expected} (layout {layout!r}: m a mode, x one of x, y, z)']
+    if name in NO_SYMMETRY_CHECK:
+        return []
+    modes = [i for i, index in enumerate(layout) if index == 'm']
+    for i, j in pairwise(modes):                # symmetric under every swap of neighbours: under every order
+        swapped = np.swapaxes(vals, i, j)
+        if not np.allclose(vals, swapped, rtol=SYMMETRY_RTOL, atol=SYMMETRY_ATOL):
+            idx = np.unravel_index(np.argmax(np.abs(vals - swapped)), vals.shape)
+            other = list(idx)
+            other[i], other[j] = other[j], other[i]
+            return [(f'{name}: not symmetric in its mode indices, {name}{list(map(int, idx))} = '
+                     f'{vals[idx]:.6g}, {name}{list(map(int, other))} = {vals[tuple(other)]:.6g}')]
+    return []
 
 
 def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
@@ -480,7 +475,7 @@ def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tu
     """
 
     harm_states = ()
-    if 'harmonic_states' in data_dict:
+    if data_dict.get('harmonic_states') is not None:
         states_dict: dict = data_dict['harmonic_states']
 
         for state, energy in states_dict.items():
@@ -488,7 +483,7 @@ def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tu
                                      state_label=make_state_label(state)),)
 
     anharm_states = ()
-    if 'anharmonic_states' in data_dict:
+    if data_dict.get('anharmonic_states') is not None:
         states_dict: dict = data_dict['anharmonic_states']
 
         for state, energy in states_dict.items():

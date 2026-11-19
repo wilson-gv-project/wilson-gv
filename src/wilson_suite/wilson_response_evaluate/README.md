@@ -45,7 +45,8 @@ A `MolSystemData` holds the data. There are two ways to make one:
 2. `MolSystemData.from_data_dict(mol_props, data_dict)` takes a data dict the caller already has.
    A new data source only has to produce this dict.
 
-Both check the dict first (`check_data_dict`): key names, mode numbers, shapes, symmetry.
+The result checks itself when it is built, either way: mode numbers, shapes and symmetry (`MolSystemData`),
+state energies (`VibStatesData`).
 
 ```python
 from wilson_suite.wilson_response_evaluate.pipeline import prop_names

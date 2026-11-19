@@ -361,8 +361,9 @@ def evv_shaped_term() -> CompiledTerm:
 
 
 def with_evv_props(molsys):
-    """molsys (cff, 2 modes, toy states) plus polgrad and dipgrad."""
-    return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props()]))
+    """molsys (cff, 2 modes, toy states) plus polgrad and dipgrad of its 2 modes: POLGRAD[:2], DIPGRAD[:2]."""
+    n = len(molsys.eigenvals)
+    return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props(POLGRAD[:n], DIPGRAD[:n])]))
 
 
 def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys):
@@ -411,7 +412,8 @@ def test_evaluate_term_coeff_sumover_mode_count_comes_from_eigenvals(term_and_av
     """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 index sets."""
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
     term, avrg = term_and_avrg
-    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
+    # no properties: their arrays would need 3 modes, and the replaced evaluate_full_index_dict reads none
+    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.}, mol_props=MolPropsCollection([]))
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
                                                  states_choice='anharmonic')

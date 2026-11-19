@@ -73,7 +73,7 @@ def mock_energy(modes) -> float:
 
 def mock_data() -> dict:
     """
-    A data dict that check_data_dict accepts: harmonic and anharmonic states up to 4 quanta, polgrad,
+    A data dict that passes the checks of MolSystemData: harmonic and anharmonic states up to 4 quanta, polgrad,
     a symmetric cff. Both modes are totally symmetric, so no entry is 0 by symmetry and no index set has
     coefficient 0: polgrad is diagonal, and with TOY_RECIPE <polgrad>[a] = trace / 3 = (0.2, 0.15).
     """

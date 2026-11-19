@@ -29,7 +29,7 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
 from wilson_suite.wilson_system.system_data import (
     VPT2_INPUT_KEYS,
     FREQUENCY_AND_STATE_KEYS,
-    PROP_INDEX_COUNTS,
+    PROP_LAYOUT,
     DataOriginInfo,
     MolecularProperty,
     MolPropsCollection,
@@ -38,10 +38,8 @@ from wilson_suite.wilson_system.system_data import (
     VibState,
     VibStatesData,
     _make_hq_states_from_data_dict,
-    check_data_dict,
     make_state_label,
 )
-from wilson_suite.wilson_utils.prop_trivname import prop_trivname
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
 
@@ -268,7 +266,7 @@ def test_molpropscollection_fill_from_and_is_filled(props):
     assert props.without_values().names() == ['polgrad']
     assert not props.is_filled
 
-# A data dict that fits (check_data_dict): 2 modes, their harmonic frequencies, every fundamental in the states.
+# A data dict that fits: 2 modes, their harmonic frequencies, both state lists.
 # The data holds every state set it has, by states choice; the evaluation picks one (states_choice).
 # Toy data: harmonic 0 -> E0, 1 -> E1, 0,1 -> E01; anharmonic: the same states, 10 cm-1 lower.
 FREQS = {'nc_sqrt_eigval': {0: E0_eigval, 1: E1_eigval}}
@@ -276,6 +274,11 @@ STATE_LISTS = {'harmonic_states': {('0',): E0, ('1',): E1, ('0', '1'): E01},
                'anharmonic_states': {('0',): E0 - 10., ('1',): E1 - 10., ('0', '1'): E01 - 10.}}
 TOY_DATA = {**FREQS, **STATE_LISTS}
 HARMONIC_ONLY = {**FREQS, 'harmonic_states': STATE_LISTS['harmonic_states']}
+
+
+def build(data: dict, names=()) -> MolSystemData:
+    """MolSystemData.from_data_dict with the named properties."""
+    return MolSystemData.from_data_dict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]), data)
 
 
 def test_from_data_dict_does_not_share_mol_props():
@@ -294,8 +297,9 @@ def test_from_data_dict_keeps_every_state_set_by_choice():
     assert molsys.states['anharmonic'].get_state_by_label('0,1').energy == E01 - 10.
 
 
-def test_from_data_dict_without_anharmonic_states_has_only_the_harmonic_set():
-    assert set(MolSystemData.from_data_dict(MolPropsCollection([]), HARMONIC_ONLY).states) == {'harmonic'}
+@pytest.mark.parametrize('kept', ['harmonic', 'anharmonic'])
+def test_from_data_dict_builds_only_the_state_sets_the_data_has(kept):
+    assert set(build({**FREQS, f'{kept}_states': STATE_LISTS[f'{kept}_states']}).states) == {kept}
 
 
 def test_from_data_dict_both_sets_get_the_harmonic_fundamentals_as_labels():
@@ -384,76 +388,68 @@ def test_with_wilson_anharmonic_states_equals_from_output_file_with_a_regime():
     assert loaded.states['anharmonic'].regime == 'unknown'
 
 
-## check_data_dict: the data dict fits what the evaluator reads ---------------------------------
-# TOY_DATA fits: 2 modes. Each test breaks one rule; from_data_dict runs the same check.
+## MolSystemData checks its fields --------------------------------------------------------------
+# TOY_DATA fits: 2 modes. Each test breaks one rule; build runs the checks through from_data_dict.
 
-def test_prop_index_counts_every_order_has_its_own_name():
-    assert len(PROP_INDEX_COUNTS) == 49
-    assert PROP_INDEX_COUNTS['polhess'] == (2, 2)
-    assert PROP_INDEX_COUNTS['cff'] == (3, 0)
-    assert PROP_INDEX_COUNTS['dipgrad'] == (1, 1)
-
-
-def test_check_data_dict_passes_data_that_fits():
-    data = {**TOY_DATA, 'polhess': np.ones((2, 2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'dipgrad': np.ones((2, 3))}
-
-    check_data_dict(data, ['polhess', 'cff', 'dipgrad'])
+def test_prop_layout_gives_the_index_order_of_every_property():
+    assert len(PROP_LAYOUT) == 49 + 4             # derivatives by modes and field, cff_rc, qff_rc, B, coriolis
+    assert PROP_LAYOUT['polhess'] == 'mmxx'
+    assert PROP_LAYOUT['cff'] == 'mmm'
+    assert PROP_LAYOUT['dipgrad'] == 'mx'
+    assert PROP_LAYOUT['coriolis'] == 'xmm'
 
 
-@pytest.mark.parametrize('drop, message', [('nc_sqrt_eigval', r"no 'nc_sqrt_eigval'"),
-                                           ('harmonic_states', r"no 'harmonic_states'")])
-def test_check_data_dict_needs_frequencies_and_harmonic_states(drop, message):
-    data = {k: v for k, v in TOY_DATA.items() if k != drop}
+def test_molsystemdata_takes_data_that_fits():
+    """coriolis changes sign when its two modes swap: no symmetry check for it"""
+    coriolis = np.zeros((3, 2, 2))
+    coriolis[2, 0, 1], coriolis[2, 1, 0] = 0.4, -0.4
+    data = {**TOY_DATA, 'polhess': np.ones((2, 2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'dipgrad': np.ones((2, 3)),
+            'B': np.array([5.8, 1.3, 1.1]), 'coriolis': coriolis}
 
-    with pytest.raises(ValueError, match=message):
-        check_data_dict(data, [])
-    with pytest.raises(ValueError, match=message):
-        MolSystemData.from_data_dict(MolPropsCollection([]), data)
+    build(data, ['polhess', 'cff', 'dipgrad', 'B', 'coriolis'])
 
 
-@pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
+@pytest.mark.parametrize('freqs', [None, {1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
                                    {0: E0_eigval, '1': E1_eigval}],
-                         ids=['modes from 1', 'no modes', 'a list', 'a str key'])
-def test_check_data_dict_frequencies_are_a_dict_with_the_modes_from_0(freqs):
-    with pytest.raises(ValueError, match=r"'nc_sqrt_eigval': needs a dict with the modes 0 \.\. n-1"):
-        check_data_dict({**TOY_DATA, 'nc_sqrt_eigval': freqs}, [])
+                         ids=['missing', 'modes from 1', 'no modes', 'a list', 'a str key'])
+def test_molsystemdata_eigenvals_are_a_dict_with_the_modes_from_0(freqs):
+    with pytest.raises(ValueError, match=r"eigenvals \(data key 'nc_sqrt_eigval'\): needs a dict with the modes "
+                                         r"0 \.\. n-1"):
+        build({**TOY_DATA, 'nc_sqrt_eigval': freqs})
 
 
-def test_check_data_dict_needs_every_fundamental_in_the_harmonic_states():
-    harmonic = {('0',): E0, ('0', '1'): E01}                                  # no ('1',)
-
-    with pytest.raises(ValueError, match=r"'harmonic_states' lacks the fundamentals of modes \[1\]"):
-        check_data_dict({**TOY_DATA, 'harmonic_states': harmonic}, [])
-
-
-@pytest.mark.parametrize('name, shape', [('dipgrad', (3, 2)), ('polhess', (2, 3, 3)), ('cff', (3, 3, 3))],
-                         ids=['x, y, z first', 'a mode index missing', '3 modes instead of 2'])
-def test_check_data_dict_property_shape_is_modes_then_xyz(name, shape):
+@pytest.mark.parametrize('name, shape', [('dipgrad', (3, 2)), ('polhess', (2, 3, 3)), ('cff', (3, 3, 3)),
+                                         ('coriolis', (2, 2, 3))],
+                         ids=['x, y, z first', 'a mode index missing', '3 modes instead of 2',
+                              'coriolis with x, y, z last'])
+def test_molsystemdata_property_shape_follows_its_layout(name, shape):
     with pytest.raises(ValueError, match=re.escape(f'{name}: shape {shape}, expected')):
-        check_data_dict({**TOY_DATA, name: np.ones(shape)}, [name])
+        build({**TOY_DATA, name: np.ones(shape)}, [name])
 
 
-def test_check_data_dict_property_is_symmetric_in_its_mode_indices():
+def test_molsystemdata_property_is_symmetric_in_its_mode_indices():
     """only cff[0, 1, 1] is filled, not cff[1, 0, 1] and cff[1, 1, 0]: one index order of a full tensor"""
     cff = np.zeros((2, 2, 2))
     cff[0, 1, 1] = 5e-6
 
     with pytest.raises(ValueError, match=r'cff: not symmetric in its mode indices, cff\[0, 1, 1\] = 5e-06, '
                                          r'cff\[1, 0, 1\] = 0'):
-        check_data_dict({**TOY_DATA, 'cff': cff}, ['cff'])
+        build({**TOY_DATA, 'cff': cff}, ['cff'])
 
 
-def test_check_data_dict_symmetry_allows_differences_below_the_zero_tol():
+def test_molsystemdata_symmetry_allows_differences_below_the_zero_tol():
     """1e-20: rounding noise, below the evaluator's zero_tol 1e-18"""
     cff = np.zeros((2, 2, 2))
     cff[0, 1, 1] = 1e-20
 
-    check_data_dict({**TOY_DATA, 'cff': cff}, ['cff'])
+    build({**TOY_DATA, 'cff': cff}, ['cff'])
 
 
-def test_check_data_dict_does_not_check_properties_the_data_lacks_or_with_no_known_shape():
-    """a missing property is require_values' job; 'coriolis' (rotational) has no entry in PROP_INDEX_COUNTS"""
-    check_data_dict({**TOY_DATA, 'coriolis': np.ones(7)}, ['polgrad', 'coriolis'])
+def test_molsystemdata_skips_a_property_without_values_but_refuses_an_unknown_name():
+    """a missing value is require_values' job; a name without a layout cannot be checked"""
+    build(TOY_DATA, ['polgrad'])
+    with pytest.raises(ValueError, match=r'polgard: no layout in PROP_LAYOUT'):
+        build(TOY_DATA, ['polgard'])
 
 
 def test_from_output_file_warning_names_the_source():
@@ -473,11 +469,12 @@ def test_from_output_file_warns_for_wilsons_states_at_or_below_the_ground_state(
         MolSystemData.from_output_file(ACETIC_ACID_DIMER, [], wilson_regime='GVPT2')
 
 
-def test_check_data_dict_names_every_problem_at_once():
-    data = {**FREQS, 'harmonic_states': {('0',): E0}, 'dipgrad': np.ones((3, 2))}
+def test_molsystemdata_names_every_problem_at_once():
+    cff = np.zeros((2, 2, 2))
+    cff[0, 1, 1] = 5e-6
 
-    with pytest.raises(ValueError, match=r'(?s)lacks the fundamentals of modes \[1\].*dipgrad: shape'):
-        check_data_dict(data, ['dipgrad'])
+    with pytest.raises(ValueError, match=r'(?s)dipgrad: shape.*cff: not symmetric'):
+        build({**TOY_DATA, 'dipgrad': np.ones((3, 2)), 'cff': cff}, ['dipgrad', 'cff'])
 
 
 def test_from_output_file_extra_keys_never_collide_with_property_names():
@@ -494,11 +491,7 @@ def test_from_output_file_extra_keys_never_collide_with_property_names():
     The property and the frequencies would then share one key, so both would get the same value from one read.
     One of the two would hold wrong numbers, and nothing would raise an error.
 
-    So the test makes every property name there can be, and checks that none is one of FREQUENCY_AND_STATE_KEYS.
-    The names: prop_trivname for 0-6 derivatives by normal modes and 0-6 by the electric field (e.g. 'dipgrad',
-    'polhess', 'cff'), plus 'B' and 'coriolis'. No name clashes today; the test fails if a new name ever does.
+    So the test checks that no name in PROP_LAYOUT, which holds every property name the data can have, is one of
+    FREQUENCY_AND_STATE_KEYS. No name clashes today; the test fails if a new name ever does.
     """
-    names = {prop_trivname(ord_geo=g, ord_el=e) for g in range(7) for e in range(7)}
-    names |= {prop_trivname(ord_rot=1), prop_trivname(ord_rot=1, ord_geo=2)}   # 'B', 'coriolis'
-
-    assert set(FREQUENCY_AND_STATE_KEYS).isdisjoint(names)
+    assert set(FREQUENCY_AND_STATE_KEYS).isdisjoint(PROP_LAYOUT)
