@@ -20,6 +20,7 @@ MolSystemData (wilson_system) with the properties the terms use, prop_names(term
     molsys = MolSystemData.from_output_file(origin, prop_names(terms))   origin: DataOriginInfo
     molsys = MolSystemData.from_data_dict(...)                           from a data dict the caller already read
 One MolSystemData serves any number of runs. evaluate_response_terms checks that molsys has every property the
+
 terms use (MolPropsCollection.require_values).
 
 Inputs
@@ -28,7 +29,7 @@ Inputs
                       index in the list.
     molsys_data       MolSystemData: the properties, frequencies and state sets of one molecule (see above)
     states_choice     'harmonic' or 'anharmonic': the state set of molsys_data for the energy differences. No default.
-                      molsys_data.states[states_choice].regime says how the set was made, e.g. 'GVPT2'.
+                      molsys_data.state_set(states_choice).regime says how the set was made, e.g. 'GVPT2'.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
     lineshape_param   the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
@@ -79,7 +80,7 @@ CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
   │    zero coeff -> `zero`, no row
-  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states[states_choice]
+  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.state_set(states_choice)
   │    always one point: compile_terms checked the motif. A term without conditions: the point without
   │    axes, a flat background on every grid point
   v
@@ -197,11 +198,14 @@ class FeatureResult:
 
     @property
     def states(self) -> 'VibStatesData':
-        """The state set the rows were computed with, molsys.states[states_choice]: boxed_features_on_grid needs it."""
+        """
+        The state set the rows were computed with, molsys.state_set(states_choice): boxed_features_on_grid
+        needs it.
+        """
         if self.molsys is None or self.states_choice is None:
             raise ValueError('this FeatureResult has no data or states choice (made by hand?): compute_features '
                              'keeps them')
-        return self.molsys.states[self.states_choice]
+        return self.molsys.state_set(self.states_choice)
 
     def factors_by_index_set(self, row: ContributionRow) -> dict:
         """

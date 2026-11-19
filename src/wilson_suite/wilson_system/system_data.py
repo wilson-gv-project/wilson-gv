@@ -273,13 +273,15 @@ class MolSystemData:
         """Check if all properties have values."""
         return self.mol_props.is_filled
 
-    def check_states_choice(self, states_choice: str) -> None:
+    def state_set(self, states_choice: str) -> 'VibStatesData':
         """
-        raises ValueError if the data has no state set states_choice,
+        The state set states[states_choice], e.g. states_choice 'anharmonic'. Every read of a state set goes here.
+        raises ValueError if the data has no such set,
             e.g. 'anharmonic' for data read from a file without anharmonic states, or a regime name like 'GVPT2'
         """
         if states_choice not in self.states:
             raise ValueError(f'states_choice {states_choice!r}: the data has the state sets {sorted(self.states)}')
+        return self.states[states_choice]
 
     def with_wilson_anharmonic_states(self, regime: str) -> 'MolSystemData':
         """
@@ -297,7 +299,7 @@ class MolSystemData:
         for s in states:                    # each state has one key, e.g. {('0', '1'): 1.0}
             s.state_label = make_state_label(next(iter(s.harm_quanta_coeffs)))
         anharmonic = VibStatesData(allstates=states, regime=regime, computed_by='wilson',
-                                   harmonic_osc_states_labels=self.states['harmonic'].harmonic_osc_states_labels)
+                                   harmonic_osc_states_labels=self.state_set('harmonic').harmonic_osc_states_labels)
         return replace(self, states={**self.states, 'anharmonic': anharmonic})
 
 
@@ -314,7 +316,7 @@ class MolSystemData:
         data_dict: dict - {data_name: values}
         states: one VibStatesData per state list in data_dict, by states choice:
             'harmonic_states' -> states['harmonic'], 'anharmonic_states' -> states['anharmonic'].
-            'anharmonic_states' may be missing: no entry (check_states_choice raises if the evaluation asks for it).
+            'anharmonic_states' may be missing: no entry (state_set raises if the evaluation asks for it).
             Both sets get the modes of the harmonic fundamentals as harmonic_osc_states_labels.
         raises ValueError if data_dict does not fit what the evaluator reads (check_data_dict), e.g. without
             'nc_sqrt_eigval'. A property of mol_props that data_dict lacks is no error here: its vals stay None
@@ -413,7 +415,7 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
     """
     raises ValueError if data_dict does not fit what the evaluator reads, with every problem found:
         names         'nc_sqrt_eigval' (harmonic frequencies, cm-1) and 'harmonic_states' are there.
-                      'anharmonic_states' may be missing: MolSystemData.check_states_choice raises if it is asked for.
+                      'anharmonic_states' may be missing: MolSystemData.state_set raises if it is asked for.
         modes         nc_sqrt_eigval has the keys 0 .. n-1, e.g. {0: 2878.7, 1: 1820.4}: n modes
         shapes        each derivative by modes and electric field (PROP_INDEX_COUNTS): mode indices first,
                       then x, y, z, e.g. n = 6: polhess (6, 6, 3, 3), cff (6, 6, 6), dipgrad (6, 3)

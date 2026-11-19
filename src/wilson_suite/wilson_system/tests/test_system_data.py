@@ -314,12 +314,12 @@ def test_from_data_dict_both_sets_get_the_harmonic_fundamentals_as_labels():
 
 
 @pytest.mark.parametrize('choice', ['GVPT2', 'anharmonic'], ids=['a regime name', 'a set the data lacks'])
-def test_check_states_choice_names_the_sets_the_data_has(choice):
+def test_state_set_returns_the_set_or_names_the_sets_the_data_has(choice):
     molsys = MolSystemData.from_data_dict(MolPropsCollection([]), HARMONIC_ONLY)
 
-    molsys.check_states_choice('harmonic')
+    assert molsys.state_set('harmonic') is molsys.states['harmonic']
     with pytest.raises(ValueError, match=r"the data has the state sets \['harmonic'\]"):
-        molsys.check_states_choice(choice)
+        molsys.state_set(choice)
 
 
 def test_require_values_names_what_is_missing_and_what_the_collection_has():

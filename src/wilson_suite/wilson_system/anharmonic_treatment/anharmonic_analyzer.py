@@ -10,9 +10,9 @@ from ..anharmonic_treatment.vpt2 import VPT2_REGIMES, anharm_corr_energies
 logger = logging.getLogger("wilson_suite."+__name__)
 
 def compute_vpt2_states(props: MolPropsCollection, 
-                         nc_sqrt_eigval: dict, 
-                         regime: str,
-                         exclude_modes: list) -> tuple[list[VibState], dict]:
+                        nc_sqrt_eigval: dict, 
+                        regime: str,
+                        exclude_modes: list) -> tuple[list[VibState], dict]:
     """
     Basically a wrapper for analyser; passes data to anharm_corr_energies where analysis happens...
         then puts into list[VibState] form.

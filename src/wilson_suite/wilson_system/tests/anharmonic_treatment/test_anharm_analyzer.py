@@ -32,9 +32,9 @@ def test_anharm_analyzer_vibana():
 
     # ---- do analysis
     states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
-                                                                        nc_sqrt_eigval=molsys.eigenvals,
-                                                                        regime='GVPT2',
-                                                                        exclude_modes=None)
+                                                                       nc_sqrt_eigval=molsys.eigenvals,
+                                                                       regime='GVPT2',
+                                                                       exclude_modes=None)
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     assert molsys.eigenvals != states_1quantum_corrected
@@ -64,9 +64,9 @@ def test_anharm_analyzer_vibana_excludemodes():
 
     # ---- do analysis
     states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
-                                                                        nc_sqrt_eigval=molsys.eigenvals,
-                                                                        regime='GVPT2',
-                                                                        exclude_modes=[1])
+                                                                       nc_sqrt_eigval=molsys.eigenvals,
+                                                                       regime='GVPT2',
+                                                                       exclude_modes=[1])
     st_dict = {','.join(list(s.harm_quanta_coeffs.keys())[0]): s.energy for s in states}
     states_1quantum_corrected = {int(list(s.harm_quanta_coeffs.keys())[0][0]): s.energy for s in states if len(list(s.harm_quanta_coeffs.keys())[0])==1}
     assert set(states_1quantum_corrected) == {0, 2}
@@ -83,8 +83,8 @@ def test_anharm_analyzer_vibana_excludemodes():
 
     with pytest.raises(ValueError, match=r'modes \[3\] do not exist'):
         ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
-                                                            nc_sqrt_eigval=molsys.eigenvals,
-                                                            regime='GVPT2', exclude_modes=[3])
+                                                           nc_sqrt_eigval=molsys.eigenvals,
+                                                           regime='GVPT2', exclude_modes=[3])
 
 
 def test_compute_vpt2_states_names_the_inputs_without_values():
@@ -93,8 +93,8 @@ def test_compute_vpt2_states_names_the_inputs_without_values():
 
     with pytest.raises(ValueError, match=r"no values for \['B', 'coriolis'\]"):
         ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
-                                                            nc_sqrt_eigval=molsys.eigenvals,
-                                                            regime='GVPT2', exclude_modes=[])
+                                                           nc_sqrt_eigval=molsys.eigenvals,
+                                                           regime='GVPT2', exclude_modes=[])
 
 '''
 def test_anharm_analyzer_vibana():

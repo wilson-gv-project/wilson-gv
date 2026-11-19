@@ -182,7 +182,7 @@ def three_ir_abc_by_hand(mol: SimpleNamespace, a: int, b: int, states: str) -> l
 def evaluator_rows(setup, terms: list, states: str) -> dict[tuple[int, ...], list[tuple[float, dict[str, float]]]]:
     """The evaluator's rows on water, {index values in label order: [(coeff, location in cm-1), ...]}."""
     molsys = MolSystemData.from_output_file(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
-                                prop_names(terms))
+                                            prop_names(terms))
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states,
                                      laser_pol=setup.laser_pol, lineshape_param=10.)
     assert result.zero == []

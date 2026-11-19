@@ -104,7 +104,6 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
     not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
         raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
-    molsys_data.check_states_choice(states_choice)
 
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
@@ -148,7 +147,7 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     index_dict: a mode for every label of the term, e.g. {'a': 0, 'b': 1, 'c': 0}
     avrg_tensor: the term's averaged part for every index set (calculate_avrg_tensor_einsum)
     zero_tol: an averaged part or a non-averaged property with |value| <= zero_tol counts as 0
-    states_choice: the state set for the energy differences, molsys_data.states[states_choice]
+    states_choice: the state set for the energy differences, molsys_data.state_set(states_choice)
 
     returns (coefficient, factors): factors maps each factor's name to its value. It stops at the
         first factor that is 0, e.g. (0.0, {'AVRG': 0.0})
@@ -386,13 +385,13 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
 def gap_denominator(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
-                     states_choice: str):
+                    states_choice: str):
     """
     product of 1/(E_left - E_right), in Eh
-    energies from the state set molsys_data.states[states_choice]
+    energies from the state set molsys_data.state_set(states_choice)
     """
     product_all = 1.
-    states = molsys_data.states[states_choice]
+    states = molsys_data.state_set(states_choice)
 
     for vibdiff in freqterms:
         vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, states)
@@ -533,7 +532,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
     resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
     The number of modes comes from molsys_data.eigenvals, the state energies from
-    molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
+    molsys_data.state_set(states_choice), e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
     polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
     exclude_modes: modes left out of the evaluation, e.g. (5,): no index set and no summed value uses them
     (included_modes).
@@ -550,9 +549,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     whose coefficient sums every label, at the location without axes (ResLocPoint({})).
     """
     modes = included_modes(molsys_data, exclude_modes)
-    molsys_data.check_states_choice(states_choice)
+    states = molsys_data.state_set(states_choice)
     molsys_data.mol_props.require_values(name for term in terms for name in term.prop_names)
-    states = molsys_data.states[states_choice]
 
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
     rows, zero = [], []
