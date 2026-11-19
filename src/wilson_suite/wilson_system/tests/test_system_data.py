@@ -161,7 +161,7 @@ def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
 
 ## Ground state ('zero') -----------------------------------------------------
 # The ground state has no quanta. Its label is 'zero' (make_state_label of no modes); VibStatesData
-# always holds it with energy 0; VibDiff counts it as energy 0. Mode 0 is something else:
+# always holds it with energy 0 and refuses another energy. Mode 0 is something else:
 # label '0', the first excited state of mode 0.
 
 # -- the label
@@ -179,17 +179,26 @@ def test_mode_0_is_not_the_ground_state(states):
 
 # -- VibStatesData
 
-def test_vibstatesdata_ground_state_energy_is_zero_even_if_the_data_says_otherwise():
-    """Energies are measured from the ground state: a 'zero' entry in the data is overridden with energy 0."""
-    data = VibStatesData(allstates=(state('zero', 5.), state('0', E0)), regime='unknown', computed_by='file')
+def test_vibstatesdata_raises_for_a_ground_state_away_from_0():
+    """Energies are measured from the ground state, so a 'zero' state must be at 0 cm-1."""
+    with pytest.raises(ValueError, match=r"the states \(regime 'unknown', computed by file\): the ground state "
+                                         r"\('zero'\) at 5\.0 cm-1; it must be at 0"):
+        VibStatesData(allstates=(state('zero', 5.), state('0', E0)), regime='unknown', computed_by='file')
 
-    assert data.get_state_by_label('zero').energy == 0.
+
+@pytest.mark.parametrize('energy', [-5., 0.], ids=['below the ground state', 'at the ground state'])
+def test_vibstatesdata_warns_for_a_state_at_or_below_the_ground_state(energy):
+    """a warning, no error: the state set is still built"""
+    with pytest.warns(UserWarning, match=rf"the states \(regime 'unknown', computed by file\): 1 of 2 state "
+                                         rf"energies are at or below 0 cm-1, the ground state; lowest: 1 {energy:.1f}"):
+        data = VibStatesData(allstates=(state('0', E0), state('1', energy)), regime='unknown', computed_by='file')
+    assert data.get_state_by_label('1').energy == energy
 
 
 # -- the data dict: the ground state key ()
 
 def test_from_data_dict_takes_the_ground_state_key_at_0():
-    """VibStatesData adds the ground state itself, so the data's () entry is left out; no warning for it"""
+    """The data's () entry becomes the one 'zero' state, at 0; no warning for it or for the other states."""
     data = {**TOY_DATA, 'harmonic_states': {(): 0., **TOY_DATA['harmonic_states']}}
 
     with warnings.catch_warnings():
@@ -202,23 +211,7 @@ def test_from_data_dict_takes_the_ground_state_key_at_0():
     assert harmonic.harmonic_osc_states_labels == (0, 1)
 
 
-def test_check_data_dict_ground_state_key_must_be_at_0():
-    """an energy there means the energies do not count from the ground state"""
-    data = {**TOY_DATA, 'anharmonic_states': {(): 5., **TOY_DATA['anharmonic_states']}}
-
-    with pytest.raises(ValueError, match=r"'anharmonic_states': the ground state \(\) at 5\.0 cm-1; it must be at 0"):
-        check_data_dict(data, [])
-
-
 # -- VibDiff
-
-def test_vibdiff_counts_a_zero_labelled_state_as_energy_zero():
-    """is_zero_state goes by the label, so the energy field of a 'zero' state is ignored."""
-    odd_zero = state('zero', 5.)
-
-    assert VibDiff(state('0', E0), odd_zero).energy_difference() == E0
-    assert VibDiff(odd_zero, state('0', E0)).energy_difference() == -E0
-
 
 @pytest.mark.parametrize('left, right, expected', [
     ('a', '', E0),        # excited -> ground:      E_a - 0
@@ -463,31 +456,21 @@ def test_check_data_dict_does_not_check_properties_the_data_lacks_or_with_no_kno
     check_data_dict({**TOY_DATA, 'coriolis': np.ones(7)}, ['polgrad', 'coriolis'])
 
 
-@pytest.mark.parametrize('key', ['harmonic_states', 'anharmonic_states'])
-@pytest.mark.parametrize('energy', [-5., 0.], ids=['below the ground state', 'at the ground state'])
-def test_check_data_dict_warns_for_a_state_at_or_below_the_ground_state(key, energy):
-    """a warning, no error: from_data_dict still builds the data"""
-    data = {**TOY_DATA, key: {**TOY_DATA[key], ('1',): energy}}
-
-    with pytest.warns(UserWarning, match=rf"{key}: 1 of 3 state energies are at or below 0 cm-1, the ground state; "
-                                         rf"lowest: \('1',\) {energy:.1f}"):
-        molsys = MolSystemData.from_data_dict(MolPropsCollection([]), data)
-    assert molsys.states[key.removesuffix('_states')].get_state_by_label('1').energy == energy
-
-
 def test_from_output_file_warning_names_the_source():
     """the acetic acid dimer file has anharmonic states below 0 cm-1, the lowest at -596.7 cm-1"""
-    with pytest.warns(UserWarning, match=r'the data from .*acetic_acid_dimer.*: anharmonic_states: \d+ of \d+ '
-                                         r'state energies are at or below 0 cm-1') as record:
+    with pytest.warns(UserWarning, match=r"the data from .*acetic_acid_dimer.*: the states \(regime 'unknown', "
+                                         r"computed by file\): \d+ of \d+ state energies are at or below 0 cm-1"
+                      ) as record:
         MolSystemData.from_output_file(ACETIC_ACID_DIMER, [])
     assert len(record) == 1
     assert record[0].filename == __file__           # points at the line that called from_output_file
 
 
-def test_check_data_dict_no_warning_for_states_above_the_ground_state():
-    with warnings.catch_warnings():
-        warnings.simplefilter('error')
-        check_data_dict(TOY_DATA, [])
+def test_from_output_file_warns_for_wilsons_states_at_or_below_the_ground_state():
+    """wilson's GVPT2 puts some acetic acid dimer states at or below 0 cm-1: the same check as for the file's"""
+    with pytest.warns(UserWarning, match=r"the states \(regime 'GVPT2', computed by wilson\): \d+ of \d+ state "
+                                         r"energies are at or below 0 cm-1"):
+        MolSystemData.from_output_file(ACETIC_ACID_DIMER, [], wilson_regime='GVPT2')
 
 
 def test_check_data_dict_names_every_problem_at_once():

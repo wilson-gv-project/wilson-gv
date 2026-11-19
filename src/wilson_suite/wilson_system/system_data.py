@@ -128,7 +128,10 @@ class VibState:
 class VibStatesData:
     """
     Holds the vibrational states of one state set (e.g. the harmonic states), looked up by label.
-    Adds the ground state itself ('zero', energy 0). VibDiff computes the energy differences.
+    VibDiff computes the energy differences.
+    The energies count from the ground state ('zero'). Checked for every state set, however it is made:
+        a ground state, if given, must be at 0 cm-1 (ValueError); without one, it is added at 0
+        an excited state at or below 0 cm-1 gives a warning (UserWarning)
 
     regime: str - the vibrational analysis regime, e.g. 'harmonic', 'GVPT2', 'VPT2';
         'unknown' for anharmonic states read from a file: the file's regime is not read
@@ -141,10 +144,19 @@ class VibStatesData:
     harmonic_osc_states_labels: Sequence[int] = ()
 
     def __post_init__(self):
-        tmp_allstates = list(self.allstates)
-        tmp_allstates.append(VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
-        self.allstates = tuple(tmp_allstates)
+        name = f'the states (regime {self.regime!r}, computed by {self.computed_by})'
+        off_zero = [s.energy for s in self.allstates if s.state_label == ZERO_STATE_LABEL and s.energy != 0.]
+        if off_zero:
+            raise ValueError(f'{name}: the ground state ({ZERO_STATE_LABEL!r}) at {off_zero[0]} cm-1; it must be '
+                             f'at 0, as the energies count from it')
+        excited = [s for s in self.allstates if s.state_label != ZERO_STATE_LABEL]
+        low = sorted((s.energy, s.state_label) for s in excited if s.energy <= 0.)
+        if low:
+            lowest = ', '.join(f'{label} {energy:.1f}' for energy, label in low[:3])
+            warnings.warn(f'{name}: {len(low)} of {len(excited)} state energies are at or below 0 cm-1, '
+                          f'the ground state; lowest: {lowest}', stacklevel=3)      # at the line that built the set
 
+        self.allstates = (*excited, VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
         self.allstates_map = {i.state_label: i for i in self.allstates}
 
 
@@ -158,9 +170,9 @@ class VibStatesData:
 
         return dict(sorted(harm_states.items()))
     
-    def get_state_by_label(self, state_label: str) -> VibState | None:
+    def get_state_by_label(self, state_label: str) -> VibState:
         if state_label in self.allstates_map:
-            return self.allstates_map.get(state_label)
+            return self.allstates_map[state_label]
         else:
             raise ValueError(f'Requested state label - {state_label} - is not in VibStatesData')
 
@@ -186,30 +198,17 @@ class VibDiff:
     """
     Represents difference between two vibrational states.
     Numerical representation that holds values, as opposed to VibDiffTerm which is symbolic.
-    Handles special case of zero states (ground state) in energy_difference.
     """
-    left: VibState | None
-    right: VibState | None
-    
-    def is_zero_state(self, state: VibState) -> bool:
-        """
-        Check if state is a zero (ground) state.
-        """
-        return state.state_label == ZERO_STATE_LABEL
-    
+    left: VibState
+    right: VibState
+
     def energy_difference(self, *, au=False) -> float:
         """
-        Calculate energy difference between states in cm-1 (in Eh if au=True).
-        For zero states, energy is considered to be 0.0
+        Energy of left minus energy of right, in cm-1 (in Eh if au=True).
+        The ground state is at 0: VibStatesData holds it there.
         """
-        if self.left is None or self.right is None:
-            raise ValueError("Both left and right states must be provided to calculate energy difference.")
-        left_energy = 0.0 if self.is_zero_state(self.left) else self.left.energy
-        right_energy = 0.0 if self.is_zero_state(self.right) else self.right.energy
-        if au:
-            return convNu2Ene(left_energy - right_energy)
-        else:
-            return left_energy - right_energy
+        difference = self.left.energy - self.right.energy
+        return convNu2Ene(difference) if au else difference
 
     @classmethod
     def from_symbolic(cls, 
@@ -328,7 +327,7 @@ class MolSystemData:
         mol_props.fill_from(data_dict)
 
         harm_states, anharm_states = _make_hq_states_from_data_dict(data_dict)
-        labels = tuple(int(i.state_label.split(',')[0]) for i in harm_states if len(i.state_label.split(','))==1)
+        labels = tuple(int(s.state_label) for s in VibState.get_1q_states(list(harm_states)))
 
         # check_data_dict raised if 'harmonic_states' is missing, so the harmonic set is never empty
         states = {'harmonic': VibStatesData(allstates=harm_states, regime='harmonic', computed_by='file',
@@ -406,7 +405,8 @@ class MolSystemData:
                     molsys = molsys.with_wilson_anharmonic_states(wilson_regime)
             except ValueError as err:
                 raise ValueError(f'the data from {origin} does not fit: {err}') from err
-        for w in caught:            # again, with the source, at the line that called from_output_file
+        # again, each distinct warning once, with the source, at the line that called from_output_file
+        for w in {(w.category, str(w.message)): w for w in caught}.values():
             warnings.warn(f'the data from {origin}: {w.message}', w.category, stacklevel=2)
         return molsys
 
@@ -422,27 +422,13 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
         full tensors  each such derivative is symmetric in its mode indices, e.g. cff[0, 2, 2] == cff[2, 0, 2]
                       (SYMMETRY_RTOL, SYMMETRY_ATOL)
         fundamentals  'harmonic_states' has one key per mode, e.g. ('0',), ('1',), ... ('5',) for n = 6
-        ground state  a state list may hold the ground state, key (), but only at 0 cm-1: energies count from it
     prop_names  the properties to check, e.g. ['polgrad', 'cff']. A name data_dict lacks is no error here
                 (MolPropsCollection.require_values); a name not in PROP_INDEX_COUNTS (e.g. 'coriolis') gets no
                 shape check.
-    warns (UserWarning), no error: an excited state at or below 0 cm-1, the ground state, in any state list,
-        e.g. ACDM's anharmonic fundamental of mode 41 at -136.1 cm-1.
+    The state energies are checked where each state set is built (VibStatesData).
     Not checked (no check is possible from the values): units, coordinates.
     """
     problems = []
-
-    for key in ('harmonic_states', 'anharmonic_states'):
-        excited = {state: energy for state, energy in (data_dict.get(key) or {}).items() if state != ()}
-        low = sorted((energy, state) for state, energy in excited.items() if energy <= 0.)
-        if low:
-            lowest = ', '.join(f'{state} {energy:.1f}' for energy, state in low[:3])
-            warnings.warn(f'{key}: {len(low)} of {len(excited)} state energies are at or below 0 cm-1, '
-                          f'the ground state; lowest: {lowest}', stacklevel=3)
-        ground = (data_dict.get(key) or {}).get(())
-        if ground is not None and ground != 0.:
-            problems.append(f"'{key}': the ground state () at {ground} cm-1; it must be at 0, as the energies "
-                            f"count from it")
 
     freqs = data_dict.get('nc_sqrt_eigval')
     n = None
@@ -490,7 +476,7 @@ def check_data_dict(data_dict: dict, prop_names: Iterable[str]) -> None:
 def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:
     """
     Construct tuple['VibState'] from data_dict.
-    The ground state key () is left out: VibStatesData adds the ground state itself, with energy 0.
+    The ground state key () becomes the state 'zero'; VibStatesData checks that it is at 0.
     """
 
     harm_states = ()
@@ -498,18 +484,16 @@ def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tu
         states_dict: dict = data_dict['harmonic_states']
 
         for state, energy in states_dict.items():
-            if state != ():
-                harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
-                                         state_label=make_state_label(state)),)
+            harm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
+                                     state_label=make_state_label(state)),)
 
     anharm_states = ()
     if 'anharmonic_states' in data_dict:
         states_dict: dict = data_dict['anharmonic_states']
 
         for state, energy in states_dict.items():
-            if state != ():
-                anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
-                                           state_label=make_state_label(state)),)
+            anharm_states += (VibState(harm_quanta_coeffs={state: 1.0}, energy=energy,
+                                       state_label=make_state_label(state)),)
 
     return harm_states, anharm_states
 
