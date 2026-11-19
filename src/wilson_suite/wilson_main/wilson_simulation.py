@@ -3,8 +3,10 @@ from functools import partial
 from collections.abc import Sequence
 from .simulation_core import SimulationCore
 from ..wilson_system.system_data import MolSystemData
+from ..wilson_integrate.integrator import SpectralIntegration
 from math import floor, ceil
 import numpy as np
+import copy
 
 
 @dataclass
@@ -27,7 +29,8 @@ class WilsonSimulation:
 
     integration_resolution: Integer: A choice describing the resolution (units: cm^-1) to be used for a
     time/freq series. The range would follow from the detector's detector_interval attribute, or if that is not
-    specified (or integrated detection) there would need to be an auto choice made (and registered) here.
+    specified (or integrated detection) there would need to be an auto choice made (and registered) here. The grid
+    is by convention taken to have an origin at zero.
 
     integration_style: String: A choice describing which style of integration will be used. Keeping in mind that other
     development may generalize this, the current span of options that the integrator might recognize are
@@ -36,9 +39,6 @@ class WilsonSimulation:
     integration with e^i w_sigma t can be omitted to directly yield a w_sigma data series, useful for spectrometer
     detection. It is likely that to begin with, "sum-freq" will be the only available choice for the integrator. I let
     the default choice be "auto", which leaves it to the integrator to make the choice.
-
-    integration_grid_origin: Float or integer (default 0.0): Grids in frequency space will be aligned so that a grid
-    point coincides exactly with this origin.
 
     n_dev_w_int: Float or integer: Positive/negative cutoff (around maximum) for frequency window of (compound) pulses:
     Integration ranges will be limited by the windows dictated by this parameter.
@@ -61,7 +61,6 @@ class WilsonSimulation:
 
     integration_resolution: int | float
     integration_style: str = 'auto'
-    integration_grid_origin: float | int  = 0.0
     n_dev_w_int: float | int = 5.0
 
 
@@ -70,12 +69,11 @@ class WilsonSimulation:
         if not self.states_choice in ['harmonic', 'anharmonic']:
             raise ValueError('states_choice must be either harmonic or anharmonic')
 
-        # Grid origin mod resolution
-        self.grid_origin_mod_res = self.integration_grid_origin % self.integration_resolution
-
         # Get integration ranges for each integration task tuple (indexed by order, compounding pattern,
         # magnitude condition, macroscopic polarization and interaction sequence)
-        self.int_ranges = self.__get_integration_ranges()
+        # int_ranges_coll are collective (union) over all scan points and are for response function evaluation
+        # int_ranges_scan are individual to each scan point and are for integration
+        self.int_ranges_coll, self.int_ranges_scan, self.pulse_banks_scan = self.__get_integration_ranges()
 
         # Call evaluator and get/organize return class instances
         self.rsp_results = self.__get_response_function_elements()
@@ -88,12 +86,14 @@ class WilsonSimulation:
 
     def __get_integration_ranges(self):
         """
-        Integrator "dry-run": Get integration ranges for each integration task
+        Integrator "dry-run": Get integration ranges for each integration task and collective integration ranges
         """
 
         from wilson_suite.wilson_utils.unit_convertor import per_cm_x_fs
 
-        int_ranges = {}
+        int_ranges_coll = {}
+        int_ranges_scan = {}
+        pulse_banks_scan = {}
 
         # Scan elements
         for scan_elem in np.ndindex(self.core.experiment.field_analyses.shape):
@@ -102,7 +102,9 @@ class WilsonSimulation:
             # however, analyzing the actual scans offers a chance to recognize invariance or recognize some
             # ranges more directly
 
-            pulse_bank = self.core.experiment.field_analyses[scan_elem].all_valid_pulses
+            int_ranges_scan[scan_elem] = {}
+
+            pulse_banks_scan[scan_elem] = self.core.experiment.field_analyses[scan_elem].all_valid_pulses
 
             int_sequences = self.core.experiment.field_analyses[scan_elem].int_sequences_by_order_comp_pol_magn
 
@@ -153,28 +155,30 @@ class WilsonSimulation:
                     # Make the freq ranges for each (compound) pulse in this sequence
                     # Taking carrier freq. -/+ n_dev * freq. domain deviation, then snap to next lower resp. larger
                     # grid point
-                    curr_freq_ranges_raw = [[pulse_bank[p].cf - self.n_dev_w_int * (per_cm_x_fs / pulse_bank[p].dev),
-                                         pulse_bank[p].cf + self.n_dev_w_int * (per_cm_x_fs / pulse_bank[p].dev)]
+                    curr_pulse = pulse_banks_scan[scan_elem][p]
+
+                    curr_freq_ranges_raw = [[curr_pulse[p].cf - self.n_dev_w_int * (per_cm_x_fs / curr_pulse[p].dev),
+                                         curr_pulse[p].cf + self.n_dev_w_int * (per_cm_x_fs / curr_pulse[p].dev)]
                                         for p in int_seq]
 
                     curr_freq_ranges = []
 
                     for p in curr_freq_ranges_raw:
 
-                        range_low = self.grid_origin_mod_res + self.integration_resolution * floor(
-                            (p[0] - self.grid_origin_mod_res) / self.integration_resolution
+                        curr_freq_ranges.append(
+                            [self.integration_resolution * floor(p[0] / self.integration_resolution),
+                             self.integration_resolution * ceil(p[1]/ self.integration_resolution)]
                         )
 
-                        range_high = self.grid_origin_mod_res + self.integration_resolution * ceil(
-                            (p[1] - self.grid_origin_mod_res) / self.integration_resolution
-                        )
+                    # Register the individual (scan-point specific) ranges
+                    int_ranges_scan[scan_elem][ocmpi] = copy.deepcopy(curr_freq_ranges)
 
-                        curr_freq_ranges.append([range_low, range_high])
+                    # Register or update the collective ranges
 
                     # Check if an entry exists for this ocMPi; if not then initalize it with the current ranges
-                    if not (ocmpi) in int_ranges:
+                    if not (ocmpi) in int_ranges_coll:
 
-                        int_ranges[ocmpi] = curr_freq_ranges
+                        int_ranges_coll[ocmpi] = curr_freq_ranges
 
                     # Otherwise make union of current and existing ranges
                     # Note: If the current and existing ranges are disjoint, the intervening interval will be included
@@ -183,12 +187,12 @@ class WilsonSimulation:
                     else:
 
                         for p in range(len(int_seq)):
-                            int_ranges[ocmpi][p] = [
-                                min(int_ranges[ocmpi][p][0], curr_freq_ranges[p][0]),
-                                max(int_ranges[ocmpi][p][1], curr_freq_ranges[p][1])
+                            int_ranges_coll[ocmpi][p] = [
+                                min(int_ranges_coll[ocmpi][p][0], curr_freq_ranges[p][0]),
+                                max(int_ranges_coll[ocmpi][p][1], curr_freq_ranges[p][1])
                             ]
 
-        return int_ranges
+        return int_ranges_coll, int_ranges_scan, pulse_banks_scan
 
 
     def __get_response_function_elements(self):
@@ -207,7 +211,7 @@ class WilsonSimulation:
         rsp_results = {}
 
         # Translate term to axis variables
-        for ocmpi in self.int_ranges:
+        for ocmpi in self.int_ranges_coll:
 
             terms_axis_vars = []
 
@@ -220,10 +224,10 @@ class WilsonSimulation:
                 axis_translation[ tuple([i + 1 for i in range(len(ax) + 1)]) ] = {cap_alpha_labels[ax]: 1.0}
 
                 # Window boxes snap to overall grid by the range construction
-                window_box[cap_alpha_labels[ax]] = (self.int_ranges[ocmpi][ax][0], self.int_ranges[ocmpi][ax][1])
+                window_box[cap_alpha_labels[ax]] = (self.int_ranges_coll[ocmpi][ax][0], self.int_ranges[ocmpi][ax][1])
 
                 points_per_axis[cap_alpha_labels[ax]] = int(round(
-                    (self.int_ranges[ocmpi][ax][1] - self.int_ranges[ocmpi][ax][0])/self.integration_resolution ) ) + 1
+                    (self.int_ranges_coll[ocmpi][ax][1] - self.int_ranges_coll[ocmpi][ax][0])/self.integration_resolution ) ) + 1
 
             for t in self.core.terms_by_order_comp_magn[(ocmpi[0], ocmpi[1], ocmpi[2])]:
                 terms_axis_vars.append(translate_one_term_to_axis_variables(t, axis_translation))
@@ -249,9 +253,12 @@ class WilsonSimulation:
 
     def __get_integrated_results(self):
 
-
-
-        int_results = []
-
+        int_results = SpectralIntegration(self.core.experiment.detector,
+                                          self.int_ranges_coll,
+                                          self.int_ranges_scan,
+                                          self.pulse_banks_scan,
+                                          self.rsp_results,
+                                          self.integration_resolution,
+                                          self.integration_style)
 
         return int_results
