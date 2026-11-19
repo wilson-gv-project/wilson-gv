@@ -17,9 +17,10 @@ term's resonance conditions, without sign. Terms with more than one set, e.g. th
 
 The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
 MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
-    molsys = MolSystemData.load(origin, prop_names(terms))     origin: DataOriginInfo; once, for any number of runs
-    molsys = MolSystemData.from_datadict(...)                  from a data dict the caller already read
-evaluate_response_terms checks that molsys has every property the terms use (MolSystemData.check_props).
+    molsys = MolSystemData.from_output_file(origin, prop_names(terms))   origin: DataOriginInfo
+    molsys = MolSystemData.from_data_dict(...)                           from a data dict the caller already read
+One MolSystemData serves any number of runs. evaluate_response_terms checks that molsys has every property the
+terms use (MolSystemData.check_props).
 
 Inputs
     terms             VibPerturbedTerm list, translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
@@ -335,7 +336,7 @@ def terms_by_axis_set(terms: Sequence['VibPerturbedTerm']) -> dict[tuple[str, ..
 def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
     """
     Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: what the caller loads,
-    e.g. MolSystemData.load(origin, prop_names(terms)).
+    e.g. MolSystemData.from_output_file(origin, prop_names(terms)).
     Only the props are read (plan.split_props).
     Per term the averaged props first, as in CompiledTerm.prop_names.
     """
@@ -418,7 +419,7 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     of grids, e.g. other window_box values: the rows are computed here once, not again for each grid.
 
     terms             translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
-    molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
+    molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.from_output_file(origin, prop_names(terms)):
                       loaded once, for any number of runs
     states_choice     the state set of molsys_data to use, 'harmonic' or 'anharmonic'. No default.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x

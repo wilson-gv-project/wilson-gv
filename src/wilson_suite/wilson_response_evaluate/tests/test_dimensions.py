@@ -73,7 +73,7 @@ def mock_energy(modes) -> float:
 
 def mock_data() -> dict:
     """
-    A data dict the load checks take (check_data_dict): harmonic and anharmonic states up to 4 quanta, polgrad,
+    A data dict that check_data_dict accepts: harmonic and anharmonic states up to 4 quanta, polgrad,
     a symmetric cff. Both modes are totally symmetric, so no entry is 0 by symmetry and no index set has
     coefficient 0: polgrad is diagonal, and with TOY_RECIPE <polgrad>[a] = trace / 3 = (0.2, 0.15).
     """
@@ -90,7 +90,7 @@ def mock_data() -> dict:
 @pytest.fixture(scope='module')
 def mock_molsys() -> MolSystemData:
     props = MolPropsCollection([MolecularProperty(trivial_name='polgrad'), MolecularProperty(trivial_name='cff')])
-    return MolSystemData.from_datadict(props, mock_data())
+    return MolSystemData.from_data_dict(props, mock_data())
 
 
 ## the chain term, 1D-4D --------------------------------------------------------
@@ -185,7 +185,7 @@ def test_spectrum_on_grid_chain_term_puts_each_feature_on_its_own_box(chain_resu
 # experiment's canonical axes; laser_pol is the experiment's polarization_avg_vector.
 
 def evaluate_on_formaldehyde(setup: StoredSetup, terms: list) -> FeatureResult:
-    molsys = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
+    molsys = MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(terms))
     return evaluate_response_terms(terms, molsys_data=molsys, states_choice='anharmonic',
                                    laser_pol=setup.laser_pol, lineshape_param=10.)
 

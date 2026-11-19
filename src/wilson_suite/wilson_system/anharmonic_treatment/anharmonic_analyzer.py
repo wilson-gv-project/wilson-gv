@@ -9,7 +9,7 @@ from ..anharmonic_treatment.vpt2 import anharm_corr_energies
 
 logger = logging.getLogger("wilson_suite."+__name__)
 
-def anharm_analyzer_data(props: MolPropsCollection, 
+def compute_vpt2_states(props: MolPropsCollection, 
                          nc_sqrt_eigval: dict, 
                          regime: str,
                          exclude_modes: list) -> tuple[list[VibState], dict]:

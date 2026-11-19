@@ -11,9 +11,9 @@ WATER = DataOriginInfo(source_type='gaussian', lvl_theory='HF', basis_set='STO-3
 VPT2_INPUTS = ['cff_rc', 'qff_rc', 'B', 'coriolis']     # force constants in cm-1, rotational, Coriolis constants
 
 '''
-anharm_analyzer_data() returns list[Vibstate] and diagn dict. Vibstates energies are with anharmonic corrections
+compute_vpt2_states() returns list[Vibstate] and diagn dict. Vibstates energies are with anharmonic corrections
 
-anharm_analyzer_data() needs:
+compute_vpt2_states() needs:
     - props as MolPropsCollection: cff_rc, qff_rc (cm-1), B, coriolis
     - nc_sqrt_eigval as dict
     - regime info - str
@@ -22,16 +22,16 @@ anharm_analyzer_data() needs:
 
 def test_anharm_analyzer_vibana():
     """
-    Water, read with MolSystemData.load. GVPT2 moves the fundamentals away from the harmonic
+    Water, read with MolSystemData.from_output_file. GVPT2 moves the fundamentals away from the harmonic
     frequencies, to the anharmonic fundamentals the file prints (3 decimals).
     """
     separatorprint()
 
-    molsys = MolSystemData.load(WATER, VPT2_INPUTS)
+    molsys = MolSystemData.from_output_file(WATER, VPT2_INPUTS)
     printtest(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
                                                                         nc_sqrt_eigval=molsys.eigenvals,
                                                                         regime='GVPT2',
                                                                         exclude_modes=None)
@@ -54,16 +54,16 @@ def test_anharm_analyzer_vibana():
 
 def test_anharm_analyzer_vibana_excludemodes():
     """
-    Water, read with MolSystemData.load, GVPT2 with mode 1 left out: no state of mode 1 comes back,
+    Water, read with MolSystemData.from_output_file, GVPT2 with mode 1 left out: no state of mode 1 comes back,
     and the diagnostics name the mode. An unknown mode raises.
     """
     separatorprint()
 
-    molsys = MolSystemData.load(WATER, VPT2_INPUTS)
+    molsys = MolSystemData.from_output_file(WATER, VPT2_INPUTS)
     printtest(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
                                                                         nc_sqrt_eigval=molsys.eigenvals,
                                                                         regime='GVPT2',
                                                                         exclude_modes=[1])
@@ -82,7 +82,7 @@ def test_anharm_analyzer_vibana_excludemodes():
         print(k, '--', v, '--', states_1quantum_corrected.get(k))
 
     with pytest.raises(ValueError, match=r'exclude_modes \[3\]'):
-        ws.system.anharmonic_treatment.anharm_analyzer_data(props=molsys.mol_props,
+        ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
                                                             nc_sqrt_eigval=molsys.eigenvals,
                                                             regime='GVPT2', exclude_modes=[3])
 
@@ -103,7 +103,7 @@ def test_anharm_analyzer_vibana():
     from CQCParse.logger import setup_logger as set_loggerCQCP
     set_loggerCQCP('CQCParse', level=logging.ERROR)
 
-    from ...anharmonic_treatment.anharmonic_analyzer import anharm_analyzer_data
+    from ...anharmonic_treatment.anharmonic_analyzer import compute_vpt2_states
     from .... import wilson_main as ws_main
 
     mol_system = ws_main.abstractions.MolecularSystem(name='FORM', natoms=4)
@@ -132,7 +132,7 @@ def test_anharm_analyzer_vibana():
         # FIXME: should be done internally with WilsonSimulation somehow? or when?
         res = ws_main.main_functions.do_anharmonic_analysis(vib_ana=vibana, 
                                                             props=props,
-                                                            anharmonic_analyzer=anharm_analyzer_data)
+                                                            anharmonic_analyzer=compute_vpt2_states)
     except Exception as e:
         assert False, f"Test failed due to an exception: {e}"
 '''

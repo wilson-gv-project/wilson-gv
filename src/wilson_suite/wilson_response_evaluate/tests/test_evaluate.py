@@ -27,10 +27,10 @@ from wilson_suite.wilson_response_evaluate.evaluate import (
     eval_resonance_factor,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
-    harmonic_denom,
+    frequency_denominator,
     included_modes,
     make_avrg_einsum_subscripts,
-    otf_vibdiffdenom,
+    gap_denominator,
     solve_LSE_motif,
 )
 from wilson_suite.wilson_response_evaluate.features import (
@@ -167,27 +167,27 @@ def test_eval_non_avrg_reads_the_tensor_at_the_modes_of_its_labels(molsys):
 
 
 ## Energy denominators, on the fly ---------------------------------------------
-# otf_vibdiffdenom: 1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
-# harmonic_denom:   1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
+# gap_denominator:       1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
+# frequency_denominator: 1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
 
-def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
+def test_gap_denominator_is_product_of_inverse_au_differences(molsys):
     freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
 
-    value = otf_vibdiffdenom(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='anharmonic')
+    value = gap_denominator(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='anharmonic')
 
     assert value == pytest.approx(1. / convNu2Ene(E01 - E0) / convNu2Ene(E1))
 
 
-def test_harmonic_denom_uses_eigenvals_not_state_energies(molsys):
+def test_frequency_denominator_uses_eigenvals_not_state_energies(molsys):
     """eigenvals are 1100 and 1580 cm-1; the states '0' and '1' are at 1000 and 1500 cm-1."""
-    value = harmonic_denom(FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b')]), {'a': 0, 'b': 1}, molsys)
+    value = frequency_denominator(FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b')]), {'a': 0, 'b': 1}, molsys)
 
     assert value == pytest.approx(1. / convNu2Ene(E0_eigval) / convNu2Ene(E1_eigval))
 
 
-def test_harmonic_denom_needs_the_ground_state_on_the_right(molsys):
+def test_frequency_denominator_needs_the_ground_state_on_the_right(molsys):
     with pytest.raises(ValueError, match='not a ground state'):
-        harmonic_denom(FreqTermsCollection([vibdiff(sl='a', sr='b')]), {'a': 0, 'b': 1}, molsys)
+        frequency_denominator(FreqTermsCollection([vibdiff(sl='a', sr='b')]), {'a': 0, 'b': 1}, molsys)
 
 
 

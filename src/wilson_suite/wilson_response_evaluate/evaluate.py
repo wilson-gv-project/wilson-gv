@@ -170,9 +170,9 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     # Evaluate VIBDIFF_TERMS (CompiledTerm splits the denominators once per term, not per index set)
     extra_freqterms = compl_term.freq_pert_wf_diff
 
-    VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
+    VIBDIFF_TERMS = gap_denominator(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
 
-    VIBENE_DENOM = harmonic_denom(compl_term.freq_vibenedenom, index_dict, molsys_data)
+    VIBENE_DENOM = frequency_denominator(compl_term.freq_vibenedenom, index_dict, molsys_data)
 
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
@@ -192,7 +192,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     order of indices generally: a,b,c,... 
     E.g. in CFF tensor index tuple is (a,b,c)
 
-    Data is checked in MolSystemData.from_datadict and build_contributions.
+    Data is checked in MolSystemData.from_data_dict and build_contributions.
     """
     product_all = 1.
     
@@ -384,7 +384,7 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
 
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
-def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
+def gap_denominator(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
                      states_choice: str):
     """
     product of 1/(E_left - E_right), in Eh
@@ -402,7 +402,7 @@ def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_
 
     return product_all
 
-def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData') -> float:
+def frequency_denominator(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData') -> float:
     """product of 1/omega_i, harmonic omega in Eh; one mode per denominator"""
     product = 1.
     for vd in freqterms:
@@ -539,7 +539,7 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     exclude_modes: modes left out of the evaluation, e.g. (5,): no index set and no summed value uses them
     (included_modes).
     Checks molsys_data first: the frequencies, the chosen states, and values for every property the terms use
-    (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.load or from_datadict).
+    (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.from_output_file or from_data_dict).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved

@@ -1,7 +1,7 @@
 import wilson_suite as ws
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
 import numpy as np
-from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import read_from_sources
 from importlib.resources import files
 
 import wilson_suite.wilson_system.data_obtainer
@@ -58,12 +58,12 @@ def test_saving_obtained_data():
 
     # saving data
     filepath_wf = SUITE_ROOT+'/wilson_main/tests/myfile.pkl'
-    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename=filepath_wf)
+    sim.getResults(obtainer=read_from_sources, save_to_filename=filepath_wf)
 
     # for requestData to have reset values for props and residual_vib_info
     sim.dressPropsWithSetup()
     
-    compl_data_wf = wilson_data_obtainer(sim.requestData())
+    compl_data_wf = read_from_sources(sim.requestData())
     unpkl_compl_data_wf = ws.utils.serialization.unpickle_smth_from(filepath_wf)
     assert_equal(unpkl_compl_data_wf, compl_data_wf)
 
@@ -122,7 +122,7 @@ def test_save_wilsonsim():
     # save this sim to pickle in the sim workflow run directory
     sim.save_to_pkl(filename='sim0.pkl')
 
-    sim.getResults(obtainer=wilson_data_obtainer, save_to_filename='data_file.pkl')
+    sim.getResults(obtainer=read_from_sources, save_to_filename='data_file.pkl')
 
     vib_ana.set_include_modes_list()
     

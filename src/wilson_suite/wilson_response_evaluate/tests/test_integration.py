@@ -45,7 +45,7 @@ EVV_SUBSCRIPTS = ['abIL,aJ,bK,IJKL->ab', 'bIL,aJ,abK,IJKL->ab', 'bIL,aJ,bK,IJKL-
 def evv_molsys() -> MolSystemData:
     """all properties of the 14 terms; the states do not enter the average"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=SUITE_ROOT+'/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
-    return MolSystemData.load(origin, prop_names(evv_terms))
+    return MolSystemData.from_output_file(origin, prop_names(evv_terms))
 
 
 def test_evv_einsum_subscripts():

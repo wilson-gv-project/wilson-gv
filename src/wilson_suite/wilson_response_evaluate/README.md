@@ -40,9 +40,9 @@ A list of `VibPerturbedTerm` from wilson_derive, translated to axes.
 
 A `MolSystemData` holds the data. There are two ways to make one:
 
-1. `MolSystemData.load(origin, prop_names(terms))` reads one source: a Gaussian or CFOUR output,
-   through `wilson_data_obtainer`.
-2. `MolSystemData.from_datadict(mol_props, data_dict)` takes a data dict the caller already has.
+1. `MolSystemData.from_output_file(origin, prop_names(terms))` reads one source: a Gaussian or CFOUR output,
+   through `read_from_sources`.
+2. `MolSystemData.from_data_dict(mol_props, data_dict)` takes a data dict the caller already has.
    A new data source only has to produce this dict.
 
 Both check the dict first (`check_data_dict`): key names, mode numbers, shapes, symmetry.
@@ -52,7 +52,7 @@ from wilson_suite.wilson_response_evaluate.pipeline import prop_names
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 
 origin = DataOriginInfo(source_type='gaussian', base_file_loc='formaldehyde.out')
-molsys = MolSystemData.load(origin, prop_names(terms))
+molsys = MolSystemData.from_output_file(origin, prop_names(terms))
 ```
 
 ### Required data

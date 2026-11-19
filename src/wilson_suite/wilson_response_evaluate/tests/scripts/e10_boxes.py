@@ -130,7 +130,8 @@ def zoom_around_strongest(result: FeatureResult, window_box: Box) -> tuple[Box, 
 
 def main(settings: list[dict]):
     terms = ref.evv_terms()
-    for mol, load in (('formaldehyde', lambda: MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))),
+    for mol, load in (('formaldehyde',
+                       lambda: MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(terms))),
                       ('ACDM', lambda: load_acdm(terms))):
         result = evaluate_response_terms(terms, molsys_data=load(), states_choice=STATES, laser_pol=ref.LASER_POL, lineshape_param=GAMMA_CM)
         run_case(f'{mol}, quick_start window_box', result, *QUICK_START, settings)

@@ -362,7 +362,7 @@ def bare_term(avrg=(), non_avrg=()) -> CompiledTerm:
     ((),                                      (),                                          ()),
 ])
 def test_compiled_term_prop_names_one_per_distinct_trivial_name(avrg, non_avrg, expected):
-    """what MolSystemData.load requests for the term: each name once, averaged properties first"""
+    """what MolSystemData.from_output_file requests for the term: each name once, averaged properties first"""
     assert bare_term(avrg, non_avrg).prop_names == expected
 
 

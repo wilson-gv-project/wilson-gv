@@ -1,6 +1,7 @@
 """
-system_data.py — vibrational states, energy differences, molecular data and the data request (MolSystemData.load).
-Built by hand from tiny arrays, no VibPerturbedTerm. The load tests read real files.
+system_data.py — vibrational states, energy differences, molecular data and the data request
+(MolSystemData.from_output_file). Built by hand from tiny arrays, no VibPerturbedTerm.
+The from_output_file tests read real files.
 """
 
 import re
@@ -26,8 +27,8 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     vibdiff,
 )
 from wilson_suite.wilson_system.system_data import (
-    ANHARMONIC_ANALYSIS_KEYS,
-    EVALUATION_DATA_KEYS,
+    VPT2_INPUT_KEYS,
+    FREQUENCY_AND_STATE_KEYS,
     PROP_INDEX_COUNTS,
     DataOriginInfo,
     MolecularProperty,
@@ -36,7 +37,7 @@ from wilson_suite.wilson_system.system_data import (
     VibDiff,
     VibState,
     VibStatesData,
-    _make_hq_states_from_datadict,
+    _make_hq_states_from_data_dict,
     check_data_dict,
     make_state_label,
 )
@@ -90,8 +91,8 @@ def test_get_1q_states_leaves_out_the_ground_state(states):
     assert [s.state_label for s in VibState.get_1q_states(list(states.allstates))] == ['0', '1']
 
 
-def test_make_hq_states_from_datadict_joins_quanta_labels():
-    harm, anharm = _make_hq_states_from_datadict({'harmonic_states': {('0',): E0, ('0', '1'): E01}})
+def test_make_hq_states_from_data_dict_joins_quanta_labels():
+    harm, anharm = _make_hq_states_from_data_dict({'harmonic_states': {('0',): E0, ('0', '1'): E01}})
 
     assert [s.state_label for s in harm] == ['0', '0,1']
     assert [s.energy for s in harm] == [E0, E01]
@@ -135,7 +136,7 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
     assert symb.energy_difference() == pytest.approx(E01 - E0)
 
 def test_state_labels_agree_for_mode_10():
-    harm, _ = _make_hq_states_from_datadict({'harmonic_states': {('10', '2'): 1.}})
+    harm, _ = _make_hq_states_from_data_dict({'harmonic_states': {('10', '2'): 1.}})
     assert harm[0].state_label == make_state_label([10, 2]) == '2,10'
 
 
@@ -187,13 +188,13 @@ def test_vibstatesdata_ground_state_energy_is_zero_even_if_the_data_says_otherwi
 
 # -- the data dict: the ground state key ()
 
-def test_from_datadict_takes_the_ground_state_key_at_0():
+def test_from_data_dict_takes_the_ground_state_key_at_0():
     """VibStatesData adds the ground state itself, so the data's () entry is left out; no warning for it"""
     data = {**TOY_DATA, 'harmonic_states': {(): 0., **TOY_DATA['harmonic_states']}}
 
     with warnings.catch_warnings():
         warnings.simplefilter('error')
-        molsys = MolSystemData.from_datadict(MolPropsCollection([]), data)
+        molsys = MolSystemData.from_data_dict(MolPropsCollection([]), data)
 
     harmonic = molsys.states['harmonic']
     assert [s.state_label for s in harmonic.allstates].count('zero') == 1
@@ -284,29 +285,29 @@ TOY_DATA = {**FREQS, **STATE_LISTS}
 HARMONIC_ONLY = {**FREQS, 'harmonic_states': STATE_LISTS['harmonic_states']}
 
 
-def test_from_datadict_does_not_share_mol_props():
+def test_from_data_dict_does_not_share_mol_props():
     template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
-    m1 = MolSystemData.from_datadict(template, {**TOY_DATA, 'cff': np.ones((2, 2, 2))})
-    m2 = MolSystemData.from_datadict(template, TOY_DATA)
+    m1 = MolSystemData.from_data_dict(template, {**TOY_DATA, 'cff': np.ones((2, 2, 2))})
+    m2 = MolSystemData.from_data_dict(template, TOY_DATA)
     assert m1.data_filled and not m2.data_filled
     assert template['cff'].vals is None
 
 
-def test_from_datadict_keeps_every_state_set_by_choice():
-    molsys = MolSystemData.from_datadict(MolPropsCollection([]), TOY_DATA)
+def test_from_data_dict_keeps_every_state_set_by_choice():
+    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), TOY_DATA)
 
     assert set(molsys.states) == {'harmonic', 'anharmonic'}
     assert molsys.states['harmonic'].get_state_by_label('0,1').energy == E01
     assert molsys.states['anharmonic'].get_state_by_label('0,1').energy == E01 - 10.
 
 
-def test_from_datadict_without_anharmonic_states_has_only_the_harmonic_set():
-    assert set(MolSystemData.from_datadict(MolPropsCollection([]), HARMONIC_ONLY).states) == {'harmonic'}
+def test_from_data_dict_without_anharmonic_states_has_only_the_harmonic_set():
+    assert set(MolSystemData.from_data_dict(MolPropsCollection([]), HARMONIC_ONLY).states) == {'harmonic'}
 
 
-def test_from_datadict_both_sets_get_the_harmonic_fundamentals_as_labels():
+def test_from_data_dict_both_sets_get_the_harmonic_fundamentals_as_labels():
     """harmonic_osc_states_labels: the modes with a fundamental among the harmonic states, for both sets"""
-    molsys = MolSystemData.from_datadict(MolPropsCollection([]), TOY_DATA)
+    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), TOY_DATA)
 
     assert molsys.states['harmonic'].harmonic_osc_states_labels == (0, 1)
     assert molsys.states['anharmonic'].harmonic_osc_states_labels == (0, 1)
@@ -314,7 +315,7 @@ def test_from_datadict_both_sets_get_the_harmonic_fundamentals_as_labels():
 
 @pytest.mark.parametrize('choice', ['GVPT2', 'anharmonic'], ids=['a regime name', 'a set the data lacks'])
 def test_check_states_choice_names_the_sets_the_data_has(choice):
-    molsys = MolSystemData.from_datadict(MolPropsCollection([]), HARMONIC_ONLY)
+    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), HARMONIC_ONLY)
 
     molsys.check_states_choice('harmonic')
     with pytest.raises(ValueError, match=r"the data has the state sets \['harmonic'\]"):
@@ -323,7 +324,7 @@ def test_check_states_choice_names_the_sets_the_data_has(choice):
 
 def test_check_props_names_what_is_missing_and_what_the_data_has():
     """polgrad: in mol_props, vals None; polhess: not in mol_props. Both count as missing, each named once."""
-    molsys = MolSystemData.from_datadict(MolPropsCollection([MolecularProperty(trivial_name='cff'),
+    molsys = MolSystemData.from_data_dict(MolPropsCollection([MolecularProperty(trivial_name='cff'),
                                                              MolecularProperty(trivial_name='polgrad')]),
                                          {**TOY_DATA, 'cff': np.ones((2, 2, 2))})
 
@@ -332,7 +333,7 @@ def test_check_props_names_what_is_missing_and_what_the_data_has():
         molsys.check_props(['cff', 'polgrad', 'polhess', 'polgrad'])
 
 
-## MolSystemData.load: reads real files -------------------------------------------------------
+## MolSystemData.from_output_file: reads real files -------------------------------------------
 
 DATA_DIR = files('wilson_suite').joinpath('data_for_tests')
 FORMALDEHYDE = DataOriginInfo(source_type='gaussian', base_file_loc=str(DATA_DIR / 'g16_formaldehyde_B3LYPcc_pVQZ.out'))
@@ -340,8 +341,8 @@ ACETIC_ACID_DIMER = DataOriginInfo(source_type='gaussian',
                                    base_file_loc=str(DATA_DIR / 'g16_acetic_acid_dimer_B3LYPcc_pVQZ.out'))
 
 
-def test_load_fills_properties_frequencies_and_state_sets():
-    molsys = MolSystemData.load(FORMALDEHYDE, ['cff'])
+def test_from_output_file_fills_properties_frequencies_and_state_sets():
+    molsys = MolSystemData.from_output_file(FORMALDEHYDE, ['cff'])
 
     assert molsys.mol_props['cff'].vals.shape == (6, 6, 6)
     assert sorted(molsys.eigenvals) == [0, 1, 2, 3, 4, 5]
@@ -349,7 +350,7 @@ def test_load_fills_properties_frequencies_and_state_sets():
     assert molsys.data_origin is FORMALDEHYDE
 
 
-def test_load_raises_for_an_unknown_anharmonic_before_reading():
+def test_from_output_file_raises_for_an_unknown_anharmonic_before_reading():
     """
     'anharmonic' is a states choice, not a source of the anharmonic states.
     The file does not exist: a read would raise another error.
@@ -357,16 +358,16 @@ def test_load_raises_for_an_unknown_anharmonic_before_reading():
     origin = DataOriginInfo(source_type='gaussian', base_file_loc='no_such_file.out')
 
     with pytest.raises(ValueError, match=r"anharmonic 'anharmonic': expected 'file', 'GVPT2', 'VPT2' or 'DVPT2'"):
-        MolSystemData.load(origin, [], anharmonic='anharmonic')
+        MolSystemData.from_output_file(origin, [], anharmonic='anharmonic')
 
 
-def test_load_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
+def test_from_output_file_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
     """
     The Gaussian formaldehyde file holds GVPT2 states. wilson's GVPT2, from the same file's force constants,
     gives the same 83 states, within 0.01 cm-1.
     """
-    from_file = MolSystemData.load(FORMALDEHYDE, [])
-    from_wilson = MolSystemData.load(FORMALDEHYDE, [], anharmonic='GVPT2')
+    from_file = MolSystemData.from_output_file(FORMALDEHYDE, [])
+    from_wilson = MolSystemData.from_output_file(FORMALDEHYDE, [], anharmonic='GVPT2')
 
     file_states, wilson_states = from_file.states['anharmonic'], from_wilson.states['anharmonic']
     assert (file_states.regime, file_states.computed_by) == ('unknown', 'file')
@@ -378,12 +379,12 @@ def test_load_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
                                [file_states.get_state_by_label(label).energy for label in labels], rtol=0, atol=0.01)
 
 
-def test_with_wilson_states_after_load_gives_the_states_of_load_with_a_regime():
+def test_with_wilson_anharmonic_states_equals_from_output_file_with_a_regime():
     """the two-step way gives the same states as the one call, and the loaded data keeps the file's states"""
-    loaded = MolSystemData.load(FORMALDEHYDE, list(ANHARMONIC_ANALYSIS_KEYS))
+    loaded = MolSystemData.from_output_file(FORMALDEHYDE, list(VPT2_INPUT_KEYS))
 
-    in_two_steps = loaded.with_wilson_states('GVPT2')
-    in_one_call = MolSystemData.load(FORMALDEHYDE, [], anharmonic='GVPT2')
+    in_two_steps = loaded.with_wilson_anharmonic_states('GVPT2')
+    in_one_call = MolSystemData.from_output_file(FORMALDEHYDE, [], anharmonic='GVPT2')
 
     assert in_two_steps.states['anharmonic'].allstates == in_one_call.states['anharmonic'].allstates
     assert in_two_steps.states['anharmonic'].regime == 'GVPT2'
@@ -391,7 +392,7 @@ def test_with_wilson_states_after_load_gives_the_states_of_load_with_a_regime():
 
 
 ## check_data_dict: the data dict fits what the evaluator reads ---------------------------------
-# TOY_DATA fits: 2 modes. Each test breaks one rule; from_datadict runs the same check.
+# TOY_DATA fits: 2 modes. Each test breaks one rule; from_data_dict runs the same check.
 
 def test_prop_index_counts_every_order_has_its_own_name():
     assert len(PROP_INDEX_COUNTS) == 49
@@ -414,7 +415,7 @@ def test_check_data_dict_needs_frequencies_and_harmonic_states(drop, message):
     with pytest.raises(ValueError, match=message):
         check_data_dict(data, [])
     with pytest.raises(ValueError, match=message):
-        MolSystemData.from_datadict(MolPropsCollection([]), data)
+        MolSystemData.from_data_dict(MolPropsCollection([]), data)
 
 
 @pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
@@ -465,22 +466,22 @@ def test_check_data_dict_does_not_check_properties_the_data_lacks_or_with_no_kno
 @pytest.mark.parametrize('key', ['harmonic_states', 'anharmonic_states'])
 @pytest.mark.parametrize('energy', [-5., 0.], ids=['below the ground state', 'at the ground state'])
 def test_check_data_dict_warns_for_a_state_at_or_below_the_ground_state(key, energy):
-    """a warning, no error: from_datadict still builds the data"""
+    """a warning, no error: from_data_dict still builds the data"""
     data = {**TOY_DATA, key: {**TOY_DATA[key], ('1',): energy}}
 
     with pytest.warns(UserWarning, match=rf"{key}: 1 of 3 state energies are at or below 0 cm-1, the ground state; "
                                          rf"lowest: \('1',\) {energy:.1f}"):
-        molsys = MolSystemData.from_datadict(MolPropsCollection([]), data)
+        molsys = MolSystemData.from_data_dict(MolPropsCollection([]), data)
     assert molsys.states[key.removesuffix('_states')].get_state_by_label('1').energy == energy
 
 
-def test_load_warning_names_the_source():
+def test_from_output_file_warning_names_the_source():
     """the acetic acid dimer file has anharmonic states below 0 cm-1, the lowest at -596.7 cm-1"""
     with pytest.warns(UserWarning, match=r'the data from .*acetic_acid_dimer.*: anharmonic_states: \d+ of \d+ '
                                          r'state energies are at or below 0 cm-1') as record:
-        MolSystemData.load(ACETIC_ACID_DIMER, [])
+        MolSystemData.from_output_file(ACETIC_ACID_DIMER, [])
     assert len(record) == 1
-    assert record[0].filename == __file__           # points at the line that called load
+    assert record[0].filename == __file__           # points at the line that called from_output_file
 
 
 def test_check_data_dict_no_warning_for_states_above_the_ground_state():
@@ -496,25 +497,25 @@ def test_check_data_dict_names_every_problem_at_once():
         check_data_dict(data, ['dipgrad'])
 
 
-def test_load_extra_keys_never_collide_with_property_names():
+def test_from_output_file_extra_keys_never_collide_with_property_names():
     """
-    Guards load against a name clash between a property and the extra data that every evaluation needs.
+    Guards from_output_file against a name clash between a property and the extra data that every evaluation needs.
 
-    load asks the reader for everything in one dict, with the names as keys. For example,
-    MolSystemData.load(origin, ['cff']) asks for
+    from_output_file asks the reader for everything in one dict, with the names as keys. For example,
+    MolSystemData.from_output_file(origin, ['cff']) asks for
         {'cff': origin, 'nc_sqrt_eigval': origin, 'harmonic_states': origin, 'anharmonic_states': origin}
-    The last three keys are EVALUATION_DATA_KEYS: the harmonic frequencies and the two state lists.
+    The last three keys are FREQUENCY_AND_STATE_KEYS: the harmonic frequencies and the two state lists.
     The reader answers with one data dict, with the same keys.
 
     Suppose a property had the same name as one of those keys, e.g. a property called 'nc_sqrt_eigval'.
     The property and the frequencies would then share one key, so both would get the same value from one read.
     One of the two would hold wrong numbers, and nothing would raise an error.
 
-    So the test makes every property name there can be, and checks that none is one of EVALUATION_DATA_KEYS.
+    So the test makes every property name there can be, and checks that none is one of FREQUENCY_AND_STATE_KEYS.
     The names: prop_trivname for 0-6 derivatives by normal modes and 0-6 by the electric field (e.g. 'dipgrad',
     'polhess', 'cff'), plus 'B' and 'coriolis'. No name clashes today; the test fails if a new name ever does.
     """
     names = {prop_trivname(ord_geo=g, ord_el=e) for g in range(7) for e in range(7)}
     names |= {prop_trivname(ord_rot=1), prop_trivname(ord_rot=1, ord_geo=2)}   # 'B', 'coriolis'
 
-    assert set(EVALUATION_DATA_KEYS).isdisjoint(names)
+    assert set(FREQUENCY_AND_STATE_KEYS).isdisjoint(names)
