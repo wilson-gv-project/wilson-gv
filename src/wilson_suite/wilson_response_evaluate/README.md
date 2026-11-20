@@ -42,7 +42,7 @@ A `MolSystemData` holds the data. There are two ways to make one:
 
 1. `MolSystemData.from_output_file(origin, prop_names(terms))` reads one source: a Gaussian or CFOUR output,
    through `read_from_sources`.
-2. `MolSystemData.from_data_dict(mol_props, data_dict)` takes a data dict the caller already has.
+2. `MolSystemData.from_data_dict(data_dict, prop_names(terms))` takes a data dict the caller already has.
    A new data source only has to produce this dict.
 
 The result checks itself when it is built, either way: mode numbers, shapes and symmetry (`MolSystemData`),

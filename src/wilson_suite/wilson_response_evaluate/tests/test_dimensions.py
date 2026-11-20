@@ -51,8 +51,6 @@ from wilson_suite.wilson_response_evaluate.tests.stored_terms import (
     load_setup,
 )
 from wilson_suite.wilson_system.system_data import (
-    MolecularProperty,
-    MolPropsCollection,
     MolSystemData,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -89,8 +87,7 @@ def mock_data() -> dict:
 
 @pytest.fixture(scope='module')
 def mock_molsys() -> MolSystemData:
-    props = MolPropsCollection([MolecularProperty(trivial_name='polgrad'), MolecularProperty(trivial_name='cff')])
-    return MolSystemData.from_data_dict(props, mock_data())
+    return MolSystemData.from_data_dict(mock_data(), ['polgrad', 'cff'])
 
 
 ## the chain term, 1D-4D --------------------------------------------------------

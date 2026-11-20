@@ -1000,8 +1000,7 @@ def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
 @pytest.fixture
 def box_states() -> VibStatesData:
     """Two fundamentals, at 950 and 1100 cm-1: MOTIF_A peaks at A = 950 (a=0) and 1100 (a=1)."""
-    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), regime='unknown', computed_by='file',
-                         harmonic_osc_states_labels=(0, 1))
+    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), regime='unknown', computed_by='file')
 
 def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_box_and_zero_outside(states):
     """

@@ -37,7 +37,7 @@ from wilson_suite.wilson_system.system_data import (
     VibDiff,
     VibState,
     VibStatesData,
-    _make_hq_states_from_data_dict,
+    _vib_states,
     make_state_label,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
@@ -77,24 +77,11 @@ def test_vibstatesdata_unknown_label_raises(states):
         states.get_state_by_label('7')
 
 
-def test_vibstatesdata_harmonic_osc_states_filters_by_label_choice():
-    data = VibStatesData(allstates=(state('1', E1), state('0', E0), state('0,1', E01)),
-                         regime='unknown', computed_by='file', harmonic_osc_states_labels=(0,1))
+def test_vib_states_joins_quanta_labels():
+    states = _vib_states({('0',): E0, ('0', '1'): E01})
 
-    assert data.get_harmonic_osc_states() == {0: E0, 1: E1}
-
-
-def test_get_1q_states_leaves_out_the_ground_state(states):
-    """'zero' has no comma, like a 1-quantum label, but no quanta at all"""
-    assert [s.state_label for s in VibState.get_1q_states(list(states.allstates))] == ['0', '1']
-
-
-def test_make_hq_states_from_data_dict_joins_quanta_labels():
-    harm, anharm = _make_hq_states_from_data_dict({'harmonic_states': {('0',): E0, ('0', '1'): E01}})
-
-    assert [s.state_label for s in harm] == ['0', '0,1']
-    assert [s.energy for s in harm] == [E0, E01]
-    assert anharm == ()
+    assert [s.state_label for s in states] == ['0', '0,1']
+    assert [s.energy for s in states] == [E0, E01]
 
 
 ## VibDiff ------------------------------------------------------------------
@@ -134,8 +121,7 @@ def test_vibdiff_from_symbolic_and_from_quanta_agree(states):
     assert symb.energy_difference() == pytest.approx(E01 - E0)
 
 def test_state_labels_agree_for_mode_10():
-    harm, _ = _make_hq_states_from_data_dict({'harmonic_states': {('10', '2'): 1.}})
-    assert harm[0].state_label == make_state_label([10, 2]) == '2,10'
+    assert _vib_states({('10', '2'): 1.})[0].state_label == make_state_label([10, 2]) == '2,10'
 
 
 def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
@@ -201,12 +187,11 @@ def test_from_data_dict_takes_the_ground_state_key_at_0():
 
     with warnings.catch_warnings():
         warnings.simplefilter('error')
-        molsys = MolSystemData.from_data_dict(MolPropsCollection([]), data)
+        molsys = MolSystemData.from_data_dict(data, [])
 
     harmonic = molsys.states['harmonic']
     assert [s.state_label for s in harmonic.allstates].count('zero') == 1
     assert harmonic.get_state_by_label('zero').energy == 0.
-    assert harmonic.harmonic_osc_states_labels == (0, 1)
 
 
 # -- VibDiff
@@ -256,15 +241,13 @@ def test_molpropscollection_contains_a_property_only_as_that_object():
     assert MolecularProperty(trivial_name='cff', vals=np.ones((2, 2, 2))) not in coll
 
 
-def test_molpropscollection_fill_from_and_is_filled(props):
-    assert not props.is_filled
-    assert props.without_values().names() == ['cff', 'polgrad']
-
+def test_molpropscollection_fill_from(props):
+    """each property takes its value from the dict, or None; other keys are left out"""
     props.fill_from({'cff': np.zeros(1), 'unrelated': 1})
 
     assert props['cff'].vals is not None
-    assert props.without_values().names() == ['polgrad']
-    assert not props.is_filled
+    assert props['polgrad'].vals is None
+    assert props.names() == ['cff', 'polgrad']
 
 # A data dict that fits: 2 modes, their harmonic frequencies, both state lists.
 # The data holds every state set it has, by states choice; the evaluation picks one (states_choice).
@@ -276,21 +259,19 @@ TOY_DATA = {**FREQS, **STATE_LISTS}
 HARMONIC_ONLY = {**FREQS, 'harmonic_states': STATE_LISTS['harmonic_states']}
 
 
-def build(data: dict, names=()) -> MolSystemData:
-    """MolSystemData.from_data_dict with the named properties."""
-    return MolSystemData.from_data_dict(MolPropsCollection([MolecularProperty(trivial_name=n) for n in names]), data)
+def test_from_data_dict_fills_the_named_properties_and_keeps_the_origin():
+    """polgrad: named, but not in the data dict, so no values"""
+    origin = DataOriginInfo(source_type='gaussian', base_file_loc='toy.out')
+    molsys = MolSystemData.from_data_dict({**TOY_DATA, 'cff': np.ones((2, 2, 2))}, ['cff', 'polgrad'],
+                                          data_origin=origin)
 
-
-def test_from_data_dict_does_not_share_mol_props():
-    template = MolPropsCollection([MolecularProperty(trivial_name='cff')])
-    m1 = MolSystemData.from_data_dict(template, {**TOY_DATA, 'cff': np.ones((2, 2, 2))})
-    m2 = MolSystemData.from_data_dict(template, TOY_DATA)
-    assert m1.data_filled and not m2.data_filled
-    assert template['cff'].vals is None
+    assert molsys.mol_props['cff'].vals.shape == (2, 2, 2)
+    assert molsys.mol_props['polgrad'].vals is None
+    assert molsys.data_origin is origin
 
 
 def test_from_data_dict_keeps_every_state_set_by_choice():
-    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), TOY_DATA)
+    molsys = MolSystemData.from_data_dict(TOY_DATA, [])
 
     assert set(molsys.states) == {'harmonic', 'anharmonic'}
     assert molsys.states['harmonic'].get_state_by_label('0,1').energy == E01
@@ -299,20 +280,14 @@ def test_from_data_dict_keeps_every_state_set_by_choice():
 
 @pytest.mark.parametrize('kept', ['harmonic', 'anharmonic'])
 def test_from_data_dict_builds_only_the_state_sets_the_data_has(kept):
-    assert set(build({**FREQS, f'{kept}_states': STATE_LISTS[f'{kept}_states']}).states) == {kept}
+    molsys = MolSystemData.from_data_dict({**FREQS, f'{kept}_states': STATE_LISTS[f'{kept}_states']}, [])
 
-
-def test_from_data_dict_both_sets_get_the_harmonic_fundamentals_as_labels():
-    """harmonic_osc_states_labels: the modes with a fundamental among the harmonic states, for both sets"""
-    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), TOY_DATA)
-
-    assert molsys.states['harmonic'].harmonic_osc_states_labels == (0, 1)
-    assert molsys.states['anharmonic'].harmonic_osc_states_labels == (0, 1)
+    assert set(molsys.states) == {kept}
 
 
 @pytest.mark.parametrize('choice', ['GVPT2', 'anharmonic'], ids=['a regime name', 'a set the data lacks'])
 def test_state_set_returns_the_set_or_names_the_sets_the_data_has(choice):
-    molsys = MolSystemData.from_data_dict(MolPropsCollection([]), HARMONIC_ONLY)
+    molsys = MolSystemData.from_data_dict(HARMONIC_ONLY, [])
 
     assert molsys.state_set('harmonic') is molsys.states['harmonic']
     with pytest.raises(ValueError, match=r"the data has the state sets \['harmonic'\]"):
@@ -389,7 +364,7 @@ def test_with_wilson_anharmonic_states_equals_from_output_file_with_a_regime():
 
 
 ## MolSystemData checks its fields --------------------------------------------------------------
-# TOY_DATA fits: 2 modes. Each test breaks one rule; build runs the checks through from_data_dict.
+# TOY_DATA fits: 2 modes. Each test breaks one rule.
 
 def test_prop_layout_gives_the_index_order_of_every_property():
     assert len(PROP_LAYOUT) == 49 + 4             # derivatives by modes and field, cff_rc, qff_rc, B, coriolis
@@ -406,7 +381,7 @@ def test_molsystemdata_takes_data_that_fits():
     data = {**TOY_DATA, 'polhess': np.ones((2, 2, 3, 3)), 'cff': np.ones((2, 2, 2)), 'dipgrad': np.ones((2, 3)),
             'B': np.array([5.8, 1.3, 1.1]), 'coriolis': coriolis}
 
-    build(data, ['polhess', 'cff', 'dipgrad', 'B', 'coriolis'])
+    MolSystemData.from_data_dict(data, ['polhess', 'cff', 'dipgrad', 'B', 'coriolis'])
 
 
 @pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
@@ -415,7 +390,7 @@ def test_molsystemdata_takes_data_that_fits():
 def test_molsystemdata_eigenvals_are_a_dict_with_the_modes_from_0(freqs):
     with pytest.raises(ValueError, match=r"eigenvals \(data key 'nc_sqrt_eigval'\): needs a dict with the modes "
                                          r"0 \.\. n-1"):
-        build({**TOY_DATA, 'nc_sqrt_eigval': freqs})
+        MolSystemData.from_data_dict({**TOY_DATA, 'nc_sqrt_eigval': freqs}, [])
 
 
 @pytest.mark.parametrize('name, shape', [('dipgrad', (3, 2)), ('polhess', (2, 3, 3)), ('cff', (3, 3, 3)),
@@ -424,7 +399,7 @@ def test_molsystemdata_eigenvals_are_a_dict_with_the_modes_from_0(freqs):
                               'coriolis with x, y, z last'])
 def test_molsystemdata_property_shape_follows_its_layout(name, shape):
     with pytest.raises(ValueError, match=re.escape(f'{name}: shape {shape}, expected')):
-        build({**TOY_DATA, name: np.ones(shape)}, [name])
+        MolSystemData.from_data_dict({**TOY_DATA, name: np.ones(shape)}, [name])
 
 
 def test_molsystemdata_property_is_symmetric_in_its_mode_indices():
@@ -434,7 +409,7 @@ def test_molsystemdata_property_is_symmetric_in_its_mode_indices():
 
     with pytest.raises(ValueError, match=r'cff: not symmetric in its mode indices, cff\[0, 1, 1\] = 5e-06, '
                                          r'cff\[1, 0, 1\] = 0'):
-        build({**TOY_DATA, 'cff': cff}, ['cff'])
+        MolSystemData.from_data_dict({**TOY_DATA, 'cff': cff}, ['cff'])
 
 
 def test_molsystemdata_symmetry_allows_differences_below_the_zero_tol():
@@ -442,14 +417,14 @@ def test_molsystemdata_symmetry_allows_differences_below_the_zero_tol():
     cff = np.zeros((2, 2, 2))
     cff[0, 1, 1] = 1e-20
 
-    build({**TOY_DATA, 'cff': cff}, ['cff'])
+    MolSystemData.from_data_dict({**TOY_DATA, 'cff': cff}, ['cff'])
 
 
 def test_molsystemdata_skips_a_property_without_values_but_refuses_an_unknown_name():
     """a missing value is require_values' job; a name without a layout cannot be checked"""
-    build(TOY_DATA, ['polgrad'])
+    MolSystemData.from_data_dict(TOY_DATA, ['polgrad'])
     with pytest.raises(ValueError, match=r'polgard: no layout in PROP_LAYOUT'):
-        build(TOY_DATA, ['polgard'])
+        MolSystemData.from_data_dict(TOY_DATA, ['polgard'])
 
 
 def test_from_output_file_warning_names_the_source():
@@ -474,7 +449,7 @@ def test_molsystemdata_names_every_problem_at_once():
     cff[0, 1, 1] = 5e-6
 
     with pytest.raises(ValueError, match=r'(?s)dipgrad: shape.*cff: not symmetric'):
-        build({**TOY_DATA, 'dipgrad': np.ones((3, 2)), 'cff': cff}, ['dipgrad', 'cff'])
+        MolSystemData.from_data_dict({**TOY_DATA, 'dipgrad': np.ones((3, 2)), 'cff': cff}, ['dipgrad', 'cff'])
 
 
 def test_from_output_file_extra_keys_never_collide_with_property_names():
