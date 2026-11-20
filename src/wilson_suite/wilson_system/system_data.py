@@ -2,7 +2,6 @@ import copy
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
-from itertools import pairwise
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -29,12 +28,7 @@ VPT2_INPUT_KEYS = ('cff_rc', 'qff_rc', 'B', 'coriolis')
 #   force constants in cm-1, as VPT2 takes them: 'cff_rc' -> 'mmm', 'qff_rc' -> 'mmmm'
 #   rotational constants: 'B' -> 'x';  Coriolis constants: 'coriolis' -> 'xmm', shape (3, n, n)
 PROP_LAYOUT = {**{prop_trivname(ord_geo=g, ord_el=e): 'm' * g + 'x' * e for g in range(7) for e in range(7)},
-               'cff_rc': 'mmm', 'qff_rc': 'mmmm',
-               prop_trivname(ord_rot=1): 'x', prop_trivname(ord_rot=1, ord_geo=2): 'xmm'}
-
-# No symmetry check in the mode indices: the Coriolis constant changes sign when its two modes swap, but the reader
-# gives the same sign. VPT2 squares it, so the sign changes no state.
-NO_SYMMETRY_CHECK = {'coriolis'}
+               'cff_rc': 'mmm', 'qff_rc': 'mmmm', 'B': 'x', 'coriolis': 'xmm'}
 
 # Symmetry in the mode indices: values that differ by less than this count as equal. 1e-18 is the evaluator's zero_tol (au).
 SYMMETRY_RTOL, SYMMETRY_ATOL = 1e-12, 1e-18
@@ -280,7 +274,7 @@ class MolSystemData:
         Checks that the fields fit together, however the data is built, with every problem in one ValueError:
             eigenvals  a dict with the modes 0 .. n-1 as keys: n modes
             mol_props  each name has a layout in PROP_LAYOUT; each array with values has the shape that its layout
-                       and n give, and is symmetric in its mode indices (not the names in NO_SYMMETRY_CHECK)
+                       and n give, and is symmetric in its mode indices (not coriolis)
         The state sets check themselves (VibStatesData).
         """
         problems, n = [], None
@@ -297,7 +291,9 @@ class MolSystemData:
             if name not in PROP_LAYOUT:
                 problems.append(f'{name}: no layout in PROP_LAYOUT, so its shape cannot be checked')
             elif n is not None and prop.vals is not None:
-                problems += _layout_problems(name, np.asarray(prop.vals), PROP_LAYOUT[name], n)
+                problem = _layout_problem(name, np.asarray(prop.vals), PROP_LAYOUT[name], n)
+                if problem:
+                    problems.append(problem)
 
         if problems:
             raise ValueError(f'MolSystemData {self.name!r} does not fit together:\n  - ' + '\n  - '.join(problems))
@@ -309,7 +305,7 @@ class MolSystemData:
 
     def state_set(self, states_choice: str) -> 'VibStatesData':
         """
-        The state set states[states_choice], e.g. states_choice 'anharmonic'. Every read of a state set goes here.
+        The state set states[states_choice], e.g. states_choice 'anharmonic'.
         raises ValueError if the data has no such set,
             e.g. 'anharmonic' for data read from a file without anharmonic states, or a regime name like 'GVPT2'
         """
@@ -374,7 +370,7 @@ class MolSystemData:
         natoms = len(geo) if geo is not None else 0
 
         return cls(name=name,
-                   eigenvals=data_dict.get('nc_sqrt_eigval'),        # type: ignore  # None: __post_init__ raises
+                   eigenvals=data_dict['nc_sqrt_eigval'],
                    eigenvecs=data_dict.get('normal_modes', None),
                    mol_props=mol_props,
                    natoms=natoms,
@@ -445,7 +441,7 @@ class MolSystemData:
         return molsys
 
 
-def _layout_problems(name: str, vals: np.ndarray, layout: str, n: int) -> list[str]:
+def _layout_problem(name: str, vals: np.ndarray, layout: str, n: int) -> str | None:
     """
     The problem of one property array, if any: its shape, then its symmetry in the mode indices.
         e.g. n = 6: polhess 'mmxx' -> shape (6, 6, 3, 3), polhess[0, 2] == polhess[2, 0]
@@ -453,19 +449,20 @@ def _layout_problems(name: str, vals: np.ndarray, layout: str, n: int) -> list[s
     """
     expected = tuple(n if index == 'm' else 3 for index in layout)
     if vals.shape != expected:
-        return [f'{name}: shape {vals.shape}, expected {expected} (layout {layout!r}: m a mode, x one of x, y, z)']
-    if name in NO_SYMMETRY_CHECK:
-        return []
-    modes = [i for i, index in enumerate(layout) if index == 'm']
-    for i, j in pairwise(modes):                # symmetric under every swap of neighbours: under every order
-        swapped = np.swapaxes(vals, i, j)
+        return f'{name}: shape {vals.shape}, expected {expected} (layout {layout!r}: m a mode, x one of x, y, z)'
+    # coriolis: no symmetry check. The Coriolis constant changes sign when its two modes swap, but the reader
+    # gives the same sign; VPT2 squares it, so the sign changes no state. Every other layout has its modes first.
+    if name == 'coriolis':
+        return None
+    for i in range(layout.count('m') - 1):     # symmetric under every swap of neighbours: under every order
+        swapped = np.swapaxes(vals, i, i + 1)
         if not np.allclose(vals, swapped, rtol=SYMMETRY_RTOL, atol=SYMMETRY_ATOL):
             idx = np.unravel_index(np.argmax(np.abs(vals - swapped)), vals.shape)
             other = list(idx)
-            other[i], other[j] = other[j], other[i]
-            return [(f'{name}: not symmetric in its mode indices, {name}{list(map(int, idx))} = '
-                     f'{vals[idx]:.6g}, {name}{list(map(int, other))} = {vals[tuple(other)]:.6g}')]
-    return []
+            other[i], other[i + 1] = other[i + 1], other[i]
+            return (f'{name}: not symmetric in its mode indices, {name}{list(map(int, idx))} = '
+                    f'{vals[idx]:.6g}, {name}{list(map(int, other))} = {vals[tuple(other)]:.6g}')
+    return None
 
 
 def _make_hq_states_from_data_dict(data_dict: dict[str, Any]) -> tuple[tuple, tuple]:

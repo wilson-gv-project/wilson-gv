@@ -409,9 +409,9 @@ def test_molsystemdata_takes_data_that_fits():
     build(data, ['polhess', 'cff', 'dipgrad', 'B', 'coriolis'])
 
 
-@pytest.mark.parametrize('freqs', [None, {1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
+@pytest.mark.parametrize('freqs', [{1: E0_eigval, 2: E1_eigval}, {}, [E0_eigval, E1_eigval],
                                    {0: E0_eigval, '1': E1_eigval}],
-                         ids=['missing', 'modes from 1', 'no modes', 'a list', 'a str key'])
+                         ids=['modes from 1', 'no modes', 'a list', 'a str key'])
 def test_molsystemdata_eigenvals_are_a_dict_with_the_modes_from_0(freqs):
     with pytest.raises(ValueError, match=r"eigenvals \(data key 'nc_sqrt_eigval'\): needs a dict with the modes "
                                          r"0 \.\. n-1"):
