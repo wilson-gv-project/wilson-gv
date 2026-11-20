@@ -719,7 +719,7 @@ def test_build_contributions_warns_once_for_a_small_gap(molsys_a1_zero):
     to the coefficient (cff[0, 1, 1] = 2). One warning names it.
     """
     close = VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E0 + 0.62), state('0,0', E00)),
-                          regime='unknown', computed_by='file')
+                          regime='unknown')
     molsys = replace(molsys_a1_zero, states={**molsys_a1_zero.states, 'anharmonic': close})
 
     with pytest.warns(UserWarning, match=r'gap below 10\.0 cm-1.*the smallest: 0,1 - 0: 0\.62 cm-1 \(1 in all\)'
@@ -1015,7 +1015,7 @@ def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
 @pytest.fixture
 def box_states() -> VibStatesData:
     """Two fundamentals, at 950 and 1100 cm-1: MOTIF_A peaks at A = 950 (a=0) and 1100 (a=1)."""
-    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), regime='unknown', computed_by='file')
+    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), regime='unknown')
 
 def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_box_and_zero_outside(states):
     """

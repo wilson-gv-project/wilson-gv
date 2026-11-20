@@ -165,17 +165,17 @@ def test_mode_0_is_not_the_ground_state(states):
 
 def test_vibstatesdata_raises_for_a_ground_state_away_from_0():
     """Energies are measured from the ground state, so a 'zero' state must be at 0 cm-1."""
-    with pytest.raises(ValueError, match=r"the states \(regime 'unknown', computed by file\): the ground state "
+    with pytest.raises(ValueError, match=r"the states \(regime 'unknown'\): the ground state "
                                          r"\('zero'\) at 5\.0 cm-1; it must be at 0"):
-        VibStatesData(allstates=(state('zero', 5.), state('0', E0)), regime='unknown', computed_by='file')
+        VibStatesData(allstates=(state('zero', 5.), state('0', E0)), regime='unknown')
 
 
 @pytest.mark.parametrize('energy', [-5., 0.], ids=['below the ground state', 'at the ground state'])
 def test_vibstatesdata_warns_for_a_state_at_or_below_the_ground_state(energy):
     """a warning, no error: the state set is still built"""
-    with pytest.warns(UserWarning, match=rf"the states \(regime 'unknown', computed by file\): 1 of 2 state "
+    with pytest.warns(UserWarning, match=rf"the states \(regime 'unknown'\): 1 of 2 state "
                                          rf"energies are at or below 0 cm-1, the ground state; lowest: 1 {energy:.1f}"):
-        data = VibStatesData(allstates=(state('0', E0), state('1', energy)), regime='unknown', computed_by='file')
+        data = VibStatesData(allstates=(state('0', E0), state('1', energy)), regime='unknown')
     assert data.get_state_by_label('1').energy == energy
 
 
@@ -342,8 +342,7 @@ def test_from_output_file_gvpt2_gives_the_gaussian_files_own_gvpt2_states():
     from_wilson = MolSystemData.from_output_file(FORMALDEHYDE, [], wilson_regime='GVPT2')
 
     file_states, wilson_states = from_file.states['anharmonic'], from_wilson.states['anharmonic']
-    assert (file_states.regime, file_states.computed_by) == ('unknown', 'file')
-    assert (wilson_states.regime, wilson_states.computed_by) == ('GVPT2', 'wilson')
+    assert (file_states.regime, wilson_states.regime) == ('unknown', 'GVPT2')
     labels = sorted(file_states.allstates_map)
     assert len(labels) == 84                                    # 83 states and the ground state
     assert sorted(wilson_states.allstates_map) == labels
@@ -429,8 +428,8 @@ def test_molsystemdata_skips_a_property_without_values_but_refuses_an_unknown_na
 
 def test_from_output_file_warning_names_the_source():
     """the acetic acid dimer file has anharmonic states below 0 cm-1, the lowest at -596.7 cm-1"""
-    with pytest.warns(UserWarning, match=r"the data from .*acetic_acid_dimer.*: the states \(regime 'unknown', "
-                                         r"computed by file\): \d+ of \d+ state energies are at or below 0 cm-1"
+    with pytest.warns(UserWarning, match=r"the data from .*acetic_acid_dimer.*: the states \(regime 'unknown'\): "
+                                         r"\d+ of \d+ state energies are at or below 0 cm-1"
                       ) as record:
         MolSystemData.from_output_file(ACETIC_ACID_DIMER, [])
     assert len(record) == 1
@@ -439,7 +438,7 @@ def test_from_output_file_warning_names_the_source():
 
 def test_from_output_file_warns_for_wilsons_states_at_or_below_the_ground_state():
     """wilson's GVPT2 puts some acetic acid dimer states at or below 0 cm-1: the same check as for the file's"""
-    with pytest.warns(UserWarning, match=r"the states \(regime 'GVPT2', computed by wilson\): \d+ of \d+ state "
+    with pytest.warns(UserWarning, match=r"the states \(regime 'GVPT2'\): \d+ of \d+ state "
                                          r"energies are at or below 0 cm-1"):
         MolSystemData.from_output_file(ACETIC_ACID_DIMER, [], wilson_regime='GVPT2')
 

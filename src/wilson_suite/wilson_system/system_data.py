@@ -132,16 +132,14 @@ class VibStatesData:
         an excited state at or below 0 cm-1 gives a warning (UserWarning)
 
     regime: str - the vibrational analysis regime, e.g. 'harmonic', 'GVPT2', 'VPT2';
-        'unknown' for anharmonic states read from a file: the file's regime is not read
-    computed_by: str - 'file': read from the data (the program is in MolSystemData.data_origin);
-        'wilson': computed by wilson (MolSystemData.with_wilson_anharmonic_states)
+        'unknown' for anharmonic states read from a file: the file's regime is not read.
+        A VPT2 regime marks wilson's own states (MolSystemData.with_wilson_anharmonic_states).
     """
     allstates: Sequence[VibState]
     regime: str
-    computed_by: str
 
     def __post_init__(self):
-        name = f'the states (regime {self.regime!r}, computed by {self.computed_by})'
+        name = f'the states (regime {self.regime!r})'
         off_zero = [s.energy for s in self.allstates if s.state_label == ZERO_STATE_LABEL and s.energy != 0.]
         if off_zero:
             raise ValueError(f'{name}: the ground state ({ZERO_STATE_LABEL!r}) at {off_zero[0]} cm-1; it must be '
@@ -331,7 +329,7 @@ class MolSystemData:
         states, _ = compute_vpt2_states(self.mol_props, self.eigenvals, regime, exclude_modes=[])
         for s in states:                    # each state has one key, e.g. {('0', '1'): 1.0}
             s.state_label = make_state_label(next(iter(s.harm_quanta_coeffs)))
-        anharmonic = VibStatesData(allstates=states, regime=regime, computed_by='wilson')
+        anharmonic = VibStatesData(allstates=states, regime=regime)
         return replace(self, states={**self.states, 'anharmonic': anharmonic})
 
 
@@ -359,7 +357,7 @@ class MolSystemData:
         for choice, regime in (('harmonic', 'harmonic'), ('anharmonic', 'unknown')):
             if data_dict.get(f'{choice}_states'):               # missing or empty: no set
                 states[choice] = VibStatesData(allstates=_vib_states(data_dict[f'{choice}_states']),
-                                               regime=regime, computed_by='file')
+                                               regime=regime)
 
         geo = data_dict.get('geo', None)
         natoms = len(geo) if geo is not None else 0
