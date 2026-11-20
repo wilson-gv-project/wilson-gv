@@ -1,4 +1,5 @@
 import warnings
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
@@ -127,6 +128,7 @@ class VibStatesData:
     VibDiff computes the energy differences.
     The energies count from the ground state ('zero'). Checked for every state set, however it is made:
         a ground state, if given, must be at 0 cm-1 (ValueError); without one, it is added at 0
+        no two states share a label (ValueError), e.g. the data keys ('0', '1') and ('1', '0'): both '0,1'
         an excited state at or below 0 cm-1 gives a warning (UserWarning)
 
     regime: str - the vibrational analysis regime, e.g. 'harmonic', 'GVPT2', 'VPT2';
@@ -145,6 +147,9 @@ class VibStatesData:
             raise ValueError(f'{name}: the ground state ({ZERO_STATE_LABEL!r}) at {off_zero[0]} cm-1; it must be '
                              f'at 0, as the energies count from it')
         excited = [s for s in self.allstates if s.state_label != ZERO_STATE_LABEL]
+        shared = [label for label, count in Counter(s.state_label for s in excited).items() if count > 1]
+        if shared:
+            raise ValueError(f'{name}: labels that name more than one state, e.g. {shared[:3]} ({len(shared)} in all)')
         low = sorted((s.energy, s.state_label) for s in excited if s.energy <= 0.)
         if low:
             lowest = ', '.join(f'{label} {energy:.1f}' for energy, label in low[:3])
@@ -254,10 +259,12 @@ class MolSystemData:
     def __post_init__(self):
         """
         Checks that the fields fit together, however the data is built, with every problem in one ValueError:
-            eigenvals  a dict with the modes 0 .. n-1 as keys: n modes
+            eigenvals  a dict with the modes 0 .. n-1 as keys: n modes; every frequency above 0 cm-1
             mol_props  each name has a layout in PROP_LAYOUT; each array with values has the shape that its layout
                        and n give, and is symmetric in its mode indices (not coriolis)
-        The state sets check themselves (VibStatesData).
+            states     every mode in a state label is one of 0 .. n-1; each harmonic fundamental equals its
+                       frequency in eigenvals, within 0.01 cm-1
+        Each state set checks its own states (VibStatesData).
         """
         problems, n = [], None
         freqs = self.eigenvals
@@ -267,6 +274,23 @@ class MolSystemData:
                             f"got {keys}")
         else:
             n = len(freqs)
+            not_positive = sorted(w for w in freqs.values() if w <= 0)
+            if not_positive:
+                problems.append(f'eigenvals: {not_positive} cm-1, at or below 0: an imaginary frequency (printed as a '
+                                f'negative number), so the geometry is not a minimum')
+            for choice, states in self.states.items():
+                unknown = [label for label in states.allstates_map if label != ZERO_STATE_LABEL
+                           and not all(m.isdigit() and int(m) < n for m in label.split(','))]
+                if unknown:
+                    problems.append(f'states[{choice!r}]: labels with modes that do not exist, e.g. {unknown[:3]} '
+                                    f'({len(unknown)} in all); the modes are 0 .. {n - 1}')
+            harmonic = self.states['harmonic'].allstates_map if 'harmonic' in self.states else {}
+            off = [(mode, harmonic[str(mode)].energy, w) for mode, w in freqs.items()
+                   if str(mode) in harmonic and abs(harmonic[str(mode)].energy - w) > 0.01]
+            if off:
+                mode, energy, w = off[0]
+                problems.append(f"states['harmonic']: fundamentals that differ from eigenvals by more than 0.01 cm-1, "
+                                f"e.g. mode {mode}: {energy} and {w} ({len(off)} in all; data from two calculations?)")
 
         for prop in self.mol_props:
             name = prop.trivial_name

@@ -251,10 +251,10 @@ def test_molpropscollection_fill_from(props):
 
 # A data dict that fits: 2 modes, their harmonic frequencies, both state lists.
 # The data holds every state set it has, by states choice; the evaluation picks one (states_choice).
-# Toy data: harmonic 0 -> E0, 1 -> E1, 0,1 -> E01; anharmonic: the same states, 10 cm-1 lower.
+# Toy data: harmonic fundamentals at the frequencies, 0,1 at their sum; anharmonic 0 -> E0, 1 -> E1, 0,1 -> E01, lower.
 FREQS = {'nc_sqrt_eigval': {0: E0_eigval, 1: E1_eigval}}
-STATE_LISTS = {'harmonic_states': {('0',): E0, ('1',): E1, ('0', '1'): E01},
-               'anharmonic_states': {('0',): E0 - 10., ('1',): E1 - 10., ('0', '1'): E01 - 10.}}
+STATE_LISTS = {'harmonic_states': {('0',): E0_eigval, ('1',): E1_eigval, ('0', '1'): E0_eigval + E1_eigval},
+               'anharmonic_states': {('0',): E0, ('1',): E1, ('0', '1'): E01}}
 TOY_DATA = {**FREQS, **STATE_LISTS}
 HARMONIC_ONLY = {**FREQS, 'harmonic_states': STATE_LISTS['harmonic_states']}
 
@@ -274,8 +274,8 @@ def test_from_data_dict_keeps_every_state_set_by_choice():
     molsys = MolSystemData.from_data_dict(TOY_DATA, [])
 
     assert set(molsys.states) == {'harmonic', 'anharmonic'}
-    assert molsys.states['harmonic'].get_state_by_label('0,1').energy == E01
-    assert molsys.states['anharmonic'].get_state_by_label('0,1').energy == E01 - 10.
+    assert molsys.states['harmonic'].get_state_by_label('0,1').energy == E0_eigval + E1_eigval
+    assert molsys.states['anharmonic'].get_state_by_label('0,1').energy == E01
 
 
 @pytest.mark.parametrize('kept', ['harmonic', 'anharmonic'])
@@ -450,6 +450,23 @@ def test_molsystemdata_names_every_problem_at_once():
 
     with pytest.raises(ValueError, match=r'(?s)dipgrad: shape.*cff: not symmetric'):
         MolSystemData.from_data_dict({**TOY_DATA, 'dipgrad': np.ones((3, 2)), 'cff': cff}, ['dipgrad', 'cff'])
+
+
+@pytest.mark.parametrize('change, message', [
+    ({'nc_sqrt_eigval': {0: -E0_eigval, 1: E1_eigval}}, r'eigenvals: \[-1100\.0\] cm-1, at or below 0'),
+    ({'anharmonic_states': {('0',): E0, ('2',): E1}}, r"states\['anharmonic'\]: labels with modes that do not "
+                                                      r"exist, e\.g\. \['2'\]"),
+    ({'anharmonic_states': {('0', '1'): E01, ('1', '0'): E01}}, r"labels that name more than one state, "
+                                                                r"e\.g\. \['0,1'\]"),
+    ({'harmonic_states': {('0',): E0, ('1',): E1_eigval}}, r"states\['harmonic'\]: fundamentals that differ from "
+                                                           r"eigenvals by more than 0\.01 cm-1, e\.g\. mode 0"),
+], ids=['an imaginary frequency',
+        'a mode that does not exist',
+        'two keys with one label',
+        'a fundamental off its frequency'])
+def test_molsystemdata_states_fit_the_frequencies(change, message):
+    with pytest.raises(ValueError, match=message):
+        MolSystemData.from_data_dict({**TOY_DATA, **change}, [])
 
 
 def test_from_output_file_extra_keys_never_collide_with_property_names():
