@@ -401,7 +401,12 @@ def adjust_for_fermi_resonance(fundamental, overtones, combotones, over3q, combo
             V[i][x_matrix_position(j, k, num_modes)] = cubic_forcefield[j][k][i]/np.sqrt(8.0)
             V[x_matrix_position(j, k, num_modes)][i] = V[i][x_matrix_position(j, k, num_modes)]
 
-    eigenvalue, eigenvector = np.linalg.eig(V)
+    # V is symmetric: each coupling above is written twice, at V[r][c] and at V[c][r].
+    # So eigh fits: numpy's eigensolver for symmetric matrices, with real results.
+    # eigh reads only the lower triangle of V.
+    # The order of the eigenvalues does not matter: the loop below picks, for each state,
+    # the unused eigenvector with the largest |component| on that state.
+    eigenvalue, eigenvector = np.linalg.eigh(V)
 
     k = 0
     for i in range(num_frequencies):
