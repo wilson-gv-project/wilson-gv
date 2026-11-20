@@ -32,7 +32,7 @@ The refactor's code is wilson_response_evaluate and wilson_system. The scripts a
 |---|---|---|
 | wilson_analysis/render/plot_spectrum.py (written for the refactor) | plot_rsp_func, plot_spectrum | example_plot_spectrum.py |
 | wilson_orientational_averaging/averaging.py, through pipeline.py | the averaging recipe | every script |
-| wilson_system.data_obtainer (the reader), through MolSystemData.from_output_file | the data of a Gaussian output file | every script |
+| wilson_system.data_obtainer.read_from_sources (the reader), through MolSystemData.from_output_file | the data of a Gaussian output file | every script |
 
 No script imports the experiment or derive. The stored terms come from
 data_for_tests/translated_terms/make_translated_terms.py, which runs main's code outside the refactor:
@@ -40,7 +40,7 @@ data_for_tests/translated_terms/make_translated_terms.py, which runs main's code
 | module | what it gives |
 |---|---|
 | wilson_experiment.experiment_abstractions | VibExperiment: the setups, their canonical axes, polarizations and polarization vector (laser_pol) |
-| wilson_derive.derive | get_fully_enhanced_terms: the terms |
+| wilson_derive.derive | ResponseTermsCollection: the derivation of the terms |
 | wilson_derive.term_var_translate | the translation of the terms to axes |
 | wilson_utils.termdict_from_symb_term | derived_terms_flat: derive's terms as one list |
 | wilson_utils.builders | make_SpectralAxisSet: the EVV axes, A = w1, B = -w1 + w2 |

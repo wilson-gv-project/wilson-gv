@@ -42,10 +42,12 @@ def main():
 
     # 2. data, once, outside the evaluator: the evaluator takes a MolSystemData and reads no file.
     #    prop_names(terms): which properties the terms use, so which ones to load.
+    #    wilson_regime='GVPT2' would put wilson's own anharmonic states in place of the file's.
     molsys = MolSystemData.from_output_file(data_origin, prop_names(terms))
 
     # 3. features. lineshape_param per condition: 3 cm-1 plus 0.2 % of the condition's |E|
-    # (energy_difference is signed).
+    # (energy_difference is signed). A gap below 10 cm-1 (evaluate.MIN_GAP) in an energy denominator gives one
+    # warning; formaldehyde has none.
     lineshape_param = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
     t0 = time.perf_counter()

@@ -713,6 +713,21 @@ def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a
     assert row.coeff != pytest.approx(full)
 
 
+def test_build_contributions_warns_once_for_a_small_gap(molsys_a1_zero):
+    """
+    '0,1' moved to 0.62 cm-1 above '0': the gap E_ab - E_a of toy_term at a = 0, b = 1, an index set that adds
+    to the coefficient (cff[0, 1, 1] = 2). One warning names it.
+    """
+    close = VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E0 + 0.62), state('0,0', E00)),
+                          regime='unknown', computed_by='file')
+    molsys = replace(molsys_a1_zero, states={**molsys_a1_zero.states, 'anharmonic': close})
+
+    with pytest.warns(UserWarning, match=r'gap below 10\.0 cm-1.*the smallest: 0,1 - 0: 0\.62 cm-1 \(1 in all\)'
+                      ) as record:
+        build_contributions([toy_term()], molsys, TOY_RECIPE, states_choice='anharmonic')
+    assert len(record) == 1
+
+
 ## Resonance factors on the grid -----------------------------------------------
 # One condition is the denominator  E_left - E_right - sum_j s_j w_j - i*gamma  (derive's convention).
 # eval_rescond_resloc and eval_resonance_factor take grids in Eh; eval_feature_on_grid takes cm-1.

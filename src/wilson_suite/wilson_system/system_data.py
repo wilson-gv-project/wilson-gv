@@ -227,6 +227,8 @@ class MolSystemData:
     Built before the evaluation, then passed to it (e.g. build_contributions). Two ways to build one:
         MolSystemData.from_output_file(origin, ['polgrad', 'dipgrad', 'cff'])   reads one output file
         MolSystemData.from_data_dict(data_dict, ['polgrad', 'dipgrad', 'cff'])  from a data dict already read
+    Either way, the result checks that its fields fit together (__post_init__), and each state set checks its
+    states (VibStatesData).
 
     The evaluator reads three fields:
         eigenvals   the harmonic frequency of each mode in cm-1 (data key 'nc_sqrt_eigval'), e.g. {0: 2878.7,
@@ -235,7 +237,7 @@ class MolSystemData:
                     gives, e.g. polhess (n, n, 3, 3), coriolis (3, n, n). A property with no values has vals None;
                     MolPropsCollection.require_values raises if a term needs it.
         states      one VibStatesData per state set, e.g. {'harmonic': ..., 'anharmonic': ...}, energies in cm-1.
-                    Gives the energy differences where a term needs them.
+                    Gives the energy differences where a term needs them. A set the data lacks has no entry.
                     The data holds no choice: the evaluation takes one (states_choice) and reads
                     states[states_choice]. 'anharmonic' holds the file's states, or wilson's own after
                     from_output_file(..., wilson_regime=...) or with_wilson_anharmonic_states;

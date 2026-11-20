@@ -18,10 +18,10 @@ term's resonance conditions, without sign. Terms with more than one set, e.g. th
 The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
 MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
     molsys = MolSystemData.from_output_file(origin, prop_names(terms))   origin: DataOriginInfo
-    molsys = MolSystemData.from_data_dict(...)                           from a data dict the caller already read
-One MolSystemData serves any number of runs. evaluate_response_terms checks that molsys has every property the
-
-terms use (MolPropsCollection.require_values).
+    molsys = MolSystemData.from_data_dict(data_dict, prop_names(terms))  from a data dict the caller already read
+With wilson_regime='GVPT2' ('VPT2', 'DVPT2'), from_output_file gives wilson's own anharmonic states instead of the
+file's. MolSystemData checks itself when it is built. One MolSystemData serves any number of runs.
+evaluate_response_terms checks that molsys has every property the terms use (MolPropsCollection.require_values).
 
 Inputs
     terms             VibPerturbedTerm list, translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
@@ -79,7 +79,7 @@ Names in the grid part, one per kind of data (the types are in grid.py), e.g. A 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
-  │    zero coeff -> `zero`, no row
+  │    zero coeff -> `zero`, no row. A gap below 10 cm-1 (evaluate.MIN_GAP) in an energy denominator -> one warning
   │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.state_set(states_choice)
   │    always one point: compile_terms checked the motif. A term without conditions: the point without
   │    axes, a flat background on every grid point
