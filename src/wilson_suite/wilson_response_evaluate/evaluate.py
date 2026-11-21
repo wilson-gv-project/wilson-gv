@@ -38,7 +38,7 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolSystemData,
     VibDiff,
-    check_modes_exist,
+    check_modes_in_range,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
 
@@ -523,7 +523,7 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
     """
     n_modes = len(molsys_data.eigenvals)
     excluded = set(exclude_modes)
-    check_modes_exist(excluded, n_modes)
+    check_modes_in_range(excluded, n_modes)
     modes = tuple(m for m in range(n_modes) if m not in excluded)
     if not modes:
         raise ValueError(f'exclude_modes removes all {n_modes} modes')

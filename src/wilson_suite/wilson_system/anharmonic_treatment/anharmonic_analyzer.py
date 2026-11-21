@@ -4,7 +4,7 @@ Anharmonic analyzer
 """
 import logging
 
-from ...wilson_system.system_data import VPT2_INPUT_KEYS, MolPropsCollection, VibState, check_modes_exist
+from ...wilson_system.system_data import VPT2_INPUT_KEYS, MolPropsCollection, VibState, check_modes_in_range
 from ..anharmonic_treatment.vpt2 import VPT2_REGIMES, anharm_corr_energies
 
 logger = logging.getLogger("wilson_suite."+__name__)
@@ -33,7 +33,7 @@ def compute_vpt2_states(props: MolPropsCollection,
     # modes exclusion list update
     if exclude_modes is None:
         exclude_modes = []
-    check_modes_exist(exclude_modes, len(nc_sqrt_eigval))
+    check_modes_in_range(exclude_modes, len(nc_sqrt_eigval))
     props.require_values(VPT2_INPUT_KEYS)
 
     # force constants in cm-1 (cff_rc, qff_rc), as anharm_corr_energies takes them; cff and qff are in atomic units

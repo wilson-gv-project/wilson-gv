@@ -81,7 +81,7 @@ def test_anharm_analyzer_vibana_excludemodes():
     for k,v in molsys.eigenvals.items():
         print(k, '--', v, '--', states_1quantum_corrected.get(k))
 
-    with pytest.raises(ValueError, match=r'modes \[3\] do not exist'):
+    with pytest.raises(ValueError, match=r'modes \[3\] are out of range'):
         ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
                                                            nc_sqrt_eigval=molsys.eigenvals,
                                                            regime='GVPT2', exclude_modes=[3])

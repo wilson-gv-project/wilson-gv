@@ -174,11 +174,11 @@ def make_state_label(modes: Sequence[int | str]) -> str:
     return ','.join(str(m) for m in sorted(int(m) for m in modes)) or ZERO_STATE_LABEL
 
 
-def check_modes_exist(modes: Iterable, n_modes: int) -> None:
+def check_modes_in_range(modes: Iterable, n_modes: int) -> None:
     """Raises ValueError for a mode not in 0 .. n_modes-1, e.g. 6, -1 or '1' when there are 6 modes."""
     unknown = [m for m in dict.fromkeys(modes) if m not in range(n_modes)]
     if unknown:
-        raise ValueError(f'modes {unknown} do not exist: the modes are 0 .. {n_modes - 1}')
+        raise ValueError(f'modes {unknown} are out of range: the modes are 0 .. {n_modes - 1}')
 
 
 @dataclass
