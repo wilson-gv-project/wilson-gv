@@ -39,8 +39,8 @@ from wilson_suite.wilson_response_evaluate.pipeline import (
     terms_by_axis_set,
 )
 from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
-from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 from wilson_suite.wilson_system.data_obtainer import read_from_sources
+from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 WATER_FILE = Path(__file__).parents[2] / 'data_for_tests' / 'g16_h2o_HF_STO3G.out'

@@ -27,9 +27,9 @@ from wilson_suite.wilson_response_evaluate.tests.helpers import (
     vibdiff,
 )
 from wilson_suite.wilson_system.system_data import (
-    VPT2_INPUT_KEYS,
     FREQUENCY_AND_STATE_KEYS,
     PROP_LAYOUT,
+    VPT2_INPUT_KEYS,
     DataOriginInfo,
     MolecularProperty,
     MolPropsCollection,

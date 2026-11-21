@@ -28,9 +28,9 @@ from wilson_suite.wilson_response_evaluate.evaluate import (
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
     frequency_denominator,
+    gap_denominator,
     included_modes,
     make_avrg_einsum_subscripts,
-    gap_denominator,
     solve_LSE_motif,
 )
 from wilson_suite.wilson_response_evaluate.features import (
