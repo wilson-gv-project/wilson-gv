@@ -146,7 +146,7 @@ def test_resmotif_from_conditions_quanta_resolve_like_the_symbolic_diff(states):
 ## Ground state ('zero') -----------------------------------------------------
 # The ground state has no quanta. Its label is 'zero' (make_state_label of no modes); VibStatesData
 # always holds it with energy 0 and refuses another energy. Mode 0 is something else:
-# label '0', the first excited state of mode 0.
+# label '0', one quantum in mode 0.
 
 # -- the label
 
@@ -197,8 +197,8 @@ def test_from_data_dict_takes_the_ground_state_key_at_0():
 # -- VibDiff
 
 @pytest.mark.parametrize('left, right, expected', [
-    ('a', '', E0),        # excited -> ground:      E_a - 0
-    ('', 'a', -E0),       # ground -> excited:      0 - E_a
+    ('a', '', E0),        # one quantum -> ground:  E_a - 0
+    ('', 'a', -E0),       # ground -> one quantum:  0 - E_a
     ('ab', '', E01),      # combination -> ground:  E_ab - 0
     ('', '', 0.),         # ground -> ground
 ])

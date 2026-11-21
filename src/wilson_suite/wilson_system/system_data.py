@@ -129,7 +129,7 @@ class VibStatesData:
     The energies count from the ground state ('zero'). Checked for every state set, however it is made:
         a ground state, if given, must be at 0 cm-1 (ValueError); without one, it is added at 0
         no two states share a label (ValueError), e.g. the data keys ('0', '1') and ('1', '0'): both '0,1'
-        an excited state at or below 0 cm-1 gives a warning (UserWarning)
+        a state with quanta at or below 0 cm-1 gives a warning (UserWarning)
 
     regime: str - the vibrational analysis regime, e.g. 'harmonic', 'GVPT2', 'VPT2';
         'unknown' for anharmonic states read from a file: the file's regime is not read.
@@ -144,17 +144,18 @@ class VibStatesData:
         if off_zero:
             raise ValueError(f'{name}: the ground state ({ZERO_STATE_LABEL!r}) at {off_zero[0]} cm-1; it must be '
                              f'at 0, as the energies count from it')
-        excited = [s for s in self.allstates if s.state_label != ZERO_STATE_LABEL]
-        shared = [label for label, count in Counter(s.state_label for s in excited).items() if count > 1]
-        if shared:
-            raise ValueError(f'{name}: labels that name more than one state, e.g. {shared[:3]} ({len(shared)} in all)')
-        low = sorted((s.energy, s.state_label) for s in excited if s.energy <= 0.)
+        with_quanta = [s for s in self.allstates if s.state_label != ZERO_STATE_LABEL]
+        repeated_labels = [label for label, count in Counter(s.state_label for s in with_quanta).items() if count > 1]
+        if repeated_labels:
+            raise ValueError(f'{name}: labels that name more than one state, e.g. {repeated_labels[:3]} '
+                             f'({len(repeated_labels)} in all)')
+        low = sorted((s.energy, s.state_label) for s in with_quanta if s.energy <= 0.)
         if low:
             lowest = ', '.join(f'{label} {energy:.1f}' for energy, label in low[:3])
-            warnings.warn(f'{name}: {len(low)} of {len(excited)} state energies are at or below 0 cm-1, '
+            warnings.warn(f'{name}: {len(low)} of {len(with_quanta)} state energies are at or below 0 cm-1, '
                           f'the ground state; lowest: {lowest}', stacklevel=3)      # at the line that built the set
 
-        self.allstates = (*excited, VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
+        self.allstates = (*with_quanta, VibState(harm_quanta_coeffs={}, state_label=ZERO_STATE_LABEL, energy=0.))
         self.allstates_map = {i.state_label: i for i in self.allstates}
 
     def get_state_by_label(self, state_label: str) -> VibState:
