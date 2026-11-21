@@ -27,10 +27,10 @@ from wilson_suite.wilson_response_evaluate.evaluate import (
     eval_resonance_factor,
     evaluate_full_index_dict,
     evaluate_term_coeff_sumover,
-    harmonic_denom,
+    frequency_denominator,
+    gap_denominator,
     included_modes,
     make_avrg_einsum_subscripts,
-    otf_vibdiffdenom,
     solve_LSE_motif,
 )
 from wilson_suite.wilson_response_evaluate.features import (
@@ -167,27 +167,27 @@ def test_eval_non_avrg_reads_the_tensor_at_the_modes_of_its_labels(molsys):
 
 
 ## Energy denominators, on the fly ---------------------------------------------
-# otf_vibdiffdenom: 1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
-# harmonic_denom:   1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
+# gap_denominator:       1/(E_left - E_right) for the perturbed-wavefunction differences, from the state energies.
+# frequency_denominator: 1/omega for the plain denominators, from the harmonic eigenvalues (not the state energies).
 
-def test_otf_vibdiffdenom_is_product_of_inverse_au_differences(molsys):
+def test_gap_denominator_is_product_of_inverse_au_differences(molsys):
     freqterms = FreqTermsCollection([vibdiff(sl='ab', sr='a', pert=True), vibdiff(sl='b', sr='', pert=True)])
 
-    value = otf_vibdiffdenom(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='anharmonic')
+    value = gap_denominator(freqterms, {'a': 0, 'b': 1}, molsys, states_choice='anharmonic')
 
     assert value == pytest.approx(1. / convNu2Ene(E01 - E0) / convNu2Ene(E1))
 
 
-def test_harmonic_denom_uses_eigenvals_not_state_energies(molsys):
+def test_frequency_denominator_uses_eigenvals_not_state_energies(molsys):
     """eigenvals are 1100 and 1580 cm-1; the states '0' and '1' are at 1000 and 1500 cm-1."""
-    value = harmonic_denom(FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b')]), {'a': 0, 'b': 1}, molsys)
+    value = frequency_denominator(FreqTermsCollection([vibdiff(sl='a'), vibdiff(sl='b')]), {'a': 0, 'b': 1}, molsys)
 
     assert value == pytest.approx(1. / convNu2Ene(E0_eigval) / convNu2Ene(E1_eigval))
 
 
-def test_harmonic_denom_needs_the_ground_state_on_the_right(molsys):
+def test_frequency_denominator_needs_the_ground_state_on_the_right(molsys):
     with pytest.raises(ValueError, match='not a ground state'):
-        harmonic_denom(FreqTermsCollection([vibdiff(sl='a', sr='b')]), {'a': 0, 'b': 1}, molsys)
+        frequency_denominator(FreqTermsCollection([vibdiff(sl='a', sr='b')]), {'a': 0, 'b': 1}, molsys)
 
 
 
@@ -361,8 +361,9 @@ def evv_shaped_term() -> CompiledTerm:
 
 
 def with_evv_props(molsys):
-    """molsys (cff, 2 modes, toy states) plus polgrad and dipgrad."""
-    return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props()]))
+    """molsys (cff, 2 modes, toy states) plus polgrad and dipgrad of its 2 modes: POLGRAD[:2], DIPGRAD[:2]."""
+    n = len(molsys.eigenvals)
+    return replace(molsys, mol_props=MolPropsCollection([*molsys.mol_props, *evv_props(POLGRAD[:n], DIPGRAD[:n])]))
 
 
 def test_evaluate_full_index_dict_on_the_fly_multiplies_the_four_factors(molsys):
@@ -411,7 +412,8 @@ def test_evaluate_term_coeff_sumover_mode_count_comes_from_eigenvals(term_and_av
     """Three eigenvalues -> each missing label (b, c) runs over {0, 1, 2}: 3 * 3 = 9 index sets."""
     monkeypatch.setattr(evaluate_mod, 'evaluate_full_index_dict', lambda term, idx, *_, **__: (1., {}))
     term, avrg = term_and_avrg
-    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.})
+    # no properties: their arrays would need 3 modes, and the replaced evaluate_full_index_dict reads none
+    three_modes = replace(molsys, eigenvals={0: E0_eigval, 1: E1_eigval, 2: 2000.}, mol_props=MolPropsCollection([]))
 
     total, factors = evaluate_term_coeff_sumover(term, {'a': 0}, three_modes, avrg_tensor=avrg,
                                                  states_choice='anharmonic')
@@ -680,7 +682,7 @@ def test_included_modes_leaves_out_the_excluded_modes(molsys):
 @pytest.mark.parametrize('exclude', [(2,), (-1,), ('1',)], ids=['beyond the last mode', 'negative', 'not a number'])
 def test_included_modes_raises_for_a_mode_that_does_not_exist(exclude, molsys):
     """modes count from 0, as in the data: a 1-based list would name a mode beyond the last one"""
-    with pytest.raises(ValueError, match=r'no such mode, the modes are 0 \.\. 1'):
+    with pytest.raises(ValueError, match=r'out of range: the modes are 0 \.\. 1'):
         included_modes(molsys, exclude)
 
 
@@ -709,6 +711,21 @@ def test_build_contributions_excluded_mode_is_left_out_of_rows_and_sums(molsys_a
     assert row.coeff == pytest.approx(c0_only, rel=1e-14, abs=0)
     full = {r.params: r.coeff for r in full_rows}[ParameterSet({'a': 0})]
     assert row.coeff != pytest.approx(full)
+
+
+def test_build_contributions_warns_once_for_a_small_gap(molsys_a1_zero):
+    """
+    '0,1' moved to 0.62 cm-1 above '0': the gap E_ab - E_a of toy_term at a = 0, b = 1, an index set that adds
+    to the coefficient (cff[0, 1, 1] = 2). One warning names it.
+    """
+    close = VibStatesData(allstates=(state('0', E0), state('1', E1), state('0,1', E0 + 0.62), state('0,0', E00)),
+                          regime='unknown')
+    molsys = replace(molsys_a1_zero, states={**molsys_a1_zero.states, 'anharmonic': close})
+
+    with pytest.warns(UserWarning, match=r'gap below 10\.0 cm-1.*the smallest: 0,1 - 0: 0\.62 cm-1 \(1 in all\)'
+                      ) as record:
+        build_contributions([toy_term()], molsys, TOY_RECIPE, states_choice='anharmonic')
+    assert len(record) == 1
 
 
 ## Resonance factors on the grid -----------------------------------------------
@@ -998,7 +1015,7 @@ def test_all_features_on_grid_without_features_is_zero_on_the_grid(states):
 @pytest.fixture
 def box_states() -> VibStatesData:
     """Two fundamentals, at 950 and 1100 cm-1: MOTIF_A peaks at A = 950 (a=0) and 1100 (a=1)."""
-    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), harmonic_osc_states_labels=(0, 1))
+    return VibStatesData(allstates=(state('0', 950.), state('1', 1100.)), regime='unknown')
 
 def test_boxed_features_on_grid_one_feature_is_all_features_on_grid_inside_its_box_and_zero_outside(states):
     """

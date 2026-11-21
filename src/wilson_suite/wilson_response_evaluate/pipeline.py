@@ -17,17 +17,19 @@ term's resonance conditions, without sign. Terms with more than one set, e.g. th
 
 The data is the caller's job: the evaluator reads no file and takes no DataOriginInfo. The caller makes one
 MolSystemData (wilson_system) with the properties the terms use, prop_names(terms), e.g.
-    molsys = MolSystemData.load(origin, prop_names(terms))     origin: DataOriginInfo; once, for any number of runs
-    molsys = MolSystemData.from_datadict(...)                  from a data dict the caller already read
-evaluate_response_terms checks that molsys has every property the terms use (MolSystemData.check_props).
+    molsys = MolSystemData.from_output_file(origin, prop_names(terms))   origin: DataOriginInfo
+    molsys = MolSystemData.from_data_dict(data_dict, prop_names(terms))  from a data dict the caller already read
+With wilson_regime='GVPT2' ('VPT2', 'DVPT2'), from_output_file gives wilson's own anharmonic states instead of the
+file's. MolSystemData checks itself when it is built. One MolSystemData serves any number of runs.
+evaluate_response_terms checks that molsys has every property the terms use (MolPropsCollection.require_values).
 
 Inputs
     terms             VibPerturbedTerm list, translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
                       (derive writes pulse IDs, e.g. [-1, 2]: plan.ResCondKey raises on them). row.term_id is the
                       index in the list.
     molsys_data       MolSystemData: the properties, frequencies and state sets of one molecule (see above)
-    states_choice    'harmonic' or 'anharmonic'. Must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic';
-                      harmonic -> 'harmonic'. No default: the data cannot know the regime.
+    states_choice     'harmonic' or 'anharmonic': the state set of molsys_data for the energy differences. No default.
+                      molsys_data.state_set(states_choice).regime says how the set was made, e.g. 'GVPT2'.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x.
                       The averaging rank fixes its length (rank 4: 3 numbers).
     lineshape_param   the parameter of each condition's line shape (lineshape.py), cm-1, e.g. the
@@ -77,8 +79,8 @@ Names in the grid part, one per kind of data (the types are in grid.py), e.g. A 
 CompiledTerm list
   │ 1. index sets: fix the motif labels (make_idx_sets over term.idx_nonsumm)
   │ 2. coeff: evaluate_term_coeff_sumover, sums the other labels     ← MolSystemData, polarization
-  │    zero coeff -> `zero`, no row
-  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.states[states_choice]
+  │    zero coeff -> `zero`, no row. A gap below 10 cm-1 (evaluate.MIN_GAP) in an energy denominator -> one warning
+  │ 3. location: solve_LSE_motif, once per (motif, params), cm-1     ← molsys_data.state_set(states_choice)
   │    always one point: compile_terms checked the motif. A term without conditions: the point without
   │    axes, a flat background on every grid point
   v
@@ -196,11 +198,14 @@ class FeatureResult:
 
     @property
     def states(self) -> 'VibStatesData':
-        """The state set the rows were computed with, molsys.states[states_choice]: boxed_features_on_grid needs it."""
+        """
+        The state set the rows were computed with, molsys.state_set(states_choice): boxed_features_on_grid
+        needs it.
+        """
         if self.molsys is None or self.states_choice is None:
             raise ValueError('this FeatureResult has no data or states choice (made by hand?): compute_features '
                              'keeps them')
-        return self.molsys.states[self.states_choice]
+        return self.molsys.state_set(self.states_choice)
 
     def factors_by_index_set(self, row: ContributionRow) -> dict:
         """
@@ -245,8 +250,7 @@ def compute_features(compiled: Sequence['CompiledTerm'], molsys_data: MolSystemD
     polarization_linear_comb: the orientation-average recipe (make_polarization_linear_comb).
     lineshape_param: cm-1, a number for every condition, or a function (vd, freqs) -> cm-1 for a value
         per condition and/or per frequency (features.LineshapeParam).
-    states_choice: the state set of molsys_data to use, e.g. 'anharmonic'. It must follow the vib analysis regime:
-        GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'. No default.
+    states_choice: the state set of molsys_data to use, 'harmonic' or 'anharmonic'. No default.
     exclude_modes: modes left out of the evaluation, e.g. (5,): no peak and no summed value uses them
     (evaluate.included_modes).
     row.term_id is the index in `compiled`, and so in the term list it was compiled from.
@@ -336,7 +340,7 @@ def terms_by_axis_set(terms: Sequence['VibPerturbedTerm']) -> dict[tuple[str, ..
 def prop_names(terms: Sequence['VibPerturbedTerm']) -> list[str]:
     """
     Every property the terms use, each once, e.g. ['polgrad', 'dipgrad', 'cff', ...]: what the caller loads,
-    e.g. MolSystemData.load(origin, prop_names(terms)).
+    e.g. MolSystemData.from_output_file(origin, prop_names(terms)).
     Only the props are read (plan.split_props).
     Per term the averaged props first, as in CompiledTerm.prop_names.
     """
@@ -419,9 +423,9 @@ def evaluate_response_terms(terms: Sequence['VibPerturbedTerm'], *,
     of grids, e.g. other window_box values: the rows are computed here once, not again for each grid.
 
     terms             translated to axes: each condition's pf in axis labels, e.g. ['A', '-B']
-    molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.load(origin, prop_names(terms)):
+    molsys_data      MolSystemData, made by the caller, e.g. MolSystemData.from_output_file(origin, prop_names(terms)):
                       loaded once, for any number of runs
-    states_choice     must follow the vib analysis regime: GVPT2, VPT2 -> 'anharmonic'; harmonic -> 'harmonic'
+    states_choice     the state set of molsys_data to use, 'harmonic' or 'anharmonic'. No default.
     laser_pol         the experiment's polarization_avg_vector, e.g. (1, 1, 1): pulses and detector along x
     lineshape_param   cm-1: a number, or a function (vd, freqs) -> cm-1 (features.LineshapeParam), e.g.
                       lambda vd, freqs: 0.01 * abs(vd.energy_difference())

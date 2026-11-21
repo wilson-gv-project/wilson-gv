@@ -155,7 +155,7 @@ class FreqTermsCollection:
     def get_vibenedenom(self):
         """
         The 1/omega denominators (is_pert_wf_diff False), e.g. 1/omega_a: one mode in sl, the ground state in sr
-        (harmonic_denom checks both).
+        (frequency_denominator checks both).
         """
         return FreqTermsCollection(freqterms=[ft for ft in self.freqterms if not ft.is_pert_wf_diff])
     

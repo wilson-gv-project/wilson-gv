@@ -6,9 +6,9 @@ box_rule of spectrum_on_grid) against all_features_on_grid (no cut). Two lists o
     RULES     compare the two rules, at dynrange 100, 500 and 1000: amplitude (eps 0.1); intensity unscaled,
               scaled with minimum_box_padding 0 and 10 cm-1 (the default)
                   python -m wilson_suite.wilson_response_evaluate.tests.scripts.e10_boxes rules
-Each takes a few minutes, mostly all_features_on_grid on ACDM.
+Most of the time goes to all_features_on_grid on ACDM.
 
-Per case, all_features_on_grid once (the reference: slow, about 70 s on ACDM in the quick_start window_box), then
+Per case, all_features_on_grid once (the reference: the slow step, on ACDM in the quick_start window_box), then
 spectrum_on_grid with each setting and cut_tails=True (each feature on its own feat_box only). Scores per setting:
     err      the largest intensity error, in floors (floor = max / dynrange: the faintest the plot shows)
     worst    the worst relative error at a grid point above the floor (a point the plot shows)
@@ -130,7 +130,8 @@ def zoom_around_strongest(result: FeatureResult, window_box: Box) -> tuple[Box, 
 
 def main(settings: list[dict]):
     terms = ref.evv_terms()
-    for mol, load in (('formaldehyde', lambda: MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))),
+    for mol, load in (('formaldehyde',
+                       lambda: MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(terms))),
                       ('ACDM', lambda: load_acdm(terms))):
         result = evaluate_response_terms(terms, molsys_data=load(), states_choice=STATES, laser_pol=ref.LASER_POL, lineshape_param=GAMMA_CM)
         run_case(f'{mol}, quick_start window_box', result, *QUICK_START, settings)

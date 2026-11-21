@@ -4,7 +4,7 @@ numpy and textbook formulas, no wilson code, so an error in shared code (derive'
 shows here.
 
 Water has 3 modes (0, 1, 2): every pair of fixed labels (a, b) is checked, and term 12's sum over c has 3 entries.
-Inputs: the data dict of data_for_tests/g16_h2o_HF_STO3G.out, read with wilson_data_obtainer (input side only).
+Inputs: the data dict of data_for_tests/g16_h2o_HF_STO3G.out, read with read_from_sources (input side only).
 A change in the reader would still show: the stored numbers of evv_reference.json would no longer match.
 Settings of evv_reference.json: laser_pol (1, 1, 1), i.e. all pulses and the detector along x.
 
@@ -39,8 +39,8 @@ from wilson_suite.wilson_response_evaluate.pipeline import (
     terms_by_axis_set,
 )
 from wilson_suite.wilson_response_evaluate.tests.stored_terms import load_setup
+from wilson_suite.wilson_system.data_obtainer import read_from_sources
 from wilson_suite.wilson_system.system_data import DataOriginInfo, MolSystemData
-from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
 
 REFERENCE_FILE = Path(__file__).parent / 'evv_reference.json'
 WATER_FILE = Path(__file__).parents[2] / 'data_for_tests' / 'g16_h2o_HF_STO3G.out'
@@ -55,7 +55,7 @@ def water() -> SimpleNamespace:
     """The data dict as numpy arrays, energies in Eh. Cartesian x, y, z; modes 0, 1, 2."""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE))
     keys = ('dipgrad', 'polgrad', 'polhess', 'cff', 'nc_sqrt_eigval', 'harmonic_states', 'anharmonic_states')
-    data = wilson_data_obtainer(requested_data_dict={k: origin for k in keys})
+    data = read_from_sources(request={k: origin for k in keys})
     modes = range(len(data['nc_sqrt_eigval']))
     return SimpleNamespace(
         modes=modes,
@@ -181,8 +181,8 @@ def three_ir_abc_by_hand(mol: SimpleNamespace, a: int, b: int, states: str) -> l
 
 def evaluator_rows(setup, terms: list, states: str) -> dict[tuple[int, ...], list[tuple[float, dict[str, float]]]]:
     """The evaluator's rows on water, {index values in label order: [(coeff, location in cm-1), ...]}."""
-    molsys = MolSystemData.load(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
-                                prop_names(terms))
+    molsys = MolSystemData.from_output_file(DataOriginInfo(source_type='gaussian', base_file_loc=str(WATER_FILE)),
+                                            prop_names(terms))
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=states,
                                      laser_pol=setup.laser_pol, lineshape_param=10.)
     assert result.zero == []

@@ -147,7 +147,7 @@ def load_formaldehyde() -> MolSystemData:
     cff.
     """
     names = dict.fromkeys(name for case in CASES.values() for name in prop_names(case_terms(case)[0]))
-    return MolSystemData.load(ref.data_origin('formaldehyde'), list(names))
+    return MolSystemData.from_output_file(ref.data_origin('formaldehyde'), list(names))
 
 
 def spectrum(case: Case, molsys: MolSystemData) -> EvalRspResult:

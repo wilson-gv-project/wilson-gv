@@ -11,6 +11,7 @@ The numbers: term coefficients, resonance locations, and the spectrum on a grid.
 """
 
 import string
+import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -37,8 +38,13 @@ from wilson_suite.wilson_system.system_data import (
     MolecularProperty,
     MolSystemData,
     VibDiff,
+    check_modes_in_range,
 )
 from wilson_suite.wilson_utils.unit_convertor import convNu2Ene
+
+# cm-1: a gap below this in an energy denominator gives a warning (build_contributions); a small gap makes
+# its terms large
+MIN_GAP = 10.
 
 if TYPE_CHECKING:
     from wilson_suite.wilson_response_evaluate.features import (
@@ -72,13 +78,15 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                          keep_factors: bool = True,
                          *,
                          states_choice: str,
-                         modes: Sequence[int] | None = None) -> tuple[float, dict | None]:
+                         modes: Sequence[int] | None = None,
+                         gaps: dict | None = None) -> tuple[float, dict | None]:
     """
     Coefficient of one term at one resonance location.
     states_choice: which state set of molsys_data gives the energy differences, e.g. 'anharmonic';
         no default (see MolSystemData.states).
     modes: the values every summed label runs over, e.g. (0, 1, 2, 3, 4) with mode 5 excluded (included_modes).
         None -> every mode, 0 .. n_modes-1. The caller fixes the resonance labels, from the same modes.
+    gaps: if given, each gap below MIN_GAP of the energy denominators goes in (gap_denominator)
 
     idx_dict must fix every resonance label (compl_term.idx_nonsumm): these labels decide where
     the peak sits. Every label left out is summed over all modes (or over `modes`). The summed pieces all
@@ -103,7 +111,6 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
     not_fixed = [i for i in compl_term.idx_nonsumm if i not in idx_dict]
     if not_fixed:
         raise ValueError(f'resonance labels {not_fixed} must be fixed, not summed')
-    molsys_data.check_states_choice(states_choice)
 
     term_idx_all = sorted(compl_term.idx_summ + compl_term.idx_nonsumm)
     
@@ -122,7 +129,8 @@ def evaluate_term_coeff_sumover(compl_term: 'CompiledTerm',
                                                        molsys_data,
                                                        avrg_tensor,
                                                        zero_tol,
-                                                       states_choice=states_choice)
+                                                       states_choice=states_choice,
+                                                       gaps=gaps)
             if factors_by_index_set is not None:
                 factors_by_index_set[ParameterSet(index_dict)] = contribs
             return value
@@ -140,14 +148,16 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
                                avrg_tensor: 'AvrgTensor',
                                zero_tol: float = 1e-18,
                                *,
-                               states_choice: str) -> tuple[float, dict]:
+                               states_choice: str,
+                               gaps: dict | None = None) -> tuple[float, dict]:
     """
     The term's coefficient at one full index set:
         frac_factor * NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
     index_dict: a mode for every label of the term, e.g. {'a': 0, 'b': 1, 'c': 0}
     avrg_tensor: the term's averaged part for every index set (calculate_avrg_tensor_einsum)
     zero_tol: an averaged part or a non-averaged property with |value| <= zero_tol counts as 0
-    states_choice: the state set for the energy differences, molsys_data.states[states_choice]
+    states_choice: the state set for the energy differences, molsys_data.state_set(states_choice)
+    gaps: if given, each gap below MIN_GAP of VIBDIFF_TERMS goes in (gap_denominator)
 
     returns (coefficient, factors): factors maps each factor's name to its value. It stops at the
         first factor that is 0, e.g. (0.0, {'AVRG': 0.0})
@@ -170,9 +180,9 @@ def evaluate_full_index_dict(compl_term: 'CompiledTerm', index_dict: dict,
     # Evaluate VIBDIFF_TERMS (CompiledTerm splits the denominators once per term, not per index set)
     extra_freqterms = compl_term.freq_pert_wf_diff
 
-    VIBDIFF_TERMS = otf_vibdiffdenom(extra_freqterms, index_dict, molsys_data, states_choice=states_choice)
+    VIBDIFF_TERMS = gap_denominator(extra_freqterms, index_dict, molsys_data, states_choice=states_choice, gaps=gaps)
 
-    VIBENE_DENOM = harmonic_denom(compl_term.freq_vibenedenom, index_dict, molsys_data)
+    VIBENE_DENOM = frequency_denominator(compl_term.freq_vibenedenom, index_dict, molsys_data)
 
     product_all = NON_AVRG * AVRG * VIBDIFF_TERMS * VIBENE_DENOM
 
@@ -192,7 +202,7 @@ def eval_non_avrg_per_indexdict(non_avrg_expr: 'PropsCollection',
     order of indices generally: a,b,c,... 
     E.g. in CFF tensor index tuple is (a,b,c)
 
-    Data is checked in MolSystemData.from_datadict and build_contributions.
+    Data is checked in MolSystemData.from_data_dict and build_contributions.
     """
     product_all = 1.
     
@@ -384,25 +394,30 @@ def calculate_avrg_tensor_einsum(avrg_expression: 'PropsCollection',
 
 
 # EVALUATION OF TERM PARTS FOR ONE INDEX SET - on the fly
-def otf_vibdiffdenom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
-                     states_choice: str):
+def gap_denominator(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData', *,
+                    states_choice: str, gaps: dict | None = None):
     """
     product of 1/(E_left - E_right), in Eh
-    energies from the state set molsys_data.states[states_choice]
+    energies from the state set molsys_data.state_set(states_choice)
+    gaps: if given, each gap below MIN_GAP goes in, {(left label, right label): E_left - E_right in cm-1},
+        e.g. {('0,1', '0'): 0.62}
     """
     product_all = 1.
-    states = molsys_data.states[states_choice]
+    states = molsys_data.state_set(states_choice)
 
     for vibdiff in freqterms:
         vib_diff_w_value = VibDiff.from_symbolic(vibdiff, index_dict, states)
+        gap = vib_diff_w_value.energy_difference()
 
-        if vib_diff_w_value.energy_difference(au=True) == 0.:
+        if gap == 0.:
             raise ZeroDivisionError("VibDiff is zero - division by zero")
-        product_all *= 1./ vib_diff_w_value.energy_difference(au=True)
+        if gaps is not None and abs(gap) < MIN_GAP:
+            gaps[(vib_diff_w_value.left.state_label, vib_diff_w_value.right.state_label)] = gap
+        product_all *= 1./ convNu2Ene(gap)
 
     return product_all
 
-def harmonic_denom(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData') -> float:
+def frequency_denominator(freqterms: 'FreqTermsCollection', index_dict: dict, molsys_data: 'MolSystemData') -> float:
     """product of 1/omega_i, harmonic omega in Eh; one mode per denominator"""
     product = 1.
     for vd in freqterms:
@@ -508,9 +523,7 @@ def included_modes(molsys_data: MolSystemData, exclude_modes: Iterable[int] = ()
     """
     n_modes = len(molsys_data.eigenvals)
     excluded = set(exclude_modes)
-    unknown = [m for m in excluded if m not in range(n_modes)]
-    if unknown:
-        raise ValueError(f'exclude_modes {unknown}: no such mode, the modes are 0 .. {n_modes - 1}')
+    check_modes_in_range(excluded, n_modes)
     modes = tuple(m for m in range(n_modes) if m not in excluded)
     if not modes:
         raise ValueError(f'exclude_modes removes all {n_modes} modes')
@@ -534,12 +547,14 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     One row per (term, index set) that adds to the spectrum. Index sets fix the term's
     resonance labels; evaluate_term_coeff_sumover sums the rest. Locations are in cm-1.
     The number of modes comes from molsys_data.eigenvals, the state energies from
-    molsys_data.states[states_choice], e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
+    molsys_data.state_set(states_choice), e.g. states_choice='anharmonic' (no default, see MolSystemData.states).
     polarization_linear_comb: the orientation-average recipe (pipeline.make_polarization_linear_comb).
     exclude_modes: modes left out of the evaluation, e.g. (5,): no index set and no summed value uses them
     (included_modes).
+    One warning lists the state pairs of the energy denominators with a gap below MIN_GAP, e.g.
+    '0,1 - 0: 0.62 cm-1': a small gap makes its terms large. Only index sets that add to a coefficient count.
     Checks molsys_data first: the frequencies, the chosen states, and values for every property the terms use
-    (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.load or from_datadict).
+    (CompiledTerm.prop_names), however molsys_data was made (MolSystemData.from_output_file or from_data_dict).
 
     returns (rows, zero), so that len(rows) + len(zero) == number of pairs:
         zero   - (term_id, params) with coeff == 0: no row, no location solved
@@ -551,10 +566,10 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
     whose coefficient sums every label, at the location without axes (ResLocPoint({})).
     """
     modes = included_modes(molsys_data, exclude_modes)
-    molsys_data.check_states_choice(states_choice)
-    molsys_data.check_props(name for term in terms for name in term.prop_names)
-    states = molsys_data.states[states_choice]
+    states = molsys_data.state_set(states_choice)
+    molsys_data.mol_props.require_values(name for term in terms for name in term.prop_names)
 
+    gaps = {}
     locations: dict[tuple[ResonanceMotif, ParameterSet], ResLocPoint] = {}
     rows, zero = [], []
     for term_id, term in enumerate(terms):
@@ -566,7 +581,8 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
 
             # no factors per index set: FeatureResult.factors_by_index_set computes them again when asked
             coeff, _ = evaluate_term_coeff_sumover(term, idxset, molsys_data, avrg_tensor=avrg_tensor,
-                                                   keep_factors=False, states_choice=states_choice, modes=modes)
+                                                   keep_factors=False, states_choice=states_choice, modes=modes,
+                                                   gaps=gaps)
             # not saving 0 coeffs
             if coeff == 0.:
                 zero.append((term_id, ps))
@@ -577,6 +593,12 @@ def build_contributions(terms: Sequence['CompiledTerm'], molsys_data: MolSystemD
             if key not in locations:
                 locations[key] = solve_LSE_motif(motif, ps, states, unit='cm-1')
             rows.append(ContributionRow(term_id, motif, ps, locations[key], coeff))
+
+    if gaps:
+        small = sorted((abs(gap), left, right) for (left, right), gap in gaps.items())
+        smallest = ', '.join(f'{left} - {right}: {gap:.2f} cm-1' for gap, left, right in small[:3])
+        warnings.warn(f'state pairs of the energy denominators with a gap below {MIN_GAP} cm-1, which makes their '
+                      f'terms large; the smallest: {smallest} ({len(small)} in all)', stacklevel=2)
     return ContributionTable(rows), zero
 
 
