@@ -443,8 +443,10 @@ def _layout_problem(name: str, vals: np.ndarray, layout: str, n: int) -> str | N
     expected = tuple(n if index == 'm' else 3 for index in layout)
     if vals.shape != expected:
         return f'{name}: shape {vals.shape}, expected {expected} (layout {layout!r}: m a mode, x one of x, y, z)'
-    # coriolis: no symmetry check. The Coriolis constant changes sign when its two modes swap, but the reader
-    # gives the same sign; VPT2 squares it, so the sign changes no state. Every other layout has its modes first.
+    # coriolis: no symmetry check, for two reasons.
+    # 1. A Coriolis constant changes sign when its two modes swap. The readers store both entries with the
+    #    same sign. VPT2 uses only the square, so the sign changes no state.
+    # 2. Its layout 'xmm' starts with an x/y/z axis. The loop below assumes the mode axes come first.
     if name == 'coriolis':
         return None
     for i in range(layout.count('m') - 1):     # symmetric under every swap of neighbours: under every order
