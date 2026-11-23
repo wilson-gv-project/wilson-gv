@@ -231,6 +231,8 @@ def test_em_pulse():
         pulse_bogus = EmPulse(env='gaussian', tc=120.0, cf=0.001, dev=2.0,
                               wv =(1.0, 0.0, 0.0), pol=(1.0, 0.0, 0.0), id=1)
 
+    # TODO: Test evalFreqSpace for scalar and array
+
 def test_make_gaussian_pulse():
 
     # Same kind of pulse as first example in test_em_pulse

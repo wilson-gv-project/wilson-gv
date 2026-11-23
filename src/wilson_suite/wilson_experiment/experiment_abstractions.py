@@ -1,3 +1,4 @@
+from collections.abc import MutableSequence
 from dataclasses import dataclass
 from typing import Optional, Iterable
 import copy
@@ -391,6 +392,29 @@ class EmPulse:
             return False
         else:
             raise ValueError('"Tends-impulsive" check currently not implemented for non-Gaussian pulses')
+
+    def evalFreqSpace(self, w: float | MutableSequence[float] ) -> float | MutableSequence[float]:
+        """
+        Evaluate pulse amplitude in frequency space (for a scalar or range
+
+        Currently only supports Gaussian pulses
+
+        w: Float or array-like: Frequency argument(s) over which to evaluate
+        """
+
+        # TODO: Test
+
+        if not self.env == 'gaussian':
+            raise ValueError('Evaluation currently not implemented for non-Gaussian pulses')
+
+        from ..wilson_utils.unit_convertor import per_cm_x_fs
+
+        dev_per_cm =  self.dev / per_cm_x_fs
+
+        return ((self.maxstr * dev_per_cm) *
+                np.exp(-( dev_per_cm ** 2 * (w - self.cf) /2.0)) *
+                (np.exp(1.0j * self.tc * w)))
+
 
 def make_gaussian_pulse(tc: float | int, cf: float | int, dev: float | int, maxstr: float | int,
                         wv: tuple[float| int], pol: tuple[float| int],

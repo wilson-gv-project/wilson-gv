@@ -1,7 +1,9 @@
+import copy
 from dataclasses import dataclass
 from collections.abc import Sequence
-from ..wilson_experiment.experiment_abstractions import SpecDetector, FieldAnalysis
+from ..wilson_experiment.experiment_abstractions import SpecDetector
 from math import floor, ceil, inf
+import numpy as np
 
 # FIXME: Consider organizing SumFreqIntegrator and DirectIntegrator under ABC paradigm - may not be that important
 # with only two integrators but could be more relevant with combined forms. CONCLUSION: Consider this later if relevant
@@ -13,20 +15,68 @@ class SumFreqIntegrator:
 
         pass
 
-    def integrate(self, sumfreq_points, rsp_points, pulse_ranges_points, rsp_results, pulses_on_grid):
+    def integrate(self, comp_pattern, sumfreq_points, rsp_points, pulse_ranges_points, rsp_on_grid, pulses_on_grid):
 
-        #       - Walk through all sum-frequency components:
-        #           - Make a nested summation for each integration (choosing freq. components that sum to that
-        #             sum-freq component) and accumulate
-        #           - Choosing indices should be possible with something like a "spent, remaining" bookkeeping of
-        #             increments from the bottom of the range and a recursion
+        def integrate_recurse(r, acc_pts, curr_rank, max_rank, emission_compounding, rsp_points, pulse_ranges_points,
+                              rsp_on_grid, pulses_on_grid):
+            """
+            Integration recursion
 
-        # Can parallelize here if needed (but want to first make a batching that balances
-        # over different sumfreq tasks)
-        # Maybe there is a way to match shorter with longer summations? (for 2, can likely
-        # match "halfway in" with "edge" and increment - does this generalize?
+            TODO: If available, might be possible to make use of factorization hints for the response function
+            TODO: This is a naive implementation and may want optimization
 
-        integration_result = []
+            """
+
+            curr_min = pulse_ranges_points[curr_rank][0]
+            curr_max = pulse_ranges_points[curr_rank][1]
+
+            if curr_rank == max_rank:
+
+                if r >= curr_min and r <= curr_max:
+
+                    if emission_compounding:
+
+                        res = rsp_on_grid[tuple(acc_pts[:-1])]
+
+                    else:
+
+                        res = rsp_on_grid[tuple(acc_pts)]
+
+                    for i in range(max_rank):
+
+                        res *= pulses_on_grid[i][acc_pts[i]]
+
+            else:
+
+                res = 0.0
+
+                a_ind = 0
+
+                for p in range(pulse_ranges_points[curr_rank][0], curr_rank[1]):
+
+                    new_acc_pts = copy.deepcopy(acc_pts)
+                    new_acc_pts.append(a_ind)
+
+                    res += integrate_recurse(r - p, new_acc_pts, curr_rank + 1, max_rank, emission_compounding,
+                                             rsp_points, pulse_ranges_points, rsp_points, pulses_on_grid)
+
+                    a_ind += 1
+
+                return res
+
+        integration_result = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,))
+        emission_compounding = comp_pattern[-1] > 1
+
+        # TODO: This loop should be readily parallelizable
+        for p in range(sumfreq_points[0], sumfreq_points[1] + 1):
+
+            pts_seed = []
+
+            integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, 0,
+                                                                          len(pulse_ranges_points),
+                                                                          emission_compounding,
+                                                                          rsp_points, pulse_ranges_points,
+                                                                          rsp_on_grid, pulses_on_grid)
 
         return integration_result
 
@@ -55,7 +105,7 @@ class SpectralIntegration:
     int_ranges_coll: dict
     # FIXME: Review these declarations: There is likely a better way to organize this (for instance, the pulse banks
     # and their integration ranges conceptually belong together)
-    # Should contain all int. ranges over all scan points (i.e. would be taken from each FieldAnalysis instance) and
+    # Should contain all int. ranges over all scan points and ocmpi index (i.e. would be taken from each FieldAnalysis instance) and
     # indexed in the same way
     int_ranges_scan: Sequence
     # Should contain all pulse banks for each scan point (and indexed by same)
@@ -118,6 +168,8 @@ class SpectralIntegration:
 
     def __integrate_all_tasks(self):
 
+        from ..wilson_utils.common_labels import cap_alpha_labels
+
         if not self.int_strategy == 'sum_freq':
             raise NotImplementedError('Only sum-frequency integration currently implemented')
 
@@ -174,8 +226,20 @@ class SpectralIntegration:
             rsp_points = {}
 
             # Rsp fn data starts/ends at grid points
+            # The data is already snapped to the grid points
+            # FIXME: Resolve axis and array rank ordering (now assuming same)
+            #  Consider this task as part of working out possible grid/dimension arg pass changes to/from evaluator?
             for ocmpi in self.rsp_results:
-                pass
+
+                rsp_points[ocmpi] = []
+
+                for d in range(len(self.rsp_results[ocmpi].amplitude.shape)):
+
+                    curr_ax_pts = [self.rsp_results[ocmpi].axis_points[cap_alpha_labels[d]][0],
+                                   self.rsp_results[ocmpi].axis_points[cap_alpha_labels[d]][1]]
+
+                    rsp_points[ocmpi].append([round(curr_ax_pts[0]/self.resolution),
+                                              round(curr_ax_pts[1]/self.resolution)])
 
             # Main integration calls
 
@@ -199,18 +263,28 @@ class SpectralIntegration:
                                              self.resolution * ceil(p[1]  / self.resolution)]
                                              for p in self.int_ranges_scan[scan_elem][ocmpi]]
 
-                    # Pulse ranges start/end at grid points
-                    # TODO
+                    # Pulse ranges start/end at grid points, pulses evaluated on grid range
+                    pulse_ranges_points = []
+                    pulses_on_grid = []
 
-                    # Relevant pulses on grid
-                    # TODO
+                    for p in range(len(curr_int_ranges_snap)):
+                        pulse_ranges_points.append([round(curr_int_ranges_snap[p][0] / self.resolution),
+                                                    round(curr_int_ranges_snap[p][1] / self.resolution) ] )
+
+                        pulses_on_grid.append(
+                                self.pulse_banks_scan[scan_elem][p].evalFreqSpace(
+                                    np.linspace(curr_int_ranges_snap[p][0], curr_int_ranges_snap[p][1],
+                                        pulse_ranges_points[p][1] - pulse_ranges_points[p][0] + 1)
+                                )
+                            )
 
                     # Integrate and yield as array
                     int_results[scan_elem][ocmpi] = integrator.integrate(
+                        ocmpi[1],
                         sumfreq_points,
                         rsp_points[ocmpi],
                         pulse_ranges_points,
-                        self.rsp_results[ocmpi],
+                        self.rsp_results[ocmpi].amplitude,
                         pulses_on_grid
                     )
 

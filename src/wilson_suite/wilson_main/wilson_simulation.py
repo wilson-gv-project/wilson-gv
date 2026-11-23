@@ -224,7 +224,7 @@ class WilsonSimulation:
                 axis_translation[ tuple([i + 1 for i in range(len(ax) + 1)]) ] = {cap_alpha_labels[ax]: 1.0}
 
                 # Window boxes snap to overall grid by the range construction
-                window_box[cap_alpha_labels[ax]] = (self.int_ranges_coll[ocmpi][ax][0], self.int_ranges[ocmpi][ax][1])
+                window_box[cap_alpha_labels[ax]] = (self.int_ranges_coll[ocmpi][ax][0], self.int_ranges_coll[ocmpi][ax][1])
 
                 points_per_axis[cap_alpha_labels[ax]] = int(round(
                     (self.int_ranges_coll[ocmpi][ax][1] - self.int_ranges_coll[ocmpi][ax][0])/self.integration_resolution ) ) + 1
