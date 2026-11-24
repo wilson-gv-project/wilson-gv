@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from ..wilson_experiment.experiment_abstractions import SpecDetector
 from math import floor, ceil, inf
 import numpy as np
+import time
 
 # FIXME: Consider organizing SumFreqIntegrator and DirectIntegrator under ABC paradigm - may not be that important
 # with only two integrators but could be more relevant with combined forms. CONCLUSION: Consider this later if relevant
@@ -15,7 +16,9 @@ class SumFreqIntegrator:
 
         pass
 
-    def integrate(self, comp_pattern, sumfreq_points, pulse_ranges_points, rsp_on_grid, pulses_on_grid):
+    def integrate(self, comp_pattern, sumfreq_points,
+                  pulse_ranges_points, rsp_on_grid, pulses_on_grid,
+                  parallel = False):
 
         def integrate_recurse(r, acc_pts, curr_rank, max_rank, emission_compounding, pulse_ranges_points,
                               rsp_on_grid, pulses_on_grid):
@@ -73,21 +76,84 @@ class SumFreqIntegrator:
 
                 return res
 
-        integration_result = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,))
+        integration_result = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,), dtype=complex)
         emission_compounding = comp_pattern[-1] > 1
 
-        # TODO: This loop should be readily parallelizable
-        for p in range(sumfreq_points[0], sumfreq_points[1] + 1):
+        if not parallel:
 
-            pts_seed = []
-            
-            integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, 0,
-                                                                          len(pulse_ranges_points) - 1,
-                                                                          emission_compounding,
-                                                                          pulse_ranges_points,
-                                                                          rsp_on_grid, pulses_on_grid)
+            for p in range(sumfreq_points[0], sumfreq_points[1] + 1):
 
-        return integration_result
+                pts_seed = []
+
+                integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, 0,
+                                                                              len(pulse_ranges_points) - 1,
+                                                                              emission_compounding,
+                                                                              pulse_ranges_points,
+                                                                              rsp_on_grid, pulses_on_grid)
+
+            return integration_result
+
+        else:
+
+            def integrate_part(pts, offset,
+                               emission_compounding, pulse_ranges_points,
+                               rsp_on_grid, pulses_on_grid, mp_queue):
+
+                integration_result = np.zeros(len(pts), dtype=complex)
+
+                for p in range(len(pts)):
+
+                    pts_seed = []
+                    integration_result[p] = integrate_recurse(pts[p] + offset, pts_seed, 0,
+                                                              len(pulse_ranges_points) - 1,
+                                                              emission_compounding,
+                                                              pulse_ranges_points,
+                                                              rsp_on_grid, pulses_on_grid
+                                                              )
+
+
+                mp_queue.put((pts, integration_result))
+
+                return
+
+            import multiprocessing as mp
+
+            prev_start = 0
+            num_units = sumfreq_points[1] - sumfreq_points[0] + 1
+            # For now just a test choice
+            pts_per_job = 10
+
+            num_cores = mp.cpu_count()
+
+            while prev_start < num_units:
+
+                mp_queue = mp.Queue()
+
+                processes = [mp.Process(
+                    target = integrate_part, args =
+                    (list(range(
+                        prev_start + c * pts_per_job,
+                        min(prev_start + (c + 1) * pts_per_job, num_units))),
+                         sumfreq_points[0], emission_compounding, pulse_ranges_points,
+                         rsp_on_grid, pulses_on_grid, mp_queue)
+                ) for c in range(num_cores)]
+
+                for proc in processes:
+                    proc.start()
+
+                for proc in processes:
+                    proc.join()
+
+                results = [mp_queue.get() for proc in processes]
+
+                for r in results:
+                    for elem in range(len(r[0])):
+                        integration_result[r[0][elem]] = r[1][elem]
+
+                prev_start += pts_per_job * num_cores
+
+            return integration_result
+
 
 class DirectIntegrator:
 
@@ -247,7 +313,11 @@ class SpectralIntegration:
             # For each scan point
             for scan_elem in self.int_ranges_scan:
 
-                int_results_sum[scan_elem] = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,))
+                ctime = time.time()
+
+                print('scan elem', scan_elem)
+
+                int_results_sum[scan_elem] = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,), dtype=complex)
 
                 int_results[scan_elem] = {}
 
@@ -281,9 +351,11 @@ class SpectralIntegration:
                         sumfreq_points,
                         pulse_ranges_points,
                         self.rsp_results[ocmpi].amplitude,
-                        pulses_on_grid
+                        pulses_on_grid,
+                        parallel=True
                     )
 
+                print('proc time', time.time() - ctime)
 
                 # FIXME: Decide which of the detailed data will also be yielded on return
 
