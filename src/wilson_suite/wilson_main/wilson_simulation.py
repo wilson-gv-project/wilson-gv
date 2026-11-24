@@ -79,7 +79,7 @@ class WilsonSimulation:
         self.rsp_results = self.__get_response_function_elements()
 
         # Evaluate response result and characterize/categorize zero intervals
-        # FIXME: For now include everything and consider masking later
+        # TODO: For now include everything but consider masking later
 
         # Integrator run; get main return data and diagnostics
         self.int_results = self.__get_integrated_results()
@@ -106,7 +106,7 @@ class WilsonSimulation:
 
             pulse_banks_scan[scan_elem] = self.core.experiment.field_analyses[scan_elem].all_valid_pulses
 
-            int_sequences = self.core.experiment.field_analyses[scan_elem].int_sequences_by_order_comp_pol_magn
+            int_sequences = self.core.experiment.field_analyses[scan_elem].int_sequences_by_order_comp_magn_pol
 
             # Order, compounding patters, magnitude condition, (macroscopic) polarization tuple
             for ocmp in int_sequences:
@@ -155,7 +155,7 @@ class WilsonSimulation:
                     # Make the freq ranges for each (compound) pulse in this sequence
                     # Taking carrier freq. -/+ n_dev * freq. domain deviation, then snap to next lower resp. larger
                     # grid point
-                    curr_pulse = pulse_banks_scan[scan_elem][p]
+                    curr_pulse = pulse_banks_scan[scan_elem]
 
                     curr_freq_ranges_raw = [[curr_pulse[p].cf - self.n_dev_w_int * (per_cm_x_fs / curr_pulse[p].dev),
                                          curr_pulse[p].cf + self.n_dev_w_int * (per_cm_x_fs / curr_pulse[p].dev)]
@@ -201,9 +201,10 @@ class WilsonSimulation:
         """
 
         from ..wilson_utils.common_labels import cap_alpha_labels
-        from ..wilson_derive.term_var_translate import translate_one_term_to_axis_variables
+        from ..wilson_derive.term_var_translate import simple_term_axis_translation
         from ..wilson_intensities.refac_rsp_eval.pipeline import evaluate_response_terms, spectrum_on_grid
         from ..wilson_intensities.refac_rsp_eval.features import amplitude_half_widths
+        from ..wilson_intensities.refac_rsp_eval.grid import Box
 
         # FIXME: Using a trivial lineshape parameter for testing
         lineshape_param = 5.0
@@ -216,21 +217,36 @@ class WilsonSimulation:
             terms_axis_vars = []
 
             axis_translation = {}
-            window_box = {}
+            window_box_dict = {}
 
             points_per_axis = {}
 
-            for ax in range(len(ocmpi[4])):
-                axis_translation[ tuple([i + 1 for i in range(len(ax) + 1)]) ] = {cap_alpha_labels[ax]: 1.0}
+            acc = 0
+
+            print('ocmpi 1', ocmpi[1])
+
+            ax_comb_ref = []
+
+            for ax in range(len(ocmpi[1]) - 1):
+
+                ax_comb_ref.append(cap_alpha_labels[ax])
+
+                axis_translation[ tuple([i + 1 for i in range(acc + ocmpi[1][ax])] )] = copy.deepcopy(ax_comb_ref)
 
                 # Window boxes snap to overall grid by the range construction
-                window_box[cap_alpha_labels[ax]] = (self.int_ranges_coll[ocmpi][ax][0], self.int_ranges_coll[ocmpi][ax][1])
+                window_box_dict[cap_alpha_labels[ax]] = (self.int_ranges_coll[ocmpi][ax][0], self.int_ranges_coll[ocmpi][ax][1])
 
                 points_per_axis[cap_alpha_labels[ax]] = int(round(
                     (self.int_ranges_coll[ocmpi][ax][1] - self.int_ranges_coll[ocmpi][ax][0])/self.integration_resolution ) ) + 1
 
-            for t in self.core.terms_by_order_comp_magn[(ocmpi[0], ocmpi[1], ocmpi[2])]:
-                terms_axis_vars.append(translate_one_term_to_axis_variables(t, axis_translation))
+                acc += ocmpi[1][ax]
+
+
+            print('my axis translation', axis_translation)
+            print('points per axis', points_per_axis)
+
+            for t in self.core.terms_by_order_comp_magn[(ocmpi[0], ocmpi[1], ocmpi[2])].terms:
+                terms_axis_vars.append(simple_term_axis_translation(t, axis_translation))
 
             term_eval_result = evaluate_response_terms(terms_axis_vars,
                                                         molsys_data=self.system_data,
@@ -240,7 +256,7 @@ class WilsonSimulation:
                                                        )
 
             rsp_result = spectrum_on_grid(term_eval_result,
-                                          window_box=window_box,
+                                          window_box=Box(window_box_dict),
                                           n_points_per_axis=points_per_axis,
                                           box_rule=partial(
                                               amplitude_half_widths, dynrange=self.dynrange

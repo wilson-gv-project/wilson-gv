@@ -15,9 +15,9 @@ class SumFreqIntegrator:
 
         pass
 
-    def integrate(self, comp_pattern, sumfreq_points, rsp_points, pulse_ranges_points, rsp_on_grid, pulses_on_grid):
+    def integrate(self, comp_pattern, sumfreq_points, pulse_ranges_points, rsp_on_grid, pulses_on_grid):
 
-        def integrate_recurse(r, acc_pts, curr_rank, max_rank, emission_compounding, rsp_points, pulse_ranges_points,
+        def integrate_recurse(r, acc_pts, curr_rank, max_rank, emission_compounding, pulse_ranges_points,
                               rsp_on_grid, pulses_on_grid):
             """
             Integration recursion
@@ -34,17 +34,26 @@ class SumFreqIntegrator:
 
                 if r >= curr_min and r <= curr_max:
 
+                    new_acc_pts = copy.deepcopy(acc_pts)
+                    new_acc_pts.append(r - curr_min)
+
                     if emission_compounding:
 
-                        res = rsp_on_grid[tuple(acc_pts[:-1])]
+                        res = rsp_on_grid[tuple(new_acc_pts[:-1])]
 
                     else:
 
-                        res = rsp_on_grid[tuple(acc_pts)]
+                        res = rsp_on_grid[tuple(new_acc_pts)]
 
                     for i in range(max_rank):
 
-                        res *= pulses_on_grid[i][acc_pts[i]]
+                        res *= pulses_on_grid[i][new_acc_pts[i]]
+
+                    return res
+
+                else:
+
+                    return 0.0
 
             else:
 
@@ -52,13 +61,13 @@ class SumFreqIntegrator:
 
                 a_ind = 0
 
-                for p in range(pulse_ranges_points[curr_rank][0], curr_rank[1]):
+                for p in range(curr_min, curr_max):
 
                     new_acc_pts = copy.deepcopy(acc_pts)
                     new_acc_pts.append(a_ind)
 
                     res += integrate_recurse(r - p, new_acc_pts, curr_rank + 1, max_rank, emission_compounding,
-                                             rsp_points, pulse_ranges_points, rsp_points, pulses_on_grid)
+                                             pulse_ranges_points, rsp_on_grid, pulses_on_grid)
 
                     a_ind += 1
 
@@ -71,11 +80,11 @@ class SumFreqIntegrator:
         for p in range(sumfreq_points[0], sumfreq_points[1] + 1):
 
             pts_seed = []
-
+            
             integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, 0,
-                                                                          len(pulse_ranges_points),
+                                                                          len(pulse_ranges_points) - 1,
                                                                           emission_compounding,
-                                                                          rsp_points, pulse_ranges_points,
+                                                                          pulse_ranges_points,
                                                                           rsp_on_grid, pulses_on_grid)
 
         return integration_result
@@ -132,11 +141,18 @@ class SpectralIntegration:
         if not self.style in valid_styles:
             raise ValueError('Invalid integration style')
 
+        self.int_strategy = self.__get_int_strategy()
+
+        self.int_results = self.__integrate_all_tasks()
+
+
+    def __get_int_strategy(self):
+
         # First pass at strategy selection logic
         # FIXME: This logic may need revision subject to changes to improve resolution of the suppl_t_grid
         # design choice above
         if self.style == 'sum_freq':
-            self.int_strategy = 'sum_freq'
+            int_strategy = 'sum_freq'
 
         elif self.style == 'direct':
 
@@ -144,7 +160,7 @@ class SpectralIntegration:
                 raise ValueError('A supplementary time-domain grid is needed for direct integration')
 
             else:
-                self.int_strategy = 'direct'
+                int_strategy = 'direct'
 
         # The 'auto' integration choice for now chooses 'sum_freq' if freq. detection or time/integrated time
         # detection with no supplementary time-domain grid, or 'direct' if time/integrated time
@@ -152,7 +168,7 @@ class SpectralIntegration:
         elif self.style == 'auto':
 
             if self.detector.detection_method == 'freq':
-                self.int_strategy = 'sum_freq'
+                int_strategy = 'sum_freq'
 
             elif self.detector.detection_method in ['time', 'int']:
 
@@ -161,14 +177,13 @@ class SpectralIntegration:
                 # than what is sufficient in the specific situation). Not sure whether to warn about this - will first
                 # see if it's actually a problem in practice first
                 if self.suppl_t_grid is None:
-                    self.int_strategy = 'sum_freq'
+                    int_strategy = 'sum_freq'
                 else:
-                    self.int_strategy = 'direct'
+                    int_strategy = 'direct'
 
+        return int_strategy
 
     def __integrate_all_tasks(self):
-
-        from ..wilson_utils.common_labels import cap_alpha_labels
 
         if not self.int_strategy == 'sum_freq':
             raise NotImplementedError('Only sum-frequency integration currently implemented')
@@ -223,34 +238,16 @@ class SpectralIntegration:
             # FIXME: Consider this method more closely, is it reliable?
             sumfreq_points = [round(sumfreq_range[0]/self.resolution), round(sumfreq_range[1]/self.resolution)]
 
-            rsp_points = {}
-
-            # Rsp fn data starts/ends at grid points
-            # The data is already snapped to the grid points
-            # FIXME: Resolve axis and array rank ordering (now assuming same)
-            #  Consider this task as part of working out possible grid/dimension arg pass changes to/from evaluator?
-            for ocmpi in self.rsp_results:
-
-                rsp_points[ocmpi] = []
-
-                for d in range(len(self.rsp_results[ocmpi].amplitude.shape)):
-
-                    curr_ax_pts = [self.rsp_results[ocmpi].axis_points[cap_alpha_labels[d]][0],
-                                   self.rsp_results[ocmpi].axis_points[cap_alpha_labels[d]][1]]
-
-                    rsp_points[ocmpi].append([round(curr_ax_pts[0]/self.resolution),
-                                              round(curr_ax_pts[1]/self.resolution)])
-
             # Main integration calls
 
             int_results = {}
 
-            # TODO: It would be easy to parallelize over the scan elements (but will of course not
-            # then have good parallelism by this if only one or a few scan points). Consider two-tier
-            # parallelization or other solution?
+            int_results_sum = {}
 
             # For each scan point
             for scan_elem in self.int_ranges_scan:
+
+                int_results_sum[scan_elem] = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,))
 
                 int_results[scan_elem] = {}
 
@@ -272,7 +269,7 @@ class SpectralIntegration:
                                                     round(curr_int_ranges_snap[p][1] / self.resolution) ] )
 
                         pulses_on_grid.append(
-                                self.pulse_banks_scan[scan_elem][p].evalFreqSpace(
+                                self.pulse_banks_scan[scan_elem][ocmpi[4][p]].evalFreqSpace(
                                     np.linspace(curr_int_ranges_snap[p][0], curr_int_ranges_snap[p][1],
                                         pulse_ranges_points[p][1] - pulse_ranges_points[p][0] + 1)
                                 )
@@ -282,13 +279,11 @@ class SpectralIntegration:
                     int_results[scan_elem][ocmpi] = integrator.integrate(
                         ocmpi[1],
                         sumfreq_points,
-                        rsp_points[ocmpi],
                         pulse_ranges_points,
                         self.rsp_results[ocmpi].amplitude,
                         pulses_on_grid
                     )
 
-                int_results_sum = {}
 
                 # FIXME: Decide which of the detailed data will also be yielded on return
 

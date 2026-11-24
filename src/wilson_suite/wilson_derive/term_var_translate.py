@@ -76,7 +76,7 @@ def translate_one_term_to_axis_variables(term: VibPerturbedTerm, id_tuples_in_ax
     term: VibPerturbedTerm to be translated
 
     id_tuples_in_axis_vars: Dictionary {pulse linear combination: {axis label 1: coeff, ...}}: That is, a description
-    of which linear combination of the axis variables make up a given oulse linear combination
+    of which linear combination of the axis variables make up a given pulse linear combination
 
     returns: return_term: The translated term
     """
@@ -149,3 +149,30 @@ def translate_terms_to_axis_variables(terms: list[VibPerturbedTerm], chosen_axis
                 translated_terms[i][j].append(translate_one_term_to_axis_variables(k, id_tuples_in_axis_vars))
 
     return translated_terms
+
+def simple_term_axis_translation(term: VibPerturbedTerm, id_tuples_in_axis_vars: dict) -> VibPerturbedTerm:
+    """
+    Translate a term represented in terms of interaction IDs to axis variables
+
+    term: VibPerturbedTerm to be translated
+
+    id_tuples_in_axis_vars: Dictionary {(interaction ID tuple): [axis name(s)]}: Maps a in interaction ID tuple to
+    a sum of axis variables, where a simple sum is implied, e.g. (1, 2, 3): ['A', 'B'] -> 1 + 2 + 3: 'A' + 'B'
+
+    returns: return_term: The translated term
+    """
+
+    return_term = copy.deepcopy(term)
+
+    # Walk through the resonance conditions and translate according to id_tuples_in_axis_vars
+    for i in range(len(return_term.res)):
+
+        new_pf = []
+
+        for j in id_tuples_in_axis_vars[tuple(return_term.res[i].pf)]:
+
+            new_pf.append(j)
+
+        return_term.res[i].pf = copy.deepcopy(new_pf)
+
+    return return_term
