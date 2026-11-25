@@ -1,1 +1,0 @@
-from .render import spectrum_renderer, matplotlib_renderer
