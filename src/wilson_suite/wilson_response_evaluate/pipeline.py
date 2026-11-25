@@ -5,7 +5,7 @@ Two calls, from terms already translated to axes and the data:
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=..., laser_pol=...,
                                      lineshape_param=..., exclude_modes=...)
                                                                       rows and features: FeatureResult
-    spec   = spectrum_on_grid(result, axis_points, box_rule=...)
+    spec   = spectrum_on_grid(result, axis_points, box_rule=..., cut_tails=...)
                                                                       the spectrum on a grid: EvalRspResult
 A caller needs only these two calls. The inputs are plain values, the terms and a few small types (below).
 evaluate_response_terms: compile_terms -> make_polarization_linear_comb -> compute_features.
@@ -41,7 +41,8 @@ Inputs
                       smallest point first, e.g.
                       {'A': np.linspace(600., 2800., 501), 'B': np.linspace(5., 3100., 201)}.
                       The points need not be equally spaced.
-    box_rule          features.BoxRule: (window_box, features) -> the half-width of each feat_box, cm-1. Knobs by
+    box_rule          None (default): every feature is kept. A rule drops features to save time:
+                      features.BoxRule, (window_box, features) -> the half-width of each feat_box, cm-1. Knobs by
                       functools.partial, e.g. partial(amplitude_half_widths, dynrange=500.). dynrange: the plot's
                       dynamic range (max / floor), required. intensity_half_widths: by intensity, leaves out more.
     cut_tails         False (default): the feat_boxes choose the features, each chosen one on the whole grid.
@@ -95,6 +96,7 @@ SpectralFeature(location, rows)                            "what" layer   featur
   │ 6. window_box: the first to the last point of each axis
   │ 7. half-widths: box_rule(window_box, features), one per feature, cm-1   ← box_rule
   │    e.g. amplitude_half_widths: from each feature's amplitude; strong features get big feat_boxes
+  │    no box_rule: every half-width is infinite, so step 8 keeps every feature
   │ 8. feat_boxes: SpectralWindow.from_features, a feat_box of location ± half-width per feature.
   │    Keeps a feature if its feat_box overlaps window_box (touching counts): full_features
   │    (location inside), contrib_features (outside). A flat feature's feat_box is window_box
@@ -479,16 +481,18 @@ class EvalRspResult:
 
 def spectrum_on_grid(feature_result: FeatureResult,
                      axis_points: AxisPoints, *,
-                     box_rule: BoxRule,
+                     box_rule: BoxRule | None = None,
                      cut_tails: bool = False) -> EvalRspResult:
     """
     The features of feature_result on the grid of axis_points, in five steps:
         1. check_grid_axes: term axes = the axes of axis_points, and the points of each axis are a 1D numpy
            array, smallest point first, no repeated points, no NaN and no infinity
         2. window_box: the first to the last point of each axis
-        3. box_rule(window_box, features): the half-width of each feature's feat_box, cm-1
+        3. box_rule(window_box, features): the half-width of each feature's feat_box, cm-1.
+           Without a box_rule every half-width is infinite
         4. SpectralWindow.from_features: each feature gets its feat_box, location +- half-width;
-           keeps the features whose feat_box overlaps window_box (touching counts)
+           keeps the features whose feat_box overlaps window_box (touching counts). An infinite
+           feat_box overlaps every window_box, so without a box_rule every feature is kept
         5. the features of spectral_window (spectral_window.features) on the grid, all added into one array:
                cut_tails=False (default)  all_features_on_grid: each feature on the whole grid.
                                           The feat_boxes only choose the features.
@@ -508,7 +512,9 @@ def spectrum_on_grid(feature_result: FeatureResult,
                            {'A': np.linspace(2600., 2800., 201), 'B': np.linspace(-100., 100., 201)}
                            Box({'A': (2600., 2800.), 'B': (-100., 100.)}).grid_points({'A': 201, 'B': 201})
                        spectrum_on_grid copies the points: changing the arrays later does not change the result.
-    box_rule           the half-width of each feat_box: a function (window_box, features) -> cm-1, one per
+    box_rule           None (default): every feature is kept, so nothing is missing from the spectrum.
+                       A rule drops the features that add little to the grid, which saves time. The rule is the
+                       half-width of each feat_box: a function (window_box, features) -> cm-1, one per
                        feature (features.BoxRule). Two exist in features.py; functools.partial gives them
                        their knobs:
                            partial(amplitude_half_widths, dynrange=500.)   by amplitude: what the feat_boxes
@@ -520,7 +526,8 @@ def spectrum_on_grid(feature_result: FeatureResult,
     cut_tails          False (default): each kept feature on the whole grid, so only the dropped features are
                        missing; the run time grows with (kept features) x (grid points). True: each feature
                        only on its feat_box, its tail beyond cut off; the run time grows with the number of
-                       grid points in all feat_boxes.
+                       grid points in all feat_boxes. Without a box_rule the feat_boxes cover the whole grid, so
+                       True cuts nothing.
     raises ValueError if the grid does not fit the terms (check_grid_axes).
     feature_result needs its states (FeatureResult.states), so it must come from compute_features.
     """
@@ -531,8 +538,9 @@ def spectrum_on_grid(feature_result: FeatureResult,
     points = {ax: np.array(axis_points[ax], dtype=float) for ax in sorted(axis_points)}
     window_box = Box({ax: (p[0], p[-1]) for ax, p in points.items()})
 
-    # the half-width of each feature's feat_box; from_features makes the feat_boxes from them
-    half_widths = box_rule(window_box, features)
+    # the half-width of each feature's feat_box; from_features makes the feat_boxes from them.
+    # No rule: infinite feat_boxes, which overlap every window_box, so every feature is kept
+    half_widths = [np.inf] * len(features) if box_rule is None else box_rule(window_box, features)
     spectral_window = SpectralWindow.from_features(window_box, features, half_widths)
 
     # the features of spectral_window on the grid, amplitudes added

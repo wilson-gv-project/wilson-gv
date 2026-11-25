@@ -650,6 +650,20 @@ def test_spectrum_on_grid_keeps_the_spectral_window_it_used(formaldehyde_molsys)
                < get_box_extent(f) for f in spectral_window.full_features)
 
 
+@pytest.mark.parametrize('cut_tails', [False, True])
+def test_spectrum_on_grid_without_a_box_rule_leaves_nothing_out(top_run, cut_tails):
+    """
+    Every feature is kept (68; AMPLITUDE_BOXES keeps 33 here), and the spectrum is all_features_on_grid of all
+    of them. cut_tails=True cuts nothing.
+    """
+    result = top_run.result
+
+    spec = spectrum_on_grid(result, POINTS_1_CM, cut_tails=cut_tails)
+
+    assert len(spec.spectral_window.features) == len(result.features) == 68
+    np.testing.assert_allclose(spec.amplitude, all_features_on_grid(result.features, result.states, POINTS_1_CM))
+
+
 def test_spectrum_on_grid_uses_the_boxes_of_its_box_rule(top_run):
     """
     The rule gets window_box and every feature; the feat_boxes on the grid are its half-widths.

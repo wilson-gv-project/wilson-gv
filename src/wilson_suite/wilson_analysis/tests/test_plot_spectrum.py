@@ -594,6 +594,21 @@ def test_feature_boxes_1d_are_lines_at_the_box_edges():
     assert edges == {(-5., '-'), (5., '-'), (15., '--'), (45., '--')}
 
 
+@pytest.mark.parametrize('names', ['A', 'AB'])
+def test_feature_boxes_draw_nothing_for_an_infinite_box(names):
+    """The inside feature with the box (-inf, inf) on every axis: no outline, no peak mark."""
+    spec = boxed_result({ax: toy_axes()[ax] for ax in names})
+    window = spec.spectral_window
+    endless = replace(window.full_features[0], feat_box=Box({ax: (-np.inf, np.inf) for ax in names}))
+    spec = replace(spec, spectral_window=SpectralWindow(window.box, [endless], []))
+    _, ax, _, _ = plot_rsp_func(spec, dynrange=100.)
+    before = (len(ax.lines), len(ax.collections))
+
+    plot_feature_boxes(ax, spec)
+
+    assert (len(ax.lines), len(ax.collections)) == before
+
+
 def test_plot_rsp_func_boxes_outlines_the_boxes():
     _, ax, _, _ = plot_rsp_func(boxed_result(toy_axes()), dynrange=100., boxes=True)
 

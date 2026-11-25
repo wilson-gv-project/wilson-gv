@@ -602,6 +602,8 @@ class SpectralWindow:
 
         e.g. half-width 55 cm-1, window_box A (0, 10): a feature at A = 60 is kept (its feat_box
         starts at 5), a feature at A = 70 is not (its feat_box starts at 15).
+        A half-width can be infinite (np.inf): its feat_box is (-inf, inf) on every axis and overlaps
+        every window_box.
         A flat feature (is_flat) has no location to put a feat_box around: its feat_box is
         window_box itself, and it goes into full_features. Its half-width is not used.
 
