@@ -12,6 +12,7 @@ The three forms of a grid's extent, e.g. A from 0 to 10 with 3 points, B from -1
     AxisPoints     the points along each axis          {'A': [0., 5., 10.], 'B': [-1., 1.]}
     Mesh           every grid point, 3 x 2 of them     {'A': [[0., 0.], [5., 5.], [10., 10.]],
                                                         'B': [[-1., 1.], [-1., 1.], [-1., 1.]]}
+    Mesh, sparse   the same without the repeats        {'A': [[0.], [5.], [10.]], 'B': [[-1., 1.]]}
 
 Imports nothing from the rest of the package.
 """
@@ -29,7 +30,7 @@ DimBounds = tuple[MinBound, MaxBound]
 # the points along each axis, ascending: the grid is every combination of them (Box.grid_points makes equally
 # spaced ones)
 AxisPoints = dict[str, np.ndarray]
-# every grid point, one full array per axis, ij indexing: mesh['A'][i, j] = axis_points['A'][i] (make_mesh)
+# the grid points as one array per axis, ij indexing, full or sparse (make_mesh)
 Mesh = dict[str, np.ndarray]
 
 
@@ -141,15 +142,20 @@ class Box:
         return axis_points
 
 
-def make_mesh(axis_points: AxisPoints) -> Mesh:
+def make_mesh(axis_points: AxisPoints, sparse: bool = False) -> Mesh:
     """
-    Every grid point, one full array per axis (Mesh), ij indexing: array dimension k is the
-    k-th axis of axis_points, e.g. A with 3 points, B with 2: mesh['A'] and mesh['B'] of
-    shape (3, 2), mesh['A'][i, j] = axis_points['A'][i], mesh['B'][i, j] = axis_points['B'][j].
-    Takes one float per grid point per axis, 
-    e.g. 8 bytes (float64) per grid point per axis, e.g. 201^3 points x 8 B = 65 MB per axis.
+    The grid points as one array per axis (Mesh), ij indexing: array dimension k is the k-th axis
+    of axis_points. Two forms, e.g. for A with 3 points, B with 2:
+      full (default)   every grid point: mesh['A'] and mesh['B'] of shape (3, 2),
+                       mesh['A'][i, j] = axis_points['A'][i], mesh['B'][i, j] = axis_points['B'][j].
+                       Takes 8 bytes (float64) per grid point per axis, e.g. 201^3 points: 65 MB per axis
+      sparse           the points of each axis once: mesh['A'] a column of shape (3, 1), mesh['B'] a
+                       row of shape (1, 2). Takes 8 bytes per point of each axis
+    numpy stretches a column and a row to the full shape when a calculation combines them
+    (broadcasting), e.g. mesh['A'] * mesh['B'] has the shape (3, 2) and the same values in both forms.
+    A calculation on one axis gives 3 values for A in the sparse form, 6 in the full form.
     """
-    return dict(zip(axis_points, np.meshgrid(*axis_points.values(), indexing="ij")))
+    return dict(zip(axis_points, np.meshgrid(*axis_points.values(), indexing="ij", sparse=sparse)))
 
 
 def box_slices(box: Box, axis_points: AxisPoints) -> tuple[slice, ...] | None:

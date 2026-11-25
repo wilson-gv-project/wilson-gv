@@ -619,7 +619,8 @@ def eval_rescond_resloc(res_cond_key: 'ResCondKey',
         E    = vib_diff.energy_difference(au=True) = E_left - E_right
         freq = signed sum of the grid axes in res_cond_key.pf, e.g. ('-A', 'B') -> B - A
     Zero where freq = E: the same point solve_LSE_motif finds.
-    mesh_au: the grid points in Eh (grid.Mesh), or one number per axis for one point.
+    mesh_au: the grid points in Eh (grid.Mesh, full or sparse), or one number per axis for one point.
+    Sparse: the result has the points of the axes in pf only, e.g. pf ('A',) gives a column (nA, 1).
 
     Sign: E - freq, because derive defines a resonance condition that way.
       - ResonanceCondition (wilson_derive/abstractions.py): "perturbing frequencies to be subtracted".
@@ -648,7 +649,7 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
     One motif consists of resonance conditions from a single term. Each condition's factor is
     lineshape.factor(resloc, parameter), e.g. the Lorentzian's 1 / (resloc - i*gamma).
 
-    mesh_au - the grid points in Eh (grid.Mesh), as for eval_rescond_resloc
+    mesh_au - the grid points in Eh, as for eval_rescond_resloc
     lineshape_param_au - vd -> the line shape's parameter in Eh, one call per condition. The Eh form
                          of feature.lineshape_param (cm-1, a number or a (vd, freqs) function), which
                          eval_feature_on_grid converts to this.
@@ -661,7 +662,9 @@ def eval_resonance_factor(motif: 'ResonanceMotif',
 
         resloc = eval_rescond_resloc(res_cond_key, vd, mesh_au)
 
-        result *= lineshape.factor(resloc, lineshape_param_au(vd))
+        # not *=: on a sparse mesh the factors of different axes have different shapes, e.g. (3, 1) and (1, 2),
+        # and their product is a new, larger array, (3, 2)
+        result = result * lineshape.factor(resloc, lineshape_param_au(vd))
 
     return result
 
@@ -671,15 +674,16 @@ def eval_feature_on_grid(feature: 'SpectralFeature',
                          vibstates_data: 'VibStatesData',
                          mesh_cm: Mesh) -> complex | np.ndarray:
     """
-    amplitude_coeff * resonance factor of the feature's motif, at every point of mesh_cm (grid.Mesh, cm-1).
-    Result in au, of the mesh's shape. The line shape comes from lineshape.py, as for get_intensity
-    and the box rules (features.py).
+    amplitude_coeff * resonance factor of the feature's motif, at every point of mesh_cm (grid.Mesh, cm-1,
+    full or sparse). Result in au, of the grid's shape; on a sparse mesh an axis without a condition has
+    length 1, and numpy stretches it when the result is added to the grid. The line shape comes from
+    lineshape.py, as for get_intensity and the box rules (features.py).
 
     The line shape's parameter is feature.lineshape_param, cm-1 (converted to Eh here):
         a number   -> the same on every condition
         a function -> lineshape_param(vd, mesh_cm) for each condition (features.LineshapeParam):
-                      a number per condition, or an array of the grid's shape for one that changes with
-                      the frequency, e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
+                      a number per condition, or an array for one that changes with the frequency,
+                      e.g. lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
     The box and get_intensity take the same lineshape_param, at the peak
     (SpectralFeature.lineshape_params_at_peak).
     A flat feature (no conditions): amplitude_coeff on every grid point, an array of the grid's shape.
@@ -720,6 +724,8 @@ def all_features_on_grid(features: Iterable['SpectralFeature'],
     the whole grid, or the grid points around one feat_box (boxed_features_on_grid).
     The grid points are every combination of the points along each axis (grid.make_mesh,
     ij indexing), e.g. A with 5 points, B with 3 -> 15 points, shape (5, 3).
+    The mesh is sparse, so a factor that depends on one axis is computed once per point of that
+    axis: 5 values for A and 3 for B, multiplied into the 15.
     On the whole grid nothing is left out, so this is the reference for boxed_features_on_grid,
     which leaves out each feature's tail beyond its feat_box. Slow for many features on big grids.
 
@@ -727,7 +733,7 @@ def all_features_on_grid(features: Iterable['SpectralFeature'],
     Returns the complex amplitude in au; array dimension k is the k-th axis of axis_points_cm.
     intensity = abs(amplitude)**2
     """
-    mesh_cm = make_mesh(axis_points_cm)
+    mesh_cm = make_mesh(axis_points_cm, sparse=True)
     amplitude = np.zeros(tuple(len(points) for points in axis_points_cm.values()), dtype=complex)
     for feature in features:
         amplitude += eval_feature_on_grid(feature, vibstates_data, mesh_cm)

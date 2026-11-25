@@ -72,7 +72,8 @@ Names in the grid part, one per kind of data (the types are in grid.py), e.g. A 
     window_box        a Box: the first to the last point of each axis   {'A': (2600., 2800.)}
     feat_box          a Box: the range of one feature on each axis
     mesh              every grid point, one full array per axis (grid.Mesh, made by grid.make_mesh):
-                      mesh['A'][i, j] = axis_points['A'][i]. Built where it is used, one cut at a time
+                      mesh['A'][i, j] = axis_points['A'][i]. The evaluation uses the sparse form, built where it is
+                      used, one cut at a time
     cut               where a feature's box sits in the grid: one slice per axis (grid.box_slices);
                       cut_points: the axis_points inside the cut
     amplitude         the complex amplitude, au, one value per grid point; intensity = abs(amplitude)**2

@@ -61,8 +61,9 @@ GroupKey = TypeVar('GroupKey', bound=Hashable)
 #      - vd: the condition's pair of states (VibDiff), e.g. vd.left.state_label,
 #        vd.energy_difference()
 #      - freqs: {axis: cm-1}, the frequencies where the value is needed. On the grid: the
-#        grid points (grid.Mesh, one array per axis). For the box and the peak height: the
-#        feature's location (one number per axis, its own axes only).
+#        grid points as a sparse grid.Mesh, e.g. freqs['A'] a column of shape (nA, 1) and
+#        freqs['B'] a row of shape (1, nB). For the box and the peak height: the feature's
+#        location (one number per axis, its own axes only).
 #
 # Examples of a function:
 #   1. one value per condition, from its energy difference:
@@ -71,6 +72,9 @@ GroupKey = TypeVar('GroupKey', bound=Hashable)
 #      lambda vd, freqs: gamma_mn[vd.left.state_label, vd.right.state_label]
 #   3. a value that changes along axis A:
 #      lambda vd, freqs: 2. + 0.002 * np.abs(freqs['A'])
+#   4. a value that changes along axis B in one step (a mask on B cannot index an array of A's
+#      shape, so np.where):
+#      lambda vd, freqs: np.where(freqs['B'] > 1000., 5., 3.)
 #
 # For a function:
 #   - use abs() on energy_difference: it is signed (left - right), and for the Lorentzian
