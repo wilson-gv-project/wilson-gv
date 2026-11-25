@@ -86,7 +86,7 @@ def score(result: FeatureResult, window_box: Box, n_points_per_axis: dict[str, i
           rule: BoxRule = amplitude_half_widths, **knobs) -> dict:
     """spectrum_on_grid with `rule` and its `knobs` (dynrange required) against the reference: the scores above"""
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis=n_points_per_axis,
+    spec = spectrum_on_grid(result, window_box.grid_points(n_points_per_axis),
                             box_rule=partial(rule, **knobs), cut_tails=True)
     t_on_grid = time.perf_counter() - t0
 

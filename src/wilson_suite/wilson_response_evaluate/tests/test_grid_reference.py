@@ -158,7 +158,7 @@ def spectrum(case: Case, molsys: MolSystemData) -> EvalRspResult:
     terms, laser_pol = case_terms(case)
     result = evaluate_response_terms(terms, molsys_data=molsys, states_choice=case.states,
                                      laser_pol=laser_pol, lineshape_param=case.lineshape_param)
-    return spectrum_on_grid(result, window_box=case.window_box, n_points_per_axis=case.n_points_per_axis,
+    return spectrum_on_grid(result, case.window_box.grid_points(case.n_points_per_axis),
                             box_rule=BOXES, cut_tails=case.cut_tails)
 
 

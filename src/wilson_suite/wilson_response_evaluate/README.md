@@ -137,26 +137,24 @@ from functools import partial
 import numpy as np
 
 from wilson_suite.wilson_response_evaluate.features import amplitude_half_widths
-from wilson_suite.wilson_response_evaluate.grid import Box
 from wilson_suite.wilson_response_evaluate.pipeline import spectrum_on_grid
 
-spec = spectrum_on_grid(result, window_box=Box({'A': (600., 2800.), 'B': (5., 3100.)}),
-                        n_points_per_axis={'A': 501, 'B': 201},
-                        box_rule=partial(amplitude_half_widths, dynrange=1000.))
+axis_points = {'A': np.linspace(600., 2800., 501), 'B': np.linspace(5., 3100., 201)}
+spec = spectrum_on_grid(result, axis_points, box_rule=partial(amplitude_half_widths, dynrange=1000.))
 intensity = np.abs(spec.amplitude) ** 2      # shape (501, 201)
 ```
 
-1. `box_rule` gives each feature a half-width. Location ± half-width is its feat_box.
-2. The features whose feat_box overlaps `window_box` are kept.
-3. The kept features go on the grid. Their amplitudes add before squaring, so peaks interfere.
+1. `window_box` is the range of the grid: the first to the last point of each axis.
+2. `box_rule` gives each feature a half-width. Location ± half-width is its feat_box.
+3. The features whose feat_box overlaps `window_box` are kept.
+4. The kept features go on the grid. Their amplitudes add before squaring, so peaks interfere.
 
-One result serves many grids. Call `spectrum_on_grid` again with another `window_box`, or
+One result serves many grids. Call `spectrum_on_grid` again with other `axis_points`, or
 with `dataclasses.replace(result, lineshape_param=8.)`. The rows are not computed again.
 
 | argument | what it is | example |
 |---|---|---|
-| `window_box` | the range of each axis, cm-1. Its axes are the term axes | `Box({'A': (600., 2800.), 'B': (5., 3100.)})` |
-| `n_points_per_axis` | grid points on each axis, both edges included | `{'A': 501, 'B': 201}` |
+| `axis_points` | the points along each axis, cm-1: one 1D numpy array per term axis, smallest point first. The points need not be equally spaced. `Box.grid_points` (grid.py) makes equally spaced points from a range and a count | `{'A': np.linspace(600., 2800., 501), 'B': np.linspace(5., 3100., 201)}` |
 | `box_rule` | how far around each peak to look (its feat_box). `dynrange` is the plot's dynamic range, max / floor. Required | `partial(amplitude_half_widths, dynrange=1000.)` |
 | `cut_tails` | `False` (default): each kept peak on the whole grid. `True`: each peak only inside its feat_box; faster | `True` |
 

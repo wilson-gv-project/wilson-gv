@@ -32,7 +32,6 @@ from wilson_suite.wilson_analysis.render.plot_spectrum import (
 from wilson_suite.wilson_response_evaluate.features import (
     amplitude_half_widths,
 )
-from wilson_suite.wilson_response_evaluate.grid import Box
 from wilson_suite.wilson_response_evaluate.pipeline import (
     FeatureResult,
     evaluate_response_terms,
@@ -70,8 +69,8 @@ def main(out: Path):
     anharmonic, harmonic = evaluate(terms, formaldehyde, 'anharmonic'), evaluate(terms, formaldehyde, 'harmonic')
 
     # 1. every feature in window_box
-    spec = spectrum_on_grid(anharmonic, window_box=Box({'A': (600., 3100.), 'B': (5., 3100.)}),
-                            n_points_per_axis={'A': 501, 'B': 501}, box_rule=BOXES)
+    axis_points = {'A': np.linspace(600., 3100., 501), 'B': np.linspace(5., 3100., 501)}
+    spec = spectrum_on_grid(anharmonic, axis_points, box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title('formaldehyde, 14 EVV terms, anharmonic states, dynrange 500')
     save(fig, out / '1_formaldehyde.png')
@@ -79,8 +78,8 @@ def main(out: Path):
     # 2. +-150 cm-1 around the strongest peak, 1 cm-1 steps
     strongest = max(anharmonic.features, key=lambda f: abs(f.amplitude_coeff))  # type: ignore
     a0, b0 = strongest.location['A'], strongest.location['B']
-    zoom = Box({'A': (a0 - 150., a0 + 150.), 'B': (b0, b0 + 300.)})
-    spec = spectrum_on_grid(anharmonic, window_box=zoom, n_points_per_axis={'A': 301, 'B': 301}, box_rule=BOXES)
+    zoom = {'A': np.linspace(a0 - 150., a0 + 150., 301), 'B': np.linspace(b0, b0 + 300., 301)}
+    spec = spectrum_on_grid(anharmonic, zoom, box_rule=BOXES)
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)
     ax.set_title(f'zoom: strongest peak at A = {a0:.1f}, B = {b0:.1f} cm$^{{-1}}$')
     save(fig, out / '2_formaldehyde_zoom.png')
@@ -93,9 +92,8 @@ def main(out: Path):
     save(fig, out / '2b_formaldehyde_zoom_1d.png')
 
     # 3. harmonic vs anharmonic: reference_max = the larger of the two maxima, so both share one scale
-    window_box, n_points_per_axis = Box({'A': (1100., 3000.), 'B': (5., 3000.)}), {'A': 401, 'B': 401}
-    specs = {name: spectrum_on_grid(result, window_box=window_box, n_points_per_axis=n_points_per_axis,
-                                    box_rule=BOXES)
+    axis_points = {'A': np.linspace(1100., 3000., 401), 'B': np.linspace(5., 3000., 401)}
+    specs = {name: spectrum_on_grid(result, axis_points, box_rule=BOXES)
              for name, result in (('anharmonic', anharmonic), ('harmonic', harmonic))}
     reference_max = max(np.max(np.abs(s.amplitude)) ** 2 for s in specs.values())
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
@@ -108,10 +106,9 @@ def main(out: Path):
     t0 = time.perf_counter()
     acdm = load_acdm(terms)
     t_load = time.perf_counter() - t0
+    axis_points = {'A': np.linspace(700., 3400., 700), 'B': np.linspace(10., 3500., 700)}
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(evaluate(terms, acdm, 'anharmonic'),
-                            window_box=Box({'A': (700., 3400.), 'B': (10., 3500.)}),
-                            n_points_per_axis={'A': 700, 'B': 700}, box_rule=BOXES)
+    spec = spectrum_on_grid(evaluate(terms, acdm, 'anharmonic'), axis_points, box_rule=BOXES)
     t_eval = time.perf_counter() - t0
     t0 = time.perf_counter()
     fig, ax, _, _ = plot_rsp_func(spec, dynrange=DYNRANGE, axis_labels=LABELS)

@@ -26,7 +26,8 @@ import numpy as np
 MinBound = float
 MaxBound = float
 DimBounds = tuple[MinBound, MaxBound]
-# the points along each axis, ascending: the grid is every combination of them (Box.grid_points makes them)
+# the points along each axis, ascending: the grid is every combination of them (Box.grid_points makes equally
+# spaced ones)
 AxisPoints = dict[str, np.ndarray]
 # every grid point, one full array per axis, ij indexing: mesh['A'][i, j] = axis_points['A'][i] (make_mesh)
 Mesh = dict[str, np.ndarray]
