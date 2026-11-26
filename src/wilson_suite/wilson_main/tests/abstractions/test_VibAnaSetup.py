@@ -1,6 +1,5 @@
 
 from ... import abstractions as wm_abst
-from ....wilson_utils.printing import printtest
 from ....wilson_utils.logger import setup_logger
 import pytest
 

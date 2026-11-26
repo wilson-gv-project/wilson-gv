@@ -1,5 +1,3 @@
-from ...wilson_utils.printing import printtest, separatorprint
-
 import logging
 from dataclasses import dataclass
 
@@ -10,7 +8,6 @@ class Mock:
 
 '''
 def test_logger_with_caplog_serialization(caplog):
-    separatorprint()
     # Set the logging level to capture all messages
     with caplog.at_level(logging.INFO, logger="wilson.wilson_utils.serialization"):
         check_if_jsonsafe(Mock(1, {(0,1): 'str'}))
