@@ -23,7 +23,7 @@ def get_plt_latex(expr, savename: str | None = None, color: str='black'):
     else:
         plt.savefig(savename)
 
-def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
+def prop_trivialname_latex(geo=None, el=None, rot=None) -> tuple[str, str]:
 	"""
 	Generate an abbreviated trivial name for a molecular property based on orders of perturbation
 
@@ -49,14 +49,14 @@ def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
 	geo_inds = ''.join([rf'\partial Q_{{{ind}}}' for ind in geo])
 
 	if (ord_el == 0) and (ord_geo == 0) and (ord_rot == 0):
-		return 'E'
+		return 'E', geo_inds
 
 	if ord_rot > 0:
 
 		if (ord_rot == 1) and (ord_geo == 0):
 
 			if ord_el == 0:
-				return 'B'
+				return 'B', geo_inds
 
 			else:
 				raise AssertionError('This property trivial name is not established in prop_trivname')
@@ -64,7 +64,7 @@ def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
 		elif (ord_rot == 1) and (ord_geo == 2):
 
 			if ord_el == 0:
-				return 'coriolis'
+				return 'coriolis', geo_inds
 
 			else:
 				raise AssertionError('This property trivial name is not established in prop_trivname')
@@ -75,4 +75,4 @@ def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
 	if (ord_el > 6) or (ord_geo > 6):
 			raise AssertionError('This property trivial name is not established in prop_trivname')
 	
-	return triv_geo[ord_geo] + triv_el[ord_el] + rf'_{{{el_ops_greek_inds}}}'#, geo_inds
+	return triv_geo[ord_geo] + triv_el[ord_el] + rf'_{{{el_ops_greek_inds}}}', geo_inds
