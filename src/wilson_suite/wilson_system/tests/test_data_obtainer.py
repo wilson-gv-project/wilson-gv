@@ -1,8 +1,7 @@
 """
 data_obtainer groups the requested names by their DataOriginInfo, calls CQCParse's parse_from_source once per
 origin, and merges the results. CQCParse tests its own readers; the tests here cover what the obtainer adds, some
-on real files. Which names the old workflow asks for (WilsonSimulation.requestData) is tested in
-wilson_main/tests/test_workflow_abstractions.py.
+on real files.
 """
 from importlib.resources import files
 
