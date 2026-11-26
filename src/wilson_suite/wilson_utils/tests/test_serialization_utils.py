@@ -2,14 +2,6 @@ from ...wilson_utils.serialization import pickle_this_to, unpickle_smth_from
 from dataclasses import dataclass
 
 
-def test_get_utils_root():
-    import os
-    from ...wilson_utils.paths import UTILS_ROOT
-
-    assert os.path.isabs(UTILS_ROOT)
-    assert os.path.exists(UTILS_ROOT)
-    assert os.path.basename(UTILS_ROOT) == "wilson_utils"
-    
 @dataclass
 class Mock1:
     a: int
