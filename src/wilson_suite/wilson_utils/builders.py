@@ -24,15 +24,15 @@ def show_valid_axis_combs(valid_axis_combs: list[SpectralAxisChoices], output=Fa
         return '\n'.join(text)
     print('\n'.join(text))
 
-def show_axis(ax: SpectralAxis, output: False):
+def show_axis(ax: SpectralAxis, output: bool = False):
     text = f"SpectralAxis with label {ax.label} and var_set {ax.var_set.var_set}"
     if output:
         return text
     print(text)
 
 # --------- VibPerturbedTerm and related
-def show_term_latex(term: VibPerturbedTerm, part_of_term: str = None, output=False):
-    """ 
+def show_term_latex(term: VibPerturbedTerm, part_of_term: str | None = None, output=False):
+    """
     part_of_term: 'res', 'coeff', 'props', 'freqterms'
     """
     res_conditions_denom = ''.join([rc.to_latex() for rc in term.res])

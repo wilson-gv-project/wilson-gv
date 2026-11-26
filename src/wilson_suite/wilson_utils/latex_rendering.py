@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
-def get_plt_latex(expr, savename: str=None, color: str='black'):
+
+def get_plt_latex(expr, savename: str | None = None, color: str='black'):
     """
     color: blue, green, red, black, yellow ...
     """
@@ -74,4 +75,4 @@ def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
 	if (ord_el > 6) or (ord_geo > 6):
 			raise AssertionError('This property trivial name is not established in prop_trivname')
 	
-	return triv_geo[ord_geo] + triv_el[ord_el] + rf'_{{{el_ops_greek_inds}}}', geo_inds
+	return triv_geo[ord_geo] + triv_el[ord_el] + rf'_{{{el_ops_greek_inds}}}'#, geo_inds
