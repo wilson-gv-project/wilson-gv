@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        # oldest supported (CQCParse needs 3.12) and newest stable
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Create environment
+        run: uv venv --python ${{ matrix.python-version }}
+
+      # setup.py lists no dependencies, so they are named here
+      - name: Install dependencies
+        run: |
+          uv pip install "CQCParse @ git+https://github.com/wilson-gv-project/CQCParse.git@main" \
+            numpy scipy matplotlib pytest
+          uv pip install .
+
+      - name: Run tests
+        run: uv run --no-project pytest src tests -q
