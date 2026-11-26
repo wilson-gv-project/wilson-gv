@@ -1,1 +1,0 @@
-from .test_saving_in_workflow import assert_equal
