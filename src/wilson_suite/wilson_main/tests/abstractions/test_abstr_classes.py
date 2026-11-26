@@ -9,10 +9,6 @@ Integration test is in wilson_suitetests/evv_tester_dataclasses.py (different fr
 """
 from ... import abstractions as wm_abst
 import numpy as np
-from ....wilson_utils.logger import setup_logger
-
-import logging
-setup_logger("wilson", level=logging.DEBUG)
 
 def test_MolecularSystem():
 

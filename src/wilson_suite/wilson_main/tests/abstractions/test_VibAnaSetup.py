@@ -1,12 +1,9 @@
 
 from ... import abstractions as wm_abst
-from ....wilson_utils.logger import setup_logger
 import pytest
-
+import logging
 import copy
 
-import logging
-setup_logger("wilson", level=logging.DEBUG)
 
 def test_VibAnaSetup_init():
 
