@@ -1,7 +1,6 @@
 from ...wilson_utils.printing import printtest, separatorprint
 
 import logging
-from ...wilson_utils.serialization import check_if_jsonsafe
 from dataclasses import dataclass
 
 @dataclass
