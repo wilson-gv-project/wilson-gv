@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 
-def get_plt_latex(expr, savename: str=None, color: str='black'):
+from .prop_trivname import prop_trivname
+
+
+def get_plt_latex(expr, savename: str | None = None, color: str='black'):
     """
     color: blue, green, red, black, yellow ...
     """
@@ -22,7 +25,7 @@ def get_plt_latex(expr, savename: str=None, color: str='black'):
     else:
         plt.savefig(savename)
 
-def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
+def prop_trivialname_latex(geo=None, el=None, rot=None) -> tuple[str, str]:
 	"""
 	Generate an abbreviated trivial name for a molecular property based on orders of perturbation
 
@@ -40,38 +43,16 @@ def prop_trivialname_latex(geo=None, el=None, rot=None) -> str:
 	
 	ord_geo = len(geo)
 	ord_el = len(el)
-	ord_rot = len(rot)
+
+	# prop_trivname raises for orders without a name
+	name = prop_trivname(ord_geo=ord_geo, ord_el=ord_el, ord_rot=len(rot))
+	geo_inds = ''.join([rf'\partial Q_{{{ind}}}' for ind in geo])
+
+	if name in ('E', 'B', 'coriolis'):
+		return name, geo_inds
 
 	triv_el = {0: 'E', 1: r'\mu', 2: r'\alpha', 3: r'\beta', 4: r'\gamma', 5: r'\chi^{(3)}', 6: r'\chi^{(4)}'}
 	triv_geo = {0: '', 1: r'\partial', 2: r'\partial^{2}', 3: r'\partial^{3}', 4: r'\partial^{4}', 5: r'\partial^{5}', 6: r'\partial^{6}'}
 	el_ops_greek_inds = ''.join([op_labels_greek_latex[i] for i in el])
-	geo_inds = ''.join([rf'\partial Q_{{{ind}}}' for ind in geo])
 
-	if (ord_el == 0) and (ord_geo == 0) and (ord_rot == 0):
-		return 'E'
-
-	if ord_rot > 0:
-
-		if (ord_rot == 1) and (ord_geo == 0):
-
-			if ord_el == 0:
-				return 'B'
-
-			else:
-				raise AssertionError('This property trivial name is not established in prop_trivname')
-
-		elif (ord_rot == 1) and (ord_geo == 2):
-
-			if ord_el == 0:
-				return 'coriolis'
-
-			else:
-				raise AssertionError('This property trivial name is not established in prop_trivname')
-
-		else:
-			raise AssertionError('This property trivial name is not established in prop_trivname')
-
-	if (ord_el > 6) or (ord_geo > 6):
-			raise AssertionError('This property trivial name is not established in prop_trivname')
-	
 	return triv_geo[ord_geo] + triv_el[ord_el] + rf'_{{{el_ops_greek_inds}}}', geo_inds

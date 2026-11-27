@@ -1,6 +1,5 @@
 import pytest
 
-from ....wilson_utils.printing import printtest, separatorprint
 from ....wilson_system.system_data import DataOriginInfo, MolSystemData
 import wilson_suite as ws
 from importlib.resources import files
@@ -25,10 +24,8 @@ def test_anharm_analyzer_vibana():
     Water, read with MolSystemData.from_output_file. GVPT2 moves the fundamentals away from the harmonic
     frequencies, to the anharmonic fundamentals the file prints (3 decimals).
     """
-    separatorprint()
-
     molsys = MolSystemData.from_output_file(WATER, VPT2_INPUTS)
-    printtest(f'eigenvals: {molsys.eigenvals}')
+    print(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
     states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
@@ -57,10 +54,8 @@ def test_anharm_analyzer_vibana_excludemodes():
     Water, read with MolSystemData.from_output_file, GVPT2 with mode 1 left out: no state of mode 1 comes back,
     and the diagnostics name the mode. An unknown mode raises.
     """
-    separatorprint()
-
     molsys = MolSystemData.from_output_file(WATER, VPT2_INPUTS)
-    printtest(f'eigenvals: {molsys.eigenvals}')
+    print(f'eigenvals: {molsys.eigenvals}')
 
     # ---- do analysis
     states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=molsys.mol_props,
@@ -104,7 +99,6 @@ def test_anharm_analyzer_vibana():
 
     OMG... it's very complicated. i give up now
     """
-    separatorprint()
     import logging
     from ....wilson_utils.logger import setup_logger
     setup_logger("wilson.", level=logging.DEBUG)
@@ -122,7 +116,7 @@ def test_anharm_analyzer_vibana():
     vibana = ws_main.abstractions.VibAnaSetup(system=mol_system, regime='GVPT2',
                                               vibana_own_analysis='anharm', # should this vary? take minimal needed for regime unless specified? 
                                               )
-    printtest(f'vibana.vibana_own_analysis: {vibana.vibana_own_analysis}')
+    print(f'vibana.vibana_own_analysis: {vibana.vibana_own_analysis}')
     # FIXME: is it intentionally not possible for VibAnaSetup to get results from files?
 
     props, residual_vib_info, vibana.max_state_lvl = \
@@ -135,7 +129,7 @@ def test_anharm_analyzer_vibana():
     ws_main.main_functions.fill_props_results(props)
     ws_main.main_functions.fill_residual_vib_info_results(vibana)
     
-    printtest(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
+    print(f'nc_sqrt_eigval: {vibana.nc_sqrt_eigval}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
     print(f'props: {props}') # vibana_own_analysis='all' -> nc_sqrt_eigval is None
 
     try:
