@@ -3,15 +3,15 @@ Run time on a bigger molecule: ACDM, the acetic acid dimer, 16 atoms, 42 modes.
 The 14 EVV terms, axes A = w1, B = -w1 + w2, laser_pol (1, 1, 1), anharmonic states (the file is a GVPT2 run).
 
 Steps:
-  1. load: MolSystemData.load, only the terms' properties + frequencies + states. The reader fails on ACDM at
-     normal_modes; the evaluator does not use normal_modes.
+  1. load: MolSystemData.from_output_file, only the terms' properties + frequencies + states. The evaluator does
+     not use normal_modes.
   2. build_contributions: wall time without a profiler. Then once under cProfile: the share of the averaging
-     (calculate_avrg_tensor_einsum + AvrgTensor.at) and of the deepcopy (FreqTermsCollection.__post_init__).
+     (calculate_avrg_tensor_einsum + AvrgTensor.at).
   3. the rest: features_from_rows, amplitude_half_widths, SpectralWindow.from_features, boxed_features_on_grid
      on one grid.
      Window, grid, gamma and dynrange as in examples/quick_start.ipynb; eps 0.1.
 
-A script, not a test: it runs for minutes.
+A script, not a test: it runs for 14 s.
     python -m wilson_suite.wilson_response_evaluate.tests.scripts.f2_speed
 """
 import cProfile
@@ -34,7 +34,6 @@ from wilson_suite.wilson_response_evaluate.pipeline import (
     make_polarization_linear_comb,
     prop_names,
 )
-from wilson_suite.wilson_response_evaluate.plan import FreqTermsCollection
 from wilson_suite.wilson_response_evaluate.tests import (
     make_evv_reference as ref,
 )
@@ -55,9 +54,9 @@ GRID = {'A': 700, 'B': 700}
 
 
 def load_acdm(terms) -> MolSystemData:
-    """the terms' properties, frequencies, states; no normal_modes, atoms, geometry: the reader fails on ACDM there"""
+    """the terms' properties, frequencies, states; no normal_modes, atoms, geometry"""
     origin = DataOriginInfo(source_type='gaussian', base_file_loc=f'{SUITE_ROOT}/{DATA_FILE}')
-    return MolSystemData.load(origin, prop_names(terms))
+    return MolSystemData.from_output_file(origin, prop_names(terms))
 
 
 def timed(f, *args, **kwargs):
@@ -68,23 +67,20 @@ def timed(f, *args, **kwargs):
 
 
 def profile_build_contributions(compiled, molsys, pol) -> dict:
-    """build_contributions under cProfile: total, averaging, deepcopy (cumulative s, number of calls)"""
+    """build_contributions under cProfile: total, averaging (cumulative s, number of calls)"""
     prof = cProfile.Profile()
     prof.enable()
     build_contributions(compiled, molsys, pol, states_choice=STATES)
     prof.disable()
     stats = pstats.Stats(prof).stats       # type: ignore # (file, line, name) -> (primitive calls, calls, own s, cumulative s, ...)
 
-    def cum(name: str, file_end: str, line: int | None = None) -> tuple[float, int]:
-        hits = [(v[3], v[1]) for (file, ln, fn), v in stats.items()
-                if fn == name and file.endswith(file_end) and (line is None or ln == line)]
+    def cum(name: str, file_end: str) -> tuple[float, int]:
+        hits = [(v[3], v[1]) for (file, _, fn), v in stats.items() if fn == name and file.endswith(file_end)]
         return sum(t for t, _ in hits), sum(n for _, n in hits)
 
-    post_init = FreqTermsCollection.__post_init__.__code__
     out = {'total': cum('build_contributions', 'evaluate.py'),
            'averaging, einsum': cum('calculate_avrg_tensor_einsum', 'evaluate.py'),
-           'averaging, lookup': cum('at', 'evaluate.py'),
-           'deepcopy': cum('__post_init__', post_init.co_filename, post_init.co_firstlineno)}
+           'averaging, lookup': cum('at', 'evaluate.py')}
     print('\nbuild_contributions under cProfile, top 15 by own time:')
     pstats.Stats(prof).sort_stats('tottime').print_stats(15)
     return out

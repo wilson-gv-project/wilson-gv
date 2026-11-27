@@ -15,7 +15,7 @@ from wilson_suite.wilson_utils.paths import SUITE_ROOT
 NEW_CODE = ('wilson_response_evaluate', 'wilson_system', 'wilson_orientational_averaging')     # relative to SUITE_ROOT
 FORBIDDEN = (
     'wilson_suite.wilson_experiment',                   # the experiment, every module
-    'wilson_suite.wilson_derive.derive',                # get_fully_enhanced_terms
+    'wilson_suite.wilson_derive.derive',                # ResponseTermsCollection: the derivation of the terms
     'wilson_suite.wilson_derive.term_var_translate',    # the translation to axes
     'wilson_suite.wilson_utils.builders',               # make_SpectralAxisSet; imports wilson_experiment
     'wilson_suite.fixtures',                            # builds VibExperiments

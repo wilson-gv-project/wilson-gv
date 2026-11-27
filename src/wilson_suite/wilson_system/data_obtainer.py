@@ -4,12 +4,12 @@ from dataclasses import asdict
 from wilson_suite.wilson_system.system_data import DataOriginInfo
 
 
-def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
+def read_from_sources(request: dict[str,DataOriginInfo]):
     """
     Read data from its sources: one parse_from_source call per origin.
 
-    requested_data_dict  {name: DataOriginInfo}, the names to read and where each comes from
-    returns              {name: value}, the requested names, plus extra names a call returns
+    request  {name: DataOriginInfo}, the names to read and where each comes from
+    returns  {name: value}, the requested names, plus extra names a call returns
 
     Names with equal origins go to one call together, e.g.
         {'cff': g16, 'qff': g16, 'dipgrad': c4} -> ['cff', 'qff'] from g16, ['dipgrad'] from c4
@@ -18,19 +18,19 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
         an extra name      kept if no origin was asked for it and only one origin returns it
     Mixing origins assumes mode k is the same vibration in each; nothing checks this.
 
-    raises TypeError if requested_data_dict is not {name: DataOriginInfo},
+    raises TypeError if request is not {name: DataOriginInfo},
         ValueError for an unknown source_type, NotImplementedError for 'wilson';
         all before any file is read
     """
-    if not isinstance(requested_data_dict, dict):
-        raise TypeError(f'requested_data_dict should be dict[str, DataOriginInfo], '
-                        f'not {type(requested_data_dict).__name__}')
-    wrong = {k: type(v).__name__ for k, v in requested_data_dict.items() if not isinstance(v, DataOriginInfo)}
+    if not isinstance(request, dict):
+        raise TypeError(f'request should be dict[str, DataOriginInfo], '
+                        f'not {type(request).__name__}')
+    wrong = {k: type(v).__name__ for k, v in request.items() if not isinstance(v, DataOriginInfo)}
     if wrong:
-        raise TypeError(f'requested_data_dict should be dict[str, DataOriginInfo]; not a DataOriginInfo: {wrong}')
+        raise TypeError(f'request should be dict[str, DataOriginInfo]; not a DataOriginInfo: {wrong}')
 
     origin_to_req_data: dict[DataOriginInfo, list] = {}
-    for k, v in requested_data_dict.items():
+    for k, v in request.items():
         origin_to_req_data.setdefault(v, []).append(k)
 
     for o, datakeys in origin_to_req_data.items():
@@ -58,7 +58,7 @@ def wilson_data_obtainer(requested_data_dict: dict[str,DataOriginInfo]):
     # an extra name is kept if no origin was asked for it and only one origin returns it
     counts = Counter(k for e in extras for k in e)
     for e in extras:
-        dict_with_data.update({k: v for k, v in e.items() if k not in requested_data_dict and counts[k] == 1})
+        dict_with_data.update({k: v for k, v in e.items() if k not in request and counts[k] == 1})
 
     return dict_with_data
 
@@ -76,7 +76,7 @@ def save_obtained_data(dict_with_data: dict, format: str, filename: str = 'obtai
     """
     Saving data wrapper function
 
-    :param dict_with_data: return dict from wilson_data_obtainer
+    :param dict_with_data: return dict from read_from_sources
     :param format: options are json or pkl
     :param filename: filename with or without extention; if no extention - will be added as `.format` value
     """

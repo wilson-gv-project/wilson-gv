@@ -9,7 +9,7 @@ from importlib.resources import files
 import pytest
 
 from wilson_suite.wilson_main.abstractions import DataOriginInfo
-from wilson_suite.wilson_system.data_obtainer import wilson_data_obtainer
+from wilson_suite.wilson_system.data_obtainer import read_from_sources
 
 data_dir = files('wilson_suite').joinpath('data_for_tests')
 WATER = DataOriginInfo(source_type='gaussian', base_file_loc=str(data_dir / 'g16_h2o_HF_STO3G.out'))
@@ -26,7 +26,7 @@ def test_getting_data():
     """
     names = ['cff', 'anharmonic_states', 'nc_sqrt_eigval', 'dipgrad', 'B', 'polgrad', 'coriolis', 'polhess', 'qff',
              'diphess']
-    data = wilson_data_obtainer(dict.fromkeys(names, WATER))
+    data = read_from_sources(dict.fromkeys(names, WATER))
 
     assert set(names) | {'cff_rc', 'qff_rc'} <= set(data)
     assert all(data[k] is not None for k in names)
@@ -67,8 +67,8 @@ def test_merge_of_two_origins(g16_first):
     from_c4 = {'harmonic_states': FORMALDEHYDE_C4}
     request = {**from_g16, **from_c4} if g16_first else {**from_c4, **from_g16}
 
-    data = wilson_data_obtainer(request)
-    g16, c4 = wilson_data_obtainer(from_g16), wilson_data_obtainer(from_c4)    # each origin alone
+    data = read_from_sources(request)
+    g16, c4 = read_from_sources(from_g16), read_from_sources(from_c4)    # each origin alone
 
     assert set(data) == {'nc_sqrt_eigval', 'cff', 'cff_rc', 'harmonic_states'}
     assert data['harmonic_states'] == c4['harmonic_states'] != g16['harmonic_states']
@@ -93,7 +93,7 @@ def test_one_call_per_origin(calls):
     same_as_g16 = DataOriginInfo(source_type='gaussian', base_file_loc='g16.out')
     c4 = DataOriginInfo(source_type='cfour', base_file_loc='c4_folder')
 
-    data = wilson_data_obtainer({'cff': g16, 'dipgrad': c4, 'qff': same_as_g16})
+    data = read_from_sources({'cff': g16, 'dipgrad': c4, 'qff': same_as_g16})
 
     assert calls == [['cff', 'qff'], ['dipgrad']]
     assert data == {'cff': 'cff from g16.out', 'qff': 'qff from g16.out', 'dipgrad': 'dipgrad from c4_folder'}
@@ -105,5 +105,5 @@ def test_unknown_source_type(calls):
     unknown = DataOriginInfo(source_type='orca')
 
     with pytest.raises(ValueError, match="'orca'"):
-        wilson_data_obtainer({'cff': known, 'dipgrad': unknown})
+        read_from_sources({'cff': known, 'dipgrad': unknown})
     assert not calls

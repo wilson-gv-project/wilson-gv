@@ -38,14 +38,16 @@ def main():
     data_origin = DataOriginInfo(source_type='gaussian',
                                  base_file_loc=f'{SUITE_ROOT}/data_for_tests/g16_formaldehyde_B3LYPcc_pVQZ.out')
     laser_pol = setup.laser_pol     # (1, 1, 1): pulses and detector along x
-    states_choice = 'anharmonic'    # follows the vib analysis regime: GVPT2 -> anharmonic
+    states_choice = 'anharmonic'    # the file's states; for this file the same as wilson's GVPT2
 
     # 2. data, once, outside the evaluator: the evaluator takes a MolSystemData and reads no file.
     #    prop_names(terms): which properties the terms use, so which ones to load.
-    molsys = MolSystemData.load(data_origin, prop_names(terms))
+    #    wilson_regime='GVPT2' would put wilson's own anharmonic states in place of the file's.
+    molsys = MolSystemData.from_output_file(data_origin, prop_names(terms))
 
     # 3. features. lineshape_param per condition: 3 cm-1 plus 0.2 % of the condition's |E|
-    # (energy_difference is signed).
+    # (energy_difference is signed). A gap below 10 cm-1 (evaluate.MIN_GAP) in an energy denominator gives one
+    # warning; formaldehyde has none.
     lineshape_param = lambda vd, freqs: 3. + 0.002 * abs(vd.energy_difference())
 
     t0 = time.perf_counter()
@@ -96,15 +98,6 @@ def main():
         params = ', '.join(f'{p:.2f}' for p in f.lineshape_params_at_peak())
         print(f'  {f.location["A"]:8.1f} {f.location["B"]:8.1f}  {str((ps["a"], ps["b"])):>7}  '  # noqa: RUF010
               f'{str(f.term_ids):<22} {params:<16} {f.get_intensity():14.3e}')  # noqa: RUF010
-
-    print('-----------------------------')
-    for i in inside:
-        for k in i.rows:
-            print(k.location, k.params, k.term_id)
-        print('\n')
-
-    print('-----------------------------')
-
 
     # ---------------------------------------------------
     # 6. another lineshape_param, same rows: replace gives a new FeatureResult with the same table,

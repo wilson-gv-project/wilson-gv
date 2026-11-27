@@ -28,7 +28,7 @@ def test_form_vpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=vpt2_inputs(props),
                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                        regime="VPT2", #vib_ana.regime
                                                                        exclude_modes=None)        
@@ -56,7 +56,7 @@ def test_form_gvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=vpt2_inputs(props),
                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                        regime="GVPT2", #vib_ana.regime
                                                                        exclude_modes=None)        
@@ -88,7 +88,7 @@ def test_form_gvpt2_nocoriolis():
             assert (p.vals == 0).all()
 
     # ---- do analysis - 
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=vpt2_inputs(props),
                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                        regime="GVPT2", #vib_ana.regime
                                                                        exclude_modes=None)        
@@ -116,7 +116,7 @@ def test_form_dvpt2():
     print()
     print([state.energy for state in vib_ana.states if ',' not in state.state_label])
     # ---- do analysis - 
-    states, diagn = ws.system.anharmonic_treatment.anharm_analyzer_data(props=vpt2_inputs(props),
+    states, diagn = ws.system.anharmonic_treatment.compute_vpt2_states(props=vpt2_inputs(props),
                                                                        nc_sqrt_eigval=vib_ana.nc_sqrt_eigval,
                                                                        regime="DVPT2", #vib_ana.regime
                                                                        exclude_modes=None)        

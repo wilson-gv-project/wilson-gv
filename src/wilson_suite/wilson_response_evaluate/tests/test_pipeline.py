@@ -1,6 +1,6 @@
 """
 pipeline.py — compute_features end to end on the toy molecule (helpers.py, conftest.py),
-then MolSystemData.load + compute_features on real data (14 EVV terms + formaldehyde).
+then MolSystemData.from_output_file + compute_features on real data (14 EVV terms + formaldehyde).
 
 The steps have their own tests (build_contributions in test_evaluate.py, features_from_rows in
 test_features.py). Here: the steps are joined right, and FeatureResult keeps the table as its source.
@@ -278,7 +278,7 @@ def toy_pulse_term() -> VibPerturbedTerm:
     return pulse_term(polprop(ops=(0, 1), inds='a'), polprop(inds='abc'))
 
 
-## prop_names: what MolSystemData.load reads ---------------------------------------
+## prop_names: what MolSystemData.from_output_file reads ---------------------------
 
 def test_prop_names_every_property_of_the_terms_each_once():
     """toy_pulse_term: <polgrad>[a], cff[a, b, c]; a second term with dipgrad[a] and cff again"""
@@ -359,7 +359,7 @@ def test_make_polarization_linear_comb_gives_each_call_its_own_copy():
 
 
 ## real data: 14 EVV terms + formaldehyde -------------------------------------
-# MolSystemData.load -> compute_features on the real data file; the settings and the stored rows are
+# MolSystemData.from_output_file -> compute_features on the real data file; the settings and the stored rows are
 # the ones of evv_reference.json (make_evv_reference.py).
 # The 14 terms have 2 motifs: terms 0, 2-7 and terms 1, 8-13. Both fix a and b: 6 modes -> 36 (a, b)
 # pairs per motif. Every pair has its own location, so here one feature = one motif at one (a, b),
@@ -379,7 +379,7 @@ class EvvRun:
 @pytest.fixture(scope='module', params=ref.STATES_CHOICES)
 def evv_formaldehyde(request) -> EvvRun:
     terms, compiled = ref.evv_terms(), ref.compiled_evv_terms()
-    molsys = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
+    molsys = MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(terms))
     polarization = make_polarization_linear_comb(terms, ref.LASER_POL)
 
     stored = next(b for b in json.loads(ref.REFERENCE_FILE.read_text())['results']
@@ -449,7 +449,7 @@ def test_real_data_strongest_feature(evv_formaldehyde):
 @pytest.fixture(scope='module')
 def formaldehyde_molsys() -> MolSystemData:
     """loaded once, used by every run below"""
-    return MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(ref.evv_terms()))
+    return MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(ref.evv_terms()))
 
 
 def evaluate_formaldehyde(molsys, lineshape_param, terms=None, **kwargs) -> FeatureResult:

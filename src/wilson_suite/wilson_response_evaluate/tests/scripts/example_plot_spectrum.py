@@ -66,7 +66,7 @@ def save(fig, path: Path, dpi: int = 210):
 def main(out: Path):
     out.mkdir(parents=True, exist_ok=True)
     terms = ref.evv_terms()
-    formaldehyde = MolSystemData.load(ref.data_origin('formaldehyde'), prop_names(terms))
+    formaldehyde = MolSystemData.from_output_file(ref.data_origin('formaldehyde'), prop_names(terms))
     anharmonic, harmonic = evaluate(terms, formaldehyde, 'anharmonic'), evaluate(terms, formaldehyde, 'harmonic')
 
     # 1. every feature in window_box
