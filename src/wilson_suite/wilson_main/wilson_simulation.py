@@ -62,7 +62,7 @@ class WilsonSimulation:
     integration_resolution: int | float
     integration_style: str = 'auto'
     n_dev_w_int: float | int = 5.0
-
+    integration_skip_rsp_dynrange = 30
 
     def __post_init__(self):
 
@@ -76,10 +76,12 @@ class WilsonSimulation:
         self.int_ranges_coll, self.int_ranges_scan, self.pulse_banks_scan = self.__get_integration_ranges()
 
         # Call evaluator and get/organize return class instances
-        self.rsp_results = self.__get_response_function_elements()
+        self.rsp_results, self.rsp_maxes = self.__get_response_function_elements()
 
         # Evaluate response result and characterize/categorize zero intervals
-        # TODO: For now include everything but consider masking later
+        self.rsp_skip_ranges = self.__find_rsp_skip_ranges()
+
+        print('skip ranges', self.rsp_skip_ranges)
 
         # Integrator run; get main return data and diagnostics
         self.int_results = self.__get_integrated_results()
@@ -207,9 +209,11 @@ class WilsonSimulation:
         from ..wilson_intensities.refac_rsp_eval.grid import Box
 
         # FIXME: Using a trivial lineshape parameter for testing
-        lineshape_param = 5.0
+        lineshape_param = 4.0
 
         rsp_results = {}
+
+        rsp_maxes = {}
 
         # Translate term to axis variables
         for ocmpi in self.int_ranges_coll:
@@ -222,8 +226,6 @@ class WilsonSimulation:
             points_per_axis = {}
 
             acc = 0
-
-            print('ocmpi 1', ocmpi[1])
 
             ax_comb_ref = []
 
@@ -241,8 +243,6 @@ class WilsonSimulation:
 
                 acc += ocmpi[1][ax]
 
-
-            print('my axis translation', axis_translation)
             print('points per axis', points_per_axis)
 
             for t in self.core.terms_by_order_comp_magn[(ocmpi[0], ocmpi[1], ocmpi[2])].terms:
@@ -265,7 +265,140 @@ class WilsonSimulation:
 
             rsp_results[ocmpi] = rsp_result
 
-        return rsp_results
+            rsp_maxes[ocmpi] = np.amax(np.abs(rsp_result.amplitude))
+
+        return rsp_results, rsp_maxes
+
+    def __find_rsp_skip_ranges(self):
+
+        global_max = np.amax(np.array([self.rsp_maxes[i] for i in self.rsp_maxes]))
+        global_thres = global_max/self.integration_skip_rsp_dynrange
+
+
+        skip_ranges = {}
+
+        # TODO: For now hardcoded 1D, 2D, 3D cases, can extend if ever needed
+        for ocmpi in self.rsp_results:
+
+            rsp_abs = np.abs(self.rsp_results[ocmpi].amplitude)
+
+            skip_ranges[ocmpi] = {}
+
+            if len(rsp_abs.shape) == 1:
+
+                skip_ranges[ocmpi][0] = set()
+
+                for i in range(rsp_abs.shape[0]):
+
+                    if rsp_abs[i] > global_thres:
+                        continue
+
+                    skip_ranges[ocmpi][0].add(i)
+
+            elif len(rsp_abs.shape) == 2:
+
+                skip_ranges[ocmpi][0] = set()
+
+                print(rsp_abs.shape)
+
+                for i in range(rsp_abs.shape[0]):
+
+                    skip_candidate = True
+
+                    for j in range(rsp_abs.shape[1]):
+
+                        if rsp_abs[i, j] > global_thres:
+                            skip_candidate = False
+                            break
+
+                    if skip_candidate:
+                        skip_ranges[ocmpi][0].add(i)
+
+
+                skip_ranges[ocmpi][1] = set()
+
+                for i in range(rsp_abs.shape[1]):
+
+                    skip_candidate = True
+
+                    for j in range(rsp_abs.shape[0]):
+
+                        if rsp_abs[j, i] > global_thres:
+                            skip_candidate = False
+                            break
+
+                    if skip_candidate:
+                        skip_ranges[ocmpi][1].add(i)
+
+            elif len(rsp_abs.shape) == 3:
+
+                skip_ranges[ocmpi][0] = set()
+
+                for i in range(rsp_abs.shape[0]):
+
+                    skip_candidate = True
+
+                    for j in range(rsp_abs.shape[1]):
+
+                        for k in range(rsp_abs.shape[2]):
+
+                            if rsp_abs[i, j, k] > global_thres:
+                                skip_candidate = False
+                                break
+
+                        if not skip_candidate:
+                            break
+
+                    if skip_candidate:
+                        skip_ranges[ocmpi][0].add(i)
+
+                skip_ranges[ocmpi][1] = set()
+
+                for i in range(rsp_abs.shape[1]):
+
+                    skip_candidate = True
+
+                    for j in range(rsp_abs.shape[0]):
+
+                        for k in range(rsp_abs.shape[2]):
+
+                            if rsp_abs[j, i, k] > global_thres:
+                                skip_candidate = False
+                                break
+
+                        if not skip_candidate:
+                            break
+
+                    if skip_candidate:
+                        skip_ranges[ocmpi][1].add(i)
+
+                skip_ranges[ocmpi][2] = set()
+
+                for i in range(rsp_abs.shape[2]):
+
+                    skip_candidate = True
+
+                    for j in range(rsp_abs.shape[0]):
+
+                        for k in range(rsp_abs.shape[1]):
+
+                            if rsp_abs[j, k, i] > global_thres:
+                                skip_candidate = False
+                                break
+
+                        if not skip_candidate:
+                            break
+
+                    if skip_candidate:
+                        skip_ranges[ocmpi][2].add(i)
+
+            else:
+
+                raise ValueError('Response data with > 3 dimensions not supported yet')
+
+        return skip_ranges
+
+
 
     def __get_integrated_results(self):
 
@@ -274,6 +407,7 @@ class WilsonSimulation:
                                           self.int_ranges_scan,
                                           self.pulse_banks_scan,
                                           self.rsp_results,
+                                          self.rsp_skip_ranges,
                                           self.integration_resolution,
                                           self.integration_style)
 

@@ -5,6 +5,9 @@ from ..wilson_experiment.experiment_abstractions import SpecDetector
 from math import floor, ceil, inf
 import numpy as np
 import time
+import scipy.integrate as scint
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 
 # FIXME: Consider organizing SumFreqIntegrator and DirectIntegrator under ABC paradigm - may not be that important
 # with only two integrators but could be more relevant with combined forms. CONCLUSION: Consider this later if relevant
@@ -17,11 +20,11 @@ class SumFreqIntegrator:
         pass
 
     def integrate(self, comp_pattern, sumfreq_points,
-                  pulse_ranges_points, rsp_on_grid, pulses_on_grid,
+                  rsp_points, pulse_ranges_points, rsp_on_grid, rsp_skip_ranges, pulses_on_grid,
                   parallel = False):
 
-        def integrate_recurse(r, acc_pts, curr_rank, max_rank, emission_compounding, pulse_ranges_points,
-                              rsp_on_grid, pulses_on_grid):
+        def integrate_recurse(r, acc_pts, rsp_pts, curr_rank, max_rank, emission_compounding, rsp_points, pulse_ranges_points,
+                              rsp_on_grid, rsp_skip_ranges, pulses_on_grid, curr_prod):
             """
             Integration recursion
 
@@ -37,40 +40,42 @@ class SumFreqIntegrator:
 
                 if r >= curr_min and r <= curr_max:
 
-                    new_acc_pts = copy.deepcopy(acc_pts)
-                    new_acc_pts.append(r - curr_min)
+                    last_pt = r - curr_min
 
                     if emission_compounding:
 
-                        res = rsp_on_grid[tuple(new_acc_pts[:-1])]
+                        return rsp_on_grid[tuple(rsp_pts)] * pulses_on_grid[max_rank][last_pt] * curr_prod
 
                     else:
 
-                        res = rsp_on_grid[tuple(new_acc_pts)]
+                        rsp_address = copy.deepcopy(rsp_pts)
+                        rsp_address.append(last_pt + pulse_ranges_points[curr_rank][0] - rsp_points[curr_rank][0])
 
-                    for i in range(max_rank):
-
-                        res *= pulses_on_grid[i][new_acc_pts[i]]
-
-                    return res
+                        return rsp_on_grid[tuple(rsp_address)] * pulses_on_grid[max_rank][last_pt] * curr_prod
 
                 else:
-
                     return 0.0
 
             else:
 
                 res = 0.0
-
                 a_ind = 0
 
                 for p in range(curr_min, curr_max):
 
-                    new_acc_pts = copy.deepcopy(acc_pts)
-                    new_acc_pts.append(a_ind)
+                    new_rsp_pt = a_ind + pulse_ranges_points[curr_rank][0] - rsp_points[curr_rank][0]
 
-                    res += integrate_recurse(r - p, new_acc_pts, curr_rank + 1, max_rank, emission_compounding,
-                                             pulse_ranges_points, rsp_on_grid, pulses_on_grid)
+                    if not new_rsp_pt in rsp_skip_ranges[curr_rank]:
+
+                        new_acc_pts = copy.deepcopy(acc_pts)
+                        new_acc_pts.append(a_ind)
+
+                        new_rsp_pts = copy.deepcopy(rsp_pts)
+                        new_rsp_pts.append(new_rsp_pt)
+
+                        res += integrate_recurse(r - p, new_acc_pts, new_rsp_pts, curr_rank + 1, max_rank, emission_compounding,
+                                                 rsp_points, pulse_ranges_points, rsp_on_grid, rsp_skip_ranges, pulses_on_grid,
+                                                 curr_prod * pulses_on_grid[curr_rank][a_ind])
 
                     a_ind += 1
 
@@ -84,31 +89,38 @@ class SumFreqIntegrator:
             for p in range(sumfreq_points[0], sumfreq_points[1] + 1):
 
                 pts_seed = []
+                rsp_pt_seed = []
 
-                integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, 0,
+                integration_result[p - sumfreq_points[0]] = integrate_recurse(p, pts_seed, rsp_pt_seed, 0,
                                                                               len(pulse_ranges_points) - 1,
                                                                               emission_compounding,
+                                                                              rsp_points,
                                                                               pulse_ranges_points,
-                                                                              rsp_on_grid, pulses_on_grid)
+                                                                              rsp_on_grid, rsp_skip_ranges,
+                                                                              pulses_on_grid, 1.0)
 
             return integration_result
 
         else:
 
             def integrate_part(pts, offset,
-                               emission_compounding, pulse_ranges_points,
-                               rsp_on_grid, pulses_on_grid, mp_queue):
+                               emission_compounding, rsp_points, pulse_ranges_points,
+                               rsp_on_grid, rsp_skip_ranges, pulses_on_grid, mp_queue):
 
                 integration_result = np.zeros(len(pts), dtype=complex)
 
                 for p in range(len(pts)):
 
                     pts_seed = []
-                    integration_result[p] = integrate_recurse(pts[p] + offset, pts_seed, 0,
+                    rsp_pt_seed = []
+
+                    integration_result[p] = integrate_recurse(pts[p] + offset, pts_seed, rsp_pt_seed, 0,
                                                               len(pulse_ranges_points) - 1,
                                                               emission_compounding,
+                                                              rsp_points,
                                                               pulse_ranges_points,
-                                                              rsp_on_grid, pulses_on_grid
+                                                              rsp_on_grid, rsp_skip_ranges,
+                                                              pulses_on_grid, 1.0
                                                               )
 
 
@@ -121,9 +133,24 @@ class SumFreqIntegrator:
             prev_start = 0
             num_units = sumfreq_points[1] - sumfreq_points[0] + 1
             # For now just a test choice
-            pts_per_job = 10
+            pts_per_job = 50
 
             num_cores = mp.cpu_count()
+
+            em_comp_core = []
+            rsp_p_core = []
+            pulse_r_core = []
+            rsp_g_core = []
+            rsp_sr_core = []
+            pulse_g_core = []
+
+            for c in range(num_cores):
+                em_comp_core.append(copy.deepcopy(emission_compounding))
+                rsp_p_core.append(copy.deepcopy(rsp_points))
+                pulse_r_core.append(copy.deepcopy(pulse_ranges_points))
+                rsp_g_core.append(copy.deepcopy(rsp_on_grid))
+                rsp_sr_core.append(copy.deepcopy(rsp_skip_ranges))
+                pulse_g_core.append(copy.deepcopy(pulses_on_grid))
 
             while prev_start < num_units:
 
@@ -134,8 +161,8 @@ class SumFreqIntegrator:
                     (list(range(
                         prev_start + c * pts_per_job,
                         min(prev_start + (c + 1) * pts_per_job, num_units))),
-                         sumfreq_points[0], emission_compounding, pulse_ranges_points,
-                         rsp_on_grid, pulses_on_grid, mp_queue)
+                         sumfreq_points[0], em_comp_core[c], rsp_p_core[c], pulse_r_core[c],
+                         rsp_g_core[c], rsp_sr_core[c], pulse_g_core[c], mp_queue)
                 ) for c in range(num_cores)]
 
                 for proc in processes:
@@ -144,10 +171,14 @@ class SumFreqIntegrator:
                 for proc in processes:
                     proc.join()
 
+                for proc in processes:
+                    proc.close()
+
                 results = [mp_queue.get() for proc in processes]
 
                 for r in results:
                     for elem in range(len(r[0])):
+
                         integration_result[r[0][elem]] = r[1][elem]
 
                 prev_start += pts_per_job * num_cores
@@ -169,6 +200,14 @@ class DirectIntegrator:
 
         return integration_result
 
+def pad_for_ft(w_data, grid_range):
+
+    max_abs_sample_point = max(abs(grid_range[0]), abs(grid_range[1]))
+
+    padded_array = np.zeros(2 * max_abs_sample_point + 1, dtype=complex)
+    padded_array[grid_range[0] + max_abs_sample_point:grid_range[1] + max_abs_sample_point + 1] = w_data
+
+    return padded_array
 
 
 @dataclass
@@ -186,6 +225,7 @@ class SpectralIntegration:
     # Should contain all pulse banks for each scan point (and indexed by same)
     pulse_banks_scan: Sequence
     rsp_results: dict
+    rsp_skip_ranges: dict
     resolution: int | float
     style: str
 
@@ -310,12 +350,14 @@ class SpectralIntegration:
 
             int_results_sum = {}
 
+            pltd_rsp = False
+
             # For each scan point
             for scan_elem in self.int_ranges_scan:
 
                 ctime = time.time()
 
-                print('scan elem', scan_elem)
+                print('Scan element:', scan_elem)
 
                 int_results_sum[scan_elem] = np.zeros((sumfreq_points[1] - sumfreq_points[0] + 1,), dtype=complex)
 
@@ -345,55 +387,131 @@ class SpectralIntegration:
                                 )
                             )
 
+                    rsp_points = []
+
+                    for ax in self.rsp_results[ocmpi].axis_points:
+                        rsp_points.append([round(self.rsp_results[ocmpi].axis_points[ax][0] / self.resolution),
+                                           round(self.rsp_results[ocmpi].axis_points[ax][-1] / self.resolution)])
+
+
                     # Integrate and yield as array
                     int_results[scan_elem][ocmpi] = integrator.integrate(
                         ocmpi[1],
                         sumfreq_points,
+                        rsp_points,
                         pulse_ranges_points,
                         self.rsp_results[ocmpi].amplitude,
+                        self.rsp_skip_ranges[ocmpi],
                         pulses_on_grid,
                         parallel=True
                     )
 
-                print('proc time', time.time() - ctime)
+
+                    if not pltd_rsp:
+
+                        rsp_intn = np.square(np.absolute(self.rsp_results[ocmpi].amplitude))
+
+                        z_max = np.amax(rsp_intn)
+                        spec_fig = plt.figure(figsize=(6, 6))
+                        ax_def = spec_fig.add_subplot(1, 1, 1)
+                        # Logarithmic plot
+
+
+                        palette = ax_def.pcolor(np.arange(rsp_points[1][0]*self.resolution, (rsp_points[1][1] + 1)*self.resolution, self.resolution),
+                                                -1.0*np.arange(rsp_points[0][0] * self.resolution, (rsp_points[0][1] + 1) * self.resolution, self.resolution),
+                                                rsp_intn,
+                                                norm=colors.LogNorm(vmin=z_max / 1000, vmax=z_max),
+                                                cmap='hot_r', shading='nearest')
+                        ax_def.set_aspect('equal')
+                        colorbar = spec_fig.colorbar(palette, ax=ax_def, extend='max')
+                        spec_fig.savefig('rsp_plot.png', dpi=180)
+                        plt.close(spec_fig)
+
+                        pltd_rsp = True
+
+
+
+                    #plt.plot(np.arange(pulse_ranges_points[0][0] * self.resolution, (pulse_ranges_points[0][1] + 1) * self.resolution,
+                    #                   self.resolution),
+                    #         pulses_on_grid[0])
+                    #plt.savefig('p1_' + str(scan_elem) + '.png')
+                    #plt.close()
+                    #plt.plot(np.arange(pulse_ranges_points[1][0] * self.resolution, (pulse_ranges_points[1][1] + 1) * self.resolution,
+                    #                   self.resolution),
+                    #         pulses_on_grid[1])
+                    #plt.savefig('p2_' + str(scan_elem) + '.png')
+                    #plt.close()
+
+                    #plt.plot(np.arange(pulse_ranges_points[2][0] * self.resolution, (pulse_ranges_points[2][1] + 1) * self.resolution,
+                    #                   self.resolution),
+                    #         pulses_on_grid[2])
+                    #plt.savefig('p3_' + str(scan_elem) + '.png')
+                    #plt.close()
+
+
+
+                print('Processed in:', time.time() - ctime)
 
                 # FIXME: Decide which of the detailed data will also be yielded on return
 
                 for ocmpi in int_results[scan_elem]:
                     int_results_sum[scan_elem] += int_results[scan_elem][ocmpi]
 
-            # TODO: Also make summed amplitudes over all scan points for one ocmpi?
-
-            # FIXME: Make intensities here or do that later?
 
             if self.detector.detection_method == 'freq':
 
-                return int_results_sum
+                intensity_results_freq = {}
+
+                for scan_elem in int_results_sum:
+                    intensity_results_freq[scan_elem] = np.square(np.absolute(int_results_sum[scan_elem]))
+
+                return intensity_results_freq
+
+            intensity_results_freq = {}
+
+
+            #for scan_elem in int_results_sum:
+            #    intensity_results_freq[scan_elem] = np.square(np.absolute(int_results_sum[scan_elem]))
+            #
+            #    plt.plot(np.arange(sumfreq_points[0]*self.resolution, (sumfreq_points[1] + 1)*self.resolution, self.resolution ),
+            #        intensity_results_freq[scan_elem])
+            #    plt.savefig('plt_' + str(scan_elem) + '.png')
+            #    plt.close()
+
 
             if self.detector.detection_method in ['time', 'int']:
 
                 int_results_t = {}
+                intensity_results_time = {}
 
                 # FIXME: If also yielding detailed data, set up to yield time data over ocmpi?
 
                 for scan_elem in int_results_sum:
 
                     # TODO: FT to time series
-                    int_results_t[scan_elem] = None
+                    int_results_t[scan_elem] = np.array(np.fft.fft(np.fft.fftshift(pad_for_ft(int_results_sum[scan_elem], sumfreq_points))))
+
+                for scan_elem in int_results_sum:
+                    intensity_results_time[scan_elem] = np.square(np.absolute(int_results_t[scan_elem]))
+                #
+                #    plt.plot(range(len(intensity_results_time[scan_elem])), intensity_results_time[scan_elem])
+                #    plt.savefig('plt_t' + str(scan_elem) + '.png')
+                #    plt.close()
+
+                # print('int res time', intensity_results_time)
 
                 if self.detector.detection_method == 'time':
 
                     return int_results_t
 
-                # FIXME: May need to make intensities here anyway
                 elif self.detector.detection_method == 'int':
 
-                    int_results_t_int = {}
+                    int_results_time_integrated = {}
 
                     for scan_elem in int_results_t:
 
-                        # TODO: Integrate over time to scalar
-                        int_results_t_int[scan_elem] = None
+                        # TODO: Use appropriate dt
+                        int_results_time_integrated[scan_elem] = scint.trapezoid(intensity_results_time[scan_elem])
 
-                    return int_results_t_int
+                    return int_results_time_integrated
 

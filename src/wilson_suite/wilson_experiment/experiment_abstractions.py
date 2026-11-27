@@ -412,7 +412,7 @@ class EmPulse:
         dev_per_cm =  self.dev / per_cm_x_fs
 
         return ((self.maxstr * dev_per_cm) *
-                np.exp(-( dev_per_cm ** 2 * (w - self.cf) /2.0)) *
+                np.exp(-( dev_per_cm ** 2 * (w - self.cf)**2.0 /2.0)) *
                 (np.exp(1.0j * self.tc * w)))
 
 
