@@ -45,8 +45,8 @@ def plot_spectrum(intensity: np.ndarray, grid: dict[str, np.ndarray], *,
                    shape: 1D the points themselves; 2D e.g. np.meshgrid(a_points, b_points, indexing='ij'),
                    EvalRspResult.mesh or the old spec_eval_setup.grid
     dynrange       the plot's dynamic range, top / lowest intensity shown, e.g. 500. For a spectrum from
-                   spectrum_on_grid, use the box rule's dynrange: with a larger one the plot shows where the boxes
-                   cut the tails.
+                   spectrum_on_grid with a box_rule, use the rule's dynrange: with a larger one the plot shows
+                   where the boxes cut the tails.
     reference_max  au; None: each plot on its own scale. A number: intensity / reference_max, so several spectra
                    share one scale; above the reference: 1D above 1, 2D over_color.
     ax             plot into this axes; None: a new figure
@@ -138,15 +138,17 @@ def plot_feature_boxes(ax: 'Axes', spec: 'EvalRspResult', *,
         full_features (peak inside the window)   solid lines, full_color
         contrib_features (peak outside)          dashed lines, contrib_color
     peaks: also mark each peak, 2D with a cross, 1D with a tick at the bottom.
-    A flat feature's box is the whole window, so it gets no outline. The axes limits stay as they
-    are: of a box larger than the plot, only the part inside shows.
+    A flat feature's box is the whole window, so it gets no outline. An infinite box (spectrum_on_grid
+    without a box_rule) has no edges to draw: its feature gets no outline and no peak mark. The axes
+    limits stay as they are: of a box larger than the plot, only the part inside shows.
     """
     names = list(spec.axis_points)
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     window = spec.spectral_window
     for features, color, style in ((window.full_features, full_color, '-'),
                                    (window.contrib_features, contrib_color, '--')):
-        boxed = [f for f in features if not f.is_flat and f.feat_box is not None]
+        boxed = [f for f in features if not f.is_flat and f.feat_box is not None
+                 and np.all(np.isfinite(list(f.feat_box.bounds.values())))]
         if not boxed:
             continue
         x = names[0]

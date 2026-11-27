@@ -64,21 +64,21 @@ def main():
     # 4. the spectrum around the strongest peak (A = 2682.8, B = 0): A in 1 cm-1 steps, B over the whole
     #    range of the features in 16.65 cm-1 steps (201 points from -230 to 3100)
     window_box = Box({'A': (600., 2800.), 'B': (5., 3100.)})
-    n_points_per_axis = {'A': 501, 'B': 201}
+    axis_points = window_box.grid_points({'A': 501, 'B': 201})
 
     # The box rule, with its knobs given by partial. dynrange is the plot's dynamic range (max / floor).
     rule = partial(amplitude_half_widths, dynrange=1001.)
 
     t0 = time.perf_counter()
-    spec = spectrum_on_grid(result, window_box=window_box, n_points_per_axis=n_points_per_axis, box_rule=rule)
+    spec = spectrum_on_grid(result, axis_points, box_rule=rule)
     t_on_grid = time.perf_counter() - t0
 
     # 5. what came out
-    axis_points = spec.axis_points                # the points along each axis, cm-1
+    points = spec.axis_points                     # the points along each axis, cm-1
     mesh = spec.mesh                              # every grid point, mesh['A'][i, j]: what a renderer reads
     intensity = np.abs(spec.amplitude) ** 2       # amplitude: complex, in au, [i_A, i_B]
     print(f'\ngrid {intensity.shape}: ' + ', '.join(
-        f'{ax} {pts[0]:.0f} .. {pts[-1]:.0f} cm-1, step {pts[1] - pts[0]:.2f}' for ax, pts in axis_points.items()))
+        f'{ax} {pts[0]:.0f} .. {pts[-1]:.0f} cm-1, step {pts[1] - pts[0]:.2f}' for ax, pts in points.items()))
 
     i, j = np.unravel_index(np.argmax(intensity), intensity.shape)
     print(f'brightest grid point: A = {mesh["A"][i, j]:.1f}, B = {mesh["B"][i, j]:.1f} cm-1, '
@@ -103,8 +103,7 @@ def main():
     # 6. another lineshape_param, same rows: replace gives a new FeatureResult with the same table,
     # spectrum_on_grid uses it
     t0 = time.perf_counter()
-    wider = spectrum_on_grid(replace(result, lineshape_param=8.), window_box=window_box,
-                             n_points_per_axis=n_points_per_axis, box_rule=rule)
+    wider = spectrum_on_grid(replace(result, lineshape_param=8.), axis_points, box_rule=rule)
     t_again = time.perf_counter() - t0
 
     print(f'\n8 cm-1 everywhere: brightest intensity {np.max(np.abs(wider.amplitude) ** 2):.3e} au; '

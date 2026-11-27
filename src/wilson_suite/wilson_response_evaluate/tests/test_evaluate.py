@@ -973,14 +973,38 @@ def test_eval_feature_on_grid_flat_feature_is_its_coefficient_on_every_point(gri
 # Peaks with a=0, b=1 (PS_01): MOTIF_AB at A = 1000, B = 1400.  With a=1, b=0 (PS_10): MOTIF_A at A = 1500,
 # a ridge along B.
 
-def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(states):
+@pytest.mark.parametrize('motif', [MOTIF_AB, MOTIF_MIXED, MOTIF_AB_EXTRA, MOTIF_A],
+                         ids=['A, B', 'B, A-B', 'A, B, A+B', 'A only'])
+def test_all_features_on_grid_index_i_j_is_the_point_A_i_B_j(motif, states):
     """ij indexing: value[i, j] belongs to A = axis_points['A'][i], B = axis_points['B'][j]; A has 5 points, B has 3."""
-    f = feature_at_solved_location(MOTIF_AB, PS_01, states)
+    f = feature_at_solved_location(motif, PS_01, states)
     axis_points = {'A': 1000. + np.array([-10., -5., 0., 5., 10.]), 'B': 1400. + np.array([-5., 0., 5.])}
 
     value = all_features_on_grid([f], states, axis_points)
 
     assert value.shape == (5, 3)
+    for i, a in enumerate(axis_points['A']):
+        for j, b in enumerate(axis_points['B']):
+            assert value[i, j] == pytest.approx(eval_feature_on_grid(f, states, {'A': a, 'B': b}))  # type: ignore
+
+
+def test_all_features_on_grid_lineshape_param_function_gets_a_column_and_a_row(states):
+    """
+    freqs['A'] is a column of 3 values, freqs['B'] a row of 2. The gamma 0.002 * A + 0.001 * B cm-1 is the one of
+    each point's own A and B.
+    """
+    shapes = set()
+
+    def lineshape_param(vd, freqs):
+        shapes.add((np.shape(freqs['A']), np.shape(freqs['B'])))
+        return 0.002 * freqs['A'] + 0.001 * freqs['B']
+
+    f = feature_at_solved_location(MOTIF_AB, PS_01, states, lineshape_param=lineshape_param)
+    axis_points = {'A': np.array([990., 1000., 1005.]), 'B': np.array([1400., 1410.])}
+
+    value = all_features_on_grid([f], states, axis_points)
+
+    assert shapes == {((3, 1), (1, 2))}
     for i, a in enumerate(axis_points['A']):
         for j, b in enumerate(axis_points['B']):
             assert value[i, j] == pytest.approx(eval_feature_on_grid(f, states, {'A': a, 'B': b}))  # type: ignore

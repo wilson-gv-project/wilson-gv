@@ -133,6 +133,16 @@ def test_make_mesh_shapes_and_ij_indexing():
     np.testing.assert_array_equal(mesh['B'][0, :], axis_points['B'])
 
 
+def test_make_mesh_sparse_is_the_full_mesh_without_the_repeats():
+    axis_points = {'A': np.array([0., 5., 10.]), 'B': np.array([-1., 1.])}
+
+    sparse, full = make_mesh(axis_points, sparse=True), make_mesh(axis_points)
+
+    np.testing.assert_array_equal(sparse['A'], [[0.], [5.], [10.]])
+    np.testing.assert_array_equal(sparse['B'], [[-1., 1.]])
+    np.testing.assert_array_equal(sparse['A'] + sparse['B'], full['A'] + full['B'])
+
+
 ## box_slices (1 to 4 axes) -------------------------------------------------
 # Grid points 0, 1, ..., 9 on every axis, unless a test says otherwise.
 
