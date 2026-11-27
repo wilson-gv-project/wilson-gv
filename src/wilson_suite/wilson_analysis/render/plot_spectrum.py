@@ -7,10 +7,8 @@
 Both show intensity / top, from 1 / dynrange to 1 on a log scale; top: the largest intensity, or reference_max
 (spectra on one shared scale).
     1D  a line; y axis log
-    2D  filled contours, the key steps of MatplotlibRenderer without its setup objects (RenderingInfo,
-        EvaluationInfo, PlotConfig): nlevels log-spaced levels; magma; below the lowest level: the axes'
-        background; above the top level: over_color; colorbar ticks as fractions of the top, 2 significant
-        digits
+    2D  filled contours: nlevels log-spaced levels; magma; below the lowest level: the axes' background;
+        above the top level: over_color; colorbar ticks as fractions of the top, 2 significant digits
 """
 from typing import TYPE_CHECKING
 

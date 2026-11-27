@@ -12,4 +12,3 @@ dependencies:
   - jupyter
   - ipykernel
   - pip
-  - rich
