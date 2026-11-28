@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use Wilson-GV, please cite it as below."
+authors:
+  - family-names: Ringholm
+    given-names: Magnus 
+    orcid: https://orcid.org/0000-0002-3208-3627
+  - family-names: Le
+    given-names: Vanda 
+    orcid: https://orcid.org/
+title: "Wilson-GV: smth"
+version: 0.1.0
+identifiers:
+  - type: doi
+    value: 10.4321/zenodo.1234
+date-released: 2026-12-25
